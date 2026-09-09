@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -28,6 +29,15 @@ func validateConfigured(vnode *VirtualNode) (string, error) {
 	}
 	if vnode.Name == "" {
 		return "", fmt.Errorf("configured vnode name is required")
+	}
+	if vnode.StaleAfter != nil {
+		duration := vnode.StaleAfter.Duration()
+		if duration < 0 || duration%time.Second != 0 || duration/time.Second > time.Duration(^uint32(0)) {
+			return "", fmt.Errorf(
+				"stale_after must be a nonnegative whole number of seconds no greater than %d",
+				^uint32(0),
+			)
+		}
 	}
 	if err := dyncfg.JobNameRuleAllowDots(vnode.Name); err != nil {
 		return "", fmt.Errorf("invalid configured vnode name %q: %w", vnode.Name, err)

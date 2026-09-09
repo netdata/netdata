@@ -97,7 +97,9 @@ func TestProcessCoreRestartFencesInitialTargetAfterCanceledConstruction(t *testi
 						close(entered)
 						<-release
 					}
-					return &runTestHandler{cleanup: func() {}}
+					return &runTestHandler{
+						cleanup: func() {},
+					}
 				},
 			},
 		},
@@ -208,7 +210,9 @@ func TestProcessCorePublishesKnownRestartFailureBeforeFinalization(t *testing.T)
 				close(failureKnown)
 				panic("successor construction failed")
 			}
-			return processSignalingDiscovery{started: started}, true, nil
+			return processSignalingDiscovery{
+				started: started,
+			}, true, nil
 		},
 	)
 	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
@@ -221,7 +225,9 @@ func TestProcessCorePublishesKnownRestartFailureBeforeFinalization(t *testing.T)
 		Jobs:            testRunJobServices(t),
 		Discovery: runDiscoveryServices{
 			BuildContext: agentdiscovery.BuildContext{
-				Registry: confgroup.Registry{"test": {}},
+				Registry: confgroup.Registry{
+					"test": {},
+				},
 			},
 			Providers: catalog,
 		},
@@ -379,8 +385,10 @@ func TestProcessCoreRotationRejectsUnownedStoreEpoch(t *testing.T) {
 		},
 	}
 	current := &runGeneration{
-		run:         run,
-		secretEpoch: &processSecretEpoch{generation: 1},
+		run: run,
+		secretEpoch: &processSecretEpoch{
+			generation: 1,
+		},
 	}
 
 	err = process.retireForSuccessor(t.Context(), current, 1, 2)
@@ -1223,3 +1231,94 @@ func (pc processControls) sendRestart(control processControl) {
 func (pc processControls) sendTerminate(control processControl) {
 	pc.terminate <- control
 }
+
+func TestProcessCorePublishesConfiguredMetadataForGeneratedJob(t *testing.T) {
+	const guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	reader, writer := io.Pipe()
+	defer writer.Close()
+	output := newProcessSynchronizedBuffer()
+	jobs := testRunJobServices(t)
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
+	jobs.InitialVnodes = map[string]*vnodes.VirtualNode{
+		"router": {
+			Name:       "router",
+			Hostname:   "configured",
+			GUID:       guid,
+			Source:     "file=test",
+			SourceType: confgroup.TypeUser,
+			Labels:     map[string]string{"site": "athens"},
+		},
+	}
+	config := confgroup.Config{
+		"module":       "module",
+		"name":         "job",
+		"update_every": 1,
+	}
+	config.SetProvider(confgroup.TypeUser)
+	config.SetSourceType(confgroup.TypeUser)
+	config.SetSource("test")
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t, config),
+		Diagnostics:     testProcessDiagnostics(),
+		Modules: collectorapi.Registry{
+			"module": {
+				Create: func() collectorapi.CollectorV1 {
+					return &processGeneratedCollector{
+						MockCollectorV1: collectorapi.MockCollectorV1{
+							ChartsFunc: func() *collectorapi.Charts {
+								return &collectorapi.Charts{
+									&collectorapi.Chart{
+										ID:    "chart",
+										Title: "test",
+										Units: "test",
+										Dims:  collectorapi.Dims{{ID: "value"}},
+									},
+								}
+							},
+							CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"value": 1} },
+						}, vnode: vnodes.VirtualNode{
+							GUID:     guid,
+							Hostname: "generated",
+							Labels:   map[string]string{"vendor": "generated"},
+						},
+					}
+				}, Config: func() any { return &collectorapi.MockConfiguration{} }, JobConfigSchema: collectorapi.MockConfigSchema,
+			},
+		},
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() { done <- process.run(context.Background(), controls) }()
+	defer func() { controls.sendTerminate(testProcessControl()); require.NoError(t, <-done) }()
+	output.waitContains(t, "HOST_LABEL 'site' 'athens'")
+	require.NotContains(t, output.String(), "HOST_LABEL 'vendor' 'generated'")
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD vnode-update 30 \"config go.d:vnode:router update\" 0xFFFF \"user=test\" application/json\n"+
+			`{"guid":"`+guid+`","hostname":"configured","labels":{"site":"london"}}`+"\nFUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN vnode-update 202 application/json")
+	output.waitContains(t, "HOST_LABEL 'site' 'london'")
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION vnode-remove 30 \"config go.d:vnode:router remove\" 0xFFFF \"user=test\"\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN vnode-remove 200 application/json")
+	output.waitContains(t, "HOST_LABEL 'vendor' 'generated'")
+}
+
+type processGeneratedCollector struct {
+	collectorapi.MockCollectorV1
+	vnode vnodes.VirtualNode
+}
+
+func (c *processGeneratedCollector) VirtualNode() *vnodes.VirtualNode { return &c.vnode }
