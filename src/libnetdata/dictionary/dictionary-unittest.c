@@ -1063,16 +1063,25 @@ struct dict_gc_cursor_test {
 static void dict_gc_cursor_delete_callback(const DICTIONARY_ITEM *item, void *value __maybe_unused, void *data) {
     struct dict_gc_cursor_test *t = data;
 
-    // The contract this test pins: by the time any delete callback runs, every victim of this
-    // collection is already off the items list. Before the fix the walk freed each victim in turn, so
-    // A's callback ran with B still linked, and this counter is what makes that visible without a
-    // sanitizer. It matters because the freed-successor read is otherwise unreliable as a signal in a
-    // plain build: ARAL usually leaves the slot readable, so the stale refcount still reads
-    // REFCOUNT_DELETED and the walk can finish quietly with every other assertion below satisfied.
-    // Measured on the unfixed collector, 10 plain-build runs: 10 failed - 8 reported this counter, 2
-    // aborted first inside the corrupted traversal. The fixed collector passed 10 of 10.
-    if(t->dict->items.list)
-        t->undetached++;
+    // The contract this test pins: when a delete callback runs, no victim of this collection is still
+    // on the items list. Before the fix the walk freed each victim in turn, so A's callback ran with B
+    // still linked, and this counter is what makes that visible without a sanitizer. It matters because
+    // the freed-successor read is otherwise unreliable as a signal in a plain build: ARAL usually leaves
+    // the slot readable, so the stale refcount still reads REFCOUNT_DELETED and the walk can finish
+    // quietly with every other assertion below satisfied. Measured on the unfixed collector, 12
+    // plain-build runs: 12 failed - 8 reported this counter, 4 crashed first inside the corrupted
+    // traversal. The fixed collector passed 10 of 10 plain and 3 of 3 under ASAN.
+    //
+    // Look for an uncollected victim specifically - deleted, unreferenced, still linked - not merely a
+    // non-empty list: live items legitimately stay on the list throughout delivery, and C below is one.
+    // This predicate is right for THIS test, not a general one: the victims here are master items, and
+    // a view orphan can carry the deleted flag only on its shared part.
+    for(DICTIONARY_ITEM *i = t->dict->items.list; i ; i = i->next) {
+        if((i->flags & ITEM_FLAG_DELETED) && i->refcount == 0) {
+            t->undetached++;
+            break;
+        }
+    }
 
     const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     if(name && *name && t->order_len < sizeof(t->order) - 1)
@@ -1099,9 +1108,12 @@ static size_t dictionary_gc_cursor_unittest(void) {
     t.dict = dict;
     dictionary_register_delete_callback(dict, dict_gc_cursor_delete_callback, &t);
 
-    // two adjacent items, in list order A then B
+    // two adjacent items, in list order A then B, plus a live item C that is never deleted.
+    // C is what keeps the check above honest: it stays linked for the whole collection, so a check that
+    // merely asked "is the items list empty?" would report a false victim on the fixed collector.
     DICTIONARY_ITEM *a = dictionary_set_and_acquire_item(dict, "A", "VA", 3);
     DICTIONARY_ITEM *b = dictionary_set_and_acquire_item(dict, "B", "VB", 3);
+    dictionary_set(dict, "C", "VC", 3);
 
     // delete both while referenced: they are only flagged, not freed
     dictionary_del(dict, "A");
@@ -1138,8 +1150,8 @@ static size_t dictionary_gc_cursor_unittest(void) {
         errors++;
     }
 
-    // everything must be gone, and nothing may be left pending
-    errors += unittest_check_dictionary("gc cursor", dict, 0, 0, 0, 0, 0);
+    // both victims must be gone and nothing left pending; the live item C must be untouched
+    errors += unittest_check_dictionary("gc cursor", dict, 1, 1, 0, 0, 0);
 
     dictionary_destroy(dict);
 
