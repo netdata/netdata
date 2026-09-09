@@ -12,13 +12,13 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	nodes := Load("testdata")
+	nodes := Load("testdata", false)
 	assert.NotNil(t, nodes)
 	require.Contains(t, nodes, "first")
 	require.Contains(t, nodes, "second")
 	assert.Equal(t, "first", nodes["first"].Name)
 	assert.Equal(t, "second", nodes["second"].Name)
-	assert.NotNil(t, Load("not_exist"))
+	assert.NotNil(t, Load("not_exist", false))
 }
 
 func TestIsStockConfig(t *testing.T) {
@@ -36,7 +36,7 @@ func TestLoad_IgnoresCustomNameInFileAndUsesHostnameIdentity(t *testing.T) {
 `
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o644))
 
-	nodes := Load(dir)
+	nodes := Load(dir, true)
 	require.Len(t, nodes, 1)
 	require.Contains(t, nodes, "host-a")
 	assert.Equal(t, "host-a", nodes["host-a"].Name)
@@ -64,7 +64,7 @@ func TestLoad_SkipsInvalidConfiguredVnodesIndividually(t *testing.T) {
 `
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o644))
 
-	nodes := Load(dir)
+	nodes := Load(dir, true)
 
 	require.Len(t, nodes, 2)
 	require.Contains(t, nodes, "first")
@@ -83,7 +83,7 @@ func TestLoad_SkipsVNodeWhoseSourceCannotBePublished(t *testing.T) {
 `
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o644))
 
-	require.Empty(t, Load(dir))
+	require.Empty(t, Load(dir, true))
 }
 
 func TestValidateConfiguredRejectsLabelNormalization(t *testing.T) {
@@ -154,7 +154,7 @@ func TestLoadSNMPKeepsStableNameAndAuthoredHostname(t *testing.T) {
     credentials:
       community: fixture-secret
 `), 0600))
-	loaded := Load(dir)
+	loaded := Load(dir, true)
 	require.Len(t, loaded, 1)
 	require.Contains(t, loaded, "router")
 	require.Empty(t, loaded["router"].Hostname)

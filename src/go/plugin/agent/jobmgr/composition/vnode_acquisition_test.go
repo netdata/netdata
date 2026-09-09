@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
 )
@@ -111,6 +112,7 @@ func TestRunOwnsIndependentAcquisitionAndModeAwareUpdates(t *testing.T) {
 		t.Fatal("credential rotation did not cancel old acquisition")
 	}
 	rotated := nextAcquisition(t, acquirer)
+	require.Equal(t, dyncfg.StatusAccepted, generation.vnodes.configStatus("router"), "new credentials are pending even while last-good identity remains usable")
 	require.Equal(t, "rotated", rotated.config.Credentials.Community)
 	kept, _ := generation.vnodeConfig.Lookup("router")
 	require.Equal(t, "good", kept.Vnode.Labels["serial"])

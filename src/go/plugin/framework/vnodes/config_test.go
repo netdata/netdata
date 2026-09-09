@@ -93,3 +93,21 @@ func TestSNMPNameRequired(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal([]byte("mode: snmp\nmode_snmp:\n  address: router\n  credentials:\n    community: secret\n"), &c))
 	require.ErrorContains(t, c.Validate(), "name is required")
 }
+
+func TestResolveUsesEffectiveHostnameForFallbackAndLabel(t *testing.T) {
+	var c Config
+	require.NoError(t, json.Unmarshal([]byte(`{"name":"stable-name","mode":"snmp","mode_snmp":{"address":"device","credentials":{"community":"fixture"}}}`), &c))
+	c.SourceType = "user"
+	require.NoError(t, c.Validate())
+	t.Run("fallback", func(t *testing.T) {
+		fallback := c.Resolve(&Metadata{Hostname: "   ", Labels: map[string]string{"description": "usable"}})
+		require.Equal(t, "stable-name", fallback.Hostname)
+		require.NoError(t, ValidateConfigured(fallback))
+	})
+	t.Run("override", func(t *testing.T) {
+		c.Hostname = "override"
+		effective := c.Resolve(&Metadata{Hostname: "device-name"})
+		require.Equal(t, "override", effective.Hostname)
+		require.Equal(t, "override", effective.Labels["_hostname"])
+	})
+}

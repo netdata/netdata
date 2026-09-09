@@ -108,3 +108,25 @@ func TestCancellationClosesBlockedUDPRead(t *testing.T) {
 		t.Fatal("cancellation did not interrupt network read")
 	}
 }
+
+func TestAcquireWhitespaceSystemName(t *testing.T) {
+	for _, description := range []string{"", "usable description"} {
+		t.Run(description, func(t *testing.T) {
+			c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
+				result := &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: "." + snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("   ")}}}
+				if description != "" {
+					result.Variables = append(result.Variables, gosnmp.SnmpPDU{Name: "." + snmputils.OidSysDescr, Type: gosnmp.OctetString, Value: []byte(description)})
+				}
+				return result
+			})
+			m, err := (SNMP{}).Acquire(context.Background(), c)
+			if description == "" {
+				require.Error(t, err)
+				require.Nil(t, m)
+			} else {
+				require.NoError(t, err)
+				require.Empty(t, m.Hostname)
+			}
+		})
+	}
+}

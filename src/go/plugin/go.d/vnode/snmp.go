@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -66,7 +67,8 @@ func acquire(client snmputils.ScalarClient, address string) (*vnodes.Metadata, e
 	if err != nil {
 		return nil, errors.New("SNMP system identity acquisition failed")
 	}
-	if !(si.Probe.SeenSysObjectID && si.SysObjectID != "" || si.Probe.SeenSysName && si.Name != "" || si.Probe.SeenSysDescr && si.Descr != "") {
+	si.Name = strings.TrimSpace(si.Name)
+	if !(si.Probe.SeenSysObjectID && si.SysObjectID != "" || si.Probe.SeenSysName && si.Name != "" || si.Probe.SeenSysDescr && strings.TrimSpace(si.Descr) != "") {
 		return nil, errors.New("SNMP response contains no usable system identity")
 	}
 	if !si.Probe.SeenSysName {

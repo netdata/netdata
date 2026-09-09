@@ -28,8 +28,8 @@ var log = logger.New().With(
 	slog.String("component", "vnodes"),
 )
 
-func Load(dir string) map[string]*Config {
-	return readConfDir(dir)
+func Load(dir string, snmpSupported bool) map[string]*Config {
+	return readConfDir(dir, snmpSupported)
 }
 
 type VirtualNode struct {
@@ -96,7 +96,7 @@ func (v *VirtualNode) HostLabels() map[string]string {
 	return labels
 }
 
-func readConfDir(dir string) map[string]*Config {
+func readConfDir(dir string, snmpSupported bool) map[string]*Config {
 	vnodes := make(map[string]*Config)
 	guids := make(map[string]string)
 	hostnames := make(map[string]string)
@@ -146,6 +146,10 @@ func readConfDir(dir string) map[string]*Config {
 		}
 
 		for _, v := range cfg {
+			if v.IsSNMP() && !snmpSupported {
+				log.Debugf("skipping virtual node %q: SNMP acquisition is unavailable in this plugin", v.Name)
+				continue
+			}
 
 			if !v.IsSNMP() && v.Name != "" && v.Name != v.Hostname {
 				log.Warningf(

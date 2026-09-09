@@ -179,7 +179,7 @@ func (a *Agent) setupVnodeRegistry() map[string]*vnodes.Config {
 		return nil
 	}
 
-	reg := vnodes.Load(dirPath)
+	reg := vnodes.Load(dirPath, a.SNMPVnodeAcquirer != nil)
 	a.Infof("found '%s' (%d vhosts)", dirPath, len(reg))
 
 	return reg

@@ -486,7 +486,7 @@ func (vb *vnodeBinding) configCreateCleanup(vnode *vnodes.Config) lifecycle.Task
 }
 func (vb *vnodeBinding) configStatus(name string) dyncfg.Status {
 	entry, ok := vb.config.Authored(name)
-	if !ok || entry.Snapshot.Vnode == nil && !entry.Failed {
+	if !ok || entry.Pending || entry.Snapshot.Vnode == nil && !entry.Failed {
 		return dyncfg.StatusAccepted
 	}
 	if entry.Failed {

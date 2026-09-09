@@ -127,7 +127,7 @@ func TestProductionProcessAcceptsIndividuallyValidatedVNodeLoad(t *testing.T) {
   guid: 22222222-2222-2222-2222-222222222222
 `), 0o644))
 
-	initial := vnodes.Load(dir)
+	initial := vnodes.Load(dir, false)
 	require.Len(t, initial, 1)
 	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
 	config.InitialVnodes = initial

@@ -141,33 +141,27 @@ func (c *Config) Resolve(m *Metadata) *VirtualNode {
 	}
 	v := c.VirtualNode.Copy()
 	v.GUID = c.IdentityGUID()
+
 	if c.IsSNMP() {
 		if v.Hostname == "" {
-			v.Hostname = m.Hostname
+			v.Hostname = strings.TrimSpace(m.Hostname)
 		}
 		if v.Hostname == "" {
 			v.Hostname = c.Name
 		}
-		// Acquired fields use normal host emission normalization; authored overrides
-		// have already passed strict validation and remain exact.
-		acquiredHost := m.Hostname
-		if acquiredHost == "" {
-			acquiredHost = c.Name
-		}
-		acquiredLabels := m.Labels
-		if prepared, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{GUID: v.GUID, Hostname: acquiredHost, Labels: m.Labels}); err == nil {
-			acquiredHost = prepared.Hostname
-			acquiredLabels = prepared.Labels
-		}
-		if c.Hostname == "" {
-			v.Hostname = acquiredHost
-		}
-		v.Labels = maps.Clone(acquiredLabels)
+		v.Labels = maps.Clone(m.Labels)
 		if v.Labels == nil {
 			v.Labels = make(map[string]string)
 		}
 		maps.Copy(v.Labels, c.Labels)
+		// Normalize acquired fields with the effective hostname. Authored overrides
+		// already passed strict validation, so preparation preserves their spelling.
+		if prepared, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{GUID: v.GUID, Hostname: v.Hostname, Labels: v.Labels}); err == nil {
+			v.Hostname = prepared.Hostname
+			v.Labels = prepared.Labels
+		}
 	}
+
 	return v
 }
 

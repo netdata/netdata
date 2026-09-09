@@ -32,6 +32,7 @@ type vnodeRecord struct {
 	token    *AcquisitionToken
 	snapshot jobruntime.VnodeSnapshot
 	failed   bool
+	pending  bool
 }
 
 // VNodeConfiguration separates authored secrets, acquired metadata and public snapshots.
@@ -49,6 +50,7 @@ type ConfiguredVNode struct {
 	Config   *vnodes.Config
 	Snapshot jobruntime.VnodeSnapshot
 	Failed   bool
+	Pending  bool
 }
 type preparedVNodeState struct {
 	mu         sync.Mutex
@@ -105,10 +107,12 @@ func (vc *VNodeConfiguration) PrepareUpsert(id string, expected uint64, config *
 		next.metadata = current.metadata
 		next.token = current.token
 		next.failed = current.failed
+		next.pending = current.pending
 	}
 	if next.config.IsSNMP() && (current == nil || !current.config.SameAcquisition(next.config)) {
 		next.token = &AcquisitionToken{name: id}
 		next.failed = false
+		next.pending = true
 	}
 	return vc.prepareLocked(id, current, next, false)
 }
@@ -127,6 +131,7 @@ func (vc *VNodeConfiguration) PrepareMetadata(token *AcquisitionToken, metadata 
 	}
 	next := *current
 	next.failed = failed
+	next.pending = false
 	if metadata != nil && (!failed || current.metadata == nil) {
 		next.metadata = metadata.Copy()
 	}
@@ -294,7 +299,7 @@ func (vc *VNodeConfiguration) Authored(id string) (ConfiguredVNode, bool) {
 	return configuredVNode(id, r), true
 }
 func configuredVNode(id string, r *vnodeRecord) ConfiguredVNode {
-	return ConfiguredVNode{ID: id, Config: r.config.Copy(), Snapshot: r.snapshot.Copy(), Failed: r.failed}
+	return ConfiguredVNode{ID: id, Config: r.config.Copy(), Snapshot: r.snapshot.Copy(), Failed: r.failed, Pending: r.pending}
 }
 func (vc *VNodeConfiguration) Acquisition(id string) (*AcquisitionToken, vnodes.SNMPConfig) {
 	vc.mu.Lock()
