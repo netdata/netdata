@@ -200,6 +200,11 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
     // after the traversal is over, where there is no cursor left to invalidate. A callback that
     // re-enters the garbage collector then walks a list these victims are no longer part of, so it
     // can neither see nor free them again.
+    //
+    // That re-entry is safe on a MASTER, whose items lock is recursive. On a view it is not: delivery
+    // below still runs under the view's index write lock, a plain rw_spinlock, so a callback that
+    // re-enters the view through anything taking that lock would deadlock on it. That is a pre-existing limitation of running
+    // callbacks under the locks at all, which this ordering fix does not change.
     DICTIONARY_ITEM *detached = NULL, *detached_last = NULL;
 
     size_t deleted = 0, pending = 0, examined = 0;
@@ -233,12 +238,15 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
                 // so once the counter reaches zero there is nothing left to find: stop, instead of
                 // scanning the remaining live items on every insert and delete.
                 //
-                // On a view we must keep going: item_check_and_acquire_advanced() above also
-                // discovers items deleted on the MASTER, and those are not in this counter, so a
-                // zero here would leave orphaned view items behind.
+                // On a view we must keep going. A view item orphaned by a MASTER deletion is
+                // discovered - and only then counted - by item_check_and_acquire_advanced() above,
+                // as this walk reaches it. So a zero counter on a view says nothing about the items
+                // the walk has not visited yet, and stopping here would strand them.
                 //
-                // Either way an item another thread pends after this point is picked up by the
-                // next collection - the entry check at the top of this function tests the counter.
+                // An item another thread pends after this point is left to the next collection - the
+                // entry check at the top of this function tests the counter. Nothing schedules that
+                // collection, so on a dictionary that then goes idle the victim waits for the next
+                // insert, delete or explicit collect; that is pre-existing behaviour, not a guarantee.
                 if(!is_view && !remaining)
                     break;
             }
@@ -270,6 +278,7 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
     (void)deleted;
     (void)examined;
+    (void)pending;
 
     dictionary_internal_error(false, dict, "DICTIONARY: garbage collected dictionary, "
                           "examined %zu items, deleted %zu items, still pending %zu items",

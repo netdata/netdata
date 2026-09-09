@@ -1055,12 +1055,24 @@ struct dict_gc_cursor_test {
     DICTIONARY *dict;
     size_t deletes;                 // how many delete callbacks fired
     size_t reentered;               // how many times we recursed into the GC
+    size_t undetached;              // callbacks that ran while a victim was still on the items list
     char order[8];                  // the order the callbacks fired in
     size_t order_len;
 };
 
 static void dict_gc_cursor_delete_callback(const DICTIONARY_ITEM *item, void *value __maybe_unused, void *data) {
     struct dict_gc_cursor_test *t = data;
+
+    // The contract this test pins: by the time any delete callback runs, every victim of this
+    // collection is already off the items list. Before the fix the walk freed each victim in turn, so
+    // A's callback ran with B still linked, and this counter is what makes that visible without a
+    // sanitizer. It matters because the freed-successor read is otherwise unreliable as a signal in a
+    // plain build: ARAL usually leaves the slot readable, so the stale refcount still reads
+    // REFCOUNT_DELETED and the walk can finish quietly with every other assertion below satisfied.
+    // Measured on the unfixed collector, 10 plain-build runs: 10 failed - 8 reported this counter, 2
+    // aborted first inside the corrupted traversal. The fixed collector passed 10 of 10.
+    if(t->dict->items.list)
+        t->undetached++;
 
     const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
     if(name && *name && t->order_len < sizeof(t->order) - 1)
@@ -1104,6 +1116,13 @@ static size_t dictionary_gc_cursor_unittest(void) {
 
     if(t.deletes != 2) {
         fprintf(stderr, "GC CURSOR: expected exactly 2 delete callbacks, got %zu\n", t.deletes);
+        errors++;
+    }
+
+    if(t.undetached) {
+        fprintf(stderr, "GC CURSOR: %zu delete callback(s) ran while a victim was still linked on the "
+                        "items list - the walk is delivering during the traversal, not after it\n",
+                t.undetached);
         errors++;
     }
 
