@@ -146,7 +146,16 @@ func (vb *vnodeBinding) publishAcquisition(ctx context.Context, commands jobmgr.
 			if !ok {
 				return nil, agentdiscovery.ErrVNodeRevision
 			}
-			return newPreparedVNodeTransaction(scope, prepared, result, vb.configCreateCleanup(entry.Config))
+			cleanup := vb.configCreateCleanup(entry.Config)
+			return newPreparedVNodeTransaction(scope, prepared, result, func() error {
+				if err := prepared.MetadataError(); err != nil {
+					jobmgr.ObserveDiagnostic(vb.diagnostics, jobmgr.DiagnosticEvent{
+						Level: jobmgr.DiagnosticWarning, Name: "vnode acquired metadata rejected",
+						Resource: "vnode:" + name, Generation: vb.epoch, Err: err,
+					})
+				}
+				return cleanup()
+			})
 		},
 	}}
 	return commands.SubmitPreparedAndWait(ctx, jobmgr.Request{UID: "jobmgr-vnode-acquire-" + uuid.NewString(), LaneKey: "vnode:" + name, Source: lifecycle.SourceJobManager, Route: "internal/vnodes/acquire"}, plan)

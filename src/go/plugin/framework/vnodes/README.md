@@ -25,6 +25,7 @@ existing framework boundary for vnode design work. This maintainer document is n
   matching and scalar metadata reads only; metric profile coverage is not a readiness condition.
 - First usable metadata makes attachment possible, including partial system identity with failed enrichment.
   A failed refresh retains the entire last usable snapshot. Complete success replaces acquired metadata.
+  Rejected metadata, including hostname collisions, produces a safe diagnostic after the fallback state commits.
 - Workers perform network I/O outside graph, configuration and output locks. Results commit through existing vnode
   transaction lanes. A record-pointer comparison fences prepared mutations; an acquisition token fences old requests
   after credential changes or remove/re-add. Label/hostname overrides preserve the acquisition token.

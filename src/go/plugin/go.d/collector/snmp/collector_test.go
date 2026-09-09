@@ -1769,6 +1769,7 @@ func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
 	m.EXPECT().Target().AnyTimes()
 	m.EXPECT().Port().AnyTimes()
 	m.EXPECT().Version().AnyTimes()
+	m.EXPECT().ContextName().AnyTimes()
 	m.EXPECT().Community().AnyTimes()
 	m.EXPECT().SetTarget(gomock.Any()).AnyTimes()
 	m.EXPECT().SetPort(gomock.Any()).AnyTimes()

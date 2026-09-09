@@ -30,3 +30,23 @@ func TestMetadataOnlySourceReportsEnrichmentFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "73657269616c", meta["serial_number"].Value, "missing OIDs are retried by the next attempt")
 }
+
+func TestMetadataOnlyFallbackClearsOnlyResolvedFieldErrors(t *testing.T) {
+	for _, unrelatedFailure := range []bool{false, true} {
+		fields := map[string]ddprofiledefinition.MetadataField{
+			"serial_number": {Symbols: []ddprofiledefinition.SymbolConfig{{OID: "1.2.3", Format: "hex"}, {OID: "1.2.4"}}},
+		}
+		if unrelatedFailure {
+			fields["model"] = ddprofiledefinition.MetadataField{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.2.3", Format: "hex"}}
+		}
+		profile := &ddsnmp.Profile{Definition: &ddprofiledefinition.ProfileDefinition{Metadata: ddprofiledefinition.MetadataConfig{"device": {Fields: fields}}}}
+		packet := &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: "1.2.3", Type: gosnmp.Integer, Value: 42}, {Name: "1.2.4", Type: gosnmp.OctetString, Value: []byte("fallback")}}}
+		meta, err := CollectDeviceMetadata(responseClient{packet: packet}, []*ddsnmp.Profile{profile}, "", logger.NewWithWriter(io.Discard))
+		if unrelatedFailure {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, "fallback", meta["serial_number"].Value)
+		}
+	}
+}

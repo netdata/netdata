@@ -552,6 +552,6 @@ Static definitions contain a `guid` field that uniquely identifies the vnode. SN
   guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 
-The `guid` value is the vnode's UUID. You do **not** need to query any internal database — the YAML configuration file is the authoritative source for the vnode GUID. See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
+For an explicitly configured GUID, the `guid` value is the vnode's UUID and the YAML configuration file is its authoritative source. SNMP definitions that omit `guid` derive the UUID from the exact address, so it is not stored in the YAML file. See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
 
 </details>

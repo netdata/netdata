@@ -103,7 +103,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 			moduleLog = moduleLog.WithMessageSanitizer(sanitize)
 		}
 		j.module.GetBase().Logger = moduleLog
-		j.supplyConfiguredVnode()
+		supplyConfiguredVnode(j.module, &j.vnode)
 	}
 	return j
 }
@@ -254,7 +254,7 @@ func (j *JobV2) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
 	}
 	j.vnodeMu.Unlock()
-	j.supplyConfiguredVnode()
+	supplyConfiguredVnode(j.module, &j.vnode)
 }
 
 func (j *JobV2) Cleanup() {
@@ -869,14 +869,6 @@ func (j *JobV2) prepareVnodeEmission(
 	decision.owner = owner
 	decision.definition = definition
 	return nil
-}
-
-func (j *JobV2) supplyConfiguredVnode() {
-	if consumer, ok := j.module.(collectorapi.ConfiguredVnodeConsumer); ok {
-		snapshot := j.vnode.Copy()
-		snapshot.Labels = snapshot.HostLabels()
-		consumer.SetConfiguredVnode(*snapshot)
-	}
 }
 
 func (j *JobV2) disableAutoDetection() {

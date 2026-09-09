@@ -53,14 +53,15 @@ type ConfiguredVNode struct {
 	Pending  bool
 }
 type preparedVNodeState struct {
-	mu         sync.Mutex
-	consumed   bool
-	owner      *VNodeConfiguration
-	id         string
-	expected   *vnodeRecord
-	next       *vnodeRecord
-	remove     bool
-	definition *hostoutput.Definition
+	mu          sync.Mutex
+	consumed    bool
+	owner       *VNodeConfiguration
+	id          string
+	expected    *vnodeRecord
+	next        *vnodeRecord
+	remove      bool
+	definition  *hostoutput.Definition
+	metadataErr error
 }
 
 func NewVNodeConfigurationWithInitial(initial map[string]*vnodes.Config) (*VNodeConfiguration, error) {
@@ -131,6 +132,7 @@ func (vc *VNodeConfiguration) PrepareMetadata(token *AcquisitionToken, metadata 
 		return PreparedVNode{}, ErrVNodeRevision
 	}
 	next := *current
+	var metadataErr error
 	next.failed = failed
 	next.pending = false
 	if metadata != nil && (!failed || current.metadata == nil) {
@@ -138,6 +140,7 @@ func (vc *VNodeConfiguration) PrepareMetadata(token *AcquisitionToken, metadata 
 	}
 	if resolved := next.config.Resolve(next.metadata); resolved != nil {
 		if err := vnodes.ValidateConfigured(resolved); err != nil {
+			metadataErr = err
 			next.metadata = current.metadata
 			next.failed = true
 		}
@@ -145,11 +148,24 @@ func (vc *VNodeConfiguration) PrepareMetadata(token *AcquisitionToken, metadata 
 	prepared, err := vc.prepareLocked(token.name, current, &next, false)
 	if err != nil {
 		// Conflicting acquired hostnames cannot replace valid last-known metadata.
+		metadataErr = err
 		next.metadata = current.metadata
 		next.failed = true
-		return vc.prepareLocked(token.name, current, &next, false)
+		prepared, err = vc.prepareLocked(token.name, current, &next, false)
 	}
-	return prepared, nil
+	if err == nil {
+		prepared.state.metadataErr = metadataErr
+	}
+	return prepared, err
+}
+
+// MetadataError explains a rejected acquisition whose last-good fallback was
+// prepared successfully. Callers report it only after committing that fallback.
+func (pv PreparedVNode) MetadataError() error {
+	if pv.state == nil {
+		return nil
+	}
+	return pv.state.metadataErr
 }
 func (vc *VNodeConfiguration) PrepareRemove(id string, expected uint64) (PreparedVNode, error) {
 	if vc == nil || id == "" || id != strings.TrimSpace(id) || expected == 0 || expected == ^uint64(0) {

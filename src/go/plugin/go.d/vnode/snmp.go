@@ -40,28 +40,6 @@ type scalarClient struct{ *gosnmp.GoSNMP }
 func (c scalarClient) MaxOids() int                { return c.GoSNMP.MaxOids }
 func (c scalarClient) Version() gosnmp.SnmpVersion { return c.GoSNMP.Version }
 
-// Handle absent v1 OIDs as ordinary missing values, as with v2c exceptions.
-func (c scalarClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
-	var missing []gosnmp.SnmpPDU
-	for len(oids) > 0 {
-		p, err := c.GoSNMP.Get(oids)
-		if err != nil || p == nil {
-			return p, err
-		}
-		if p.Error == gosnmp.NoError {
-			p.Variables = append(p.Variables, missing...)
-			return p, nil
-		}
-		if c.Version() != gosnmp.Version1 || p.Error != gosnmp.NoSuchName || p.ErrorIndex < 1 || int(p.ErrorIndex) > len(oids) {
-			return p, nil
-		}
-		i := int(p.ErrorIndex) - 1
-		missing = append(missing, gosnmp.SnmpPDU{Name: oids[i], Type: gosnmp.NoSuchObject})
-		next := append([]string(nil), oids[:i]...)
-		oids = append(next, oids[i+1:]...)
-	}
-	return &gosnmp.SnmpPacket{Variables: missing}, nil
-}
 func acquire(client snmputils.ScalarClient, address string) (*vnodes.Metadata, error) {
 	si, err := snmputils.GetSysInfo(client)
 	if err != nil {

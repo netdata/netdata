@@ -4,6 +4,7 @@ package vnode
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -31,11 +32,15 @@ func serve(t *testing.T, reply func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket) (vno
 		for {
 			n, addr, err := conn.ReadFrom(buf)
 			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					t.Errorf("SNMP fixture read: %v", err)
+				}
 				return
 			}
 			decoder := &gosnmp.GoSNMP{}
 			p, err := decoder.SnmpDecodePacket(buf[:n])
 			if err != nil {
+				t.Errorf("SNMP fixture decode request: %v", err)
 				return
 			}
 			select {
@@ -49,9 +54,15 @@ func serve(t *testing.T, reply func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket) (vno
 				response.RequestID = p.RequestID
 				raw, err := response.MarshalMsg()
 				if err != nil {
+					t.Errorf("SNMP fixture encode response: %v", err)
 					return
 				}
-				_, _ = conn.WriteTo(raw, addr)
+				if _, err := conn.WriteTo(raw, addr); err != nil {
+					if !errors.Is(err, net.ErrClosed) {
+						t.Errorf("SNMP fixture write response: %v", err)
+					}
+					return
+				}
 			}
 		}
 	}()

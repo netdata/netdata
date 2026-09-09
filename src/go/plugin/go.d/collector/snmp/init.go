@@ -18,7 +18,7 @@ func (c *Collector) validateConfig() error {
 	if c.Hostname == "" {
 		return snmputils.WithFailure(errors.New("SNMP hostname is required"), "configuration", "missing_hostname")
 	}
-	if c.LocalVnode.GUID != "" {
+	if c.Vnode == "" && c.LocalVnode.GUID != "" {
 		if err := uuid.Validate(c.LocalVnode.GUID); err != nil {
 			return snmputils.WithFailure(fmt.Errorf("invalid Vnode GUID: %v", err), "configuration", "invalid_vnode_id")
 		}
@@ -32,7 +32,7 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 		return nil, err
 	}
 
-	c.Infof("SNMP client target=%q port=%d version=%s", client.Target(), client.Port(), client.Version())
+	c.Infof("SNMP client target=%q port=%d version=%s context=%q", client.Target(), client.Port(), client.Version(), client.ContextName())
 
 	return client, nil
 }

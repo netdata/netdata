@@ -192,6 +192,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
+			fieldErrStart := len(errs)
 			for i, sym := range field.Symbols {
 				v, err := dc.processSymbolValueObserved(name, sym, pdus, i == len(field.Symbols)-1, observer.processing(name))
 				if err != nil {
@@ -202,6 +203,8 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 					continue
 				}
 				if v != "" {
+					// A usable fallback resolves only this field's earlier failures.
+					errs = errs[:fieldErrStart]
 					ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
 					observer.value(name)
 					break // Use first successful value

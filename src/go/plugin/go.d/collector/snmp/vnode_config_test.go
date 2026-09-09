@@ -4,6 +4,7 @@ package snmp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -24,6 +25,29 @@ func TestNamedVnodeClientInitializationDoesNotLogCredentials(t *testing.T) {
 	_, err := c.initSNMPClient()
 	require.NoError(t, err)
 	require.NotContains(t, logs.String(), c.Community)
+	c.Options.Version = "3"
+	c.User.Name = "fixture-user"
+	c.User.ContextName = "routing-context"
+	c.User.AuthKey = "fixture-auth-secret"
+	c.User.PrivKey = "fixture-priv-secret"
+	logs.Reset()
+	_, err = c.initSNMPClient()
+	require.NoError(t, err)
+	require.Contains(t, logs.String(), `context=\"routing-context\"`)
+	require.NotContains(t, logs.String(), c.Community)
+	require.NotContains(t, logs.String(), c.User.AuthKey)
+	require.NotContains(t, logs.String(), c.User.PrivKey)
+}
+
+func TestNamedVnodeIgnoresUnusedLocalGUID(t *testing.T) {
+	c := New(ddsnmp.NewDeviceStore())
+	c.Hostname = "192.0.2.1"
+	c.Vnode = "central"
+	c.LocalVnode.GUID = "invalid-unused-guid"
+	require.NoError(t, c.Init(context.Background()))
+	c.Cleanup(context.Background())
+	c.Vnode = ""
+	require.ErrorContains(t, c.Init(context.Background()), "invalid Vnode GUID")
 }
 
 func TestVnodeConfigurationRoundTrip(t *testing.T) {
