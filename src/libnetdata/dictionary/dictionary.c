@@ -216,7 +216,7 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
-                item_pending_deletion_clear(dict, item);
+                long int remaining = item_pending_deletion_clear(dict, item);
 
                 // chain the detached victim, in traversal order;
                 // prev/next are dead after the list removal, so ->next is free to reuse
@@ -229,10 +229,18 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
                 deleted++;
 
-                // NOTE: no early exit on a zero pending count here.
-                // On a view, items are also discovered by the master-deletion check inside
-                // item_check_and_acquire_advanced() above, which the pending counter does not
-                // track - stopping when it reaches zero would leave orphaned view items behind.
+                // On a master, every victim is a pending-deletion item and they are all counted,
+                // so once the counter reaches zero there is nothing left to find: stop, instead of
+                // scanning the remaining live items on every insert and delete.
+                //
+                // On a view we must keep going: item_check_and_acquire_advanced() above also
+                // discovers items deleted on the MASTER, and those are not in this counter, so a
+                // zero here would leave orphaned view items behind.
+                //
+                // Either way an item another thread pends after this point is picked up by the
+                // next collection - the entry check at the top of this function tests the counter.
+                if(!is_view && !remaining)
+                    break;
             }
         }
         else if(rc == RC_ITEM_IS_CURRENTLY_BEING_DELETED)

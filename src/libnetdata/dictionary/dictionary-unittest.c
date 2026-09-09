@@ -1130,6 +1130,59 @@ static size_t dictionary_gc_cursor_unittest(void) {
     return errors;
 }
 
+// Views discover victims the pending counter never saw: an item deleted on the MASTER orphans the
+// view item, and that discovery happens inside item_check_and_acquire_advanced() during the walk.
+// So the GC must not stop on a zero pending count when it is collecting a view. Two orphans, so a
+// premature exit after the first one is caught.
+
+static size_t dictionary_gc_view_orphans_unittest(void) {
+    size_t errors = 0;
+    struct dictionary_stats stats = {};
+
+    fprintf(stderr, "\n\nChecking GC on a view collects every master-deleted orphan...\n");
+
+    DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
+    DICTIONARY *view = dictionary_create_view(master);
+
+    DICTIONARY_ITEM *m1 = dictionary_set_and_acquire_item(master, "M1", "V1", 3);
+    DICTIONARY_ITEM *m2 = dictionary_set_and_acquire_item(master, "M2", "V2", 3);
+
+    DICTIONARY_ITEM *v1 = dictionary_view_set_and_acquire_item(view, "VIEW1", m1);
+    DICTIONARY_ITEM *v2 = dictionary_view_set_and_acquire_item(view, "VIEW2", m2);
+
+    dictionary_acquired_item_release(view, v1);
+    dictionary_acquired_item_release(view, v2);
+    dictionary_acquired_item_release(master, m1);
+    dictionary_acquired_item_release(master, m2);
+
+    // delete on the master: both view items are now orphans, but the view's own
+    // pending-deletion counter is still zero - nothing marked them
+    dictionary_del(master, "M1");
+    dictionary_del(master, "M2");
+
+    // the setup is only meaningful if the view really has nothing counted: these orphans are
+    // invisible to the pending counter until the walk discovers them
+    long int pending_before = DICTIONARY_PENDING_DELETES_GET(view);
+    if(pending_before != 0) {
+        fprintf(stderr, "GC VIEW ORPHANS: expected 0 pending on the view before the GC, got %ld\n",
+                pending_before);
+        errors++;
+    }
+
+    dictionary_garbage_collect(view);
+
+    // both must be gone; if the walk stopped at a zero pending count, VIEW2 would survive
+    errors += unittest_check_dictionary("gc view orphans", view, 0, 0, 0, 0, 0);
+
+    dictionary_destroy(view);
+    dictionary_destroy(master);
+
+    if(!errors)
+        fprintf(stderr, "GC view orphan collection test OK\n");
+
+    return errors;
+}
+
 size_t dictionary_unittest_views(void) {
     size_t errors = 0;
     struct dictionary_stats stats = {};
@@ -2238,6 +2291,7 @@ int dictionary_unittest(size_t entries) {
         fprintf(stderr, "Destroy on traversal test OK\n");
 
     errors += dictionary_gc_cursor_unittest();
+    errors += dictionary_gc_view_orphans_unittest();
 
     errors += dictionary_destroy_race_unittest();
 
