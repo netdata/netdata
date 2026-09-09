@@ -31,14 +31,14 @@ func TestFDGlobalChartContract(t *testing.T) {
 			context:    "filesystem.file_descriptor",
 			units:      "calls/s",
 			order:      2195,
-			dimensions: []string{"do_sys_open", "__close_fd"},
+			dimensions: []string{"open", "close"},
 			algorithm:  "incremental",
 		},
 		"file_error": {
 			context:    "filesystem.file_error",
 			units:      "calls/s",
 			order:      2196,
-			dimensions: []string{"do_sys_open", "__close_fd"},
+			dimensions: []string{"open", "close"},
 			algorithm:  "incremental",
 			errorChart: true,
 		},
@@ -92,11 +92,11 @@ func TestWriteFDGlobalPublishesRawCounters(t *testing.T) {
 
 	for _, want := range []string{
 		"BEGIN 'filesystem.file_descriptor'",
-		"SET 'do_sys_open' = 1000",
-		"SET '__close_fd' = 900",
+		"SET 'open' = 1000",
+		"SET 'close' = 900",
 		"BEGIN 'filesystem.file_error'",
-		"SET 'do_sys_open' = 7",
-		"SET '__close_fd' = 3",
+		"SET 'open' = 7",
+		"SET 'close' = 3",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q:\n%s", want, got)
