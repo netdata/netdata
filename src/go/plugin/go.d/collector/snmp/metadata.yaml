@@ -456,25 +456,48 @@ modules:
 
             - name: create_vnode
               group: Virtual node
-              description: If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata.
+              description: Create a Virtual Node for this SNMP device when no named vnode reference is set. A named reference takes precedence, including when this option is true.
               default_value: "true"
               required: false
             - name: vnode_device_down_threshold
               group: Virtual node
-              description: Number of consecutive failed data collections before marking the device as down.
+              description: Number of consecutive failed data collections before marking a collector-generated vnode as down. Named vnodes use their own stale_after setting.
               default_value: 3
               required: false
-            - name: vnode.guid
+            - name: vnode
+              group: Virtual node
+              description: Name of a centrally configured Virtual Node to attach this job to. Takes precedence over local vnode creation.
+              default_value: ""
+              required: false
+              detailed_description: |
+                A string such as `vnode: router` attaches this job to a vnode defined in `vnodes/*.conf` or dynamic
+                configuration. Static YAML vnodes use their hostname as the reference; SNMP-mode vnodes use their
+                required stable name. SNMP-mode identity is acquired independently, so this job waits for its first
+                usable identity before starting. The reference supplies host identity and labels only: configure this
+                job's own address, credentials, and metric profiles. It takes precedence over `create_vnode`.
+
+                Use `local_vnode` to configure a vnode created by this job. Legacy inline `vnode` objects remain
+                accepted; opening them through dynamic configuration returns the same settings under `local_vnode`.
+            - name: local_vnode
+              group: Virtual node
+              description: Configuration for the Virtual Node created by this job when create_vnode is enabled and no named vnode reference is set.
+              default_value: ""
+              required: false
+              detailed_description: |
+                Optional hostname, GUID, and host-label settings for the vnode owned by this job. Without these
+                settings, the collector uses its existing device-derived identity. A named `vnode` reference takes
+                precedence. Do not combine a legacy inline `vnode` object with `local_vnode`; use one object.
+            - name: local_vnode.guid
               group: Virtual node
               description: A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.
               default_value: ""
               required: false
-            - name: vnode.hostname
+            - name: local_vnode.hostname
               group: Virtual node
               description: The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.
               default_value: ""
               required: false
-            - name: vnode.labels
+            - name: local_vnode.labels
               group: Virtual node
               description: Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence.
               default_value: ""
@@ -484,6 +507,18 @@ modules:
             title: Config
             enabled: true
           list:
+            - name: Attach to an independently configured vnode
+              description: |
+                First define the vnode named `router` in `vnodes/*.conf` or the Vnodes dynamic configuration view.
+                This job uses its own SNMP connection and metric profiles; the vnode owns host identity and labels.
+              config: |
+                jobs:
+                  - name: router_metrics
+                    vnode: router
+                    hostname: 192.0.2.1
+                    community: example-collector-community
+                    options:
+                      version: 2c
             - name: SNMPv1/2
               description: |
                 In this example:
@@ -570,8 +605,8 @@ modules:
                       version: 2
             - name: Additional node labels
               description: |
-                Because `create_vnode` defaults to true, each SNMP job automatically creates a Virtual Node for its device — no separate vnode definition file is needed.
-                Use `vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
+                Without a named vnode reference, `create_vnode: true` (the default) creates a Virtual Node from this job — no separate vnode definition is needed.
+                Use `local_vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
               config: |
                 jobs:
                   - name: core-switch
@@ -580,7 +615,7 @@ modules:
                     community: public
                     options:
                       version: 2
-                    vnode:
+                    local_vnode:
                       labels:
                         site: dc1
                         rack: a12

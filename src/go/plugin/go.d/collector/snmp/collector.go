@@ -112,7 +112,8 @@ type (
 		normalWriter        *diagnostics.NormalWriter
 		Config              `yaml:",inline" json:""`
 
-		vnode *vnodes.VirtualNode
+		vnode           *vnodes.VirtualNode
+		configuredVnode *vnodes.VirtualNode
 
 		charts                   *collectorapi.Charts
 		seenScalarMetrics        map[string]bool

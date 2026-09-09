@@ -79,7 +79,7 @@ func (vb *vnodeBinding) handle(
 	command := vnodeCommand(input)
 	switch command {
 	case dyncfg.CommandSchema:
-		return lifecycle.NewSealedResult(200, "application/json", []byte(vnodes.ConfigSchema))
+		return lifecycle.NewSealedResult(200, "application/json", []byte(vnodes.ConfigSchemaFor(vb.acquirer != nil)))
 	case dyncfg.CommandUserconfig:
 		return vb.userConfig(input)
 	case dyncfg.CommandGet:

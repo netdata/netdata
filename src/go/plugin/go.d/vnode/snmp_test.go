@@ -6,6 +6,8 @@ import (
 	"context"
 	"net"
 	"strconv"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -77,6 +79,50 @@ func TestAcquireRealUDP(t *testing.T) {
 	require.NotNil(t, m)
 	require.Empty(t, m.Hostname, "missing sysName must not become the legacy unknown placeholder")
 	require.Equal(t, "fixture device", m.Labels["description"])
+}
+
+func TestAcquireV1RecoversFromIndexedMissingSystemOIDs(t *testing.T) {
+	c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
+		for i, v := range p.Variables {
+			if v.Name != "."+snmputils.OidSysName {
+				return &gosnmp.SnmpPacket{Error: gosnmp.NoSuchName, ErrorIndex: uint8(i + 1), Variables: p.Variables}
+			}
+		}
+		return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: "." + snmputils.OidSysName, Type: gosnmp.OctetString, Value: "v1-router"}}}
+	})
+	c.Version = "1"
+	m, err := (SNMP{}).Acquire(t.Context(), c)
+	require.NoError(t, err)
+	require.Equal(t, "v1-router", m.Hostname)
+}
+
+func TestAcquireRealUDPProfileFailureRetainsSystemIdentity(t *testing.T) {
+	var enrichmentRequests atomic.Int32
+	c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
+		for _, request := range p.Variables {
+			if !strings.HasPrefix(request.Name, ".1.3.6.1.2.1.1.") {
+				enrichmentRequests.Add(1)
+				return &gosnmp.SnmpPacket{Error: gosnmp.GenErr, Variables: p.Variables}
+			}
+		}
+		r := &gosnmp.SnmpPacket{}
+		for _, request := range p.Variables {
+			v := gosnmp.SnmpPDU{Name: request.Name, Type: gosnmp.NoSuchObject}
+			switch request.Name {
+			case "." + snmputils.OidSysObject:
+				v.Type, v.Value = gosnmp.ObjectIdentifier, ".1.3.6.1.4.1.6574.1"
+			case "." + snmputils.OidSysName:
+				v.Type, v.Value = gosnmp.OctetString, "storage"
+			}
+			r.Variables = append(r.Variables, v)
+		}
+		return r
+	})
+	m, err := (SNMP{}).Acquire(t.Context(), c)
+	require.ErrorContains(t, err, "profile metadata acquisition failed")
+	require.Equal(t, "storage", m.Hostname)
+	require.NotEmpty(t, m.Labels["sys_object_id"])
+	require.Positive(t, enrichmentRequests.Load())
 }
 func TestAcquireRejectsEmptyAndErrorResponses(t *testing.T) {
 	for _, status := range []gosnmp.SNMPError{gosnmp.NoError, gosnmp.GenErr} {

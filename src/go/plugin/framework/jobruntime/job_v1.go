@@ -141,6 +141,7 @@ func NewJob(cfg JobConfig) *Job {
 		j.module.GetBase().Logger = moduleLog
 	}
 
+	j.supplyConfiguredVnode()
 	return j
 }
 
@@ -327,9 +328,9 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 	next := snapshot.Vnode.Copy()
 
 	j.vnodeMu.Lock()
-	defer j.vnodeMu.Unlock()
 
 	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
+		j.vnodeMu.Unlock()
 		return
 	}
 
@@ -339,6 +340,16 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 	}
 	if snapshot.MetadataRevision != 0 {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
+	}
+	j.vnodeMu.Unlock()
+	j.supplyConfiguredVnode()
+}
+
+func (j *Job) supplyConfiguredVnode() {
+	if consumer, ok := j.module.(collectorapi.ConfiguredVnodeConsumer); ok {
+		snapshot := j.vnode.Copy()
+		snapshot.Labels = snapshot.HostLabels()
+		consumer.SetConfiguredVnode(*snapshot)
 	}
 }
 
