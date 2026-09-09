@@ -1477,7 +1477,7 @@ collect_cmd 08-network/netdata-sockets.txt "All sockets owned by the Netdata pro
       ss -a -tunxp 2>&1 | awk -v re="pid=(${_pid_re})(,|\\))" "NR == 1 || \$0 ~ re"
     elif command -v sockstat >/dev/null 2>&1; then
       _pid_re=$(printf "%s" "$NETDATA_PIDS" | tr "\\n" "|" | sed "s/|$//")
-      sockstat -a 2>&1 | awk -v re="^(${_pid_re})$" "NR == 1 || \$3 ~ re"
+      sockstat -s 2>&1 | awk -v re="^(${_pid_re})$" "NR == 1 || \$3 ~ re"
     else
       echo "(unavailable: lsof, ss, or sockstat is required for process-owned socket details)"
     fi; true'
