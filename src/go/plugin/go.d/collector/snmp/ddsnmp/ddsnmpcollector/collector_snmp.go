@@ -32,6 +32,7 @@ func getSNMPValues(
 			if err == nil && result.Error == gosnmp.NoSuchName && client.Version() == gosnmp.Version1 && result.ErrorIndex > 0 && int(result.ErrorIndex) <= len(chunk) {
 				// V1 fails the whole request for one absent OID. Record that operation's
 				// missing value before retrying the remaining OIDs on an owned slice.
+				// Request diagnostics retain NoSuchName evidence even if this recovery succeeds.
 				i := int(result.ErrorIndex) - 1
 				recordMissingOID(client, gosnmp.SnmpPDU{Name: chunk[i], Type: gosnmp.NoSuchObject}, missingOIDs, stats)
 				chunk = slices.Delete(slices.Clone(chunk), i, i+1)

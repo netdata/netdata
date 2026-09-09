@@ -525,33 +525,35 @@ For virtual nodes, see [Does renaming a virtual node change its identity?](#does
 <details>
 <summary>Does renaming a virtual node change its identity?</summary>
 
-A virtual node's identity is determined by its **`guid`** field — not its `hostname` or `name`. The fields behave as follows:
+A virtual node's identity is determined by its **UUID**. This is either explicitly configured as `guid` or, for an SNMP vnode without an override, derived from its exact configured address. The fields behave as follows:
 
 - **`guid`** — This is the vnode's identity. Changing it creates an entirely new node in Netdata Cloud. The old vnode's historical data remains under the old GUID but is no longer associated with the new one.
 - **`hostname`** — The display name, and the reference key for static YAML definitions. Changing it without changing the UUID renames the display. Update job references too when renaming a static YAML definition.
 - **`name`** — Required as the stable reference key for SNMP YAML definitions. Static YAML definitions ignore this field and use `hostname`; GUI definitions use their resource name.
 
-**To preserve data continuity when renaming a vnode**, change only the `hostname` field in its YAML file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and keep the `guid` unchanged. For SNMP vnodes, hostname overrides keep the stable reference name. Mode/address/context/UUID changes require a replacement vnode. Historical data belongs to the old UUID.
+**To preserve data continuity when renaming a vnode**, edit `hostname` in the configuration source you used: its YAML file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md), or its [Vnodes GUI configuration](#creating-virtual-nodes-via-the-gui-dynamic-configuration). Keep any explicit `guid` unchanged. For an SNMP vnode with a derived UUID, keep the exact address unchanged too.
+
+SNMP hostname overrides preserve the stable reference name. Changing an existing SNMP vnode's mode, address, context, or UUID requires a replacement vnode. Historical data belongs to the old UUID.
 
 </details>
 
 <details>
 <summary>How do I find the UUID of my existing vnode?</summary>
 
-An explicitly configured GUID is stored in its YAML configuration file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md). To look it up:
+If the vnode has an explicit `guid`, that value is its UUID. Look it up in the configuration source:
+
+- **YAML-defined vnode:** read its `guid` in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md).
+- **GUI-created vnode:** open the node's dynamic configuration view, select **go.d → Vnodes**, and inspect the vnode's `guid`. GUI-created definitions are managed through dynamic configuration; they do not require a YAML file in `vnodes/`.
+
+To inspect YAML definitions:
 
 ```bash
 # Default path — adjust if your Netdata config directory differs.
 cat /etc/netdata/vnodes/*
 ```
 
-Static definitions contain a `guid` field that uniquely identifies the vnode. SNMP definitions may omit it; the UUID is then derived from the exact address and becomes visible when an attached job publishes the node:
+Static vnodes require an explicit `guid`. SNMP vnodes can omit it in either YAML or the GUI; their UUID is then derived from the exact `mode_snmp.address` string. The derived UUID is not written back into the authored configuration. It becomes visible with the vnode when an attached collector job publishes that node.
 
-```yaml
-- hostname: remote-server.example.com
-  guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-```
-
-For an explicitly configured GUID, the `guid` value is the vnode's UUID and the YAML configuration file is its authoritative source. SNMP definitions that omit `guid` derive the UUID from the exact address, so it is not stored in the YAML file. See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
+See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
 
 </details>

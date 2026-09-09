@@ -31,6 +31,8 @@ func (s VnodeSnapshot) Copy() VnodeSnapshot {
 	}
 }
 
+// Called during construction or synchronously by the owning job's collection loop.
+// Configuration updates never write job state directly, so this copy has no competing writer.
 func supplyConfiguredVnode(module any, vnode *vnodes.VirtualNode) {
 	if consumer, ok := module.(collectorapi.ConfiguredVnodeConsumer); ok {
 		snapshot := vnode.Copy()
