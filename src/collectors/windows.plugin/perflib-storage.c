@@ -6,6 +6,9 @@
 #define _COMMON_PLUGIN_NAME PLUGIN_WINDOWS_NAME
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibStorage"
 #define CONFIG_SECTION_PERFLIB_STORAGE "plugin:windows:PerflibStorage"
+#ifndef IO_REPARSE_TAG_CSV
+#define IO_REPARSE_TAG_CSV ((DWORD)0x80000009UL)
+#endif
 #include "../common-contexts/common-contexts.h"
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
@@ -627,7 +630,7 @@ static bool mount_points_scan_cluster_storage(DICTIONARY *paths)
             continue;
 
         if ((fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
-            fd.dwReserved0 != IO_REPARSE_TAG_MOUNT_POINT)
+            fd.dwReserved0 != IO_REPARSE_TAG_MOUNT_POINT && fd.dwReserved0 != IO_REPARSE_TAG_CSV)
             continue;
 
         if (fd.cFileName[0] == L'.' &&
@@ -645,7 +648,8 @@ static bool mount_points_scan_cluster_storage(DICTIONARY *paths)
             continue;
         snprintfz(path, sizeof(path), "%c:\\ClusterStorage\\%s", (char)windir[0], name);
 
-        if (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+        if ((fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
+            fd.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT) {
             wchar_t mount_path[ND_MOUNT_PATH_MAX];
             int mount_path_len = swprintf(
                 mount_path, _countof(mount_path), L"%c:\\ClusterStorage\\%ls\\", windir[0], fd.cFileName);
