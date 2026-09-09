@@ -17,11 +17,10 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func newCollectStatusChart(pluginName string) *collectorapi.Chart {
@@ -73,6 +72,7 @@ type JobConfig struct {
 	VnodeName               string
 	VnodeRevision           uint64
 	VnodeMetadataRevision   uint64
+	Publication             *hostoutput.Publisher
 	VnodeLookup             VnodeLookup
 	FunctionOnly            bool
 	LifecycleErrorSanitizer func(error) error
@@ -88,7 +88,13 @@ func NewJob(cfg JobConfig) *Job {
 		cfg.CleanupOut = cfg.Out
 	}
 
+	if cfg.Publication == nil {
+		cfg.Publication = hostoutput.New()
+	}
 	j := &Job{
+		publication:     cfg.Publication,
+		hostCharts:      make(jobV1ChartInventory),
+		selfCharts:      make(jobV1ChartInventory),
 		autoDetectEvery: cfg.AutoDetectEvery,
 		autoDetectTries: infTries,
 
@@ -118,6 +124,12 @@ func NewJob(cfg JobConfig) *Job {
 		lifecycleErrorSanitizer: cfg.LifecycleErrorSanitizer,
 	}
 
+	j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
+	j.collectDurationChart.ID = fmt.Sprintf(
+		"%s_%s_data_collection_duration",
+		cleanPluginName(j.pluginName),
+		j.FullName(),
+	)
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 
 	j.Logger = log
@@ -168,7 +180,13 @@ type Job struct {
 	buf                  *bytes.Buffer
 	api                  *netdataapi.API
 
-	vnodeCreated bool
+	publication    *hostoutput.Publisher
+	hostOwner      *hostoutput.Owner
+	hostGUID       string
+	hostDefinition *hostoutput.Definition
+	hostCharts     jobV1ChartInventory
+	selfCharts     jobV1ChartInventory
+	emission       jobV1Emission
 	// vnodeMu covers current vnode state while collection refreshes it.
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
@@ -283,27 +301,27 @@ func (j *Job) autoDetection(ctx context.Context) (err error) {
 	return nil
 }
 
-func (j *Job) refreshVnodeSnapshot() bool {
+func (j *Job) refreshVnodeSnapshot() {
 	if j.vnodeName == "" || j.vnodeLookup == nil {
-		return false
+		return
 	}
 	snapshot, ok := j.vnodeLookup(j.vnodeName)
 	if !ok {
-		return false
+		return
 	}
-	return j.applyVnodeSnapshot(snapshot)
+	j.applyVnodeSnapshot(snapshot)
 }
 
-func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
+func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 	if snapshot.Vnode == nil {
-		return false
+		return
 	}
 	if snapshot.Revision != 0 {
 		j.vnodeMu.Lock()
 		stale := snapshot.Revision <= j.vnodeRevision
 		j.vnodeMu.Unlock()
 		if stale {
-			return false
+			return
 		}
 	}
 	next := snapshot.Vnode.Copy()
@@ -312,14 +330,9 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	defer j.vnodeMu.Unlock()
 
 	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
-		return false
+		return
 	}
-	metadataChanged := snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
-	createChart := false
-	if metadataChanged {
-		j.vnodeCreated = false
-		createChart = j.vnode.GUID != next.GUID
-	}
+
 	j.vnode = *next
 	if snapshot.Revision != 0 {
 		j.vnodeRevision = snapshot.Revision
@@ -327,12 +340,19 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	if snapshot.MetadataRevision != 0 {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
 	}
-	return createChart
 }
 
 // Tick Tick.
 func (j *Job) Tick(clock int) {
-	enqueueTickWithSkipLog(j.tick, clock, j.functionOnly, j.updateEvery, int(j.retries.Load()), &j.skipTracker, j.Logger)
+	enqueueTickWithSkipLog(
+		j.tick,
+		clock,
+		j.functionOnly,
+		j.updateEvery,
+		int(j.retries.Load()),
+		&j.skipTracker,
+		j.Logger,
+	)
 }
 
 // IsRunning returns true if the job's main loop is currently running.
@@ -405,54 +425,38 @@ func (j *Job) cleanupModule() {
 }
 
 func (j *Job) Cleanup() {
+	defer j.clearOutputState()
 	j.cleanupModule()
 	j.buf.Reset()
 	if !collectorapi.ShouldObsoleteCharts() {
 		return
 	}
-
-	// Netdata automatically obsoletes vnode charts when no updates are sent.
-	// For virtual nodes with a stale label, we must not send anything:
-	//   - Sending a HOST line would incorrectly mark the vnode as active.
-	isVnodeWithStaleConfig := j.vnode.Labels["_node_stale_after_seconds"] != ""
-
-	if !isVnodeWithStaleConfig {
-		if !j.vnodeCreated && j.vnode.GUID != "" {
-			j.sendVnodeHostInfo()
-			j.vnodeCreated = true
-		}
-		j.api.HOST(j.vnode.GUID)
-
-		if j.charts != nil {
-			for _, chart := range *j.charts {
-				if chart.IsCreated() {
-					chart.MarkRemove()
-					j.createChart(chart)
-				}
-			}
-		}
+	if len(j.hostCharts) > 0 {
+		j.api.HOST(j.hostGUID)
+		j.hostCharts.cleanup(j.api)
 	}
-
-	j.api.HOST("")
-
-	if j.collectStatusChart.IsCreated() {
-		j.collectStatusChart.MarkRemove()
-		j.createChart(j.collectStatusChart)
+	hostBytes := j.buf.Len()
+	if len(j.selfCharts) > 0 {
+		j.api.HOST("")
+		j.selfCharts.cleanup(j.api)
 	}
-	if j.collectDurationChart.IsCreated() {
-		j.collectDurationChart.MarkRemove()
-		j.createChart(j.collectDurationChart)
-	}
-
 	if j.buf.Len() > 0 {
-		if err := commitJobOutput(j.cleanupOut, j.buf.Bytes()); err != nil {
+		if _, err := commitHostOutput(j.cleanupOut, hostoutput.Request{
+			Owner:      j.hostOwner,
+			Definition: j.hostDefinition,
+			Payload:    j.buf.Bytes()[:hostBytes],
+			Tail:       j.buf.Bytes()[hostBytes:],
+			Cleanup:    true,
+		}, nil); err != nil {
 			j.Errorf("cleanup output failed: %v", err)
 		}
 	}
+	j.buf.Reset()
 }
 
 // CleanupRejected releases a constructed job without emitting cleanup output.
 func (j *Job) CleanupRejected() {
+	defer j.clearOutputState()
 	j.cleanupModule()
 	j.buf.Reset()
 }
@@ -495,27 +499,49 @@ func (j *Job) postCheck() error {
 
 func (j *Job) runOnce() {
 	defer j.ResetAllOnce()
-
 	curTime := time.Now()
 	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
-	j.prevRun = curTime
-
+	j.refreshVnodeSnapshot()
 	metrics := j.collect()
-
 	if j.panicked.Load() {
 		return
 	}
-
-	if j.processMetrics(metrics, curTime, sinceLastRun) {
+	if j.vnodeName == "" && j.vnode.GUID == "" {
+		if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
+			j.vnodeMu.Lock()
+			j.vnode = *v.Copy()
+			j.vnodeMu.Unlock()
+		}
+	}
+	tx, err := j.prepareEmission(curTime)
+	if err != nil {
+		j.retries.Add(1)
+		j.Warningf("prepare vnode host info failed: %v", err)
+		return
+	}
+	j.buf.Reset()
+	defer func() {
+		_ = tx.Abort()
+		j.buf.Reset()
+	}()
+	if tx.processMetrics(metrics, sinceLastRun) {
 		j.retries.Store(0)
 	} else {
 		j.retries.Add(1)
 	}
-
-	if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
+	owner, definition := tx.owner, tx.definition
+	if tx.hostBytes == 0 {
+		owner = nil
+		definition = nil
+	}
+	if _, err := commitHostOutput(j.out, hostoutput.Request{
+		Owner:      owner,
+		Definition: definition,
+		Payload:    j.buf.Bytes(),
+	}, tx); err != nil {
+		poisonJobOutput(j.out, err)
 		j.Errorf("collection output failed: %v", err)
 	}
-	j.buf.Reset()
 }
 
 func (j *Job) collect() collectedMetrics {
@@ -537,288 +563,34 @@ func (j *Job) collect() collectedMetrics {
 	return mx
 }
 
-func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int) bool {
-	var createChart bool
-	if j.module.VirtualNode() == nil {
-		createChart = j.refreshVnodeSnapshot()
-	}
-
-	if !j.vnodeCreated {
-		if j.vnode.GUID == "" {
-			if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
-				j.vnodeMu.Lock()
-				j.vnode = *v
-				j.vnodeMu.Unlock()
-			}
-		}
-		if j.vnode.GUID != "" {
-			j.sendVnodeHostInfo()
-			j.vnodeCreated = true
-		}
-	}
-
-	bufLenBeforeHost := j.buf.Len()
-	j.api.HOST(j.vnode.GUID)
-
-	elapsed := int64(durationTo(time.Since(startTime), time.Millisecond))
-
-	var i, updated, created int
-	for _, chart := range *j.charts {
-		if !chart.IsCreated() || createChart {
-			typeID := fmt.Sprintf("%s.%s", getChartType(chart, j), getChartID(chart))
-			if len(typeID) >= NetdataChartIDMaxLength {
-				j.Warningf("chart 'type.id' length (%d) >= max allowed (%d), the chart is ignored (%s)",
-					len(typeID), NetdataChartIDMaxLength, typeID)
-				chart.SetIgnored(true)
-			}
-			j.createChart(chart)
-			created++
-		}
-		if chart.IsRemoved() {
-			continue
-		}
-		(*j.charts)[i] = chart
-		i++
-		if len(mx.intMetrics)+len(mx.floatMetrics) == 0 || chart.Obsolete {
-			continue
-		}
-		if j.updateChart(chart, mx, sinceLastRun) {
-			updated++
-		}
-	}
-	*j.charts = (*j.charts)[:i]
-
-	if updated == 0 && created == 0 && j.vnode.GUID != "" {
-		j.buf.Truncate(bufLenBeforeHost)
-	}
-
-	j.api.HOST("")
-
-	if !j.collectStatusChart.IsCreated() || createChart {
-		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
-		j.createChart(j.collectStatusChart)
-	}
-
-	if !j.collectDurationChart.IsCreated() || createChart {
-		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
-		j.createChart(j.collectDurationChart)
-	}
-
-	intMx := collectedMetrics{intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)}}
-	j.updateChart(j.collectStatusChart, intMx, sinceLastRun)
-
-	if updated == 0 {
-		return false
-	}
-
-	intMx = collectedMetrics{intMetrics: map[string]int64{"duration": elapsed}}
-	j.updateChart(j.collectDurationChart, intMx, sinceLastRun)
-
-	return true
-}
-
-func (j *Job) sendVnodeHostInfo() {
-	info, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{
-		GUID:     j.vnode.GUID,
-		Hostname: j.vnode.Hostname,
-		Labels:   j.vnode.Labels,
-	})
-	if err != nil {
-		j.Warningf("prepare vnode host info failed: %v", err)
-		return
-	}
-
-	j.vnodeMu.Lock()
-	j.vnode.Hostname = info.Hostname
-	j.vnode.Labels = info.Labels
-	j.vnodeMu.Unlock()
-	j.api.HOSTINFO(info)
-}
-
-func (j *Job) createChart(chart *collectorapi.Chart) {
-	defer func() { chart.SetCreated(true) }()
-	if chart.IsIgnored() {
-		return
-	}
-
-	if chart.Priority == 0 {
-		chart.Priority = j.priority
-		j.priority++
-	}
-	updateEvery := j.updateEvery
-	if chart.UpdateEvery > 0 {
-		updateEvery = chart.UpdateEvery
-	}
-
-	j.api.CHART(netdataapi.ChartOpts{
-		TypeID:      getChartType(chart, j),
-		ID:          getChartID(chart),
-		Name:        chart.OverID,
-		Title:       chart.Title,
-		Units:       chart.Units,
-		Family:      chart.Fam,
-		Context:     chart.Ctx,
-		ChartType:   chart.Type.String(),
-		Priority:    chart.Priority,
-		UpdateEvery: updateEvery,
-		Options:     chart.Opts.String(),
-		Plugin:      j.pluginName,
-		Module:      j.moduleName,
-	})
-
-	if chart.Obsolete {
-		_ = j.api.EMPTYLINE()
-		return
-	}
-
-	seen := make(map[string]bool)
-	for _, l := range chart.Labels {
-		if l.Key != "" {
-			seen[l.Key] = true
-			ls := l.Source
-			// the default should be auto
-			// https://github.com/netdata/netdata/blob/cc2586de697702f86a3c34e60e23652dd4ddcb42/database/rrd.h#L205
-			if ls == 0 {
-				ls = collectorapi.LabelSourceAuto
-			}
-			j.api.CLABEL(l.Key, lblValueReplacer.Replace(l.Value), ls)
-		}
-	}
-	for k, v := range j.labels {
-		if !seen[k] {
-			j.api.CLABEL(k, lblValueReplacer.Replace(v), collectorapi.LabelSourceConf)
-		}
-	}
-	j.api.CLABEL("_collect_job", lblValueReplacer.Replace(j.Name()), collectorapi.LabelSourceAuto)
-	j.api.CLABELCOMMIT()
-
-	for _, dim := range chart.Dims {
-		j.api.DIMENSION(netdataapi.DimensionOpts{
-			ID:         firstNotEmpty(dim.Name, dim.ID),
-			Name:       dim.Name,
-			Algorithm:  dim.Algo.String(),
-			Multiplier: handleZero(dim.Mul),
-			Divisor:    handleZero(dim.Div),
-			Options:    dim.DimOpts.String(),
-		})
-	}
-	for _, v := range chart.Vars {
-		name := firstNotEmpty(v.Name, v.ID)
-		j.api.VARIABLE(name, v.Value)
-	}
-	_ = j.api.EMPTYLINE()
-}
-
-func (j *Job) updateChart(chart *collectorapi.Chart, mx collectedMetrics, sinceLastRun int) bool {
-	if chart.IsIgnored() {
-		dims := chart.Dims[:0]
-		for _, dim := range chart.Dims {
-			if !dim.IsRemoved() {
-				dims = append(dims, dim)
-			}
-		}
-		chart.Dims = dims
-		return false
-	}
-
-	// Handle SkipGaps: check if any dimension has data
-	if chart.SkipGaps {
-		hasData := false
-		for _, dim := range chart.Dims {
-			if dim.IsRemoved() {
-				continue
-			}
-			if _, hasData = mx.getValue(dim.ID); hasData {
-				break
-			}
-		}
-		if !hasData {
-			// No dimensions have data - skip this chart entirely
-			return false
-		}
-		// At least one dimension has data - proceed with deltaTime=0
-		sinceLastRun = 0
-	} else if !chart.IsUpdated() {
-		sinceLastRun = 0
-	}
-
-	j.api.BEGIN(getChartType(chart, j), getChartID(chart), sinceLastRun)
-
-	var i, updated int
-	for _, dim := range chart.Dims {
-		if dim.IsRemoved() {
-			continue
-		}
-		chart.Dims[i] = dim
-		i++
-
-		name := firstNotEmpty(dim.Name, dim.ID)
-		v, ok := mx.getValue(dim.ID)
-		if !ok {
-			j.api.SETEMPTY(name)
-			continue
-		}
-		updated++
-		if dim.Float {
-			j.api.SETFLOAT(name, v)
-		} else {
-			j.api.SET(name, int64(v))
-		}
-	}
-
-	chart.Dims = chart.Dims[:i]
-
-	for _, vr := range chart.Vars {
-		if v, ok := mx.getValue(vr.ID); ok {
-			name := firstNotEmpty(vr.Name, vr.ID)
-			j.api.VARIABLE(name, v)
-		}
-	}
-
-	j.api.END()
-
-	chart.SetUpdated(updated > 0)
-	if chart.IsUpdated() {
-		chart.Retries = 0
-	} else {
-		chart.Retries++
-	}
-	return chart.IsUpdated()
-}
-
 func getChartType(chart *collectorapi.Chart, j *Job) string {
 	if chart.CachedType() != "" {
 		return chart.CachedType()
 	}
-	if !chart.IDSep {
-		chart.SetCachedType(j.FullName())
-	} else if i := strings.IndexByte(chart.ID, '.'); i != -1 {
-		chart.SetCachedType(j.FullName() + "_" + chart.ID[:i])
-	} else {
-		chart.SetCachedType(j.FullName())
-	}
-	if chart.OverModule != "" {
-		cachedType := chart.CachedType()
-		if v, ok := strings.CutPrefix(cachedType, j.ModuleName()); ok {
-			chart.SetCachedType(chart.OverModule + v)
+	typ := j.FullName()
+	if chart.IDSep {
+		if i := strings.IndexByte(chart.ID, '.'); i != -1 {
+			typ += "_" + chart.ID[:i]
 		}
 	}
-	return chart.CachedType()
+	if chart.OverModule != "" {
+		if suffix, ok := strings.CutPrefix(typ, j.ModuleName()); ok {
+			typ = chart.OverModule + suffix
+		}
+	}
+	return typ
 }
 
 func getChartID(chart *collectorapi.Chart) string {
 	if chart.CachedID() != "" {
 		return chart.CachedID()
 	}
-	if !chart.IDSep {
-		return chart.ID
+	if chart.IDSep {
+		if i := strings.IndexByte(chart.ID, '.'); i != -1 {
+			return chart.ID[i+1:]
+		}
 	}
-	if i := strings.IndexByte(chart.ID, '.'); i != -1 {
-		chart.SetCachedID(chart.ID[i+1:])
-	} else {
-		chart.SetCachedID(chart.ID)
-	}
-	return chart.CachedID()
+	return chart.ID
 }
 
 func calcSinceLastRun(curTime, prevRun time.Time) int {

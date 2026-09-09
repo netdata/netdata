@@ -20,8 +20,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -31,7 +31,6 @@ type runJobServices struct {
 	Resolver      *secretresolver.AtomicResolver // atomic secret resolver (process-fixed)
 	StoreCreators *secretstore.CreatorCatalog    // frozen secret store creator catalog
 	Runtime       runtimecomp.Service            // runtime service dependency
-	Vnodes        *vnoderegistry.Registry        // vnode metadata registry
 	InitialVnodes map[string]*vnodes.VirtualNode // file-configured vnodes
 }
 
@@ -40,10 +39,11 @@ type runSecretServices struct {
 }
 
 type runGenerationConfig struct {
-	Generation      uint64                       // this run's generation number
-	ShutdownTimeout time.Duration                // per-run shutdown budget
-	Diagnostics     jobmgr.DiagnosticObserver    // process-wide operational log sink
-	UIDs            *lifecycle.UIDLedger         // process-lifetime UID ledger
+	Generation      uint64                    // this run's generation number
+	ShutdownTimeout time.Duration             // per-run shutdown budget
+	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
+	UIDs            *lifecycle.UIDLedger      // process-lifetime UID ledger
+	Publication     *hostoutput.Publisher
 	Frames          *lifecycle.FrameOwner        // the one frame writer
 	CleanupOutput   *joboutput.CleanupOutputGate // process-lifetime accepted-cleanup output
 	Modules         collectorapi.Registry        // collector module registry
@@ -55,6 +55,8 @@ type runGenerationConfig struct {
 }
 
 type runGeneration struct {
+	publication         *hostoutput.Publisher
+	vnodeConfig         *agentdiscovery.VNodeConfiguration
 	diagnostics         jobmgr.DiagnosticObserver      // operational log sink
 	run                 *lifecycle.RunSupervisor       // run supervisor for this generation
 	tasks               *lifecycle.TaskSupervisor      // task supervisor
@@ -85,6 +87,9 @@ func newRunGeneration(
 			resultErr = errors.Join(resultErr, abortRunConstruction(functions, secretController))
 		}
 	}()
+	if config.Publication == nil {
+		config.Publication = hostoutput.New()
+	}
 	if ctx == nil ||
 		config.Generation == 0 ||
 		config.ShutdownTimeout <= 0 ||
@@ -96,7 +101,6 @@ func newRunGeneration(
 		config.Jobs.Defaults == nil ||
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
-		config.Jobs.Vnodes == nil ||
 		config.SecretEpoch == nil ||
 		config.Attempts == nil ||
 		config.SecretEpoch.generation != config.Generation ||
@@ -245,7 +249,7 @@ func newRunGeneration(
 		CleanupOutput:   config.CleanupOutput,
 		ConfigModules:   configModules,
 		Runtime:         config.Jobs.Runtime,
-		Vnodes:          config.Jobs.Vnodes,
+		Publication:     config.Publication,
 		Vnode:           vnodeConfig.Lookup,
 		HandlerStager:   functionJobs,
 		HandlerAttacher: functionJobs,
@@ -315,6 +319,8 @@ func newRunGeneration(
 		}
 	}
 	return &runGeneration{
+		publication:         config.Publication,
+		vnodeConfig:         vnodeConfig,
 		diagnostics:         config.Diagnostics,
 		run:                 run,
 		tasks:               tasks,
@@ -376,6 +382,7 @@ func (rg *runGeneration) startWithRunContext(
 		rg.kernel.Stop()
 		return err
 	}
+	rg.publication.Bind(rg.vnodeConfig.Definition)
 	if err := rg.run.OpenAdmission(); err != nil {
 		rg.run.Dirty(err)
 		rg.Stop()

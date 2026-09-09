@@ -14,9 +14,9 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 )
 
 type ModuleCatalog interface {
@@ -68,7 +68,7 @@ type FactoryConfig struct {
 	CleanupOutput   *CleanupOutputGate                            // process-lifetime accepted-cleanup output
 	ConfigModules   *ConfigModuleFactory                          // resolved config application and short-lived probes
 	Runtime         runtimecomp.Service                           // V2 runtime service dependency
-	Vnodes          *vnoderegistry.Registry                       // vnode registry for V2 jobs
+	Publication     *hostoutput.Publisher                         // shared host metadata publisher for V1 and V2 jobs
 	Vnode           func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
 	HandlerStager   JobHandlerStager                              // run-detached Function-handler staging
 	HandlerAttacher JobHandlerAttacher                            // run-owned Function publication attachment
@@ -189,7 +189,7 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		config.Frames == nil ||
 		config.CleanupOutput == nil ||
 		config.ConfigModules == nil ||
-		config.Vnodes == nil ||
+		config.Publication == nil ||
 		config.Scheduler == nil ||
 		(config.HandlerStager == nil) != (config.HandlerAttacher == nil) {
 		return nil, errors.New("job output: incomplete factory configuration")
@@ -500,6 +500,7 @@ func (f *Factory) buildV1(
 		return nil, nil, redactLifecycle, err
 	}
 	jobConfig := jobruntime.JobConfig{
+		Publication:     f.config.Publication,
 		PluginName:      f.config.PluginName,
 		Name:            config.Name(),
 		ModuleName:      config.Module(),
@@ -595,7 +596,7 @@ func (f *Factory) buildV2(
 		IsStock:         config.SourceType() == confgroup.TypeStock,
 		FunctionOnly:    functionOnly,
 		RuntimeService:  runtimeStage,
-		VnodeRegistry:   f.config.Vnodes,
+		Publication:     f.config.Publication,
 	}
 	if redactLifecycle {
 		jobConfig.LifecycleErrorSanitizer = redactResolvedLifecycleError
@@ -631,13 +632,21 @@ func (f *Factory) lookupVNode(config confgroup.Config) (jobruntime.VnodeSnapshot
 	}
 	if f.config.Vnode == nil {
 		return jobruntime.VnodeSnapshot{}, transientJobConstruction(
-			withJobConfigFailure(fmt.Errorf("job output: vnode %q is unavailable", config.Vnode()), "vnode", "unavailable"),
+			withJobConfigFailure(
+				fmt.Errorf("job output: vnode %q is unavailable", config.Vnode()),
+				"vnode",
+				"unavailable",
+			),
 		)
 	}
 	vnode, ok := f.config.Vnode(config.Vnode())
 	if !ok || vnode.Vnode == nil {
 		return jobruntime.VnodeSnapshot{}, transientJobConstruction(
-			withJobConfigFailure(fmt.Errorf("job output: vnode %q is not registered", config.Vnode()), "vnode", "missing_vnode"),
+			withJobConfigFailure(
+				fmt.Errorf("job output: vnode %q is not registered", config.Vnode()),
+				"vnode",
+				"missing_vnode",
+			),
 		)
 	}
 	return vnode, nil

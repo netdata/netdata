@@ -99,8 +99,7 @@ See [VM Templates](/docs/learn/vm-templates.md) for how to avoid this when cloni
 Each virtual node is defined in a YAML file:
 
 ```yaml
-- name: my-remote-server
-  hostname: remote-server.example.com
+- hostname: remote-server.example.com
   guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
   labels:
     environment: production
@@ -111,8 +110,9 @@ Each virtual node is defined in a YAML file:
 |------------|----------|-------------------------------------------------|
 | `hostname` | Yes      | Display name shown in dashboards and Cloud      |
 | `guid`     | Yes      | UUID that uniquely identifies this virtual node |
-| `name`     | No       | Internal reference name                         |
+| `name`     | No       | Ignored for YAML definitions; `hostname` supplies the reference name |
 | `labels`   | No       | Key-value pairs for filtering and organization  |
+| `stale_after` | No | Host inactivity timeout as whole seconds or a duration such as `5m`. Zero disables the timeout. |
 
 :::warning
 
@@ -134,7 +134,7 @@ In the Netdata UI, open the node's dynamic configuration view and look for the *
 
 :::
 
-The GUI form exposes `hostname`, `guid`, and `labels` — the same fields as YAML, minus `name` which the Agent ignores:
+The GUI form exposes `hostname`, `guid`, `labels`, and `stale_after` — the same fields as YAML, minus `name` which the Agent ignores:
 
 | Field      | Required in the GUI | Description                                                                                                                         |
 |------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -142,13 +142,15 @@ The GUI form exposes `hostname`, `guid`, and `labels` — the same fields as YAM
 | `hostname` | No                  | Display name shown in dashboards and Cloud. If left blank, the job name you assign when creating the vnode is used as the hostname. |
 | `labels`   | No                  | Key-value pairs for filtering and organization.                                                                                     |
 
+The optional `stale_after` GUI field accepts whole seconds, from 0 to 4294967295. Omitting it preserves any legacy `_node_stale_after_seconds` label; an explicit value overrides that label, and zero disables it. When the timeout is enabled, stopping a job suppresses its chart cleanup to avoid refreshing host activity. Its charts can therefore remain while another job keeps the vnode active.
+
 Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in PowerShell. Each `guid` must be unique across your infrastructure, as described in the GUID Uniqueness warning above. Each `hostname` must also be unique across all vnodes — the Agent rejects a new vnode whose hostname matches an existing one. See [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity) for how each field affects the vnode.
 
 :::info
 
 **Changes apply without an Agent restart**
 
-Vnode changes applied via the GUI propagate immediately to all running collector jobs that reference the vnode — no restart or reload is needed.
+Vnode changes applied via the GUI are used by subsequent output without an Agent restart. A collection already in progress keeps its routing GUID; the next collection adopts an updated named vnode snapshot.
 
 :::
 
@@ -168,16 +170,18 @@ Vnode changes applied via the GUI propagate immediately to all running collector
 
 ### Attaching a Virtual Node to a Collector Job
 
-Defining a vnode is step 1. The vnode becomes active when a collector job references it by setting `vnode` in the job's configuration to the vnode's **hostname**:
+Defining a vnode is step 1. The vnode becomes active when a collector job references it by setting `vnode` in the job's configuration to the vnode's **name**:
 
 ```yaml
 jobs:
   - name: win_server1
-    vnode: win_server1
+    vnode: remote-server.example.com
     url: http://203.0.113.10:9182/metrics
 ```
 
-The `vnode` value must exactly match the `hostname` of the vnode definition. The Agent resolves the vnode at job startup — if the referenced hostname is not registered, the job fails to start.
+The `vnode` value must exactly match the vnode reference name. For YAML definitions, the reference name is always `hostname` and any explicit `name` is ignored; for GUI definitions, use the name assigned when creating the vnode. If that name is not registered, the job fails to start.
+
+Several jobs can reference the same vnode. Its configured hostname and host labels govern output to its GUID within that plugin process, including collector-generated scopes using the same GUID. Job labels remain chart labels. Removing an unreferenced configured vnode lets generated contributors resume using their own host metadata.
 
 :::note
 
@@ -188,7 +192,7 @@ The `vnode` value must exactly match the `hostname` of the vnode definition. The
 ### How Virtual Nodes Work
 
 1. Define a vnode (YAML file or GUI) with a unique `hostname` and `guid`
-2. Configure the collector job with `vnode: <hostname>` to attach it
+2. Configure the collector job with `vnode: <name>` to attach it
 3. Metrics are tagged with the vnode's GUID instead of the Agent's Machine GUID
 4. Cloud sees the vnode as a separate node in your Space
 5. Parent nodes store vnode metadata alongside Children metadata
@@ -462,8 +466,7 @@ cat /etc/netdata/vnodes/*
 Each file contains a `guid` field that uniquely identifies the vnode:
 
 ```yaml
-- name: my-remote-server
-  hostname: remote-server.example.com
+- hostname: remote-server.example.com
   guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 

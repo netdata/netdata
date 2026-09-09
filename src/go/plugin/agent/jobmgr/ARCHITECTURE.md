@@ -1168,7 +1168,7 @@ attempt until it releases.
 | `plugin/framework/functions` | Passive Function values and the stdin input capsule |
 | `plugin/framework/dyncfg` | The dynamic-configuration `Graph` |
 | `plugin/framework/jobruntime` | V1 / V2 job runtime and host/vnode scope |
-| `plugin/framework/vnoderegistry` | Post-success vnode owner/conflict registry |
+| `plugin/framework/hostoutput` | Process-owned host publication and contributor lifetimes |
 | `plugin/agent/secrets/resolver` | Atomic config clone, reference compilation, scoped resolution |
 | `plugin/agent/secrets/secretstore` | Frozen creator catalog and process-owned Store epoch generations |
 | `plugin/agent/discovery` | Provider catalog and the discovery pipeline generation |
