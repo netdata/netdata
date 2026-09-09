@@ -16,8 +16,8 @@ use tokio_util::sync::CancellationToken;
 
 use common::{req, sp, sealed_source, tail_source, write_wal};
 use sfsq::traces::{
-    DURATION_BIN_COUNT, FACET_TOP_K, OverviewData, OverviewQuery, PartialReason, QueryStatus,
-    TraceQuery, TraceSource, overview, trace_by_id,
+    DURATION_BIN_COUNT, DurationPercentiles, FACET_TOP_K, OverviewData, OverviewQuery,
+    PartialReason, QueryStatus, TraceQuery, TraceSource, overview, trace_by_id,
 };
 
 /// One second-wide bucket per second, 10 buckets from t=0.
@@ -100,6 +100,46 @@ fn sealed_grid_counts_traces_by_merged_envelope() {
     assert_eq!(data.total_errors, 1);
     let cell_sum: u64 = data.cells.iter().flatten().sum();
     assert_eq!(cell_sum, data.total_traces, "cells count traces");
+}
+
+/// Error counts are index-parallel to `cells` — per time bucket AND per
+/// duration bin — and they count STORED ERROR-SPAN rows, the statistic
+/// `total_errors` reports, not "traces that failed": the cell that
+/// binned ONE trace with two failed spans reads 2.
+#[test]
+fn error_cells_count_error_spans_per_bucket_and_duration_bin() {
+    let dir = tempfile::tempdir().unwrap();
+    // D: two failed spans, 3us envelope → bucket 7, bin 0.
+    let mut d1 = tspan(0xD, 6, 7_000_000_000, 7_000_001_000, "d-1");
+    d1.status = Some((2, "boom"));
+    let mut d2 = tspan(0xD, 7, 7_000_002_000, 7_000_003_000, "d-2");
+    d2.status = Some((2, "boom"));
+    // F: one failed span in D's BUCKET but a 5s envelope → bin 4, so the
+    // two failures never share a cell.
+    let mut f = tspan(0xF, 9, 7_000_000_000, 12_000_000_000, "f-slow");
+    f.status = Some((2, "boom"));
+    // Past the grid's end: the envelope-start clipping drops E from the
+    // cells, the totals AND the error cells.
+    let mut e = tspan(0xE, 8, 12_000_000_000, 12_000_001_000, "e-clipped");
+    e.status = Some((2, "boom"));
+    let mut spans = corpus();
+    spans.extend([d1, d2, f, e]);
+    let wal = write_wal(dir.path(), vec![req(&spans)], "errs");
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "a")],
+        OverviewQuery::new(grid()),
+    );
+    let mut expected = vec![[0u64; DURATION_BIN_COUNT]; 10];
+    expected[3][0] = 1; // B: one failed span, 500ns
+    expected[7][0] = 2; // D: two failed spans, 3us
+    expected[7][4] = 1; // F: one failed span, 5s
+    assert_eq!(data.error_cells, expected);
+    assert_eq!(data.total_errors, 4, "E never reached the totals");
+    assert_eq!(
+        data.error_cells.iter().flatten().sum::<u64>(),
+        data.total_errors
+    );
+    assert_eq!(data.cells[7][0], 1, "one trace, two failed spans");
 }
 
 #[test]
@@ -285,6 +325,79 @@ fn empty_grid_is_a_request_error() {
     )
     .unwrap_err();
     assert!(err.to_string().contains("empty"), "{err}");
+}
+
+// ── Per-bucket duration percentiles ─────────────────────────────────
+
+/// Ten traces in ONE bucket with durations 1ms..10ms, plus a single
+/// 42ms trace in another — a population whose nearest-rank answers are
+/// hand-checkable.
+fn percentile_corpus() -> Vec<common::SpanSpec> {
+    let mut spans: Vec<common::SpanSpec> = (1..=10u8)
+        .map(|i| {
+            tspan(
+                0x20 + i,
+                i,
+                2_000_000_000,
+                2_000_000_000 + u64::from(i) * 1_000_000,
+                "p",
+            )
+        })
+        .collect();
+    spans.push(tspan(0x40, 11, 5_000_000_000, 5_042_000_000, "q"));
+    spans
+}
+
+#[test]
+fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&percentile_corpus())], "pct");
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "a")],
+        OverviewQuery::new(grid()),
+    );
+    assert_eq!(data.total_traces, 11);
+    assert_eq!(data.bucket_percentiles.len(), 10, "one per time bucket");
+    // n=10, nearest rank ceil(p/100 x n) - 1: p50 is the 5th smallest,
+    // p95 and p99 the largest. Every answer is an OBSERVED duration —
+    // no interpolation over the decade-wide "1-10ms" bin could name 5ms.
+    assert_eq!(
+        data.bucket_percentiles[2],
+        Some(DurationPercentiles {
+            p50: 5_000_000,
+            p95: 10_000_000,
+            p99: 10_000_000,
+        })
+    );
+    // A one-trace bucket answers that trace's duration at every rank.
+    assert_eq!(
+        data.bucket_percentiles[5],
+        Some(DurationPercentiles {
+            p50: 42_000_000,
+            p95: 42_000_000,
+            p99: 42_000_000,
+        })
+    );
+    // Every other bucket binned nothing: absent, never zero.
+    for (i, p) in data.bucket_percentiles.iter().enumerate() {
+        assert_eq!(p.is_some(), i == 2 || i == 5, "bucket {i}");
+    }
+}
+
+/// The all-or-empty paths keep the array at the grid's shape, so a
+/// consumer walking it beside `cells` never runs off its end.
+#[test]
+fn a_cancelled_call_keeps_the_percentile_array_at_the_grid_shape() {
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let data = overview(
+        vec![],
+        OverviewQuery::new(grid()),
+        cancel,
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    assert_eq!(data.bucket_percentiles, vec![None; 10]);
 }
 
 // ── Root facets ─────────────────────────────────────────────────────
