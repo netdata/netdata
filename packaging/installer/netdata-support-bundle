@@ -1104,6 +1104,7 @@ STREAMVEC
 # processes whose executable names or invocation paths contain "netdata".
 NETDATA_PID=$(ps -eo pid=,comm= 2>/dev/null | awk '$2=="netdata"{print $1; exit}')
 [ -z "${NETDATA_PID:-}" ] && NETDATA_PID=$(pidof netdata 2>/dev/null | awk '{print $1}')
+export NETDATA_PID
 
 # Include plugin processes by walking the live parent/child relationship. A
 # fixed process-name list misses custom plugin launchers and can match unrelated
@@ -1455,10 +1456,26 @@ fi
 info "collecting: network"
 collect_cmd 08-network/netdata-sockets.txt "All sockets owned by the Netdata process tree" \
   sh -c '
-    if [ -z "$NETDATA_PIDS" ]; then
+    _live_pids=""
+    if [ -n "${NETDATA_PID:-}" ] && command -v ps >/dev/null 2>&1; then
+      _live_pids=$(ps -eo pid=,ppid=,comm= 2>/dev/null | awk -v root="$NETDATA_PID" "
+        { pid=\$1; parent[pid]=\$2; comm[pid]=\$3 }
+        END {
+          if (root !~ /^[0-9]+$/ || comm[root] != \"netdata\") exit
+          owned[root]=1; changed=1
+          while (changed) {
+            changed=0
+            for (pid in parent) if (!owned[pid] && owned[parent[pid]]) {
+              owned[pid]=1; changed=1
+            }
+          }
+          for (pid in owned) if (owned[pid]) print pid
+        }" | sort -n)
+    fi
+    if [ -z "$_live_pids" ]; then
       echo "(unavailable: Netdata process not found)"
     elif command -v lsof >/dev/null 2>&1; then
-      _valid_pids=$(printf "%s\\n" "$NETDATA_PIDS" | awk "/^[0-9]+$/")
+      _valid_pids=$(printf "%s\\n" "$_live_pids" | awk "/^[0-9]+$/")
       if [ -z "$_valid_pids" ]; then
         echo "(unavailable: Netdata process tree contains no valid PIDs)"
       else
@@ -1473,13 +1490,16 @@ collect_cmd 08-network/netdata-sockets.txt "All sockets owned by the Netdata pro
           awk -v re="^(${_pid_re})$" "\$1 ~ /^lsof:/ || \$1 == \"COMMAND\" || \$2 ~ re"
       fi
     elif command -v ss >/dev/null 2>&1; then
-      _pid_re=$(printf "%s" "$NETDATA_PIDS" | tr "\\n" "|" | sed "s/|$//")
+      _pid_re=$(printf "%s\\n" "$_live_pids" | awk "/^[0-9]+$/ { printf \"%s%s\", sep, \$1; sep=\"|\" }")
       ss -a -tunxp 2>&1 | awk -v re="pid=(${_pid_re})(,|\\))" "NR == 1 || \$0 ~ re"
     elif command -v sockstat >/dev/null 2>&1; then
-      _pid_re=$(printf "%s" "$NETDATA_PIDS" | tr "\\n" "|" | sed "s/|$//")
+      _pid_re=$(printf "%s\\n" "$_live_pids" | awk "/^[0-9]+$/ { printf \"%s%s\", sep, \$1; sep=\"|\" }")
       sockstat -s 2>&1 | awk -v re="^(${_pid_re})$" "NR == 1 || \$3 ~ re"
+    elif command -v netstat >/dev/null 2>&1; then
+      echo "(degraded: process ownership unavailable; showing port 19999 listeners only)"
+      netstat -an 2>&1 | awk "NR == 1 || (\$0 ~ /19999/ && \$0 ~ /LISTEN|listen|LISTENING/)"
     else
-      echo "(unavailable: lsof, ss, or sockstat is required for process-owned socket details)"
+      echo "(unavailable: lsof, ss, sockstat, or netstat is required for socket details)"
     fi; true'
 if [ "$OBFUSCATE" = "1" ]; then
   # search/domain values are often corporate-internal names outside private TLDs
