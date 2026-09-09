@@ -33,7 +33,8 @@ existing framework boundary for vnode design work. This maintainer document is n
 - Credential changes mark status accepted while pending, even when last-good metadata remains available. Completion
   reports running or failed. DynCfg test validates authored configuration without network access; get returns authored
   configuration. The result path never substitutes acquired metadata into authored credentials/configuration.
-- Removal and run shutdown cancel and join workers. Late results cannot publish into a retired run or incarnation.
+- Removal cancels the vnode's worker; run shutdown cancels and joins all workers. Late results cannot publish into a
+  retired run or incarnation.
 - Acquisition updates the configured host authority but MUST NOT announce a host by itself. Ordinary job output
   publishes it under the existing [host ownership contract](../hostoutput/README.md#metadata-ownership).
 

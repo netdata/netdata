@@ -5,7 +5,10 @@ package vnodes
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/snmpauth"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
 )
@@ -17,6 +20,17 @@ func TestVnodeSchemaModesAndCredentials(t *testing.T) {
 	require.NoError(t, compiler.AddResource("vnode.json", doc["jsonSchema"]))
 	schema, err := compiler.Compile("vnode.json")
 	require.NoError(t, err)
+	t.Run("authored get roundtrip", func(t *testing.T) {
+		config := Config{VirtualNode: VirtualNode{Name: "router"}, Mode: "snmp", ModeSNMP: &SNMPConfig{
+			Address: "device", Timeout: confopt.Duration(5 * time.Second),
+			Config: snmpauth.Config{Version: "2c", Credentials: &snmpauth.Community{Community: "fixture"}},
+		}}
+		raw, err := json.Marshal(config)
+		require.NoError(t, err)
+		var form any
+		require.NoError(t, json.Unmarshal(raw, &form))
+		require.NoError(t, schema.Validate(form), "authored get must be editable in its schema")
+	})
 	for _, tc := range []struct {
 		config string
 		valid  bool

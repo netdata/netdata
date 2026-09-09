@@ -96,9 +96,10 @@
                   },
                   "timeout": {
                     "title": "Timeout",
-                    "description": "Timeout for each SNMP request, as a duration.",
-                    "type": "string",
-                    "default": "5s"
+                    "description": "Timeout for each SNMP request, in seconds.",
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "default": 5
                   },
                   "retries": {
                     "title": "Retries",
@@ -354,7 +355,7 @@
         }
       },
       "timeout": {
-        "ui:placeholder": "5s"
+        "ui:placeholder": "5"
       },
       "credentials": {
         "community": {
