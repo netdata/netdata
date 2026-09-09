@@ -51,7 +51,7 @@ if [ -z "${ND_SUPPORT_BUNDLE_DEMOTED:-}" ]; then
   exec nice -n 19 sh "$0" "$@"
 fi
 
-VERSION="1.2.0"
+VERSION="1.3.0"
 OUTDIR="/tmp"
 SINCE_HOURS=24
 CMD_TIMEOUT=10
@@ -1100,8 +1100,32 @@ STREAMVEC
 [ "$SELFTEST" = "1" ] && run_selftest
 
 # --- environment detection ------------------------------------------------------
-NETDATA_PID=$(pidof netdata 2>/dev/null | awk '{print $1}')
-[ -z "${NETDATA_PID:-}" ] && NETDATA_PID=$(ps -eo pid=,comm= 2>/dev/null | awk '$2=="netdata"{print $1; exit}')
+# Prefer the exact daemon command name: pidof can also return Netdata helper
+# processes whose executable names or invocation paths contain "netdata".
+NETDATA_PID=$(ps -eo pid=,comm= 2>/dev/null | awk '$2=="netdata"{print $1; exit}')
+[ -z "${NETDATA_PID:-}" ] && NETDATA_PID=$(pidof netdata 2>/dev/null | awk '{print $1}')
+export NETDATA_PID
+
+# Include plugin processes by walking the live parent/child relationship. A
+# fixed process-name list misses custom plugin launchers and can match unrelated
+# services; socket ownership stays limited to this Netdata process tree.
+NETDATA_PIDS="${NETDATA_PID:-}"
+if [ -n "${NETDATA_PID:-}" ]; then
+  _proc_tree=$(ps -eo pid=,ppid= 2>/dev/null | awk -v root="$NETDATA_PID" '
+    { pid=$1; parent[pid]=$2 }
+    END {
+      owned[root]=1; changed=1
+      while (changed) {
+        changed=0
+        for (pid in parent) if (!owned[pid] && owned[parent[pid]]) {
+          owned[pid]=1; changed=1
+        }
+      }
+      for (pid in owned) if (owned[pid]) print pid
+    }' | sort -n)
+  [ -n "$_proc_tree" ] && NETDATA_PIDS="$_proc_tree"
+fi
+export NETDATA_PIDS
 
 # path candidates per install type: FHS packages, static (/opt/netdata),
 # FreeBSD ports (/usr/local + /var/db), Homebrew (incl. Apple Silicon prefix)
@@ -1430,10 +1454,53 @@ fi
 # 08-network
 # =============================================================================
 info "collecting: network"
-collect_cmd 08-network/listening-sockets.txt "Listening sockets (netdata-related)" \
-  sh -c 'if command -v ss >/dev/null; then ss -tlnp 2>/dev/null | awk "NR==1 || /19999|netdata/";
-  elif command -v sockstat >/dev/null; then sockstat -l 2>/dev/null | awk "NR==1 || /19999|netdata/";
-  else netstat -an 2>/dev/null | grep -i listen | grep 19999; fi; true'
+collect_cmd 08-network/netdata-sockets.txt "All sockets owned by the Netdata process tree" \
+  sh -c '
+    _live_pids=""
+    if [ -n "${NETDATA_PID:-}" ] && command -v ps >/dev/null 2>&1; then
+      _live_pids=$(ps -eo pid=,ppid=,comm= 2>/dev/null | awk -v root="$NETDATA_PID" "
+        { pid=\$1; parent[pid]=\$2; comm[pid]=\$3 }
+        END {
+          if (root !~ /^[0-9]+$/ || comm[root] != \"netdata\") exit
+          owned[root]=1; changed=1
+          while (changed) {
+            changed=0
+            for (pid in parent) if (!owned[pid] && owned[parent[pid]]) {
+              owned[pid]=1; changed=1
+            }
+          }
+          for (pid in owned) if (owned[pid]) print pid
+        }" | sort -n)
+    fi
+    if [ -z "$_live_pids" ]; then
+      echo "(unavailable: Netdata process not found)"
+    elif command -v lsof >/dev/null 2>&1; then
+      _valid_pids=$(printf "%s\\n" "$_live_pids" | awk "/^[0-9]+$/")
+      if [ -z "$_valid_pids" ]; then
+        echo "(unavailable: Netdata process tree contains no valid PIDs)"
+      else
+        _pid_list=$(printf "%s\\n" "$_valid_pids" | awk "/^[0-9]+$/ { printf \"%s%s\", sep, \$1; sep=\",\" }")
+        _pid_re=$(printf "%s" "$_pid_list" | tr "," "|")
+        # Keep a second PID check on the text output. Some lsof variants have
+        # different selection semantics; an ignored -p must never publish a
+        # host-wide listing.
+        lsof -nP -a -p "$_pid_list" -i 2>&1 |
+          awk -v re="^(${_pid_re})$" "\$1 ~ /^lsof:/ || \$1 == \"COMMAND\" || \$2 ~ re"
+        lsof -nP -a -p "$_pid_list" -U 2>&1 |
+          awk -v re="^(${_pid_re})$" "\$1 ~ /^lsof:/ || \$1 == \"COMMAND\" || \$2 ~ re"
+      fi
+    elif command -v ss >/dev/null 2>&1; then
+      _pid_re=$(printf "%s\\n" "$_live_pids" | awk "/^[0-9]+$/ { printf \"%s%s\", sep, \$1; sep=\"|\" }")
+      ss -a -tunxp 2>&1 | awk -v re="pid=(${_pid_re})(,|\\))" "NR == 1 || \$0 ~ re"
+    elif command -v sockstat >/dev/null 2>&1; then
+      _pid_re=$(printf "%s\\n" "$_live_pids" | awk "/^[0-9]+$/ { printf \"%s%s\", sep, \$1; sep=\"|\" }")
+      sockstat -s 2>&1 | awk -v re="^(${_pid_re})$" "NR == 1 || \$3 ~ re"
+    elif command -v netstat >/dev/null 2>&1; then
+      echo "(degraded: process ownership unavailable; showing port 19999 listeners only)"
+      netstat -an 2>&1 | awk "NR == 1 || (\$0 ~ /19999/ && \$0 ~ /LISTEN|listen|LISTENING/)"
+    else
+      echo "(unavailable: lsof, ss, sockstat, or netstat is required for socket details)"
+    fi; true'
 if [ "$OBFUSCATE" = "1" ]; then
   # search/domain values are often corporate-internal names outside private TLDs
   collect_cmd 08-network/resolv-conf.txt "DNS resolver config (search domains withheld)" \
@@ -1684,7 +1751,7 @@ in a config file is still visible here.
 | `05-logs/` | journal + agent log files (window-capped), updater log, coredump metadata |
 | `06-state/` | daemon status file (crash record), state/db disk usage, claim state |
 | `07-runtime/` | live API captures: info, node instances, alerts, aclk state, buildinfo |
-| `08-network/` | listening sockets, DNS, proxy, Netdata Cloud reachability |
+| `08-network/` | Netdata process-tree socket inventory, DNS, proxy, Netdata Cloud reachability |
 | `09-permissions/` | modes, ownership, setuid bits, file capabilities, extended attributes, SELinux/AppArmor contexts and ACLs - including every `plugins.d` |
 
 ## Conventions
@@ -1701,7 +1768,7 @@ manifest_add README.md file generated "Bundle documentation"
 # emit MANIFEST.json LAST so every file (incl. summary.txt and README.md) is indexed
 {
   echo '{'
-  echo '  "schema": "netdata-support-bundle/v1",'
+  echo '  "schema": "netdata-support-bundle/v2",'
   echo "  \"tool_version\": \"$VERSION\","
   echo "  \"generated_utc\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
   echo "  \"runtime_seconds\": $(( $(now_s) - START_TS )),"

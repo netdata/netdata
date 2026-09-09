@@ -2,7 +2,7 @@
 #
 # netdata-support-bundle - collect a diagnostic bundle for Netdata support tickets.
 # Windows counterpart of netdata-support-bundle. Same bundle layout, same MANIFEST
-# schema (netdata-support-bundle/v1), same sanitization rules.
+# schema (netdata-support-bundle/v2), same sanitization rules.
 #
 # Standard captures redact secrets except the streaming API key in stream.conf
 # (netdata/netdata#23448). -IncludeSnmpDiagnostics adds raw SNMP files with neither
@@ -37,7 +37,7 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'SilentlyContinue'
 
-$ToolVersion = '1.2.0'
+$ToolVersion = '1.3.0'
 $script:SnmpFiles = 0
 $script:SnmpStatus = 'not_requested'
 if ($Version) { Write-Output "netdata-support-bundle $ToolVersion"; exit 0 }
@@ -931,6 +931,22 @@ $NetdataCli = Join-Path $NetdataPrefix 'usr\bin\netdatacli.exe'
 
 $NetdataSvc = Get-Service -Name 'Netdata' -ErrorAction SilentlyContinue
 $NetdataProc = Get-Process -Name 'netdata' -ErrorAction SilentlyContinue | Select-Object -First 1
+$NetdataProcessIds = @()
+if ($NetdataProc) {
+    # Walk descendants so sockets opened by plugin processes remain in scope
+    # without relying on a brittle fixed process-name list.
+    $allProcesses = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId -ErrorAction SilentlyContinue)
+    $ids = New-Object 'System.Collections.Generic.HashSet[int]'
+    [void]$ids.Add([int]$NetdataProc.Id)
+    $changed = $true
+    while ($changed) {
+        $changed = $false
+        foreach ($child in $allProcesses) {
+            if ($ids.Contains([int]$child.ParentProcessId) -and $ids.Add([int]$child.ProcessId)) { $changed = $true }
+        }
+    }
+    $NetdataProcessIds = @($ids | Sort-Object)
+}
 $ApiOk = $false
 try {
     # /api/v3/info stays reachable under bearer protection (v1 is locked)
@@ -1214,7 +1230,24 @@ if ((Test-Path $NetdataCli) -and $NetdataProc) {
 # 08-network
 # ============================================================================
 Show-Info 'collecting: network'
-Save-Cmd '08-network\listening-sockets.txt' 'Listening sockets (netdata-related)' { Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq $using:NdPort -or (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -match 'netdata' } | Format-Table LocalAddress, LocalPort, OwningProcess -AutoSize } 'Get-NetTCPConnection -State Listen (netdata)'
+Save-Cmd '08-network\netdata-sockets.txt' 'All sockets owned by the Netdata process tree' {
+    $pids = @($using:NetdataProcessIds)
+    if (-not $pids) { 'unavailable: Netdata process not found'; return }
+    $rows = @()
+    try {
+        $rows += @(Get-NetTCPConnection -ErrorAction Stop | Where-Object { $pids -contains $_.OwningProcess } | ForEach-Object {
+            $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+            [pscustomobject]@{ Protocol = 'TCP'; LocalAddress = $_.LocalAddress; LocalPort = $_.LocalPort; RemoteAddress = $_.RemoteAddress; RemotePort = $_.RemotePort; State = $_.State; OwningProcess = $_.OwningProcess; ProcessName = if ($p) { $p.ProcessName } else { '-' } }
+        })
+    } catch { $rows += [pscustomobject]@{ Protocol = 'TCP'; State = "unavailable: $($_.Exception.Message)" } }
+    try {
+        $rows += @(Get-NetUDPEndpoint -ErrorAction Stop | Where-Object { $pids -contains $_.OwningProcess } | ForEach-Object {
+            $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+            [pscustomobject]@{ Protocol = 'UDP'; LocalAddress = $_.LocalAddress; LocalPort = $_.LocalPort; RemoteAddress = '*'; RemotePort = '*'; State = '-'; OwningProcess = $_.OwningProcess; ProcessName = if ($p) { $p.ProcessName } else { '-' } }
+        })
+    } catch { $rows += [pscustomobject]@{ Protocol = 'UDP'; State = "unavailable: $($_.Exception.Message)" } }
+    if ($rows.Count -eq 0) { 'No Netdata-owned TCP or UDP sockets found.' } else { $rows | Format-Table Protocol, LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess, ProcessName -AutoSize }
+} 'Get-NetTCPConnection/Get-NetUDPEndpoint (Netdata process tree)'
 Save-Cmd '08-network\dns-config.txt' 'DNS resolver config' { Get-DnsClientServerAddress | Where-Object { $_.ServerAddresses } | Format-Table InterfaceAlias, ServerAddresses -AutoSize } 'Get-DnsClientServerAddress'
 Save-Cmd '08-network\proxy-config.txt' 'System proxy configuration' { netsh winhttp show proxy 2>&1; Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' | Format-List ProxyEnable, ProxyServer, AutoConfigURL } 'netsh winhttp show proxy + registry'
 Save-Cmd '08-network\cloud-connectivity.txt' 'Reachability of Netdata Cloud (TCP/TLS only, no data sent)' { Test-NetConnection -ComputerName $using:CloudHost -Port 443 -WarningAction SilentlyContinue | Format-List ComputerName, RemotePort, TcpTestSucceeded, PingSucceeded } "Test-NetConnection ${CloudHost}:443"
@@ -1369,7 +1402,7 @@ Add-Manifest 'README.md' 'file' 'generated' 'Bundle documentation'
 
 # emit MANIFEST.json LAST so every file (incl. summary.txt and README.md) is indexed
 $manifest = [ordered]@{
-    schema = 'netdata-support-bundle/v1'
+    schema = 'netdata-support-bundle/v2'
     tool_version = "$ToolVersion-windows"
     generated_utc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     runtime_seconds = $RuntimeSecs

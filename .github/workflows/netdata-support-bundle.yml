@@ -84,6 +84,36 @@ jobs:
           sudo install -d -m 755 /var/lib/netdata/snmp/diagnostics
           sudo cp src/go/plugin/go.d/collector/snmp_topology/testdata/topology-diagnostic-archive-replay-v1.zst /var/lib/netdata/snmp/diagnostics/lifecycle.zst
           sudo chmod 644 /var/lib/netdata/snmp/diagnostics/lifecycle.zst
+          fixture_dir=$(mktemp -d)
+          fixture_root_bin="$fixture_dir/netdata"
+          fixture_child_script="$fixture_dir/socket-child.py"
+          fixture_port_file="$fixture_dir/port"
+          fixture_child_pid_file="$fixture_dir/child.pid"
+          cp "$(command -v bash)" "$fixture_root_bin"
+          chmod 755 "$fixture_root_bin"
+          printf '%s\n' \
+            'import socket, sys, time' \
+            's = socket.socket(socket.AF_INET, socket.SOCK_STREAM)' \
+            's.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)' \
+            's.bind(("127.0.0.1", 0))' \
+            's.listen(1)' \
+            'open(sys.argv[1], "w").write(str(s.getsockname()[1]))' \
+            'time.sleep(30)' > "$fixture_child_script"
+          "$fixture_root_bin" -c 'python3 "$1" "$2" & child=$!; echo "$child" > "$3"; wait' \
+            fixture-root "$fixture_child_script" "$fixture_port_file" "$fixture_child_pid_file" &
+          fixture_root_pid=$!
+          for _ in $(seq 1 30); do
+            test -s "$fixture_child_pid_file" && break
+            sleep 0.1
+          done
+          test -s "$fixture_child_pid_file"
+          fixture_child_pid=$(cat "$fixture_child_pid_file")
+          for _ in $(seq 1 30); do
+            test -s "$fixture_port_file" && break
+            sleep 0.1
+          done
+          test -s "$fixture_port_file"
+          trap 'kill "$fixture_root_pid" "$fixture_child_pid" 2>/dev/null || true; wait "$fixture_root_pid" 2>/dev/null || true' EXIT
           output=$(mktemp -d)
           extract=$(mktemp -d)
           sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 --include-snmp-diagnostics -o "$output"
@@ -97,12 +127,18 @@ jobs:
             exit 1
           fi
           test -s "$root/08-network/resolv-conf.txt"
+          test -s "$root/08-network/netdata-sockets.txt"
+          awk -v pid="$fixture_child_pid" '
+            $2 == pid || $3 == pid || $0 ~ ("pid=" pid "([,)]|$)") { found = 1 }
+            END { exit !found }
+          ' "$root/08-network/netdata-sockets.txt"
+          test ! -e "$root/08-network/listening-sockets.txt"
           grep -qF 'KEEP-NONSECRET-CONTENT' "$root/04-config/netdata.conf"
           if grep -R -q 'SENTINEL-E2E-PASSWORD' "$root"; then
             echo 'planted secret survived in bundle' >&2
             exit 1
           fi
-          jq -e '.schema == "netdata-support-bundle/v1" and (.files | length > 0)' "$root/MANIFEST.json"
+          jq -e '.schema == "netdata-support-bundle/v2" and (.files | length > 0)' "$root/MANIFEST.json"
           jq -e '.files[] | select(.path == "04-config/netdata.conf" and .bytes > 0)' "$root/MANIFEST.json"
 
           cmp /var/lib/netdata/snmp/diagnostics/lifecycle.zst "$root/06-state/snmp-diagnostics/lifecycle.zst"
@@ -178,6 +214,33 @@ jobs:
           [System.IO.Directory]::CreateDirectory($diagDir) | Out-Null
           $diagSource = (Resolve-Path 'src/go/plugin/go.d/collector/snmp_topology/testdata/topology-diagnostic-archive-replay-v1.zst').Path
           Copy-Item $diagSource (Join-Path $diagDir 'lifecycle.zst')
+          $fixtureDir = Join-Path $env:RUNNER_TEMP ('netdata-socket-fixture-' + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $fixtureDir -Force | Out-Null
+          $fixtureChildScript = Join-Path $fixtureDir 'socket-child.ps1'
+          $fixtureRootScript = Join-Path $fixtureDir 'netdata-root.ps1'
+          $fixturePortFile = Join-Path $fixtureDir 'port.txt'
+          $fixtureChildPidFile = Join-Path $fixtureDir 'child.pid'
+          @'
+          param([string]$PortFile)
+          $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $listener.LocalEndpoint.Port | Set-Content -NoNewline $PortFile
+          Start-Sleep -Seconds 30
+          $listener.Stop()
+          '@ | Set-Content -Encoding UTF8 $fixtureChildScript
+          @'
+          $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $args[0], $args[1]) -PassThru
+          $child.Id | Set-Content -NoNewline $args[2]
+          Wait-Process -Id $child.Id
+          '@ | Set-Content -Encoding UTF8 $fixtureRootScript
+          $fixtureRootBin = Join-Path $fixtureDir 'netdata.exe'
+          Copy-Item (Join-Path $PSHOME 'powershell.exe') $fixtureRootBin
+          $fixtureRoot = Start-Process -FilePath $fixtureRootBin -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $fixtureRootScript, $fixtureChildScript, $fixturePortFile, $fixtureChildPidFile) -PassThru
+          for ($i = 0; $i -lt 30 -and -not (Test-Path $fixtureChildPidFile); $i++) { Start-Sleep -Milliseconds 100 }
+          if (-not (Test-Path $fixtureChildPidFile)) { throw 'socket fixture child did not start' }
+          $fixtureChildPid = [int](Get-Content $fixtureChildPidFile -Raw)
+          for ($i = 0; $i -lt 30 -and -not (Test-Path $fixturePortFile); $i++) { Start-Sleep -Milliseconds 100 }
+          if (-not (Test-Path $fixturePortFile)) { throw 'socket fixture did not open a listener' }
           $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
           .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1 -IncludeSnmpDiagnostics
           $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
@@ -201,7 +264,12 @@ jobs:
               } finally { $manifestStream.Dispose() }
               if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
               $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
-              if ($manifest.schema -ne 'netdata-support-bundle/v1' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+              if ($manifest.schema -ne 'netdata-support-bundle/v2' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+              $socketEntry = $archive.Entries | Where-Object { $_.FullName -match '08-network[\\/]netdata-sockets[.]txt$' } | Select-Object -First 1
+              if (-not $socketEntry) { throw 'Netdata socket inventory missing' }
+              $socketReader = New-Object System.IO.StreamReader($socketEntry.Open(), $utf8, $true)
+              try { $socketText = $socketReader.ReadToEnd() } finally { $socketReader.Dispose() }
+              if ($socketText -notmatch "(?m)\b$fixtureChildPid\b") { throw "socket fixture child PID $fixtureChildPid was not collected" }
 
               if ($manifest.snmp_diagnostics.files -ne 1 -or $manifest.snmp_diagnostics.status -ne 'complete' -or
                   $manifest.secrets_redacted -or $manifest.pii_obfuscated) { throw 'raw SNMP manifest contract failed' }
@@ -243,4 +311,4 @@ jobs:
               if (-not ($archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])09-permissions[\\/]plugins-d.txt$' })) {
                   throw '09-permissions/plugins-d.txt is missing'
               }
-          } finally { $archive.Dispose() }
+          } finally { $archive.Dispose(); Stop-Process -Id $fixtureChildPid, $fixtureRoot.Id -Force -ErrorAction SilentlyContinue }
