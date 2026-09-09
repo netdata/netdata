@@ -4,11 +4,17 @@ package joboutput
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
@@ -295,6 +301,193 @@ func BenchmarkHostPublicationChangesAndRetirement(b *testing.B) {
 			b.StopTimer()
 			owner.Release()
 			require.Zero(b, p.Len())
+		})
+	}
+}
+
+func TestV1FencedCollectionPreservesCommittedState(t *testing.T) {
+	for name, tc := range map[string]struct {
+		warm, global, hostSwitch, ignored bool
+		mutate                            func(*collectorapi.Charts)
+	}{
+		"first vnode frame":        {},
+		"first global frame":       {global: true},
+		"ignored first definition": {ignored: true},
+		"host switch":              {warm: true, hostSwitch: true},
+		"redefinition": {warm: true, mutate: func(cs *collectorapi.Charts) {
+			c := (*cs)[0]
+			c.Title = "desired"
+			c.MarkNotCreated()
+		}},
+		"chart removal": {warm: true, mutate: func(cs *collectorapi.Charts) {
+			c := (*cs)[0]
+			c.MarkRemove()
+			c.MarkNotCreated()
+		}},
+		"removal without definition request": {warm: true, mutate: func(cs *collectorapi.Charts) { (*cs)[0].MarkRemove() }},
+		"dimension removal": {warm: true, mutate: func(cs *collectorapi.Charts) {
+			c := (*cs)[0]
+			_ = c.MarkDimRemove("old", false)
+			c.MarkNotCreated()
+		}},
+		"same ID replacement": {warm: true, mutate: func(cs *collectorapi.Charts) {
+			old := (*cs)[0]
+			old.MarkRemove()
+			old.MarkNotCreated()
+			_ = cs.Add(&collectorapi.Chart{
+				ID:    "work",
+				Title: "replacement",
+				Units: "units",
+				Dims:  collectorapi.Dims{{ID: "value"}},
+			})
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var out bytes.Buffer
+			firstWrite := make(chan struct{})
+			firstWriteRelease := make(chan struct{})
+			var once sync.Once
+			frames, err := lifecycle.NewFrameOwner(hostTestWriter(func(p []byte) (int, error) {
+				n, err := out.Write(p)
+				once.Do(func() {
+					close(firstWrite)
+					<-firstWriteRelease
+				})
+				return n, err
+			}))
+			require.NoError(t, err)
+			gate, err := newGenerationOutputGate(frames)
+			require.NoError(t, err)
+			require.NoError(t, gate.Activate())
+			cleanup, err := NewCleanupOutputGate(frames)
+			require.NoError(t, err)
+			entered, release := make(chan struct{}), make(chan struct{})
+			chart := &collectorapi.Chart{
+				ID:    "work",
+				Title: "committed",
+				Units: "units",
+				Dims:  collectorapi.Dims{{ID: "old"}, {ID: "value"}},
+			}
+			if tc.ignored {
+				chart.ID = strings.Repeat("x", jobruntime.NetdataChartIDMaxLength)
+			}
+			charts := collectorapi.Charts{chart}
+			var desired *collectorapi.Charts
+			calls := 0
+			mod := &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts { return &charts },
+				CollectFunc: func(context.Context) map[string]int64 {
+					calls++
+					if !tc.warm || calls > 1 {
+						if tc.mutate != nil {
+							tc.mutate(&charts)
+						}
+						desired = charts.Copy()
+						for i, c := range charts {
+							if c.Vars == nil {
+								(*desired)[i].Vars = nil
+							}
+						}
+						close(entered)
+						<-release
+					}
+					return map[string]int64{"old": 1, "value": 1}
+				},
+				CleanupFunc: func(context.Context) {
+					for _, c := range charts {
+						c.Title = "cleanup-mutated"
+					}
+				},
+			}
+			const guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+			vnode := vnodes.VirtualNode{
+				Name:     "device",
+				Hostname: "device",
+				GUID:     guid,
+			}
+			cfgs, err := discovery.NewVNodeConfigurationWithInitial(map[string]*vnodes.VirtualNode{"device": &vnode})
+			require.NoError(t, err)
+			publisher := hostoutput.New()
+			cfg := jobruntime.JobConfig{
+				PluginName:            "go.d",
+				Name:                  "device",
+				ModuleName:            "test",
+				FullName:              "test_device",
+				Module:                mod,
+				Out:                   gate,
+				CleanupOut:            cleanup,
+				Publication:           publisher,
+				Vnode:                 vnode,
+				VnodeName:             "device",
+				VnodeRevision:         1,
+				VnodeMetadataRevision: 1,
+				VnodeLookup:           cfgs.Lookup,
+				UpdateEvery:           1,
+			}
+			if tc.global {
+				cfg.Vnode = vnodes.VirtualNode{}
+				cfg.VnodeName = ""
+			}
+			job := jobruntime.NewJob(cfg)
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			done := make(chan struct{})
+			go func() {
+				job.StartManaged(make(chan struct{}))
+				close(done)
+			}()
+			tickUntil := func(ch <-chan struct{}) {
+				require.Eventually(t, func() bool {
+					job.Tick(1)
+					select {
+					case <-ch:
+						return true
+					default:
+						return false
+					}
+				}, time.Second, time.Millisecond)
+			}
+			if tc.warm {
+				tickUntil(firstWrite)
+				if tc.hostSwitch {
+					next := vnode
+					next.GUID = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
+					edit, err := cfgs.PrepareUpsert("device", 1, &next)
+					require.NoError(t, err)
+					_, err = edit.Commit()
+					require.NoError(t, err)
+				}
+				close(firstWriteRelease)
+			}
+			tickUntil(entered)
+			gate.Fence()
+			close(release)
+			job.Stop()
+			<-done
+			assert.Equal(
+				t,
+				desired,
+				&charts,
+				"rejected preparation must preserve collector objects and removal requests",
+			)
+			assert.Same(t, chart, charts[0])
+			if tc.warm {
+				assert.Equal(t, 1, publisher.Len())
+			} else {
+				assert.Zero(t, publisher.Len())
+				assert.Empty(t, out.String())
+			}
+			out.Reset()
+			job.Cleanup()
+			if tc.warm {
+				assert.Contains(t, out.String(), "HOST '"+guid+"'")
+				assert.Contains(t, out.String(), "'committed'")
+				assert.Equal(t, 3, strings.Count(out.String(), "CHART '"))
+				assert.NotContains(t, out.String(), "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee")
+			} else {
+				assert.Empty(t, out.String())
+			}
+			assert.NotContains(t, out.String(), "cleanup-mutated")
+			assert.Zero(t, publisher.Len())
 		})
 	}
 }

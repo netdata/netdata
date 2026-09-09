@@ -51,11 +51,27 @@ owned configured snapshot initially before Init/Check, and on changed revisions 
 Nagios uses this consumer for host macros. Configuration commits never mutate collector state asynchronously.
 A collection already in progress retains its original target; the next collection receives the updated snapshot.
 
+## V1 output settlement
+
+V1 collectors retain their desired chart objects, including pending redefinitions and removals. The runtime
+renders through a journal of changed fields and commits creation flags, caches, priorities, pruning and output
+timing only after the frame is accepted and written. Rejected or failed output leaves collector intent and the
+last committed host state intact. Chart pointers remain stable for collectors that retain them.
+
+Cleanup uses an inventory of successfully emitted `CHART` definitions, separate from mutable collector objects.
+It applies create/obsolete operations in wire order and removes a definition only when its obsolete command was
+emitted. Collector cleanup can mutate the desired charts without changing which definitions are retired. Global
+self charts have their own inventory and remain independent of vnode staleness suppression.
+
 ## Cost and scope
 
 Steady-state publication uses a GUID lookup and constant-time provenance checks per host batch. Metadata preparation
 and encoding happen on changes outside frame admission. Diagnostic scans occur only for changed unconfigured
 metadata. Retained publication state scales with live contributors, not all hosts ever seen.
+
+V1 rendering remains O(charts + visited dimensions + bytes). The reusable journal retains only changed fields and
+emitted definitions; steady cycles do not copy the chart graph or scan the cleanup inventory. Inventory updates
+are O(emitted definitions), storage follows live emitted charts, and terminal cleanup sorts their wire IDs.
 
 This authority covers one plugin process. Other plugin processes or streaming writers can address the same host
 in Netdata; agent-wide exclusive metadata ownership would require a separate protocol contract.

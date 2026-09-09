@@ -4,6 +4,7 @@ package jobruntime
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 
@@ -77,4 +78,70 @@ func (w v1BenchmarkFrameWriter) Write(payload []byte) (int, error) {
 
 func (w v1BenchmarkFrameWriter) CommitBuiltJobOutput(build func() ([]byte, error), state OutputStateTransaction) error {
 	return w.frames.CommitBuiltProtocolTransaction(build, state)
+}
+
+// BenchmarkV1ChartInventory measures steady collection and a single changed
+// definition among live charts. Rendering remains O(charts + dimensions + bytes);
+// bookkeeping allocations must follow emitted definitions, not the retained inventory.
+// Timing is a workstation trend, not a CI threshold.
+func BenchmarkV1ChartInventory(b *testing.B) {
+	for _, count := range []int{1, 64, 512} {
+		for name, changed := range map[string]bool{"steady": false, "one_definition": true} {
+			b.Run(fmt.Sprintf("%d/%s", count, name), func(b *testing.B) {
+				charts := make(collectorapi.Charts, 0, count)
+				mx := make(map[string]int64, count)
+				for i := range count {
+					id := fmt.Sprintf("chart_%d", i)
+					charts = append(
+						charts,
+						&collectorapi.Chart{
+							ID:    id,
+							Title: "Work",
+							Units: "units",
+							Dims:  collectorapi.Dims{{ID: id}},
+						},
+					)
+					mx[id] = 1
+				}
+				module := &collectorapi.MockCollectorV1{
+					ChartsFunc:  func() *collectorapi.Charts { return &charts },
+					CollectFunc: func(context.Context) map[string]int64 { return mx },
+				}
+				frames, err := lifecycle.NewFrameOwner(io.Discard)
+				if err != nil {
+					b.Fatal(err)
+				}
+				job := NewJob(
+					JobConfig{
+						PluginName: "go.d",
+						Name:       "device",
+						ModuleName: "test",
+						FullName:   "test_device",
+						Module:     module,
+						Out: v1BenchmarkFrameWriter{
+							frames: frames,
+						},
+						Vnode: vnodes.VirtualNode{
+							GUID:     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+							Hostname: "device",
+						},
+					},
+				)
+				if err := job.AutoDetectionManaged(context.Background()); err != nil {
+					b.Fatal(err)
+				}
+				job.runOnce()
+				b.ReportAllocs()
+				b.ResetTimer()
+				for b.Loop() {
+					if changed {
+						charts[count/2].MarkNotCreated()
+					}
+					job.runOnce()
+				}
+				b.StopTimer()
+				job.Cleanup()
+			})
+		}
+	}
 }
