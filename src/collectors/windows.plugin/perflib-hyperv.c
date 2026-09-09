@@ -2495,20 +2495,25 @@ int do_PerflibHyperV(int update_every, usec_t dt __maybe_unused)
     }
 
     for (int i = 0; hyperv_perf_list[i].registry_name != NULL; i++) {
+        hyperv_perf_item *item = &hyperv_perf_list[i];
+        item->generation = generation;
+
         // Find the registry ID using the registry name
-        DWORD id = RegistryFindIDByName(hyperv_perf_list[i].registry_name);
-        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+        DWORD id = RegistryFindIDByName(item->registry_name);
+        if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+            hyperv_reconcile_instances(item);
             continue;
+        }
 
         // Get the performance data using the registry ID
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-        if (!pDataBlock)
-            continue;
-
-        hyperv_perf_item *item = &hyperv_perf_list[i];
-        item->generation = generation;
-        if (item->function_collect(pDataBlock, update_every, item))
+        if (!pDataBlock) {
             hyperv_reconcile_instances(item);
+            continue;
+        }
+
+        item->function_collect(pDataBlock, update_every, item);
+        hyperv_reconcile_instances(item);
     }
     return 0;
 }
