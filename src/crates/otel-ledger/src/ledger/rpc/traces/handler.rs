@@ -44,9 +44,9 @@ use super::adapter::{
 };
 use super::sources::TracesSourceSupplier;
 use super::wire::{
-    AttributeValuesParams, AttributesParams, CoverageWire, InfoResponse, OtelTracesRequest,
-    OtelTracesResponse, OverviewParams, SearchParams, SearchResult, SlowestParams, TraceParams,
-    TracesMode,
+    AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
+    FunctionsTracesResponse, InfoResponse, OtelTracesRequest, OtelTracesResponse, OverviewParams,
+    SearchParams, SearchResult, SlowestParams, TraceParams, TracesMode,
 };
 
 /// Shorthand for the handler-level error every failure path maps to.
@@ -178,12 +178,12 @@ impl OtelTracesHandler {
     /// The `search` mode: the engine's bounded most-recent-first trace
     /// search over the request's (canonicalized) window, with wire-level
     /// tie-safe pagination — see the adapter's cursor docs.
-    async fn search(
+    async fn search_result(
         &self,
         ctx: &FunctionCallContext,
         params: &SearchParams,
         tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+    ) -> netdata_plugin_error::Result<SearchResult> {
         let client_err =
             |e: String| handler_err(format!("invalid otel-traces request: {e}"));
 
@@ -307,7 +307,33 @@ impl OtelTracesHandler {
             (window.capture.start, window.capture.end),
             completion_coverage,
         );
-        Ok(OtelTracesResponse::Search(Box::new(result)))
+        Ok(result)
+    }
+
+    async fn search(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &SearchParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        Ok(OtelTracesResponse::Search(Box::new(
+            self.search_result(ctx, params, tenant).await?,
+        )))
+    }
+
+    async fn functions(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &FunctionsParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let search_params = params
+            .search_params(unix_now_s())
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let data = self.search_result(ctx, &search_params, tenant).await?;
+        Ok(OtelTracesResponse::Functions(Box::new(
+            FunctionsTracesResponse::new(data),
+        )))
     }
 
     /// Common setup for the windowed fold modes (enumeration, slowest):
@@ -546,6 +572,7 @@ impl FunctionHandler for OtelTracesHandler {
     ) -> netdata_plugin_error::Result<Self::Response> {
         let tenant = req.tenant.as_deref();
         match &req.mode {
+            TracesMode::Functions(params) => self.functions(&ctx, params, tenant).await,
             TracesMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             TracesMode::Trace(params) => self.trace(&ctx, params, tenant).await,
             TracesMode::Search(params) => self.search(&ctx, params, tenant).await,

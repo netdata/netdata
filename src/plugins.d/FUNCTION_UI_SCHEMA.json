@@ -13,6 +13,7 @@
     { "$ref": "#/definitions/data_response" },
     { "$ref": "#/definitions/topology_response" },
     { "$ref": "#/definitions/flows_response" },
+    { "$ref": "#/definitions/traces_response" },
     { "$ref": "#/definitions/error_response" },
     { "$ref": "#/definitions/not_modified_response" }
   ],
@@ -623,6 +624,239 @@
           },
           "additionalProperties": true
         },
+        "has_history": { "type": "boolean" },
+        "accepted_params": { "$ref": "#/definitions/accepted_params" },
+        "required_params": { "$ref": "#/definitions/required_params" },
+        "help": { "type": "string" },
+        "update_every": { "type": "integer" },
+        "expires": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "traces_status": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["complete"],
+          "properties": {
+            "complete": { "const": true }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["partial"],
+          "properties": {
+            "partial": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "size_cap",
+                  "source_failure",
+                  "work_ceiling",
+                  "cancelled",
+                  "overview_ceiling",
+                  "rollup_absent",
+                  "slowest_ceiling"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "traces_coverage": {
+      "type": "object",
+      "required": ["after", "before"],
+      "properties": {
+        "after": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "before": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      },
+      "additionalProperties": false
+    },
+    "traces_string_pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "string" }
+    },
+    "traces_field_kinds": {
+      "type": "object",
+      "required": ["fields", "event_attributes", "link_attributes"],
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_string_pair" }
+        },
+        "event_attributes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_string_pair" }
+        },
+        "link_attributes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_string_pair" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "traces_event": {
+      "type": "object",
+      "required": ["time_unix_nano", "name", "dropped_attributes_count", "attributes"],
+      "properties": {
+        "time_unix_nano": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string" },
+        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_string_pair" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "traces_link": {
+      "type": "object",
+      "required": [
+        "trace_id",
+        "span_id",
+        "trace_state",
+        "flags",
+        "dropped_attributes_count",
+        "attributes"
+      ],
+      "properties": {
+        "trace_id": { "type": "string" },
+        "span_id": { "type": "string" },
+        "trace_state": { "type": "string" },
+        "flags": { "type": "integer", "minimum": 0 },
+        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_string_pair" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "traces_span": {
+      "type": "object",
+      "required": [
+        "span_id",
+        "start_ns",
+        "duration_ns",
+        "kind",
+        "flags",
+        "dropped_attributes_count",
+        "dropped_events_count",
+        "dropped_links_count",
+        "fields",
+        "events",
+        "links"
+      ],
+      "properties": {
+        "span_id": { "type": "string" },
+        "parent_span_id": { "type": "string" },
+        "start_ns": { "type": "integer" },
+        "duration_ns": { "type": "integer" },
+        "kind": { "type": "integer" },
+        "flags": { "type": "integer", "minimum": 0 },
+        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
+        "dropped_events_count": { "type": "integer", "minimum": 0 },
+        "dropped_links_count": { "type": "integer", "minimum": 0 },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_string_pair" }
+        },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_event" }
+        },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_link" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "traces_search_item": {
+      "type": "object",
+      "required": [
+        "trace_id",
+        "start_ns",
+        "newest_matched_start_ns",
+        "duration_ns",
+        "span_count",
+        "error_count",
+        "matched_count",
+        "exact",
+        "matched_spans"
+      ],
+      "properties": {
+        "trace_id": { "type": "string" },
+        "root_service": { "type": "string" },
+        "root_name": { "type": "string" },
+        "start_ns": { "type": "integer" },
+        "newest_matched_start_ns": { "type": "integer" },
+        "duration_ns": { "type": "integer" },
+        "span_count": { "type": "integer", "minimum": 0 },
+        "error_count": { "type": "integer", "minimum": 0 },
+        "matched_count": { "type": "integer", "minimum": 0 },
+        "exact": { "type": "boolean" },
+        "matched_spans": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_span" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "traces_search_data": {
+      "type": "object",
+      "required": [
+        "mode",
+        "version",
+        "status",
+        "completion_coverage",
+        "items",
+        "traces",
+        "field_kinds"
+      ],
+      "properties": {
+        "mode": { "const": "search" },
+        "version": { "type": "integer", "minimum": 1 },
+        "status": { "$ref": "#/definitions/traces_status" },
+        "completion_coverage": { "$ref": "#/definitions/traces_coverage" },
+        "items": {
+          "type": "object",
+          "required": ["returned", "max_to_return"],
+          "properties": {
+            "returned": { "type": "integer", "minimum": 0 },
+            "max_to_return": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "traces": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_search_item" }
+        },
+        "field_kinds": { "$ref": "#/definitions/traces_field_kinds" },
+        "anchor": {
+          "type": "object",
+          "required": ["next"],
+          "properties": {
+            "next": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "traces_response": {
+      "type": "object",
+      "required": ["status", "type", "data"],
+      "properties": {
+        "status": { "type": "integer" },
+        "type": { "const": "traces" },
+        "data": { "$ref": "#/definitions/traces_search_data" },
         "has_history": { "type": "boolean" },
         "accepted_params": { "$ref": "#/definitions/accepted_params" },
         "required_params": { "$ref": "#/definitions/required_params" },
