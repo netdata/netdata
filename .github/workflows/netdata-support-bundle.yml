@@ -87,6 +87,7 @@ jobs:
           fixture_dir=$(mktemp -d)
           fixture_root_bin="$fixture_dir/netdata"
           fixture_child_script="$fixture_dir/socket-child.py"
+          fixture_port_file="$fixture_dir/port"
           fixture_child_pid_file="$fixture_dir/child.pid"
           cp "$(command -v bash)" "$fixture_root_bin"
           chmod 755 "$fixture_root_bin"
@@ -99,7 +100,7 @@ jobs:
             'open(sys.argv[1], "w").write(str(s.getsockname()[1]))' \
             'time.sleep(30)' > "$fixture_child_script"
           "$fixture_root_bin" -c 'python3 "$1" "$2" & child=$!; echo "$child" > "$3"; wait' \
-            fixture-root "$fixture_child_script" "$fixture_dir/port" "$fixture_child_pid_file" &
+            fixture-root "$fixture_child_script" "$fixture_port_file" "$fixture_child_pid_file" &
           fixture_root_pid=$!
           for _ in $(seq 1 30); do
             test -s "$fixture_child_pid_file" && break
@@ -107,6 +108,11 @@ jobs:
           done
           test -s "$fixture_child_pid_file"
           fixture_child_pid=$(cat "$fixture_child_pid_file")
+          for _ in $(seq 1 30); do
+            test -s "$fixture_port_file" && break
+            sleep 0.1
+          done
+          test -s "$fixture_port_file"
           trap 'kill "$fixture_root_pid" "$fixture_child_pid" 2>/dev/null || true; wait "$fixture_root_pid" 2>/dev/null || true' EXIT
           output=$(mktemp -d)
           extract=$(mktemp -d)
