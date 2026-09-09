@@ -122,7 +122,10 @@ jobs:
           fi
           test -s "$root/08-network/resolv-conf.txt"
           test -s "$root/08-network/netdata-sockets.txt"
-          awk -v pid="$fixture_child_pid" '$2 == pid { found = 1 } END { exit !found }' "$root/08-network/netdata-sockets.txt"
+          awk -v pid="$fixture_child_pid" '
+            $2 == pid || $3 == pid || $0 ~ ("pid=" pid "([,)]|$)") { found = 1 }
+            END { exit !found }
+          ' "$root/08-network/netdata-sockets.txt"
           test ! -e "$root/08-network/listening-sockets.txt"
           grep -qF 'KEEP-NONSECRET-CONTENT' "$root/04-config/netdata.conf"
           if grep -R -q 'SENTINEL-E2E-PASSWORD' "$root"; then
