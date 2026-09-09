@@ -252,7 +252,10 @@ static void test_popen_echo_loop(POPEN_INSTANCE *pi, const char *msg, size_t ite
                    len, rc);
             exit(1);
         }
-        fflush(child_stdin);
+        if(fflush(child_stdin) != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot flush to plugin: %s", strerror(errno));
+            exit(1);
+        }
 
         char *s = fgets(buffer, (int)buffer_size, child_stdout);
         if (!s || strlen(s) != len) {
@@ -595,18 +598,8 @@ static void test_server_destroy(SPAWN_SERVER *server) {
 }
 
 static void test_exec_child_dies_when_stdout_closes(int argc, const char **argv) {
-    // Model the daemon: netdata ignores SIGPIPE before it creates its spawn server, and that is
-    // what the child must not inherit. Without this the test would pass trivially, because the
-    // tester's own SIGPIPE is already default.
-    struct sigaction ignore_pipe, previous_pipe;
-    memset(&ignore_pipe, 0, sizeof(ignore_pipe));
-    ignore_pipe.sa_handler = SIG_IGN;
-    sigemptyset(&ignore_pipe.sa_mask);
-    if(sigaction(SIGPIPE, &ignore_pipe, &previous_pipe) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot ignore SIGPIPE for the termination contract test");
-        exit(1);
-    }
-
+    // The daemon's ignored SIGPIPE - the thing the child must not inherit - is installed
+    // process-wide by main() (see ignore_sigpipe_like_the_daemon()), so it is already in place here.
     SPAWN_SERVER *server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC, "test-sigpipe", NULL, argc, argv);
     if(!server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create spawn server for the termination contract test");
@@ -669,11 +662,6 @@ static void test_exec_child_dies_when_stdout_closes(int argc, const char **argv)
     nd_log(NDLS_COLLECTORS, NDLP_ERR, "child died of SIGPIPE when its stdout closed, as it must");
 
     test_server_destroy(server);
-
-    if(sigaction(SIGPIPE, &previous_pipe, NULL) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot restore SIGPIPE after the termination contract test");
-        exit(1);
-    }
 }
 #endif
 
@@ -848,6 +836,40 @@ static void test_callback_signal_lifecycle(int argc, const char **argv) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#if !defined(OS_WINDOWS)
+// Model the daemon for the whole suite: netdata sets SIGPIPE to SIG_IGN before it creates its spawn
+// server (NETDATA_SIGNAL_IGNORE in src/daemon/signal-handler.c), and SIG_IGN survives execve(), so
+// an ignored SIGPIPE is exactly what a spawned child must NOT inherit.
+//
+// This has to be process-wide, and it has to happen before the FIRST test that asserts anything
+// about a child's SIGPIPE state. Doing it per-test is what made the callback assertion in
+// callback_wait_for_sigterm() depend on the invoking shell: with SIGPIPE left at its default, the
+// callback child sees SIG_DFL no matter what spawn_server_run_callback() does, so the assertion
+// passed even with the reset removed. It only bit on CI, where the runner leaks SIG_IGN into every
+// step's shell (GitHub Actions is Node-based and Node ignores SIGPIPE - the same inheritance the
+// fix is about, which tests/manual/spawn-termination-macos.sh documents). Coverage that depends on
+// the caller's signal state is not coverage.
+//
+// Only the DISPOSITION needs modelling here. The daemon blocks SIGPIPE too, but that half needs no
+// help: spawn_server_event_loop() calls signals_block_all() and unblocks only SIGTERM and SIGCHLD,
+// so the callback child's inherited mask always carries SIGPIPE blocked and the sigdelset() in
+// spawn_server_run_callback() is exercised on every run, whatever our own mask is.
+//
+// It also makes the tester itself behave like the daemon: a write to a dead child's pipe returns
+// EPIPE and hits our own error path with a diagnostic, instead of killing the tester silently.
+static void ignore_sigpipe_like_the_daemon(void) {
+    struct sigaction ignore_pipe = {
+        .sa_handler = SIG_IGN,
+    };
+    sigemptyset(&ignore_pipe.sa_mask);
+
+    if(sigaction(SIGPIPE, &ignore_pipe, NULL) == -1) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot ignore SIGPIPE to model the daemon");
+        exit(1);
+    }
+}
+#endif
+
 int main(int argc, const char **argv) {
     if(argc > 1 && strcmp(argv[1], "plugin-kill-to-stop") == 0)
         return plugin_kill_to_stop();
@@ -872,6 +894,13 @@ int main(int argc, const char **argv) {
     }
 
     nd_setenv(ENV_VAR_KEY, ENV_VAR_VALUE, 1);
+
+#if !defined(OS_WINDOWS)
+    // Only for the test driver, and it MUST stay below the plugin-* dispatch above: those early
+    // returns are the exec'd children. If they came through here they would ignore SIGPIPE
+    // themselves, after exec, and test_exec_child_dies_when_stdout_closes() could never fail.
+    ignore_sigpipe_like_the_daemon();
+#endif
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
     fprintf(stderr, "\n\nTESTING spawn-server listener backlog\n\n");
