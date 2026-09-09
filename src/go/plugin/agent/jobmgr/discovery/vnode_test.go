@@ -21,7 +21,7 @@ func TestVNodeConfigAtomicRevisions(t *testing.T) {
 		"abort preserves current": {
 			run: func(t *testing.T, configuration *VNodeConfiguration) {
 				first := commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
-				aborted, err := configuration.PrepareUpsert("node", first.Revision, testVNode("changed", "source"))
+				aborted, err := configuration.PrepareUpsert("node", first.Revision, &vnodes.Config{VirtualNode: *testVNode("changed", "source")})
 				require.NoError(t, err)
 
 				require.NoError(t, aborted.Abort())
@@ -64,16 +64,16 @@ func TestVNodeConfigAtomicRevisions(t *testing.T) {
 			run: func(t *testing.T, configuration *VNodeConfiguration) {
 				commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
 
-				_, err := configuration.PrepareUpsert("node", 0, testVNode("stale", "source"))
+				_, err := configuration.PrepareUpsert("node", 0, &vnodes.Config{VirtualNode: *testVNode("stale", "source")})
 				require.ErrorIs(t, err, ErrVNodeRevision)
 			},
 		},
 		"commit selects one preparation from the same revision": {
 			run: func(t *testing.T, configuration *VNodeConfiguration) {
 				first := commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
-				winner, err := configuration.PrepareUpsert("node", first.Revision, testVNode("winner", "source"))
+				winner, err := configuration.PrepareUpsert("node", first.Revision, &vnodes.Config{VirtualNode: *testVNode("winner", "source")})
 				require.NoError(t, err)
-				stale, err := configuration.PrepareUpsert("node", first.Revision, testVNode("stale", "source"))
+				stale, err := configuration.PrepareUpsert("node", first.Revision, &vnodes.Config{VirtualNode: *testVNode("stale", "source")})
 				require.NoError(t, err)
 
 				_, err = winner.Commit()
@@ -105,9 +105,9 @@ func TestVNodeConfigCopiesMutableValues(t *testing.T) {
 }
 
 func TestVNodeConfigInitialSnapshotIsDeterministicAndIndependent(t *testing.T) {
-	initial := map[string]*vnodes.VirtualNode{
-		"z": {Name: "z", Hostname: "z-host", GUID: "z-guid", Labels: map[string]string{"site": "z"}},
-		"a": {Name: "a", Hostname: "a-host", GUID: "a-guid", Labels: map[string]string{"site": "a"}},
+	initial := map[string]*vnodes.Config{
+		"z": {VirtualNode: vnodes.VirtualNode{Name: "z", Hostname: "z-host", GUID: "z-guid", Labels: map[string]string{"site": "z"}}},
+		"a": {VirtualNode: vnodes.VirtualNode{Name: "a", Hostname: "a-host", GUID: "a-guid", Labels: map[string]string{"site": "a"}}},
 	}
 	configuration, err := NewVNodeConfigurationWithInitial(initial)
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestVNodeConfigInitialSnapshotIsDeterministicAndIndependent(t *testing.T) {
 }
 
 func TestVNodeConfigInitialIdentityMustMatchMapKey(t *testing.T) {
-	_, err := NewVNodeConfigurationWithInitial(map[string]*vnodes.VirtualNode{"map-name": {Name: "vnode-name"}})
+	_, err := NewVNodeConfigurationWithInitial(map[string]*vnodes.Config{"map-name": {VirtualNode: vnodes.VirtualNode{Name: "vnode-name"}}})
 	require.Error(t, err)
 }
 
@@ -156,7 +156,7 @@ func commitVNode(
 	vnode *vnodes.VirtualNode,
 ) jobruntime.VnodeSnapshot {
 	t.Helper()
-	prepared, err := configuration.PrepareUpsert(id, expected, vnode)
+	prepared, err := configuration.PrepareUpsert(id, expected, &vnodes.Config{VirtualNode: *vnode})
 	require.NoError(t, err)
 	snapshot, err := prepared.Commit()
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestVNodeDefinitionIndex(t *testing.T) {
 				zero := confopt.Duration(0)
 				next.StaleAfter = &zero
 			}
-			prepared, err := c.PrepareUpsert("node", first.Revision, next)
+			prepared, err := c.PrepareUpsert("node", first.Revision, &vnodes.Config{VirtualNode: *next})
 			require.NoError(t, err)
 			assert.Same(t, old, c.Definition(initial.GUID))
 			if tc.abort {
@@ -218,7 +218,7 @@ func TestVNodeDefinitionIndex(t *testing.T) {
 				_, err = removal.Commit()
 				require.NoError(t, err)
 				assert.Nil(t, c.Definition(initial.GUID))
-				prepared, err = c.PrepareUpsert("node", 0, next)
+				prepared, err = c.PrepareUpsert("node", 0, &vnodes.Config{VirtualNode: *next})
 				require.NoError(t, err)
 			}
 			snapshot, err := prepared.Commit()

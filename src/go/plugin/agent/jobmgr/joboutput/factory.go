@@ -640,7 +640,10 @@ func (f *Factory) lookupVNode(config confgroup.Config) (jobruntime.VnodeSnapshot
 		)
 	}
 	vnode, ok := f.config.Vnode(config.Vnode())
-	if !ok || vnode.Vnode == nil {
+	if ok && vnode.Vnode == nil {
+		return jobruntime.VnodeSnapshot{}, transientJobConstruction(withJobConfigFailure(fmt.Errorf("job output: vnode %q is awaiting identity acquisition", config.Vnode()), "vnode", "pending_vnode"))
+	}
+	if !ok {
 		return jobruntime.VnodeSnapshot{}, transientJobConstruction(
 			withJobConfigFailure(
 				fmt.Errorf("job output: vnode %q is not registered", config.Vnode()),

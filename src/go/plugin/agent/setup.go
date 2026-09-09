@@ -168,7 +168,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discoverySetup
 	return cfg
 }
 
-func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
+func (a *Agent) setupVnodeRegistry() map[string]*vnodes.Config {
 	a.Debugf("looking for 'vnodes/' in %v", a.ConfigDir)
 	if len(a.ConfigDir) == 0 {
 		return nil

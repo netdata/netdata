@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/snmpauth"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 )
 
 // Config is authored input. Credentials must never enter VirtualNode snapshots.
@@ -145,7 +148,21 @@ func (c *Config) Resolve(m *Metadata) *VirtualNode {
 		if v.Hostname == "" {
 			v.Hostname = c.Name
 		}
-		v.Labels = maps.Clone(m.Labels)
+		// Acquired fields use normal host emission normalization; authored overrides
+		// have already passed strict validation and remain exact.
+		acquiredHost := m.Hostname
+		if acquiredHost == "" {
+			acquiredHost = c.Name
+		}
+		acquiredLabels := m.Labels
+		if prepared, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{GUID: v.GUID, Hostname: acquiredHost, Labels: m.Labels}); err == nil {
+			acquiredHost = prepared.Hostname
+			acquiredLabels = prepared.Labels
+		}
+		if c.Hostname == "" {
+			v.Hostname = acquiredHost
+		}
+		v.Labels = maps.Clone(acquiredLabels)
 		if v.Labels == nil {
 			v.Labels = make(map[string]string)
 		}
@@ -174,4 +191,34 @@ func (c *Config) SameAcquisition(next *Config) bool {
 		return !c.IsSNMP() && !next.IsSNMP()
 	}
 	return reflect.DeepEqual(c.ModeSNMP.Defaults(), next.ModeSNMP.Defaults())
+}
+
+// ValidateConfigSet validates authored identities, including unresolved GUID reservations.
+func ValidateConfigSet(initial map[string]*Config) error {
+	guids := make(map[string]string)
+	hostnames := make(map[string]string)
+	for _, id := range slices.Sorted(maps.Keys(initial)) {
+		c := initial[id]
+		if c == nil {
+			return fmt.Errorf("configured vnode %q is nil", id)
+		}
+		if c.Name != id {
+			return fmt.Errorf("configured vnode %q identity differs from its map key", id)
+		}
+		if err := c.Validate(); err != nil {
+			return fmt.Errorf("configured vnode %q: %w", id, err)
+		}
+		guid, _ := ConfiguredGUIDKey(c.IdentityGUID())
+		if other, ok := guids[guid]; ok {
+			return fmt.Errorf("duplicate configured vnode GUID (%s and %s)", other, id)
+		}
+		guids[guid] = id
+		if c.Hostname != "" {
+			if other, ok := hostnames[c.Hostname]; ok {
+				return fmt.Errorf("duplicate configured vnode hostname (%s and %s)", other, id)
+			}
+			hostnames[c.Hostname] = id
+		}
+	}
+	return nil
 }

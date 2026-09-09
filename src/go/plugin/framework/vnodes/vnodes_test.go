@@ -132,3 +132,33 @@ func TestValidateConfiguredRejectsLabelNormalization(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadSNMPKeepsStableNameAndAuthoredHostname(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "snmp.yaml"), []byte(`
+- name: router
+  mode: snmp
+  mode_snmp:
+    address: device
+    credentials:
+      community: fixture-secret
+- name: duplicate-guid
+  mode: snmp
+  mode_snmp:
+    address: device
+    credentials:
+      community: fixture-secret
+- mode: snmp
+  mode_snmp:
+    address: missing-name
+    credentials:
+      community: fixture-secret
+`), 0600))
+	loaded := Load(dir)
+	require.Len(t, loaded, 1)
+	require.Contains(t, loaded, "router")
+	require.Empty(t, loaded["router"].Hostname)
+	require.Empty(t, loaded["router"].GUID)
+	require.Equal(t, "fixture-secret", loaded["router"].ModeSNMP.Credentials.Community)
+	require.Nil(t, loaded["router"].Resolve(nil))
+}
