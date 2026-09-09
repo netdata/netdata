@@ -60,7 +60,7 @@ static MRG *mrg_create_internal(bool load_from_db) {
         mrg->index[i].aral = aral_create(buf, sizeof(METRIC), 0, 16384, &mrg_aral_statistics, NULL, NULL,
                                          false, false, true);
     }
-    pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
+    dbengine_stats_register_aral_statistics(&mrg_aral_statistics, "mrg");
 
     if(load_from_db)
         mrg_load(mrg);
@@ -169,7 +169,7 @@ size_t mrg_destroy(MRG *mrg) {
     mrg_unlock_all_partitions(mrg);
 
     // Unregister the aral statistics
-    pulse_aral_unregister_statistics(&mrg_aral_statistics);
+    dbengine_stats_unregister_aral_statistics(&mrg_aral_statistics);
 
     // Free the MRG structure
     posix_memalign_freez(mrg);

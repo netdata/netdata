@@ -77,6 +77,152 @@ int default_rrdeng_extent_cache_mb = 0;
 #endif
 
 // ----------------------------------------------------------------------------
+// engine-published statistics
+//
+// dbengine_stats_storage holds the published struct; dbengine_stats_lock
+// guards the ARAL registration array. Gorilla counters are updated via
+// __atomic_fetch_add and read via __atomic_load_n, so they need no lock.
+// collect_stats defaults to true so a standalone link (no daemon to call
+// the setter) still collects.
+
+static SPINLOCK dbengine_stats_lock = SPINLOCK_INITIALIZER;
+static dbengine_stats_t dbengine_stats_storage = { 0 };
+static bool dbengine_collect_stats_flag = true;
+static bool dbengine_collect_extended_stats_flag = false;
+
+const dbengine_stats_t *dbengine_get_stats(void) {
+    return &dbengine_stats_storage;
+}
+
+void dbengine_set_collect_stats(bool enabled) {
+    __atomic_store_n(&dbengine_collect_stats_flag, enabled, __ATOMIC_RELAXED);
+}
+
+bool dbengine_collect_stats(void) {
+    return __atomic_load_n(&dbengine_collect_stats_flag, __ATOMIC_RELAXED);
+}
+
+void dbengine_set_collect_extended_stats(bool enabled) {
+    __atomic_store_n(&dbengine_collect_extended_stats_flag, enabled, __ATOMIC_RELAXED);
+}
+
+bool dbengine_collect_extended_stats(void) {
+    return __atomic_load_n(&dbengine_collect_extended_stats_flag, __ATOMIC_RELAXED);
+}
+
+// Idempotent on the stats pointer. Reuses tombstone slots (where a
+// previous registration was unregistered) before extending aral_count,
+// so an engine that cycles through init/exit in the same process won't
+// exhaust DBENGINE_MAX_ARAL_REGISTRATIONS.
+//
+// All accesses to the slot array and aral_count go through
+// dbengine_stats_lock; the daemon reads via dbengine_stats_snapshot_arals
+// which takes the same lock, so callers always observe a consistent
+// (stats, name, ar) tuple per slot.
+static void dbengine_stats_register_slot(struct aral *ar,
+                                         struct aral_statistics *stats,
+                                         const char *name) {
+    if(!stats || !name) return;
+
+    bool exhausted = false;
+
+    spinlock_lock(&dbengine_stats_lock);
+
+    size_t free_slot = SIZE_MAX;
+    bool already_registered = false;
+
+    for(size_t i = 0; i < dbengine_stats_storage.aral_count; i++) {
+        if(dbengine_stats_storage.arals[i].stats == stats) {
+            already_registered = true;
+            break;
+        }
+        if(free_slot == SIZE_MAX && !dbengine_stats_storage.arals[i].stats)
+            free_slot = i;
+    }
+
+    if(!already_registered) {
+        size_t target;
+        if(free_slot != SIZE_MAX) {
+            target = free_slot;
+        }
+        else if(dbengine_stats_storage.aral_count < DBENGINE_MAX_ARAL_REGISTRATIONS) {
+            target = dbengine_stats_storage.aral_count;
+            dbengine_stats_storage.aral_count = target + 1;
+        }
+        else {
+            exhausted = true;
+            target = 0; // unused
+        }
+
+        if(!exhausted) {
+            dbengine_stats_storage.arals[target].ar = ar;
+            dbengine_stats_storage.arals[target].name = name;
+            dbengine_stats_storage.arals[target].stats = stats;
+        }
+    }
+
+    spinlock_unlock(&dbengine_stats_lock);
+
+    if(exhausted)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "DBENGINE: ARAL registration slots exhausted (max %d); dropping '%s'.",
+               DBENGINE_MAX_ARAL_REGISTRATIONS, name);
+}
+
+void dbengine_stats_register_aral_statistics(struct aral_statistics *stats, const char *name) {
+    dbengine_stats_register_slot(NULL, stats, name);
+}
+
+void dbengine_stats_register_aral(struct aral *ar, const char *name) {
+    if(!ar) return;
+    if(!name) name = aral_name(ar);
+    dbengine_stats_register_slot(ar, aral_get_statistics(ar), name);
+}
+
+void dbengine_stats_unregister_aral_statistics(struct aral_statistics *stats) {
+    if(!stats) return;
+
+    spinlock_lock(&dbengine_stats_lock);
+    for(size_t i = 0; i < dbengine_stats_storage.aral_count; i++) {
+        if(dbengine_stats_storage.arals[i].stats == stats) {
+            dbengine_stats_storage.arals[i].ar = NULL;
+            dbengine_stats_storage.arals[i].name = NULL;
+            dbengine_stats_storage.arals[i].stats = NULL;
+            break;
+        }
+    }
+    spinlock_unlock(&dbengine_stats_lock);
+}
+
+size_t dbengine_stats_snapshot_arals(dbengine_aral_snapshot_t *out_buf) {
+    if(!out_buf) return 0;
+
+    size_t n = 0;
+    spinlock_lock(&dbengine_stats_lock);
+    for(size_t i = 0; i < dbengine_stats_storage.aral_count; i++) {
+        struct aral_statistics *stats = dbengine_stats_storage.arals[i].stats;
+        if(!stats) continue;
+        out_buf[n].stats = stats;
+        out_buf[n].name = dbengine_stats_storage.arals[i].name;
+        n++;
+    }
+    spinlock_unlock(&dbengine_stats_lock);
+    return n;
+}
+
+void dbengine_stats_gorilla_hot_buffer_added(void) {
+    if(!dbengine_collect_extended_stats()) return;
+    __atomic_fetch_add(&dbengine_stats_storage.gorilla.hot_buffers_added, 1, __ATOMIC_RELAXED);
+}
+
+void dbengine_stats_gorilla_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t original) {
+    if(!dbengine_collect_extended_stats()) return;
+    __atomic_fetch_add(&dbengine_stats_storage.gorilla.tier0_disk_actual_bytes, actual, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dbengine_stats_storage.gorilla.tier0_disk_optimal_bytes, optimal, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dbengine_stats_storage.gorilla.tier0_disk_original_bytes, original, __ATOMIC_RELAXED);
+}
+
+// ----------------------------------------------------------------------------
 // metrics groups
 
 static inline void rrdeng_page_alignment_acquire(struct pg_alignment *pa) {
