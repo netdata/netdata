@@ -1,0 +1,36 @@
+---
+# LinkedAccount series are available only when the management/payer account has
+# access to linked-account Billing metrics.
+version: v1
+display_name: AWS Billing Estimated Charges by Linked Account
+namespace: AWS/Billing
+supported_regions: [us-east-1]
+disabled: true
+query:
+  period: 10m
+  lookback: 24h
+instance:
+  dimensions:
+    - name: Currency
+      constant: USD
+    - name: LinkedAccount
+      label: linked_account_id
+metrics:
+  - id: estimated_charges
+    metric_name: EstimatedCharges
+    statistics: [maximum]
+template:
+  family: Billing
+  context_namespace: billing_linked_account
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, linked_account_id]
+  charts:
+    - id: aws_cloudwatch_billing_linked_account_estimated_charges
+      context: estimated_charges
+      title: Latest AWS Estimated Charges by Linked Account (Worldwide MTD)
+      units: USD
+      algorithm: absolute
+      dimensions:
+        - selector: estimated_charges_maximum
+          name: estimated_charges

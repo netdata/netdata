@@ -182,7 +182,7 @@ int format_batch_mongodb(struct instance *instance)
 
     size_t documents_inserted = 0;
 
-    while (*end && documents_inserted <= (size_t)stats->buffered_metrics) {
+    while (*end && documents_inserted < (size_t)stats->buffered_metrics) {
         while (*end && *end != '\n')
             end++;
 

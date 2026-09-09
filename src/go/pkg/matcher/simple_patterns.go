@@ -3,6 +3,8 @@
 package matcher
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -21,7 +23,12 @@ func NewSimplePatternsMatcher(expr string) (Matcher, error) {
 	ps := simplePatternsMatcher{}
 
 	for pattern := range strings.FieldsSeq(expr) {
-		if err := ps.add(pattern); err != nil {
+		positive := true
+		if strings.HasPrefix(pattern, "!") {
+			positive = false
+			pattern = strings.TrimPrefix(pattern, "!")
+		}
+		if err := ps.add(pattern, positive); err != nil {
 			return nil, err
 		}
 	}
@@ -31,14 +38,40 @@ func NewSimplePatternsMatcher(expr string) (Matcher, error) {
 	return ps, nil
 }
 
-func (m *simplePatternsMatcher) add(term string) error {
-	p := simplePatternTerm{}
-	if term[0] == '!' {
-		p.positive = false
-		term = term[1:]
-	} else {
-		p.positive = true
+// NewSimplePatternListMatcher creates a simple-patterns matcher from a pre-split
+// list of glob patterns. Use it when individual patterns may contain whitespace.
+func NewSimplePatternListMatcher(patterns []string) (Matcher, error) {
+	ps := simplePatternsMatcher{}
+	hasPositive := false
+
+	for _, pattern := range patterns {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+		negative := strings.HasPrefix(pattern, "!")
+		if negative {
+			pattern = strings.TrimSpace(strings.TrimPrefix(pattern, "!"))
+		}
+		if pattern == "" {
+			return nil, errors.New("invalid empty negative pattern")
+		}
+		hasPositive = hasPositive || !negative
+		if err := ps.add(pattern, !negative); err != nil {
+			return nil, fmt.Errorf("invalid pattern: %w", err)
+		}
 	}
+	if len(ps) == 0 {
+		return FALSE(), nil
+	}
+	if !hasPositive {
+		return nil, errors.New("must include at least one positive pattern")
+	}
+	return ps, nil
+}
+
+func (m *simplePatternsMatcher) add(term string, positive bool) error {
+	p := simplePatternTerm{positive: positive}
 	matcher, err := NewGlobMatcher(term)
 	if err != nil {
 		return err

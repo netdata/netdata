@@ -4,6 +4,18 @@
 
 size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, const unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
     if(unlikely(!dst || !dst_size)) return 0;
+    if(unlikely(!empty)) empty = "";
+
+    char *src_to_free = NULL;
+    if(unlikely(utf && src == dst)) {
+        for(const unsigned char *s = src; *s ;s++) {
+            if(IS_UTF8_STARTBYTE(*s)) {
+                src_to_free = strdupz((const char *)src);
+                src = (const unsigned char *)src_to_free;
+                break;
+            }
+        }
+    }
 
     // skip leading spaces and invalid characters
     while(src && *src && !IS_UTF8_BYTE(*src) && (isspace(*src) || iscntrl(*src) || !isprint(*src)))
@@ -137,10 +149,13 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
         dst[dst_size - 1] = '\0';
         mblen = strlen((char *)dst);
         if(multibyte_length) *multibyte_length = mblen;
+        freez(src_to_free);
         return mblen;
     }
 
     if(multibyte_length) *multibyte_length = mblen;
 
-    return d - dst;
+    size_t len = d - dst;
+    freez(src_to_free);
+    return len;
 }

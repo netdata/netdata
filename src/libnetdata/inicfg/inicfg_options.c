@@ -93,8 +93,12 @@ void inicfg_option_remove_and_delete_all(struct config_section *sect, bool have_
     if(!have_sect_lock)
         SECTION_LOCK(sect);
 
-    while(sect->values)
-        inicfg_option_remove_and_delete(sect, sect->values, true);
+    struct config_option *opt = sect->values;
+    while(opt) {
+        struct config_option *next = opt->next;
+        inicfg_option_remove_and_delete(sect, opt, true);
+        opt = next;
+    }
 
     if(!have_sect_lock)
         SECTION_UNLOCK(sect);

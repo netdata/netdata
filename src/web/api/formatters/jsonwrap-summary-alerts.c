@@ -10,14 +10,17 @@ void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const char *ke
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
     for (long c = 0; c < (long) qt->instances.used; c++) {
         QUERY_INSTANCE *qi = query_instance(qt, c);
-        RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
+        RRDSET_ACQUIRED *rsa = rrdinstance_acquired_rrdset_acquire(qi->ria);
+        RRDSET *st = rrdset_acquired_to_rrdset(rsa);
         if (st) {
             rw_spinlock_read_lock(&st->alerts.spinlock);
             if (st->alerts.base) {
                 for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
                     z = dictionary_set(dict, string2str(rc->config.name), NULL, sizeof(*z));
 
-                    switch(rc->status) {
+                    RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                    rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                    switch(snapshot.status) {
                         case RRDCALC_STATUS_CLEAR:
                             z->clear++;
                             break;
@@ -41,6 +44,7 @@ void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const char *ke
             }
             rw_spinlock_read_unlock(&st->alerts.spinlock);
         }
+        rrdset_acquired_release(rsa);
     }
     dfe_start_read(dict, z)
         query_target_alerts_counts(wb, z, z_dfe.name, true);

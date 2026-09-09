@@ -22,7 +22,7 @@ typedef struct listen_sockets {
     char *fds_names[MAX_LISTEN_FDS];    // descriptions for the open sockets
     int fds_types[MAX_LISTEN_FDS];      // the socktype for the open sockets (SOCK_STREAM, SOCK_DGRAM)
     int fds_families[MAX_LISTEN_FDS];   // the family of the open sockets (AF_UNIX, AF_INET, AF_INET6)
-    HTTP_ACL fds_acl_flags[MAX_LISTEN_FDS];  // the acl to apply to the open sockets (dashboard, badges, streaming, netdata.conf, management)
+    HTTP_ACL fds_acl_flags[MAX_LISTEN_FDS];  // the acl to apply to the open sockets (dashboard, badges, streaming, netdata.conf, management, mcp)
 } LISTEN_SOCKETS;
 
 int listen_sockets_setup(LISTEN_SOCKETS *sockets);

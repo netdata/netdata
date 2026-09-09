@@ -47,7 +47,7 @@ modules:
         list:
           - title: Enable old_stats plugin
             description: |
-              To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics).
+              To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#old-statistics).
       configuration:
         file:
           name: go.d/dovecot.conf
@@ -70,7 +70,7 @@ modules:
               group: Collection
 
             - name: address
-              description: "Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin."
+              description: "Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#old-statistics) plugin."
               default_value: 127.0.0.1:24242
               required: true
               group: Target

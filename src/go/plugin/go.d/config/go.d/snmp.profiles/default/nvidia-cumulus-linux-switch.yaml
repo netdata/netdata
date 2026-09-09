@@ -1,5 +1,6 @@
 extends:
   - _std-host-resources-mib-feat-base.yaml
+  - _std-bgp4-mib.yaml
   - _std-ucd-mib.yaml
   - nvidia.yaml
 

@@ -56,8 +56,8 @@ static void calc_dir_size_recursive(const char *base_path, const char *rel_path,
     };
 
     // Use string representation as the dictionary name
-    char name[sizeof(INODE_DEVICE_PAIR) * 2 + 1];
-    snprintfz(name, sizeof(name), "%lu_%lu", (unsigned long)id_pair.inode, (unsigned long)id_pair.device);
+    char name[UINT64_MAX_LENGTH * 2 + 1];
+    snprintfz(name, sizeof(name), "%" PRIu64 "_%" PRIu64, (uint64_t)id_pair.inode, (uint64_t)id_pair.device);
 
     // Check if we've seen this inode-device pair before (for symlink loop detection)
     if (dictionary_get(visited_inodes, name))

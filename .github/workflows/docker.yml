@@ -38,7 +38,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -126,11 +126,9 @@ jobs:
           fi
       - name: Check Go
         id: check-go
-        env:
-          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+            if [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
               echo 'skip-go=' >> "${GITHUB_OUTPUT}"
             else
               echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
@@ -161,7 +159,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Prepare tools
         id: prepare
         run: |
@@ -213,7 +211,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -258,7 +256,7 @@ jobs:
       - name: Upload Cache
         id: upload-cache
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache/*
@@ -307,7 +305,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Generate Tags
         id: tag
         run: |
@@ -330,7 +328,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -383,7 +381,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: docker-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -426,7 +424,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@v8
@@ -447,11 +445,13 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
-        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.docker_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
+        run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.docker_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -488,7 +488,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -542,7 +542,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: quay-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -585,7 +585,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@v8
@@ -607,11 +607,13 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
-        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.quay_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
+        run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.quay_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -648,7 +650,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -702,7 +704,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ghcr-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -745,7 +747,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@v8
@@ -767,11 +769,13 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
-        run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.ghcr_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
+        run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.ghcr_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -805,7 +809,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Trigger Helmchart PR

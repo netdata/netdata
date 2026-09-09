@@ -20,7 +20,7 @@ Gemini CLI supports all major MCP transport types, giving you maximum flexibilit
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
 3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections on v2.7.2+.
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
+4. **Netdata MCP API key** - required when `[web].bearer token protection = yes`. When bearer protection is disabled, it is optional and unlocks sensitive observability data (protected functions, full access to logs). Each Netdata Agent or Parent has its own unique MCP API key - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 ## Installation
 
@@ -47,7 +47,7 @@ or firewall changes needed.
 
 **Prerequisites:**
 
-- Netdata Cloud account with Business plan
+- Netdata Cloud account with a Paid plan
 - Nodes claimed to Netdata Cloud
 - API token with `scope:mcp`
   ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
@@ -357,6 +357,6 @@ Control which Netdata tools are available:
 
 - [Gemini CLI GitHub Repository](https://github.com/google-gemini/gemini-cli)
 - [Gemini CLI MCP Documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
-- [Gemini CLI Configuration Guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/configuration.md)
+- [Gemini CLI Configuration Guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/configuration.md)
 - [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
 - [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)

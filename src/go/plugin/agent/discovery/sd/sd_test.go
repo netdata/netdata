@@ -3,12 +3,14 @@
 package sd
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -105,17 +107,58 @@ func TestServiceDiscovery_UnsupportedDiscovererConfigIsIgnored(t *testing.T) {
 		configs: []confFile{
 			prepareUnsupportedDiscovererConfigFile("/usr/lib/netdata/conf.d/sd/unsupported.conf", "unsupported"),
 		},
-		wantPipelines:    nil,
-		wantExposedCount: 0,
+		wantPipelines: nil,
+		wantExposed:   []wantExposedCfg{},
 	}
 	sim.run(t)
 }
 
+func TestServiceDiscovery_WindowsSourcePathIsPublished(t *testing.T) {
+	const source = `C:\Program Files\Netdata\etc\netdata\sd\windows.conf`
+	sim := &discoverySimExt{
+		configs: []confFile{
+			prepareConfigFile(source, "windows"),
+		},
+		wantPipelines: []*mockPipeline{
+			{name: "windows", started: true, stopped: false},
+		},
+		wantExposed: []wantExposedCfg{{
+			discovererType: "net_listeners",
+			name:           "windows",
+			source:         source,
+			sourceType:     sourceTypeFromPath(source),
+			status:         dyncfg.StatusRunning,
+		}},
+		wantOutputContains: `'C:\Program Files\Netdata\etc\netdata\sd\windows.conf'`,
+	}
+	sim.run(t)
+}
+
+func TestServiceDiscovery_UnpublishableConfigDoesNotEnterStateOrWaitGate(t *testing.T) {
+	var output bytes.Buffer
+	discovery, err := NewServiceDiscovery(Config{
+		Epoch:        1,
+		Attempts:     newTestAttemptAuthority(t),
+		PluginName:   testPluginName,
+		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
+		Discoverers:  testDiscovererRegistry(),
+	})
+	require.NoError(t, err)
+
+	discovery.addPipeline(
+		t.Context(),
+		prepareConfigFile("/etc/netdata/sd.d/operator.conf", "operator's"),
+	)
+
+	require.Zero(t, exposedCacheCount(discovery.exposed))
+	require.False(t, discovery.handler.WaitingForDecision())
+	require.Empty(t, output.String())
+}
+
 func prepareConfigFile(source, name string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
 		Name:       name,
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -127,10 +170,9 @@ func prepareConfigFile(source, name string) confFile {
 }
 
 func prepareUnsupportedDiscovererConfigFile(source, name string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload("unsupported", map[string]any{})
 	cfg := pipeline.Config{
 		Name:       name,
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload("unsupported", map[string]any{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -142,9 +184,8 @@ func prepareUnsupportedDiscovererConfigFile(source, name string) confFile {
 }
 
 func prepareUnnamedConfigFile(source string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -162,11 +203,10 @@ func prepareEmptyConfigFile(source string) confFile {
 }
 
 func prepareDisabledConfigFile(source, name string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
 		Name:       name,
 		Disabled:   true,
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -178,9 +218,8 @@ func prepareDisabledConfigFile(source, name string) confFile {
 }
 
 func prepareInvalidConfigFile(source string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 	}
 	bs, _ := yaml.Marshal(cfg)
 
@@ -214,7 +253,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 				{name: "myconfig", started: true, stopped: true},  // stock stopped
 				{name: "myconfig", started: true, stopped: false}, // user running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -229,7 +267,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // user keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -244,7 +281,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // first stock keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
 			},
@@ -259,7 +295,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // first user keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -275,7 +310,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // user keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -290,7 +324,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 				{name: "stock-config", started: true, stopped: false},
 				{name: "user-config", started: true, stopped: false},
 			},
-			wantExposedCount: 2,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "stock-config", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
 				{discovererType: "net_listeners", name: "user-config", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},

@@ -32,7 +32,7 @@ static inline void json_skip_spaces(LOG_JSON_STATE *js) {
     const char *s = json_current_pos(js);
     const char *start = s;
 
-    while(isspace(*s)) s++;
+    while(isspace((uint8_t)*s)) s++;
 
     js->pos += s - start;
 }
@@ -236,7 +236,8 @@ size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
 
     if (s[1] == 'u') {
         // Handle \uXXXX
-        if (!isxdigit(s[2]) || !isxdigit(s[3]) || !isxdigit(s[4]) || !isxdigit(s[5])) {
+        if (!isxdigit((uint8_t)s[2]) || !isxdigit((uint8_t)s[3]) || !isxdigit((uint8_t)s[4]) ||
+            !isxdigit((uint8_t)s[5])) {
             return 0; // Not a valid \uXXXX sequence
         }
 
@@ -248,8 +249,8 @@ size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
 
         if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
             // Possible start of surrogate pair
-            if (s[6] == '\\' && s[7] == 'u' && isxdigit(s[8]) && isxdigit(s[9]) &&
-                isxdigit(s[10]) && isxdigit(s[11])) {
+            if (s[6] == '\\' && s[7] == 'u' && isxdigit((uint8_t)s[8]) && isxdigit((uint8_t)s[9]) &&
+                isxdigit((uint8_t)s[10]) && isxdigit((uint8_t)s[11])) {
                 // Valid low surrogate
                 unsigned low_surrogate = strtoul(&s[8], NULL, 16);
                 if (low_surrogate < 0xDC00 || low_surrogate > 0xDFFF) {
@@ -266,7 +267,7 @@ size_t parse_surrogate(const char *s, char *d, size_t *remaining) {
     else {
         // Handle \UXXXXXXXX
         for (int i = 2; i < 10; i++) {
-            if (!isxdigit(s[i])) {
+            if (!isxdigit((uint8_t)s[i])) {
                 return 0; // Not a valid \UXXXXXXXX sequence
             }
             hex[i - 2] = s[i];

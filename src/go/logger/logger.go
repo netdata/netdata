@@ -40,9 +40,10 @@ func newLogger(w io.Writer, isTerminal bool, depth int) *Logger {
 }
 
 type Logger struct {
-	muted atomic.Bool
-	sl    *slog.Logger
-	rl    *rateLimiter
+	muted            atomic.Bool
+	sl               *slog.Logger
+	rl               *rateLimiter
+	messageSanitizer func(string) string
 }
 
 func (l *Logger) Error(a ...any) {
@@ -123,10 +124,50 @@ func (l *Logger) With(args ...any) *Logger {
 		ll := New()
 		return &Logger{sl: ll.sl.With(args...), rl: ll.rl}
 	}
+	args = sanitizeLogAttributes(l.messageSanitizer, args)
 
-	ll := &Logger{sl: l.sl.With(args...), rl: l.rl}
+	ll := &Logger{sl: l.sl.With(args...), rl: l.rl, messageSanitizer: l.messageSanitizer}
 	ll.muted.Store(l.muted.Load())
 
+	return ll
+}
+
+func sanitizeLogAttributes(sanitize func(string) string, attributes []any) []any {
+	if sanitize == nil || len(attributes) == 0 {
+		return attributes
+	}
+	sanitized := make([]any, 0, len(attributes))
+	for index := 0; index < len(attributes); index++ {
+		switch attribute := attributes[index].(type) {
+		case slog.Attr:
+			sanitized = append(sanitized, slog.String(
+				"redacted_attribute",
+				sanitizeLogMessage(sanitize, fmt.Sprint(attribute.Value.Any())),
+			))
+		case string:
+			sanitized = append(sanitized, "redacted_attribute")
+			if index+1 < len(attributes) {
+				index++
+				sanitized = append(
+					sanitized,
+					sanitizeLogMessage(sanitize, fmt.Sprint(attributes[index])),
+				)
+			}
+		default:
+			sanitized = append(sanitized, sanitizeLogMessage(sanitize, fmt.Sprint(attribute)))
+		}
+	}
+	return sanitized
+}
+
+// WithMessageSanitizer returns a derived logger that sanitizes messages and
+// attributes added after this call. Existing attributes remain unchanged.
+func (l *Logger) WithMessageSanitizer(sanitize func(string) string) *Logger {
+	if l.isNil() {
+		l = New()
+	}
+	ll := &Logger{sl: l.sl, rl: l.rl, messageSanitizer: sanitize}
+	ll.muted.Store(l.muted.Load())
 	return ll
 }
 
@@ -137,8 +178,23 @@ func (l *Logger) log(level slog.Level, msg string) {
 	}
 
 	if !l.muted.Load() {
+		msg = sanitizeLogMessage(l.messageSanitizer, msg)
 		l.sl.Log(context.Background(), level, msg)
 	}
+}
+
+func sanitizeLogMessage(sanitize func(string) string, message string) (sanitized string) {
+	if sanitize == nil {
+		return message
+	}
+	sanitized = "log message redacted"
+	defer func() {
+		_ = recover()
+	}()
+	if result := sanitize(message); result != "" {
+		sanitized = result
+	}
+	return sanitized
 }
 
 func (l *Logger) canLog(level slog.Level) bool {

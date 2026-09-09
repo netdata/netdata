@@ -6,7 +6,7 @@ import (
 	"encoding/xml"
 )
 
-// https://boinc.berkeley.edu/trac/wiki/GuiRpcProtocol
+// https://github.com/BOINC/boinc/wiki/GuiRpcProtocol
 
 type boincRequest struct {
 	XMLName    xml.Name                `xml:"boinc_gui_rpc_request"`

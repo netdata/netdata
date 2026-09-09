@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //go:build cgo
-// +build cgo
 
 package as400
 
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -209,6 +209,13 @@ func parseInt64OrZero(value string) int64 {
 		return v
 	}
 	return 0
+}
+
+// int64ToCount narrows a row count to int, saturating instead of wrapping.
+// The values come from SQL COUNT(*) results parsed as int64, so a bogus or
+// hostile value must not become a negative or tiny int.
+func int64ToCount(v int64) int {
+	return int(min(max(v, 0), math.MaxInt))
 }
 
 func boolToInt(cond bool) int64 {
@@ -614,15 +621,6 @@ func (a *Collector) collectOutputQueues(ctx context.Context) error {
 }
 
 func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign func(column, value string, lineEnd bool)) error {
-	var (
-		capture      bool
-		columnsSaved []string
-		rowsSaved    [][]string
-	)
-	if a.dump != nil {
-		capture = true
-	}
-
 	start := time.Now()
 	defer func() {
 		a.recordQueryLatency(queryName, time.Since(start))
@@ -632,14 +630,6 @@ func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign
 		for i, col := range columns {
 			assign(col, values[i], i == len(columns)-1)
 		}
-		if capture {
-			if columnsSaved == nil {
-				columnsSaved = append(columnsSaved, columns...)
-			}
-			rowCopy := make([]string, len(values))
-			copy(rowCopy, values)
-			rowsSaved = append(rowsSaved, rowCopy)
-		}
 		return nil
 	})
 	if err != nil {
@@ -652,23 +642,11 @@ func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign
 		}
 		return err
 	}
-	if capture && columnsSaved != nil {
-		a.dump.recordQuery(query, columnsSaved, rowsSaved)
-	}
 	return nil
 }
 
 // doQueryRow executes a query that returns a single row
 func (a *Collector) doQueryRow(ctx context.Context, queryName, query string, assign func(column, value string)) error {
-	var (
-		capture      bool
-		columnsSaved []string
-		rowsSaved    [][]string
-	)
-	if a.dump != nil {
-		capture = true
-	}
-
 	start := time.Now()
 	defer func() {
 		a.recordQueryLatency(queryName, time.Since(start))
@@ -678,12 +656,6 @@ func (a *Collector) doQueryRow(ctx context.Context, queryName, query string, ass
 		for i, col := range columns {
 			assign(col, values[i])
 		}
-		if capture {
-			columnsSaved = append([]string{}, columns...)
-			rowCopy := make([]string, len(values))
-			copy(rowCopy, values)
-			rowsSaved = append(rowsSaved, rowCopy)
-		}
 		return nil
 	})
 	if err != nil {
@@ -695,9 +667,6 @@ func (a *Collector) doQueryRow(ctx context.Context, queryName, query string, ass
 			a.Errorf("failed to execute query: %s, error: %v", query, err)
 		}
 		return err
-	}
-	if capture && columnsSaved != nil {
-		a.dump.recordQuery(query, columnsSaved, rowsSaved)
 	}
 	return nil
 }
@@ -934,11 +903,9 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 				// Calculate used_gb from capacity - available
 				// Always calculate used_gb if we have capacity information
 				if m.CapacityGB > 0 {
-					usedGB := m.CapacityGB - m.AvailableGB
-					// Ensure used_gb is not negative
-					if usedGB < 0 {
-						usedGB = 0
-					}
+					usedGB := max(
+						// Ensure used_gb is not negative
+						m.CapacityGB-m.AvailableGB, 0)
 					m.UsedGB = usedGB
 					a.mx.disks[currentUnit] = m
 				}
@@ -951,7 +918,7 @@ func (a *Collector) countDisks(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQuery(ctx, "count_disks", queryCountDisks, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
-			count = int(parseInt64OrZero(value))
+			count = int64ToCount(parseInt64OrZero(value))
 		}
 	})
 	return count, err
@@ -986,7 +953,7 @@ func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 	err := a.doQueryRow(ctx, "count_network_interfaces", queryCountNetworkInterfaces, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = int(v)
+				count = int64ToCount(v)
 			}
 		}
 	})
@@ -1002,7 +969,7 @@ func (a *Collector) countHTTPServers(ctx context.Context) (int, error) {
 			}
 		}
 	})
-	return int(count), err
+	return int64ToCount(count), err
 }
 
 func withFetchLimit(query string, limit int) string {
@@ -1026,7 +993,7 @@ func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
 			}
 		}
 	})
-	return int(count), err
+	return int64ToCount(count), err
 }
 
 // Temporary storage collection
@@ -1091,9 +1058,7 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 			*ptr = meta
 			a.subsystems[key] = ptr
 		}
-		for key, metrics := range snapshot.metrics {
-			a.mx.subsystems[key] = metrics
-		}
+		maps.Copy(a.mx.subsystems, snapshot.metrics)
 		return snapshot.err
 	}
 
@@ -1665,9 +1630,7 @@ func (a *Collector) collectPlanCache(ctx context.Context) error {
 				a.planCache[key] = ptr
 			}
 		}
-		for key, values := range snapshot.values {
-			a.mx.planCache[key] = values
-		}
+		maps.Copy(a.mx.planCache, snapshot.values)
 		return snapshot.err
 	}
 

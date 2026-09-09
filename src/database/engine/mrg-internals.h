@@ -8,13 +8,38 @@
 #include "libnetdata/locks/locks.h"
 #include "rrddiskprotocol.h"
 
+// METRIC lifetime rules:
+//
+// 1. A METRIC is kept alive by its refcount. Only an acquired reference
+//    (metric_acquire(), mrg_metric_dup(), mrg_metric_get_and_acquire*())
+//    guarantees the object stays valid.
+//
+// 2. A bare METRIC pointer stored elsewhere -- notably PGC's page->metric_id,
+//    which is (Word_t)metric -- is NOT a reference and does NOT keep the
+//    metric alive. Such a pointer can be stale.
+//
+// 3. Acquiring from a possibly stale pointer is NOT safe: aral_freez() lets
+//    ARAL write its free-list header over the start of the element. ARAL_FREE is
+//    {size_t size; struct aral_free *next;}, so on 64-bit builds those 16 bytes
+//    cover section, uuid AND refcount; on 32-bit they cover 8 and stop before
+//    refcount. Either way the slot can also be handed to an unrelated allocation,
+//    so a freed slot can present a refcount that metric_acquire() happily accepts.
+//    Do not treat a successful acquire on an unowned pointer as proof the metric
+//    is alive.
+//
+// 4. uuid never changes and every live METRIC holds its uuidmap reference for
+//    its whole lifetime: metric_add_and_acquire() takes it, and metric_release()
+//    drops it via uuidmap_free() on the deletion branch below. So an id that
+//    resolves through the MRG index is necessarily backed by a live metric --
+//    which is why callers holding an unowned pointer should resolve the metric
+//    by id (mrg_metric_get_and_acquire_by_id()) instead of dereferencing it.
+//
 struct metric {
     Word_t section;                 // never changes
     UUIDMAP_ID uuid;                 // never changes
 
     REFCOUNT refcount;
     uint8_t partition;
-    bool deleted;
 
     uint32_t latest_update_every_s; // the latest data collection frequency
 
@@ -52,6 +77,8 @@ struct metric {
 extern struct aral_statistics mrg_aral_statistics;
 
 struct mrg {
+    // each partition 64-aligned so the contended rw_spinlock words of
+    // adjacent partitions do not false-share a cache line
     struct mrg_partition {
         ARAL *aral;                 // not protected by our spinlock - it has its own
 
@@ -59,27 +86,29 @@ struct mrg {
         Pvoid_t uuid_judy;          // JudyL: each UUID has a JudyL of sections (tiers)
 
         struct mrg_statistics stats;
-    } index[UUIDMAP_PARTITIONS];
+    } __attribute__((aligned(64))) index[UUIDMAP_PARTITIONS];
 };
 
+_Static_assert(_Alignof(MRG) == 64, "MRG must remain cache-line aligned");
+
 static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg, size_t partition) {
-    mrg->index[partition].stats.additions_duplicate++;
+    __atomic_add_fetch(&mrg->index[partition].stats.additions_duplicate, 1, __ATOMIC_RELAXED);
 }
 
 static inline void MRG_STATS_ADDED_METRIC(MRG *mrg, size_t partition, Word_t section) {
-    mrg->index[partition].stats.entries++;
-    mrg->index[partition].stats.additions++;
-    mrg->index[partition].stats.size += sizeof(METRIC);
+    __atomic_add_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.additions, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
 }
 
 static inline void MRG_STATS_DELETED_METRIC(MRG *mrg, size_t partition, Word_t section) {
-    mrg->index[partition].stats.entries--;
-    mrg->index[partition].stats.size -= sizeof(METRIC);
-    mrg->index[partition].stats.deletions++;
+    __atomic_sub_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.deletions, 1, __ATOMIC_RELAXED);
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
-    __atomic_sub_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
+    rrdeng_atomic_uint64_sub_saturating(ctx, &ctx->atomic.metrics, 1, "metrics", "deleting an MRG metric");
 }
 
 static inline void MRG_STATS_SEARCH_HIT(MRG *mrg, size_t partition) {
@@ -91,7 +120,7 @@ static inline void MRG_STATS_SEARCH_MISS(MRG *mrg, size_t partition) {
 }
 
 static inline void MRG_STATS_DELETE_MISS(MRG *mrg, size_t partition) {
-    mrg->index[partition].stats.delete_misses++;
+    __atomic_add_fetch(&mrg->index[partition].stats.delete_misses, 1, __ATOMIC_RELAXED);
 }
 
 #define mrg_index_read_lock(mrg, partition) rw_spinlock_read_lock(&(mrg)->index[partition].rw_spinlock)
@@ -144,8 +173,11 @@ static time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, METRIC 
 
         if(first_time_s <= 0)
             first_time_s = 0;
-        else
-            __atomic_store_n(&metric->first_time_s, first_time_s, __ATOMIC_RELAXED);
+        else if(!set_metric_field_with_condition(metric->first_time_s, first_time_s, _current <= 0))
+            // lost the race to a concurrent writer publishing the real
+            // retention start (the collector, when the page gets its first
+            // real value) - never overwrite it
+            first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
     }
 
     return first_time_s;
@@ -200,8 +232,6 @@ static void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
 
     mrg_index_write_unlock(mrg, partition);
 
-    __atomic_store_n(&metric->deleted, true, __ATOMIC_RELEASE);
-
     mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
 }
 
@@ -210,11 +240,6 @@ static bool metric_acquire(MRG *mrg, METRIC *metric) {
     REFCOUNT rc = refcount_acquire_advanced(&metric->refcount);
     if(!REFCOUNT_ACQUIRED(rc))
         return false;
-
-    if (__atomic_load_n(&metric->deleted, __ATOMIC_ACQUIRE)) {
-        refcount_release(&metric->refcount);
-        return false;
-    }
 
     size_t partition = metric->partition;
 
@@ -230,24 +255,23 @@ ALWAYS_INLINE
 static bool metric_release(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
 
-    if (refcount_release(&metric->refcount) == 0) {
+    if (refcount_release_and_acquire_for_deletion_advanced(&metric->refcount) == REFCOUNT_DELETED) {
         // we are the last user
         if (!acquired_metric_has_retention(mrg, metric)) {
-            // This metric is eligible for deletion.
-            // Atomically check and set the 'deleted' flag.
-            // If __atomic_test_and_set returns 'true', it means the flag was already set.
-            if (!__atomic_test_and_set(&metric->deleted, __ATOMIC_ACQ_REL)) {
-                // We won the race. The flag was 'false' and we set it to 'true'.
-                // We are now responsible for deletion.
-                acquired_for_deletion_metric_delete(mrg, metric);
-                uuidmap_free(metric->uuid);
-                aral_freez(mrg->index[partition].aral, metric);
-                __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
-                __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
-                return true;
-            }
-            // Another thread is already deleting it. nothing to do
+            // We claimed the last reference for deletion, so no new acquire can resurrect it.
+            acquired_for_deletion_metric_delete(mrg, metric);
+            uuidmap_free(metric->uuid);
+            aral_freez(mrg->index[partition].aral, metric);
+            __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
+            return true;
         }
+
+        REFCOUNT expected = REFCOUNT_DELETED;
+        bool restored = __atomic_compare_exchange_n(&metric->refcount, &expected, 0,
+                                                    false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+        internal_fatal(!restored, "DBENGINE METRIC: cannot restore retained metric refcount from deletion state");
+        __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
@@ -262,7 +286,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
 
     size_t partition = uuid_to_uuidmap_partition(*entry->uuid);
 
-    METRIC *allocation = aral_mallocz(mrg->index[partition].aral);
     Pvoid_t *PValue;
 
     while(1) {
@@ -291,7 +314,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
                 *ret = false;
 
             uuidmap_free(id);
-            aral_freez(mrg->index[partition].aral, allocation);
 
             mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
             return metric;
@@ -300,14 +322,16 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         break;
     }
 
-    METRIC *metric = allocation;
+    // allocate under the partition write lock: mrg_destroy() destroys the
+    // ARALs while holding all partition locks, so the allocator cannot be
+    // destroyed while we hold this lock
+    METRIC *metric = aral_mallocz(mrg->index[partition].aral);
     metric->uuid = id;
     metric->section = entry->section;
     metric->first_time_s = MAX(0, entry->first_time_s);
     metric->latest_time_s_clean = MAX(0, entry->last_time_s);
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
-    metric->deleted = false;
 #ifdef NETDATA_INTERNAL_CHECKS
     metric->writer = 0;
 #endif

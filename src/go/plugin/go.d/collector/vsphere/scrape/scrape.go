@@ -14,15 +14,22 @@ import (
 
 	"github.com/vmware/govmomi/performance"
 	"github.com/vmware/govmomi/vim25/types"
+	vsantypes "github.com/vmware/govmomi/vsan/types"
 )
 
 type Client interface {
 	Version() string
 	PerformanceMetrics([]types.PerfQuerySpec) ([]performance.EntityMetric, error)
+	VSANPerfMetrics(types.ManagedObjectReference, []vsantypes.VsanPerfQuerySpec) ([]vsantypes.VsanPerfEntityMetricCSV, error)
+	VSANSpaceUsage(types.ManagedObjectReference) (*vsantypes.VsanSpaceUsage, error)
+	VSANHealth(types.ManagedObjectReference) (string, error)
 }
 
 func New(client Client) *Scraper {
-	v := &Scraper{Client: client}
+	v := &Scraper{
+		Client:       client,
+		vsanWarnings: make(map[string]bool),
+	}
 	v.calcMaxQuery()
 	return v
 }
@@ -30,13 +37,15 @@ func New(client Client) *Scraper {
 type Scraper struct {
 	*logger.Logger
 	Client
-	maxQuery int
+	maxQuery         int
+	vsanWarnings     map[string]bool
+	vsanWarningsLock sync.Mutex
 }
 
 // Default settings for vCenter 6.5 and above is 256, prior versions of vCenter have this set to 64.
 func (s *Scraper) calcMaxQuery() {
 	major, minor, err := parseVersion(s.Version())
-	if err != nil || major < 6 || minor == 0 {
+	if err != nil || major < 6 || (major == 6 && minor < 5) {
 		s.maxQuery = 64
 		return
 	}
@@ -112,7 +121,8 @@ func (s *Scraper) scrapeMetrics(pqs []types.PerfQuerySpec) []performance.EntityM
 func (s *Scraper) scrape(metrics *[]performance.EntityMetric, lock *sync.Mutex, pqs []types.PerfQuerySpec) {
 	m, err := s.PerformanceMetrics(pqs)
 	if err != nil {
-		s.Error(err)
+		s.Limit(logKeyPerfQueryError+perfQuerySpecEntityType(pqs), 1, recurringLogEvery).
+			Errorf("scrape vSphere performance metrics: query_specs=%d entities=[%s]: %v", len(pqs), describePerfQuerySpecs(pqs), err)
 		return
 	}
 
@@ -129,15 +139,45 @@ func chunkify(pqs []types.PerfQuerySpec, chunkSize int) (chunks [][]types.PerfQu
 	return chunks
 }
 
+func describePerfQuerySpecs(pqs []types.PerfQuerySpec) string {
+	if len(pqs) == 0 {
+		return "none"
+	}
+
+	const limit = 5
+	refs := make([]string, 0, min(len(pqs), limit))
+	for _, pq := range pqs[:min(len(pqs), limit)] {
+		refs = append(refs, fmt.Sprintf("%s/%s", pq.Entity.Type, pq.Entity.Value))
+	}
+	if len(pqs) > limit {
+		refs = append(refs, fmt.Sprintf("+%d more", len(pqs)-limit))
+	}
+
+	return strings.Join(refs, ",")
+}
+
+func perfQuerySpecEntityType(pqs []types.PerfQuerySpec) string {
+	if len(pqs) == 0 {
+		return "none"
+	}
+	return pqs[0].Entity.Type
+}
+
 const (
 	pqsMaxSample  = 1
 	pqsIntervalID = 20
 	pqsFormat     = "normal"
+
+	recurringLogEvery    = time.Hour
+	logKeyPerfQueryError = "vsphere:perf-query-error:"
 )
 
 func newHostsPerfQuerySpecs(hosts rs.Hosts) []types.PerfQuerySpec {
 	pqs := make([]types.PerfQuerySpec, 0, len(hosts))
 	for _, host := range hosts {
+		if !host.IsPoweredOn() || len(host.MetricList) == 0 {
+			continue
+		}
 		pq := types.PerfQuerySpec{
 			Entity:     host.Ref,
 			MaxSample:  pqsMaxSample,
@@ -153,6 +193,9 @@ func newHostsPerfQuerySpecs(hosts rs.Hosts) []types.PerfQuerySpec {
 func newVMsPerfQuerySpecs(vms rs.VMs) []types.PerfQuerySpec {
 	pqs := make([]types.PerfQuerySpec, 0, len(vms))
 	for _, vm := range vms {
+		if !vm.IsPoweredOn() || len(vm.MetricList) == 0 {
+			continue
+		}
 		pq := types.PerfQuerySpec{
 			Entity:     vm.Ref,
 			MaxSample:  pqsMaxSample,
@@ -172,7 +215,7 @@ const pqsHistoricalIntervalID = 300
 func newDatastoresPerfQuerySpecs(datastores rs.Datastores) []types.PerfQuerySpec {
 	pqs := make([]types.PerfQuerySpec, 0, len(datastores))
 	for _, ds := range datastores {
-		if len(ds.MetricList) == 0 {
+		if !ds.Accessible || len(ds.MetricList) == 0 {
 			continue
 		}
 		pq := types.PerfQuerySpec{
@@ -208,13 +251,13 @@ func newClustersPerfQuerySpecs(clusters rs.Clusters) []types.PerfQuerySpec {
 func parseVersion(version string) (major, minor int, err error) {
 	parts := strings.Split(version, ".")
 	if len(parts) < 2 {
-		return 0, 0, fmt.Errorf("unparsable version string : %s", version)
+		return 0, 0, fmt.Errorf("parse vSphere API version %q: expected <major>.<minor>", version)
 	}
 	if major, err = strconv.Atoi(parts[0]); err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("parse vSphere API version major component %q from %q: %w", parts[0], version, err)
 	}
 	if minor, err = strconv.Atoi(parts[1]); err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("parse vSphere API version minor component %q from %q: %w", parts[1], version, err)
 	}
 	return major, minor, nil
 }

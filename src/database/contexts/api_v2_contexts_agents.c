@@ -4,6 +4,7 @@
 #include "aclk/aclk_capas.h"
 #include "database/rrd-metadata.h"
 #include "database/rrd-retention.h"
+#include "web/api/http_auth.h"
 
 void build_info_to_json_object(BUFFER *b);
 
@@ -72,7 +73,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_member_add_object(wb, "api");
         {
             buffer_json_member_add_uint64(wb, "version", aclk_get_http_api_version());
-            buffer_json_member_add_boolean(wb, "bearer_protection", netdata_is_protected_by_bearer);
+            buffer_json_member_add_boolean(wb, "bearer_protection", netdata_bearer_protection_is_enabled());
         }
         buffer_json_object_close(wb); // api
 
@@ -99,7 +100,11 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_double(wb, "disk_percent", rounded_percent);
             }
 
-            if(tier_info->first_time_s < tier_info->last_time_s) {
+            // rrdstats_retention_collect() sets retention only when the tier has a
+            // known retention start; do not re-derive the condition from
+            // first_time_s here, or a zero (unknown) first_time_s publishes
+            // "from" as the unix epoch.
+            if(tier_info->retention) {
                 buffer_json_member_add_time_t_formatted(wb, "from", tier_info->first_time_s, options & CONTEXTS_OPTION_RFC3339);
                 buffer_json_member_add_time_t_formatted(wb, "to", tier_info->last_time_s, options & CONTEXTS_OPTION_RFC3339);
                 buffer_json_member_add_time_t(wb, "retention", tier_info->retention);

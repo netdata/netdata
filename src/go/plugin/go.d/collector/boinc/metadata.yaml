@@ -23,7 +23,7 @@ modules:
         metrics_description: |
           This collector monitors task counts for the Berkeley Open Infrastructure Networking Computing (BOINC) distributed computing client.
         method_description: |
-          It communicates with BOING using [GIU RPC Protocol](https://boinc.berkeley.edu/trac/wiki/GuiRpcProtocol).
+          It communicates with BOINC using the [GUI RPC Protocol](https://github.com/BOINC/boinc/wiki/GuiRpcProtocol).
       supported_platforms:
         include: []
         exclude: []

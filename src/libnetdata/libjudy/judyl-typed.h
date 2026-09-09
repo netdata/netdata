@@ -36,7 +36,7 @@
     ALWAYS_INLINE                                                                                       \
     static TYPE __attribute__((unused)) NAME##_GET(NAME##_JudyLSet *set, Word_t index) {                \
         Pvoid_t *pValue = JudyLGet(set->judyl, index, PJE0);                                            \
-        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};                              \
+        return (pValue != NULL && pValue != PJERR) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};           \
     }                                                                                                   \
                                                                                                         \
     ALWAYS_INLINE                                                                                       \
@@ -47,25 +47,25 @@
     ALWAYS_INLINE                                                                                       \
     static TYPE __attribute__((unused)) NAME##_FIRST(NAME##_JudyLSet *set, Word_t *index) {             \
         Pvoid_t *pValue = JudyLFirst(set->judyl, index, PJE0);                                          \
-        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};                              \
+        return (pValue != NULL && pValue != PJERR) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};           \
     }                                                                                                   \
                                                                                                         \
     ALWAYS_INLINE                                                                                       \
     static TYPE __attribute__((unused)) NAME##_NEXT(NAME##_JudyLSet *set, Word_t *index) {              \
         Pvoid_t *pValue = JudyLNext(set->judyl, index, PJE0);                                           \
-        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};                              \
+        return (pValue != NULL && pValue != PJERR) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};           \
     }                                                                                                   \
                                                                                                         \
     ALWAYS_INLINE                                                                                       \
     static TYPE __attribute__((unused)) NAME##_LAST(NAME##_JudyLSet *set, Word_t *index) {              \
         Pvoid_t *pValue = JudyLLast(set->judyl, index, PJE0);                                           \
-        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};                              \
+        return (pValue != NULL && pValue != PJERR) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};           \
     }                                                                                                   \
                                                                                                         \
     ALWAYS_INLINE                                                                                       \
     static TYPE __attribute__((unused)) NAME##_PREV(NAME##_JudyLSet *set, Word_t *index) {              \
         Pvoid_t *pValue = JudyLPrev(set->judyl, index, PJE0);                                           \
-        return (pValue != NULL) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};                              \
+        return (pValue != NULL && pValue != PJERR) ? (TYPE)UNPACK_MACRO(*pValue) : (TYPE){0};           \
     }                                                                                                   \
                                                                                                         \
     ALWAYS_INLINE                                                                                       \
@@ -74,7 +74,7 @@
         Pvoid_t *pValue;                                                                                \
         if (callback) {                                                                                 \
             for (pValue = JudyLFirst(set->judyl, &index, PJE0);                                         \
-                 pValue != NULL;                                                                        \
+                 pValue != NULL && pValue != PJERR;                                                     \
                  pValue = JudyLNext(set->judyl, &index, PJE0)) {                                        \
                 callback(index, (TYPE)UNPACK_MACRO(*pValue), data);                                     \
             }                                                                                           \

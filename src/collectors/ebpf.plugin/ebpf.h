@@ -6,12 +6,14 @@
 #ifndef __FreeBSD__
 #include <linux/perf_event.h>
 #endif
+#include <stdatomic.h>
 #include <stdint.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 #include <dlfcn.h>
@@ -23,9 +25,9 @@
 #include "libbpf_api/ebpf.h"
 
 #include "collectors/cgroups.plugin/sys_fs_cgroup.h"
+#include "libnetdata/netipc/netipc_netdata.h"
 
 #include "ebpf_apps.h"
-#include "ebpf_functions.h"
 #include "ebpf_cgroup.h"
 
 #define NETDATA_EBPF_OLD_CONFIG_FILE "ebpf.conf"
@@ -33,7 +35,6 @@
 
 extern size_t ebpf_hash_table_pids_count;
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
-#include "cachestat.skel.h"
 #include "dc.skel.h"
 #include "disk.skel.h"
 #include "fd.skel.h"
@@ -44,11 +45,9 @@ extern size_t ebpf_hash_table_pids_count;
 #include "process.skel.h"
 #include "shm.skel.h"
 #include "sync.skel.h"
-#include "socket.skel.h"
 #include "swap.skel.h"
 #include "vfs.skel.h"
 
-extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
 extern struct disk_bpf *disk_bpf_obj;
 extern struct fd_bpf *fd_bpf_obj;
@@ -56,7 +55,6 @@ extern struct hardirq_bpf *hardirq_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
 extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
-extern struct socket_bpf *socket_bpf_obj;
 extern struct swap_bpf *swap_bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
 extern struct process_bpf *process_bpf_obj;
@@ -110,15 +108,12 @@ typedef struct netdata_ebpf_judy_pid {
 
 typedef struct netdata_ebpf_judy_pid_stats {
     char *cmdline;
-
-    // Index for Socket timestamp
-    struct {                     // support for multiple indexing engines
-        Pvoid_t JudyLArray;      // the hash table
-        RW_SPINLOCK rw_spinlock; // protect the index
-    } socket_stats;
 } netdata_ebpf_judy_pid_stats_t;
 
+#define NETDATA_EBPF_PID_STATS_ARAL_TABLE_NAME "ebpf_pid_stats"
+
 extern ebpf_module_t ebpf_modules[];
+extern bool ebpf_program_loaded_any;
 
 typedef struct ebpf_tracepoint {
     bool enabled;
@@ -183,7 +178,6 @@ enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_
 
 // Threads
 void ebpf_process_thread(void *ptr);
-void ebpf_socket_thread(void *ptr);
 
 // Common variables
 extern netdata_mutex_t lock;
@@ -269,9 +263,9 @@ extern struct ebpf_pid_stat *ebpf_root_of_pids;
 extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
-extern int shm_fd_ebpf_cgroup;
-extern sem_t *shm_sem_ebpf_cgroup;
+extern _Atomic int ebpf_cgroup_systemd_enabled;
+extern _Atomic int ebpf_cgroup_integration_active;
+extern _Atomic int send_cgroup_chart;
 extern netdata_mutex_t mutex_cgroup_shm;
 extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
@@ -289,13 +283,9 @@ extern const char *btf_path;
 // Socket functions and variables
 // Common functions
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
 
 // BPF teardown callbacks — called by main thread after all module threads have been joined
 void ebpf_unload_legacy_bpf(ebpf_module_t *em); // legacy-only modules: process, disk, softirq, oomkill, mdflush
-void ebpf_cachestat_unload_bpf(ebpf_module_t *em);
-void ebpf_dcstat_unload_bpf(ebpf_module_t *em);
 void ebpf_swap_unload_bpf(ebpf_module_t *em);
 void ebpf_vfs_unload_bpf(ebpf_module_t *em);
 void ebpf_filesystem_unload_bpf(ebpf_module_t *em);
@@ -318,15 +308,41 @@ void ebpf_read_global_table_stats(
 void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
 netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
 
-void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
-void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
-void ebpf_read_local_addresses_unsafe();
-
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern volatile sig_atomic_t ebpf_stop_signal;
 extern bool ebpf_plugin_exit;
 extern uint64_t collect_pids;
+
+static inline void ebpf_cgroup_systemd_enabled_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_systemd_enabled, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_systemd_enabled_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_systemd_enabled, memory_order_acquire);
+}
+
+static inline void ebpf_cgroup_integration_active_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_integration_active, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_integration_active_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_integration_active, memory_order_acquire);
+}
+
+static inline void ebpf_send_cgroup_chart_set(int value)
+{
+    atomic_store_explicit(&send_cgroup_chart, value, memory_order_release);
+}
+
+static inline int ebpf_send_cgroup_chart_get(void)
+{
+    return atomic_load_explicit(&send_cgroup_chart, memory_order_acquire);
+}
 
 static inline bool ebpf_plugin_stop(void)
 {
@@ -335,12 +351,36 @@ static inline bool ebpf_plugin_stop(void)
            nd_thread_signaled_to_cancel();
 }
 
+static inline void ebpf_mark_program_loaded(void)
+{
+    __atomic_store_n(&ebpf_program_loaded_any, true, __ATOMIC_RELEASE);
+}
+
+static inline bool ebpf_program_loaded(void)
+{
+    return __atomic_load_n(&ebpf_program_loaded_any, __ATOMIC_ACQUIRE);
+}
+
+// `enabled` is sampled from stats/shutdown paths without a single shared mutex.
+// Keep those state transitions defined without changing the plugin's lock layout.
+static inline enum ebpf_threads_status ebpf_module_enabled_get(ebpf_module_t *em)
+{
+    return __atomic_load_n(&em->enabled, __ATOMIC_RELAXED);
+}
+
+static inline void ebpf_module_enabled_set(ebpf_module_t *em, enum ebpf_threads_status enabled)
+{
+    __atomic_store_n(&em->enabled, enabled, __ATOMIC_RELAXED);
+}
+
 static inline bool ebpf_module_thread_has_valid_state(ebpf_module_t *em)
 {
-    if (likely(em->enabled == NETDATA_THREAD_EBPF_RUNNING || em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
+    enum ebpf_threads_status enabled = ebpf_module_enabled_get(em);
+
+    if (likely(enabled == NETDATA_THREAD_EBPF_RUNNING))
         return true;
 
-    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)em->enabled);
+    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)enabled);
     return false;
 }
 

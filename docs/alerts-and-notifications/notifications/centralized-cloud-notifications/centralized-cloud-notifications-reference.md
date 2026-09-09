@@ -96,7 +96,7 @@ You can set up silencing rules that apply to any combination of:
 
 You can turn off all notifications for a user at the space or war room level at the beginning of any maintenance window. This disables all notifications from Netdata Cloud, though you'll still need additional steps to disable or mute alerts from the nodes/agents themselves.
 
-[For more info click here](https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-reference#disable-or-silence-alerts)
+[For more info click here](https://learn.netdata.cloud/docs/alerts-&-notifications/alert-configuration-reference#how-to-disable-or-silence-alerts)
 
 ## Anatomy of an Email Alert Notification
 

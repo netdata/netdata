@@ -58,7 +58,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "Dimensions Filter",
         "Array of dimensions to include in the query.\n"
         "Examples: [\"read\", \"write\"] or [\"in\", \"out\"] or [\"used\", \"free\", \"cached\"]\n"
-        "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover the available dimensions for a metric.");
+        "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover the available dimensions for a metric.",
+        true);
 
     mcp_schema_add_labels_object(
         buffer, "Labels Filter",
@@ -75,7 +76,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "If no instances are specified, all instances of the metric are queried.\n"
         "Example: [\"instance1\", \"instance2\", \"instance3\"]\n."
         "IMPORTANT: when you have a choice, prefer to filter by labels instead of instances, because many monitored "
-        "components may change instance names over time.");
+        "components may change instance names over time.",
+        false);
 
     mcp_schema_add_array_param(
         buffer, "nodes",
@@ -83,7 +85,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         "Array of nodes to include in the query.\n"
         "If no nodes are specified, all nodes having data for the given metrics in the specified time-frame will be queried.\n"
         "Examples: [\"node1\", \"node2\", \"node3\"]\n"
-        "Use the '" MCP_TOOL_LIST_NODES "' tool to discover the available nodes.");
+        "Use the '" MCP_TOOL_LIST_NODES "' tool to discover the available nodes.",
+        false);
 
     // Add cardinality limit
     mcp_schema_add_cardinality_limit(buffer,
@@ -134,7 +137,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
     {
         buffer_json_member_add_string(buffer, "type", "string");
         buffer_json_member_add_string(buffer, "title", "Time Grouping Method");
-        buffer_json_member_add_string(buffer, "description", "Method to group data points over time. The 'extremes' method returns the maximum value for positive numbers and the minimum value for negative numbers, which is particularly useful for showing the highest peaks in both directions on charts.");
+        buffer_json_member_add_string(buffer, "description", "Method to group data points over time. The 'extremes' method returns the maximum value for positive numbers and the minimum value for negative numbers, which is particularly useful for showing the highest peaks in both directions on charts. The 'latest' method returns the most recent collected value of each time frame, which is useful for reading the current value of a metric.");
         buffer_json_member_add_string(buffer, "default", "average");
         
         // Define enum of possible values
@@ -154,6 +157,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
         buffer_json_add_array_item_string(buffer, "countif");  // requires time_group_options parameter
         buffer_json_add_array_item_string(buffer, "extremes");  // for each time frame, returns max for positive values and min for negative values
+        buffer_json_add_array_item_string(buffer, "latest");  // for each time frame, returns the most recent collected value
         buffer_json_array_close(buffer);
     }
     buffer_json_object_close(buffer); // time_group
@@ -196,6 +200,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "- 'node': Groups by node. Example: for disks, it provides one metric per node, aggregating reads and writes across all its disks.\n"
             "- 'label': Groups by the given label key (use the parameter 'group_by_label' to set the key). Example: for disks, aggregate over key 'disk_type' to get an group all 'physical', 'virtual' and 'partition' separately.\n"
             "Multiple groupings can be combined. Example: '[\"dimension\", \"label\"]'.");
+        buffer_json_member_add_uint64(buffer, "minItems", 1);
         buffer_json_member_add_array(buffer, "default");
         buffer_json_add_array_item_string(buffer, "dimension");
         buffer_json_array_close(buffer);
@@ -279,12 +284,8 @@ typedef struct {
 
 // Interrupt callback for query execution
 static bool mcp_query_interrupt_callback(void *data) {
-    mcp_query_interrupt_data *int_data = (mcp_query_interrupt_data *)data;
-    
-    // Check if the MCP client is still valid and connected
-    if (!int_data || !int_data->mcpc)
-        return false;
-        
+    (void)data;
+
     // Real implementations might check for client disconnection or timeout
     // Here we're just returning false to indicate "no interrupt"
     return false;
@@ -318,13 +319,8 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     // Check if all required parameters are provided
     struct json_object *after_obj = NULL, *before_obj = NULL, *points_obj = NULL, *time_group_obj = NULL;
-    struct json_object *group_by_obj = NULL, *aggregation_obj = NULL, *dimensions_obj = NULL;
-    
-    if (!json_object_object_get_ex(params, "dimensions", &dimensions_obj) || !dimensions_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'dimensions'. Use the '" MCP_TOOL_LIST_METRICS "' to get the list of dimensions for this metric/context.");
-        return MCP_RC_BAD_REQUEST;
-    }
-    
+    struct json_object *aggregation_obj = NULL;
+
     if (!json_object_object_get_ex(params, "after", &after_obj) || !after_obj) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'after'. This parameter defines the start time for your query (Unix epoch timestamp in seconds, or negative value relative to 'before', or RFC3339 datetime string).");
         return MCP_RC_BAD_REQUEST;
@@ -342,11 +338,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     
     if (!json_object_object_get_ex(params, "time_group", &time_group_obj) || !time_group_obj) {
         buffer_sprintf(mcpc->error, "Missing required parameter 'time_group'. This parameter defines how to aggregate data points over time (e.g., 'average', 'min', 'max', 'sum').");
-        return MCP_RC_BAD_REQUEST;
-    }
-    
-    if (!json_object_object_get_ex(params, "group_by", &group_by_obj) || !group_by_obj) {
-        buffer_sprintf(mcpc->error, "Missing required parameter 'group_by'. This parameter defines how to group metrics (e.g., 'dimension', 'instance', 'node', or combinations like 'dimension,node').");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -402,12 +393,17 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     // Handle dimensions array parameter
     CLEAN_BUFFER *dimensions_buffer = NULL;
     
-    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", true, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    // 'dimensions' and 'group_by' are validated here, where they are parsed, so that a missing parameter
+    // and an empty array give the same guidance
+    struct json_object *dimensions_obj = NULL;
+    dimensions_buffer = mcp_params_parse_array_to_pattern(params, "dimensions", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
-        buffer_strcat(mcpc->error, ". You must explicitly list every dimension you want to query. "
+        buffer_strcat(mcpc->error, " You must explicitly list every dimension you want to query. "
                                    "Use the '" MCP_TOOL_GET_METRICS_DETAILS "' tool to discover available dimensions for the context.");
         return MCP_RC_BAD_REQUEST;
     }
+    // the parse above proves 'dimensions' is a non-empty array of strings
+    json_object_object_get_ex(params, "dimensions", &dimensions_obj);
     // Handle labels - expects a structured object only
     CLEAN_BUFFER *labels_buffer = NULL;
     
@@ -496,8 +492,11 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     CLEAN_BUFFER *group_by_buffer = NULL;
     const char *group_by_str = NULL;
     
-    group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", true, false, MCP_TOOL_GET_METRICS_DETAILS, mcpc->error);
+    group_by_buffer = mcp_params_parse_array_to_pattern(params, "group_by", true, false, NULL, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
+        buffer_strcat(mcpc->error, " This parameter defines how to group metrics. "
+                                   "Valid values are: 'dimension', 'instance', 'node', 'label', "
+                                   "and they can be combined, e.g. [\"dimension\", \"node\"].");
         return MCP_RC_BAD_REQUEST;
     }
     
@@ -546,7 +545,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                    RRDR_OPTION_ABSOLUTE | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR |
                    RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO |
                    RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS | RRDR_OPTION_LONG_JSON_KEYS |
-                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339,
+                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339 | RRDR_OPTION_CARDINALITY_ALL,
         .time_group_method = time_group,
         .time_group_options = time_group_options,
         .resampling_time = 0,
@@ -636,7 +635,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
             // Add a warning about potentially misleading aggregation
             bool warn_aggregation = false;
             // Only warn if using average without dimension grouping AND multiple dimensions selected
-            int dimensions_count = (int)json_object_array_length(dimensions_obj);
+            size_t dimensions_count = json_object_array_length(dimensions_obj);
             if (dimensions_count > 1 &&
                 group_by[0].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && 
                 !(group_by[0].group_by & RRDR_GROUP_BY_DIMENSION)) {

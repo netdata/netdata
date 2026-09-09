@@ -3,7 +3,7 @@
 #ifndef NETDATA_MMAP_LIMIT_H
 #define NETDATA_MMAP_LIMIT_H
 
-#include "libnetdata/common.h"
+#include "libnetdata/libnetdata-base.h"
 
 unsigned long long os_mmap_limit(void);
 

@@ -8,6 +8,7 @@ import (
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
 )
 
 func (d Discoverer) build(raw *resources) *rs.Resources {
@@ -22,9 +23,11 @@ func (d Discoverer) build(raw *resources) *rs.Resources {
 	res.Hosts = d.buildHosts(raw.hosts)
 	res.VMs = d.buildVMs(raw.vms)
 	res.Datastores = d.buildDatastores(raw.datastores)
+	res.Networks = d.buildNetworks(raw.networks)
+	res.StoragePods = d.buildStoragePods(raw.storagePods)
 	res.ResourcePools = d.buildResourcePools(raw.resourcePools, res.Clusters)
 
-	d.Infof("discovering : building : built %d/%d dcs, %d/%d folders, %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d/%d resource pools, process took %s",
+	d.Infof("discovering : building : built %d/%d dcs, %d/%d folders, %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d/%d networks, %d/%d datastore clusters, %d/%d resource pools, process took %s",
 		len(res.DataCenters),
 		len(raw.dcs),
 		len(res.Folders),
@@ -37,6 +40,10 @@ func (d Discoverer) build(raw *resources) *rs.Resources {
 		len(raw.vms),
 		len(res.Datastores),
 		len(raw.datastores),
+		len(res.Networks),
+		len(raw.networks),
+		len(res.StoragePods),
+		len(raw.storagePods),
 		len(res.ResourcePools),
 		len(raw.resourcePools),
 		time.Since(t),
@@ -53,11 +60,7 @@ func fixClustersParentID(res *rs.Resources) {
 }
 
 func findClusterDcID(parentID string, folders rs.Folders) string {
-	f := folders.Get(parentID)
-	if f == nil {
-		return parentID
-	}
-	return findClusterDcID(f.ParentID, folders)
+	return findFolderRootID(parentID, folders)
 }
 
 func (Discoverer) buildDatacenters(raw []mo.Datacenter) rs.DataCenters {
@@ -79,12 +82,18 @@ func newDC(raw mo.Datacenter) *rs.Datacenter {
 func (Discoverer) buildFolders(raw []mo.Folder) rs.Folders {
 	fs := make(rs.Folders)
 	for _, d := range raw {
-		fs.Put(newFolder(d))
+		if f := newFolder(d); f != nil {
+			fs.Put(f)
+		}
 	}
 	return fs
 }
 
 func newFolder(raw mo.Folder) *rs.Folder {
+	parentID := parentRefValue(raw.Parent)
+	if parentID == "" {
+		return nil
+	}
 	// vm group-v55 datacenter-54
 	// host group-h56 datacenter-54
 	// datastore group-s57 datacenter-54
@@ -92,127 +101,257 @@ func newFolder(raw mo.Folder) *rs.Folder {
 	return &rs.Folder{
 		Name:     raw.Name,
 		ID:       raw.Reference().Value,
-		ParentID: raw.Parent.Value,
+		ParentID: parentID,
 	}
 }
 
 func (Discoverer) buildClusters(raw []mo.ComputeResource) rs.Clusters {
 	clusters := make(rs.Clusters)
 	for _, c := range raw {
-		clusters.Put(newCluster(c))
+		if cluster := newCluster(c); cluster != nil {
+			clusters.Put(cluster)
+		}
 	}
 	return clusters
 }
 
 func newCluster(raw mo.ComputeResource) *rs.Cluster {
+	parentID := parentRefValue(raw.Parent)
+	if parentID == "" {
+		return nil
+	}
 	// s - dummy cluster, c - created by user cluster
 	// 192.168.0.201 domain-s61 group-h4
 	// New Cluster1 domain-c52 group-h67
-	return &rs.Cluster{
-		Name:     raw.Name,
-		ID:       raw.Reference().Value,
-		ParentID: raw.Parent.Value,
-		Ref:      raw.Reference(),
+	cluster := &rs.Cluster{
+		Name:         raw.Name,
+		ID:           raw.Reference().Value,
+		ParentID:     parentID,
+		CustomValues: customFieldValues(raw.CustomValue),
+		Ref:          raw.Reference(),
 	}
+	rs.SetClusterVSANInfo(cluster, raw.ConfigurationEx)
+	return cluster
 }
 
-const (
-	poweredOn = "poweredOn"
-)
-
 func (d Discoverer) buildHosts(raw []mo.HostSystem) rs.Hosts {
-	var num int
 	hosts := make(rs.Hosts)
 	for _, h := range raw {
-		//	poweredOn | poweredOff | standBy | unknown
-		if h.Runtime.PowerState != poweredOn {
-			num++
-			continue
+		if host := newHost(h); host != nil {
+			hosts.Put(host)
 		}
-		// connected | notResponding | disconnected
-		//if v.Runtime.ConnectionState == "" {
-		//
-		//}
-		hosts.Put(newHost(h))
-	}
-	if num > 0 {
-		d.Infof("discovering : building : removed %d hosts (not powered on)", num)
 	}
 	return hosts
 }
 
 func newHost(raw mo.HostSystem) *rs.Host {
+	parentID := parentRefValue(raw.Parent)
+	if parentID == "" {
+		return nil
+	}
 	// 192.168.0.201 host-22 domain-s61
 	// 192.168.0.202 host-28 domain-c52
 	// 192.168.0.203 host-33 domain-c52
-	return &rs.Host{
-		Name:          raw.Name,
-		ID:            raw.Reference().Value,
-		ParentID:      raw.Parent.Value,
-		OverallStatus: string(raw.Summary.OverallStatus),
-		Ref:           raw.Reference(),
+	host := &rs.Host{
+		Name:              raw.Name,
+		ID:                raw.Reference().Value,
+		ParentID:          parentID,
+		CustomValues:      customFieldValues(raw.CustomValue),
+		ConnectionState:   string(raw.Runtime.ConnectionState),
+		PowerState:        string(raw.Runtime.PowerState),
+		InMaintenanceMode: raw.Runtime.InMaintenanceMode,
+		OverallStatus:     string(raw.Summary.OverallStatus),
+		Ref:               raw.Reference(),
 	}
+	if raw.Config != nil && raw.Config.VsanHostConfig != nil && raw.Config.VsanHostConfig.ClusterInfo != nil {
+		host.VSANNodeUUID = raw.Config.VsanHostConfig.ClusterInfo.NodeUuid
+	}
+	return host
 }
 
 func (d Discoverer) buildVMs(raw []mo.VirtualMachine) rs.VMs {
-	var num int
 	vms := make(rs.VMs)
 	for _, v := range raw {
-		//  poweredOff | poweredOn | suspended
-		if v.Runtime.PowerState != poweredOn {
-			num++
-			continue
-		}
-		// connected | disconnected | orphaned | inaccessible | invalid
-		//if v.Runtime.ConnectionState == "" {
-		//
-		//}
 		vms.Put(newVM(v))
-	}
-	if num > 0 {
-		d.Infof("discovering : building : removed %d vms (not powered on)", num)
 	}
 	return vms
 }
 
 func newVM(raw mo.VirtualMachine) *rs.VM {
 	// deb91 vm-25 group-v3 host-22
+	var hostID string
+	if raw.Runtime.Host != nil {
+		hostID = raw.Runtime.Host.Value
+	}
+	var folderID string
+	if raw.Parent != nil {
+		folderID = raw.Parent.Value
+	}
+	var toolsRunningStatus, toolsVersionStatus string
+	if raw.Summary.Guest != nil {
+		toolsRunningStatus = raw.Summary.Guest.ToolsRunningStatus
+		toolsVersionStatus = raw.Summary.Guest.ToolsVersionStatus2
+	}
+	var committed, uncommitted, unshared int64
+	if raw.Summary.Storage != nil {
+		committed = raw.Summary.Storage.Committed
+		uncommitted = raw.Summary.Storage.Uncommitted
+		unshared = raw.Summary.Storage.Unshared
+	}
+	var instanceUUID string
+	if raw.Config != nil {
+		instanceUUID = raw.Config.InstanceUuid
+	}
+	snapshot := summarizeSnapshotInfo(raw.Snapshot)
 	return &rs.VM{
-		Name:          raw.Name,
-		ID:            raw.Reference().Value,
-		ParentID:      raw.Runtime.Host.Value,
-		OverallStatus: string(raw.Summary.OverallStatus),
-		Ref:           raw.Reference(),
+		Name:                     raw.Name,
+		ID:                       raw.Reference().Value,
+		ParentID:                 hostID,
+		FolderParentID:           folderID,
+		CustomValues:             customFieldValues(raw.CustomValue),
+		ConnectionState:          string(raw.Runtime.ConnectionState),
+		PowerState:               string(raw.Runtime.PowerState),
+		ToolsRunningStatus:       toolsRunningStatus,
+		ToolsVersionStatus:       toolsVersionStatus,
+		InstanceUUID:             instanceUUID,
+		ConsolidationNeeded:      raw.Runtime.ConsolidationNeeded,
+		ConfigCPU:                int64(raw.Summary.Config.NumCpu),
+		ConfigMemory:             int64(raw.Summary.Config.MemorySizeMB),
+		ConfigDisks:              int64(raw.Summary.Config.NumVirtualDisks),
+		ConfigNICs:               int64(raw.Summary.Config.NumEthernetCards),
+		StorageCommitted:         committed,
+		StorageUncommitted:       uncommitted,
+		StorageUnshared:          unshared,
+		OverallStatus:            string(raw.Summary.OverallStatus),
+		SnapshotCount:            snapshot.count,
+		SnapshotMaxChainDepth:    snapshot.maxChainDepth,
+		SnapshotOldestCreateTime: snapshot.oldestCreateTime,
+		Ref:                      raw.Reference(),
 	}
 }
 
 func (d Discoverer) buildDatastores(raw []mo.Datastore) rs.Datastores {
-	var num int
 	datastores := make(rs.Datastores)
 	for _, ds := range raw {
-		if !ds.Summary.Accessible {
-			num++
-			continue
+		if datastore := newDatastore(ds); datastore != nil {
+			datastores.Put(datastore)
 		}
-		datastores.Put(newDatastore(ds))
-	}
-	if num > 0 {
-		d.Infof("discovering : building : removed %d datastores (not accessible)", num)
 	}
 	return datastores
 }
 
 func newDatastore(raw mo.Datastore) *rs.Datastore {
+	parentID := parentRefValue(raw.Parent)
+	if parentID == "" {
+		return nil
+	}
 	return &rs.Datastore{
+		Name:               raw.Name,
+		ID:                 raw.Reference().Value,
+		ParentID:           parentID,
+		CustomValues:       customFieldValues(raw.CustomValue),
+		OverallStatus:      string(raw.OverallStatus),
+		Type:               raw.Summary.Type,
+		Capacity:           raw.Summary.Capacity,
+		FreeSpace:          raw.Summary.FreeSpace,
+		Uncommitted:        raw.Summary.Uncommitted,
+		Accessible:         raw.Summary.Accessible,
+		MaintenanceMode:    raw.Summary.MaintenanceMode,
+		MultipleHostAccess: raw.Summary.MultipleHostAccess,
+		Ref:                raw.Reference(),
+	}
+}
+
+func (d Discoverer) buildNetworks(raw []mo.Network) rs.Networks {
+	networks := make(rs.Networks)
+	for _, network := range raw {
+		networks.Put(newNetwork(network))
+	}
+	return networks
+}
+
+func newNetwork(raw mo.Network) *rs.Network {
+	var accessible bool
+	var ipPoolName string
+	if raw.Summary != nil {
+		if summary := raw.Summary.GetNetworkSummary(); summary != nil {
+			accessible = summary.Accessible
+			ipPoolName = summary.IpPoolName
+		}
+	}
+
+	networkType := raw.Reference().Type
+	if networkType == "" {
+		networkType = "Network"
+	}
+
+	var parentID string
+	if raw.Parent != nil {
+		parentID = raw.Parent.Value
+	}
+
+	return &rs.Network{
 		Name:          raw.Name,
 		ID:            raw.Reference().Value,
-		ParentID:      raw.Parent.Value,
+		Type:          networkType,
+		ParentID:      parentID,
+		CustomValues:  customFieldValues(raw.CustomValue),
+		Accessible:    accessible,
+		IPPoolName:    ipPoolName,
+		HostIDs:       refValues(raw.Host),
+		VMIDs:         refValues(raw.Vm),
 		OverallStatus: string(raw.OverallStatus),
-		Type:          raw.Summary.Type,
-		Capacity:      raw.Summary.Capacity,
-		FreeSpace:     raw.Summary.FreeSpace,
-		Accessible:    raw.Summary.Accessible,
 		Ref:           raw.Reference(),
+	}
+}
+
+func refValues(refs []types.ManagedObjectReference) []string {
+	if len(refs) == 0 {
+		return nil
+	}
+	values := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		if ref.Value != "" {
+			values = append(values, ref.Value)
+		}
+	}
+	return values
+}
+
+func (d Discoverer) buildStoragePods(raw []mo.StoragePod) rs.StoragePods {
+	pods := make(rs.StoragePods)
+	for _, pod := range raw {
+		if storagePod := newStoragePod(pod); storagePod != nil {
+			pods.Put(storagePod)
+		}
+	}
+	return pods
+}
+
+func newStoragePod(raw mo.StoragePod) *rs.StoragePod {
+	parentID := parentRefValue(raw.Parent)
+	if parentID == "" {
+		return nil
+	}
+	var capacity, freeSpace int64
+	if raw.Summary != nil {
+		capacity = raw.Summary.Capacity
+		freeSpace = raw.Summary.FreeSpace
+	}
+	var storageDRSEnabled *bool
+	if raw.PodStorageDrsEntry != nil {
+		storageDRSEnabled = new(raw.PodStorageDrsEntry.StorageDrsConfig.PodConfig.Enabled)
+	}
+	return &rs.StoragePod{
+		Name:              raw.Name,
+		ID:                raw.Reference().Value,
+		ParentID:          parentID,
+		CustomValues:      customFieldValues(raw.CustomValue),
+		Capacity:          capacity,
+		FreeSpace:         freeSpace,
+		StorageDRSEnabled: storageDRSEnabled,
+		OverallStatus:     string(raw.OverallStatus),
+		Ref:               raw.Reference(),
 	}
 }
 
@@ -221,6 +360,9 @@ func (d Discoverer) buildResourcePools(raw []mo.ResourcePool, clusters rs.Cluste
 	for _, rp := range raw {
 		// owner is the cluster that owns this pool
 		ownerID := rp.Owner.Value
+		if ownerID == "" {
+			continue
+		}
 		// skip pools whose owner is a dummy cluster (standalone host)
 		if isDummyCluster(ownerID) {
 			continue
@@ -236,9 +378,36 @@ func (d Discoverer) buildResourcePools(raw []mo.ResourcePool, clusters rs.Cluste
 
 func newResourcePool(raw mo.ResourcePool) *rs.ResourcePool {
 	return &rs.ResourcePool{
-		Name:     raw.Name,
-		ID:       raw.Reference().Value,
-		ParentID: raw.Owner.Value, // owner cluster ref
-		Ref:      raw.Reference(),
+		Name:         raw.Name,
+		ID:           raw.Reference().Value,
+		ParentID:     raw.Owner.Value, // owner cluster ref
+		CustomValues: customFieldValues(raw.CustomValue),
+		Ref:          raw.Reference(),
 	}
+}
+
+func customFieldValues(values []types.BaseCustomFieldValue) map[int32]string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	out := make(map[int32]string, len(values))
+	for _, value := range values {
+		stringValue, ok := value.(*types.CustomFieldStringValue)
+		if !ok || stringValue == nil || stringValue.Value == "" {
+			continue
+		}
+		out[stringValue.Key] = stringValue.Value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func parentRefValue(ref *types.ManagedObjectReference) string {
+	if ref == nil {
+		return ""
+	}
+	return ref.Value
 }

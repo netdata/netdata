@@ -25,11 +25,11 @@ func newPerfdataRouter(maxPerJob int) *perfdataRouter {
 	}
 }
 
-func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfRouteResult {
+func (r *perfdataRouter) route(checkName string, perf []output.PerfDatum) perfRouteResult {
 	if len(perf) == 0 {
 		return perfRouteResult{}
 	}
-	source := perfSourceFromPlugin(pluginPath)
+	source := perfSourceFromCheckName(checkName)
 
 	items := make([]perfPreparedDatum, 0, len(perf))
 	for _, datum := range perf {
@@ -81,11 +81,11 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 		base := perfMetricIdentity(source, item)
 		tail := perfMetricTail(item)
 		result.values = append(result.values, perfValueMeasureSet{
-			name:       base,
-			scriptName: source,
-			unit:       unitForClass(item.class),
-			counter:    item.class == perfClassCounter,
-			value:      item.value,
+			name:      base,
+			checkName: source,
+			unit:      unitForClass(item.class),
+			counter:   item.class == perfClassCounter,
+			value:     item.value,
 		})
 
 		if item.class == perfClassCounter {
@@ -97,7 +97,7 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 
 		result.thresholdStates = append(result.thresholdStates, perfThresholdStateSet{
 			name:          perfThresholdStateMetricName(base),
-			scriptName:    source,
+			checkName:     source,
 			perfdataValue: tail,
 			state:         thresholdStateForPerfDatum(item),
 		})

@@ -2,6 +2,8 @@
 
 package charttpl
 
+import "slices"
+
 const (
 	defaultChartType = "line"
 )
@@ -36,8 +38,11 @@ func applyChartDefaults(chart *Chart, defaults *ChartDefaults) {
 	if chart == nil || defaults == nil {
 		return
 	}
+	if chart.Priority == 0 && defaults.Priority != 0 {
+		chart.Priority = defaults.Priority
+	}
 	if chart.LabelPromoted == nil && defaults.LabelPromoted != nil {
-		chart.LabelPromoted = append([]string(nil), defaults.LabelPromoted...)
+		chart.LabelPromoted = slices.Clone(defaults.LabelPromoted)
 	}
 	if chart.Instances == nil && defaults.Instances != nil {
 		chart.Instances = cloneInstances(defaults.Instances)
@@ -51,22 +56,28 @@ func inheritChartDefaults(parent, own *ChartDefaults) *ChartDefaults {
 
 	out := &ChartDefaults{}
 	if parent != nil {
+		if parent.Priority != 0 {
+			out.Priority = parent.Priority
+		}
 		if parent.LabelPromoted != nil {
-			out.LabelPromoted = append([]string(nil), parent.LabelPromoted...)
+			out.LabelPromoted = slices.Clone(parent.LabelPromoted)
 		}
 		if parent.Instances != nil {
 			out.Instances = cloneInstances(parent.Instances)
 		}
 	}
 	if own != nil {
+		if own.Priority != 0 {
+			out.Priority = own.Priority
+		}
 		if own.LabelPromoted != nil {
-			out.LabelPromoted = append([]string(nil), own.LabelPromoted...)
+			out.LabelPromoted = slices.Clone(own.LabelPromoted)
 		}
 		if own.Instances != nil {
 			out.Instances = cloneInstances(own.Instances)
 		}
 	}
-	if out.LabelPromoted == nil && out.Instances == nil {
+	if out.Priority == 0 && out.LabelPromoted == nil && out.Instances == nil {
 		return nil
 	}
 	return out
@@ -77,6 +88,7 @@ func cloneInstances(in *Instances) *Instances {
 		return nil
 	}
 	return &Instances{
-		ByLabels: append([]string(nil), in.ByLabels...),
+		ByLabels:         append([]string(nil), in.ByLabels...),
+		OptionalByLabels: append([]string(nil), in.OptionalByLabels...),
 	}
 }

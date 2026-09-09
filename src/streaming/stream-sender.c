@@ -15,6 +15,8 @@ static void stream_sender_move_running_to_connector_or_remove_internal(struct st
 // --------------------------------------------------------------------------------------------------------------------
 
 #ifdef NETDATA_LOG_STREAM_SENDER
+#include "stream-trace.h"
+
 void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_TRAFFIC_TYPE type __maybe_unused, bool inbound) {
     spinlock_lock(&s->log.spinlock);
 
@@ -34,23 +36,8 @@ void stream_sender_log_payload(struct sender_state *s, BUFFER *payload, STREAM_T
         struct timespec now;
         clock_gettime(CLOCK_REALTIME, &now);
 
-        time_t elapsed_sec = now.tv_sec - s->log.first_call.tv_sec;
-        long elapsed_nsec = now.tv_nsec - s->log.first_call.tv_nsec;
-
-        if (elapsed_nsec < 0) {
-            elapsed_sec--;
-            elapsed_nsec += 1000000000;
-        }
-
-        uint16_t days = elapsed_sec / 86400;
-        uint8_t hours = (elapsed_sec % 86400) / 3600;
-        uint8_t minutes = (elapsed_sec % 3600) / 60;
-        uint8_t seconds = elapsed_sec % 60;
-        uint16_t milliseconds = elapsed_nsec / 1000000;
-
-        char prefix[30];
-        snprintf(prefix, sizeof(prefix), "%03ud.%02u:%02u:%02u.%03u ",
-                 days, hours, minutes, seconds, milliseconds);
+        char prefix[STREAM_TRACE_PREFIX_SIZE];
+        stream_trace_format_elapsed_prefix(prefix, now, s->log.first_call);
 
         const char *line_start = buffer_tostring(payload);
         const char *line_end;
@@ -81,8 +68,18 @@ void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     // reset the state of all charts
     RRDSET *st;
     rrdset_foreach_read(st, s->host) {
+        // Decrement only when this chart actually contributed +1 to the host
+        // counter, i.e. when IN_PROGRESS was set. The previous condition
+        // (!FINISHED) over-decremented initial-state charts (no flags set, no
+        // prior +1) and relied on a force-zero safety net below to compensate.
+        // Force-zero is unsafe against concurrent claim-before-publish in
+        // stream_sender_send_rrdset_definition: a sender that has just
+        // incremented but not yet published IN_PROGRESS would be desynced from
+        // the counter we forcibly cleared. Use the precise condition instead.
+        // Pulse status is intentionally not flipped here -- the surrounding
+        // sender connect/disconnect lifecycle drives it (e.g. SND_DISCONNECTED).
         RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-        if(!(old & RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+        if(old & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)
             rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
 #ifdef REPLICATION_TRACKING
@@ -100,13 +97,18 @@ void stream_sender_charts_and_replication_reset(struct sender_state *s) {
     }
     rrdset_foreach_done(st);
 
-    if(rrdhost_sender_replicating_charts(s->host) != 0) {
+    // Observability only. The per-chart loop now precisely balances
+    // contributions; a non-zero residual either reflects a concurrent
+    // claim-before-publish in flight (will resolve) or a real accounting bug
+    // worth investigating. Do NOT force-zero: that would desynchronize the
+    // counter from any in-flight sender's not-yet-published IN_PROGRESS flag.
+    size_t residual = rrdhost_sender_replicating_charts(s->host);
+    if(residual != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "STREAM REPLAY ERROR: sender replicating instances counter should be zero, but it is %u"
-               " - resetting it to zero",
-               rrdhost_sender_replicating_charts(s->host));
-
-        rrdhost_sender_replicating_charts_zero(s->host);
+               "STREAM REPLAY: sender replicating-charts counter is %zu after reset "
+               "(expected 0); leaving it untouched to preserve any concurrent "
+               "claim-before-publish in flight",
+               residual);
     }
 
     stream_sender_replicating_charts_zero(s);
@@ -126,6 +128,19 @@ static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
     stream_sender_unlock(s);
 }
 
+// Record the interface the stream actually egresses on as the host's _net_default_iface label, so
+// the parent sees the real uplink. The OS-specific lookup (getsockname + getifaddrs match) lives in
+// libnetdata/os/socket_egress_interface; here we only stamp the label. This is correct under policy
+// routing / multi-WAN, where the main routing table's default route can point at a different
+// interface than the stream uses. Runs once per (re)connect and rides out with the first host-labels
+// push in on_ready_to_dispatch(); on failover the connection breaks and reconnects over the new
+// interface, so it re-evaluates automatically.
+static void stream_sender_update_egress_iface_label(struct sender_state *s) {
+    char iface[OS_IFNAME_MAX];
+    if (os_socket_egress_interface(s->sock.fd, iface, sizeof(iface)) && iface[0])
+        rrdlabels_add(s->host->rrdlabels, "_net_default_iface", iface, RRDLABEL_SRC_AUTO);
+}
+
 void stream_sender_on_connect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND [%s]: running on-connect hooks...",
@@ -136,6 +151,9 @@ void stream_sender_on_connect(struct sender_state *s) {
     stream_sender_on_connect_and_disconnect(s);
 
     s->thread.last_traffic_ut = now_monotonic_usec();
+
+    // record the real uplink interface before the first host-labels push
+    stream_sender_update_egress_iface_label(s);
 
     freez(s->thread.rbuf.b);
     s->thread.rbuf.size = PLUGINSD_LINE_MAX + 1;
@@ -164,6 +182,18 @@ void stream_sender_on_disconnect(struct sender_state *s) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM SND '%s': running on-disconnect hooks...",
            rrdhost_hostname(s->host));
+
+    // Stop new metadata pushes BEFORE the reset. New collectors that haven't
+    // yet entered stream_sender_send_rrdset_definition will fail the
+    // rrdhost_can_stream_metadata_to_parent() predicate and skip the
+    // bookkeeping entirely; in-flight collectors that already passed the
+    // predicate are caught by the post-CAS recheck in
+    // stream_sender_send_rrdset_definition (which then rolls back via atomic
+    // CAS, so the reset's per-chart accounting and the rollback do not
+    // double-decrement). The duplicate clear later in
+    // stream_sender_move_running_to_connector_or_remove_internal /
+    // stream_sender_remove is idempotent for atomic flag ops.
+    rrdhost_flag_clear(s->host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     stream_sender_on_connect_and_disconnect(s);
 
@@ -240,7 +270,7 @@ void stream_sender_handle_op(struct stream_thread *sth, struct sender_state *s, 
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(s->scb);
         stream_sender_unlock(s);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM SND[%zu] '%s' [to %s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
+               "STREAM SND[%zu] '%s' [to %s]: send buffer is full (buffer size %zu, max %zu, used %zu, available %zu). "
                "Restarting connection.",
                sth->id, rrdhost_hostname(s->host), s->remote_ip,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
@@ -331,7 +361,7 @@ void stream_sender_move_queue_to_running_unsafe(struct stream_thread *sth) {
         s->thread.msg.meta = &s->thread.meta;
 
         __atomic_store_n(&s->host->stream.snd.status.tid, gettid_cached(), __ATOMIC_RELAXED);
-        s->host->stream.snd.status.connections++;
+        __atomic_add_fetch(&s->host->stream.snd.status.connections, 1, __ATOMIC_RELAXED);
         s->last_state_since_t = now_realtime_sec();
 
         s->replication.last_progress_ut = now_monotonic_usec();
@@ -486,8 +516,12 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         if (stats.buffer_ratio > overall_buffer_ratio)
             overall_buffer_ratio = stats.buffer_ratio;
 
+        if(unlikely(!s->thread.last_traffic_ut) && now_ut)
+            s->thread.last_traffic_ut = now_ut;
+        usec_t idle_ut = clocks_usec_delta_or_zero_with_rebase(now_ut, &s->thread.last_traffic_ut);
+
         if(unlikely(stats.bytes_outstanding &&
-                     s->thread.last_traffic_ut + stream_send.parents.timeout_s * USEC_PER_SEC < now_ut &&
+                     idle_ut > (usec_t)stream_send.parents.timeout_s * USEC_PER_SEC &&
                      !stream_sender_pending_replication_requests(s) &&
                      !stream_sender_replicating_charts(s))) {
 
@@ -504,17 +538,17 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
             worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT);
 
             char duration[RFC3339_MAX_LENGTH];
-            duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - s->thread.last_traffic_ut), "us", true);
+            duration_snprintf(duration, sizeof(duration), (int64_t)MIN(idle_ut, (usec_t)INT64_MAX), "us", true);
 
             char pending[64] = "0";
             if(stats.bytes_outstanding)
                 size_snprintf(pending, sizeof(pending), stats.bytes_outstanding, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SND[%zu] '%s' [to %s]: there was not traffic for %ld seconds - closing connection - "
+                   "STREAM SND[%zu] '%s' [to %s]: there was not traffic for %" PRId64 " seconds - closing connection - "
                    "we have sent %zu bytes in %zu operations, it is idle for %s, and we have %s pending to send "
                    "(buffer is used %.2f%%).",
-                   sth->id, rrdhost_hostname(s->host), s->remote_ip, stream_send.parents.timeout_s,
+                   sth->id, rrdhost_hostname(s->host), s->remote_ip, (int64_t)stream_send.parents.timeout_s,
                    stats.bytes_sent, stats.sends,
                    duration, pending, stats.buffer_ratio);
 
@@ -549,7 +583,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, overall_buffer_ratio);
 }
 
-static bool stream_sender_did_replication_progress(struct sender_state *s) {
+static bool stream_sender_did_replication_progress(struct sender_state *s, usec_t now_ut) {
     RRDHOST *host = s->host;
 
     size_t host_counter_sum =
@@ -559,7 +593,7 @@ static bool stream_sender_did_replication_progress(struct sender_state *s) {
     if(s->replication.last_counter_sum != host_counter_sum) {
         // there has been some progress
         s->replication.last_counter_sum = host_counter_sum;
-        s->replication.last_progress_ut = now_monotonic_usec();
+        s->replication.last_progress_ut = now_ut;
         return true;
     }
 
@@ -571,10 +605,16 @@ static bool stream_sender_did_replication_progress(struct sender_state *s) {
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - s->replication.last_progress_ut < 10ULL * 60 * USEC_PER_SEC);
+    if(unlikely(!s->replication.last_progress_ut)) {
+        s->replication.last_progress_ut = now_ut;
+        return true;
+    }
+
+    return clocks_usec_delta_or_zero_with_rebase(now_ut, &s->replication.last_progress_ut) <
+           10ULL * 60 * USEC_PER_SEC;
 }
 
-void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
+void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
     Word_t idx = 0;
@@ -585,7 +625,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         struct sender_state *s = m->s;
         RRDHOST *host = s->host;
 
-        if(stream_sender_did_replication_progress(s)) {
+        if(stream_sender_did_replication_progress(s, now_ut)) {
             s->replication.last_checked_ut = 0;
             continue;
         }
@@ -625,7 +665,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         }
         rrdset_foreach_done(st);
 
-        if(stalled && !stream_sender_did_replication_progress(s)) {
+        if(stalled && !stream_sender_did_replication_progress(s, now_ut)) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests (%zu completed)."
                    "We have received %u and sent %u replication commands. "
@@ -750,25 +790,37 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
 bool stream_sender_receive_data(struct stream_thread *sth, struct sender_state *s, usec_t now_ut, bool process_opcodes) {
     EVLOOP_STATUS status = EVLOOP_STATUS_CONTINUE;
     while(status == EVLOOP_STATUS_CONTINUE) {
-        ssize_t rc = nd_sock_revc_nowait(&s->sock, s->thread.rbuf.b + s->thread.rbuf.read_len, s->thread.rbuf.size - s->thread.rbuf.read_len - 1);
-        if (likely(rc > 0)) {
-            s->thread.rbuf.read_len += rc;
-
-            s->thread.last_traffic_ut = now_ut;
-            sth->snd.bytes_received += rc;
-            pulse_stream_received_bytes(rc);
-
-            worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-            stream_sender_execute_commands(s);
+        ssize_t read_len = s->thread.rbuf.read_len;
+        if(unlikely(!s->thread.rbuf.b || !s->thread.rbuf.size || read_len < 0 ||
+                    (size_t)read_len >= s->thread.rbuf.size - 1)) {
+            internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
+            errno_clear();
+            status = EVLOOP_STATUS_SOCKET_ERROR;
         }
-        else if (rc == 0 || errno == ECONNRESET)
-            status = EVLOOP_STATUS_SOCKET_CLOSED;
+        else {
+            size_t available = s->thread.rbuf.size - (size_t)read_len - 1;
+            ssize_t rc = nd_sock_revc_nowait(&s->sock, s->thread.rbuf.b + read_len, available);
 
-        else if (rc < 0) {
-            if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
-                status = EVLOOP_STATUS_SOCKET_FULL;
-            else
-                status = EVLOOP_STATUS_SOCKET_ERROR;
+            if (likely(rc > 0)) {
+                s->thread.rbuf.read_len = read_len + rc;
+
+                s->thread.last_traffic_ut = now_ut;
+                sth->snd.bytes_received += rc;
+                pulse_stream_received_bytes(rc);
+
+                worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
+                if(!stream_sender_execute_commands(s))
+                    status = EVLOOP_STATUS_SOCKET_ERROR;
+            }
+            else if (rc == 0 || errno == ECONNRESET)
+                status = EVLOOP_STATUS_SOCKET_CLOSED;
+
+            else if (rc < 0) {
+                if(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR)
+                    status = EVLOOP_STATUS_SOCKET_FULL;
+                else
+                    status = EVLOOP_STATUS_SOCKET_ERROR;
+            }
         }
 
         if(status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED) {

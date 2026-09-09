@@ -13,3 +13,4 @@ z @varlibdir_POST@/registry/netdata.public.unique.id 0660 @netdata_user_POST@ @n
 z @varlibdir_POST@/netdata.api.key 0660 @netdata_user_POST@ @netdata_group_POST@ -
 
 d @logdir_POST@ 0755 @netdata_user_POST@ @netdata_group_POST@ -
+d @logdir_POST@/traps 0755 @netdata_user_POST@ @netdata_group_POST@ -

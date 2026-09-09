@@ -75,6 +75,7 @@ void set_environment_for_plugins_and_scripts(void) {
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
     verify_required_directory("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
     verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
+    verify_required_directory("NETDATA_STOCK_DATA_DIR", netdata_configured_stock_data_dir, false, 0);
     verify_required_directory("NETDATA_PLUGINS_DIR", netdata_configured_primary_plugins_dir, false, 0);
     verify_required_directory("NETDATA_WEB_DIR", netdata_configured_web_dir, false, 0);
     verify_required_directory("NETDATA_CACHE_DIR", netdata_configured_cache_dir, true, 0775);
@@ -112,12 +113,12 @@ void set_environment_for_plugins_and_scripts(void) {
     const char *p = getenv("PATH");
     if (!p) p = "/bin:/usr/bin";
     snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
+    setenv("PATH", inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
 
     // python options
     p = getenv("PYTHONPATH");
     if (!p) p = "";
-    setenv("PYTHONPATH", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
+    setenv("PYTHONPATH", inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
 
     // disable buffering for python plugins
     setenv("PYTHONUNBUFFERED", "1", 1);

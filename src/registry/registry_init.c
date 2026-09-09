@@ -46,22 +46,6 @@ void registry_db_stats(void) {
                      machines, machines_urls, max_urls_per_machine);
 }
 
-void registry_generate_curl_urls(void) {
-    FILE *fp = fopen("/tmp/registry.curl", "w+");
-    if (unlikely(!fp))
-        return;
-
-    REGISTRY_PERSON *p;
-    dfe_start_read(registry.persons, p) {
-        for(REGISTRY_PERSON_URL *pu = p->person_urls ; pu ;pu = pu->next) {
-            fprintf(fp, "do_curl '%s' '%s' '%s'\n", p->guid, pu->machine->guid, string2str(pu->url));
-        }
-    }
-    dfe_done(p);
-
-    fclose(fp);
-}
-
 void netdata_conf_section_registry(void) {
     FUNCTION_RUN_ONCE();
 
@@ -82,14 +66,14 @@ void netdata_conf_section_registry(void) {
 
     // path names
     snprintfz(filename, FILENAME_MAX, "%s/registry", netdata_configured_varlib_dir);
-    registry.pathname = inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "registry", filename);
+    registry.pathname = inicfg_get_path(&netdata_config, CONFIG_SECTION_DIRECTORIES, "registry", filename);
 
     // filenames
     snprintfz(filename, FILENAME_MAX, "%s/registry.db", registry.pathname);
-    registry.db_filename = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry db file", filename);
+    registry.db_filename = inicfg_get_filename(&netdata_config, CONFIG_SECTION_REGISTRY, "registry db file", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/registry-log.db", registry.pathname);
-    registry.log_filename = inicfg_get(&netdata_config, CONFIG_SECTION_REGISTRY, "registry log file", filename);
+    registry.log_filename = inicfg_get_filename(&netdata_config, CONFIG_SECTION_REGISTRY, "registry log file", filename);
 
     // configuration options
     registry.save_registry_every_entries = (unsigned long long)inicfg_get_number(&netdata_config, CONFIG_SECTION_REGISTRY, "registry save db every new entries", 1000000);
@@ -189,7 +173,6 @@ bool registry_load(void) {
             registry_db_save();
 
         //        registry_db_stats();
-        //        registry_generate_curl_urls();
         //        exit(0);
 
         return true;
@@ -231,6 +214,8 @@ static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unus
 }
 
 void registry_free(void) {
+    registry_cloud_base_url_free();
+
     if(!registry.enabled) return;
     registry.enabled = false;
 

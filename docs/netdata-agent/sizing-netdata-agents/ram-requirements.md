@@ -53,6 +53,14 @@ memory = UNIQUE_METRICS x 16KiB + CONFIGURED_CACHES
 
 The default `CONFIGURED_CACHES` is 32MiB.
 
+To determine `UNIQUE_METRICS` for your Agent, query the `/api/v3/info` endpoint:
+
+```bash
+curl -s http://localhost:19999/api/v3/info | jq '.agents[0].metrics.collected'
+```
+
+This returns the number of unique time-series currently being collected.
+
 For **one million concurrently collected time-series** (independently of their data collection frequency), **the required memory is 16 GiB**. In detail:
 
 ```text

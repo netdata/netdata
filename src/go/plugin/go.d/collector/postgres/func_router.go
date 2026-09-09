@@ -50,10 +50,10 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func pgMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
-		runningQueriesMethodConfig(),
+func pgMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
+		runningQueriesFunctionConfig(),
 	}
 }
 

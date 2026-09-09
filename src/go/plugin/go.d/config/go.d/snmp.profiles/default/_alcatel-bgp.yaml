@@ -1,0 +1,397 @@
+# Alcatel-Lucent AOS7 BGP peer monitoring via BGP4-MIB and ALCATEL-IND1-BGP-MIB.
+# IPv4 peer state comes from the standard BGP4-MIB peer table; Alcatel-specific
+# peer fields are joined from alaBgpPeerTable by the same IPv4 peer address index.
+# IPv6 peers are available only in ALCATEL-IND1-BGP-MIB.
+
+bgp:
+  - id: alcatel-bgp4-peer
+    MIB: BGP4-MIB
+    kind: peer
+    table: &alcatel_bgp4_peer_table
+      name: bgpPeerTable
+      OID: 1.3.6.1.2.1.15.3
+    identity: &alcatel_bgp4_peer_identity
+      routing_instance: &alcatel_bgp_default_routing_instance
+        value: default
+      neighbor: &alcatel_bgp4_neighbor
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.7
+          name: bgpPeerRemoteAddr
+          format: ip_address
+      remote_as: &alcatel_bgp4_remote_as
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.9
+          name: bgpPeerRemoteAs
+          format: uint32
+    descriptors:
+      bgp_version:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.4
+          name: bgpPeerNegotiatedVersion
+      local_address: &alcatel_bgp4_local_address
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.5
+          name: bgpPeerLocalAddr
+          format: ip_address
+      peer_identifier:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.1
+          name: bgpPeerIdentifier
+          format: ip_address
+      description:
+        table: alaBgpPeerTable
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.4
+          name: alaBgpPeerName
+      peer_type: &alcatel_bgp4_peer_type
+        table: alaBgpPeerTable
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.27
+          name: alaBgpPeerType
+          mapping: &alcatel_bgp_peer_type_mapping
+            1: internal
+            2: external
+    admin:
+      enabled:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.3
+          name: bgpPeerAdminStatus
+          mapping: &alcatel_bgp_admin_mapping
+            1: stop
+            2: start
+    state:
+      symbol:
+        OID: 1.3.6.1.2.1.15.3.1.2
+        name: bgpPeerState
+        mapping: &alcatel_bgp_state_mapping
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    connection:
+      established_uptime:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.16
+          name: bgpPeerFsmEstablishedTime
+      last_received_update_age:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.24
+          name: bgpPeerInUpdateElapsedTime
+    traffic:
+      messages:
+        received:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.12
+            name: bgpPeerInTotalMessages
+        sent:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.13
+            name: bgpPeerOutTotalMessages
+      updates:
+        received:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.10
+            name: bgpPeerInUpdates
+        sent:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.11
+            name: bgpPeerOutUpdates
+      notifications:
+        received:
+          table: alaBgpPeerTable
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.21, name: alaBgpPeerRcvdNotifyMsgs }
+        sent:
+          table: alaBgpPeerTable
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.22, name: alaBgpPeerSentNotifyMsgs }
+      route_refreshes:
+        received:
+          table: alaBgpPeerTable
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.13, name: alaBgpPeerRcvdRtRefreshMsgs }
+        sent:
+          table: alaBgpPeerTable
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.14, name: alaBgpPeerSentRtRefreshMsgs }
+    transitions:
+      established:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.15
+          name: bgpPeerFsmEstablishedTransitions
+      up:
+        table: alaBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.47, name: alaBgpPeerUpTransitions }
+      down:
+        table: alaBgpPeerTable
+        symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.26, name: alaBgpPeerDownTransitions }
+    timers:
+      negotiated:
+        hold_time:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.18
+            name: bgpPeerHoldTime
+        keepalive_time:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.19
+            name: bgpPeerKeepAlive
+      configured:
+        connect_retry:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.17
+            name: bgpPeerConnectRetryInterval
+        hold_time:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.20
+            name: bgpPeerHoldTimeConfigured
+        keepalive_time:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.21
+            name: bgpPeerKeepAliveConfigured
+        min_as_origination_interval:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.22
+            name: bgpPeerMinASOriginationInterval
+        min_route_advertisement_interval:
+          symbol:
+            OID: 1.3.6.1.2.1.15.3.1.23
+            name: bgpPeerMinRouteAdvertisementInterval
+    last_error:
+      code:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.14
+          name: bgpPeerLastErrorCode
+          format: hex
+          extract_value: '^([0-9a-f]{2})'
+      subcode:
+        symbol:
+          OID: 1.3.6.1.2.1.15.3.1.14
+          name: bgpPeerLastErrorSubcode
+          format: hex
+          extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
+    reasons:
+      last_down:
+        table: alaBgpPeerTable
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.18
+          name: alaBgpPeerLastDownReason
+          mapping: &alcatel_bgp_last_down_reason_mapping
+            1: user_request
+            2: connection_timeout
+            3: hold_timeout
+            4: bad_message
+            5: fsm_unexpected_event
+            6: peer_closed
+            7: peer_notify
+            8: transport_error
+            9: none
+    last_notifications:
+      received:
+        reason:
+          table: alaBgpPeerTable
+          symbol:
+            OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.24
+            name: alaBgpPeerLastRecvNotifyReason
+            mapping: &alcatel_bgp_notify_reason_mapping
+              1: msg_hdr_no_sync
+              2: msg_hdr_bad_len
+              3: msg_hdr_bad_type
+              4: open_unsupp_version
+              5: open_bad_as
+              6: open_bad_id
+              7: open_unsupp_option
+              8: open_auth_fail
+              9: open_bad_holdtime
+              10: open_unsupp_capability
+              11: update_malform_attr
+              12: update_unsupp_wknwn_attr
+              13: update_missing_wknwn_attr
+              14: update_bad_attr_flags
+              15: update_bad_attr_len
+              16: update_bad_origin
+              17: update_as_loop
+              18: update_bad_nexthop
+              19: update_bad_opt_attr
+              20: update_bad_net
+              21: update_bad_aspath
+              22: hold_timeout
+              23: fsm_error
+              24: cease_max_prefix_reached
+              25: cease_admin_shutdown
+              26: cease_peer_deconfigured
+              27: cease_admin_reset
+              28: cease_conn_rejected
+              29: cease_other_conf_change
+              30: cease_conn_collision_resolution
+              31: cease_out_of_resources
+              32: none
+      sent:
+        reason:
+          table: alaBgpPeerTable
+          symbol:
+            OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.23
+            name: alaBgpPeerLastSentNotifyReason
+            mapping: *alcatel_bgp_notify_reason_mapping
+
+  - id: alcatel-bgp4-peer-family
+    MIB: ALCATEL-IND1-BGP-MIB
+    kind: peer_family
+    table: &alcatel_bgp4_alcatel_peer_table
+      name: alaBgpPeerTable
+      OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2
+    identity:
+      routing_instance: *alcatel_bgp_default_routing_instance
+      neighbor: &alcatel_bgp4_alcatel_neighbor
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.1
+          name: alaBgpPeerAddr
+          format: ip_address
+      remote_as: &alcatel_bgp4_alcatel_remote_as
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.2
+          name: alaBgpPeerAS
+          format: uint32
+      address_family:
+        value: ipv4
+      subsequent_address_family:
+        value: unicast
+    descriptors:
+      local_address:
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.17
+          name: alaBgpPeerLocalAddr
+          format: ip_address
+      description:
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.4
+          name: alaBgpPeerName
+      peer_type: *alcatel_bgp4_peer_type
+    routes:
+      current:
+        received:
+          symbol:
+            OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.25
+            name: alaBgpPeerRcvdPrefixes
+
+  - id: alcatel-bgp6-peer
+    MIB: ALCATEL-IND1-BGP-MIB
+    kind: peer
+    table: &alcatel_bgp6_peer_table
+      name: alaBgpPeer6Table
+      OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14
+    identity: &alcatel_bgp6_peer_identity
+      routing_instance: *alcatel_bgp_default_routing_instance
+      neighbor: &alcatel_bgp6_neighbor
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.1
+          name: alaBgpPeer6Addr
+          format: ip_address
+      remote_as: &alcatel_bgp6_remote_as
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.2
+          name: alaBgpPeer6AS
+          format: uint32
+    descriptors: &alcatel_bgp6_peer_descriptors
+      local_address:
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.17
+          name: alaBgpPeer6LocalAddr
+          format: ip_address
+      description:
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.4
+          name: alaBgpPeer6Name
+      peer_type: &alcatel_bgp6_peer_type
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.27
+          name: alaBgpPeer6Type
+          mapping: *alcatel_bgp_peer_type_mapping
+    admin:
+      enabled:
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.68
+          name: alaBgpPeer6AdminStatus
+          mapping: *alcatel_bgp_admin_mapping
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.69
+        name: alaBgpPeer6State
+        mapping: *alcatel_bgp_state_mapping
+    traffic:
+      messages:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.49, name: alaBgpPeer6RcvdMsgs }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.50, name: alaBgpPeer6SentMsgs }
+      updates:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.51, name: alaBgpPeer6RcvdUpdMsgs }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.52, name: alaBgpPeer6SentUpdMsgs }
+      notifications:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.21, name: alaBgpPeer6RcvdNotifyMsgs }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.22, name: alaBgpPeer6SentNotifyMsgs }
+      route_refreshes:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.13, name: alaBgpPeer6RcvdRtRefreshMsgs }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.14, name: alaBgpPeer6SentRtRefreshMsgs }
+    transitions:
+      up:
+        symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.47, name: alaBgpPeer6UpTransitions }
+      down:
+        symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.26, name: alaBgpPeer6DownTransitions }
+    timers:
+      negotiated:
+        hold_time:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.61, name: alaBgpPeer6HoldTime }
+        keepalive_time:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.62, name: alaBgpPeer6KeepAlive }
+      configured:
+        connect_retry:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.63, name: alaBgpPeer6ConnRetryInterval }
+        hold_time:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.64, name: alaBgpPeer6HoldTimeConfigured }
+        keepalive_time:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.65, name: alaBgpPeer6KeepAliveConfigured }
+        min_route_advertisement_interval:
+          symbol: { OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.73, name: alaBgpPeer6MinRouteAdvertisementInterval }
+    reasons:
+      last_down:
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.18
+          name: alaBgpPeer6LastDownReason
+          mapping: *alcatel_bgp_last_down_reason_mapping
+    last_notifications:
+      received:
+        reason:
+          symbol:
+            OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.24
+            name: alaBgpPeer6LastRecvNotifyReason
+            mapping: *alcatel_bgp_notify_reason_mapping
+      sent:
+        reason:
+          symbol:
+            OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.23
+            name: alaBgpPeer6LastSentNotifyReason
+            mapping: *alcatel_bgp_notify_reason_mapping
+
+  - id: alcatel-bgp6-peer-family
+    MIB: ALCATEL-IND1-BGP-MIB
+    kind: peer_family
+    table: *alcatel_bgp6_peer_table
+    identity:
+      routing_instance: *alcatel_bgp_default_routing_instance
+      neighbor: *alcatel_bgp6_neighbor
+      remote_as: *alcatel_bgp6_remote_as
+      address_family:
+        value: ipv6
+      subsequent_address_family:
+        value: unicast
+    descriptors: *alcatel_bgp6_peer_descriptors
+    routes:
+      current:
+        received:
+          symbol:
+            OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.25
+            name: alaBgpPeer6RcvdPrefixes

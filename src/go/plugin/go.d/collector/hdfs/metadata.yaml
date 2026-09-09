@@ -6,6 +6,7 @@ modules:
       module_name: hfs
       monitored_instance:
         name: Hadoop Distributed File System (HDFS)
+        description: "Monitor HDFS NameNode and DataNode capacity, activity, RPC, and JVM metrics through JMX web endpoints."
         link: https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html
         icon_filename: hadoop.svg
         categories:
@@ -189,13 +190,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:9870/jmx
-                
+
                   - name: remote
                     url: http://192.0.2.1:9870/jmx
     troubleshooting:

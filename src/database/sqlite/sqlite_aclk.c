@@ -37,6 +37,7 @@ static void create_node_instance_result_job(const char *machine_guid, const char
 
 struct aclk_sync_config_s {
     ND_THREAD *thread;
+    pid_t event_loop_tid; // atomic: the event loop publishes it, other threads compare against it
     uv_loop_t loop;
     uv_timer_t timer_req;
     uv_async_t async;
@@ -72,87 +73,109 @@ static bool aclk_database_enq_cmd(cmd_data_t *cmd, bool wait_on_full)
     return added;
 }
 
-enum {
-    IDX_HOST_ID,
-    IDX_HOSTNAME,
-    IDX_REGISTRY,
-    IDX_UPDATE_EVERY,
-    IDX_OS,
-    IDX_TIMEZONE,
-    IDX_HOPS,
-    IDX_MEMORY_MODE,
-    IDX_ABBREV_TIMEZONE,
-    IDX_UTC_OFFSET,
-    IDX_PROGRAM_NAME,
-    IDX_PROGRAM_VERSION,
-    IDX_ENTRIES,
-    IDX_HEALTH_ENABLED,
-    IDX_LAST_CONNECTED,
-    IDX_IS_EPHEMERAL,
-    IDX_IS_REGISTERED,
-};
-
 struct children {
     int vnodes;
     int normal;
 };
 
-static int create_host_callback(void *data, int argc, char **argv, char **column)
+// Column indices for SQL_FETCH_ALL_HOSTS — keep in lock-step with the SELECT list.
+enum {
+    COL_FETCH_HOST_ID = 0,
+    COL_FETCH_HOSTNAME,
+    COL_FETCH_REGISTRY,
+    COL_FETCH_UPDATE_EVERY,
+    COL_FETCH_OS,
+    COL_FETCH_TIMEZONE,
+    COL_FETCH_HOPS,
+    COL_FETCH_ABBREV_TIMEZONE,
+    COL_FETCH_UTC_OFFSET,
+    COL_FETCH_PROGRAM_NAME,
+    COL_FETCH_PROGRAM_VERSION,
+    COL_FETCH_ENTRIES,
+    COL_FETCH_LAST_CONNECTED,
+    COL_FETCH_IS_EPHEMERAL,
+    COL_FETCH_IS_REGISTERED,
+};
+
+// Materialise one archived host row from SQL_FETCH_ALL_HOSTS into rrdhost_root_index.
+// Returns the host (or NULL if creation skipped/failed) so the caller can update counters.
+static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
 {
-    struct children *node_data = data;
-    UNUSED(argc);
-    UNUSED(column);
+    // The COL_FETCH_* enum is in lock-step with SQL_FETCH_ALL_HOSTS' SELECT list.
+    // Catch drift early in debug builds; release builds compile this out.
+    internal_fatal(sqlite3_column_count(res) != COL_FETCH_IS_REGISTERED + 1,
+                   "SQL_FETCH_ALL_HOSTS column count (%d) does not match COL_FETCH_* enum (%d)",
+                   sqlite3_column_count(res), COL_FETCH_IS_REGISTERED + 1);
 
-    time_t last_connected =
-        (time_t)(argv[IDX_LAST_CONNECTED] ? str2uint64_t(argv[IDX_LAST_CONNECTED], NULL) : 0);
+    nd_uuid_t host_uuid;
+    if (!sqlite3_column_uuid_copy(res, COL_FETCH_HOST_ID, host_uuid)) {
+        nd_log_daemon(
+            NDLP_ERR,
+            "Skipping archived host: host_id column is not a valid 16-byte UUID blob (type=%d, bytes=%d). Possible DB corruption.",
+            sqlite3_column_type(res, COL_FETCH_HOST_ID),
+            sqlite3_column_bytes(res, COL_FETCH_HOST_ID));
+        return NULL;
+    }
 
+    char guid[UUID_STR_LEN];
+    uuid_unparse_lower(host_uuid, guid);
+
+    const char *hostname     = (const char *)sqlite3_column_text(res, COL_FETCH_HOSTNAME);
+    const char *registry     = (const char *)sqlite3_column_text(res, COL_FETCH_REGISTRY);
+    const char *os           = (const char *)sqlite3_column_text(res, COL_FETCH_OS);
+    const char *host_tz      = (const char *)sqlite3_column_text(res, COL_FETCH_TIMEZONE);
+    const char *abbrev_tz    = (const char *)sqlite3_column_text(res, COL_FETCH_ABBREV_TIMEZONE);
+    const char *prog_name    = (const char *)sqlite3_column_text(res, COL_FETCH_PROGRAM_NAME);
+    const char *prog_version = (const char *)sqlite3_column_text(res, COL_FETCH_PROGRAM_VERSION);
+    int hops          = sqlite3_column_int(res, COL_FETCH_HOPS);
+    int utc_offset    = sqlite3_column_int(res, COL_FETCH_UTC_OFFSET);
+    int entries       = sqlite3_column_int(res, COL_FETCH_ENTRIES);
+    // update_every defaults to 1 only when the column is SQL NULL — preserves
+    // the pre-refactor `argv[i] ? str2i(argv[i]) : 1` fallback exactly. A
+    // stored 0 stays 0 (matches the original str2i path).
+    int update_every = (sqlite3_column_type(res, COL_FETCH_UPDATE_EVERY) == SQLITE_NULL)
+        ? 1
+        : sqlite3_column_int(res, COL_FETCH_UPDATE_EVERY);
+    int64_t last_connected_db = sqlite3_column_int64(res, COL_FETCH_LAST_CONNECTED);
+    int is_ephemeral  = sqlite3_column_int(res, COL_FETCH_IS_EPHEMERAL);
+    int is_registered = sqlite3_column_int(res, COL_FETCH_IS_REGISTERED);
+
+    time_t last_connected = (time_t)last_connected_db;
     if (!last_connected)
         last_connected = now_realtime_sec();
 
     time_t age = now_realtime_sec() - last_connected;
-    int is_ephemeral = 0;
-    int is_registered = 0;
 
-    if (argv[IDX_IS_EPHEMERAL])
-        is_ephemeral = str2i(argv[IDX_IS_EPHEMERAL]);
-
-    if (argv[IDX_IS_REGISTERED])
-        is_registered = str2i(argv[IDX_IS_REGISTERED]);
-
-    char guid[UUID_STR_LEN];
-    uuid_unparse_lower(*(nd_uuid_t *)argv[IDX_HOST_ID], guid);
-
-    if (is_ephemeral && ((!is_registered && last_connected == 1) || (rrdhost_free_ephemeral_time_s && age > rrdhost_free_ephemeral_time_s))) {
+    if (is_ephemeral && ((!is_registered && last_connected == 1) ||
+                         (rrdhost_free_ephemeral_time_s && age > rrdhost_free_ephemeral_time_s))) {
         netdata_log_info(
             "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
             is_registered ? "Loading registered" : "Skipping unregistered",
-            (const char *)argv[IDX_HOSTNAME],
+            hostname,
             guid,
             age,
             rrdhost_free_ephemeral_time_s);
 
         if (!is_registered)
-           goto done;
+           return NULL;
     }
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_create();
-
-    rrdhost_system_info_hops_set(system_info, (int16_t)str2i((const char *) argv[IDX_HOPS]));
-
-    sql_build_host_system_info((nd_uuid_t *)argv[IDX_HOST_ID], system_info);
+    rrdhost_system_info_hops_set(system_info, (int16_t)hops);
+    sql_build_host_system_info(&host_uuid, system_info);
 
     RRDHOST *host = rrdhost_find_or_create(
-        (const char *)argv[IDX_HOSTNAME],
-        (const char *)argv[IDX_REGISTRY],
+        hostname,
+        registry,
         guid,
-        (const char *)argv[IDX_OS],
-        (const char *)argv[IDX_TIMEZONE],
-        (const char *)argv[IDX_ABBREV_TIMEZONE],
-        (int32_t)(argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET], NULL) : 0),
-        (const char *)(argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown"),
-        (const char *)(argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown"),
-        argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1,
-        argv[IDX_ENTRIES] ? str2i(argv[IDX_ENTRIES]) : 0,
+        os,
+        host_tz,
+        abbrev_tz,
+        (int32_t)utc_offset,
+        prog_name    ? prog_name    : "unknown",
+        prog_version ? prog_version : "unknown",
+        update_every,
+        entries,
         default_rrd_memory_mode,
         0,              // health
         0,              // rrdpush enabled
@@ -168,23 +191,17 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     rrdhost_system_info_free(system_info);
 
     if (unlikely(!host))
-        return 0;
+        return NULL;
 
-    if (is_ephemeral)
+    if (is_ephemeral) {
         rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-
-    if (is_ephemeral)
         host->stream.rcv.status.last_disconnected = now_realtime_sec();
+    }
 
-    host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
+    host->rrdlabels = sql_load_host_labels(&host_uuid);
     host->stream.snd.status.last_connected = last_connected;
 
     pulse_host_status(host, 0, 0); // this will detect the receiver status
-
-    if (IS_VIRTUAL_HOST_OS(host))
-        node_data->vnodes++;
-    else
-        node_data->normal++;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     char node_str[UUID_STR_LEN] = "<none>";
@@ -194,8 +211,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
 
-done:
-    return 0;
+    return host;
 }
 
 
@@ -285,17 +301,6 @@ skip:
     freez(machine_guid);
 }
 
-static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
-{
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(*((nd_uuid_t *) argv[0]), uuid_str);
-
-    RRDHOST *host = rrdhost_find_by_guid(uuid_str);
-    if (host != localhost)
-        create_aclk_config(host, (nd_uuid_t *)argv[0], (nd_uuid_t *)argv[1]);
-    return 0;
-}
-
 struct judy_list_t {
     Pvoid_t JudyL;
     Word_t count;
@@ -349,6 +354,9 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
         case SEND_NODE_INSTANCES:
             worker_is_busy(UV_EVENT_SEND_NODE_INSTANCES);
             aclk_send_node_instances();
+            // the cloud asks for the node instances after connecting, so this is also where the
+            // manifest gets its one request per ACLK session - see aclk_arm_node_manifest_all_hosts()
+            aclk_arm_node_manifest_all_hosts();
             ok_to_send = false;
             break;
         case ALERT_START_STREAMING:
@@ -383,6 +391,9 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
         case UPDATE_NODE_INFO:
             worker_is_busy(UV_EVENT_UPDATE_NODE_INFO);
             break;
+        case UPDATE_NODE_MANIFEST:
+            worker_is_busy(UV_EVENT_UPDATE_NODE_MANIFEST);
+            break;
         case CTX_SEND_SNAPSHOT:
             worker_is_busy(UV_EVENT_CTX_SEND_SNAPSHOT);
             break;
@@ -399,12 +410,17 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
     }
 
     if (ok_to_send) {
-        if (client)
-            send_bin_msg(client, query);
-        else {
-            freez(query->data.bin_payload.payload);
-            nd_log_daemon(NDLP_ERR, "No client to send message %u", query->type);
+        if (client) {
+            bool sent = (send_bin_msg(client, query) == 0);
+
+            // aclk_query_free() reports the outcome to whoever tracks what the cloud has been told;
+            // leaving it unset here is what makes a dropped message recoverable. Only the manifest
+            // carries a publication record, so it is the only type with an outcome to record here.
+            if (query->type == UPDATE_NODE_MANIFEST)
+                query->manifest.published = sent;
         }
+        else
+            nd_log_daemon(NDLP_ERR, "No client to send message %u", query->type);
     }
 
     aclk_query_free(query);
@@ -534,7 +550,7 @@ static void start_alert_push(uv_work_t *req)
         return;
 
     worker_is_busy(UV_EVENT_ACLK_NODE_INFO);
-    aclk_check_node_info_and_collectors();
+    aclk_check_node_info_collectors_and_manifest();
     worker_is_idle();
 
     worker_is_busy(UV_EVENT_ACLK_ALERT_PUSH);
@@ -612,6 +628,12 @@ static void aclk_synchronization_event_loop(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
     uv_thread_set_name_np("ACLKSYNC");
+
+    // published so code that can run on either this thread or a worker can tell which it is on -
+    // this thread must never block on a lock a host teardown may be holding while it waits here
+    // (destroy_aclk_config()). See aclk_sync_on_event_loop_thread().
+    __atomic_store_n(&config->event_loop_tid, gettid_cached(), __ATOMIC_RELEASE);
+
     init_cmd_pool(&config->cmd_pool, CMD_POOL_SIZE);
 
     worker_register("ACLKSYNC");
@@ -684,6 +706,29 @@ static void aclk_synchronization_event_loop(void *arg)
             if(likely(opcode != ACLK_DATABASE_NOOP && opcode != ACLK_QUERY_EXECUTE))
                 worker_is_busy(opcode);
 
+            // pending_queries is an accounting alias for the number of queries held in
+            // aclk_query_execute->JudyL. Drift in EITHER direction is harmful:
+            //  - too high: the NOOP -> ACLK_QUERY_EXECUTE rewrite below fires every iteration
+            //    with nothing to drain and the inner UV_RUN_NOWAIT loop never blocks -> a
+            //    silent one-core 100% CPU spin that cannot self-recover;
+            //  - too low (e.g. 0 while the queue still holds work): the rewrite never fires and
+            //    those queries stall until an unrelated enqueue happens to nudge execution.
+            // Reconcile the alias against the Judy array (the source of truth) on every idle
+            // pass so drift heals immediately instead of becoming a lockup or a stalled queue.
+            // The field trigger is unproven (suspected Judy/memory corruption on some
+            // runtimes); log it if seen.
+            if (opcode == ACLK_DATABASE_NOOP) {
+                size_t queued = (size_t)JudyLCount(aclk_query_execute->JudyL, 0, -1, PJE0);
+                if (unlikely(queued != pending_queries)) {
+                    nd_log_limit_static_global_var(erl, 1, 0);
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                                 "ACLK: pending query counter (%zu) disagrees with the queued-query count (%zu); "
+                                 "reconciling to prevent a CPU spin or a stalled queue (possible memory corruption)",
+                                 pending_queries, queued);
+                    pending_queries = queued;
+                }
+            }
+
             // Check if we have pending commands to execute
             if (opcode == ACLK_DATABASE_NOOP && pending_queries && config->aclk_queries_running < query_thread_count) {
                 opcode = ACLK_QUERY_EXECUTE;
@@ -697,10 +742,10 @@ static void aclk_synchronization_event_loop(void *arg)
                     // NODE STATE
                 case ACLK_DATABASE_NODE_STATE:
                     host = cmd.param[0];
-                    aclk_host_config = host->aclk_host_config;
+                    aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     if (unlikely(!aclk_host_config)) {
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
-                        aclk_host_config = host->aclk_host_config;
+                        aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     }
 
                     if (aclk_host_config) {
@@ -730,17 +775,21 @@ static void aclk_synchronization_event_loop(void *arg)
                 case ACLK_QUEUE_NODE_INFO:
                     host = cmd.param[0];
                     bool immediate = (bool)(uintptr_t)cmd.param[1];
-                    aclk_host_config = host->aclk_host_config;
+                    aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     if (unlikely(!aclk_host_config)) {
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
-                        aclk_host_config = host->aclk_host_config;
+                        aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     }
-                    aclk_host_config->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
+                    aclk_send_timestamp_set(
+                        &aclk_host_config->node_info_send_time,
+                        (host == localhost || immediate) ? 1 : now_realtime_sec());
+                    // the manifest is re-armed by build_node_info() itself, so every path that
+                    // sends node info re-arms it, not only this opcode
                     break;
                 case ACLK_CANCEL_NODE_UPDATE_TIMER:
                     host = cmd.param[0];
                     struct completion *compl = cmd.param[1];
-                    aclk_host_config = host->aclk_host_config;
+                    aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     if (!aclk_host_config || !aclk_host_config->timer_initialized) {
                         completion_mark_complete(compl);
                         break;
@@ -988,15 +1037,33 @@ static void aclk_initialize_event_loop(void)
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
 {
 
-    if (!host || host->aclk_host_config)
+    if (!host || __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE))
         return;
 
     struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
+    spinlock_init(&aclk_host_config->pending_ctx_spinlock);
+    spinlock_init(&aclk_host_config->node_id_spinlock);
     if (node_id && !uuid_is_null(*node_id))
-        uuid_unparse_lower(*node_id, aclk_host_config->node_id);
+        aclk_node_id_set(aclk_host_config, *node_id);
+
+    // Initialize every field BEFORE publishing the pointer via CAS; the RELEASE on
+    // the CAS pairs with ACQUIRE loads of host->aclk_host_config in readers so they
+    // cannot observe the pointer with zero-initialized fields (host == NULL etc.).
+    aclk_host_config->host = host;
+    aclk_alert_streaming_set(aclk_host_config, false);
+    time_t now = now_realtime_sec();
+    aclk_send_timestamp_set(
+        &aclk_host_config->node_info_send_time,
+        (host == localhost || NULL == localhost) ? nd_time_t_add_saturating(now, -25) : now);
+    // node_manifest_send_time is deliberately NOT armed here: build_node_info() arms it, so it is
+    // armed after that host's node info was built rather than alongside it. That orders the ARMING
+    // only - both messages are dispatched to parallel query workers, so it is no guarantee of
+    // publish order at the cloud. What keeps the manifest from describing a node the cloud does not
+    // know is the node_id check in aclk_check_node_info_collectors_and_manifest().
+    // (set_host_node_id() also arms right after creating a config, so this is not the only path.)
 
     struct aclk_sync_cfg_t *expected = NULL;
-    if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+    if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
         if (node_id && UUIDiszero(host->node_id))
             uuid_copy(host->node_id.uuid, *node_id);
     }
@@ -1004,21 +1071,28 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
         freez(aclk_host_config);
         return;
     }
-
-    aclk_host_config->host = host;
-    aclk_host_config->stream_alerts = false;
-    time_t now = now_realtime_sec();
-    aclk_host_config->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
 }
 
+// Replaces two correlated subqueries (host_label, node_instance) with LEFT JOINs
+// so the planner does the lookup once per row instead of 2N extra index probes.
+// memory_mode and health_enabled are intentionally omitted — they were SELECTed
+// in the previous shape but never read by the consumer.
+//
+// Both LEFT JOINs are guaranteed to match at most one row per host by the
+// schema (sqlite_metadata.c database_config[]): host_label has
+// PRIMARY KEY (host_id, label_key), and node_instance has host_id PRIMARY KEY.
+// Row multiplication is therefore impossible here without a SQLite invariant
+// violation; no DISTINCT / GROUP BY / EXISTS wrapper needed.
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
-    "SELECT host_id, hostname, registry_hostname, update_every, os, "                                                  \
-    "timezone, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "                                         \
-    "program_version, entries, health_enabled, last_connected, "                                                       \
-    "(SELECT CASE WHEN hl.label_value = 'true' THEN 1 ELSE 0 END FROM "                                                \
-    "host_label hl WHERE hl.host_id = h.host_id AND hl.label_key = '_is_ephemeral'),  "                                \
-    "(SELECT CASE WHEN ni.node_id is NULL THEN 0 ELSE 1 END FROM "                                                     \
-    "node_instance ni WHERE ni.host_id = h.host_id) FROM host h WHERE hops > 0"
+    "SELECT h.host_id, h.hostname, h.registry_hostname, h.update_every, h.os, "                                        \
+    "h.timezone, h.hops, h.abbrev_timezone, h.utc_offset, h.program_name, "                                            \
+    "h.program_version, h.entries, h.last_connected, "                                                                 \
+    "CASE WHEN hl.label_value = 'true' THEN 1 ELSE 0 END, "                                                            \
+    "CASE WHEN ni.node_id IS NULL THEN 0 ELSE 1 END "                                                                  \
+    "FROM host h "                                                                                                     \
+    "LEFT JOIN host_label hl ON hl.host_id = h.host_id AND hl.label_key = '_is_ephemeral' "                            \
+    "LEFT JOIN node_instance ni ON ni.host_id = h.host_id "                                                            \
+    "WHERE h.hops > 0"
 
 #define SQL_FETCH_ALL_INSTANCES                                                                                        \
     "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni "                                                     \
@@ -1029,18 +1103,33 @@ uv_sem_t ctx_sem;
 
 void aclk_synchronization_init(void)
 {
-    char *err_msg = NULL;
-    int rc;
-
     nd_log_daemon(NDLP_INFO, "Creating archived hosts");
-    struct children node_data = { 0, 0};
+    struct children node_data = { 0, 0 };
 
-    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, &node_data, &err_msg);
-
-    if (rc != SQLITE_OK) {
-        nd_log_daemon(NDLP_ERR, "SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
-        sqlite3_free(err_msg);
+    sqlite3_stmt *res = NULL;
+    if (PREPARE_STATEMENT(db_meta, SQL_FETCH_ALL_HOSTS, &res)) {
+        int step_rc;
+        while ((step_rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
+            RRDHOST *host = load_archived_host_from_row(res);
+            if (!host)
+                continue;
+            if (IS_VIRTUAL_HOST_OS(host))
+                node_data.vnodes++;
+            else
+                node_data.normal++;
+        }
+        if (step_rc != SQLITE_DONE)
+            nd_log_daemon(
+                NDLP_ERR,
+                "SQLite error while loading archived hosts, rc = %d (%s); load may be partial",
+                step_rc,
+                sqlite3_errmsg(db_meta));
+        SQLITE_FINALIZE(res);
     }
+    else
+        nd_log_daemon(NDLP_ERR,
+                      "SQLite error when preparing statement to load archived hosts: %s",
+                      sqlite3_errmsg(db_meta));
 
     nd_log_daemon(
         NDLP_INFO,
@@ -1061,12 +1150,48 @@ void aclk_synchronization_init(void)
         sem_init = false;
     }
 
-    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
+    sqlite3_stmt *res_inst = NULL;
+    if (PREPARE_STATEMENT(db_meta, SQL_FETCH_ALL_INSTANCES, &res_inst)) {
+        int step_rc;
+        while ((step_rc = sqlite3_step_monitored(res_inst)) == SQLITE_ROW) {
+            nd_uuid_t host_uuid, node_uuid;
+            if (!sqlite3_column_uuid_copy(res_inst, 0, host_uuid)) {
+                nd_log_daemon(
+                    NDLP_ERR,
+                    "Skipping node_instance row: host_id (col 0) is not a valid 16-byte UUID blob (type=%d, bytes=%d). ACLK config not configured for this host.",
+                    sqlite3_column_type(res_inst, 0),
+                    sqlite3_column_bytes(res_inst, 0));
+                continue;
+            }
+            if (!sqlite3_column_uuid_copy(res_inst, 1, node_uuid)) {
+                nd_log_daemon(
+                    NDLP_ERR,
+                    "Skipping node_instance row: node_id (col 1) is not a valid 16-byte UUID blob (type=%d, bytes=%d). ACLK config not configured for this host.",
+                    sqlite3_column_type(res_inst, 1),
+                    sqlite3_column_bytes(res_inst, 1));
+                continue;
+            }
 
-    if (rc != SQLITE_OK) {
-        nd_log_daemon(NDLP_ERR, "SQLite error when configuring host ACLK synchonization parameters, rc = %d (%s)", rc, err_msg);
-        sqlite3_free(err_msg);
+            char uuid_str[UUID_STR_LEN];
+            uuid_unparse_lower(host_uuid, uuid_str);
+            RRDHOST *host = rrdhost_find_by_guid(uuid_str);
+            // create_aclk_config() already null-checks `host`, but the explicit
+            // guard makes the intent clear and skips the call for unknown GUIDs.
+            if (host && host != localhost)
+                create_aclk_config(host, &host_uuid, &node_uuid);
+        }
+        if (step_rc != SQLITE_DONE)
+            nd_log_daemon(
+                NDLP_ERR,
+                "SQLite error while configuring host ACLK synchronization parameters, rc = %d (%s); some configs may be missing",
+                step_rc,
+                sqlite3_errmsg(db_meta));
+        SQLITE_FINALIZE(res_inst);
     }
+    else
+        nd_log_daemon(NDLP_ERR,
+                      "SQLite error when preparing statement to configure host ACLK synchronization parameters: %s",
+                      sqlite3_errmsg(db_meta));
 
     aclk_initialize_event_loop();
 
@@ -1075,7 +1200,7 @@ void aclk_synchronization_init(void)
 
     if (sem_init) {
         int finished_vnodes = 0;
-        time_t deadline = now_realtime_sec() + 60;  // hard timeput to avoid infinite block
+        time_t deadline = nd_time_t_add_saturating(now_realtime_sec(), 60);  // hard timeput to avoid infinite block
         while (finished_vnodes < node_data.vnodes) {
             if (uv_sem_trywait(&ctx_sem) == 0) {
                 finished_vnodes++;
@@ -1138,6 +1263,19 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
         freez(node_id_dup);
         freez(config_hash_dup);
     }
+}
+
+// Whether the caller is running on the ACLK sync event loop. That thread has one hard constraint the
+// workers do not: a host teardown can be blocked inside destroy_aclk_config() waiting for it while
+// holding rrd_wrlock(), so anything reachable from this thread that waits for rrd_rdlock() closes a
+// cycle. A worker blocking on it is safe - the event loop stays free to satisfy that wait.
+//
+// Returns false before the loop has published its id, which is the safe answer: nothing can be
+// waiting on a loop that has not started.
+bool aclk_sync_on_event_loop_thread(void)
+{
+    pid_t tid = __atomic_load_n(&aclk_sync_config.event_loop_tid, __ATOMIC_ACQUIRE);
+    return tid != 0 && tid == gettid_cached();
 }
 
 void aclk_execute_query(aclk_query_t *query)
@@ -1207,7 +1345,7 @@ void destroy_aclk_config(RRDHOST *host)
     if (!host)
         return;
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if (!aclk_host_config)
         return;
 
@@ -1220,11 +1358,123 @@ void destroy_aclk_config(RRDHOST *host)
         completion_destroy(&compl);
     }
 
-    struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_RELAXED);
+    struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_ACQUIRE);
+    if (!old_aclk_host_config)
+        return;
+
+    // detach pending checkpoint strings under lock, to avoid racing with save/replay
+    spinlock_lock(&old_aclk_host_config->pending_ctx_spinlock);
+    char *pending_claim_id = old_aclk_host_config->pending_ctx_claim_id;
+    char *pending_node_id = old_aclk_host_config->pending_ctx_node_id;
+    old_aclk_host_config->pending_ctx_claim_id = NULL;
+    old_aclk_host_config->pending_ctx_node_id = NULL;
+    old_aclk_host_config->pending_ctx_version_hash = 0;
+    old_aclk_host_config->pending_ctx_saved_monotonic_s = 0;
+    __atomic_store_n(&old_aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
+    spinlock_unlock(&old_aclk_host_config->pending_ctx_spinlock);
+
+    freez(pending_claim_id);
+    freez(pending_node_id);
     freez(old_aclk_host_config);
 }
 
 void aclk_queue_node_info(RRDHOST *host, bool immediate)
 {
     (void) queue_aclk_sync_cmd(ACLK_QUEUE_NODE_INFO, (void *)host, (void *)(uintptr_t)immediate);
+}
+
+// Requests a refresh of the cloud function manifest for this host.
+//
+// Arming is a single atomic CAS on the host's aclk config, so - unlike node info, which needs
+// the event loop to create a missing config - this does NOT go through the command queue. That
+// keeps a burst of function registrations (a parent's children reconnecting, a plugin
+// restarting) from flooding the ACLK sync command pool, and avoids publishing a borrowed host
+// pointer to another thread.
+//
+// A change made before the arm is always reported: build_node_manifest() reads the live function
+// list rather than a snapshot taken here, so an already-armed request covers this change too,
+// and a change racing with the send re-arms (the claim resets the timestamp to 0).
+void aclk_arm_node_manifest(RRDHOST *host)
+{
+    if (!host)
+        return;
+
+    // No config: nothing to arm. build_node_info() arms the first manifest for every host that
+    // gets one, which covers every function registered until then.
+    //
+    // The load below is lock-free and destroy_aclk_config() frees what it returns, so what keeps
+    // this safe is teardown ordering, not the NULL check. destroy_aclk_config() has exactly one
+    // caller - rrdhost_free_unlinked() - and everything this function's callers depend on is torn
+    // down earlier in it:
+    //   1. rrdhost_index_del_by_guid()          - the host stops being findable
+    //   2. stream_receiver_signal_to_stop_and_wait() - waits for host->receiver to become NULL,
+    //      but the wait is BOUNDED (~2s) and gives up on a stalled receiver thread, so step 2 is
+    //      best-effort, not a guarantee (pre-existing residual, tracked separately)
+    //   3. nrpc_registry_destroy()         - the host's registry entry is synchronously DISARMED
+    //      (owner callbacks cleared under the entry's lock, so the component can no longer call
+    //      this function for that host) and leaves the component index
+    //   4. destroy_aclk_config()                - only now is the config freed
+    // So the function-registry paths (which reach this only through the owner callback the disarm
+    // cleared in step 3) and rrdhost_clear_receiver() (which runs before host->receiver is
+    // cleared) cannot still be running here, and a caller that reached this host through
+    // rrdhost_find_by_guid() did so before step 1. An owner-callback invocation that snapshotted
+    // the callback JUST before the disarm is bounded by the owner's thread lifecycle: the sender
+    // is joined and the receiver stopped (best-effort, step 2) before step 3 runs.
+    // Do NOT "fix" this by routing the arm back through the ACLK event loop: that
+    // publishes a borrowed RRDHOST pointer to another thread (a wider window on a longer-lived
+    // object) and blocks the caller in push_cmd() when the command pool is full, sometimes while
+    // holding the host functions lock.
+    //
+    // One caller does NOT reach the host any of those ways: aclk_arm_node_manifest_all_hosts()
+    // walks rrdhost_root_index. That walk only yields hosts still indexed when it reaches them, so
+    // step 1 bounds it - but the index links the host without owning it, so the walk's reference
+    // does not stop rrdhost_free_unlinked() from freeing a host it already unlinked. That caller
+    // therefore carries the same pre-existing teardown exposure as the alert-push scan, which
+    // dereferences hosts from the same index (see build_node_manifest() in sqlite_aclk_node.c).
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
+
+    aclk_send_timestamp_arm(&aclk_host_config->node_manifest_send_time, now_realtime_sec());
+}
+
+// Re-arms the manifest of every host. Called when the cloud asks the agent to re-announce its node
+// instances (the SendNodeInstances message), which it does after connecting - so this is where the
+// manifest gets its request for a new ACLK session. How often the cloud repeats that ask within one
+// session is server-side behaviour this repository cannot verify, so treat "once per session" as an
+// assumption, not a guarantee; the suppression below is what makes repeats cheap either way.
+//
+// It is needed because a successful send is NOT a delivery. send_bin_msg() returning 0 means only
+// that the PUBLISH was appended to mqtt_ng's transaction buffer, and that is exactly when the
+// publication record is kept (published = true). Three windows then lose the message with no
+// agent-side signal at all:
+//   1. disconnect before the bytes reach the socket - the fragment is still queued, and
+//      mqtt_ng_connect() purges the whole tx buffer on the next connect (buffer_purge()).
+//   2. disconnect after the write but before the PUBACK - QoS1, but mqtt_ng_connect() also calls
+//      destroy_timeout_monitor_list(), so nothing is retransmitted and there is no MQTT session
+//      continuation.
+//   3. no PUBACK within PACKET_ACK_TIMEOUT_SECS (60s) while still connected -
+//      check_packet_monitor_list_for_timeouts() calls mark_packet_acked(), the same path a real
+//      PUBACK takes, and the message is garbage collected as if it had been delivered.
+// Nothing correlates an ack back to a query in any case: send_bin_msg() passes NULL for the packet
+// id and puback_callback() only counts pubacks. build_node_manifest() scopes its suppression to one
+// session for exactly this reason, so the pair publishes one manifest per host per session. A
+// redundant arm costs one manifest build (rrd_rdlock plus a dictionary of string copies) and one
+// hash; the content hash then drops the publish.
+//
+// Note what this does NOT cover: a new session lets a rebuild through, but it does not cause one.
+// Something still has to arm the host. Every other arm is event-driven - a function registration,
+// pluginsd, a child reconnecting, host creation, an ingestion-status change, or a node info send
+// (build_node_info() arms too, and aclk_queue_node_info() is reached independently of this message,
+// from metadata load, label updates, streaming reconnect and pluginsd). None of them is tied to an
+// ACLK reconnect, so on a node whose functions and labels are stable this ask is what triggers the
+// rebuild, and without it a manifest lost above stays lost for the whole session.
+void aclk_arm_node_manifest_all_hosts(void)
+{
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host)
+    {
+        aclk_arm_node_manifest(host);
+    }
+    dfe_done(host);
 }

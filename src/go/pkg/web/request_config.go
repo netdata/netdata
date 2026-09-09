@@ -4,17 +4,19 @@ package web
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
 // RequestConfig is the configuration of the HTTP request.
@@ -119,10 +121,10 @@ func setAuthentication(req *http.Request, cfg RequestConfig) error {
 }
 
 func setBearerTokenAuth(req *http.Request, tokenFile string) error {
-	tokenBs, err := os.ReadFile(tokenFile)
+	tokenBs, err := safefile.Read(tokenFile)
 	if err != nil {
-		// Ignore K8s service account token errors when running outside the cluster
-		if strings.HasPrefix(tokenFile, "/var/run/secrets/") && !hostinfo.IsInsideK8sCluster() {
+		// A missing mounted service-account token is optional outside Kubernetes.
+		if isOptionalK8sTokenFileError(tokenFile, hostinfo.IsInsideK8sCluster(), err) {
 			return nil
 		}
 		return fmt.Errorf("bearer token file: %w", err)
@@ -135,6 +137,12 @@ func setBearerTokenAuth(req *http.Request, tokenFile string) error {
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	return nil
+}
+
+func isOptionalK8sTokenFileError(tokenFile string, insideK8s bool, err error) bool {
+	return !insideK8s &&
+		strings.HasPrefix(tokenFile, "/var/run/secrets/") &&
+		errors.Is(err, fs.ErrNotExist)
 }
 
 // NewHTTPRequestWithPath creates a new HTTP request with the given path appended to the base URL.

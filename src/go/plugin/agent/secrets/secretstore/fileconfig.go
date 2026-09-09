@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"gopkg.in/yaml.v2"
@@ -55,12 +56,28 @@ func LoadFileConfigs(roots []string) ([]Config, []error) {
 			sourceType := fileConfigSourceType(path)
 			source := "file=" + path
 			for i, job := range jobs {
-				cfg := Config(job)
-				if strings.TrimSpace(cfg.Name()) == "" {
-					errs = append(errs, fmt.Errorf("secretstore file config '%s' job %d: store name is required", path, i+1))
+				if job == nil {
+					errs = append(
+						errs,
+						fmt.Errorf("secretstore file config '%s' job %d: store config is nil", path, i+1),
+					)
 					continue
 				}
-				if cfg.Kind() == "" {
+				cfg := Config(job)
+				rawKind, hasKind := job[keyKind]
+				if hasKind {
+					kind, ok := rawKind.(string)
+					if !ok {
+						errs = append(
+							errs,
+							fmt.Errorf("secretstore file config '%s' job %d: store kind must be a string", path, i+1),
+						)
+						continue
+					}
+					if strings.TrimSpace(kind) == "" {
+						cfg.SetKind(StoreKind(stem))
+					}
+				} else {
 					cfg.SetKind(StoreKind(stem))
 				}
 				cfg.SetSource(source)
@@ -99,20 +116,11 @@ func fileConfigSourceType(path string) string {
 }
 
 func validateFileConfig(cfg Config) error {
-	if cfg == nil {
-		return fmt.Errorf("store config is nil")
+	if err := cfg.Validate(); err != nil {
+		return err
 	}
-	if strings.TrimSpace(cfg.Name()) == "" {
-		return fmt.Errorf("store name is required")
-	}
-	if err := validateStoreName(cfg.Name()); err != nil {
-		return fmt.Errorf("invalid store name '%s': %w", cfg.Name(), err)
-	}
-	if strings.TrimSpace(string(cfg.Kind())) == "" {
-		return fmt.Errorf("store kind is required")
-	}
-	if strings.TrimSpace(cfg.Source()) == "" {
-		return fmt.Errorf("store source is required")
+	if !netdataapi.ValidSingleQuotedProtocolField(cfg.Source()) {
+		return fmt.Errorf("store source cannot be represented in the plugins.d CONFIG protocol")
 	}
 	switch cfg.SourceType() {
 	case confgroup.TypeUser, confgroup.TypeStock:

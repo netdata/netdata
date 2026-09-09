@@ -19,6 +19,13 @@ struct rrdhost_system_info {
     char *host_os_version;
     char *host_os_version_id;
     char *host_os_detection;
+    // Host-label metadata intentionally stays out of the public system-info serializers.
+    char *host_os_label_name;
+    char *host_os_label_version;
+    char *host_os_label_release;
+    char *host_os_label_codename;
+    char *host_os_label_edition;
+    char *host_os_label_build;
     char *host_cores;
     char *host_cpu_freq;
     char *host_cpu_model;
@@ -48,6 +55,7 @@ struct rrdhost_system_info {
     char *network_default_iface_ip;
     char *network_default_iface_detection;
     int mc_version;
+    char *hw_product_id;
     char *hw_product_name;
     char *hw_sys_vendor;
     char *hw_product_type;
@@ -60,6 +68,7 @@ struct rrdhost_system_info;
 // allocation and free
 
 struct rrdhost_system_info *rrdhost_system_info_create(void);
+struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info);
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -79,7 +88,7 @@ void rrdhost_system_info_ml_capable_set(struct rrdhost_system_info *system_info,
 void rrdhost_system_info_ml_enabled_set(struct rrdhost_system_info *system_info, bool enabled);
 void rrdhost_system_info_mc_version_set(struct rrdhost_system_info *system_info, int version);
 
-int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, char *name, char *value);
+int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, const char *name, const char *value);
 
 // --------------------------------------------------------------------------------------------------------------------
 // reading individual fields
@@ -98,12 +107,19 @@ void rrdhost_system_info_to_json_v2(BUFFER *wb, struct rrdhost_system_info *syst
 void rrdhost_system_info_to_url_encode_stream(BUFFER *wb, struct rrdhost_system_info *system_info);
 
 typedef int (*add_host_sysinfo_key_value_t)(const char *name, const char *value, nd_uuid_t *uuid);
+
+// Number of NETDATA_* keys emitted by rrdhost_system_info_foreach(); callers
+// compare against the cb-success count to detect partial-store failures.
+// Keep in sync with the body of rrdhost_system_info_foreach().
+#define RRDHOST_SYSTEM_INFO_KEY_COUNT 27
+
 int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_host_sysinfo_key_value_t cb, nd_uuid_t *uuid);
 
 struct update_node_info;
 void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, struct update_node_info *node_info);
 
 void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info);
+void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system_info *system_info);
 
 bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds);
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b);

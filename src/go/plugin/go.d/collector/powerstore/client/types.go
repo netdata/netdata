@@ -37,7 +37,6 @@ type Hardware struct {
 	LifecycleState string `json:"lifecycle_state"`
 	StatusLED      string `json:"status_led,omitempty"`
 	ApplianceID    string `json:"appliance_id,omitempty"`
-	ExtraDetails   string `json:"extra_details,omitempty"`
 	PartNumber     string `json:"part_number,omitempty"`
 	SerialNumber   string `json:"serial_number,omitempty"`
 	Slot           int    `json:"slot,omitempty"`

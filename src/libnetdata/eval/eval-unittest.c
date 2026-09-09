@@ -680,8 +680,10 @@ static TestCase special_value_tests[] = {
     {"$nan_var || 0", 0.0, EVAL_ERROR_OK, true},
     {"!$nan_var", 1.0, EVAL_ERROR_OK, true},
 
-    // Ternary with NaN
+    // Ternary branches that deliberately preserve non-finite input
     {"($nan_var) ? 1 : 2", 2.0, EVAL_ERROR_OK, true},
+    {"($nan_var == nan or $nan_var == inf) ? (nan) : ($nan_var == 2)", NAN, EVAL_ERROR_VALUE_IS_NAN, true},
+    {"($inf_var == nan or $inf_var == inf) ? (nan) : ($inf_var == 2)", NAN, EVAL_ERROR_VALUE_IS_NAN, true},
 
     // Infinity tests - Netdata rejects with VALUE_IS_INFINITE error
     {"$inf_var", 0.0, EVAL_ERROR_VALUE_IS_INFINITE, true},

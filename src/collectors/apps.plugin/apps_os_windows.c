@@ -605,19 +605,23 @@ static void GetServiceNames(void) {
         CloseServiceHandle(hSCManager);
         return;
     }
+    DWORD dwAllocatedBytes = dwBytesNeeded;
 
     // Allocate memory to hold the services
-    pServiceStatus = mallocz(dwBytesNeeded);
+    pServiceStatus = mallocz(dwAllocatedBytes);
 
     // Now, retrieve the list of services
     if (!EnumServicesStatusEx(
             hSCManager, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
-            (LPBYTE)pServiceStatus, dwBytesNeeded, &dwBytesNeeded, &dwServicesReturned,
+            (LPBYTE)pServiceStatus, dwAllocatedBytes, &dwBytesNeeded, &dwServicesReturned,
             &dwResumeHandle, NULL)) {
         freez(pServiceStatus);
         CloseServiceHandle(hSCManager);
         return;
     }
+    DWORD dwServicesCapacity = (DWORD)(dwAllocatedBytes / sizeof(*pServiceStatus));
+    if (dwServicesReturned > dwServicesCapacity)
+        dwServicesReturned = dwServicesCapacity;
 
     // Loop through the services
     for (DWORD i = 0; i < dwServicesReturned; i++) {

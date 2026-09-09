@@ -1,0 +1,314 @@
+---
+name: Netdata support bundle
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
+      - 'packaging/installer/netdata-support-bundle'
+      - 'packaging/installer/netdata-support-bundle.ps1'
+      - 'packaging/installer/SUPPORT-BUNDLE.md'
+      - 'packaging/installer/tests/**'
+      - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
+  pull_request:
+    paths:
+      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
+      - 'packaging/installer/netdata-support-bundle'
+      - 'packaging/installer/netdata-support-bundle.ps1'
+      - 'packaging/installer/SUPPORT-BUNDLE.md'
+      - 'packaging/installer/tests/**'
+      - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netdata-support-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  posix:
+    name: POSIX sanitization (${{ matrix.shell }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell:
+          - sh
+          - dash
+          - busybox
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install BusyBox
+        if: matrix.shell == 'busybox'
+        run: sudo apt-get update && sudo apt-get install -y busybox
+
+      - name: Parse and run adversarial self-test
+        env:
+          TEST_SHELL: ${{ matrix.shell }}
+        run: |
+          set -eu
+          if [ "$TEST_SHELL" = busybox ]; then
+            busybox sh -n packaging/installer/netdata-support-bundle
+            busybox sh packaging/installer/netdata-support-bundle --selftest
+            SUPPORT_BUNDLE_TEST_SHELL="busybox sh" python3 packaging/installer/tests/test_snmp_diagnostics.py -v
+          else
+            "$TEST_SHELL" -n packaging/installer/netdata-support-bundle
+            "$TEST_SHELL" packaging/installer/netdata-support-bundle --selftest
+            SUPPORT_BUNDLE_TEST_SHELL="$TEST_SHELL" python3 packaging/installer/tests/test_snmp_diagnostics.py -v
+          fi
+
+  posix-e2e:
+    name: POSIX end-to-end bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and validate a fixture bundle
+        run: |
+          set -eu
+          sudo install -d -m 755 /etc/netdata
+          sudo sh -c 'printf "%s\n" "KEEP-NONSECRET-CONTENT" "password=SENTINEL-E2E-PASSWORD" > /etc/netdata/netdata.conf'
+          sudo chmod 644 /etc/netdata/netdata.conf
+          # stream.conf fixture: a UTF-8 BOM, CRLF endings and NO final newline,
+          # so the encoding-preservation and streaming-api-key contracts are
+          # exercised end to end (netdata/netdata#23448)
+          printf '\357\273\277[stream]\r\n    enabled = yes\r\n    api key = 11111111-2222-3333-4444-555555555555\r\n    password = SENTINEL-E2E-STREAMPW\r\n[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]\r\n    enabled = yes' > /tmp/stream.conf
+          sudo cp /tmp/stream.conf /etc/netdata/stream.conf
+          sudo chmod 644 /etc/netdata/stream.conf
+          sudo install -d -m 755 /var/lib/netdata/snmp/diagnostics
+          sudo cp src/go/plugin/go.d/collector/snmp_topology/testdata/topology-diagnostic-archive-replay-v1.zst /var/lib/netdata/snmp/diagnostics/lifecycle.zst
+          sudo chmod 644 /var/lib/netdata/snmp/diagnostics/lifecycle.zst
+          fixture_dir=$(mktemp -d)
+          fixture_root_bin="$fixture_dir/netdata"
+          fixture_child_script="$fixture_dir/socket-child.py"
+          fixture_port_file="$fixture_dir/port"
+          fixture_child_pid_file="$fixture_dir/child.pid"
+          cp "$(command -v bash)" "$fixture_root_bin"
+          chmod 755 "$fixture_root_bin"
+          printf '%s\n' \
+            'import socket, sys, time' \
+            's = socket.socket(socket.AF_INET, socket.SOCK_STREAM)' \
+            's.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)' \
+            's.bind(("127.0.0.1", 0))' \
+            's.listen(1)' \
+            'open(sys.argv[1], "w").write(str(s.getsockname()[1]))' \
+            'time.sleep(30)' > "$fixture_child_script"
+          "$fixture_root_bin" -c 'python3 "$1" "$2" & child=$!; echo "$child" > "$3"; wait' \
+            fixture-root "$fixture_child_script" "$fixture_port_file" "$fixture_child_pid_file" &
+          fixture_root_pid=$!
+          for _ in $(seq 1 30); do
+            test -s "$fixture_child_pid_file" && break
+            sleep 0.1
+          done
+          test -s "$fixture_child_pid_file"
+          fixture_child_pid=$(cat "$fixture_child_pid_file")
+          for _ in $(seq 1 30); do
+            test -s "$fixture_port_file" && break
+            sleep 0.1
+          done
+          test -s "$fixture_port_file"
+          trap 'kill "$fixture_root_pid" "$fixture_child_pid" 2>/dev/null || true; wait "$fixture_root_pid" 2>/dev/null || true' EXIT
+          output=$(mktemp -d)
+          extract=$(mktemp -d)
+          sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 --include-snmp-diagnostics -o "$output"
+          bundle=$(find "$output" -maxdepth 1 \( -name '*.tar.gz' -o -name '*.tar.zst' \) -print -quit)
+          test -n "$bundle"
+          tar -xaf "$bundle" -C "$extract"
+          root=$(find "$extract" -mindepth 1 -maxdepth 1 -type d -print -quit)
+          if ! test -s "$root/01-system/os-release.txt"; then
+            echo 'OS release fixture is missing or empty' >&2
+            find "$root" -maxdepth 2 -type f -print >&2
+            exit 1
+          fi
+          test -s "$root/08-network/resolv-conf.txt"
+          test -s "$root/08-network/netdata-sockets.txt"
+          awk -v pid="$fixture_child_pid" '
+            $2 == pid || $3 == pid || $0 ~ ("pid=" pid "([,)]|$)") { found = 1 }
+            END { exit !found }
+          ' "$root/08-network/netdata-sockets.txt"
+          test ! -e "$root/08-network/listening-sockets.txt"
+          grep -qF 'KEEP-NONSECRET-CONTENT' "$root/04-config/netdata.conf"
+          if grep -R -q 'SENTINEL-E2E-PASSWORD' "$root"; then
+            echo 'planted secret survived in bundle' >&2
+            exit 1
+          fi
+          jq -e '.schema == "netdata-support-bundle/v2" and (.files | length > 0)' "$root/MANIFEST.json"
+          jq -e '.files[] | select(.path == "04-config/netdata.conf" and .bytes > 0)' "$root/MANIFEST.json"
+
+          cmp /var/lib/netdata/snmp/diagnostics/lifecycle.zst "$root/06-state/snmp-diagnostics/lifecycle.zst"
+          jq -e '.snmp_diagnostics.files == 1 and .snmp_diagnostics.status == "complete" and .secrets_redacted == false and .pii_obfuscated == false' "$root/MANIFEST.json"
+          test -s "$root/09-permissions/plugins-d.txt"
+
+          # streaming api key kept verbatim, other stream.conf secrets redacted,
+          # and the source bytes (BOM + CRLF + no final newline) preserved
+          sc="$root/04-config/stream.conf"
+          grep -qF 'api key = 11111111-2222-3333-4444-555555555555' "$sc"
+          grep -qF '[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]' "$sc"
+          grep -q 'SENTINEL-E2E-STREAMPW' "$sc" && { echo 'a non-api-key secret survived in stream.conf' >&2; exit 1; }
+          [ "$(head -c 3 "$sc" | od -An -tx1 | tr -d ' \n')" = efbbbf ] || { echo 'the UTF-8 BOM was not preserved' >&2; exit 1; }
+          [ "$(tr -dc '\r' < "$sc" | wc -c)" -ge 4 ] || { echo 'CRLF line endings were not preserved' >&2; exit 1; }
+
+  macos-posix:
+    name: macOS POSIX sanitization
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse and run adversarial self-test
+        run: |
+          set -eu
+          sh -n packaging/installer/netdata-support-bundle
+          sh packaging/installer/netdata-support-bundle --selftest
+          python3 packaging/installer/tests/test_snmp_diagnostics.py -v
+
+  powershell-core:
+    name: PowerShell 7 sanitization
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run adversarial self-test
+        shell: pwsh
+        run: ./packaging/installer/netdata-support-bundle.ps1 -SelfTest
+      - name: SNMP evidence fixtures
+        env:
+          SUPPORT_BUNDLE_TEST_SHELL: pwsh
+        run: python3 packaging/installer/tests/test_snmp_diagnostics.py -v
+
+  windows-powershell:
+    name: Windows PowerShell 5.1 sanitization
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run adversarial self-test
+        shell: powershell
+        run: .\packaging\installer\netdata-support-bundle.ps1 -SelfTest
+      - name: SNMP evidence fixtures
+        env:
+          SUPPORT_BUNDLE_TEST_SHELL: powershell
+        run: python packaging/installer/tests/test_snmp_diagnostics.py -v
+
+      - name: Build and validate a fixture bundle
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $confDir = 'C:\Program Files\Netdata\etc\netdata'
+          [System.IO.Directory]::CreateDirectory($confDir) | Out-Null
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText(
+              (Join-Path $confDir 'netdata.conf'),
+              "KEEP-NONSECRET-CONTENT`npassword=SENTINEL-E2E-PASSWORD`n",
+              $utf8)
+          # stream.conf fixture: a UTF-8 BOM, CRLF endings and NO final newline,
+          # so the encoding-preservation and streaming-api-key contracts are
+          # exercised end to end (netdata/netdata#23448)
+          $streamText = "[stream]`r`n    enabled = yes`r`n    api key = 11111111-2222-3333-4444-555555555555`r`n    password = SENTINEL-E2E-STREAMPW`r`n[aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee]`r`n    enabled = yes"
+          [System.IO.File]::WriteAllBytes(
+              (Join-Path $confDir 'stream.conf'),
+              [byte[]](@(0xEF, 0xBB, 0xBF) + $utf8.GetBytes($streamText)))
+          $diagDir = 'C:\Program Files\Netdata\var\lib\netdata\snmp\diagnostics'
+          [System.IO.Directory]::CreateDirectory($diagDir) | Out-Null
+          $diagSource = (Resolve-Path 'src/go/plugin/go.d/collector/snmp_topology/testdata/topology-diagnostic-archive-replay-v1.zst').Path
+          Copy-Item $diagSource (Join-Path $diagDir 'lifecycle.zst')
+          $fixtureDir = Join-Path $env:RUNNER_TEMP ('netdata-socket-fixture-' + [guid]::NewGuid())
+          New-Item -ItemType Directory -Path $fixtureDir -Force | Out-Null
+          $fixtureChildScript = Join-Path $fixtureDir 'socket-child.ps1'
+          $fixtureRootScript = Join-Path $fixtureDir 'netdata-root.ps1'
+          $fixturePortFile = Join-Path $fixtureDir 'port.txt'
+          $fixtureChildPidFile = Join-Path $fixtureDir 'child.pid'
+          @'
+          param([string]$PortFile)
+          $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $listener.LocalEndpoint.Port | Set-Content -NoNewline $PortFile
+          Start-Sleep -Seconds 30
+          $listener.Stop()
+          '@ | Set-Content -Encoding UTF8 $fixtureChildScript
+          @'
+          $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $args[0], $args[1]) -PassThru
+          $child.Id | Set-Content -NoNewline $args[2]
+          Wait-Process -Id $child.Id
+          '@ | Set-Content -Encoding UTF8 $fixtureRootScript
+          $fixtureRootBin = Join-Path $fixtureDir 'netdata.exe'
+          Copy-Item (Join-Path $PSHOME 'powershell.exe') $fixtureRootBin
+          $fixtureRoot = Start-Process -FilePath $fixtureRootBin -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $fixtureRootScript, $fixtureChildScript, $fixturePortFile, $fixtureChildPidFile) -PassThru
+          for ($i = 0; $i -lt 30 -and -not (Test-Path $fixtureChildPidFile); $i++) { Start-Sleep -Milliseconds 100 }
+          if (-not (Test-Path $fixtureChildPidFile)) { throw 'socket fixture child did not start' }
+          $fixtureChildPid = [int](Get-Content $fixtureChildPidFile -Raw)
+          for ($i = 0; $i -lt 30 -and -not (Test-Path $fixturePortFile); $i++) { Start-Sleep -Milliseconds 100 }
+          if (-not (Test-Path $fixturePortFile)) { throw 'socket fixture did not open a listener' }
+          $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
+          .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1 -IncludeSnmpDiagnostics
+          $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
+          if (-not $zip) { throw 'bundle zip was not created' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          try {
+              $manifestEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])MANIFEST.json$' } | Select-Object -First 1
+              $configEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])04-config[\\/]netdata.conf$' } | Select-Object -First 1
+              if (-not $manifestEntry -or -not $configEntry -or $configEntry.Length -eq 0) { throw 'required non-empty entries are missing' }
+              $reader = New-Object System.IO.StreamReader($configEntry.Open(), $utf8, $true)
+              try { $config = $reader.ReadToEnd() } finally { $reader.Dispose() }
+              if ($config -notmatch 'KEEP-NONSECRET-CONTENT' -or $config -match 'SENTINEL-E2E-PASSWORD') { throw 'config survival/redaction contract failed' }
+              $manifestStream = $manifestEntry.Open()
+              try {
+                  $memory = New-Object System.IO.MemoryStream
+                  try {
+                      $manifestStream.CopyTo($memory)
+                      $bytes = $memory.ToArray()
+                  } finally { $memory.Dispose() }
+              } finally { $manifestStream.Dispose() }
+              if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
+              $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
+              if ($manifest.schema -ne 'netdata-support-bundle/v2' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+              $socketEntry = $archive.Entries | Where-Object { $_.FullName -match '08-network[\\/]netdata-sockets[.]txt$' } | Select-Object -First 1
+              if (-not $socketEntry) { throw 'Netdata socket inventory missing' }
+              $socketReader = New-Object System.IO.StreamReader($socketEntry.Open(), $utf8, $true)
+              try { $socketText = $socketReader.ReadToEnd() } finally { $socketReader.Dispose() }
+              if ($socketText -notmatch "(?m)\b$fixtureChildPid\b") { throw "socket fixture child PID $fixtureChildPid was not collected" }
+
+              if ($manifest.snmp_diagnostics.files -ne 1 -or $manifest.snmp_diagnostics.status -ne 'complete' -or
+                  $manifest.secrets_redacted -or $manifest.pii_obfuscated) { throw 'raw SNMP manifest contract failed' }
+              $diagEntry = $archive.Entries | Where-Object { $_.FullName -match '06-state[\\/]snmp-diagnostics[\\/]lifecycle.zst$' } | Select-Object -First 1
+              if (-not $diagEntry) { throw 'SNMP evidence missing' }
+              $diagStream = $diagEntry.Open()
+              $diagMemory = New-Object System.IO.MemoryStream
+              try {
+                  $diagStream.CopyTo($diagMemory)
+                  if ([Convert]::ToBase64String($diagMemory.ToArray()) -cne [Convert]::ToBase64String([IO.File]::ReadAllBytes($diagSource))) {
+                      throw 'SNMP evidence bytes changed'
+                  }
+              } finally { $diagStream.Dispose(); $diagMemory.Dispose() }
+
+              # streaming api key kept verbatim, other stream.conf secrets redacted,
+              # and the source bytes (BOM + CRLF + no final newline) preserved
+              $streamEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])04-config[\\/]stream.conf$' } | Select-Object -First 1
+              if (-not $streamEntry) { throw 'stream.conf was not collected' }
+              $ms = New-Object System.IO.MemoryStream
+              $es = $streamEntry.Open()
+              try { $es.CopyTo($ms) } finally { $es.Dispose() }
+              $sb = $ms.ToArray(); $ms.Dispose()
+              $stext = $utf8.GetString($sb)
+              if ($stext -notmatch 'api key = 11111111-2222-3333-4444-555555555555') { throw 'the streaming api key was redacted' }
+              if ($stext -match 'SENTINEL-E2E-STREAMPW') { throw 'a non-api-key secret survived in stream.conf' }
+              if (-not ($sb.Length -ge 3 -and $sb[0] -eq 0xEF -and $sb[1] -eq 0xBB -and $sb[2] -eq 0xBF)) { throw 'the UTF-8 BOM was not preserved' }
+              if (@([regex]::Matches($stext, "`r`n")).Count -lt 4) { throw 'CRLF line endings were not preserved' }
+              if ($sb[$sb.Length - 1] -eq 10) { throw 'a final newline was added to a source that had none' }
+
+              # the ETW channels are actually queried - they are where a Windows
+              # agent logs by default, and querying only NetdataWEL found nothing
+              $elEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])05-logs[\\/]eventlog-netdata.txt$' } | Select-Object -First 1
+              if (-not $elEntry) { throw 'the event log capture is missing' }
+              $er = New-Object System.IO.StreamReader($elEntry.Open(), $utf8, $true)
+              try { $eltext = $er.ReadToEnd() } finally { $er.Dispose() }
+              foreach ($ch in @('Netdata/Daemon', 'Netdata/Collectors', 'Netdata/Health', 'Netdata/Aclk', 'Netdata/Access', 'NetdataWEL')) {
+                  if ($eltext -notmatch [regex]::Escape($ch)) { throw "the event log capture never queried $ch" }
+              }
+              if (-not ($archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])09-permissions[\\/]plugins-d.txt$' })) {
+                  throw '09-permissions/plugins-d.txt is missing'
+              }
+          } finally { $archive.Dispose(); Stop-Process -Id $fixtureChildPid, $fixtureRoot.Id -Force -ErrorAction SilentlyContinue }

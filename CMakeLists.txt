@@ -92,8 +92,84 @@ set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include(NetdataPlatform)
 include(NetdataCompilerFlags)
 
+if(OS_MACOS)
+  enable_language(OBJC)
+  if(OSLOG AND FOUNDATION)
+    # macos-logs.plugin needs OSLogStore, which only exists in the 10.15 SDK and later;
+    # the OSLog framework alone (10.12 SDK) is not sufficient.
+    include(CheckOBJCSourceCompiles)
+    check_objc_source_compiles("
+#import <OSLog/OSLog.h>
+int main(void) { OSLogStore *store = nil; return store != nil; }
+" HAVE_OSLOG_STORE)
+    if(HAVE_OSLOG_STORE)
+      add_compile_definitions(HAVE_OSLOG)
+    endif()
+  endif()
+
+  # The oldest macOS this source tree is expected to run on (the deployment target floor,
+  # not an SDK version). Collectors that need a newer SDK guard themselves at the source
+  # level and degrade to unavailable, so raising this floor must be a deliberate change to
+  # this value rather than an accident.
+  set(NETDATA_MACOS_MINIMUM_VERSION "10.6")
+
+  # Only validated when the deployment target is explicit; an unset target means the
+  # toolchain default applies, which is always at least as new as the floor.
+  if(CMAKE_OSX_DEPLOYMENT_TARGET AND
+     CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS NETDATA_MACOS_MINIMUM_VERSION)
+    message(FATAL_ERROR
+      "CMAKE_OSX_DEPLOYMENT_TARGET is ${CMAKE_OSX_DEPLOYMENT_TARGET}, but netdata requires "
+      "macOS ${NETDATA_MACOS_MINIMUM_VERSION} or later.\n"
+      "Either raise the deployment target, or lower NETDATA_MACOS_MINIMUM_VERSION in "
+      "CMakeLists.txt and add the source-level guards the older SDK needs.")
+  endif()
+
+  message(STATUS "macOS minimum supported version: ${NETDATA_MACOS_MINIMUM_VERSION}")
+endif()
+
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
+
+function(netdata_windows_path_to_runtime_path output_var input_path)
+  set(_converted_path "")
+  set(_cygpath_result 1)
+
+  find_program(_cygpath_executable NAMES cygpath)
+  if(_cygpath_executable)
+    execute_process(
+      COMMAND ${_cygpath_executable} -u "${input_path}"
+      RESULT_VARIABLE _cygpath_result
+      OUTPUT_VARIABLE _converted_path
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+
+  if(NOT _converted_path OR NOT _cygpath_result EQUAL 0)
+    string(REPLACE "\\" "/" _converted_path "${input_path}")
+
+    if(_converted_path MATCHES "^([A-Za-z]):(.*)$")
+      string(TOLOWER "${CMAKE_MATCH_1}" _drive_letter)
+      set(_converted_path "/${_drive_letter}${CMAKE_MATCH_2}")
+    endif()
+  endif()
+
+  if(NOT _converted_path STREQUAL "")
+    string(REGEX REPLACE "/$" "" _converted_path "${_converted_path}")
+  endif()
+
+  set(${output_var} "${_converted_path}" PARENT_SCOPE)
+endfunction()
+
+if(OS_WINDOWS)
+  set(NETDATA_WINDOWS_PATH_PREFIX "C:\\Program Files\\Netdata" CACHE STRING
+      "Native Windows install prefix used to derive runtime paths")
+  string(REGEX REPLACE "[/\\\\]+$" "" NETDATA_WINDOWS_PATH_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
+  string(REPLACE "\\" "\\\\" NETDATA_WINDOWS_PATH_PREFIX_ESCAPED "${NETDATA_WINDOWS_PATH_PREFIX}")
+
+  if(NOT BUILD_FOR_PACKAGING)
+    netdata_windows_path_to_runtime_path(NETDATA_RUNTIME_PREFIX "${NETDATA_WINDOWS_PATH_PREFIX}")
+  endif()
+endif()
 
 if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
   string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
@@ -104,8 +180,13 @@ set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
 set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
 set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
 set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
+set(STOCK_DATA_DEST "usr/share/netdata")
+set(STOCK_DATA_DIR "${NETDATA_RUNTIME_PREFIX}/${STOCK_DATA_DEST}")
 set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(NETDATA_BIN_DIR "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
+if(NOT DEFINED NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
+  set(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR "")
+endif()
 
 # A non-default value is only used when building Debian packages (/var/lib/netdata/www)
 if(NOT DEFINED WEB_DIR)
@@ -136,9 +217,10 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" OFF)
-option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
-cmake_dependent_option(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER "Enable OTel signal viewer plugin" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
+option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
+cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
+cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
@@ -148,12 +230,25 @@ cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEA
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_CGROUP_NETWORK "Enable Linux CGroup network usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROUPS_LOOKUP netipc server" True "OS_LINUX" False)
+cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
+cmake_dependent_option(ENABLE_CGROUP_NAME "Build the cgroup-name helper" True "OS_LINUX;ENABLE_PLUGIN_GO" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+# eBPF support is 64-bit only: the legacy BPF objects we ship are fetched with no
+# architecture dimension (see NetdataEBPFLegacy.cmake - only libc varies), 32-bit
+# kernels provide no BTF to build CO-RE programs from, and the loaders share struct
+# layouts with the BPF side. On a 32-bit userland the plugin builds and installs but
+# cannot load a single program - it exits 1 and netdata disables it.
+cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX;CMAKE_SIZEOF_VOID_P EQUAL 8" False)
+
+if(OS_LINUX AND NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(STATUS "eBPF plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+endif()
+
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -183,6 +278,41 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
+# Selects which native package format the staged tree is shaped for. The empty
+# default preserves the historical (DEB-shaped) layout so existing builds are
+# unaffected; packaging/build-package.sh passes it explicitly.
+set(NETDATA_PACKAGING_FORMAT "" CACHE STRING "Native package format being built (deb, rpm, or empty)")
+mark_as_advanced(NETDATA_PACKAGING_FORMAT)
+if(NOT NETDATA_PACKAGING_FORMAT STREQUAL "" AND
+   NOT NETDATA_PACKAGING_FORMAT STREQUAL "deb" AND
+   NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        message(FATAL_ERROR "Invalid NETDATA_PACKAGING_FORMAT '${NETDATA_PACKAGING_FORMAT}' (expected deb, rpm, or empty)")
+endif()
+
+# CPack only emits Recommends: from CMake 4.1 on; older versions ignore the
+# variables silently, which would strip the weak dependencies from the RPMs
+# without any build failure. Checked here rather than in Packaging.cmake so
+# the configure fails fast.
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
+        message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
+endif()
+
+# A few payloads live in different packages per format: the spec keeps the
+# sensors3/otel stock configs and nd-mcp in the main RPM and the swagger
+# files in the dashboard RPM, while the DEB layout groups them with their
+# plugins (and swagger with the main package).
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        set(NETDATA_SENSORS3_COMPONENT netdata)
+        set(NETDATA_ND_MCP_COMPONENT netdata)
+        set(NETDATA_OTEL_CONF_COMPONENT netdata)
+        set(NETDATA_SWAGGER_COMPONENT dashboard)
+else()
+        set(NETDATA_SENSORS3_COMPONENT plugin-debugfs)
+        set(NETDATA_ND_MCP_COMPONENT plugin-go)
+        set(NETDATA_OTEL_CONF_COMPONENT plugin-otel)
+        set(NETDATA_SWAGGER_COMPONENT netdata)
+endif()
+
 cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
@@ -194,7 +324,7 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
 # Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -219,8 +349,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     if(ENABLE_PLUGIN_OTEL)
         list(APPEND _WORKSPACE_CRATES otel-plugin)
     endif()
-    if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-        list(APPEND _WORKSPACE_CRATES otel-signal-viewer-plugin)
+    if(ENABLE_PLUGIN_NETFLOW)
+        list(APPEND _WORKSPACE_CRATES netflow-plugin)
     endif()
     if(_WORKSPACE_CRATES)
         corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
@@ -233,24 +363,57 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
       else()
         corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
       endif()
+
+      # The workspace release profile propagates fat LTO, single-codegen-unit,
+      # and debuginfo settings through the whole dependency graph. On 32-bit
+      # targets that makes rustc-LLVM exhaust the ~3 GB process address space
+      # during codegen ("rustc-LLVM ERROR: out of memory"). Override Cargo's
+      # release profile so the otel-plugin build stays within budget.
+      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # We depend (transitively) on the `io-uring` crate which doesn't provide
+        # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+        # and not a runtime dependency (because we don't use foyer's io-uring
+        # engine), we can simply skip the check.
+        corrosion_add_target_rustflags(otel-plugin --cfg=io_uring_skip_arch_check)
+        corrosion_set_env_vars(
+                otel-plugin
+                "CARGO_PROFILE_RELEASE_DEBUG=0"
+                "CARGO_PROFILE_RELEASE_LTO=off"
+                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
+      endif()
     endif()
 
-    if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-      set(OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
+    if(ENABLE_PLUGIN_NETFLOW)
+      set(NETFLOW_PLUGIN_RUSTFLAGS "")
+      set(NETFLOW_PLUGIN_ENV_VARS
+              "NETDATA_BUILD_CACHE_DIR=${CACHE_DIR}"
+              "NETDATA_BUILD_LIB_DIR=${VARLIB_DIR}"
+              "NETDATA_BUILD_STOCK_DATA_DIR=${STOCK_DATA_DIR}")
 
       # We depend (transitively) on the `io-uring` crate which doesn't provide
       # prebuilt bindings for 32-bit arches. Considering this is a compile-time
       # and not a runtime dependency (because we don't use foyer's io-uring
       # engine), we can simply skip the check.
       if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+        # The workspace release profile still propagates fat LTO, single-codegen-unit,
+        # and debuginfo settings through Rust dependencies on 32-bit builds. Override
+        # Cargo's release profile too so the entire dependency graph stays linkable.
+        list(APPEND NETFLOW_PLUGIN_ENV_VARS
+                "CARGO_PROFILE_RELEASE_DEBUG=0"
+                "CARGO_PROFILE_RELEASE_LTO=off"
+                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
       endif()
 
       if(STATIC_BUILD)
-        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
+        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "target-feature=+crt-static")
       endif()
 
-      corrosion_add_target_rustflags(otel-signal-viewer-plugin ${OTEL_SIGNAL_VIEWER_RUSTFLAGS})
+      if(NETFLOW_PLUGIN_RUSTFLAGS)
+        corrosion_add_target_rustflags(netflow-plugin ${NETFLOW_PLUGIN_RUSTFLAGS})
+      endif()
+
+      corrosion_set_env_vars(netflow-plugin ${NETFLOW_PLUGIN_ENV_VARS})
     endif()
 endif()
 
@@ -342,15 +505,31 @@ if(ENABLE_JEMALLOC)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS)
+set(ENABLE_PLUGIN_EBPF_GO OFF)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
-    find_package(Go "${MIN_GO_VERSION}" REQUIRED)
+    find_package(Go "${MIN_GO_VERSION}" QUIET)
+    if(NOT GO_FOUND)
+        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW)
+            find_package(Go "${MIN_GO_VERSION}" REQUIRED)
+        endif()
+    endif()
+
+    if(GO_FOUND)
+        # The BPF side is always LP64, and the loader shares struct layouts with it,
+        # so this plugin is only built for 64-bit userlands.
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(ENABLE_PLUGIN_EBPF_GO ON)
+        else()
+            message(STATUS "eBPF Go plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+        endif()
+    endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
+if(OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
     set(NEED_NDSUDO TRUE)
 else()
     set(NEED_NDSUDO FALSE)
@@ -384,6 +563,19 @@ if(ENABLE_BUNDLED_PROTOBUF)
 endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
+
+include(NetdataOSRelease)
+
+# DEB policy requires a copyright file in every binary package; RPMs do not
+# ship one (netdata.spec.in never packaged it).
+function(netdata_add_deb_copyright component package_name)
+        if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+                install(FILES
+                        "${PKG_FILES_PATH}/copyright"
+                        COMPONENT "${component}"
+                        DESTINATION "usr/share/doc/${package_name}")
+        endif()
+endfunction()
 
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
@@ -428,6 +620,7 @@ endif()
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
+include(NetdataSQLite)
 include(NetdataDlib)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
@@ -502,7 +695,6 @@ check_symbol_exists(strerror_r "string.h" HAVE_STRERROR_R)
 check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
-check_symbol_exists(clearenv "stdlib.h" HAVE_CLEARENV)
 
 check_function_exists(setresuid HAVE_SETRESUID)
 check_function_exists(setresgid HAVE_SETRESGID)
@@ -547,6 +739,8 @@ endif()
 if(ENABLE_LIBBACKTRACE)
     netdata_bundle_libbacktrace()
 endif()
+
+netdata_bundle_sqlite3()
 
 #
 # check source compilation
@@ -653,15 +847,6 @@ int main() {
         return 0;
 }
 " HAVE_BUILTIN_ATOMICS)
-
-check_cxx_source_compiles("
-#include <stdint.h>
-int main(void) {
-        uint64_t a;
-        __sync_add_and_fetch(&a, 1);
-        return 0;
-}
-" ARCH_SUPPORTS_64BIT_ATOMICS)
 
 check_c_source_compiles("
 void my_printf(char const *s, ...) __attribute__((format(gnu_printf, 1, 2)));
@@ -860,17 +1045,21 @@ set(LIBNETDATA_FILES
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
         src/libnetdata/avl/avl.h
-        src/libnetdata/bitmap/bitmap64.h
+        src/libnetdata/avl/avl-types.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
         src/libnetdata/buffer/functions_fields.c
         src/libnetdata/buffer/functions_fields.h
         src/libnetdata/ringbuffer/ringbuffer.c
         src/libnetdata/ringbuffer/ringbuffer.h
+        src/libnetdata/ringbuffer/ringbuffer-unittest.c
         src/libnetdata/circular_buffer/circular_buffer.c
         src/libnetdata/circular_buffer/circular_buffer.h
         src/libnetdata/clocks/clocks.c
         src/libnetdata/clocks/clocks.h
+        src/libnetdata/clocks/clocks-internals.h
+        src/libnetdata/clocks/clocks-unittest.c
+        src/libnetdata/clocks/time_t_arithmetic.h
         src/libnetdata/completion/completion.c
         src/libnetdata/completion/completion.h
         src/libnetdata/datetime/iso8601.c
@@ -924,6 +1113,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
+        src/libnetdata/os/ci.c
+        src/libnetdata/os/ci.h
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
@@ -931,7 +1122,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/procfile/procfile.h
         src/libnetdata/query_progress/progress.c
         src/libnetdata/query_progress/progress.h
-        src/libnetdata/required_dummies.h
         src/libnetdata/socket/security.c
         src/libnetdata/socket/security.h
         src/libnetdata/simple_hashtable/simple_hashtable.h
@@ -1012,6 +1202,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/windows-wmi/windows-wmi.h
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.h
+        src/libnetdata/os/windows-wmi/windows-wmi-GetSystemInfo.c
+        src/libnetdata/os/windows-wmi/windows-wmi-GetSystemInfo.h
         src/libnetdata/os/windows-perflib/perflib.c
         src/libnetdata/os/windows-perflib/perflib.h
         src/libnetdata/os/windows-perflib/perflib-names.c
@@ -1086,6 +1278,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-common.h
         src/libnetdata/log/nd_log-to-windows-common.h
         src/libnetdata/common.h
+        src/libnetdata/libnetdata-base.h
+        src/libnetdata/libnetdata-types.h
+        src/libnetdata/libnetdata-platform-fwd.h
         src/libnetdata/xxHash/xxhash.h
         src/libnetdata/os/random.c
         src/libnetdata/os/random.h
@@ -1108,8 +1303,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/locks/spinlock.h
         src/libnetdata/locks/rw-spinlock.c
         src/libnetdata/locks/rw-spinlock.h
+        src/libnetdata/locks/rw-spinlock-unittest.c
         src/libnetdata/atomics/atomic_flags.h
         src/libnetdata/atomics/atomics.h
+        src/libnetdata/atomics/single_writer.h
         src/libnetdata/locks/waitq.c
         src/libnetdata/locks/waitq.h
         src/libnetdata/object-state/object-state.c
@@ -1131,6 +1328,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/get_system_pagesize.h
         src/libnetdata/os/hostname.c
         src/libnetdata/os/hostname.h
+        src/libnetdata/os/socket_egress_interface.c
+        src/libnetdata/os/socket_egress_interface.h
         src/libnetdata/exit/exit_initiated.c
         src/libnetdata/exit/exit_initiated.h
         src/libnetdata/os/disk_space.c
@@ -1151,6 +1350,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/mmap_limit.h
         src/libnetdata/signals/signals.c
         src/libnetdata/signals/signals.h
+        src/libnetdata/runtime-paths/runtime-paths.c
+        src/libnetdata/runtime-paths/runtime-paths.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
         src/libnetdata/os/process_memory.c
@@ -1168,6 +1369,13 @@ if(OS_WINDOWS)
     )
 
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
+endif()
+
+if(OS_LINUX OR OS_WINDOWS)
+    list(APPEND LIBNETDATA_FILES
+            src/libnetdata/netipc/netipc_netdata.c
+            src/libnetdata/netipc/netipc_netdata.h
+    )
 endif()
 
 if(NOT OS_FREEBSD)
@@ -1222,6 +1430,8 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
+        src/daemon/unit_test_bridge.c
+        src/daemon/unit_test_bridge.h
         src/daemon/dyncfg/dyncfg.c
         src/daemon/dyncfg/dyncfg.h
         src/daemon/dyncfg/dyncfg-files.c
@@ -1382,13 +1592,20 @@ set(API_PLUGIN_FILES
         src/web/api/functions/functions.h
         src/web/api/functions/function-progress.c
         src/web/api/functions/function-progress.h
-        src/web/api/functions/function-streaming.c
-        src/web/api/functions/function-streaming.h
+        src/web/api/functions/function-netdata-streaming.c
+        src/web/api/functions/function-netdata-streaming.h
+        src/web/api/functions/function-topology-streaming.c
+        src/web/api/functions/function-topology-streaming.h
         src/web/api/queries/rrdr.c
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
         src/web/api/queries/query.h
+        src/web/api/queries/query-execute.c
+        src/web/api/queries/query-window.c
         src/web/api/queries/query-group-by.c
+        src/web/api/queries/query-group-by-init.c
+        src/web/api/queries/query-group-by-finalize.c
+        src/web/api/queries/query-cardinality-limit.c
         src/web/api/queries/query-group-over-time.c
         src/web/api/queries/query-internal.h
         src/web/api/queries/query-plan.c
@@ -1418,7 +1635,10 @@ set(API_PLUGIN_FILES
         src/web/api/queries/trimmed_mean/trimmed_mean.h
         src/web/api/queries/extremes/extremes.c
         src/web/api/queries/extremes/extremes.h
+        src/web/api/queries/latest/latest.c
+        src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
+        src/web/api/queries/weights-ranking.h
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
         src/web/api/formatters/rrd2json.h
@@ -1557,6 +1777,8 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
         src/collectors/common-contexts/power-supply.h
+        src/collectors/common-contexts/hw-sensors.h
+        src/collectors/common-contexts/hw-sensors-function.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
@@ -1570,6 +1792,7 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_dyncfg.c
         src/plugins.d/pluginsd_dyncfg.h
         src/plugins.d/pluginsd_functions.c
+        src/plugins.d/pluginsd_functions-unittest.c
         src/plugins.d/pluginsd_functions.h
         src/plugins.d/pluginsd_internals.c
         src/plugins.d/pluginsd_internals.h
@@ -1577,6 +1800,20 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_parser.h
         src/plugins.d/pluginsd_replication.c
         src/plugins.d/pluginsd_replication.h
+)
+
+set(NRPC_FILES
+        src/nrpc/nrpc.h
+        src/nrpc/nrpc-internals.h
+        src/nrpc/nrpc-lifetime.h
+        src/nrpc/nrpc-builtin.c
+        src/nrpc/nrpc-calls.c
+        src/nrpc/nrpc-catalog.c
+        src/nrpc/nrpc-registry.c
+        src/nrpc/nrpc-serving.c
+        src/nrpc/nrpc-serving-internals.h
+        src/nrpc/nrpc-transport.h
+        src/nrpc/nrpc-unittest.c
 )
 
 set(RRD_PLUGIN_FILES
@@ -1597,13 +1834,7 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext.c
         src/database/contexts/rrdcontext.h
         src/database/contexts/rrdcontext-worker.c
-        src/database/rrdcollector.c
-        src/database/rrdcollector.h
         src/database/rrddim.c
-        src/database/rrdfunctions.c
-        src/database/rrdfunctions.h
-        src/database/rrdfunctions-inline.c
-        src/database/rrdfunctions-inline.h
         src/database/rrdhost.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
@@ -1635,19 +1866,8 @@ set(RRD_PLUGIN_FILES
         src/database/sqlite/sqlite_aclk_node.h
         src/database/sqlite/sqlite_aclk_alert.c
         src/database/sqlite/sqlite_aclk_alert.h
-        src/database/sqlite/vendored/sqlite3.c
-        src/database/sqlite/vendored/sqlite3.h
-        src/database/sqlite/vendored/sqlite3recover.c
-        src/database/sqlite/vendored/sqlite3recover.h
-        src/database/sqlite/vendored/dbdata.c
         src/web/api/queries/KolmogorovSmirnovDist.c
         src/web/api/queries/KolmogorovSmirnovDist.h
-        src/database/rrdfunctions-inflight.c
-        src/database/rrdfunctions-inflight.h
-        src/database/rrdfunctions-exporters.c
-        src/database/rrdfunctions-exporters.h
-        src/database/rrdfunctions-internals.h
-        src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
         src/database/rrd-database-mode.c
         src/database/rrdhost-system-info.c
@@ -1744,6 +1964,8 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-internals.h
         src/collectors/systemd-journal.plugin/systemd-main.c
         src/collectors/systemd-journal.plugin/systemd-journal.c
+        src/collectors/systemd-journal.plugin/systemd-journal-function.h
+        src/collectors/systemd-journal.plugin/systemd-journal-execute.h
         src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
         src/collectors/systemd-journal.plugin/systemd-journal-files.c
         src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
@@ -1761,6 +1983,7 @@ set(SYSTEMD_UNITS_PLUGIN_FILES
 
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
+        src/streaming/stream-trace.h
         src/streaming/stream-compression/compression.c
         src/streaming/stream-compression/compression.h
         src/streaming/stream-compression/brotli.c
@@ -1848,6 +2071,7 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-list-metadata.h
         src/web/mcp/mcp-tools-execute-function.c
         src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-execute-function-unittest.c
         src/web/mcp/mcp-tools-execute-function-internal.h
         src/web/mcp/mcp-tools-execute-function-registry.c
         src/web/mcp/mcp-tools-execute-function-registry.h
@@ -1874,6 +2098,7 @@ set(WEB_PLUGIN_FILES
         src/web/server/static/static-threaded.c
         src/web/server/static/static-threaded.h
         src/web/server/web_client.c
+        src/web/server/web_client-unittest.c
         src/web/server/web_client.h
         src/web/server/web_client_cache.c
         src/web/server/web_client_cache.h
@@ -1945,8 +2170,28 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/sys_fs_cgroup.h
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-name-config.c
+        src/collectors/cgroups.plugin/cgroup-name-config.h
+        src/collectors/cgroups.plugin/cgroup-name-labels.c
+        src/collectors/cgroups.plugin/cgroup-orchestrator.c
+        src/collectors/common-cgroups/cgroup-path.c
+        src/collectors/common-cgroups/cgroup-path.h
         src/collectors/cgroups.plugin/cgroup-charts.c
         src/collectors/cgroups.plugin/cgroup-top.c
+        src/collectors/cgroups.plugin/cgroup-netipc.c
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-netipc.c>"
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-resolver.c>"
+        "$<$<BOOL:${ENABLE_CGROUPS_LOOKUP_SERVER}>:src/collectors/cgroups.plugin/cgroup-lookup-resolver.h>"
+        src/collectors/cgroups.plugin/cgroup-netipc.h
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+        src/collectors/cgroups.plugin/cgroup-snapshot-store.h
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
+        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
+        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_shared_memory.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_shared_memory.h
 )
 
 set(DISKSPACE_PLUGIN_FILES
@@ -1959,6 +2204,21 @@ set(MACOS_PLUGIN_FILES
         src/collectors/macos.plugin/macos_sysctl.c
         src/collectors/macos.plugin/macos_mach_smi.c
         src/collectors/macos.plugin/macos_fw.c
+        src/collectors/macos.plugin/macos_power.c
+        src/collectors/macos.plugin/macos_iohid.c
+        src/collectors/macos.plugin/macos_iohid.h
+        src/collectors/macos.plugin/macos_smc.c
+        src/collectors/macos.plugin/macos_smc.h
+        src/collectors/macos.plugin/macos_gpu.c
+        src/collectors/macos.plugin/macos_sensors.c
+        src/collectors/macos.plugin/macos_powermetrics.c
+        src/collectors/macos.plugin/macos_nvme.c
+)
+
+set(MACOS_LOGS_PLUGIN_FILES
+        src/collectors/macos-logs.plugin/macos-logs.c
+        src/collectors/macos-logs.plugin/macos-logs.h
+        src/collectors/macos-logs.plugin/macos-logs-oslog.m
 )
 
 set(FREEBSD_PLUGIN_FILES
@@ -2014,6 +2274,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-thermalzone.c
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
+        src/collectors/windows.plugin/perflib-smb.c
+        src/collectors/windows.plugin/perflib-terminal-services.c
         src/collectors/windows.plugin/perflib-netframework.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
@@ -2091,6 +2353,7 @@ set(NETDATA_FILES
         ${IDLEJITTER_PLUGIN_FILES}
         ${ML_FILES}
         ${PLUGINSD_PLUGIN_FILES}
+        ${NRPC_FILES}
         ${RRD_PLUGIN_FILES}
         ${REGISTRY_PLUGIN_FILES}
         ${STATSD_PLUGIN_FILES}
@@ -2145,6 +2408,7 @@ set(MQTT_WEBSOCKETS_FILES
         src/aclk/mqtt_websockets/mqtt_wss_client.h
         src/aclk/mqtt_websockets/ws_client.c
         src/aclk/mqtt_websockets/ws_client.h
+        src/aclk/mqtt_websockets/ws_client-unittest.c
         src/aclk/mqtt_websockets/mqtt_ng.c
         src/aclk/mqtt_websockets/mqtt_ng.h
         src/aclk/mqtt_websockets/common_public.c
@@ -2162,6 +2426,7 @@ set(ACLK_PROTO_DEFS
         src/aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
         src/aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
         src/aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/manifest/v1/manifest.proto
         src/aclk/aclk-schemas/proto/context/v1/context.proto
         src/aclk/aclk-schemas/proto/context/v1/stream.proto
         src/aclk/aclk-schemas/proto/agent/v1/cmds.proto
@@ -2194,6 +2459,8 @@ set(ACLK_FILES
         src/aclk/schema-wrappers/alarm_config.h
         src/aclk/schema-wrappers/node_info.cc
         src/aclk/schema-wrappers/node_info.h
+        src/aclk/schema-wrappers/node_manifest.cc
+        src/aclk/schema-wrappers/node_manifest.h
         src/aclk/schema-wrappers/capability.cc
         src/aclk/schema-wrappers/capability.h
         src/aclk/schema-wrappers/proto_2_json.cc
@@ -2250,11 +2517,99 @@ set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/j__udyLGet.c P
 set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
+set(NETIPC_PROTOCOL_FILES
+        src/libnetdata/netipc/src/protocol/netipc_protocol.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_increment.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_string_reverse.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_cgroups_snapshot.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_lookup_common.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_cgroups_lookup.c
+        src/libnetdata/netipc/src/protocol/netipc_protocol_apps_lookup.c
+)
+
+set(NETIPC_SERVICE_COMMON_FILES
+        src/libnetdata/netipc/src/service/netipc_service_common.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_cache_common.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_cache.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_snapshot.c
+        src/libnetdata/netipc/src/service/netipc_service_cgroups_lookup.c
+        src/libnetdata/netipc/src/service/netipc_service_apps_lookup.c
+)
+
+#
+# build netipc (standalone IPC library, no Netdata deps)
+#
+
+# clock_gettime / shm_open / sem_* live in librt on old glibc (< 2.34) and on
+# FreeBSD, but in libc on musl (Alpine) and modern glibc (>= 2.34).  Probe
+# once here; all targets below (netipc, libnetdata, netdata, CGO_LDFLAGS) use
+# HAVE_LIBRT so we never unconditionally link a library that may not exist.
+include(CheckLibraryExists)
+check_library_exists(rt clock_gettime "" HAVE_LIBRT)
+
+if(OS_LINUX)
+    set(NETIPC_FILES
+            ${NETIPC_PROTOCOL_FILES}
+            src/libnetdata/netipc/src/transport/posix/netipc_uds.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_handshake.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_inflight.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_lifecycle.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_receive.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds_send.c
+            src/libnetdata/netipc/src/transport/posix/netipc_shm.c
+            ${NETIPC_SERVICE_COMMON_FILES}
+            src/libnetdata/netipc/src/service/netipc_service.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_client.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_client_connect.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_client_call.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_server.c
+            src/libnetdata/netipc/src/service/netipc_service_posix_server_session.c
+    )
+
+    add_library(netipc STATIC ${NETIPC_FILES})
+    target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
+
+    if(HAVE_LIBRT)
+        target_link_libraries(netipc PUBLIC pthread rt)
+    else()
+        target_link_libraries(netipc PUBLIC pthread)
+    endif()
+
+    set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+elseif(OS_WINDOWS)
+    set(NETIPC_FILES
+            ${NETIPC_PROTOCOL_FILES}
+            src/libnetdata/netipc/src/transport/windows/netipc_named_pipe.c
+            src/libnetdata/netipc/src/transport/windows/netipc_win_shm.c
+            ${NETIPC_SERVICE_COMMON_FILES}
+            src/libnetdata/netipc/src/service/netipc_service_win.c
+            src/libnetdata/netipc/src/service/netipc_service_win_client.c
+            src/libnetdata/netipc/src/service/netipc_service_win_client_connect.c
+            src/libnetdata/netipc/src/service/netipc_service_win_client_call.c
+            src/libnetdata/netipc/src/service/netipc_service_win_server.c
+            src/libnetdata/netipc/src/service/netipc_service_win_server_session.c
+    )
+
+    add_library(netipc STATIC ${NETIPC_FILES})
+    target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
+    set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+endif()
+
 #
 # build libnetdata
 #
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(arm64)|(aarch64)|(ARM64)|(AARCH64)")
+    check_c_compiler_flag("-mno-outline-atomics" HAVE_C_MNO_OUTLINE_ATOMICS)
+    if(HAVE_C_MNO_OUTLINE_ATOMICS)
+        # This source is reached from raw signal handlers and cannot call atomic runtime helpers.
+        set_source_files_properties(src/libnetdata/exit/exit_initiated.c PROPERTIES
+                                    COMPILE_OPTIONS "-mno-outline-atomics")
+    endif()
+endif()
+
 set_source_files_properties(src/libnetdata/gorilla/gorilla.cc PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
@@ -2271,14 +2626,21 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
-        "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
+        "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread>"
+        "$<$<BOOL:${HAVE_LIBRT}>:rt>"
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
+if(OS_LINUX OR OS_WINDOWS)
+    target_link_libraries(libnetdata PUBLIC netipc)
+endif()
+
 if(HAVE_LIBBACKTRACE)
     netdata_add_libbacktrace_to_target(libnetdata)
 endif()
+
+netdata_add_sqlite3_to_target(libnetdata)
 
 if(OS_WINDOWS)
         set(HAVE_ETW True)
@@ -2498,7 +2860,11 @@ endif()
 #
 # proto definitions
 #
-netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+# aclk-schemas moved to Buf v2 (PR netdata/aclk-schemas#57): the module root is
+# now "proto/" and internal imports are relative to it (e.g. "aclk/v1/lib.proto"),
+# so protoc's include root must be the proto/ directory. Generated headers are
+# therefore included without the "proto/" prefix (e.g. "aclk/v1/lib.pb.h").
+netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas/proto"
                             "${CMAKE_BINARY_DIR}/src/aclk/aclk-schemas"
                             ACLK_PROTO_BUILT_SRCS
                             ACLK_PROTO_BUILT_HDRS
@@ -2521,7 +2887,7 @@ if(CAP_FOUND)
   set(HAVE_CAPABILITY True)
 endif()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c)
+set(NDRUN_FILES src/collectors/utils/nd-run.c src/collectors/utils/exec-signals.h)
 add_executable(nd-run ${NDRUN_FILES})
 if(CAP_FOUND)
   target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
@@ -2544,6 +2910,7 @@ if(ENABLE_PLUGIN_DEBUGFS)
             src/collectors/debugfs.plugin/module-zswap.c
             src/collectors/debugfs.plugin/module-devices-powercap.c
             src/collectors/debugfs.plugin/module-libsensors.c
+            src/collectors/debugfs.plugin/module-audit.c
     )
 
     # Add executable for debugfs.plugin
@@ -2573,17 +2940,12 @@ if(ENABLE_PLUGIN_DEBUGFS)
 
     install(FILES
             src/collectors/debugfs.plugin/libsensors/vendored/etc/sensors.conf.default
-            COMPONENT plugin-debugfs
+            COMPONENT ${NETDATA_SENSORS3_COMPONENT}
             DESTINATION usr/lib/netdata/conf.d
             RENAME sensors3.conf)
 
     # Install additional packaging files if building for packaging
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-debugfs
-                DESTINATION usr/share/doc/netdata-plugin-debugfs)
-    endif()
+    netdata_add_deb_copyright(plugin-debugfs netdata-plugin-debugfs)
 endif()
 
 add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
@@ -2608,6 +2970,26 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_pid_match.c
     )
 
+    if(OS_LINUX)
+        list(APPEND APPS_PLUGIN_FILES
+                src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+                src/collectors/collectors-ipc/ebpfgo_shared_memory.c
+                src/collectors/apps.plugin/apps_ebpf_shared_memory.c
+                src/collectors/common-cgroups/cgroup-path.c
+                src/collectors/common-cgroups/cgroup-path.h
+                src/collectors/common-cgroups/cgroup-topology-rules.c
+                src/collectors/common-cgroups/cgroup-topology-rules.h
+                src/collectors/apps.plugin/apps-cgroups-path.c
+                src/collectors/apps.plugin/apps-cgroups-path.h
+                src/collectors/apps.plugin/apps-cgroups-enrichment.c
+                src/collectors/apps.plugin/apps-cgroups-enrichment.h
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.c
+                src/collectors/apps.plugin/apps-cgroups-lookup-client.h
+                src/collectors/apps.plugin/apps-lookup-netipc.c
+                src/collectors/apps.plugin/apps-lookup-netipc.h
+        )
+    endif()
+
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
 
     target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES}
@@ -2624,12 +3006,7 @@ if(ENABLE_PLUGIN_APPS)
             COMPONENT plugin-apps
             DESTINATION usr/lib/netdata/conf.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-apps
-                DESTINATION usr/share/doc/netdata-plugin-apps)
-    endif()
+    netdata_add_deb_copyright(plugin-apps netdata-plugin-apps)
 endif()
 
 if(ENABLE_PLUGIN_FREEIPMI)
@@ -2646,12 +3023,7 @@ if(ENABLE_PLUGIN_FREEIPMI)
             COMPONENT plugin-freeipmi
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-freeipmi
-                DESTINATION usr/share/doc/netdata-plugin-freeipmi)
-    endif()
+    netdata_add_deb_copyright(plugin-freeipmi netdata-plugin-freeipmi)
 endif()
 
 if(ENABLE_PLUGIN_NFACCT)
@@ -2672,12 +3044,7 @@ if(ENABLE_PLUGIN_NFACCT)
             COMPONENT plugin-nfacct
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-nfacct
-                DESTINATION usr/share/doc/netdata-plugin-nfacct)
-    endif()
+    netdata_add_deb_copyright(plugin-nfacct netdata-plugin-nfacct)
 endif()
 
 if(ENABLE_PLUGIN_XENSTAT)
@@ -2695,12 +3062,7 @@ if(ENABLE_PLUGIN_XENSTAT)
             COMPONENT plugin-xenstat
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-xenstat
-                DESTINATION usr/share/doc/netdata-plugin-xenstat)
-    endif()
+    netdata_add_deb_copyright(plugin-xenstat netdata-plugin-xenstat)
 endif()
 
 if(ENABLE_PLUGIN_PERF)
@@ -2713,12 +3075,7 @@ if(ENABLE_PLUGIN_PERF)
             COMPONENT plugin-perf
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-         install(FILES
-                 ${PKG_FILES_PATH}/copyright
-                 COMPONENT plugin-perf
-                 DESTINATION usr/share/doc/netdata-plugin-perf)
-    endif()
+    netdata_add_deb_copyright(plugin-perf netdata-plugin-perf)
 endif()
 
 if(ENABLE_PLUGIN_SLABINFO)
@@ -2731,12 +3088,7 @@ if(ENABLE_PLUGIN_SLABINFO)
             COMPONENT plugin-slabinfo
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-slabinfo
-                DESTINATION usr/share/doc/netdata-plugin-slabinfo)
-    endif()
+    netdata_add_deb_copyright(plugin-slabinfo netdata-plugin-slabinfo)
 endif()
 
 
@@ -2771,19 +3123,14 @@ if(ENABLE_PLUGIN_CUPS)
                 COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-cups
-                        DESTINATION usr/share/doc/netdata-plugin-cups)
-        endif()
+        netdata_add_deb_copyright(plugin-cups netdata-plugin-cups)
     endif()
 endif()
 
 if(NEED_NDSUDO)
     set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
-    add_executable(ndsudo ${NDSUDO_FILES})
+    add_executable(ndsudo ${NDSUDO_FILES} src/collectors/utils/exec-signals.h)
 
     install(TARGETS ndsudo
             COMPONENT netdata
@@ -2800,6 +3147,94 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
+    add_executable(cgroup-lookup-test src/collectors/cgroups.plugin/cgroup-lookup-test/cgroup-lookup-test.c)
+    target_link_libraries(cgroup-lookup-test libnetdata)
+endif()
+
+if(OS_LINUX)
+    add_executable(cgroup-name-config-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_name_config.c
+            src/collectors/cgroups.plugin/cgroup-name-config.c)
+
+    add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-orchestrator-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-orchestrator-test libnetdata)
+
+    # The label-parser test links the real src/database/rrdlabels.c against a
+    # small set of stubs (test_cgroups_plugin_stubs.c) so it stays self-contained
+    # while still validating production parsing behavior. Plain C, no test
+    # framework; the target is EXCLUDE_FROM_ALL so it is built only on demand.
+    add_executable(cgroups-plugin-labels-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroups_plugin.c
+            src/collectors/cgroups.plugin/tests/test_cgroups_plugin_stubs.c
+            src/collectors/cgroups.plugin/cgroup-name-labels.c
+            src/database/rrdlabels.c
+            src/database/rrdlabels-aggregated.c
+            src/database/pattern-array.c)
+    target_link_libraries(cgroups-plugin-labels-test libnetdata)
+
+    add_executable(apps-cgroups-path-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_path.c
+            src/collectors/common-cgroups/cgroup-path.c
+            src/collectors/apps.plugin/apps-cgroups-path.c)
+    target_link_libraries(apps-cgroups-path-test libnetdata)
+
+    add_executable(apps-cgroups-enrichment-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_enrichment.c
+            src/collectors/common-cgroups/cgroup-path.c
+            src/collectors/common-cgroups/cgroup-topology-rules.c)
+    target_link_libraries(apps-cgroups-enrichment-test libnetdata)
+
+    add_executable(cgroup-topology-rules-test EXCLUDE_FROM_ALL
+            src/collectors/common-cgroups/tests/test_cgroup_topology_rules.c
+            src/collectors/common-cgroups/cgroup-path.c
+            src/collectors/common-cgroups/cgroup-topology-rules.c)
+    target_link_libraries(cgroup-topology-rules-test libnetdata)
+
+    add_executable(apps-lookup-protocol-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_protocol.c)
+    target_link_libraries(apps-lookup-protocol-test libnetdata)
+
+    add_executable(apps-lookup-netipc-lock-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_lookup_netipc_lock.c)
+    target_link_libraries(apps-lookup-netipc-lock-test libnetdata)
+
+    add_executable(apps-cgroups-lookup-client-abort-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
+    target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
+endif()
+
+add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-handshake-hops-test.c)
+target_link_libraries(stream-receiver-hops-test libnetdata)
+
+add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-replay-endpoints-test.c)
+target_link_libraries(stream-replay-endpoints-test libnetdata)
+
+if(OS_LINUX)
+        add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
+                src/web/api/tests/http-auth-bearer-test.c)
+        target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(http-auth-bearer-test libnetdata)
+endif()
+
+if(ENABLE_CGROUPS_LOOKUP_SERVER)
+    add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
+            src/collectors/cgroups.plugin/cgroup-lookup-netipc.c
+            src/collectors/cgroups.plugin/cgroup-lookup-resolver.c
+            src/collectors/cgroups.plugin/cgroup-snapshot-store.c
+            src/collectors/common-cgroups/cgroup-path.c
+            src/collectors/cgroups.plugin/cgroup-orchestrator.c)
+    target_compile_definitions(cgroup-lookup-netipc-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
+    target_link_libraries(cgroup-lookup-netipc-test libnetdata)
 endif()
 
 # Enable rust implementation if we don't have systemd and we want the journal plugin
@@ -2824,12 +3259,7 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 COMPONENT plugin-systemd-journal
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-systemd-journal
-                        DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
-        endif()
+        netdata_add_deb_copyright(plugin-systemd-journal netdata-plugin-systemd-journal)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
@@ -2850,12 +3280,7 @@ if(ENABLE_PLUGIN_SYSTEMD_UNITS)
                 COMPONENT plugin-systemd-units
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-systemd-units
-                        DESTINATION usr/share/doc/netdata-plugin-systemd-units)
-        endif()
+        netdata_add_deb_copyright(plugin-systemd-units netdata-plugin-systemd-units)
 endif()
 
 if(OS_WINDOWS)
@@ -2867,14 +3292,20 @@ if(OS_WINDOWS)
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
+if(OS_MACOS AND OSLOG AND FOUNDATION AND HAVE_OSLOG_STORE)
+        add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
+        target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
+        target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})
+
+        install(TARGETS macos-logs.plugin
+                COMPONENT plugin-macos-logs
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
 if(ENABLE_PLUGIN_EBPF)
     set(EBPF_PLUGIN_FILES
             src/collectors/ebpf.plugin/ebpf.c
             src/collectors/ebpf.plugin/ebpf.h
-            src/collectors/ebpf.plugin/ebpf_cachestat.c
-            src/collectors/ebpf.plugin/ebpf_cachestat.h
-            src/collectors/ebpf.plugin/ebpf_dcstat.c
-            src/collectors/ebpf.plugin/ebpf_dcstat.h
             src/collectors/ebpf.plugin/ebpf_disk.c
             src/collectors/ebpf.plugin/ebpf_disk.h
             src/collectors/ebpf.plugin/ebpf_fd.c
@@ -2893,10 +3324,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_process.h
             src/collectors/ebpf.plugin/ebpf_shm.c
             src/collectors/ebpf.plugin/ebpf_shm.h
-            src/collectors/ebpf.plugin/ebpf_socket.c
-            src/collectors/ebpf.plugin/ebpf_socket.h
-            src/collectors/ebpf.plugin/ebpf_socket_ipc.c
-            src/collectors/ebpf.plugin/ebpf_socket_ipc.h
             src/collectors/ebpf.plugin/ebpf_softirq.c
             src/collectors/ebpf.plugin/ebpf_softirq.h
             src/collectors/ebpf.plugin/ebpf_sync.c
@@ -2911,8 +3338,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_cgroup.h
             src/collectors/ebpf.plugin/ebpf_unittest.c
             src/collectors/ebpf.plugin/ebpf_unittest.h
-            src/collectors/ebpf.plugin/ebpf_functions.c
-            src/collectors/ebpf.plugin/ebpf_functions.h
              src/collectors/ebpf.plugin/libbpf_api/ebpf.c
              src/collectors/ebpf.plugin/libbpf_api/ebpf.h
              src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
@@ -2926,8 +3351,79 @@ if(ENABLE_PLUGIN_EBPF)
     netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
+            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE SETUID
             COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
+
+    # GLOB_RECURSE descends into subdirectories, so netipc/*.go covers
+    # protocol/, service/, and transport/ even though no .go files exist at
+    # netipc/'s root level. Keep fixed workspace and module files out of the
+    # recursive glob so CMake does not scan their parent trees on every build.
+    file(GLOB_RECURSE EBPF_GO_PLUGIN_FILES CONFIGURE_DEPENDS
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.go"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.c"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/*.h"
+            "${CMAKE_SOURCE_DIR}/src/go/pkg/netipc/*.go"
+            "${CMAKE_SOURCE_DIR}/src/go/pkg/netdataapi/*.go")
+    # go.work is optional; watch its exact path so appearance or removal regenerates the graph.
+    file(GLOB EBPF_GO_WORKSPACE_FILE CONFIGURE_DEPENDS LIST_DIRECTORIES false
+            "${CMAKE_SOURCE_DIR}/go.work")
+    list(APPEND EBPF_GO_PLUGIN_FILES
+            ${EBPF_GO_WORKSPACE_FILE}
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum"
+            "${CMAKE_SOURCE_DIR}/src/go/go.mod"
+            "${CMAKE_SOURCE_DIR}/src/go/go.sum")
+
+    set(EBPF_GO_LIBBPF_LIB_DIR lib)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
+        set(EBPF_GO_LIBBPF_LIB_DIR lib64)
+    endif()
+
+    set(EBPF_GO_CGO_CFLAGS "")
+    foreach(include_dir IN LISTS NETDATA_LIBBPF_INCLUDE_DIRECTORIES)
+        string(APPEND EBPF_GO_CGO_CFLAGS " -I${include_dir}")
+    endforeach()
+    string(APPEND EBPF_GO_CGO_CFLAGS " -I${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin")
+    string(APPEND EBPF_GO_CGO_CFLAGS " -I${ebpf-co-re_SOURCE_DIR}")
+    string(STRIP "${EBPF_GO_CGO_CFLAGS}" EBPF_GO_CGO_CFLAGS)
+    set(EBPF_GO_CGO_LDFLAGS
+            "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
+    if(HAVE_LIBRT)
+        string(APPEND EBPF_GO_CGO_LDFLAGS " -lrt")
+    endif()
+
+    if(OS_LINUX AND ENABLE_PLUGIN_EBPF_GO)
+        add_custom_command(
+                OUTPUT "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
+                COMMAND "${CMAKE_COMMAND}" -E env
+                        GOROOT=${GO_ROOT}
+                        CGO_ENABLED=1
+                        CGO_CFLAGS=${EBPF_GO_CGO_CFLAGS}
+                        CGO_LDFLAGS=${EBPF_GO_CGO_LDFLAGS}
+                        GOPROXY=https://proxy.golang.org,direct
+                        "${GO_EXECUTABLE}" build -buildvcs=false
+                        -ldflags "-X github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin.netdataRuntimePrefix=${NETDATA_RUNTIME_PREFIX}"
+                        -tags netdata_ebpf_libbpf
+                        -o "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
+                        "."
+                DEPENDS ${EBPF_GO_PLUGIN_FILES}
+                COMMENT "Building Go eBPF plugin ebpf-go.plugin"
+                WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin/ebpfgo.plugin"
+                VERBATIM)
+
+        add_custom_target(ebpf-go-plugin ALL
+                DEPENDS "${CMAKE_BINARY_DIR}/ebpf-go.plugin")
+
+        if(TARGET libbpf)
+            add_dependencies(ebpf-go-plugin libbpf)
+        endif()
+        add_dependencies(ebpf-go-plugin ebpf-co-re)
+        install(FILES "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
+                PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE SETUID
+                COMPONENT plugin-ebpf
+                DESTINATION usr/libexec/netdata/plugins.d)
+    endif()
 
     install(FILES
             src/collectors/ebpf.plugin/ebpf.d.conf
@@ -2942,12 +3438,13 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.d/fd.conf
             src/collectors/ebpf.plugin/ebpf.d/filesystem.conf
             src/collectors/ebpf.plugin/ebpf.d/hardirq.conf
+            src/collectors/ebpf.plugin/ebpf.d/dns.conf
             src/collectors/ebpf.plugin/ebpf.d/mdflush.conf
             src/collectors/ebpf.plugin/ebpf.d/mount.conf
-            src/collectors/ebpf.plugin/ebpf.d/network.conf
             src/collectors/ebpf.plugin/ebpf.d/oomkill.conf
             src/collectors/ebpf.plugin/ebpf.d/process.conf
             src/collectors/ebpf.plugin/ebpf.d/shm.conf
+            src/collectors/ebpf.plugin/ebpf.d/socket.conf
             src/collectors/ebpf.plugin/ebpf.d/softirq.conf
             src/collectors/ebpf.plugin/ebpf.d/swap.conf
             src/collectors/ebpf.plugin/ebpf.d/sync.conf
@@ -2955,12 +3452,7 @@ if(ENABLE_PLUGIN_EBPF)
             COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-ebpf
-                DESTINATION usr/share/doc/netdata-plugin-ebpf)
-    endif()
+    netdata_add_deb_copyright(plugin-ebpf netdata-plugin-ebpf)
 
     if(ENABLE_LEGACY_EBPF_PROGRAMS)
         netdata_install_legacy_ebpf_code()
@@ -2987,13 +3479,99 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
+if(OS_LINUX AND MNL_FOUND)
+        add_executable(local-sockets-mnl-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_mnl.c)
+        target_compile_options(local-sockets-mnl-test PRIVATE ${MNL_CFLAGS_OTHER})
+        target_include_directories(local-sockets-mnl-test PRIVATE ${MNL_INCLUDE_DIRS})
+        target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
+endif()
+
+if(OS_LINUX)
+        add_executable(local-sockets-namespaces-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_namespaces.c)
+        target_compile_options(local-sockets-namespaces-test PRIVATE
+                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+        target_include_directories(local-sockets-namespaces-test PRIVATE
+                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+        target_link_libraries(local-sockets-namespaces-test libnetdata
+                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
+endif()
+
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
-        set(NETWORK_VIEWER_FILES
-                src/libnetdata/local-sockets/local-sockets.h
+        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+                # GCC still performs LTO when linking slim LTO static archives into a
+                # non-LTO target. Build these archives as fat objects and force a
+                # regular final link to avoid exhausting the i386 linker.
+                foreach(_network_viewer_fat_lto_target judy libnetdata netipc json-c)
+                        if(TARGET ${_network_viewer_fat_lto_target})
+                                target_compile_options(${_network_viewer_fat_lto_target} PRIVATE -ffat-lto-objects)
+                        endif()
+                endforeach()
+        endif()
+
+        set(NETWORK_VIEWER_COMMON_FILES
+                src/collectors/common-cgroups/cgroup-path.c
+                src/collectors/common-cgroups/cgroup-path.h
+                src/collectors/common-cgroups/cgroup-topology-rules.c
+                src/collectors/common-cgroups/cgroup-topology-rules.h
+                src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                src/collectors/network-viewer.plugin/network-viewer-topology.c
+                src/collectors/network-viewer.plugin/network-viewer-topology.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 
+        set(NETWORK_VIEWER_FILES)
+        if(OS_LINUX)
+                list(APPEND NETWORK_VIEWER_FILES
+                        src/libnetdata/local-sockets/local-sockets.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.c
+                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.h
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.c
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.h
+                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.c
+                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.h
+                        ${NETWORK_VIEWER_COMMON_FILES}
+                )
+        endif()
+        if(OS_WINDOWS)
+                list(APPEND NETWORK_VIEWER_FILES
+                        src/collectors/network-viewer.plugin/network-viewer-windows.c
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-path.h
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.h
+                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                        src/collectors/network-viewer.plugin/network-viewer-topology.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology.h
+                        src/libnetdata/local-sockets/local-sockets-windows.h
+                )
+        endif()
+        if(OS_FREEBSD)
+                list(APPEND NETWORK_VIEWER_FILES
+                        src/libnetdata/local-sockets/local-sockets-freebsd.h
+                        ${NETWORK_VIEWER_COMMON_FILES}
+                )
+        endif()
+        if(OS_MACOS)
+                list(APPEND NETWORK_VIEWER_FILES
+                        src/libnetdata/local-sockets/local-sockets-macos.h
+                        ${NETWORK_VIEWER_COMMON_FILES}
+                )
+        endif()
+
         add_executable(network-viewer.plugin ${NETWORK_VIEWER_FILES})
+        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+                set_property(TARGET network-viewer.plugin PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
+                target_link_options(network-viewer.plugin PRIVATE -fno-lto)
+        endif()
 
         target_compile_options(network-viewer.plugin PRIVATE
                                "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
@@ -3006,12 +3584,20 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-network-viewer
-                        DESTINATION usr/share/doc/netdata-plugin-network-viewer)
+        if(OS_LINUX)
+                add_executable(network-viewer-apps-lookup-client-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_apps_lookup_client.c)
+                target_link_libraries(network-viewer-apps-lookup-client-test libnetdata)
+
+                add_executable(network-viewer-topology-containers-test EXCLUDE_FROM_ALL
+                        src/collectors/network-viewer.plugin/tests/test_network_viewer_topology_containers.c
+                        src/collectors/common-cgroups/cgroup-path.c
+                        src/collectors/common-cgroups/cgroup-topology-rules.c
+                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c)
+                target_link_libraries(network-viewer-topology-containers-test libnetdata)
         endif()
+
+        netdata_add_deb_copyright(plugin-network-viewer netdata-plugin-network-viewer)
 endif()
 
 #
@@ -3076,6 +3662,16 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
         configure_file(src/collectors/windows.plugin/driver/netdata_driver.inf netdata_driver.inf COPYONLY)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" AND
+   NOT CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set_property(
+                SOURCE src/daemon/unit_test_bridge.c
+                APPEND PROPERTY COMPILE_OPTIONS "-fno-lto" "-fvisibility=hidden")
+elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        message(WARNING
+                "Netdata test bridge cannot disable IPO for unsupported C compiler '${CMAKE_C_COMPILER_ID}'")
 endif()
 
 add_executable(netdata
@@ -3144,7 +3740,7 @@ target_include_directories(netdata PRIVATE
 target_link_libraries(netdata PRIVATE
         m
         libnetdata
-        "$<$<BOOL:${OS_LINUX}>:rt>"
+        "$<$<BOOL:${HAVE_LIBRT}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
@@ -3251,18 +3847,32 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
     if (OS_WINDOWS)
-        set(ND_MCP_NAME nd-mcp.exe)
+        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen.exe)
     else()
-        set(ND_MCP_NAME nd-mcp)
+        set(SNMP_TRAP_PROFILE_GEN_BIN snmp-trap-profile-gen)
     endif()
 
-    add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
-    install(PROGRAMS
-            ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
+    add_go_target(snmp_trap_profile_gen ${SNMP_TRAP_PROFILE_GEN_BIN} src/go cmd/snmptrapprofilegen)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${SNMP_TRAP_PROFILE_GEN_BIN}
             COMPONENT plugin-go
-            DESTINATION "${BINDIR}")
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
+    if(ENABLE_ND_MCP)
+        if (OS_WINDOWS)
+            set(ND_MCP_NAME nd-mcp.exe)
+        else()
+            set(ND_MCP_NAME nd-mcp)
+        endif()
+
+        add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
+                COMPONENT ${NETDATA_ND_MCP_COMPONENT}
+                DESTINATION "${BINDIR}")
+    endif()
 endif()
 
 #
@@ -3320,7 +3930,7 @@ if(ENABLE_PLUGIN_IBM)
             DESTINATION usr/lib/netdata/conf.d/ibm.d
     )
 
-    install_ibm_runtime(plugin-ibm)
+    install_ibm_runtime(plugin-ibm-libs)
 endif()
 
 #
@@ -3334,22 +3944,79 @@ if(ENABLE_PLUGIN_OTEL)
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-otel)
 
-    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
-            COMPONENT plugin-otel
+    install(FILES src/crates/otel-ingestor/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
+            COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
 
     install(DIRECTORY COMPONENT plugin-otel DESTINATION etc/netdata/otel.d/v1/metrics)
 endif()
 
+
 #
-# otel-signal-viewer
+# netflow-plugin
 #
-# Handle OTel signal viewer plugin
-if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-    corrosion_install(TARGETS otel-signal-viewer-plugin
+# Handle NetFlow/IPFIX/sFlow flow analysis plugin
+if(ENABLE_PLUGIN_NETFLOW)
+    corrosion_install(TARGETS netflow-plugin
                       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
-                      COMPONENT plugin-otel-signal-viewer)
+                      COMPONENT plugin-netflow)
+
+    install(FILES src/crates/netflow-plugin/configs/netflow.yaml
+            COMPONENT plugin-netflow
+            DESTINATION usr/lib/netdata/conf.d)
+
+    if (OS_WINDOWS)
+        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader.exe)
+    else()
+        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader)
+    endif()
+
+    if(CMAKE_SIZEOF_VOID_P LESS 8)
+        message(STATUS
+                "plugin-netflow: skipping topology-ip-intel-downloader binary on 32-bit targets; "
+                "stock topology-ip-intel payload installation remains enabled")
+    else()
+        add_go_target(topology-ip-intel-downloader-target ${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN} src/go tools/topology-ip-intel-downloader)
+        install(PROGRAMS
+                ${CMAKE_BINARY_DIR}/${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN}
+                COMPONENT plugin-netflow
+                DESTINATION "${BINDIR}")
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader\")"
+                COMPONENT plugin-netflow)
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin\")"
+                COMPONENT plugin-netflow)
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.exe\")"
+                COMPONENT plugin-netflow)
+        install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin.exe\")"
+                COMPONENT plugin-netflow)
+    endif()
+
+    install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
+            COMPONENT plugin-netflow
+            DESTINATION usr/lib/netdata/conf.d)
+
+    if(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
+        set(TOPOLOGY_IP_INTEL_STOCK_PAYLOAD
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/README.md"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-asn.mmdb"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-geo.mmdb"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-intel.json")
+        foreach(stock_file IN LISTS TOPOLOGY_IP_INTEL_STOCK_PAYLOAD)
+            if(NOT EXISTS "${stock_file}")
+                message(FATAL_ERROR
+                        "Missing topology IP intelligence stock payload file: ${stock_file}")
+            endif()
+        endforeach()
+        install(FILES
+                ${TOPOLOGY_IP_INTEL_STOCK_PAYLOAD}
+                COMPONENT plugin-netflow
+                DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
+    else()
+        message(STATUS
+                "plugin-netflow: no staged topology IP intelligence stock payload provided; "
+                "skipping stock topology-ip-intel install")
+    endif()
 endif()
 
 #
@@ -3450,38 +4117,28 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
-configure_file(src/collectors/cgroups.plugin/cgroup-name.sh.in
-               src/collectors/cgroups.plugin/cgroup-name.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(ENABLE_CGROUP_NAME)
+    add_go_target(cgroup-name-target cgroup-name
+                  src/collectors/cgroups.plugin/cgroup-name .)
+    install(PROGRAMS
+            ${CMAKE_BINARY_DIR}/cgroup-name
+            COMPONENT netdata
+            DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 #
 # otel config
 #
 if(ENABLE_PLUGIN_OTEL)
-    configure_file(src/crates/netdata-otel/otel-plugin/configs/otel.yaml.in
-                   src/crates/netdata-otel/otel-plugin/configs/otel.yaml
+    configure_file(src/crates/otel-plugin/configs/otel.yaml.in
+                   src/crates/otel-plugin/configs/otel.yaml
                    @ONLY)
 
-    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-otel/otel-plugin/configs/otel.yaml
-            COMPONENT plugin-otel
+    install(FILES ${CMAKE_BINARY_DIR}/src/crates/otel-plugin/configs/otel.yaml
+            COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
             DESTINATION usr/lib/netdata/conf.d)
 endif()
 
-#
-# otel-signal-viewer config
-#
-if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-    configure_file(src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml.in
-                   src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml
-                   @ONLY)
-
-    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml
-            COMPONENT plugin-otel-signal-viewer
-            DESTINATION usr/lib/netdata/conf.d)
-endif()
 
 #
 # statsd
@@ -3523,7 +4180,7 @@ install(FILES
 install(FILES
         src/web/api/netdata-swagger.json
         src/web/api/netdata-swagger.yaml
-        COMPONENT netdata
+        COMPONENT ${NETDATA_SWAGGER_COMPONENT}
         DESTINATION ${WEB_DEST})
 
 #
@@ -3623,11 +4280,29 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd/tmpfiles)
 
+# RPM distros ship systemd units in %{_unitdir} (/usr/lib/systemd/system);
+# the DEB layout (and the historical default) uses /lib/systemd/system.
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        set(NETDATA_SYSTEMD_UNIT_DEST "usr/lib/systemd/system")
+else()
+        set(NETDATA_SYSTEMD_UNIT_DEST "lib/systemd/system")
+endif()
+
+# The spec packages the systemd-235-compatible unit variant on EL 7 and
+# Amazon Linux 2.
+set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service")
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND
+   ((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
+    (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2)))
+        set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235")
+endif()
+
 if(BUILD_FOR_PACKAGING)
         install(FILES
-                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+                ${NETDATA_PACKAGED_SYSTEMD_UNIT}
                 COMPONENT netdata
-                DESTINATION lib/systemd/system)
+                DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST}
+                RENAME netdata.service)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
                 COMPONENT user
@@ -3644,6 +4319,13 @@ if(BUILD_FOR_PACKAGING)
                 COMPONENT netdata
                 DESTINATION usr/lib/systemd/journald@netdata.conf.d
                 RENAME netdata.conf)
+
+        if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+                install(FILES
+                        system/systemd/50-netdata.preset
+                        COMPONENT netdata
+                        DESTINATION usr/lib/systemd/system-preset)
+        endif()
 endif()
 
 install(FILES
@@ -3675,7 +4357,7 @@ endif()
 #
 # misc files
 #
-if(BUILD_FOR_PACKAGING)
+if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         install(FILES
                 ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
                 COMPONENT netdata
@@ -3687,17 +4369,61 @@ if(BUILD_FOR_PACKAGING)
                 DESTINATION etc/init.d)
 endif()
 
+if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        # The spec's %install stages these RPM-only files; no other install
+        # rule covers them.
+        install(PROGRAMS
+                packaging/installer/netdata-uninstaller.sh
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata
+                PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE)
+
+        # %doc README.md equivalent; openSUSE keeps package docs under
+        # /usr/share/doc/packages, and the rpm 4.11 era (EL 7, Amazon
+        # Linux 2) defaults %_docdir_fmt to %{NAME}-%{VERSION} where newer
+        # rpm uses plain %{NAME}.
+        if(NETDATA_DISTRO_SUSE)
+          set(NETDATA_RPM_DOC_DIR "usr/share/doc/packages/netdata")
+        elseif((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
+               (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
+          string(REPLACE "-" "." _rpm_doc_version "${NETDATA_PACKAGE_VERSION}")
+          set(NETDATA_RPM_DOC_DIR "usr/share/doc/netdata-${_rpm_doc_version}")
+        else()
+          set(NETDATA_RPM_DOC_DIR "usr/share/doc/netdata")
+        endif()
+        install(FILES
+                README.md
+                COMPONENT netdata
+                DESTINATION ${NETDATA_RPM_DOC_DIR})
+endif()
+
 if(NOT OS_WINDOWS)
   install(PROGRAMS
           packaging/installer/netdata-updater.sh
           COMPONENT netdata
           DESTINATION usr/libexec/netdata)
 
+  # user-facing support-bundle tool: on PATH as `netdata-support-bundle`, like netdatacli
+  install(PROGRAMS
+          packaging/installer/netdata-support-bundle
+          COMPONENT netdata
+          DESTINATION "${BINDIR}")
+
   install(FILES
           system/netdata.conf
           system/netdata-updater.conf
           COMPONENT netdata
           DESTINATION ${NETDATA_CONF_DEST})
+
+  if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+    # The spec ships the stock copies under /usr/lib/netdata/conf.d in
+    # addition to the %config(noreplace) ones in /etc/netdata.
+    install(FILES
+            system/netdata.conf
+            system/netdata-updater.conf
+            COMPONENT netdata
+            DESTINATION usr/lib/netdata/conf.d)
+  endif()
 
   configure_file(system/cron/netdata-updater-daily.in
                  system/cron/netdata-updater-daily
@@ -3724,11 +4450,11 @@ if(NOT OS_WINDOWS)
     install(FILES
             ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
             COMPONENT netdata
-            DESTINATION lib/systemd/system)
+            DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
     install(FILES
             system/systemd/netdata-updater.timer
             COMPONENT netdata
-            DESTINATION lib/systemd/system)
+            DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
   endif()
 endif()
 
@@ -3791,15 +4517,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
         configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
         configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
-        configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
-
         install(FILES
                 ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
                 ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
                 ${CMAKE_BINARY_DIR}/tests/urls/request.sh
                 ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
                 ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
-                ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -3840,12 +4563,7 @@ if(ENABLE_PLUGIN_CHARTS)
           COMPONENT plugin-chartsd
           DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-  if(BUILD_FOR_PACKAGING)
-    install(FILES
-            ${PKG_FILES_PATH}/copyright
-            COMPONENT plugin-chartsd
-            DESTINATION usr/share/doc/netdata-plugin-chartsd)
-  endif()
+  netdata_add_deb_copyright(plugin-chartsd netdata-plugin-chartsd)
 endif()
 
 # This is needed both by the TC plugin (which only gets built on Linux) and the charts plugin.
@@ -3903,7 +4621,6 @@ if(ENABLE_PLUGIN_PYTHON)
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.conf
           src/collectors/python.d.plugin/go_expvar/go_expvar.conf
-          src/collectors/python.d.plugin/haproxy/haproxy.conf
           src/collectors/python.d.plugin/pandas/pandas.conf
           src/collectors/python.d.plugin/traefik/traefik.conf
           COMPONENT plugin-pythond
@@ -3912,18 +4629,12 @@ if(ENABLE_PLUGIN_PYTHON)
   install(FILES
           src/collectors/python.d.plugin/am2320/am2320.chart.py
           src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
-          src/collectors/python.d.plugin/haproxy/haproxy.chart.py
           src/collectors/python.d.plugin/pandas/pandas.chart.py
           src/collectors/python.d.plugin/traefik/traefik.chart.py
           COMPONENT plugin-pythond
           DESTINATION usr/libexec/netdata/python.d)
 
-  if(BUILD_FOR_PACKAGING)
-    install(FILES
-            ${PKG_FILES_PATH}/copyright
-            COMPONENT plugin-pythond
-            DESTINATION usr/share/doc/netdata-plugin-pythond)
-  endif()
+  netdata_add_deb_copyright(plugin-pythond netdata-plugin-pythond)
 endif()
 
 #
@@ -3987,6 +4698,74 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_META_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default)
+
+    file(GLOB GO_SNMP_TRAP_PROFILE_FILES CONFIGURE_DEPENDS
+            src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yaml
+            src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default/*.yml)
+
+    set(SNMP_TRAP_PROFILE_PACK_DIR "${CMAKE_BINARY_DIR}/snmp-trap-profile-pack")
+    set(SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR "${SNMP_TRAP_PROFILE_PACK_DIR}/default")
+    set(SNMP_TRAP_PROFILE_PACK_STAMP "${SNMP_TRAP_PROFILE_PACK_DIR}/.compressed-stamp")
+    set(SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT "${CMAKE_BINARY_DIR}/snmp-trap-profile-pack-clean.cmake")
+    file(WRITE "${SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT}"
+        "file(REMOVE_RECURSE [[${SNMP_TRAP_PROFILE_PACK_DIR}]])\n")
+    file(MAKE_DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}")
+
+    add_custom_command(
+            OUTPUT "${SNMP_TRAP_PROFILE_PACK_STAMP}"
+            COMMAND "${CMAKE_COMMAND}" -P "${SNMP_TRAP_PROFILE_PACK_CLEAN_SCRIPT}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/default"
+                "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json"
+                "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json"
+            COMMAND "${CMAKE_COMMAND}" -E env
+                GOROOT=${GO_ROOT}
+                CGO_ENABLED=0
+                GOPROXY=https://proxy.golang.org,direct
+                "${GO_EXECUTABLE}" run -buildvcs=false -ldflags "${GO_LDFLAGS}" ./cmd/snmptrapprofilegen compress-zstd --rm
+                "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}"
+                "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json"
+            COMMAND "${CMAKE_COMMAND}" -E touch "${SNMP_TRAP_PROFILE_PACK_STAMP}"
+            DEPENDS
+                ${GO_SNMP_TRAP_PROFILE_FILES}
+                "${CMAKE_SOURCE_DIR}/src/go/plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json"
+                ${snmp_trap_profile_gen_DEPS}
+            COMMENT "Compressing SNMP trap profile pack"
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/go"
+            VERBATIM)
+    add_custom_target(snmp_trap_profile_pack ALL
+            DEPENDS "${SNMP_TRAP_PROFILE_PACK_STAMP}")
+
+    install(CODE "
+        if(NOT EXISTS \"${SNMP_TRAP_PROFILE_PACK_STAMP}\")
+            message(FATAL_ERROR \"SNMP trap profile pack is not built; build target snmp_trap_profile_pack before install\")
+        endif()
+    " COMPONENT plugin-go)
+    install(DIRECTORY "${SNMP_TRAP_PROFILE_PACK_DEFAULT_DIR}/"
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles/default
+            FILES_MATCHING
+                PATTERN "*.yaml.zst"
+                PATTERN "*.yml.zst")
+    install(FILES "${SNMP_TRAP_PROFILE_PACK_DIR}/catalogue.json.zst"
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
+    install(FILES src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/snmp.trap-profiles)
 
     install(DIRECTORY
             COMPONENT plugin-go
@@ -3999,12 +4778,29 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-go
-                DESTINATION usr/share/doc/netdata-plugin-go)
-    endif()
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles/default)
+    file(GLOB GO_PROMETHEUS_PROFILE_FILES src/go/plugin/go.d/config/go.d/prometheus.profiles/default/*.yaml)
+    install(FILES ${GO_PROMETHEUS_PROFILE_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/prometheus.profiles/default)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/cloudwatch.profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default)
+    file(GLOB GO_CLOUDWATCH_PROFILE_FILES src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/*.yaml)
+    install(FILES ${GO_CLOUDWATCH_PROFILE_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default)
+
+    netdata_add_deb_copyright(plugin-go netdata-plugin-go)
 endif()
 
 #
@@ -4048,6 +4844,11 @@ if(OS_WINDOWS)
                       /usr/bin/msys-uv-1.dll
                       DESTINATION "${BINDIR}")
 
+        # user-facing support-bundle tool (Windows PowerShell implementation)
+        install(PROGRAMS packaging/installer/netdata-support-bundle.ps1
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata)
+
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
@@ -4066,3 +4867,16 @@ include(NetdataRenderDocs)
 #
 
 include(Packaging)
+
+#
+# Optional convenience: wire the netdata-build MCP server (packaging/tools/
+# automation/mcp) into a local agent client. Explicit one-off — `ninja setup-mcp`
+# — not part of the build (no ALL). Mutates the USER's global opencode/Claude
+# config for this checkout; never touches the repo. See the tool's README.
+#
+add_custom_target(setup-mcp
+        COMMAND python3
+                "${CMAKE_SOURCE_DIR}/packaging/tools/automation/mcp/scripts/setup_mcp.py"
+                --tool all --source-dir "${CMAKE_SOURCE_DIR}"
+        USES_TERMINAL
+        COMMENT "Configuring netdata-build MCP server for opencode/Claude Code (global config)")

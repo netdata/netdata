@@ -692,6 +692,10 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
     datafile = xt_io_descr->datafile;
 
     bool still_running = ctx_is_available_for_queries(ctx);
+    if (likely(still_running && !have_error))
+        internal_fatal(!rrdeng_valid_extent_disk_size(xt_io_descr->bytes),
+                       "DBENGINE: flushed extent has invalid size %u",
+                       xt_io_descr->bytes);
 
     usec_t max_end_time_ut = 0;
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
@@ -700,16 +704,18 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
         if (descr->end_time_ut > max_end_time_ut)
             max_end_time_ut = descr->end_time_ut;
 
-        if (likely(still_running && !have_error))
+        if (likely(still_running && !have_error)) {
             pgc_open_add_hot_page(
                 (Word_t)ctx,
                 descr->metric_id,
+                descr->uuid_id,
                 (time_t)(descr->start_time_ut / USEC_PER_SEC),
                 (time_t)(descr->end_time_ut / USEC_PER_SEC),
                 descr->update_every_s,
                 datafile,
                 xt_io_descr->pos,
                 xt_io_descr->bytes);
+        }
 
         page_descriptor_release(descr);
     }
@@ -719,10 +725,10 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
             time_t new_last_time_s = (time_t)(max_end_time_ut / USEC_PER_SEC);
 
             // Atomically update to keep the maximum
-            spinlock_lock(&datafile->journalfile->data_spinlock);
+            spinlock_tracked_lock(&datafile->journalfile->data_spinlock);
             if (new_last_time_s > datafile->journalfile->v2.last_time_s)
                 datafile->journalfile->v2.last_time_s = new_last_time_s;
-            spinlock_unlock(&datafile->journalfile->data_spinlock);
+            spinlock_tracked_unlock(&datafile->journalfile->data_spinlock);
         }
     }
 
@@ -745,6 +751,12 @@ static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_da
     bool ret = false;
 
     spinlock_lock(&datafile->writers.spinlock);
+
+    if(unlikely(datafile->writers.failed)) {
+        // this datafile cannot accept any more extents
+        spinlock_unlock(&datafile->writers.spinlock);
+        return true;
+    }
 
 #ifdef OS_WINDOWS
     time_t now = now_realtime_sec();
@@ -930,7 +942,12 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     }
 
     if (!count) {
-        __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+        // No decrement here. The only caller does `if (!xt_io_descr) goto done;` and `done:`
+        // decrements extents_currently_being_flushed, so decrementing here too would take the
+        // unsigned counter below zero and wrap it, and both waiters on it - shutdown's
+        // ctx_shutdown_tp_worker() (rrdengine.c) and finalize_data_files() (datafile.c) - would
+        // spin forever. Not reachable today (the only EXTENT_WRITE producer returns early on an
+        // empty batch), but the accounting must not depend on that.
         return NULL;
     }
 
@@ -980,9 +997,9 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
     // compress the payload
     size_t compressed_size =
-        (int)dbengine_compress(xt_io_descr->buf + payload_offset,
-                               uncompressed_payload_length,
-                               compression_algorithm);
+        dbengine_compress(xt_io_descr->buf + payload_offset,
+                          uncompressed_payload_length,
+                          compression_algorithm);
 
     internal_fatal(compressed_size > max_compressed_size, "DBENGINE: compression returned more data than the max allowed");
     internal_fatal(compressed_size > uncompressed_payload_length, "DBENGINE: compression returned more data than the uncompressed extent");
@@ -1056,6 +1073,65 @@ static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, vo
     check_and_schedule_db_rotation(ctx);
 }
 
+static void datafile_mark_failed(struct rrdengine_datafile *datafile) {
+    spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.failed = true;
+    spinlock_unlock(&datafile->writers.spinlock);
+}
+
+// The extent buffer is position independent - only its WAL transaction references
+// the reserved datafile offset. So, an extent that failed to be written can be
+// retargeted to another datafile by reserving space on it and rebuilding the WAL.
+// The caller must have marked the current datafile failed, so that rotation is forced.
+static bool extent_move_to_new_datafile(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
+    struct rrdengine_datafile *old_datafile = xt_io_descr->datafile;
+
+    // the WAL references the offset reserved on the failed datafile
+    wal_release(xt_io_descr->wal);
+    xt_io_descr->wal = NULL;
+
+    // release our writer slot on the failed datafile
+    spinlock_lock(&old_datafile->writers.spinlock);
+    old_datafile->writers.running--;
+    spinlock_unlock(&old_datafile->writers.spinlock);
+
+    // the failed datafile is reported full, so this rotates to a new datafile pair
+    struct rrdengine_datafile *datafile = get_datafile_to_write_extent(ctx, xt_io_descr->real_io_size);
+    xt_io_descr->datafile = datafile;
+
+    if(datafile == old_datafile)
+        // rotation failed - a new datafile pair could not be created
+        return false;
+
+    spinlock_lock(&datafile->writers.spinlock);
+    xt_io_descr->pos = datafile->pos;
+    datafile->pos += xt_io_descr->real_io_size;
+    spinlock_unlock(&datafile->writers.spinlock);
+
+    journalfile_extent_build(ctx, xt_io_descr);
+    ctx_last_flush_fileno_set(ctx, datafile->fileno);
+
+    return true;
+}
+
+static int extent_write_to_datafile(struct rrdengine_datafile *datafile, uv_buf_t *iov, uint64_t pos) {
+    uv_fs_t request;
+
+    int retries = 10;
+    int ret = -1;
+    while (ret < 0 && --retries) {
+        ret = uv_fs_write(NULL, &request, datafile->file, iov, 1, (int64_t)pos, NULL);
+        uv_fs_req_cleanup(&request);
+        if (ret < 0) {
+            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+                break;
+            sleep_usec(300 * USEC_PER_MS);
+        }
+    }
+
+    return ret;
+}
+
 static void *extent_write_tp_worker(
     struct rrdengine_instance *ctx,
     void *data,
@@ -1070,34 +1146,55 @@ static void *extent_write_tp_worker(
     if (!xt_io_descr)
         goto done;
 
-    struct rrdengine_datafile *datafile = xt_io_descr->datafile;
-    uv_fs_t request;
-
-    int retries = 10;
     int ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &request, datafile->file, &iov, 1, (int64_t)xt_io_descr->pos, NULL);
-        uv_fs_req_cleanup(&request);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+    for (size_t attempt = 0; attempt < 2 ; attempt++) {
+        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
+        struct rrdengine_datafile *datafile = xt_io_descr->datafile;
+
+        ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos);
+        if (likely(ret >= 0)) {
+            ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
+            ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
+
+            // journalfile_v1_extent_write() always releases the WAL
+            ret = journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+            xt_io_descr->wal = NULL;
+
+            if (likely(ret >= 0))
                 break;
-            sleep_usec(300 * USEC_PER_MS);
         }
-    }
 
-    if (unlikely(ret < 0))
         ctx_io_error(ctx);
-    else {
-        ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
-        ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
-        ret = journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+
+        // this datafile pair dropped a write - no more extents should be directed to it
+        datafile_mark_failed(datafile);
+
+        if (attempt == 0) {
+            nd_log_limit_static_global_var(dbengine_rotate_erl, 10, 0);
+            nd_log_limit(&dbengine_rotate_erl, NDLS_DAEMON, NDLP_ERR,
+                         "DBENGINE: tier %d datafile %u write failed (%s) - "
+                         "rotating to a new datafile and retrying the extent, to prevent data loss",
+                         ctx->config.tier, datafile->fileno, uv_strerror(ret));
+
+            if (extent_move_to_new_datafile(ctx, xt_io_descr))
+                continue;
+        }
+
+        break;
     }
 
-    if (ret < 0) {
+    if (unlikely(ret < 0)) {
+        // recovery failed - the pages of this extent are lost
+        wal_release(xt_io_descr->wal);
+        xt_io_descr->wal = NULL;
+
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
-        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Tier %d, %s", ctx->config.tier, uv_strerror(ret));
+        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR,
+                     "DBENGINE: tier %d datafile %u write failed (%s) - the extent is lost",
+                     ctx->config.tier, xt_io_descr->datafile->fileno, uv_strerror(ret));
     }
 
+    struct rrdengine_datafile *datafile = xt_io_descr->datafile;
     spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running--;
     datafile->writers.flushed_to_open_running++;
@@ -1149,7 +1246,7 @@ static time_t find_uuid_first_time(
     struct uuid_first_time_s *uuid_first_entry_list,
     size_t count)
 {
-    time_t global_first_time_s = LONG_MAX;
+    volatile time_t global_first_time_s = LONG_MAX;
 
     // acquire the datafile to work with it
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
@@ -1162,34 +1259,59 @@ static time_t find_uuid_first_time(
         return global_first_time_s;
 
     unsigned journalfile_count = 0;
-    size_t binary_match = 0;
-    size_t not_matching_bsearches = 0;
+    volatile size_t binary_match = 0;
+    volatile size_t not_matching_bsearches = 0;
 
     bool agent_shutdown = false;
     while (datafile) {
+        size_t journal_v2_file_size = 0;
         struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
-            datafile->journalfile, NULL, 0, 0, JOURNALFILE_V2_ACCESS_RANDOM);
+            datafile->journalfile, &journal_v2_file_size, 0, 0, JOURNALFILE_V2_ACCESS_RANDOM);
         if (!j2_header) {
             datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
             continue;
         }
 
         bool any_matching = false;
+        bool journal_access_failed = false;
 
-        time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
-
-        if (journal_start_time_s < global_first_time_s)
-            global_first_time_s = journal_start_time_s;
-
-        struct journal_metric_list *uuid_list =
-            (struct journal_metric_list *)((uint8_t *)j2_header + j2_header->metric_offset);
-        struct uuid_first_time_s *uuid_original_entry;
-
-        size_t journal_metric_count = j2_header->metric_count;
         char file_path[RRDENG_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
         if (no_signal_received) {
+            time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
+
+            // same as journalfile_v2_populate_retention_to_mrg(): a zero header
+            // start time means the journal has no metrics, not that its
+            // retention starts at the epoch
+            if (journal_start_time_s > 0 && journal_start_time_s < global_first_time_s)
+                global_first_time_s = journal_start_time_s;
+
+            size_t metric_offset = j2_header->metric_offset;
+            size_t journal_metric_count = j2_header->metric_count;
+            size_t metric_list_size;
+            if (__builtin_mul_overflow(journal_metric_count, sizeof(struct journal_metric_list), &metric_list_size)) {
+                nd_log_daemon(NDLP_ERR,
+                              "DBENGINE: metric list size overflow in journalfile \"%s\" "
+                              "(metric_count=%zu, entry_size=%zu), skipping it",
+                              file_path, journal_metric_count, sizeof(struct journal_metric_list));
+                journal_access_failed = true;
+                goto release_journal;
+            }
+            if (metric_offset > journal_v2_file_size ||
+                metric_list_size > journal_v2_file_size - metric_offset) {
+                nd_log_daemon(NDLP_ERR,
+                              "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                              "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping it",
+                              file_path, metric_offset, metric_list_size, journal_v2_file_size);
+                journal_access_failed = true;
+                goto release_journal;
+            }
+
+            struct journal_metric_list *uuid_list =
+                (struct journal_metric_list *)((uint8_t *)j2_header + metric_offset);
+            struct uuid_first_time_s *uuid_original_entry;
+
             size_t journal_search_start = 0; // Start of remaining search space
             any_matching = false;
             for (size_t index = 0; index < count; ++index) {
@@ -1199,6 +1321,9 @@ static time_t find_uuid_first_time(
                     continue;
 
                 any_matching = true;
+                if (journal_search_start >= journal_metric_count)
+                    break;
+
                 struct journal_metric_list *live_entry = &uuid_list[journal_search_start];
                 // Check if we avoid bsearch
                 if (journal_metric_uuid_compare(uuid_original_entry->uuid, live_entry->uuid) != 0) {
@@ -1218,10 +1343,8 @@ static time_t find_uuid_first_time(
                 size_t found_index = live_entry - uuid_list;
                 journal_search_start = found_index + 1; // Next search starts after this match
 
-                if (journal_search_start >= journal_metric_count) {
-                    not_matching_bsearches += (count - index - 1);
+                if (journal_search_start >= journal_metric_count)
                     break;
-                }
 
                 uuid_original_entry->pages_found += live_entry->entries;
                 uuid_original_entry->df_matched++;
@@ -1241,8 +1364,10 @@ static time_t find_uuid_first_time(
                 }
             }
         } else {
-            nd_log_daemon(NDLP_ERR, "DBENGINE: journalfile \"%s\" is corrupted, skipping it", file_path);
+            journal_access_failed = true;
         }
+
+release_journal:
         journalfile_v2_data_release(datafile->journalfile);
 
         if (agent_shutdown) {
@@ -1252,6 +1377,9 @@ static time_t find_uuid_first_time(
 
         journalfile_count++;
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
+        if (journal_access_failed)
+            continue;
+
         if (!any_matching) {
             if (datafile)
                 datafile_release(datafile, DATAFILE_ACQUIRE_RETENTION);
@@ -1354,24 +1482,96 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
 
-    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
+    char file_path[RRDENG_PATH_MAX];
+    journalfile_v2_generate_path(datafile_to_delete, file_path, sizeof(file_path));
 
-    size_t count = j2_header->metric_count;
     struct uuid_first_time_s *uuid_first_t_entry;
-    struct uuid_first_time_s *uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
+    // PROTECTED_ACCESS_SETUP below uses sigsetjmp/siglongjmp (see
+    // src/daemon/protected-access.h). Per C11 7.13.2.1, non-volatile locals
+    // that are modified between setjmp and longjmp have indeterminate values
+    // on the recovery path. uuid_first_entry_list / count / added are all
+    // mutated inside the protected region and then read afterwards (the
+    // unconditional log line and the journal_access_failed cleanup loop), so
+    // they must be volatile to keep the recovery path well-defined.
+    // journal_access_failed is also marked volatile defensively: although it
+    // is only assigned on a path that does not subsequently SIGBUS, future
+    // edits could break that invariant, and the bool is read once on cleanup.
+    struct uuid_first_time_s * volatile uuid_first_entry_list = NULL;
+    volatile size_t count = 0;
+    volatile size_t added = 0;
+    volatile bool journal_access_failed = false;
 
-    size_t added = 0;
-    for (size_t index = 0; index < count; ++index) {
-        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &uuid_list[index].uuid, (Word_t)ctx);
-        if (!metric)
-            continue;
+    // Protect the mmap walk: reading j2_header->metric_offset, metric_count,
+    // and the per-metric uuid_list[] entries can SIGBUS if the underlying v2
+    // file has any unreadable page (truncated, sparse hole, transient I/O
+    // error). Without a protected region active the process aborts. Same
+    // pattern as find_uuid_first_time() added by commit 26b26ac25a (#22310);
+    // this caller was missed at the time.
+    // Scope the protected frame tightly to the mmap walk only. The
+    // PROTECTED_ACCESS_AUTO_CLEANUP() guard inside PROTECTED_ACCESS_SETUP
+    // declares a __attribute__((cleanup)) local; when this inner block exits
+    // (normally or via the SIGBUS recovery else-branch falling through), the
+    // cleanup runs and the protected-access depth drops back to its prior
+    // value. Without this scoping, the frame would stay live through the
+    // post-walk log, the data_release, the cleanup loop, the nested
+    // find_uuid_first_time() (which registers its own frame), and the final
+    // cleanup -- masking unrelated faults that might land in the mmap range
+    // and inflating nesting depth unnecessarily.
+    {
+        PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, file_path, "mrg-retention");
+        if(no_signal_received) {
+            size_t journal_v2_file_size = journalfile->mmap.size;
+            size_t metric_offset = j2_header->metric_offset;
+            count = j2_header->metric_count;
+            size_t metric_list_size;
+            size_t entry_list_size;
+            // Also check count * sizeof(uuid_first_time_s) -- the allocation below
+            // sizes the working array by count, and on 32-bit builds count can
+            // pass the metric_list_size bound while still overflowing the entry
+            // list multiplication (struct uuid_first_time_s is larger than
+            // struct journal_metric_list).
+            if (__builtin_mul_overflow(count, sizeof(struct journal_metric_list), &metric_list_size) ||
+                __builtin_mul_overflow(count, sizeof(struct uuid_first_time_s), &entry_list_size) ||
+                metric_offset > journal_v2_file_size ||
+                metric_list_size > journal_v2_file_size - metric_offset) {
+                nd_log_daemon(NDLP_ERR,
+                              "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                              "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
+                              file_path, metric_offset, metric_list_size, journal_v2_file_size);
+                journal_access_failed = true;
+            }
+            else {
+                struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + metric_offset);
+                uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
 
-        uuid_first_entry_list[added].metric = metric;
-        uuid_first_entry_list[added].first_time_s = LONG_MAX;
-        uuid_first_entry_list[added].df_matched = 0;
-        uuid_first_entry_list[added].df_index_oldest = 0;
-        uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
-        added++;
+                for (size_t index = 0; index < count; ++index) {
+                    // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
+                    // If a backing page is unreadable, uuid_copy SIGBUSes here and
+                    // the protected region recovers cleanly; the mrg call then
+                    // never executes. If we passed &uuid_list[index].uuid into
+                    // mrg, a SIGBUS could fire INSIDE mrg while it holds internal
+                    // locks, and siglongjmp would skip mrg's unlock paths.
+                    nd_uuid_t local_uuid;
+                    uuid_copy(local_uuid, uuid_list[index].uuid);
+
+                    METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &local_uuid, (Word_t)ctx);
+                    if (!metric)
+                        continue;
+
+                    uuid_first_entry_list[added].metric = metric;
+                    uuid_first_entry_list[added].first_time_s = LONG_MAX;
+                    uuid_first_entry_list[added].df_matched = 0;
+                    uuid_first_entry_list[added].df_index_oldest = 0;
+                    uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
+                    added++;
+                }
+            }
+        }
+        else {
+            // SIGBUS/SIGSEGV inside the mmap walk -- bail cleanly. The
+            // PROTECTED_ACCESS_SETUP macro already rate-limits the error log.
+            journal_access_failed = true;
+        }
     }
 
     netdata_log_info(
@@ -1381,6 +1581,14 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         first_datafile_remaining ? first_datafile_remaining->fileno : 0);
 
     journalfile_v2_data_release(journalfile);
+
+    if (unlikely(journal_access_failed)) {
+        // Release any partially-acquired metrics; uuid_first_entry_list may
+        // be NULL (signal received before callocz).
+        for (size_t index = 0; index < added; ++index)
+            mrg_metric_release(main_mrg, uuid_first_entry_list[index].metric);
+        goto done;
+    }
 
     // Update the first time / last time for all metrics we plan to delete
 
@@ -1418,10 +1626,20 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             bool changed = mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
             if (changed) {
                 uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                if (update_every_s && old_first_time_s && uuid_first_t_entry->first_time_s > old_first_time_s) {
-                    uint64_t remove_samples = (uuid_first_t_entry->first_time_s - old_first_time_s) / update_every_s;
-                    __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
-                }
+                uint64_t remove_samples;
+                if (rrdeng_retention_samples_delta(
+                        ctx,
+                        old_first_time_s,
+                        uuid_first_t_entry->first_time_s,
+                        update_every_s,
+                        "advancing metric first retention time",
+                        &remove_samples))
+                    rrdeng_atomic_uint64_sub_saturating(
+                        ctx,
+                        &ctx->atomic.samples,
+                        remove_samples,
+                        "samples",
+                        "advancing metric first retention time");
             }
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
@@ -1433,11 +1651,21 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             if (!has_retention) {
                 time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
                 time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, uuid_first_t_entry->metric);
-                time_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                if (update_every_s && first_time_s && last_time_s) {
-                    uint64_t remove_samples = (first_time_s - last_time_s) / update_every_s;
-                    __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
-                }
+                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
+                uint64_t remove_samples;
+                if (rrdeng_retention_samples_delta(
+                        ctx,
+                        first_time_s,
+                        last_time_s,
+                        update_every_s,
+                        "deleting a metric with zero disk retention",
+                        &remove_samples))
+                    rrdeng_atomic_uint64_sub_saturating(
+                        ctx,
+                        &ctx->atomic.samples,
+                        remove_samples,
+                        "samples",
+                        "deleting a metric with zero disk retention");
 
                 bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
                 if(deleted)
@@ -1483,14 +1711,14 @@ void datafile_delete(
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
     size_t attempts = 0;
 
     while (!datafile_got_for_deletion) {
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
         if (!datafile_got_for_deletion) {
             if(++attempts >= 30) {

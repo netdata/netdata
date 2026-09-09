@@ -40,7 +40,7 @@ void pulse_thread_memory_extended_main(void *ptr);
 #define p1_fetch_sub(variable, value) __atomic_fetch_sub(variable, value, __ATOMIC_RELAXED)
 
 #define p1_store(variable, value) __atomic_store_n(variable, value, __ATOMIC_RELAXED)
-#define p1_load(variable) __atomic_load_n(variable, value, __ATOMIC_RELAXED)
+#define p1_load(variable) __atomic_load_n(variable, __ATOMIC_RELAXED)
 
 #define p2_add_fetch(variable, value) __atomic_add_fetch(variable, value, __ATOMIC_RELAXED)
 #define p2_sub_fetch(variable, value) __atomic_sub_fetch(variable, value, __ATOMIC_RELAXED)
@@ -49,6 +49,6 @@ void pulse_thread_memory_extended_main(void *ptr);
 #define p2_fetch_sub(variable, value) __atomic_fetch_sub(variable, value, __ATOMIC_RELAXED)
 
 #define p2_store(variable, value) __atomic_store_n(variable, value, __ATOMIC_RELAXED)
-#define p2_load(variable) __atomic_load_n(variable, value, __ATOMIC_RELAXED)
+#define p2_load(variable) __atomic_load_n(variable, __ATOMIC_RELAXED)
 
 #endif /* NETDATA_PULSE_H */

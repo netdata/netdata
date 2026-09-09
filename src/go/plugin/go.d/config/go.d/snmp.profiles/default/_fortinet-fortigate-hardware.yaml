@@ -1,0 +1,67 @@
+# Hardware sensor monitoring for Fortinet FortiGate devices
+# fgHwSensorTable: temperature, fan speed, voltage, and alarm status per sensor
+
+metrics:
+  # Sensor value — split by type using transform (same pattern as MikroTik/ENTITY-SENSOR-MIB)
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.3.2
+      name: fgHwSensorTable
+    symbols:
+      # fgHwSensorEntValue is DisplayString — extract numeric part before transform
+      - OID: 1.3.6.1.4.1.12356.101.4.3.2.1.3
+        name: fgHwSensorEntValue
+        extract_value: '(\d+)'
+        chart_meta:
+          description: Hardware sensor reading
+          family: 'Hardware/Sensor'
+          unit: "1"
+        transform: |
+          {{- $name := index .Metric.Tags "rm:sensor_name" | default "" | lower -}}
+          {{- if or (contains "temp" $name) (contains "cpu" $name) (contains "thermal" $name) -}}
+            {{- setName .Metric "fgHwSensorEntValue_temperature" -}}
+            {{- setUnit .Metric "Cel" -}}
+            {{- setFamily .Metric "Hardware/Sensor/Temperature/Value" -}}
+            {{- setDesc .Metric "Temperature sensor reading" -}}
+          {{- else if or (contains "fan" $name) -}}
+            {{- setName .Metric "fgHwSensorEntValue_fan_speed" -}}
+            {{- setUnit .Metric "{revolution}/min" -}}
+            {{- setFamily .Metric "Hardware/Sensor/FanSpeed/Value" -}}
+            {{- setDesc .Metric "Fan rotation speed" -}}
+          {{- else if or (contains "vcc" $name) (contains "volt" $name) (hasSuffix "v" $name) -}}
+            {{- setName .Metric "fgHwSensorEntValue_voltage" -}}
+            {{- setUnit .Metric "V" -}}
+            {{- setFamily .Metric "Hardware/Sensor/Voltage/Value" -}}
+            {{- setDesc .Metric "Voltage sensor reading" -}}
+          {{- else if or (contains "power" $name) (contains "psu" $name) (contains "ps" $name) -}}
+            {{- setName .Metric "fgHwSensorEntValue_power" -}}
+            {{- setUnit .Metric "W" -}}
+            {{- setFamily .Metric "Hardware/Sensor/Power/Value" -}}
+            {{- setDesc .Metric "Power sensor reading" -}}
+          {{- else -}}
+            {{- setName .Metric "fgHwSensorEntValue_other" -}}
+            {{- setFamily .Metric "Hardware/Sensor/Other/Value" -}}
+            {{- setDesc .Metric "Unclassified sensor reading" -}}
+          {{- end -}}
+      - OID: 1.3.6.1.4.1.12356.101.4.3.2.1.4
+        name: fgHwSensorEntAlarmStatus
+        chart_meta:
+          description: Hardware sensor alarm status
+          family: 'Hardware/Sensor/Status'
+          unit: "{status}"
+        mapping:
+          0: ok
+          1: alarm
+    metric_tags:
+      - tag: sensor_index
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.3.2.1.1
+          name: fgHwSensorEntIndex
+      - tag: _sensor_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.3.2.1.2
+          name: fgHwSensorEntName
+      - tag: rm:sensor_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.3.2.1.2
+          name: fgHwSensorEntName

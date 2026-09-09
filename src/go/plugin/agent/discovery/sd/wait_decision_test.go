@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -24,35 +23,16 @@ import (
 
 func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 	tests := map[string]struct {
-		waitTimeout time.Duration
-		run         func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func())
+		run func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func())
 	}{
-		"timeout clears wait gate and keeps accepted state": {
-			waitTimeout: 40 * time.Millisecond,
-			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func()) {
-				cfg := prepareConfigFile("/etc/netdata/sd.d/job1.conf", "job1")
-				confCh <- cfg
-
-				require.Eventually(t, sd.handler.WaitingForDecision, time.Second, 10*time.Millisecond)
-				require.Eventually(t, func() bool { return !sd.handler.WaitingForDecision() }, time.Second, 10*time.Millisecond)
-
-				stop()
-
-				entry, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
-				require.True(t, ok, "expected discovered config to stay exposed after wait timeout")
-				assert.Equal(t, dyncfg.StatusAccepted, entry.Status)
-				assert.False(t, sd.mgr.IsRunning(pipelineKeyFromSource(cfg.source)))
-			},
-		},
-		"enable command before timeout clears wait and starts pipeline": {
-			waitTimeout: 750 * time.Millisecond,
+		"enable command clears wait and starts pipeline": {
 			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func()) {
 				cfg := prepareConfigFile("/etc/netdata/sd.d/job1.conf", "job1")
 				confCh <- cfg
 
 				require.Eventually(t, sd.handler.WaitingForDecision, time.Second, 10*time.Millisecond)
 
-				sd.dyncfgCh <- dyncfg.NewFunction(functions.Function{
+				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
 					UID:  "enable-job1",
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
 				})
@@ -70,9 +50,13 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				assert.Equal(t, dyncfg.StatusRunning, entry.Status)
 			},
 		},
-		"timeout unblocks and next config is processed": {
-			waitTimeout: 40 * time.Millisecond,
+		"second config blocks while wait gate is open and proceeds after decision": {
 			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func()) {
+				// Without a wait-decision timeout, the run loop must stay in
+				// WaitingForDecision until an explicit enable/disable for cfg1
+				// arrives. Sending cfg2 in the meantime must block until the
+				// gate clears. This guards against accidental gate-clearing or
+				// a regression that lets new configs interleave.
 				cfg1 := prepareConfigFile("/etc/netdata/sd.d/job1.conf", "job1")
 				cfg2 := prepareConfigFile("/etc/netdata/sd.d/job2.conf", "job2")
 
@@ -85,43 +69,41 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 					close(secondSent)
 				}()
 
+				// Give the goroutine a chance to either block (expected) or
+				// race ahead. We can't use require.Eventually for negative
+				// "still blocked" assertions, but a short window is enough to
+				// catch a regression that lets the second config flow through
+				// while the wait gate is still open.
 				select {
 				case <-secondSent:
-					t.Fatalf("second config should block while wait gate is active")
-				case <-time.After(20 * time.Millisecond):
+					t.Fatal("second config was processed while wait gate was open")
+				case <-time.After(100 * time.Millisecond):
+				}
+				require.True(t, sd.handler.WaitingForDecision(), "wait gate should still be open before decision")
+
+				// Send the matching enable for cfg1 — this clears the wait gate.
+				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
+					UID:  "enable-job1",
+					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
+				})
+
+				select {
+				case <-secondSent:
+				case <-time.After(2 * time.Second):
+					t.Fatal("second config did not proceed after wait gate cleared")
 				}
 
-				require.Eventually(t, func() bool { return !sd.handler.WaitingForDecision() }, time.Second, 10*time.Millisecond)
 				require.Eventually(t, func() bool {
-					select {
-					case <-secondSent:
-						return true
-					default:
-						return false
-					}
+					return exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job1") &&
+						exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job2")
 				}, time.Second, 10*time.Millisecond)
-
-				require.Eventually(t, func() bool {
-					ok1 := exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
-					ok2 := exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job2")
-					return ok1 && ok2
-				}, time.Second, 10*time.Millisecond)
-
-				stop()
-
-				entry1, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
-				require.True(t, ok)
-				assert.Equal(t, dyncfg.StatusAccepted, entry1.Status)
-				entry2, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job2")
-				require.True(t, ok)
-				assert.Equal(t, dyncfg.StatusAccepted, entry2.Status)
 			},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			sd, confCh, cancel, done := newWaitTestServiceDiscovery(t, tc.waitTimeout)
+			sd, confCh, cancel, done := newWaitTestServiceDiscovery(t)
 			stopped := false
 			stop := func() {
 				if stopped {
@@ -136,19 +118,21 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 	}
 }
 
-func newWaitTestServiceDiscovery(t *testing.T, waitTimeout time.Duration) (*ServiceDiscovery, chan confFile, context.CancelFunc, <-chan struct{}) {
+func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile, context.CancelFunc, <-chan struct{}) {
 	t.Helper()
 
 	var out bytes.Buffer
 	confProv := &mockConfigProvider{ch: make(chan confFile)}
 
 	sd := &ServiceDiscovery{
+		epoch:          1,
+		attempts:       newTestAttemptAuthority(t),
 		Logger:         logger.New(),
 		confProv:       confProv,
 		pluginName:     testPluginName,
-		fnReg:          functions.NewManager(),
+		fnReg:          waitTestFunctionRegistry{},
 		discoverers:    testDiscovererRegistry(),
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))),
+		dyncfgApi:      dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&out))),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
@@ -158,7 +142,6 @@ func newWaitTestServiceDiscovery(t *testing.T, waitTimeout time.Duration) (*Serv
 	}
 	sd.sdCb = &sdCallbacks{sd: sd}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    sd.Logger,
 		API:       sd.dyncfgApi,
 		Seen:      sd.seen,
 		Exposed:   sd.exposed,
@@ -166,11 +149,9 @@ func newWaitTestServiceDiscovery(t *testing.T, waitTimeout time.Duration) (*Serv
 		WaitKey: func(cfg sdConfig) string {
 			return cfg.PipelineKey()
 		},
-		WaitTimeout: waitTimeout,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
-		JobCommands: []dyncfg.Command{
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
+		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
 			dyncfg.CommandEnable,
@@ -182,7 +163,7 @@ func newWaitTestServiceDiscovery(t *testing.T, waitTimeout time.Duration) (*Serv
 	})
 
 	send := func(context.Context, []*confgroup.Group) {}
-	sd.mgr = NewPipelineManager(sd.Logger, sd.newPipeline, send)
+	sd.mgr = NewPipelineManager(sd.Logger, send)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sd.ctx = ctx
@@ -195,6 +176,11 @@ func newWaitTestServiceDiscovery(t *testing.T, waitTimeout time.Duration) (*Serv
 
 	return sd, confProv.ch, cancel, done
 }
+
+type waitTestFunctionRegistry struct{}
+
+func (waitTestFunctionRegistry) RegisterPrefix(string, string, functions.Handler) {}
+func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                  {}
 
 func stopWaitTestServiceDiscovery(t *testing.T, sd *ServiceDiscovery, cancel context.CancelFunc, done <-chan struct{}) {
 	t.Helper()

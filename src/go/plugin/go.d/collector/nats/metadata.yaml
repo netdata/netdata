@@ -25,7 +25,7 @@ modules:
         metrics_description: |
           This collector monitors the activity and performance of NATS servers.
         method_description: |
-          It sends HTTP requests to the NATS HTTP server's dedicated [monitoring port](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#monitoring-nats).
+          It sends HTTP requests to the NATS HTTP server's dedicated [monitoring port](https://docs.nats.io/learn/monitoring/monitoring-endpoints).
       default_behavior:
         auto_detection:
           description: |
@@ -48,7 +48,7 @@ modules:
         list:
           - title: Enable NATS monitoring
             description: |
-              See [Enable monitoring](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#enabling-monitoring).
+              See [Enable monitoring](https://docs.nats.io/learn/monitoring/monitoring-endpoints).
       configuration:
         file:
           name: go.d/nats.conf
@@ -82,7 +82,7 @@ modules:
               group: Target
 
             - name: healthz_check
-              description: "Selects the `/healthz` [endpoint mode](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#health-healthz). Options: `default` (standard check), `js-enabled-only` (error if JetStream is disabled), `js-server-only` (skip account/stream/consumer checks)."
+              description: "Selects the `/healthz` [endpoint mode](https://docs.nats.io/reference/system/monitor/healthz). Options: `default` (standard check), `js-enabled-only` (error if JetStream is disabled), `js-server-only` (skip account/stream/consumer checks)."
               default_value: default
               required: false
               group: Validation
@@ -356,7 +356,7 @@ modules:
               dimensions:
                 - name: requests
         - name: account
-          description: These metrics refer to [Accounts](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#account-statistics).
+          description: These metrics refer to [Accounts](https://docs.nats.io/reference/system/monitor/accstatz).
           labels:
             - name: cluster_name
               description: "The name of the NATS cluster this server belongs to."
@@ -412,7 +412,7 @@ modules:
               dimensions:
                 - name: leafnode
         - name: route
-          description: These metrics refer to [Routes](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#route-information).
+          description: These metrics refer to [Routes](https://docs.nats.io/reference/system/monitor/routez).
           labels:
             - name: cluster_name
               description: "The name of the NATS cluster this server belongs to."
@@ -446,7 +446,7 @@ modules:
               dimensions:
                 - name: active
         - name: inbound gateway connection
-          description: These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
+          description: These metrics refer to [Inbound Gateway Connections](https://docs.nats.io/reference/system/monitor/gatewayz).
           labels:
             - name: cluster_name
               description: "The name of the NATS cluster this server belongs to."
@@ -488,7 +488,7 @@ modules:
               dimensions:
                 - name: uptime
         - name: outbound gateway connection
-          description: These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#gateway-information).
+          description: These metrics refer to [Outbound Gateway Connections](https://docs.nats.io/reference/system/monitor/gatewayz).
           labels:
             - name: cluster_name
               description: "The name of the NATS cluster this server belongs to."
@@ -530,7 +530,7 @@ modules:
               dimensions:
                 - name: uptime
         - name: leaf node connection
-          description: These metrics refer to [Leaf Node Connections](https://docs.nats.io/running-a-nats-service/nats_admin/monitoring#leaf-node-information).
+          description: These metrics refer to [Leaf Node Connections](https://docs.nats.io/reference/system/monitor/leafz).
           labels:
             - name: cluster_name
               description: "The name of the NATS cluster this server belongs to."

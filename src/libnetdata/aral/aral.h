@@ -124,12 +124,19 @@ void *aral_mallocz_internal(ARAL *ar, bool marked);
 void aral_freez_internal(ARAL *ar, void *ptr);
 void aral_destroy_internal(ARAL *ar);
 
-void aral_unmark_allocation(ARAL *ar, void *ptr);
+#endif // NETDATA_TRACE_ALLOCATIONS
 
 // --------------------------------------------------------------------------------------------------------------------
+// Declarations that do not depend on the NETDATA_TRACE_ALLOCATIONS macro
+// shape, kept outside the conditional so callers in any compilation unit
+// can see them in both build modes.
+
+void aral_unmark_allocation(ARAL *ar, void *ptr);
 
 int aral_unittest(size_t elements);
 
-#endif // NETDATA_TRACE_ALLOCATIONS
+#ifdef NETDATA_INTERNAL_CHECKS
+int aral_unittest_concurrency(void);
+#endif
 
 #endif // ARAL_H

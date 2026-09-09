@@ -155,12 +155,12 @@ func samplesFromQueryResponse(metricData []azmetrics.MetricData, profileName str
 		if !ok {
 			continue
 		}
-		samples = append(samples, samplesFromMetricValues(data.Values, resourceLabels(resource, profileName), metricToRuntime)...)
+		samples = append(samples, samplesFromMetricValues(data.Values, resource.HostScope, resourceLabels(resource, profileName), metricToRuntime)...)
 	}
 	return samples
 }
 
-func samplesFromMetricValues(metrics []azmetrics.Metric, labels metrix.Labels, metricToRuntime map[string]*metricRuntime) []metricSample {
+func samplesFromMetricValues(metrics []azmetrics.Metric, scope metrix.HostScope, labels metrix.Labels, metricToRuntime map[string]*metricRuntime) []metricSample {
 	samples := make([]metricSample, 0, len(metrics))
 	for _, metric := range metrics {
 		runtimeMetric, ok := metricToRuntime[stringsLowerTrim(derefOrZero(metric.Name.Value))]
@@ -176,6 +176,7 @@ func samplesFromMetricValues(metrics []azmetrics.Metric, labels metrix.Labels, m
 				Instrument: series.Instrument,
 				Kind:       series.Kind,
 				Labels:     labels,
+				Scope:      scope,
 				Value:      value,
 			})
 		}

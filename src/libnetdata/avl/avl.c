@@ -14,15 +14,21 @@
  * Foundation, Inc.
 */
 
+static inline void avl_check_descent_height(size_t depth, const char *operation) {
+    if (unlikely(depth >= AVL_MAX_HEIGHT))
+        fatal("AVL: %s descent exceeded maximum height %zu", operation, (size_t)AVL_MAX_HEIGHT);
+}
 
 /* Search |tree| for an item matching |item|, and return it if found.
      Otherwise return |NULL|. */
 avl_t *avl_search(avl_tree_type *tree, avl_t *item) {
     avl_t *p;
+    size_t depth = 0;
 
     // assert (tree != NULL && item != NULL);
 
     for (p = tree->root; p != NULL; ) {
+        avl_check_descent_height(depth++, "search");
         int cmp = tree->compar(item, p);
 
         if (cmp < 0)
@@ -52,7 +58,13 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
 
     // assert(tree != NULL && item != NULL);
 
-    z = (avl_t *) &tree->root;
+    /* Real sentinel node; avoids treating tree->root storage as avl_t. */
+    avl_t root_parent = {
+        .avl_link = { tree->root, NULL },
+        .avl_balance = 0,
+    };
+
+    z = &root_parent;
     y = tree->root;
     dir = 0;
     for (q = z, p = y; p != NULL; q = p, p = p->avl_link[dir]) {
@@ -62,6 +74,7 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
 
         if (p->avl_balance != 0)
             z = q, y = p, k = 0;
+        avl_check_descent_height(k, "insert");
         da[k++] = dir = (unsigned char)(cmp > 0);
     }
 
@@ -70,7 +83,10 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
     // tree->avl_count++;
     n->avl_link[0] = n->avl_link[1] = NULL;
     n->avl_balance = 0;
-    if (y == NULL) return n;
+    if (y == NULL) {
+        tree->root = root_parent.avl_link[0];
+        return n;
+    }
 
     for (p = y, k = 0; p != n; p = p->avl_link[da[k]], k++)
         if (da[k] == 0)
@@ -126,11 +142,15 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
             w->avl_balance = 0;
         }
     }
-    else return n;
+    else {
+        tree->root = root_parent.avl_link[0];
+        return n;
+    }
 
     z->avl_link[y != z->avl_link[0]] = w;
 
     // tree->avl_generation++;
+    tree->root = root_parent.avl_link[0];
     return n;
 }
 
@@ -147,11 +167,18 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
 
     // assert (tree != NULL && item != NULL);
 
+    /* Real sentinel node; avoids treating tree->root storage as avl_t. */
+    avl_t root_parent = {
+        .avl_link = { tree->root, NULL },
+        .avl_balance = 0,
+    };
+
     k = 0;
-    p = (avl_t *) &tree->root;
+    p = &root_parent;
     for(cmp = -1; cmp != 0; cmp = tree->compar(item, p)) {
         unsigned char dir = (unsigned char)(cmp > 0);
 
+        avl_check_descent_height(k, "remove");
         pa[k] = p;
         da[k++] = dir;
 
@@ -169,14 +196,17 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
             r->avl_link[0] = p->avl_link[0];
             r->avl_balance = p->avl_balance;
             pa[k - 1]->avl_link[da[k - 1]] = r;
+            avl_check_descent_height(k, "remove");
             da[k] = 1;
             pa[k++] = r;
         }
         else {
             avl_t *s;
+            avl_check_descent_height(k, "remove");
             int j = k++;
 
             for (;;) {
+                avl_check_descent_height(k, "remove");
                 da[k] = 0;
                 pa[k++] = r;
                 s = r->avl_link[0];
@@ -275,6 +305,7 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
 
     // tree->avl_count--;
     // tree->avl_generation++;
+    tree->root = root_parent.avl_link[0];
     return item;
 }
 
@@ -284,11 +315,13 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
 // ---------------------------
 // traversing
 
-int avl_walker(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
+static int avl_walker_depth(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data, size_t depth) {
     int total = 0, ret = 0;
 
+    avl_check_descent_height(depth, "traverse");
+
     if(node->avl_link[0]) {
-        ret = avl_walker(node->avl_link[0], callback, data);
+        ret = avl_walker_depth(node->avl_link[0], callback, data, depth + 1);
         if(ret < 0) return ret;
         total += ret;
     }
@@ -298,12 +331,16 @@ int avl_walker(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), 
     total += ret;
 
     if(node->avl_link[1]) {
-        ret = avl_walker(node->avl_link[1], callback, data);
+        ret = avl_walker_depth(node->avl_link[1], callback, data, depth + 1);
         if (ret < 0) return ret;
         total += ret;
     }
 
     return total;
+}
+
+int avl_walker(avl_t *node, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
+    return avl_walker_depth(node, callback, data, 0);
 }
 
 int avl_traverse(avl_tree_type *tree, int (*callback)(void * /*entry*/, void * /*data*/), void *data) {
@@ -364,8 +401,7 @@ void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/
 
 void avl_destroy_lock(avl_tree_lock *tree __maybe_unused) {
 #if defined(AVL_LOCK_WITH_RWLOCK)
-    if(netdata_rwlock_destroy(&tree->rwlock) != 0)
-        fatal("Failed to destroy AVL rwlock");
+    netdata_rwlock_destroy(&tree->rwlock);
 #endif
 }
 

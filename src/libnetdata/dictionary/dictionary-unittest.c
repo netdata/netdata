@@ -242,6 +242,80 @@ static size_t dictionary_unittest_foreach_delete_this(DICTIONARY *dict, char **n
     return entries - count;
 }
 
+static size_t dictionary_unittest_reject_unrepresentable_lengths(void) {
+    size_t errors = 0;
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    int value = 1;
+    if(dictionary_set_advanced(dict, "key-too-long", (ssize_t)KEY_LEN_MAX + 1, &value, sizeof(value), NULL)) {
+        fprintf(stderr, ">>> %s() accepted an unrepresentable key length\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 0) {
+        fprintf(stderr, ">>> %s() added an item with an unrepresentable key length\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    DICTIONARY *master = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *view = dictionary_create_view(master);
+    DICT_ITEM_CONST DICTIONARY_ITEM *master_item = dictionary_set_and_acquire_item(master, "master", &value, sizeof(value));
+    if(!master_item) {
+        fprintf(stderr, ">>> %s() failed to add the master item\n", __FUNCTION__);
+        errors++;
+    }
+    else {
+        if(dictionary_view_set_advanced(view, "view-key-too-long", (ssize_t)KEY_LEN_MAX + 1, master_item)) {
+            fprintf(stderr, ">>> %s() accepted an unrepresentable view key length\n", __FUNCTION__);
+            errors++;
+        }
+        if(dictionary_entries(view) != 0) {
+            fprintf(stderr, ">>> %s() added a view item with an unrepresentable key length\n", __FUNCTION__);
+            errors++;
+        }
+        dictionary_acquired_item_release(master, master_item);
+    }
+    dictionary_destroy(view);
+    dictionary_destroy(master);
+
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    if(dictionary_set(dict, "value-too-large", NULL, (size_t)VALUE_LEN_MAX + 1)) {
+        fprintf(stderr, ">>> %s() accepted an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 0) {
+        fprintf(stderr, ">>> %s() added an item with an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    int original = 1234;
+    int *stored = dictionary_set(dict, "existing", &original, sizeof(original));
+    if(!stored || *stored != original) {
+        fprintf(stderr, ">>> %s() failed to add the baseline item\n", __FUNCTION__);
+        errors++;
+    }
+
+    if(dictionary_set(dict, "existing", NULL, (size_t)VALUE_LEN_MAX + 1)) {
+        fprintf(stderr, ">>> %s() reset an item with an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+
+    stored = dictionary_get(dict, "existing");
+    if(!stored || *stored != original) {
+        fprintf(stderr, ">>> %s() changed the baseline item after rejected reset\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 1) {
+        fprintf(stderr, ">>> %s() changed dictionary entries after rejected reset\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    return errors;
+}
+
 static size_t dictionary_unittest_destroy(DICTIONARY *dict, char **names, char **values, size_t entries) {
     (void)names;
     (void)values;
@@ -456,6 +530,41 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     return errors;
 }
 
+static size_t dictionary_unittest_last_release_before_delete_mark(void) {
+    size_t errors = 0;
+    const char *name = "pending-delete-race";
+
+    fprintf(stderr, "\nTesting last-release/delete-mark race accounting:\n");
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
+    dictionary_set(dict, name, "VALUE", 6);
+    DICTIONARY_ITEM *item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, name);
+
+    errors += unittest_check_dictionary("pre-race", dict, 1, 1, 0, 1, 0);
+
+    dictionary_index_lock_wrlock(dict);
+    if(hashtable_delete_unsafe(dict, item_get_name(item), item_get_name_len(item), item) == 0) {
+        fprintf(stderr, "failed to remove race item from index\n");
+        errors++;
+    }
+    else
+        pointer_del(dict, item);
+    dictionary_index_wrlock_unlock(dict);
+
+    dict_item_shared_set_deleted(dict, item);
+    item_release(dict, item);
+    dict_item_set_deleted(dict, item);
+
+    errors += unittest_check_dictionary("post-race", dict, 0, 0, 1, 0, 1);
+
+    dictionary_garbage_collect(dict);
+    errors += unittest_check_dictionary("post-gc", dict, 0, 0, 0, 0, 0);
+
+    dictionary_destroy(dict);
+
+    return errors;
+}
+
 static int check_item_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     return value == data;
 }
@@ -665,15 +774,15 @@ static void unittest_dict_thread(void *arg) {
 
 static int dictionary_unittest_threads() {
     time_t seconds_to_run = 5;
-    int threads_to_create = 2;
+    enum { DICTIONARY_UNITTEST_THREADS = 2 };
 
-    struct thread_unittest tu[threads_to_create];
-    memset(tu, 0, sizeof(struct thread_unittest) * threads_to_create);
+    struct thread_unittest tu[DICTIONARY_UNITTEST_THREADS];
+    memset(tu, 0, sizeof(struct thread_unittest) * DICTIONARY_UNITTEST_THREADS);
 
     fprintf(
         stderr,
         "\nChecking dictionary concurrency with %d threads for %lld seconds...\n",
-        threads_to_create,
+        DICTIONARY_UNITTEST_THREADS,
         (long long)seconds_to_run);
 
     // threads testing of dictionary
@@ -682,7 +791,7 @@ static int dictionary_unittest_threads() {
     tu[0].dups = 1;
     tu[0].dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &stats, 0);
 
-    for (int i = 0; i < threads_to_create; i++) {
+    for (int i = 0; i < DICTIONARY_UNITTEST_THREADS; i++) {
         if(i)
             tu[i] = tu[0];
 
@@ -693,7 +802,7 @@ static int dictionary_unittest_threads() {
 
     sleep_usec(seconds_to_run * USEC_PER_SEC);
 
-    for (int i = 0; i < threads_to_create; i++) {
+    for (int i = 0; i < DICTIONARY_UNITTEST_THREADS; i++) {
         __atomic_store_n(&tu[i].join, 1, __ATOMIC_RELAXED);
 
         nd_thread_join(tu[i].thread);
@@ -930,11 +1039,189 @@ static int dictionary_unittest_view_threads() {
     return 0;
 }
 
+// ----------------------------------------------------------------------------
+// GC traversal cursor regression test
+//
+// garbage_collect_pending_deletes() used to free each victim - and therefore run the user's delete
+// callback - in the middle of its list walk, while holding an unprotected pointer to the victim's
+// successor. A callback that garbage collects the same dictionary could free that successor, and the
+// walk then dereferenced freed memory (crash signature: SIGSEGV in garbage_collect_pending_deletes()
+// at "item_next = item->next").
+//
+// The victims are now detached during the walk and delivered after it, so a re-entrant callback walks
+// a list they are no longer part of.
+
+struct dict_gc_cursor_test {
+    DICTIONARY *dict;
+    size_t deletes;                 // how many delete callbacks fired
+    size_t reentered;               // how many times we recursed into the GC
+    size_t undetached;              // callbacks that ran while a victim was still on the items list
+    char order[8];                  // the order the callbacks fired in
+    size_t order_len;
+};
+
+static void dict_gc_cursor_delete_callback(const DICTIONARY_ITEM *item, void *value __maybe_unused, void *data) {
+    struct dict_gc_cursor_test *t = data;
+
+    // The contract this test pins: when a delete callback runs, no victim of this collection is still
+    // on the items list. Before the fix the walk freed each victim in turn, so A's callback ran with B
+    // still linked, and this counter is what makes that visible without a sanitizer. It matters because
+    // the freed-successor read is otherwise unreliable as a signal in a plain build: ARAL usually leaves
+    // the slot readable, so the stale refcount still reads REFCOUNT_DELETED and the walk can finish
+    // quietly with every other assertion below satisfied. Measured on the unfixed collector, 12
+    // plain-build runs: 12 failed - 8 reported this counter, 4 crashed first inside the corrupted
+    // traversal. The fixed collector passed 10 of 10 plain and 3 of 3 under ASAN.
+    //
+    // Look for an uncollected victim specifically - deleted, unreferenced, still linked - not merely a
+    // non-empty list: live items legitimately stay on the list throughout delivery, and C below is one.
+    // This predicate is right for THIS test, not a general one: the victims here are master items, and
+    // a view orphan can carry the deleted flag only on its shared part.
+    for(DICTIONARY_ITEM *i = t->dict->items.list; i ; i = i->next) {
+        if((i->flags & ITEM_FLAG_DELETED) && i->refcount == 0) {
+            t->undetached++;
+            break;
+        }
+    }
+
+    const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    if(name && *name && t->order_len < sizeof(t->order) - 1)
+        t->order[t->order_len++] = name[0];
+
+    t->deletes++;
+
+    // Re-enter the garbage collector from inside a delete callback, exactly as a real callback can
+    // (the items lock is recursive). Before the fix this freed the walk's cached successor.
+    if(name && name[0] == 'A' && !t->reentered) {
+        t->reentered++;
+        dictionary_garbage_collect(t->dict);
+    }
+}
+
+static size_t dictionary_gc_cursor_unittest(void) {
+    size_t errors = 0;
+    struct dictionary_stats stats = {};
+    struct dict_gc_cursor_test t = { 0 };
+
+    fprintf(stderr, "\n\nChecking GC traversal cursor (delete callback re-entering the GC)...\n");
+
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
+    t.dict = dict;
+    dictionary_register_delete_callback(dict, dict_gc_cursor_delete_callback, &t);
+
+    // two adjacent items, in list order A then B, plus a live item C that is never deleted.
+    // C is what keeps the check above honest: it stays linked for the whole collection, so a check that
+    // merely asked "is the items list empty?" would report a false victim on the fixed collector.
+    DICTIONARY_ITEM *a = dictionary_set_and_acquire_item(dict, "A", "VA", 3);
+    DICTIONARY_ITEM *b = dictionary_set_and_acquire_item(dict, "B", "VB", 3);
+    dictionary_set(dict, "C", "VC", 3);
+
+    // delete both while referenced: they are only flagged, not freed
+    dictionary_del(dict, "A");
+    dictionary_del(dict, "B");
+
+    // releasing the references makes both pending-deletion victims
+    dictionary_acquired_item_release(dict, a);
+    dictionary_acquired_item_release(dict, b);
+
+    // the walk that used to crash here
+    dictionary_garbage_collect(dict);
+
+    if(t.deletes != 2) {
+        fprintf(stderr, "GC CURSOR: expected exactly 2 delete callbacks, got %zu\n", t.deletes);
+        errors++;
+    }
+
+    if(t.undetached) {
+        fprintf(stderr, "GC CURSOR: %zu delete callback(s) ran while a victim was still linked on the "
+                        "items list - the walk is delivering during the traversal, not after it\n",
+                t.undetached);
+        errors++;
+    }
+
+    if(!t.reentered) {
+        fprintf(stderr, "GC CURSOR: the delete callback never re-entered the garbage collector - "
+                        "the test did not exercise what it is meant to\n");
+        errors++;
+    }
+
+    t.order[t.order_len] = '\0';
+    if(strcmp(t.order, "AB") != 0) {
+        fprintf(stderr, "GC CURSOR: expected victims delivered in traversal order 'AB', got '%s'\n", t.order);
+        errors++;
+    }
+
+    // both victims must be gone and nothing left pending; the live item C must be untouched
+    errors += unittest_check_dictionary("gc cursor", dict, 1, 1, 0, 0, 0);
+
+    dictionary_destroy(dict);
+
+    if(!errors)
+        fprintf(stderr, "GC traversal cursor test OK\n");
+
+    return errors;
+}
+
+// Views discover victims the pending counter never saw: an item deleted on the MASTER orphans the
+// view item, and that discovery happens inside item_check_and_acquire_advanced() during the walk.
+// So the GC must not stop on a zero pending count when it is collecting a view. Two orphans, so a
+// premature exit after the first one is caught.
+
+static size_t dictionary_gc_view_orphans_unittest(void) {
+    size_t errors = 0;
+    struct dictionary_stats stats = {};
+
+    fprintf(stderr, "\n\nChecking GC on a view collects every master-deleted orphan...\n");
+
+    DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
+    DICTIONARY *view = dictionary_create_view(master);
+
+    DICTIONARY_ITEM *m1 = dictionary_set_and_acquire_item(master, "M1", "V1", 3);
+    DICTIONARY_ITEM *m2 = dictionary_set_and_acquire_item(master, "M2", "V2", 3);
+
+    DICTIONARY_ITEM *v1 = dictionary_view_set_and_acquire_item(view, "VIEW1", m1);
+    DICTIONARY_ITEM *v2 = dictionary_view_set_and_acquire_item(view, "VIEW2", m2);
+
+    dictionary_acquired_item_release(view, v1);
+    dictionary_acquired_item_release(view, v2);
+    dictionary_acquired_item_release(master, m1);
+    dictionary_acquired_item_release(master, m2);
+
+    // delete on the master: both view items are now orphans, but the view's own
+    // pending-deletion counter is still zero - nothing marked them
+    dictionary_del(master, "M1");
+    dictionary_del(master, "M2");
+
+    // the setup is only meaningful if the view really has nothing counted: these orphans are
+    // invisible to the pending counter until the walk discovers them
+    long int pending_before = DICTIONARY_PENDING_DELETES_GET(view);
+    if(pending_before != 0) {
+        fprintf(stderr, "GC VIEW ORPHANS: expected 0 pending on the view before the GC, got %ld\n",
+                pending_before);
+        errors++;
+    }
+
+    dictionary_garbage_collect(view);
+
+    // both must be gone; if the walk stopped at a zero pending count, VIEW2 would survive
+    errors += unittest_check_dictionary("gc view orphans", view, 0, 0, 0, 0, 0);
+
+    dictionary_destroy(view);
+    dictionary_destroy(master);
+
+    if(!errors)
+        fprintf(stderr, "GC view orphan collection test OK\n");
+
+    return errors;
+}
+
 size_t dictionary_unittest_views(void) {
     size_t errors = 0;
     struct dictionary_stats stats = {};
     DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
     DICTIONARY *view = dictionary_create_view(master);
+    DICTIONARY_ITEM *master_item2 = NULL;
+    DICTIONARY_ITEM *view_item2 = NULL;
+    DICTIONARY_ITEM *lookup = NULL;
 
     fprintf(stderr, "\n\nChecking dictionary views...\n");
 
@@ -1004,10 +1291,404 @@ size_t dictionary_unittest_views(void) {
     errors += unittest_check_dictionary("master", master, 0, 0, 1, 0, 1);
     errors += unittest_check_dictionary("view", view, 0, 0, 1, 0, 1);
 
+    fprintf(stderr, "\nPASS 3: Replacing a stale view item after master deletion:\n");
+    item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
+    item1_on_view = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", item1_on_master);
+    dictionary_acquired_item_release(view, item1_on_view);
+    dictionary_del(master, "KEY 1");
+
+    // Suppress the preflight garbage collection once so view_set() exercises
+    // the stale-entry cleanup path inside dict_item_add_or_reset_value_and_acquire().
+    __atomic_store_n(&view->last_gc_run_us, now_realtime_usec(), __ATOMIC_RELAXED);
+
+    master_item2 = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE2", strlen("VALUE2") + 1);
+    view_item2 = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", master_item2);
+
+    if(!view_item2) {
+        fprintf(stderr, "View replacement returned NULL\n");
+        errors++;
+    }
+    else if(item_flag_check(view_item2, ITEM_FLAG_DELETED) || view_item2->shared != master_item2->shared) {
+        fprintf(stderr, "View replacement returned stale/deleted item\n");
+        dictionary_acquired_item_release(view, view_item2);
+        errors++;
+    }
+    else
+        dictionary_acquired_item_release(view, view_item2);
+
+    lookup = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(view, "KEY 1 ON VIEW");
+    if(!lookup || item_flag_check(lookup, ITEM_FLAG_DELETED) || lookup->shared != master_item2->shared) {
+        fprintf(stderr, "View lookup did not resolve to the replacement item\n");
+        errors++;
+    }
+    if(lookup)
+        dictionary_acquired_item_release(view, lookup);
+
+    dictionary_acquired_item_release(master, master_item2);
+    dictionary_acquired_item_release(master, item1_on_master);
+
     dictionary_destroy(master);
     dictionary_destroy(view);
     return errors;
 }
+
+// ----------------------------------------------------------------------------
+// Test: dictionary_destroy() TOCTOU race
+//
+// Stress test for the race where dictionary_destroy() could start force-freeing
+// a dictionary while concurrent get/set/traversal operations were still able
+// to enter through stale pre-lock destroyed-state checks.
+//
+// The test runs the racy workload in a forked child process so that a crash
+// is detected as a child signal instead of bringing down the test harness.
+
+#ifndef OS_WINDOWS
+#include <sys/wait.h>
+#endif
+
+#ifndef OS_WINDOWS
+
+struct dict_destroy_race_data {
+    DICTIONARY *dict;
+    int ready;          // atomic: worker signals it is looping
+    int stop;           // atomic: main tells worker to stop
+    int refused;        // atomic: inserts the destroy refused (race window hit)
+};
+
+// Worker that continuously acquires and releases an item.
+// Keep the reference briefly so destroy() can observe an in-flight access in
+// the post-index-teardown recheck without forcing the old "already referenced"
+// path up front.
+static void dict_destroy_race_getter_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        DICTIONARY_ITEM *item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(d->dict, "key");
+        if(item) {
+            const char *val = dictionary_acquired_item_value(item);
+            if(val) {
+                volatile char c __attribute__((unused)) = val[0];
+            }
+            tinysleep();
+            dictionary_acquired_item_release(d->dict, item);
+        }
+    }
+}
+
+// Worker that continuously sets (inserts/updates) items.
+static void dict_destroy_race_setter_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    int counter = 0;
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        char key[32], val[32];
+        // Use unique keys so the test exercises concurrent inserts during
+        // destruction without racing on value replacement semantics.
+        snprintfz(key, sizeof(key), "key-%d", counter);
+        snprintfz(val, sizeof(val), "val-%d", counter);
+
+        // value_len > 0 and the name is valid, so NULL here is unambiguously a
+        // refusal by a concurrent destroy (see the set-family contract in
+        // dictionary.h). Count it: it is the proof that this test actually
+        // reached the destroy-vs-insert window it exists to cover.
+        if(!dictionary_set(d->dict, key, val, strlen(val) + 1))
+            __atomic_add_fetch(&d->refused, 1, __ATOMIC_RELAXED);
+
+        counter++;
+    }
+}
+
+// Worker that continuously traverses (dfe_start_read / dfe_done).
+static void dict_destroy_race_traverser_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        void *val;
+        dfe_start_read(d->dict, val) {
+            if(val) {
+                volatile char c __attribute__((unused)) = ((const char *)val)[0];
+            }
+        }
+        dfe_done(val);
+    }
+}
+
+// Anchor thread: enters the dictionary API and stays admitted - holding no
+// item reference and none of the dictionary's locks - until told to leave.
+//
+// This is what makes the rest of the test legal. The documented contract only
+// protects a caller that is ALREADY inside the API; a thread holding a
+// DICTIONARY * it has not entered with is explicitly unsupported
+// (dictionary-internals.h). Without this anchor, a worker below could be
+// descheduled between its stop check and its next dictionary call while
+// dictionary_destroy() observes inflight == 0 and force-frees the object. The
+// worker would then resume into freed memory - a stale-pointer use-after-free
+// of the test's own making, which would make this test both flaky and useless
+// as proof of the admitted-caller guarantee.
+//
+// With the anchor admitted, dictionary_destroy() must take one of its deferred
+// paths, so the object stays alive until cleanup_destroyed_dictionaries() runs
+// after every worker has been joined and the anchor has left.
+static void dict_destroy_race_anchor_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    dictionary_api_enter(d->dict);
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED))
+        tinysleep();
+
+    dictionary_api_exit(d->dict);
+}
+
+// Run the racy workload in a child process: concurrent get/set/traverse
+// while the main thread destroys the dictionary. Without the fix this may
+// crash or trip internal consistency checks, depending on timing.
+static void dict_destroy_race_child(int iterations) {
+    // Drain whatever the parent process left queued, then take a baseline.
+    // Anything still queued after this is stuck for reasons outside this test
+    // and stays stuck, so the count is stable and each iteration below must
+    // return to it.
+    cleanup_destroyed_dictionaries(false);
+    size_t queued_baseline = dictionary_destroy_delayed_count();
+
+    for(int i = 0; i < iterations; i++) {
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
+        dictionary_set(dict, "key", "value", 6);
+
+        struct dict_destroy_race_data getter_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data setter_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data traverser_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data anchor_data = { .dict = dict, .ready = 0, .stop = 0 };
+
+        ND_THREAD *anchor = nd_thread_create(
+            "race-anchor", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_anchor_thread, &anchor_data);
+
+        ND_THREAD *getter = nd_thread_create(
+            "race-getter", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_getter_thread, &getter_data);
+
+        ND_THREAD *setter = nd_thread_create(
+            "race-setter", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_setter_thread, &setter_data);
+
+        ND_THREAD *traverser = nd_thread_create(
+            "race-trav", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_traverser_thread, &traverser_data);
+
+        if(!anchor || !getter || !setter || !traverser) {
+            // Thread creation failed — stop any that did start and clean up.
+            __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
+            __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
+            __atomic_store_n(&traverser_data.stop, 1, __ATOMIC_RELEASE);
+            if(getter) nd_thread_join(getter);
+            if(setter) nd_thread_join(setter);
+            if(traverser) nd_thread_join(traverser);
+
+            // the anchor leaves last: it is what keeps the object alive
+            __atomic_store_n(&anchor_data.stop, 1, __ATOMIC_RELEASE);
+            if(anchor) nd_thread_join(anchor);
+
+            dictionary_destroy(dict);
+            cleanup_destroyed_dictionaries(false);
+            _exit(2);
+        }
+
+        // wait for all workers to be running
+        // the anchor's ready flag also means "this thread is admitted", which
+        // is the precondition that makes the destroy below legal
+        while(!__atomic_load_n(&anchor_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&getter_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&setter_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&traverser_data.ready, __ATOMIC_ACQUIRE))
+            tinysleep();
+
+        tinysleep();
+
+        // Do not hold a permanent acquired item here: that would force the old
+        // "already referenced" delayed-destroy path before destroy() reaches
+        // the new destroyed-flag + index-teardown synchronization. Instead,
+        // rely on the active workers to create transient in-flight accesses
+        // while destroy() races with get/set/traversal.
+        size_t freed = dictionary_destroy(dict);
+
+        // This is the admitted-caller guarantee, asserted: the anchor is inside
+        // the API, so dictionary_destroy() MUST refuse to free the object and
+        // return 0 (having queued it for deferred destruction). A non-zero
+        // return means it freed the dictionary out from under an admitted
+        // caller, which is the exact bug this test exists to catch.
+        if(freed != 0)
+            _exit(3);
+
+        // Let the workers actually operate on the now-DESTROYED dictionary.
+        // dictionary_destroy() has flagged it (via the deferred-destruction
+        // path), so from here every insert must be refused under the index
+        // lock. Waiting for the first refusal - rather than setting stop
+        // immediately - is what makes each iteration exercise the window this
+        // test exists to cover: otherwise the workers can leave their loops
+        // before ever calling in again, and the iteration proves nothing.
+        // Bounded by wall clock, not by a spin count: the workers loop tightly
+        // on a destroyed dictionary, so the first refusal lands in microseconds.
+        // The deadline is only ever paid once, because reaching it exits.
+        usec_t refuse_deadline = now_monotonic_usec() + 2 * USEC_PER_SEC;
+        while(!__atomic_load_n(&setter_data.refused, __ATOMIC_RELAXED) &&
+              now_monotonic_usec() < refuse_deadline)
+            tinysleep();
+
+        if(!__atomic_load_n(&setter_data.refused, __ATOMIC_RELAXED))
+            _exit(5);
+
+        __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&traverser_data.stop, 1, __ATOMIC_RELEASE);
+        nd_thread_join(getter);
+        nd_thread_join(setter);
+        nd_thread_join(traverser);
+
+        // Only now can the object become freeable: every worker has left the
+        // API for good, so the anchor can drop the last in-flight count.
+        __atomic_store_n(&anchor_data.stop, 1, __ATOMIC_RELEASE);
+        nd_thread_join(anchor);
+
+        cleanup_destroyed_dictionaries(false);
+
+        // The deferred destruction MUST have completed: nothing holds an item
+        // reference and nothing is inside the API any more, so the dictionary
+        // queued above must be gone and the queue back to its baseline.
+        //
+        // This is what makes the whole test prove something about production
+        // bracketing rather than only about the anchor. Every
+        // dictionary_api_enter() the workers executed - in the getter, the
+        // setter and the traversal - had to be matched by its exit; a single
+        // leaked in-flight count, or a leaked item reference, pins the object
+        // in the queue forever and fails here.
+        //
+        // Known limit: removing a bracket PAIR outright keeps the counter
+        // balanced, so that reverts to the ASAN-plus-timing detection which
+        // originally found the use-after-free. What is caught deterministically
+        // here is an unbalanced bracket.
+        if(dictionary_destroy_delayed_count() != queued_baseline)
+            _exit(4);
+    }
+}
+
+static int dictionary_destroy_race_unittest(void) {
+    const int iterations = nd_is_running_under_ci() ? 10 : 100;
+
+    fprintf(stderr,
+            "\nTesting dictionary_destroy() TOCTOU race (%d iterations in child process)...\n",
+            iterations);
+
+    fflush(stderr);
+    fflush(stdout);
+
+    pid_t pid = fork();
+    if(pid == 0) {
+        // child — run the racy workload
+        dict_destroy_race_child(iterations);
+        _exit(0);
+    }
+
+    if(pid < 0) {
+        fprintf(stderr, "dictionary_destroy() TOCTOU race test: fork() failed: %s\n",
+                strerror(errno));
+        return 1;
+    }
+
+    // Give the child a generous timeout so a hang doesn't stall the suite.
+    int timeout_sec = 120;
+    int status = 0;
+    bool reaped = false;
+    for(int elapsed = 0; elapsed < timeout_sec; elapsed++) {
+        pid_t rc = waitpid(pid, &status, WNOHANG);
+        if(rc > 0) { reaped = true; break; }
+        if(rc < 0) {
+            if(errno == EINTR)
+                continue;
+            fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed: %s\n",
+                    strerror(errno));
+            return 1;
+        }
+        sleep_usec(USEC_PER_SEC);
+    }
+    if(!reaped) {
+        kill(pid, SIGKILL);
+        while(waitpid(pid, &status, 0) < 0) {
+            if(errno != EINTR) {
+                fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed after SIGKILL: %s\n",
+                        strerror(errno));
+                return 1;
+            }
+        }
+        fprintf(stderr, "dictionary_destroy() TOCTOU race test: FAILED — "
+                "child hung (killed after %d seconds)\n", timeout_sec);
+        return 1;
+    }
+
+    if(WIFSIGNALED(status)) {
+        int sig = WTERMSIG(status);
+        fprintf(stderr,
+                "dictionary_destroy() TOCTOU race test: FAILED — "
+                "child killed by signal %d (%s) — "
+                "dictionary_destroy() still has a TOCTOU in its destroy/access "
+                "synchronization path\n",
+                sig, strsignal(sig));
+        return 1;
+    }
+
+    if(WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+        int code = WEXITSTATUS(status);
+
+        if(code == 5)
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "the setter was never refused after the dictionary was destroyed, "
+                    "so the race window this test exists to cover was never reached "
+                    "(the test, not the engine, needs fixing)\n");
+        else if(code == 4)
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "the deferred destruction never drained: the dictionary is still "
+                    "queued after every worker left the API (unbalanced "
+                    "dictionary_api_enter()/exit(), or a leaked item reference)\n");
+        else if(code == 3)
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "dictionary_destroy() freed the dictionary while a thread was "
+                    "admitted inside the API (in-flight counter ignored)\n");
+        else if(code == 2)
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "child could not create its worker threads\n");
+        else
+            fprintf(stderr,
+                    "dictionary_destroy() TOCTOU race test: FAILED — "
+                    "child exited with status %d\n", code);
+
+        return 1;
+    }
+
+    fprintf(stderr, "dictionary_destroy() TOCTOU race test: OK\n");
+    return 0;
+}
+
+#else
+
+static int dictionary_destroy_race_unittest(void) {
+    fprintf(stderr,
+            "\nTesting dictionary_destroy() TOCTOU race: SKIPPED "
+            "(fork-based test is unsupported on this platform)\n");
+    return 0;
+}
+
+#endif
 
 bool dictionary_traverse_or_destroy_unittest(void) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
@@ -1551,6 +2232,8 @@ int dictionary_unittest(size_t entries) {
     // check reference counters
     {
         fprintf(stderr, "\nTesting reference counters:\n");
+        errors += dictionary_unittest_last_release_before_delete_mark();
+
         dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
         errors += unittest_check_dictionary("", dict, 0, 0, 0, 0, 0);
 
@@ -1624,6 +2307,9 @@ int dictionary_unittest(size_t entries) {
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
 
+    fprintf(stderr, "\nTesting dictionary packed length bounds\n");
+    errors += dictionary_unittest_reject_unrepresentable_lengths();
+
     errors += dictionary_unittest_views();
     errors += dictionary_unittest_threads();
     errors += dictionary_unittest_view_threads();
@@ -1634,6 +2320,11 @@ int dictionary_unittest(size_t entries) {
     }
     else
         fprintf(stderr, "Destroy on traversal test OK\n");
+
+    errors += dictionary_gc_cursor_unittest();
+    errors += dictionary_gc_view_orphans_unittest();
+
+    errors += dictionary_destroy_race_unittest();
 
     cleanup_destroyed_dictionaries(false);
 

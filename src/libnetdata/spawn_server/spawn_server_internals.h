@@ -8,6 +8,10 @@
 #include "spawn_library.h"
 #include "log-forwarder.h"
 
+// grace period spawn_server_exec_kill() waits after SIGTERM before escalating to SIGKILL,
+// used when the caller passes a non-positive timeout_ms (i.e. no explicit grace)
+#define SPAWN_KILL_DEFAULT_GRACE_MS 2000
+
 #if defined(OS_WINDOWS)
 #define SPAWN_SERVER_VERSION_WINDOWS 1
 // #define SPAWN_SERVER_VERSION_UV 1
@@ -72,6 +76,11 @@ struct spawn_instance {
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)
+    // The command line, kept client-side so a failure to signal the child can name it. The spawn
+    // server has its own copy (SPAWN_REQUEST.cmdline), but the kills are issued from this side and
+    // the server logs a command line only at child creation (DEBUG) and at child death - neither of
+    // which fires for a child that refuses to die, which is exactly when we need to report it.
+    const char *cmdline;
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
@@ -84,6 +93,7 @@ struct spawn_instance {
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)
     HANDLE process_handle;
     DWORD dwProcessId;
+    LOG_FORWARDER_TOKEN stderr_log_token;
 #endif
 };
 

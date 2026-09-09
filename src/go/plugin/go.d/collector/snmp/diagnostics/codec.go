@@ -1,0 +1,157 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package diagnostics
+
+import (
+	jsonv1 "encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"errors"
+	"fmt"
+	"io"
+	"math"
+	"reflect"
+
+	"github.com/klauspost/compress/zstd"
+)
+
+const Format = "netdata.snmp.diagnostics"
+const Version = 1
+const KindLifecycle = "lifecycle"
+const KindTopology = "topology"
+
+var (
+	ErrCompressedLimit = errors.New("SNMP topology diagnostic archive compressed-byte limit exceeded")
+	ErrDecodedLimit    = errors.New("SNMP topology diagnostic archive decoded-byte limit exceeded")
+)
+
+type ReadLimits struct {
+	MaxCompressedBytes int64
+	MaxDecodedBytes    int64
+}
+
+func DefaultReadLimits() ReadLimits { return ReadLimits{128 << 20, 512 << 20} }
+
+// Write encodes one complete document. The caller owns its immutable snapshot.
+func Write(w io.Writer, document Document) error {
+	if w == nil {
+		return errors.New("write SNMP diagnostic archive: nil writer")
+	}
+	encoder, err := newArchiveEncoder()
+	if err != nil {
+		return err
+	}
+	return encoder.write(w, document)
+}
+
+// One serial publisher reuses the compressor's workspace across device files.
+// Per-file construction would allocate megabytes on every device publication.
+type archiveEncoder struct{ encoder *zstd.Encoder }
+
+func newArchiveEncoder() (*archiveEncoder, error) {
+	encoder, err := zstd.NewWriter(
+		nil,
+		zstd.WithEncoderLevel(zstd.SpeedDefault),
+		zstd.WithEncoderConcurrency(1),
+		zstd.WithEncoderCRC(true),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create diagnostic zstd encoder: %w", err)
+	}
+	return &archiveEncoder{encoder: encoder}, nil
+}
+
+func (e *archiveEncoder) write(w io.Writer, document Document) error {
+	if w == nil {
+		return errors.New("write SNMP diagnostic archive: nil writer")
+	}
+	e.encoder.Reset(w)
+	encodeErr := jsonv2.MarshalWrite(
+		e.encoder,
+		document,
+		jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.EscapeForHTML(false)),
+	)
+	closeErr := e.encoder.Close()
+	return errors.Join(encodeErr, closeErr)
+}
+
+// Read checks the transport and envelope. Domain consumers validate their
+// typed sections before inspection or replay.
+func Read(r io.Reader, limits ReadLimits) (Document, error) {
+	if r == nil {
+		return Document{}, errors.New("read SNMP diagnostic archive: nil reader")
+	}
+	if limits.MaxCompressedBytes <= 0 || limits.MaxCompressedBytes == math.MaxInt64 {
+		return Document{}, errors.New("invalid compressed-byte limit")
+	}
+	if limits.MaxDecodedBytes <= 0 || limits.MaxDecodedBytes == math.MaxInt64 {
+		return Document{}, errors.New("invalid decoded-byte limit")
+	}
+	compressed := &io.LimitedReader{
+		R: r,
+		N: limits.MaxCompressedBytes + 1,
+	}
+	decoder, err := zstd.NewReader(compressed, zstd.WithDecoderConcurrency(1))
+	if err != nil {
+		if compressed.N == 0 {
+			return Document{}, ErrCompressedLimit
+		}
+		return Document{}, fmt.Errorf("create diagnostic zstd decoder: %w", err)
+	}
+	decoded := &io.LimitedReader{
+		R: decoder,
+		N: limits.MaxDecodedBytes + 1,
+	}
+	var document Document
+	err = jsonv2.UnmarshalRead(
+		decoded,
+		&document,
+		jsonv2.JoinOptions(jsonv1.DefaultOptionsV1(), jsontext.AllowInvalidUTF8(false)),
+	)
+	decoder.Close()
+	if compressed.N == 0 {
+		return Document{}, ErrCompressedLimit
+	}
+	if decoded.N == 0 {
+		return Document{}, ErrDecodedLimit
+	}
+	if err != nil {
+		return Document{}, fmt.Errorf("decode diagnostic JSON: %w", err)
+	}
+	if err := document.ValidateEnvelope(); err != nil {
+		return Document{}, err
+	}
+	return document, nil
+}
+
+func (d Document) ValidateEnvelope() error {
+	if d.Format != Format {
+		return fmt.Errorf("unsupported format %q", d.Format)
+	}
+	if d.Version != Version {
+		return fmt.Errorf("unsupported version %d", d.Version)
+	}
+	switch d.Kind {
+	case KindNormal:
+		if d.Normal == nil || !reflect.ValueOf(d.Snapshot).IsZero() || d.TopologyActive || d.Checkpoint != 0 {
+			return errors.New("invalid normal device document envelope")
+		}
+	case KindLifecycle:
+		if d.Normal != nil {
+			return errors.New("lifecycle document contains normal evidence")
+		}
+		if d.Snapshot.Topology != nil || d.Snapshot.LastAborted != nil || d.Snapshot.ProducerScopeID != "" || d.Checkpoint != 0 {
+			return errors.New("lifecycle document contains topology checkpoint data")
+		}
+	case KindTopology:
+		if d.Normal != nil {
+			return errors.New("topology document contains normal evidence")
+		}
+		if d.TopologyActive {
+			return errors.New("topology checkpoint contains current lifecycle status")
+		}
+	default:
+		return fmt.Errorf("unsupported document kind %q", d.Kind)
+	}
+	return nil
+}

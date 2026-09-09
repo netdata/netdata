@@ -62,14 +62,14 @@ These events log alert state transitions for node metrics:
 
 ## Who Can Access Events?
 
-| **User Role**      | **Event Domains Accessible**                    |
-|--------------------|-------------------------------------------------|
-| Administrators     | All event domains (Auditing, Topology, Alerts). |
-| Non-administrators | Topology and Alerts only.                       |
+| **User Role**                            | **Event Domains Accessible**                    |
+|------------------------------------------|-------------------------------------------------|
+| Admin, Manager, Troubleshooter, Observer | All event domains (Auditing, Topology, Alerts). |
+| Billing                                  | None.                                           |
 
 :::note
 
-See the [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for details.
+See the [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions matrix.
 
 :::
 

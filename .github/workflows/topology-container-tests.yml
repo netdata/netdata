@@ -1,0 +1,216 @@
+---
+name: Topology Container Tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/topology-container-tests.yml'
+      - 'src/collectors/cgroups.plugin/**'
+      - 'src/collectors/apps.plugin/**'
+      - 'src/collectors/network-viewer.plugin/**'
+      - 'src/collectors/common-cgroups/**'
+      - 'src/libnetdata/local-sockets/**'
+      - 'src/libnetdata/netipc/**'
+  pull_request:
+    paths:
+      - '.github/workflows/topology-container-tests.yml'
+      - 'src/collectors/cgroups.plugin/**'
+      - 'src/collectors/apps.plugin/**'
+      - 'src/collectors/network-viewer.plugin/**'
+      - 'src/collectors/common-cgroups/**'
+      - 'src/libnetdata/local-sockets/**'
+      - 'src/libnetdata/netipc/**'
+
+concurrency:
+  group: topology-container-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TEST_TARGETS: >-
+    apps-cgroups-path-test
+    apps-cgroups-enrichment-test
+    apps-lookup-protocol-test
+    apps-lookup-netipc-lock-test
+    apps-cgroups-lookup-client-abort-test
+    cgroup-lookup-netipc-test
+    cgroup-orchestrator-test
+    cgroup-name-config-test
+    cgroups-plugin-labels-test
+    local-sockets-mnl-test
+    local-sockets-namespaces-test
+    network-viewer-apps-lookup-client-test
+    network-viewer-topology-containers-test
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config flex bison g++ \
+            libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
+            liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev python3-jsonschema \
+            libprotobuf-dev protobuf-compiler
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_PLUGIN_FREEIPMI=Off \
+            -DENABLE_PLUGIN_CUPS=Off \
+            -DENABLE_PLUGIN_NFACCT=Off \
+            -DENABLE_PLUGIN_OTEL=Off \
+            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
+            -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
+            -DENABLE_EXPORTER_MONGODB=Off \
+            -DENABLE_BUNDLED_PROTOBUF=Off
+
+      - name: Build test binaries
+        run: |
+          (echo "${TEST_TARGETS}"; echo network-viewer.plugin) | xargs ninja -C build
+
+      - name: Run test binaries
+        run: |
+          set -euo pipefail
+          for t in ${TEST_TARGETS}; do
+            bin="$(find build -name "$t" -type f -executable | head -n 1)"
+            if [ -z "$bin" ]; then
+              echo "::error::test binary $t not found"
+              exit 1
+            fi
+            echo "--- running $t"
+            timeout 120 "$bin"
+            echo "--- $t OK"
+          done
+
+      - name: Validate topology fixtures
+        run: python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py
+
+      - name: Validate network-viewer topology payload (live)
+        run: |
+          set -euo pipefail
+          plugin="$(find build -name 'network-viewer.plugin' -type f -executable | head -n 1)"
+          if [ -z "$plugin" ]; then
+            echo "::error::network-viewer.plugin binary not found"
+            exit 1
+          fi
+          # The plugin needs privileges to enumerate /proc/<pid>/fd for all
+          # processes, but PR-controlled code must never run as root: restrict
+          # the privileged run to the trusted push event and keep pull_request
+          # runs unprivileged (the payload is still schema-valid without it).
+          run_as_root=()
+          if [ "${GITHUB_EVENT_NAME:-}" = "push" ]; then
+            run_as_root=(sudo -n)
+          fi
+          tmpd="$(mktemp -d)"
+          trap 'rm -rf "$tmpd"' EXIT
+          # regression tests for the payload parser itself
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py --self-test
+          validate() {
+            local name="$1" payload="$2"
+            shift 2
+            local out="$tmpd/${name}.json" err="$tmpd/${name}.err"
+            set +e
+            # shellcheck disable=SC2024 # the redirect must stay in the runner
+            # (the plugin only runs as root; the output file must be readable
+            # by the validator running as the runner user)
+            printf '%s' "$payload" | "${run_as_root[@]}" timeout 120 "$plugin" --test topology:network-connections > "$out" 2> "$err"
+            local rc=$?
+            set -e
+            echo "--- topology ${name}: exit=${rc} stdout_bytes=$(wc -c < "$out")"
+            if [ "$rc" -ne 0 ]; then
+              echo "::error::topology ${name} command failed with exit code ${rc}"
+              tail -n 15 "$err"
+              return "$rc"
+            fi
+            python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py "$out" "$@"
+          }
+          validate aggregated '{}' --mode aggregated --group-by process_name
+          validate pid '{"selections":{"group_by":"pid"}}' --mode aggregated --group-by pid
+          validate detailed '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}' --mode detailed
+
+  asan-tests:
+    name: Unit Tests (ASAN)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config flex bison g++ \
+            libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
+            liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev \
+            libprotobuf-dev protobuf-compiler
+
+      - name: Configure
+        run: |
+          # ENABLE_ADDRESS_SANITIZER adds the sanitizer flags AND defines
+          # FSANITIZE_ADDRESS, which is what makes libnetdata's pooled
+          # allocators fall back to plain malloc/free. Setting the flags by hand
+          # (as this step used to) instruments the build but leaves the pools
+          # intact, so ASan cannot see a use-after-free inside ARAL, the
+          # dictionary allocators, STRING or onewayalloc.
+          cmake -S . -B build -G Ninja \
+            -DENABLE_ADDRESS_SANITIZER=On \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_PLUGIN_FREEIPMI=Off \
+            -DENABLE_PLUGIN_CUPS=Off \
+            -DENABLE_PLUGIN_NFACCT=Off \
+            -DENABLE_PLUGIN_OTEL=Off \
+            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
+            -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
+            -DENABLE_EXPORTER_MONGODB=Off \
+            -DENABLE_BUNDLED_PROTOBUF=Off
+
+      - name: Build test binaries
+        run: echo "${TEST_TARGETS}" | xargs ninja -C build
+
+      - name: Run test binaries under ASAN
+        run: |
+          set -euo pipefail
+          # focus on use-after-free/overflows; the harnesses do not free
+          # everything on exit, so leak detection stays off here
+          export ASAN_OPTIONS="detect_leaks=0:abort_on_error=1"
+          for t in ${TEST_TARGETS}; do
+            bin="$(find build -name "$t" -type f -executable | head -n 1)"
+            if [ -z "$bin" ]; then
+              echo "::error::test binary $t not found"
+              exit 1
+            fi
+            echo "--- running $t (ASAN)"
+            timeout 300 "$bin"
+            echo "--- $t OK"
+          done

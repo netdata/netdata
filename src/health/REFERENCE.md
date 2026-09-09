@@ -81,11 +81,12 @@ crit: $this > (($status == $CRITICAL) ? (75) : (85))
 
 ### Task 2: Disable Unwanted Alerts
 
-| Method                  | Use Case                            | Configuration File | How To                                   |
-|-------------------------|-------------------------------------|--------------------|------------------------------------------|
-| Disable all alerts      | Testing/maintenance                 | netdata.conf       | Set `enabled = no` in `[health]` section |
-| Disable specific alerts | Remove noisy alerts                 | netdata.conf       | Set `enabled alarms = !alert_name *`     |
-| Silence notifications   | Keep monitoring, stop notifications | Alert config file  | Change `to: silent`                      |
+| Method                      | Use Case                            | Configuration File | How To                                              |
+|-----------------------------|-------------------------------------|--------------------|-----------------------------------------------------|
+| Disable all alerts          | Testing/maintenance                 | netdata.conf       | Set `enabled = no` in `[health]` section            |
+| Disable specific alerts     | Remove noisy alerts                 | netdata.conf       | Set `enabled alarms = !alert_name *`                |
+| Enable only specific alerts | Load only a chosen set of alerts    | netdata.conf       | Set `enabled alarms = alert_name` (no trailing `*`) |
+| Silence notifications       | Keep monitoring, stop notifications | Alert config file  | Change `to: silent`                                 |
 
 ### Task 3: Create a Simple Alert
 
@@ -124,6 +125,12 @@ You don't need to restart your Netdata Agent when making changes to health confi
 sudo netdatacli reload-health
 ```
 
+**On Windows:**
+
+```powershell
+& "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-health
+```
+
 **Alternative Method:**
 If `netdatacli` doesn't work on your system, you can send a `SIGUSR2` signal to the daemon, which reloads health configuration without restarting the entire process.
 
@@ -135,14 +142,18 @@ sudo killall -USR2 netdata
 
 **Configuration Locations:**
 
-**Configuration Locations:**
-
 | Location                          | Purpose                      | Common Tasks                                                                                             | How to Edit                              |
 |-----------------------------------|------------------------------|----------------------------------------------------------------------------------------------------------|------------------------------------------|
 | `netdata.conf` `[health]` section | Global health settings       | • Disable all monitoring (`enabled = no`)<br />• Disable specific alerts<br />• Change check frequencies | Edit directly or use `edit-config`       |
 | `health.d/*.conf` files           | Individual alert definitions | • Modify thresholds<br />• Change notification recipients<br />• Silence alerts (`to: silent`)           | Use `edit-config health.d/filename.conf` |
 
 Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and use `edit-config` to make changes to any of these files.
+
+:::note
+
+**On Windows:** the stock (default) alert templates ship at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\` — browse them to see which alerts ship with Netdata. Place your overrides in `C:\Program Files\Netdata\etc\netdata\health.d\` instead, so they survive Agent updates. Edit files there using `edit-config` from the bundled MSYS2 shell — see [On Windows](/docs/netdata-agent/configuration/README.md#on-windows) in the Agent configuration guide.
+
+:::
 
 **Edit Individual Alerts:**
 
@@ -200,7 +211,37 @@ In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart you
 
 In the `netdata.conf` `[health]` section, use [pattern](/src/libnetdata/simple_pattern/README.md) exclusion with `enabled alarms = !oom_kill *` to load all alerts except `oom_kill`.
 
+To exclude multiple specific alerts, list all exclusions before the wildcard and restart the Agent to apply the `netdata.conf` change:
+
+```conf
+[health]
+    enabled alarms = !oom_kill !disk_space_usage *
+```
+
+Restart your Netdata Agent after changing `netdata.conf` (`netdatacli reload-health` reloads health configuration files, but does not reload `netdata.conf`).
+
+:::warning
+
+Do **not** place `*` between exclusions (`!alert1 * !alert2 *` is incorrect — patterns are evaluated in order and the first match wins). When using exclusions, put all `!` patterns first, followed by a single trailing `*`.
+
+:::
+
 You can also [edit the file where the alert is defined](#how-to-edit-health-configuration-files), comment out its definition, and [reload Netdata's health configuration](#how-to-reload-health-configuration).
+
+#### Enable Only Specific Alerts (Whitelist)
+
+**Use Case:** Enable only a chosen set of alerts and disable everything else
+
+To enable only specific alerts, list their names in `enabled alarms` **without** a trailing `*` wildcard. Because [simple patterns](/src/libnetdata/simple_pattern/README.md) deny anything that is not explicitly matched, only the listed alerts load; every other alert is disabled.
+
+```conf
+[health]
+    enabled alarms = oom_kill disk_space_usage
+```
+
+Because there is no trailing `*`, any alert added by a future Netdata upgrade will not be in this list and will stay disabled until you add it explicitly — unlike the exclusion form above, where the trailing `*` keeps new alerts enabled by default.
+
+Restart your Netdata Agent after changing `netdata.conf` (`netdatacli reload-health` reloads health configuration files, but does not reload `netdata.conf`).
 
 #### Silence Individual Alert Notifications
 
@@ -339,6 +380,18 @@ For complete details on configuration loading order and precedence rules, see [A
 - The `on` line is **always required**
 - The `every` line is **required** if not using `lookup`
 - Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`
+
+While `lookup` or `calc` alone satisfies this minimum syntax requirement, an alert also needs at least one `warn` or `crit` expression to ever leave **UNDEFINED** status. Only a `warn` or `crit` expression can move an alert to CLEAR, WARNING, or CRITICAL (see [Alert Status Lifecycle](#alert-status-lifecycle) for the full status flow). With only `lookup` (or `calc`) and no `warn`/`crit`, the value is computed but nothing evaluates it against a threshold, so once the alert is first evaluated it stays UNDEFINED indefinitely.
+
+For example, this template adds `warn` and `crit` so the alert has something to evaluate:
+
+```text
+template: ram_avail_now
+      on: mem.available
+  lookup: median -15m unaligned of avail
+    warn: $this < 512
+    crit: $this < 128
+```
 
 :::
 
@@ -535,28 +588,31 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 
 **Optional Parameters:**
 
-| Parameter          | Purpose                     | Details                                                              |
-|--------------------|-----------------------------|----------------------------------------------------------------------|
-| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `==`, `<=`, `<`, `>`, `>=` |
-| `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                   |
-| `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                    |
-| `OPTIONS`          | Processing modifiers        | See options table below                                              |
-| `of DIMENSIONS`    | Which dimensions to include | Space-separated list, supports patterns                              |
+| Parameter          | Purpose                     | Details                                                                                    |
+|--------------------|-----------------------------|--------------------------------------------------------------------------------------------|
+| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `==`, `<=`, `<`, `>`, `>=`                 |
+| `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                                         |
+| `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                                          |
+| `OPTIONS`          | Processing modifiers        | See options table below                                                                    |
+| `of DIMENSIONS`    | Which dimensions to include | Comma- or pipe-separated list, supports patterns; prefer `user,system` over `user, system` |
 
 **Processing Options:**
 
-| Option        | Effect                                                  |
-|---------------|---------------------------------------------------------|
-| `percentage`  | Calculate percentage of selected dimensions over total  |
-| `absolute`    | Turn all sample values positive                         |
-| `min`         | Return minimum of all dimensions after time-aggregation |
-| `max`         | Return maximum of all dimensions after time-aggregation |
-| `average`     | Return average of all dimensions after time-aggregation |
-| `sum`         | Return sum of all dimensions (default)                  |
-| `min2max`     | Return delta between min and max of dimensions          |
-| `unaligned`   | Prevent shifting query window to multiples of duration  |
-| `match-ids`   | Match dimensions by IDs (default)                       |
-| `match-names` | Match dimensions by names                               |
+| Option        | Effect                                                                                             |
+|---------------|----------------------------------------------------------------------------------------------------|
+| `percentage`  | Calculate percentage of selected dimensions over total                                             |
+| `absolute`    | Turn all sample values positive                                                                    |
+| `min`         | Return minimum of all dimensions after time-aggregation                                            |
+| `max`         | Return maximum of all dimensions after time-aggregation                                            |
+| `average`     | Return average of all dimensions after time-aggregation                                            |
+| `sum`         | Return sum of all dimensions (default)                                                             |
+| `min2max`     | Return delta between min and max of dimensions                                                     |
+| `unaligned`   | Prevent shifting query window to multiples of duration                                             |
+| `anomaly-bit` | Query anomaly-rate percentages (0-100) instead of raw values, enabling anomaly-rate-based alerting |
+| `match-ids`   | Match dimensions by IDs (default)                                                                  |
+| `match-names` | Match dimensions by names                                                                          |
+
+When `anomaly-bit` is used, each data point returns the anomaly rate as a percentage from 0 to 100. At native resolution this is typically 0 (normal) or 100 (anomalous), while aggregated or lower-resolution data can yield intermediate values such as 12.5. For more details and practical examples, see the [ML anomaly detection documentation](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).
 
 **Example:**
 
@@ -895,7 +951,7 @@ How to write calculations and use variables in your alert definitions. Essential
 |------------|----------------------------------------|---------------------------|
 | Arithmetic | `+`, `-`, `*`, `/`                     | Numeric values            |
 | Comparison | `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=` | `1` (true) or `0` (false) |
-| Logical    | `&&`, `||`, `!`, `AND`, `OR`, `NOT`    | `1` (true) or `0` (false) |
+| Logical    | `&&`, `||`,`!`,`AND`,`OR`,`NOT`        | `1` (true) or `0` (false) |
 
 **Special Functions:**
 
@@ -908,6 +964,10 @@ How to write calculations and use variables in your alert definitions. Essential
 |-------|---------------------------------------|----------------|
 | `nan` | Not a number (database lookup failed) | `$this != nan` |
 | `inf` | Infinite (division by zero)           | `$this != inf` |
+
+**Referencing Variables:**
+
+Reference a variable as `$name`. The unbraced form stops at the first character that isn't part of a plain identifier — a space, or any operator/punctuation character the expression syntax itself uses (`+`, `-`, `*`, `/`, comparisons, `(`, `)`, etc.) — so it only works for names built entirely from safe characters. A variable name containing an unsafe character — for example a dimension name with spaces (`Has Number`), or a Prometheus chart ID with hyphens (see [Prometheus Collector Variables](#prometheus-collector-variables)) — must be wrapped in braces instead: `${name}` captures everything up to the closing `}`, including spaces and hyphens. Using the unbraced form on such a name causes the whole `calc`, `warn`, or `crit` expression to fail to parse.
 
 ### Conditional Operator for Hysteresis
 
@@ -981,6 +1041,28 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 - **Raw suffix:** `$dimension_raw` - Last collected value
 - **Timestamp suffix:** `$dimension_last_collected_t` - Unix timestamp when dimension was last collected
 
+:::note
+
+**Dimension names with spaces**
+
+A dimension name containing spaces needs the `${...}` brace form — see [Referencing Variables](#expressions-overview). A dimension named `Has Number` must be referenced as `${Has Number}`:
+
+```text
+    alarm: my_dimension_alert
+       on: mychart
+     calc: ${Has Number} * 100
+     warn: $this > 80
+     crit: $this > 95
+    units: %
+    every: 1m
+     info: percentage of the Has Number dimension
+       to: sysadmin
+```
+
+This uses `calc` directly on the chart-local dimension, without a `lookup` — see [Alert Examples](#alert-examples) for when to pair `calc` with `lookup` for time-window aggregation instead of the current value.
+
+:::
+
 #### Host Variables
 
 **What's Available:** All dimensions of all charts, including all alerts, in fullname format.
@@ -989,11 +1071,58 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 
 - `CHART` can be either chart ID or chart name
 - Both formats are supported
+- If `CHART` or `VARIABLE` contains a space, hyphen, or other character the unbraced `$name` form can't capture, wrap the whole reference in braces instead (e.g. `${mychart.Has Number}`) — see [Referencing Variables](#expressions-overview)
 
 **Examples:**
 
 - `$system.cpu.user` - User CPU from system.cpu chart
 - `$disk.sda.reads` - Read operations from sda disk chart
+
+##### Cross-Chart Variable Examples from Stock Health Entities
+
+Several stock health configurations use host variables to reference dimensions from **other charts** in their `calc`, `warn`, and `crit` expressions.
+
+| Health entity               | File                       | Expression                                                                                              | Cross-chart reference                                                                  |
+|-----------------------------|----------------------------|---------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| `30min_ram_swapped_out`     | `health.d/swap.conf`       | `calc: $this / 1024 * 100 / ( $system.ram.used + $system.ram.cached + $system.ram.free )`               | `$system.ram.*` from within an alert on the `mem.swapio` chart                         |
+| `ram_available`             | `health.d/ram.conf`        | `calc: $avail * 100 / ($system.ram.used + $system.ram.cached + $system.ram.free + $system.ram.buffers)` | `$system.ram.*` from within an alert on the `mem.available` chart                      |
+| `system_clock_sync_state`   | `health.d/timex.conf`      | `warn: $system.uptime.uptime > 17 * 60 AND $this == 0`                                                  | `$system.uptime.uptime` from within an alert on the `system.clock_sync_state` chart    |
+| `audit_backlog_utilization` | `health.d/audit.conf`      | `warn: $this > 50 AND $audit.failure.panic == 1`                                                        | `$audit.failure.panic` from within an alert on the `audit.backlog_utilization` chart   |
+| `10s_ip_tcp_resets_sent`    | `health.d/tcp_resets.conf` | `warn: $netdata.uptime.uptime > (1 * 60) AND ...`                                                       | `$netdata.uptime.uptime` from within an alert on the `ip.tcphandshake` chart           |
+| `streaming_never_connected` | `health.d/streaming.conf`  | `warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0`                                                  | `$netdata.uptime.uptime` from within an alert on the `netdata.streaming_inbound` chart |
+
+##### Prometheus Collector Variables
+
+For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set usually produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`); characters in a label value that are not chart-ID-safe, such as `.`, are replaced with `_` in the chart ID, while the chart's label keeps the original value (so `addr="10.0.0.1"` yields `…-addr=10_0_0_1`). In the Netdata chart registry, the prefix comes from the go.d job `FullName`: it is `prometheus.<metric_name>-<label_set>` only when the job name is literally `prometheus`; otherwise it is `prometheus_<job_name>.<metric_name>-<label_set>` (for example, `prometheus_local.<metric_name>-<label_set>` or `prometheus_kubelet.<metric_name>-<label_set>`). Summary and histogram families also emit separate `_sum` and `_count` charts; the suffix is part of the metric name, so the IDs are `<metric_name>_sum-<label_set>` and `<metric_name>_count-<label_set>` (just `<metric_name>_sum` / `<metric_name>_count` when the series has no labels), while histogram buckets are dimensions of the base `<metric_name>` chart. Verify the exact chart ID you want to reference.
+
+Prometheus chart IDs typically contain hyphens and `=` characters, so reference them with the `${...}` brace form — see [Referencing Variables](#expressions-overview). This applies to both the common `prometheus_<job_name>` prefix and the special-case plain `prometheus` prefix, including any `_sum` or `_count` chart variants.
+
+**Example — PVC volume usage alert using kubelet metrics from a named Prometheus job (`name: kubelet`):**
+
+```text
+   alarm: kubelet_pvc_volume_usage
+      on: prometheus_kubelet.kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc
+   lookup: max -1m unaligned match-names of kubelet_volume_stats_used_bytes
+     calc: $this * 100 / ${prometheus_kubelet.kubelet_volume_stats_capacity_bytes-persistentvolumeclaim=my-pvc.kubelet_volume_stats_capacity_bytes}
+     warn: $this > 80
+     crit: $this > 95
+   units: %
+    every: 1m
+     info: PVC volume usage percentage
+       to: sysadmin
+```
+
+:::note
+
+The exact chart ID and dimension names depend on your endpoint's label sets. Use the alarm variables API to discover the correct names:
+
+```text
+http://NODE:19999/api/v1/alarm_variables?chart=prometheus_kubelet.kubelet_volume_stats_used_bytes-persistentvolumeclaim%3Dmy-pvc
+```
+
+URL-encode the chart ID only in API query parameters. In alert expressions, use the chart ID as-is inside `${...}` braces.
+
+:::
 
 #### Special Variables
 
@@ -1173,6 +1302,7 @@ template: disk_full_percent
 <br/>
 </details>
 
+<a id="example-4-network-packet-drops"></a>
 <details>
 <summary><strong>Example 4: Network Packet Drops</strong></summary><br/>
 
@@ -1265,7 +1395,7 @@ template: ml_5min_cpu_chart
    units: %
    every: 30s
     warn: $this > (($status >= $WARNING)  ? (5) : (20))
-    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    crit: $this >= (($status == $CRITICAL) ? (20) : (100))
     info: rolling 5min anomaly rate for system.cpu chart
 ```
 
@@ -1275,7 +1405,7 @@ template: ml_5min_cpu_chart
 |---------------|--------------------------------------------|-------------------------------------|
 | `lookup`      | Average anomaly rate across CPU dimensions | 5-minute rolling window             |
 | Hysteresis    | Prevent alert flapping                     | Warning: 20%→5%, Critical: 100%→20% |
-| `anomaly-bit` | ML-generated anomaly indicators            | 0 (normal) or 1 (anomalous)         |
+| `anomaly-bit` | ML-generated anomaly indicators            | 0 (normal) or 100 (anomalous)       |
 
 <br/>
 </details>
@@ -1295,7 +1425,7 @@ template: ml_5min_node
    units: %
    every: 30s
     warn: $this > (($status >= $WARNING)  ? (5) : (20))
-    crit: $this > (($status == $CRITICAL) ? (20) : (100))
+    crit: $this >= (($status == $CRITICAL) ? (20) : (100))
     info: rolling 5min anomaly rate for all ML enabled dims
 ```
 
@@ -1304,6 +1434,124 @@ template: ml_5min_node
 - Uses `anomaly_detection.anomaly_rate` chart
 - Monitors `anomaly_rate` dimension
 - Covers all ML-enabled dimensions across the node
+
+<br/>
+</details><br/>
+
+<details>
+<summary><strong>Example 8: Boolean / Binary Metric Alerting</strong></summary><br/>
+
+**Scenario:** Monitor a boolean 0/1 health-check gauge and choose the right aggregation method for your alerting intent.
+
+**Why This Matters:** Boolean metrics require different aggregation strategies depending on whether you need to detect any single failure, confirm a sustained outage, or check the current state. Choosing the wrong method leads to missed alerts or alert noise.
+
+**Approach 1: Detect Any Failure Event (average)**
+
+```text
+ alarm: service_failure_event
+    on: my_service.health_status
+lookup: average -10s of health_status
+ every: 10s
+  warn: $this > 0
+   info: any failure detected in the last 10 seconds
+    to: sysadmin
+```
+
+Use when the metric acts as a failure indicator — the value is 0 normally and 1 when a failure occurs. `average` over a short window naturally reflects any non-zero sample: if the metric was 1 at any point, the average will be greater than 0. This is the same pattern used by Netdata's Docker container health monitoring (`average -10s of unhealthy`, `warn: $this > 0`).
+
+:::note
+
+Do not use `sum` for boolean 0/1 gauges. While `sum -5m unaligned absolute` would technically detect failures (any non-zero sample makes the sum positive), `sum` produces a count of seconds in state 1 rather than an intuitive threshold. Use `sum` only for counter/cumulative metrics like packet drops or error totals — see [Example 4: Network Packet Drops](#example-4-network-packet-drops) for a correct `sum` use case.
+
+:::
+
+**Approach 2: Detect Any Downtime (min) or Continuous Outage (max)**
+
+```text
+ alarm: service_any_downtime
+    on: my_service.health_status
+lookup: min -5m unaligned
+ every: 10s
+  crit: $this == 0
+   info: metric dropped to 0 at some point in the last 5 minutes
+    to: sysadmin
+```
+
+Use when the metric is 1 = healthy and 0 = unhealthy. `min` returns the lowest value in the window — if the metric dropped to 0 at any point, the alert fires. This catches even brief outages.
+
+For the stricter check of **continuous outage** (metric was never 1), use `max`:
+
+```text
+ alarm: service_continuous_outage
+    on: my_service.health_status
+lookup: max -5m unaligned
+ every: 10s
+  crit: $this == 0
+   info: service was down for the entire last 5 minutes
+    to: sysadmin
+```
+
+`max` returns the highest value in the window. If `max == 0`, the metric never reached 1 — the service was down the entire time.
+
+**Approach 3: Measure Failure Rate (average)**
+
+```text
+ alarm: service_failure_rate
+    on: my_service.health_status
+lookup: average -5m unaligned of health_status
+ every: 1m
+  warn: $this > 0.1
+   crit: $this > 0.5
+   info: failure rate exceeded threshold over the last 5 minutes
+    to: sysadmin
+```
+
+When the metric is 0 = healthy and 1 = failure, `average` over the window returns a value between 0.0 and 1.0 representing the fraction of time spent in failure. `warn: $this > 0.1` fires when the service was failing more than 10% of the time, and `crit: $this > 0.5` fires when failures exceeded half the window. This is useful for SLO-style alerting where occasional failures are acceptable.
+
+:::note
+**Note on `percentage`:** The `percentage` option calculates each dimension's share of the chart total — it is designed for multi-dimension charts like `system.ram` (see [Task 3: Create a Simple Alert](#task-3-create-a-simple-alert): `lookup: average -1m percentage of used`). For a single-dimension boolean gauge, `percentage` always returns 100. Use plain `average` and compare against 0.0–1.0 thresholds instead.
+:::
+
+**Approach 4: Instant State Check (calc, no lookup)**
+
+```text
+ alarm: service_current_state
+    on: my_service.health_status
+  calc: $health_status
+ every: 10s
+  crit: $this == 0
+   info: service is currently down
+    to: sysadmin
+ delay: down 5m
+```
+
+Use to check only the current value without time-window aggregation. The `calc: $health_status` references the chart dimension directly — no `lookup` needed. Note that `$status` is a built-in alert variable (the alert's own status code, −2 to 3) and must not be used here; use the dimension name instead (e.g. `$health_status` for a dimension named `health_status`). The `delay: down 5m` debounces recovery notifications, requiring the alert to stay clear for 5 minutes before sending recovery. This is the same pattern used in `health.d/timex.conf` for clock sync state monitoring (`calc: $state`).
+
+**Comparison: Which Method to Use**
+
+| Intent                                                 | Method    | Lookup / Calc                            | Condition     | Fires When                                     |
+|--------------------------------------------------------|-----------|------------------------------------------|---------------|------------------------------------------------|
+| Any failure event (metric is 0 normally, 1 on failure) | `average` | `average -10s of health_status`          | `$this > 0`   | Metric was non-zero at any point in the window |
+| Any downtime (metric is 1=healthy, 0=down)             | `min`     | `min -5m unaligned`                      | `$this == 0`  | Metric hit 0 at any point in the window        |
+| Continuous outage (metric is 1=healthy, 0=down)        | `max`     | `max -5m unaligned`                      | `$this == 0`  | Metric was 0 for the entire window             |
+| Failure rate over time                                 | `average` | `average -5m unaligned of health_status` | `$this > 0.N` | Failure fraction exceeds threshold (0.0–1.0)   |
+| Current state only                                     | `calc`    | `calc: $health_status` (no lookup)       | `$this == 0`  | Current value is 0 (debounce with delay)       |
+
+For a full list of available lookup methods and processing options (`average`, `min`, `max`, `sum`, `percentage`, `absolute`, etc.), see the [Alert Line `lookup`](#alert-line-lookup) section.
+
+**Key Points:**
+
+- Boolean 0/1 metrics work with all standard lookup methods — the choice depends on your alerting intent
+- Use `average` over a short window for failure detection (`average -10s of <dimension>`, `warn: $this > 0`) — the same pattern Netdata uses in its own health configs (e.g., `health.d/docker.conf`)
+- Use `min` for "was it ever down?" and `max` for "was it continuously down?"
+- Use `average` for SLO-style failure-rate alerting (returns 0.0–1.0 fraction of time in failure state; compare against decimal thresholds)
+- Use `calc` without `lookup` for instant state checks, combined with `delay` for debouncing
+- Avoid `sum` on boolean gauges — it produces a count of seconds in state 1, not an intuitive threshold. Use `sum` only for counter/cumulative metrics (e.g., total packet drops in a time window)
+
+**Variables Used:**
+
+- `$this` — Result of the `lookup` or `calc` expression
+- `$health_status` — Dimension value from the chart (used in the `calc` approach; the variable name matches the dimension name, e.g. `health_status`)
 
 <br/>
 </details><br/>
@@ -1489,6 +1737,7 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 **Debug Steps:**
 
 1. **Check Available Variables:**
+
    ```
    http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME
    ```
@@ -1507,12 +1756,14 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 **Safe Testing Process:**
 
 1. **Create Test File:**
+
    ```bash
    sudo touch health.d/test-alert.conf
    sudo ./edit-config health.d/test-alert.conf
    ```
 
 2. **Write Simple Alert:**
+
    ```text
    alarm: test_ram
       on: system.ram
@@ -1523,12 +1774,14 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
    ```
 
 3. **Reload and Monitor:**
+
    ```bash
    sudo netdatacli reload-health
    # Watch dashboard for test alert appearance
    ```
 
 4. **Remove When Done:**
+
    ```bash
    sudo rm health.d/test-alert.conf
    sudo netdatacli reload-health
@@ -1560,16 +1813,19 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 When seeking help, include:
 
 1. **Alert Configuration:**
+
    ```text
    # Your complete alert definition
    ```
 
 2. **Chart Information:**
+
    ```
    http://your-server:19999/api/v1/alarm_variables?chart=chart_name
    ```
 
 3. **Current Status:**
+
    ```
    http://your-server:19999/api/v1/alarms?all
    ```
@@ -1578,7 +1834,50 @@ When seeking help, include:
 
 - [Netdata GitHub Issues](https://github.com/netdata/netdata/issues)
 - [Netdata Community Forum](https://community.netdata.cloud)
-- [Netdata Discord](https://discord.gg/mPZ6WZKKG2)
+- [Netdata Discord](https://discord.com/invite/2mEmfW735j)
+
+### Alert Notification Variables
+
+The following variables are available in alert notification templates and custom notification scripts:
+
+|        Variable name        | Description                                                                                                                                  |
+|:---------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------|
+|         `${alarm}`          | Like "name = value units"                                                                                                                    |
+|     `${status_message}`     | Like "needs attention", "recovered", "is critical"                                                                                           |
+|        `${severity}`        | Like "Escalated to CRITICAL", "Recovered from WARNING"                                                                                       |
+|       `${raised_for}`       | Like "(alarm was raised for 10 minutes)"                                                                                                     |
+|          `${host}`          | The host generated this event                                                                                                                |
+|        `${url_host}`        | Same as `${host}` but URL encoded                                                                                                            |
+|       `${unique_id}`        | The unique id of this event                                                                                                                  |
+|        `${alarm_id}`        | The unique id of the alarm that generated this event                                                                                         |
+|        `${event_id}`        | The incremental id of the event, for this alarm id                                                                                           |
+|          `${when}`          | The timestamp this event occurred                                                                                                            |
+|          `${date}`          | The date and time the event occurred (local timezone)                                                                                        |
+|        `${date_utc}`        | The date and time the event occurred (UTC)                                                                                                   |
+|          `${name}`          | The name of the alarm, as given in netdata health.d entries                                                                                  |
+|        `${url_name}`        | Same as `${name}` but URL encoded                                                                                                            |
+|         `${chart}`          | The name of the chart (type.id)                                                                                                              |
+|       `${url_chart}`        | Same as `${chart}` but URL encoded                                                                                                           |
+|         `${status}`         | The current status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL                                                              |
+|       `${old_status}`       | The previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL                                                             |
+|         `${value}`          | The current value of the alarm                                                                                                               |
+|       `${old_value}`        | The previous value of the alarm                                                                                                              |
+|          `${src}`           | The line number and file the alarm has been configured                                                                                       |
+|        `${duration}`        | The duration in seconds of the previous alarm state                                                                                          |
+|      `${duration_txt}`      | Same as `${duration}` for humans                                                                                                             |
+|   `${non_clear_duration}`   | The total duration in seconds this is/was non-clear. For repeating alerts in WARNING or CRITICAL state, Netdata sends `${duration}` instead. |
+| `${non_clear_duration_txt}` | Same as `${non_clear_duration}` for humans                                                                                                   |
+|         `${units}`          | The units of the value                                                                                                                       |
+|          `${info}`          | A short description of the alarm                                                                                                             |
+|      `${value_string}`      | Friendly value (with units)                                                                                                                  |
+|    `${old_value_string}`    | Friendly old value (with units)                                                                                                              |
+|         `${image}`          | The URL of an image to represent the status of the alarm                                                                                     |
+|         `${color}`          | A color in #AABBCC format for the alarm                                                                                                      |
+|        `${goto_url}`        | The URL the user can click to see the netdata dashboard                                                                                      |
+|    `${calc_expression}`     | The expression evaluated to provide the value for the alarm                                                                                  |
+|   `${calc_param_values}`    | The values of the variables in the evaluated expression                                                                                      |
+|     `${total_warnings}`     | The total number of alarms in WARNING state on the host                                                                                      |
+|     `${total_critical}`     | The total number of alarms in CRITICAL state on the host                                                                                     |
 
 ## Related Pages
 

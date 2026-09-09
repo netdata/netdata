@@ -1,0 +1,103 @@
+# High Availability cluster monitoring for Fortinet FortiGate devices
+# fgHaInfo scalars: cluster mode, group, priority
+# fgHaStatsTable: per-node CPU, memory, network, sessions, security events, sync status
+
+metrics:
+  ### HA cluster scalars
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.13.1.1.0
+      name: fgHaSystemMode
+      chart_meta:
+        description: HA system operating mode
+        family: 'System/HA/Cluster/Mode'
+        unit: "{status}"
+      mapping:
+        1: standalone
+        2: activeActive
+        3: activePassive
+
+  ### HA per-node statistics table
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.13.2.1
+      name: fgHaStatsTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.3
+        name: fgHaStatsCpuUsage
+        chart_meta:
+          description: CPU usage of the HA cluster member
+          family: 'System/HA/Node/CPU/Usage'
+          unit: "%"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.4
+        name: fgHaStatsMemUsage
+        chart_meta:
+          description: Memory usage of the HA cluster member
+          family: 'System/HA/Node/Memory/Usage'
+          unit: "%"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.5
+        name: fgHaStatsNetUsage
+        scale_factor: 1000
+        chart_meta:
+          description: Network bandwidth usage of the HA cluster member
+          family: 'System/HA/Node/Network/Bandwidth'
+          unit: "bit/s"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.6
+        name: fgHaStatsSesCount
+        chart_meta:
+          description: Active session count on the HA cluster member
+          family: 'System/HA/Node/Session/Count'
+          unit: "{session}"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.7
+        name: fgHaStatsPktCount
+        chart_meta:
+          description: Packets processed by the HA cluster member
+          family: 'System/HA/Node/Traffic/Packets'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.8
+        name: fgHaStatsByteCount
+        scale_factor: 8
+        chart_meta:
+          description: Network bandwidth processed by the HA cluster member
+          family: 'System/HA/Node/Traffic/Bandwidth'
+          unit: "bit/s"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.9
+        name: fgHaStatsIdsCount
+        chart_meta:
+          description: IPS events detected by the HA cluster member
+          family: 'System/HA/Node/Security/IPS'
+          unit: "{event}/s"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.10
+        name: fgHaStatsAvCount
+        chart_meta:
+          description: Antivirus events detected by the HA cluster member
+          family: 'System/HA/Node/Security/Antivirus'
+          unit: "{event}/s"
+      - OID: 1.3.6.1.4.1.12356.101.13.2.1.1.12
+        name: fgHaStatsSyncStatus
+        chart_meta:
+          description: Configuration sync status of the HA cluster member
+          family: 'System/HA/Node/Sync/Status'
+          unit: "{status}"
+        mapping:
+          0: out_of_sync
+          1: in_sync
+    metric_tags:
+      - tag: ha_node_index
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.13.2.1.1.1
+          name: fgHaStatsIndex
+      - tag: _ha_node_serial
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.13.2.1.1.2
+          name: fgHaStatsSerial
+      - tag: _ha_node_hostname
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.13.2.1.1.11
+          name: fgHaStatsHostname
+
+metric_tags:
+  - tag: _ha_group_name
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.13.1.7.0
+      name: fgHaGroupName

@@ -13,6 +13,11 @@ void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry)
     size_t payload_size;
     char *payload = generate_alarm_log_entry(&payload_size, log_entry);
 
+    if (!payload) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate payload");
+        return;
+    }
+
     aclk_send_bin_msg(payload, payload_size, ACLK_TOPICID_ALARM_LOG, "AlarmLogEntry");
 }
 

@@ -108,8 +108,8 @@ var errorInfoColumns = []errorInfoColumn{
 	},
 }
 
-func errorInfoMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func errorInfoFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:             errorInfoMethodID,
 		Name:           "Error Info",
 		UpdateEvery:    10,

@@ -1,0 +1,12 @@
+{
+  "os": {
+    "discovery": {
+      "devices": [
+        {
+          "sysObjectID": ".1.3.6.1.4.1.9.1.2984",
+          "sysDescr": "Cisco IOS XR Software (NCS540L), Version 7.11.2 Copyright (c) 2013-2024 by Cisco Systems, Inc."
+        }
+      ]
+    }
+  }
+}

@@ -9,8 +9,10 @@ void inicfg_section_destroy_non_loaded(struct config *root, const char *section)
 
     netdata_log_debug(D_CONFIG, "Destroying section '%s'.", section);
 
+    APPCONFIG_LOCK(root);
     sect = inicfg_section_find(root, section);
     if(!sect) {
+        APPCONFIG_UNLOCK(root);
         netdata_log_error("Could not destroy section '%s'. Not found.", section);
         return;
     }
@@ -22,23 +24,28 @@ void inicfg_section_destroy_non_loaded(struct config *root, const char *section)
         if (opt->flags & CONFIG_VALUE_LOADED) {
             // do not destroy values that were loaded from the configuration files.
             SECTION_UNLOCK(sect);
+            APPCONFIG_UNLOCK(root);
             return;
         }
     }
 
     // no option is loaded, free them all
-    inicfg_section_remove_and_delete(root, sect, false, true);
+    inicfg_section_remove_and_delete(root, sect, true, true);
+    APPCONFIG_UNLOCK(root);
 }
 
 void inicfg_section_option_destroy_non_loaded(struct config *root, const char *section, const char *name) {
     struct config_section *sect;
+    APPCONFIG_LOCK(root);
     sect = inicfg_section_find(root, section);
     if (!sect) {
+        APPCONFIG_UNLOCK(root);
         netdata_log_error("Could not destroy section option '%s -> %s'. The section not found.", section, name);
         return;
     }
 
     SECTION_LOCK(sect);
+    APPCONFIG_UNLOCK(root);
 
     struct config_option *opt = inicfg_option_find(sect, name);
     if (opt && opt->flags & CONFIG_VALUE_LOADED) {

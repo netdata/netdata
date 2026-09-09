@@ -16,8 +16,6 @@ import (
 
 var errJailNotExist = errors.New("jail not exist")
 
-const socketPathInDocker = "/host/var/run/fail2ban/fail2ban.sock"
-
 type fail2banClientCli interface {
 	status() ([]byte, error)
 	jailStatus(s string) ([]byte, error)
@@ -42,9 +40,7 @@ type fail2banClientCliExec struct {
 
 func (e *fail2banClientCliExec) status() ([]byte, error) {
 	if e.isInsideDocker {
-		return e.execute("fail2ban-client-status-socket",
-			"--socket_path", socketPathInDocker,
-		)
+		return e.execute("fail2ban-client-status-socket")
 	}
 	return e.execute("fail2ban-client-status")
 }
@@ -53,7 +49,6 @@ func (e *fail2banClientCliExec) jailStatus(jail string) ([]byte, error) {
 	if e.isInsideDocker {
 		return e.execute("fail2ban-client-status-jail-socket",
 			"--jail", jail,
-			"--socket_path", socketPathInDocker,
 		)
 	}
 	return e.execute("fail2ban-client-status-jail",

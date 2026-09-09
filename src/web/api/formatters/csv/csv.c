@@ -21,7 +21,13 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         }
         buffer_strcat(wb, separator);
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
-        buffer_strcat(wb, string2str(r->dn[c]));
+        if(format == DATASOURCE_CSV_JSON_ARRAY)
+            // the array format is JSON: a quote or backslash in a
+            // dimension name (or a label value under group_by=label)
+            // must be escaped or the payload breaks
+            buffer_json_strcat(wb, string2str(r->dn[c]));
+        else
+            buffer_strcat(wb, string2str(r->dn[c]));
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
         i++;
     }

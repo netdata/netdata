@@ -1,0 +1,46 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: cato_networks
+placements:
+  - id: cato-networks
+    section_id: remote-devices
+    title: Cato Networks
+    icon: snmp
+    properties: { important: false, grouping: true }
+    items:
+      - type: group
+        id: sites
+        title: Sites
+        items:
+          - cato_networks.site_connectivity_status
+          - cato_networks.site_operational_status
+          - cato_networks.site_hosts
+          - cato_networks.site_traffic
+          - cato_networks.site_packet_loss
+          - cato_networks.site_discarded_packets
+          - cato_networks.site_jitter
+          - cato_networks.site_latency
+          - cato_networks.site_last_mile_packet_loss
+      - type: group
+        id: devices
+        title: Devices
+        items:
+          - cato_networks.device_connection_status
+      - type: group
+        id: interfaces
+        title: Interfaces
+        items:
+          - cato_networks.interface_connection_status
+          - cato_networks.interface_tunnel_uptime
+          - cato_networks.interface_traffic
+          - cato_networks.interface_packet_loss
+          - cato_networks.interface_discarded_packets
+          - cato_networks.interface_jitter
+          - cato_networks.interface_latency
+      - type: group
+        id: bgp
+        title: BGP
+        items:
+          - cato_networks.bgp_session_status
+          - cato_networks.bgp_routes
+          - cato_networks.bgp_routes_limit_status

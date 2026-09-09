@@ -6,6 +6,7 @@ modules:
       module_name: /sys/fs/cgroup
       monitored_instance:
         name: Containers
+        description: "Monitor container and virtual machine CPU, memory, disk I/O, network, and page cache activity through Linux cgroups."
         link: ""
         categories:
           - data-collection.containers-and-vms
@@ -32,7 +33,7 @@ modules:
         - linux containers
     overview: &overview
       data_collection: &data_collection
-        metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+        metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, network, and page cache activity — via Linux cgroups."
         method_description: ""
       supported_platforms:
         include:
@@ -329,6 +330,103 @@ modules:
               chart_type: line
               dimensions:
                 - name: pids
+            - name: cgroup.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: cgroup.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: cgroup.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: cgroup.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
+            - name: cgroup.dc_ratio
+              description: Percentage of directory lookups resolved by the cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: cgroup.dc_reference
+              description: Count file access
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: reference
+            - name: cgroup.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: cgroup.dc_not_found
+              description: Files not found
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: miss
+            - name: cgroup.net_conn_ipv4
+              description: TCP v4 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: cgroup.net_conn_ipv6
+              description: TCP v6 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: cgroup.net_total_bandwidth
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: cgroup.net_tcp_recv
+              description: TCP calls to clean up buffer
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: cgroup.net_tcp_send
+              description: TCP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: cgroup.net_retransmit
+              description: TCP retransmits
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: cgroup.net_udp_send
+              description: UDP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: cgroup.net_udp_recv
+              description: UDP calls to receive
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
         - name: cgroup network device
           description: ""
           labels:
@@ -424,10 +522,10 @@ modules:
       <<: *meta
       monitored_instance:
         name: Kubernetes Containers
+        description: "Monitor Kubernetes pod and container CPU, memory, disk I/O, and network utilization through Linux cgroups."
         link: https://kubernetes.io/
         icon_filename: kubernetes.svg
         categories:
-          #- data-collection.containers-and-vms
           - data-collection.containers-and-vms
       keywords:
         - k8s
@@ -465,7 +563,7 @@ modules:
               module_name: coredns
     overview:
       <<: *overview
-      data-collection:
+      data_collection:
         <<: *data_collection
         metrics_description: Monitor Kubernetes pod and container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups.
     alerts: &k8s_alerts
@@ -846,11 +944,45 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
+        - name: cgroups plugin IPC
+          description: cgroups.plugin netipc lookup-server and discovery signal health.
+          labels: []
+          metrics:
+            - name: netdata.collector.ipc.cgroups_lookup.server.requests
+              description: CGROUPS_LOOKUP server request outcomes
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests_responded
+                - name: requests_error
+                - name: lookup_miss_signals_sent
+                - name: lookup_miss_signals_coalesced
+            - name: netdata.collector.ipc.cgroups_lookup.server.request_duration_ms
+              description: CGROUPS_LOOKUP server request duration buckets
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: le_1ms
+                - name: le_5ms
+                - name: le_10ms
+                - name: le_50ms
+                - name: le_100ms
+                - name: le_500ms
+                - name: le_1000ms
+                - name: gt_1000ms
+            - name: netdata.collector.cgroups.discovery.scans
+              description: cgroups discovery scans by trigger source
+              unit: "scans/s"
+              chart_type: line
+              dimensions:
+                - name: discovery_scans_natural
+                - name: discovery_scans_opportunistic
   - <<: *module
     meta:
       <<: *meta
       monitored_instance:
         name: Systemd Services
+        description: "Monitor systemd service CPU, memory, disk I/O, and page cache activity through Linux cgroups."
         link: ""
         icon_filename: systemd.svg
         categories:
@@ -864,9 +996,9 @@ modules:
         - cgroups
     overview:
       <<: *overview
-      data-collection:
+      data_collection:
         <<: *data_collection
-        metrics_description: "Monitor Systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups."
+        metrics_description: "Monitor systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups."
     alerts: []
     metrics:
       folding:
@@ -979,6 +1111,103 @@ modules:
               chart_type: line
               dimensions:
                 - name: pids
+            - name: systemd.service.cachestat_ratio
+              description: Hit ratio
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: systemd.service.cachestat_dirties
+              description: Number of dirty pages
+              unit: "page/s"
+              chart_type: line
+              dimensions:
+                - name: dirty
+            - name: systemd.service.cachestat_hits
+              description: Number of accessed files
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hit
+            - name: systemd.service.cachestat_misses
+              description: Files out of page cache
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: miss
+            - name: systemd.service.dc_ratio
+              description: Percentage of directory lookups resolved by the cache
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: systemd.service.dc_reference
+              description: Count file access
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: reference
+            - name: systemd.service.dc_not_cache
+              description: Files not present inside directory cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: systemd.service.dc_not_found
+              description: Files not found
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: miss
+            - name: systemd.service.net_conn_ipv4
+              description: TCP v4 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: systemd.service.net_conn_ipv6
+              description: TCP v6 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: systemd.service.net_total_bandwidth
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: systemd.service.net_tcp_recv
+              description: TCP calls to clean up buffer
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: systemd.service.net_tcp_send
+              description: TCP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: systemd.service.net_retransmit
+              description: TCP retransmits
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: systemd.service.net_udp_send
+              description: UDP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: systemd.service.net_udp_recv
+              description: UDP calls to receive
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
   - <<: *module
     meta:
       <<: *meta

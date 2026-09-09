@@ -1,0 +1,23 @@
+<nvidia_smi_log>
+    <gpu id="00000000:01:00.0">
+        <product_name>NVIDIA RTX PRO 6000 Blackwell</product_name>
+        <uuid>GPU-11111111-2222-3333-4444-555555555555</uuid>
+        <fan_speed> 40 % </fan_speed>
+        <performance_state>P8</performance_state>
+        <temperature>
+            <gpu_temp> 37 C </gpu_temp>
+            <gpu_temp_tlimit>56 C</gpu_temp_tlimit>
+            <gpu_temp_max_tlimit_threshold>-5 C</gpu_temp_max_tlimit_threshold>
+            <gpu_temp_slow_tlimit_threshold>0 C</gpu_temp_slow_tlimit_threshold>
+            <gpu_temp_max_gpu_tlimit_threshold>N/A</gpu_temp_max_gpu_tlimit_threshold>
+            <gpu_target_temperature>N/A</gpu_target_temperature>
+            <memory_temp>N/A</memory_temp>
+            <gpu_temp_max_mem_tlimit_threshold>N/A</gpu_temp_max_mem_tlimit_threshold>
+        </temperature>
+        <gpu_power_readings>
+            <power_draw> N/A </power_draw>
+            <average_power_draw> N/A </average_power_draw>
+            <instant_power_draw> 66.84 W </instant_power_draw>
+        </gpu_power_readings>
+    </gpu>
+</nvidia_smi_log>

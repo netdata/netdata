@@ -1,0 +1,103 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: apache
+placements:
+  - id: apache
+    section_id: applications.apache
+    title: Apache
+    icon: apache
+    families: true
+    items:
+      - type: grid
+        id: apache-heads
+        items:
+          - type: context
+            title: Connections
+            contexts:
+              - apache.connections
+            chart_library: easypiechart
+            group_by:
+              - selected
+            value_range: [0, null]
+            colors:
+              - "#990099"
+              - "#0099C6"
+            layout: { left: 0, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Requests
+            contexts:
+              - apache.requests
+            chart_library: easypiechart
+            show_post_aggregations: true
+            post_group_by:
+              - selected
+            value_range: [0, null]
+            colors:
+              - "#994499"
+              - "#0099C6"
+            layout: { left: 3, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Traffic
+            contexts:
+              - apache.net
+            chart_library: gauge
+            group_by:
+              - selected
+            value_range: [0, null]
+            colors:
+              - "#994499"
+              - "#0099C6"
+            layout: { left: 6, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Max Workers %
+            contexts:
+              - apache.workers
+            chart_library: gauge
+            group_by:
+              - percentage-of-instance
+            show_post_aggregations: true
+            post_group_by:
+              - selected
+            aggregation_method: max
+            selected_dimensions:
+              - busy
+            value_range: [0, 100]
+            colors:
+              - "#994499"
+              - "#0099C6"
+            layout: { left: 9, top: 0, width: 3, height: 4 }
+      - type: context
+        title: List Apache Jobs
+        contexts:
+          - apache.connections
+          - apache.requests
+          - apache.net
+          - apache.workers
+          - apache.uptime
+        chart_library: table
+        group_by:
+          - dimension
+          - label
+          - node
+          - context
+        group_by_label:
+          - _collect_job
+        table_columns:
+          - context
+          - dimension
+        labels:
+          apache.connections: Connections
+          apache.requests: Requests
+          apache.net: Traffic
+          apache.workers: Workers
+          apache.uptime: Uptime
+      - apache.connections
+      - apache.conns_async
+      - apache.workers
+      - apache.scoreboard
+      - apache.requests
+      - apache.net
+      - apache.reqpersec
+      - apache.bytespersec
+      - apache.bytesperreq
+      - apache.uptime

@@ -153,7 +153,7 @@ The architecture adapts to your needs - train where you have resources, use ever
 
 - **Ephemeral systems** - Kubernetes pods, auto-scaling VMs that disappear
 - **Resource constraints** - Systems where every CPU cycle matters
-- **On-premises requirements** - Multi-node view without Cloud connectivity
+- **On-premises requirements** - Multi-node view without Cloud connectivity. For a fully self-hosted Cloud experience, consider [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
 - **Network restrictions** - Agents can't reach Cloud due to firewalls/policies
 
 ### Parent Sizing Guidelines
@@ -270,7 +270,7 @@ This isn't just optimization. It's a fundamentally different architecture that r
 <details>
 <summary><strong>How many nodes can a single Netdata Parent handle?</strong></summary><br/>
 
-We recommend running Parents with up to 500 Agents (1.5M metrics/s). We have customers running larger Parents, but resources increase and performance decreases non-linearly.
+We recommend running Parents with up to 500 Agents — see [Parent Sizing Guidelines](#parent-sizing-guidelines) above for the metrics/s and resource breakdown by scale. We have customers running larger Parents, but resources increase and performance decreases non-linearly.
 
 </details>
 
@@ -355,7 +355,7 @@ There is some extra network latency involved, but this is usually small (a few m
 
 - **[Deploy your first Agent](/docs/deployment-guides/standalone-deployment.md)** - Start monitoring in 60 seconds
 - **[Configure Parents](/docs/deployment-guides/deployment-with-centralization-points.md)** - Scale to hundreds of nodes
-- **[Design for Enterprise](/docs/netdata-enterprise-evaluation-corrected.md)** - Architect for thousands
+- **[Design for Enterprise](/docs/netdata-enterprise-evaluation.md)** - Architect for thousands
 - **[Try Netdata Cloud](/docs/netdata-cloud/README.md)** - Unified visibility across everything
 
 *Based on real production deployments, independent research (University of Amsterdam, ICSOC 2023), and comparative testing (2025). All metrics and resource usage figures represent typical production scenarios.*

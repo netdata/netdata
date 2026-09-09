@@ -413,21 +413,26 @@ void analytics_alarms_notifications(void)
     POPEN_INSTANCE *instance = spawn_popen_run(script);
     if (instance) {
         char line[200 + 1];
+        FILE *child_stdout = spawn_popen_stdout(instance);
 
-        while (fgets(line, 200, spawn_popen_stdout(instance)) != NULL) {
-            char *end = line;
-            while (*end && *end != '\n')
-                end++;
-            *end = '\0';
+        if(unlikely(!child_stdout))
+            spawn_popen_kill(instance, 0);
+        else {
+            while (fgets(line, 200, child_stdout) != NULL) {
+                char *end = line;
+                while (*end && *end != '\n')
+                    end++;
+                *end = '\0';
 
-            if (likely(cnt))
-                buffer_strcat(b, "|");
+                if (likely(cnt))
+                    buffer_strcat(b, "|");
 
-            buffer_strcat(b, line);
+                buffer_strcat(b, line);
 
-            cnt++;
+                cnt++;
+            }
+            spawn_popen_wait(instance);
         }
-        spawn_popen_wait(instance);
     }
     freez(script);
 
@@ -511,10 +516,17 @@ void analytics_alarms(void)
     char b[21];
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
-        if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+        if (unlikely(!st))
             continue;
+        if (unlikely(!st->last_collected_time.tv_sec)) {
+            rrdcalc_rrdset_read_unlock(st);
+            continue;
+        }
 
-        switch (rc->status) {
+        RRDCALC_RUNTIME_SNAPSHOT snapshot;
+        rrdcalc_runtime_snapshot_get(rc, &snapshot);
+        switch (snapshot.status) {
             case RRDCALC_STATUS_WARNING:
                 alarm_warn++;
                 break;
@@ -524,6 +536,7 @@ void analytics_alarms(void)
             default:
                 alarm_normal++;
         }
+        rrdcalc_rrdset_read_unlock(st);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
@@ -1298,9 +1311,11 @@ void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
         if (rrdhost_update_timezone(localhost, timezone, new_abbrev, new_offset)) {
             // Timezone changed — update the two labels directly, persist, and notify.
             if (localhost->rrdlabels) {
-                rrdlabels_add(localhost->rrdlabels, "_timezone", timezone, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(localhost->rrdlabels, "_abbrev_timezone", new_abbrev, RRDLABEL_SRC_AUTO);
+                bool labels_changed = rrdlabels_add_changed(localhost->rrdlabels, "_timezone", timezone, RRDLABEL_SRC_AUTO);
+                labels_changed |= rrdlabels_add_changed(localhost->rrdlabels, "_abbrev_timezone", new_abbrev, RRDLABEL_SRC_AUTO);
                 rrdhost_flag_set(localhost, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+                if(labels_changed)
+                    rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
                 stream_send_host_labels(localhost);
             }
             aclk_queue_node_info(localhost, false);

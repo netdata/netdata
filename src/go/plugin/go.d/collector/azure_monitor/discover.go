@@ -15,9 +15,11 @@ import (
 )
 
 type discoveryFetchResult struct {
-	Resources        []resourceInfo
-	ByType           map[string][]resourceInfo
-	UnsupportedTypes []string
+	Resources              []resourceInfo
+	ByType                 map[string][]resourceInfo
+	UnsupportedTypes       []string
+	QueryTagsColumnMissing bool
+	QueryTagsWrongShape    bool
 }
 
 type normalizedTagFilter struct {
@@ -49,24 +51,29 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourc
 		c.Warningf("ignoring unsupported discovered resource types: %v", fetched.UnsupportedTypes)
 	}
 
-	state := buildDiscoveryState(fetched.Resources, c.runtime, now, c.Discovery.RefreshEvery, c.discovery.FetchCounter+1)
+	state := buildDiscoveryState(fetched.Resources, c.runtime, now, c.Discovery.RefreshEvery, c.discovery.FetchCounter+1, fetched)
 	if !equalResourceSlices(state.Resources, c.discovery.Resources) {
 		c.Infof("discovered %d resources: %v", len(state.Resources), state.Resources)
 	}
 
 	c.discovery = state
+	c.warnDiscoveryScopeFallbacks(state, c.runtime)
 	return state.Resources, nil
 }
 
-func buildDiscoveryState(resources []resourceInfo, runtime *collectorRuntime, now time.Time, refreshEvery int, fetchCounter uint64) discoveryState {
-	filteredResources, byType := filterDiscoveryResourcesByTypes(resources, runtimeResourceTypes(runtime))
+func buildDiscoveryState(resources []resourceInfo, runtime *collectorRuntime, now time.Time, refreshEvery int, fetchCounter uint64, fetched discoveryFetchResult) discoveryState {
+	filteredResources, _ := filterDiscoveryResourcesByTypes(resources, runtimeResourceTypes(runtime))
+	scopeReport := applyWorkloadHostScopes(filteredResources, runtime)
 	return discoveryState{
-		Resources:    filteredResources,
-		ByType:       byType,
-		ByProfile:    filterDiscoveryResourcesByProfiles(filteredResources, runtime),
-		FetchedAt:    now,
-		ExpiresAt:    discoveryExpiresAt(now, refreshEvery),
-		FetchCounter: fetchCounter,
+		Resources:              filteredResources,
+		ByType:                 indexResourcesByType(filteredResources),
+		ByProfile:              filterDiscoveryResourcesByProfiles(filteredResources, runtime),
+		FetchedAt:              now,
+		ExpiresAt:              discoveryExpiresAt(now, refreshEvery),
+		FetchCounter:           fetchCounter,
+		QueryTagsColumnMissing: fetched.QueryTagsColumnMissing,
+		QueryTagsWrongShape:    fetched.QueryTagsWrongShape,
+		UnsafeWorkloadValues:   scopeReport.unsafeValues,
 	}
 }
 
@@ -227,6 +234,7 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 	result := make([]resourceInfo, 0, 256)
 	unsupported := make(map[string]struct{})
 	seenIDs := make(map[string]struct{})
+	var resultMissingTagsColumn, resultWrongTagsShape bool
 
 	var skipToken *string
 	for {
@@ -244,9 +252,15 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 		}
 
 		for i, row := range rows {
-			resource, err := parseStrictQueryDiscoveryRow(row)
+			resource, tagsShape, err := parseStrictQueryDiscoveryRow(row)
 			if err != nil {
 				return discoveryFetchResult{}, fmt.Errorf("query result row %d: %w", i, err)
+			}
+			switch tagsShape {
+			case queryTagsShapeAbsent:
+				resultMissingTagsColumn = true
+			case queryTagsShapeWrong:
+				resultWrongTagsShape = true
 			}
 
 			idKey := stringsLowerTrim(resource.ID)
@@ -278,9 +292,11 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 	slices.Sort(unsupportedTypes)
 
 	return discoveryFetchResult{
-		Resources:        result,
-		ByType:           indexResourcesByType(result),
-		UnsupportedTypes: unsupportedTypes,
+		Resources:              result,
+		ByType:                 indexResourcesByType(result),
+		UnsupportedTypes:       unsupportedTypes,
+		QueryTagsColumnMissing: resultMissingTagsColumn,
+		QueryTagsWrongShape:    resultWrongTagsShape,
 	}, nil
 }
 
@@ -498,40 +514,49 @@ func normalizedFilterSet(values []string) map[string]struct{} {
 	return set
 }
 
-func parseStrictQueryDiscoveryRow(row map[string]any) (resourceInfo, error) {
+type queryTagsShape int
+
+const (
+	queryTagsShapeAbsent queryTagsShape = iota
+	queryTagsShapePresentMap
+	queryTagsShapeWrong
+)
+
+func parseStrictQueryDiscoveryRow(row map[string]any) (resourceInfo, queryTagsShape, error) {
 	id, err := strictQueryStringColumn(row, "id")
 	if err != nil {
-		return resourceInfo{}, err
+		return resourceInfo{}, queryTagsShapeAbsent, err
 	}
 	subscriptionID, ok := parseARMResourceID(id)
 	if !ok {
-		return resourceInfo{}, fmt.Errorf("invalid ARM resource id %q", id)
+		return resourceInfo{}, queryTagsShapeAbsent, fmt.Errorf("invalid ARM resource id %q", id)
 	}
 
 	name, err := strictQueryStringColumn(row, "name")
 	if err != nil {
-		return resourceInfo{}, err
+		return resourceInfo{}, queryTagsShapeAbsent, err
 	}
 	resourceType, err := strictQueryStringColumn(row, "type")
 	if err != nil {
-		return resourceInfo{}, err
+		return resourceInfo{}, queryTagsShapeAbsent, err
 	}
 	if resourceType == "" {
-		return resourceInfo{}, errors.New("column 'type' must not be empty")
+		return resourceInfo{}, queryTagsShapeAbsent, errors.New("column 'type' must not be empty")
 	}
 
 	resourceGroup, err := strictQueryStringColumn(row, "resourceGroup")
 	if err != nil {
-		return resourceInfo{}, err
+		return resourceInfo{}, queryTagsShapeAbsent, err
 	}
 	location, err := strictQueryStringColumn(row, "location")
 	if err != nil {
-		return resourceInfo{}, err
+		return resourceInfo{}, queryTagsShapeAbsent, err
 	}
 	region := stringsLowerTrim(location)
 	if region == "" {
 		region = "global"
 	}
+	tags, tagsShape := optionalQueryTagsColumn(row)
 
 	return resourceInfo{
 		SubscriptionID: subscriptionID,
@@ -541,7 +566,24 @@ func parseStrictQueryDiscoveryRow(row map[string]any) (resourceInfo, error) {
 		Type:           resourceType,
 		ResourceGroup:  resourceGroup,
 		Region:         region,
-	}, nil
+		Tags:           tags,
+	}, tagsShape, nil
+}
+
+func optionalQueryTagsColumn(row map[string]any) ([]resourceTag, queryTagsShape) {
+	value, ok := row["tags"]
+	if !ok {
+		return nil, queryTagsShapeAbsent
+	}
+	if value == nil {
+		return nil, queryTagsShapePresentMap
+	}
+	switch value.(type) {
+	case map[string]any, map[string]string:
+		return normalizeResourceTags(value), queryTagsShapePresentMap
+	default:
+		return nil, queryTagsShapeWrong
+	}
 }
 
 func strictQueryStringColumn(row map[string]any, column string) (string, error) {
@@ -783,6 +825,7 @@ func equalResourceInfo(a, b resourceInfo) bool {
 		a.Type == b.Type &&
 		a.ResourceGroup == b.ResourceGroup &&
 		a.Region == b.Region &&
+		a.HostScope.ScopeKey == b.HostScope.ScopeKey &&
 		equalResourceTags(a.Tags, b.Tags)
 }
 

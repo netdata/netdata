@@ -288,7 +288,10 @@ static SIMPLE_PATTERN_RESULT simple_pattern_matches_extract_with_length(SIMPLE_P
     for(m = root; m ; m = m->next) {
         char *ws = wildcarded;
         size_t wss = wildcarded_size;
-        if(unlikely(ws)) *ws = '\0';
+        if(unlikely(wss)) {
+            if(unlikely(ws))
+                *ws = '\0';
+        }
 
         if (match_pattern(m, str, len, ws, &wss)) {
             if (m->negative) return SP_MATCHED_NEGATIVE;
@@ -300,7 +303,7 @@ static SIMPLE_PATTERN_RESULT simple_pattern_matches_extract_with_length(SIMPLE_P
 }
 
 SIMPLE_PATTERN_RESULT simple_pattern_matches_buffer_extract(SIMPLE_PATTERN *list, BUFFER *str, char *wildcarded, size_t wildcarded_size) {
-    if(!list || !str || buffer_strlen(str)) return SP_NOT_MATCHED;
+    if(!list || !str || !buffer_strlen(str)) return SP_NOT_MATCHED;
     return simple_pattern_matches_extract_with_length(list, buffer_tostring(str), buffer_strlen(str), wildcarded, wildcarded_size);
 }
 
@@ -320,12 +323,15 @@ SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list
 }
 
 static inline void free_pattern(struct simple_pattern *m) {
-    if(!m) return;
+    while(m) {
+        struct simple_pattern *next = m->next;
 
-    free_pattern(m->child);
-    free_pattern(m->next);
-    freez((void *)m->match);
-    freez(m);
+        free_pattern(m->child);
+        freez((void *)m->match);
+        freez(m);
+
+        m = next;
+    }
 }
 
 void simple_pattern_free(SIMPLE_PATTERN *list) {
@@ -385,8 +391,8 @@ static void scan_is_potential_name(struct simple_pattern *p, int *alpha, int *co
             }
             if (p->mode != SIMPLE_PATTERN_EXACT)
                 *wildcards = 1;
-            p = p->child;
         }
+        p = p->child;
     }
 }
 

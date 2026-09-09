@@ -117,7 +117,7 @@ extern int aclklog_enabled;
 #define LOG_DATE_LENGTH 26
 void log_date(char *buffer, size_t len, time_t now);
 
-static inline void debug_dummy(void) {}
+static inline void debug_dummy(void) { /* no-op: target for debug/timing macros when those are compiled out */ }
 
 void nd_log_limits_reset(void);
 void nd_log_limits_unlimited(void);

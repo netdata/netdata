@@ -24,7 +24,7 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         proxysqlMethods,
+		SharedFunctions: proxysqlMethods,
 		MethodHandler:   proxysqlFunctionHandler,
 	})
 }

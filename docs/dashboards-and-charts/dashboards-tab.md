@@ -130,6 +130,18 @@ Elements automatically align to the grid system after moving or resizing.
 | **Delete a dashboard** | Select the dashboard → click the 🗑️ icon or **Delete** button. |
 | **Save changes**       | Click the **Save** button after making any edits.               |
 
+:::warning
+
+Deleting a dashboard is permanent and cannot be undone.
+
+:::
+
+:::note
+
+Can't find a dashboard? Dashboards belong to a specific [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#create-your-first-room), and each Room keeps its own separate dashboards. A dashboard that appears to be missing is often in another Room — check the **Dashboards** tab in each Room to locate it.
+
+:::
+
 :::note
 
 If multiple users edit the same dashboard at once, the second user who clicks **Save** will be prompted to either overwrite or reload the dashboard to see the latest changes.

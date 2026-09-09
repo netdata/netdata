@@ -123,7 +123,7 @@ func (c *Collector) addInterfaceCharts(dev *iwInterface) {
 			{Key: "ssid", Value: dev.ssid},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, dev.name, dev.ssid)
+			dim.ID = fmt.Sprintf(dim.ID, dev.name, cleanSSID(dev.ssid))
 		}
 	}
 

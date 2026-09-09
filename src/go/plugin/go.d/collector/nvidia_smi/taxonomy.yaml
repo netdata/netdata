@@ -1,0 +1,81 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: nvidia_smi
+placements:
+  - id: nvidia-smi
+    section_id: system.hardware.gpus.nvidia
+    title: NVIDIA GPUs
+    icon: compute
+    families: true
+    properties:
+      important: false
+      grouping: false
+    items:
+      - type: context
+        title: List Nvidia GPUs
+        contexts:
+          - nvidia_smi.gpu_pcie_bandwidth_usage
+          - nvidia_smi.gpu_fan_speed_perc
+          - nvidia_smi.gpu_temperature
+          - nvidia_smi.gpu_utilization
+          - nvidia_smi.gpu_memory_utilization
+          - nvidia_smi.gpu_decoder_utilization
+          - nvidia_smi.gpu_encoder_utilization
+        chart_library: table
+        group_by:
+          - dimension
+          - label
+          - node
+          - context
+        group_by_label:
+          - index
+          - product_name
+        table_columns:
+          - context
+          - dimension
+        labels:
+          nvidia_smi.gpu_pcie_bandwidth_usage: PCIe
+          nvidia_smi.gpu_fan_speed_perc: Fan
+          nvidia_smi.gpu_temperature: Temperature
+          nvidia_smi.gpu_utilization: GPU %
+          nvidia_smi.gpu_memory_utilization: Mem %
+          nvidia_smi.gpu_decoder_utilization: Dec %
+          nvidia_smi.gpu_encoder_utilization: Enc %
+      - type: group
+        id: bus
+        title: Bus
+        items:
+          - nvidia_smi.gpu_pcie_bandwidth_usage
+          - nvidia_smi.gpu_pcie_bandwidth_utilization
+      - type: group
+        id: utilization
+        title: Utilization
+        items:
+          - nvidia_smi.gpu_fan_speed_perc
+          - nvidia_smi.gpu_utilization
+          - nvidia_smi.gpu_memory_utilization
+          - nvidia_smi.gpu_decoder_utilization
+          - nvidia_smi.gpu_encoder_utilization
+      - type: group
+        id: memory
+        title: Memory
+        items:
+          - nvidia_smi.gpu_frame_buffer_memory_usage
+          - nvidia_smi.gpu_bar1_memory_usage
+      - type: group
+        id: sensors
+        title: Sensors
+        items:
+          - nvidia_smi.gpu_temperature
+          - nvidia_smi.gpu_voltage
+          - nvidia_smi.gpu_clock_freq
+          - nvidia_smi.gpu_power_draw
+          - nvidia_smi.gpu_performance_state
+      - type: group
+        id: mig
+        title: MIG
+        items:
+          - nvidia_smi.gpu_mig_mode_current_status
+          - nvidia_smi.gpu_mig_devices_count
+          - nvidia_smi.gpu_mig_frame_buffer_memory_usage
+          - nvidia_smi.gpu_mig_bar1_memory_usage

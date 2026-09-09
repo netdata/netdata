@@ -1,0 +1,7 @@
+/prometheus-profile-validation
+/*.exe
+/*.test
+/coverage*.out
+/trace*.out
+/*.prof
+/*.pprof

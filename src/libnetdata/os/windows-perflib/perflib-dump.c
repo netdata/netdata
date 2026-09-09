@@ -448,8 +448,13 @@ bool dumpInstanceCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, 
         if(pInstance->ParentObjectTitleIndex) {
             PERF_INSTANCE_DEFINITION *pi = pInstance;
             while(pi->ParentObjectTitleIndex) {
-                PERF_OBJECT_TYPE *po = getObjectTypeByIndex(pDataBlock, pInstance->ParentObjectTitleIndex);
+                PERF_OBJECT_TYPE *po = getObjectTypeByIndex(pDataBlock, pi->ParentObjectTitleIndex);
+                if(!po)
+                    break;
+
                 pi = getInstanceByPosition(pDataBlock, po, pi->ParentObjectInstance);
+                if(!pi)
+                    break;
 
                 if(!getInstanceName(pDataBlock, po, pi, name, sizeof(name)))
                     strncpyz(name, "[failed]", sizeof(name) - 1);
@@ -500,9 +505,12 @@ bool dumpInstanceCounterCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
 }
 
 
-int windows_perflib_dump(const char *key) {
+int windows_perflib_dump(const char *key, const char *filename) {
     if(key && !*key)
         key = NULL;
+
+    if(filename && !*filename)
+        filename = NULL;
 
     PerflibNamesRegistryInitialize();
 
@@ -521,7 +529,36 @@ int windows_perflib_dump(const char *key) {
     perflibQueryAndTraverse(id, dumpDataCb, dumpObjectCb, dumpInstanceCb, dumpInstanceCounterCb, dumpCounterCb, wb);
 
     buffer_json_finalize(wb);
-    printf("\n%s\n", buffer_tostring(wb));
+
+    if(!filename) {
+        // no output file specified - print the dump to stdout
+        printf("\n%s\n", buffer_tostring(wb));
+        perflibFreePerformanceData();
+        return 0;
+    }
+
+    FILE *fp = fopen(filename, "wb");
+    if(!fp) {
+        fprintf(stderr, "Cannot open '%s' for writing: %s\n", filename, strerror(errno));
+        perflibFreePerformanceData();
+        return 1;
+    }
+
+    size_t len = buffer_strlen(wb);
+    if(fwrite(buffer_tostring(wb), 1, len, fp) != len) {
+        fprintf(stderr, "Failed to write the perflib dump to '%s': %s\n", filename, strerror(errno));
+        fclose(fp);
+        perflibFreePerformanceData();
+        return 1;
+    }
+
+    if(fclose(fp) != 0) {
+        fprintf(stderr, "Failed to flush/close '%s': %s\n", filename, strerror(errno));
+        perflibFreePerformanceData();
+        return 1;
+    }
+
+    fprintf(stderr, "Perflib dump written to '%s'\n", filename);
 
     perflibFreePerformanceData();
 

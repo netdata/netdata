@@ -38,7 +38,7 @@ Check <https://en.wikipedia.org/wiki/Standard_deviation>.
 
 ---
 
-# Coefficient of variation (`cv`)
+## Coefficient of variation (`cv`)
 
 > This query is also available as `rsd`.
 
@@ -84,5 +84,4 @@ Examining last 1 minute `successful` web server responses:
 ## References
 
 Check <https://en.wikipedia.org/wiki/Coefficient_of_variation>.
-
 

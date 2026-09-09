@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testPluginPath = "/opt/nagios-scripts/check_memory.pl"
+const testCheckName = "check_memory"
 
 func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	router := newPerfdataRouter(64)
 
 	warnLow := 100.0
 	warnHigh := 500.0
-	got := router.route(testPluginPath, []output.PerfDatum{
+	got := router.route(testCheckName, []output.PerfDatum{
 		{
 			Label: "latency",
 			Unit:  "ms",
@@ -150,11 +150,11 @@ func TestPerfdataRouterPolicies(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			router := newPerfdataRouter(tc.budget)
 			if len(tc.prime) > 0 {
-				primed := router.route(testPluginPath, tc.prime)
+				primed := router.route(testCheckName, tc.prime)
 				require.NotEmpty(t, primed.values)
 			}
 
-			got := router.route(testPluginPath, tc.input)
+			got := router.route(testCheckName, tc.input)
 			tc.assert(t, got)
 		})
 	}

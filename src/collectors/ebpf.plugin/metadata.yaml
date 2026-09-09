@@ -42,7 +42,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "Depending of kernel version and frequency that files are open and close, this thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "Depending of kernel version and frequency that files are open and close, this thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -250,7 +250,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
+        metrics_description: "Monitor Linux process and thread creation by tracing kernel task-creation functions with eBPF."
         method_description: "Attach tracing (kprobe or tracepoint, and trampoline) to internal kernel functions."
       supported_platforms:
         include:
@@ -274,7 +274,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -484,6 +484,7 @@ modules:
       module_name: disk
       monitored_instance:
         name: eBPF Disk
+        description: "Measure Linux disk I/O latency by attaching eBPF programs to kernel tracepoints."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -524,7 +525,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -536,7 +537,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for disk I/O requests. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/disk.conf"
@@ -591,6 +592,7 @@ modules:
       module_name: hardirq
       monitored_instance:
         name: eBPF Hardirq
+        description: "Measure the latency of available Linux hardware interrupts through eBPF kernel tracepoints."
         link: "https://kernel.org/"
         categories:
           - data-collection.operating-systems
@@ -629,7 +631,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -693,238 +695,6 @@ modules:
                 - name: hardirq names
   - meta:
       plugin_name: ebpf.plugin
-      module_name: cachestat
-      monitored_instance:
-        name: eBPF Cachestat
-        link: "https://kernel.org/"
-        categories:
-          - data-collection.operating-systems
-        icon_filename: "ebpf.jpg"
-      related_resources:
-        integrations:
-          list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: /sys/fs/cgroup
-              monitored_instance_name: Containers
-      info_provided_to_referring_integrations:
-        description: ""
-      keywords:
-        - Page cache
-        - Hit ratio
-        - eBPF
-    overview:
-      data_collection:
-        metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
-        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
-      supported_platforms:
-        include:
-          - Linux
-        exclude: []
-      multi_instance: true
-      additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
-      default_behavior:
-        auto_detection:
-          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
-        limits:
-          description: ""
-        performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
-    setup:
-      prerequisites:
-        list:
-          - title: Compile kernel
-            description: |
-              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-              with different names.
-
-              Now follow steps:
-              1. Copy the configuration file to /usr/src/linux/.config.
-              2. Select the necessary options: make oldconfig
-              3. Compile your kernel image: make bzImage
-              4. Compile your modules: make modules
-              5. Copy your new kernel image for boot loader directory
-              6. Install the new modules: make modules_install
-              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-              8. Update your boot loader
-      configuration:
-        file:
-          name: "ebpf.d/cachestat.conf"
-          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
-        options:
-          description: |
-            All options are defined inside section `[global]`.
-          folding:
-            title: "Config options"
-            enabled: true
-          list:
-            - name: update every
-              description: Data collection frequency.
-              default_value: 10
-              required: false
-            - name: ebpf load mode
-              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
-              default_value: entry
-              required: false
-            - name: apps
-              description: Enable or disable integration with apps.plugin
-              default_value: no
-              required: false
-            - name: cgroups
-              description: Enable or disable integration with cgroup.plugin
-              default_value: no
-              required: false
-            - name: pid table size
-              description: Number of elements stored inside hash tables used to monitor calls per PID.
-              default_value: 32768
-              required: false
-            - name: ebpf type format
-              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
-              default_value: auto
-              required: false
-            - name: ebpf co-re tracing
-              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
-              default_value: trampoline
-              required: false
-            - name: maps per core
-              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
-              default_value: yes
-              required: false
-            - name: lifetime
-              description: Set default lifetime for thread when enabled by cloud.
-              default_value: 300
-              required: false
-        examples:
-          folding:
-            enabled: true
-            title: ""
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: "These metrics show total number of calls to functions inside kernel."
-          labels: []
-          metrics:
-            - name: mem.cachestat_ratio
-              description: Hit ratio
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-            - name: mem.cachestat_dirties
-              description: Number of dirty pages
-              unit: "page/s"
-              chart_type: line
-              dimensions:
-                - name: dirty
-            - name: mem.cachestat_hits
-              description: Number of accessed files
-              unit: "hits/s"
-              chart_type: line
-              dimensions:
-                - name: hit
-            - name: mem.cachestat_misses
-              description: Files out of page cache
-              unit: "misses/s"
-              chart_type: line
-              dimensions:
-                - name: miss
-        - name: apps
-          description: "These Metrics show grouped information per apps group."
-          labels:
-            - name: app_group
-              description: The name of the group defined in the configuration.
-          metrics:
-            - name: app.ebpf_cachestat_hit_ratio
-              description: Hit ratio
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-            - name: app.ebpf_cachestat_dirty_pages
-              description: Number of dirty pages
-              unit: "page/s"
-              chart_type: stacked
-              dimensions:
-                - name: pages
-            - name: app.ebpf_cachestat_access
-              description: Number of accessed files
-              unit: "hits/s"
-              chart_type: stacked
-              dimensions:
-                - name: hits
-            - name: app.ebpf_cachestat_misses
-              description: Files out of page cache
-              unit: "misses/s"
-              chart_type: stacked
-              dimensions:
-                - name: misses
-        - name: cgroup
-          description: ""
-          labels: []
-          metrics:
-            - name: cgroup.cachestat_ratio
-              description: Hit ratio
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-            - name: cgroup.cachestat_dirties
-              description: Number of dirty pages
-              unit: "page/s"
-              chart_type: line
-              dimensions:
-                - name: dirty
-            - name: cgroup.cachestat_hits
-              description: Number of accessed files
-              unit: "hits/s"
-              chart_type: line
-              dimensions:
-                - name: hit
-            - name: cgroup.cachestat_misses
-              description: Files out of page cache
-              unit: "misses/s"
-              chart_type: line
-              dimensions:
-                - name: miss
-            - name: services.cachestat_ratio
-              description: Hit ratio
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_dirties
-              description: Number of dirty pages
-              unit: "page/s"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_hits
-              description: Number of accessed files
-              unit: "hits/s"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.cachestat_misses
-              description: Files out of page cache
-              unit: "misses/s"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-  - meta:
-      plugin_name: ebpf.plugin
       module_name: sync
       monitored_instance:
         name: eBPF Sync
@@ -959,7 +729,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -968,7 +738,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -1109,6 +879,7 @@ modules:
       module_name: mdflush
       monitored_instance:
         name: eBPF MDflush
+        description: "Monitor Linux software RAID flush events by tracing kernel functions with eBPF."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -1139,7 +910,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -1233,7 +1004,7 @@ modules:
         - Hard Disk
     overview:
       data_collection:
-        metrics_description: "Monitors when swap has I/O events and applications executing events."
+        metrics_description: "Monitor Linux swap reads and writes by tracing kernel swap I/O functions with eBPF."
         method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
       supported_platforms:
         include:
@@ -1248,7 +1019,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -1392,6 +1163,7 @@ modules:
       module_name: oomkill
       monitored_instance:
         name: eBPF OOMkill
+        description: "Track Linux applications terminated by the out-of-memory killer through an eBPF kernel tracepoint."
         link: "https://kernel.org/"
         categories:
           - data-collection.operating-systems
@@ -1435,7 +1207,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -1515,587 +1287,6 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: kills
-  - meta:
-      plugin_name: ebpf.plugin
-      module_name: socket
-      monitored_instance:
-        name: eBPF Socket
-        link: "https://kernel.org/"
-        categories:
-          - data-collection.networking
-        icon_filename: "ebpf.jpg"
-      related_resources:
-        integrations:
-          list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: /sys/fs/cgroup
-              monitored_instance_name: Containers
-      info_provided_to_referring_integrations:
-        description: ""
-      keywords:
-        - TCP
-        - UDP
-        - bandwidth
-        - server
-        - connection
-        - socket
-    overview:
-      data_collection:
-        metrics_description: "Monitor bandwidth consumption per application for protocols TCP and UDP."
-        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
-      supported_platforms:
-        include:
-          - Linux
-        exclude: []
-      multi_instance: true
-      additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
-      default_behavior:
-        auto_detection:
-          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
-        limits:
-          description: ""
-        performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
-    setup:
-      prerequisites:
-        list:
-          - title: Compile kernel
-            description: |
-              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-              with different names.
-
-              Now follow steps:
-              1. Copy the configuration file to /usr/src/linux/.config.
-              2. Select the necessary options: make oldconfig
-              3. Compile your kernel image: make bzImage
-              4. Compile your modules: make modules
-              5. Copy your new kernel image for boot loader directory
-              6. Install the new modules: make modules_install
-              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-              8. Update your boot loader
-      configuration:
-        file:
-          name: "ebpf.d/network.conf"
-          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
-        options:
-          description: |
-            All options are defined inside section `[global]`. Options inside `network connections` are ignored for while.
-          folding:
-            title: "Config options"
-            enabled: true
-          list:
-            - name: update every
-              description: Data collection frequency.
-              default_value: 10
-              required: false
-            - name: ebpf load mode
-              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
-              default_value: entry
-              required: false
-            - name: apps
-              description: Enable or disable integration with apps.plugin
-              default_value: no
-              required: false
-            - name: cgroups
-              description: Enable or disable integration with cgroup.plugin
-              default_value: no
-              required: false
-            - name: bandwidth table size
-              description: Number of elements stored inside hash tables used to monitor calls per PID.
-              default_value: 16384
-              required: false
-            - name: ipv4 connection table size
-              description: Number of elements stored inside hash tables used to monitor calls per IPV4 connections.
-              default_value: 16384
-              required: false
-            - name: ipv6 connection table size
-              description: Number of elements stored inside hash tables used to monitor calls per IPV6 connections.
-              default_value: 16384
-              required: false
-            - name: udp connection table size
-              description: Number of temporary elements stored inside hash tables used to monitor UDP connections.
-              default_value: 4096
-              required: false
-            - name: ebpf type format
-              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
-              default_value: auto
-              required: false
-            - name: ebpf co-re tracing
-              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
-              default_value: trampoline
-              required: false
-            - name: maps per core
-              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
-              default_value: yes
-              required: false
-            - name: lifetime
-              description: Set default lifetime for thread when enabled by cloud.
-              default_value: 300
-              required: false
-        examples:
-          folding:
-            enabled: true
-            title: ""
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: global
-          description: "These metrics show total number of calls to functions inside kernel."
-          labels: []
-          metrics:
-            - name: ip.inbound_conn
-              description: Inbound connections.
-              unit: "connections/s"
-              chart_type: line
-              dimensions:
-                - name: connection_tcp
-            - name: ip.tcp_outbound_conn
-              description: TCP outbound connections.
-              unit: "connections/s"
-              chart_type: line
-              dimensions:
-                - name: received
-            - name: ip.tcp_functions
-              description: Calls to internal functions
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: send
-                - name: closed
-            - name: ip.total_tcp_bandwidth
-              description: TCP bandwidth
-              unit: "kilobits/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: send
-            - name: ip.tcp_error
-              description: TCP errors
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: send
-            - name: ip.tcp_retransmit
-              description: Packages retransmitted
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: retransmited
-            - name: ip.udp_functions
-              description: UDP calls
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: send
-            - name: ip.total_udp_bandwidth
-              description: UDP bandwidth
-              unit: "kilobits/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: send
-            - name: ip.udp_error
-              description: UDP errors
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: send
-        - name: apps
-          description: "These metrics show grouped information per apps group."
-          labels:
-            - name: app_group
-              description: The name of the group defined in the configuration.
-          metrics:
-            - name: app.ebpf_call_tcp_v4_connection
-              description: Calls to tcp_v4_connection
-              unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: connections
-            - name: app.ebpf_call_tcp_v6_connection
-              description: Calls to tcp_v6_connection
-              unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: connections
-            - name: app.ebpf_sock_total_bandwidth
-              description: Bytes sent
-              unit: "kilobits/s"
-              chart_type: stacked
-              dimensions:
-                - name: received
-                - name: sent
-            - name: app.ebpf_call_tcp_sendmsg
-              description: Calls for tcp_sendmsg
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: app.ebpf_call_tcp_cleanup_rbuf
-              description: Calls for tcp_cleanup_rbuf
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: app.ebpf_call_tcp_retransmit
-              description: Calls for tcp_retransmit
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: app.ebpf_call_udp_sendmsg
-              description: Calls for udp_sendmsg
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: app.ebpf_call_udp_recvmsg
-              description: Calls for udp_recvmsg
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-        - name: cgroup
-          description: ""
-          labels: []
-          metrics:
-            - name: cgroup.net_conn_ipv4
-              description: Calls to tcp_v4_connection
-              unit: "connections/s"
-              chart_type: line
-              dimensions:
-                - name: connections
-            - name: cgroup.net_conn_ipv6
-              description: Calls to tcp_v6_connection
-              unit: "connections/s"
-              chart_type: line
-              dimensions:
-                - name: connections
-            - name: cgroup.net_total_bandwidth
-              description: Bytes received
-              unit: "kilobits/s"
-              chart_type: line
-              dimensions:
-                - name: received
-                - name: sent
-            - name: cgroup.net_tcp_recv
-              description: Calls to tcp_cleanup_rbuf.
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: calls
-            - name: cgroup.net_tcp_send
-              description: Calls to tcp_sendmsg.
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: calls
-            - name: cgroup.net_retransmit
-              description: Calls to tcp_retransmit.
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: calls
-            - name: cgroup.net_udp_send
-              description: Calls to udp_sendmsg
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: calls
-            - name: cgroup.net_udp_recv
-              description: Calls to udp_recvmsg
-              unit: "calls/s"
-              chart_type: line
-              dimensions:
-                - name: calls
-            - name: services.net_conn_ipv4
-              description: Calls to tcp_v4_connection
-              unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: connections
-            - name: services.net_conn_ipv6
-              description: Calls to tcp_v6_connection
-              unit: "connections/s"
-              chart_type: stacked
-              dimensions:
-                - name: connections
-            - name: services.net_total_bandwidth
-              description: Bytes received
-              unit: "kilobits/s"
-              chart_type: stacked
-              dimensions:
-                - name: received
-                - name: sent
-            - name: services.net_tcp_recv
-              description: Calls to tcp_cleanup_rbuf.
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: services.net_tcp_send
-              description: Calls to tcp_sendmsg.
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: services.net_tcp_retransmit
-              description: Calls to tcp_retransmit
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: services.net_udp_send
-              description: Calls to udp_sendmsg
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-            - name: services.net_udp_recv
-              description: Calls to udp_recvmsg
-              unit: "calls/s"
-              chart_type: stacked
-              dimensions:
-                - name: calls
-  - meta:
-      plugin_name: ebpf.plugin
-      module_name: dcstat
-      monitored_instance:
-        name: eBPF DCstat
-        link: "https://kernel.org/"
-        categories:
-          - data-collection.operating-systems
-        icon_filename: "ebpf.jpg"
-      related_resources:
-        integrations:
-          list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: /sys/fs/cgroup
-              monitored_instance_name: Containers
-      info_provided_to_referring_integrations:
-        description: ""
-      keywords:
-        - Directory Cache
-        - File system
-        - eBPF
-    overview:
-      data_collection:
-        metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
-        method_description: "Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel."
-      supported_platforms:
-        include:
-          - Linux
-        exclude: []
-      multi_instance: true
-      additional_permissions:
-        description: "The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time."
-      default_behavior:
-        auto_detection:
-          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached."
-        limits:
-          description: ""
-        performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
-    setup:
-      prerequisites:
-        list:
-          - title: Compile kernel
-            description: |
-              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-              with different names.
-
-              Now follow steps:
-              1. Copy the configuration file to /usr/src/linux/.config.
-              2. Select the necessary options: make oldconfig
-              3. Compile your kernel image: make bzImage
-              4. Compile your modules: make modules
-              5. Copy your new kernel image for boot loader directory
-              6. Install the new modules: make modules_install
-              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-              8. Update your boot loader
-      configuration:
-        file:
-          name: "ebpf.d/dcstat.conf"
-          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
-        options:
-          description: |
-            All options are defined inside section `[global]`.
-          folding:
-            title: "Config option"
-            enabled: true
-          list:
-            - name: update every
-              description: Data collection frequency.
-              default_value: 10
-              required: false
-            - name: ebpf load mode
-              description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
-              default_value: entry
-              required: false
-            - name: apps
-              description: Enable or disable integration with apps.plugin
-              default_value: no
-              required: false
-            - name: cgroups
-              description: Enable or disable integration with cgroup.plugin
-              default_value: no
-              required: false
-            - name: pid table size
-              description: Number of elements stored inside hash tables used to monitor calls per PID.
-              default_value: 32768
-              required: false
-            - name: ebpf type format
-              description: "Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load)."
-              default_value: auto
-              required: false
-            - name: ebpf co-re tracing
-              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
-              default_value: trampoline
-              required: false
-            - name: maps per core
-              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
-              default_value: yes
-              required: false
-            - name: lifetime
-              description: Set default lifetime for thread when enabled by cloud.
-              default_value: 300
-              required: false
-        examples:
-          folding:
-            enabled: true
-            title: ""
-          list: []
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: apps
-          description: "These Metrics show grouped information per apps group."
-          labels:
-            - name: app_group
-              description: The name of the group defined in the configuration.
-          metrics:
-            - name: app.ebpf_dc_ratio
-              description: Percentage of files inside directory cache
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-            - name: app.ebpf_dc_reference
-              description: Count file access
-              unit: "files"
-              chart_type: stacked
-              dimensions:
-                - name: files
-            - name: app.ebpf_dc_not_cache
-              description: Files not present inside directory cache
-              unit: "files"
-              chart_type: stacked
-              dimensions:
-                - name: files
-            - name: app.ebpf_dc_not_found
-              description: Files not found
-              unit: "files"
-              chart_type: stacked
-              dimensions:
-                - name: files
-        - name: filesystem
-          description: "These metrics show total number of calls to functions inside kernel."
-          labels: []
-          metrics:
-            - name: filesystem.dc_reference
-              description: Variables used to calculate hit ratio.
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: reference
-                - name: slow
-                - name: miss
-            - name: filesystem.dc_hit_ratio
-              description: Percentage of files inside directory cache
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-        - name: cgroup
-          description: ""
-          labels: []
-          metrics:
-            - name: cgroup.dc_ratio
-              description: Percentage of files inside directory cache
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: ratio
-            - name: cgroup.dc_reference
-              description: Count file access
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: reference
-            - name: cgroup.dc_not_cache
-              description: Files not present inside directory cache
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: slow
-            - name: cgroup.dc_not_found
-              description: Files not found
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: miss
-            - name: services.dc_ratio
-              description: Percentage of files inside directory cache
-              unit: "%"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.dc_reference
-              description: Count file access
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.dc_not_cache
-              description: Files not present inside directory cache
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
-            - name: services.dc_not_found
-              description: Files not found
-              unit: "files"
-              chart_type: line
-              dimensions:
-                - name: a dimension per systemd service
   - meta:
       plugin_name: ebpf.plugin
       module_name: filesystem
@@ -2297,7 +1488,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -2306,7 +1497,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -2318,7 +1509,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for shared-memory system calls. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/shm.conf"
@@ -2498,6 +1689,7 @@ modules:
       module_name: softirq
       monitored_instance:
         name: eBPF SoftIRQ
+        description: "Measure the latency of available Linux software interrupts through eBPF kernel tracing."
         link: "https://kernel.org/"
         categories:
           - data-collection.operating-systems
@@ -2536,7 +1728,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -2548,7 +1740,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for software interrupts. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/softirq.conf"
@@ -2603,6 +1795,7 @@ modules:
       module_name: mount
       monitored_instance:
         name: eBPF Mount
+        description: "Track Linux mount and unmount system calls by tracing kernel functions with eBPF."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -2634,7 +1827,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -2643,7 +1836,7 @@ modules:
               Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
               When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
               with different names.
-              
+
               Now follow steps:
               1. Copy the configuration file to /usr/src/linux/.config.
               2. Select the necessary options: make oldconfig
@@ -2655,7 +1848,7 @@ modules:
               8. Update your boot loader
           - title: Debug Filesystem
             description: |
-              This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+              This thread attaches tracepoints for mount and unmount system calls. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
       configuration:
         file:
           name: "ebpf.d/mount.conf"
@@ -2726,6 +1919,7 @@ modules:
       module_name: vfs
       monitored_instance:
         name: eBPF VFS
+        description: "Monitor Linux virtual filesystem read, write, open, create, unlink, and fsync activity through eBPF kernel tracing."
         link: "https://kernel.org/"
         categories:
           - data-collection.storage
@@ -2763,7 +1957,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology."
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ns per call on kernels that do not have BTF technology."
     setup:
       prerequisites:
         list:
@@ -3161,6 +2355,7 @@ modules:
       module_name: process
       monitored_instance:
         name: eBPF Process
+        description: "Monitor the eBPF plugin's internal memory allocation and management statistics."
         link: "https://github.com/netdata/netdata/"
         categories:
           - data-collection.operating-systems

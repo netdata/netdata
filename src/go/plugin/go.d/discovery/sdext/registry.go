@@ -9,6 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/dockersd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/httpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/k8ssd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/netlistensd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/snmpsd"
@@ -17,6 +18,7 @@ import (
 const (
 	discovererNetListeners = "net_listeners"
 	discovererDocker       = "docker"
+	discovererHTTP         = "http"
 	discovererK8s          = "k8s"
 	discovererSNMP         = "snmp"
 )
@@ -34,6 +36,12 @@ func Registry(includeDocker bool) sd.Registry {
 			schemaK8s,
 			parseJSONConfig[[]k8ssd.Config],
 			newK8sDiscoverers,
+		),
+		sd.NewDescriptor(
+			discovererHTTP,
+			schemaHTTP,
+			parseJSONConfig[httpsd.Config],
+			newHTTPDiscoverers,
 		),
 		sd.NewDescriptor(
 			discovererSNMP,
@@ -73,6 +81,15 @@ func newNetListenersDiscoverers(cfg netlistensd.Config, source string) ([]model.
 func newDockerDiscoverers(cfg dockersd.Config, source string) ([]model.Discoverer, error) {
 	cfg.Source = source
 	d, err := dockersd.NewDiscoverer(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return []model.Discoverer{d}, nil
+}
+
+func newHTTPDiscoverers(cfg httpsd.Config, source string) ([]model.Discoverer, error) {
+	cfg.Source = source
+	d, err := httpsd.NewDiscoverer(cfg)
 	if err != nil {
 		return nil, err
 	}

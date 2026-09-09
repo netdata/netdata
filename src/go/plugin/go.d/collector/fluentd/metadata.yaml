@@ -6,6 +6,7 @@ modules:
       module_name: fluentd
       monitored_instance:
         name: Fluentd
+        description: "Monitor Fluentd plugin retry counts, buffer queue lengths, and total buffered data size."
         link: https://www.fluentd.org/
         icon_filename: fluentd.svg
         categories:
@@ -189,13 +190,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:24220
-                
+
                   - name: remote
                     url: http://192.0.2.1:24220
     troubleshooting:

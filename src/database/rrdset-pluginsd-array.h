@@ -48,7 +48,13 @@ typedef struct pluginsd_rrddim_array {
 // --------------------------------------------------------------------------------------------------------------------
 
 // Create a new array with the specified size and refcount=1
+// size is expected to be bounded by the caller: pluginsd slot input is capped at
+// the parser (PLUGINSD_DIMENSION_SLOT_MAX) and the no-slots path uses the dimension
+// count, so the size multiplication below cannot overflow. The check documents and
+// guards that invariant against any future unbounded caller (debug builds only).
 static inline PRD_ARRAY *prd_array_create(size_t size) {
+    internal_fatal(size > (SIZE_MAX - sizeof(PRD_ARRAY)) / sizeof(struct pluginsd_rrddim),
+                   "PRD_ARRAY: requested size %zu would overflow the allocation", size);
     PRD_ARRAY *arr = callocz(1, sizeof(PRD_ARRAY) + size * sizeof(struct pluginsd_rrddim));
     arr->refcount = 1;
     arr->size = size;

@@ -3,6 +3,9 @@
 package prometheus
 
 import (
+	"math"
+	"slices"
+
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 )
@@ -33,6 +36,8 @@ type (
 	Summary struct {
 		sum       float64
 		count     float64
+		hasSum    bool
+		hasCount  bool
 		quantiles []Quantile
 	}
 	Quantile struct {
@@ -104,6 +109,15 @@ func (u Untyped) Value() float64 { return u.value }
 func (s Summary) Count() float64        { return s.count }
 func (s Summary) Sum() float64          { return s.sum }
 func (s Summary) Quantiles() []Quantile { return s.quantiles }
+
+// HasCountAndSum reports whether both required summary components were present in the assembled sample stream.
+func (s Summary) HasCountAndSum() bool { return s.hasCount && s.hasSum }
+
+// AllQuantilesNaN reports whether the summary has quantiles and every quantile value is NaN.
+func (s Summary) AllQuantilesNaN() bool {
+	return len(s.quantiles) > 0 &&
+		!slices.ContainsFunc(s.quantiles, func(q Quantile) bool { return !math.IsNaN(q.value) })
+}
 
 func (q Quantile) Quantile() float64 { return q.quantile }
 func (q Quantile) Value() float64    { return q.value }

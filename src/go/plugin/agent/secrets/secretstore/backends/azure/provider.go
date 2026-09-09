@@ -45,9 +45,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	return secretstore.Creator{
-		Kind:        secretstore.KindAzureKV,
-		DisplayName: "Azure Key Vault",
-		Schema:      configSchema,
+		Kind:   secretstore.KindAzureKV,
+		Schema: configSchema,
 		Create: func() secretstore.Store {
 			return &store{
 				Config: Config{

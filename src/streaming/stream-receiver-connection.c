@@ -5,14 +5,6 @@
 #include "stream-receiver-internals.h"
 #include "stream-replication-sender.h"
 
-#if defined(__APPLE__) && !defined(TCP_KEEPIDLE)
-#define TCP_KEEPIDLE TCP_KEEPALIVE
-#endif
-
-#define CONNECTION_PROBE_AFTER_SECONDS (30)
-#define CONNECTION_PROBE_INTERVAL_SECONDS (10)
-#define CONNECTION_PROBE_COUNT (3)
-
 void svc_rrdhost_obsolete_all_charts(RRDHOST *host);
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -201,10 +193,10 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         if(!host) {
             stream_receiver_log_status(
                 rpt,
-                "rejecting streaming connection; failed to find or create the required host structure",
-                STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR, NDLP_ERR);
+                "rejecting streaming connection; host creation is busy, retry later",
+                STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER, NDLP_NOTICE);
 
-            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_BUSY_TRY_LATER);
             return false;
         }
 
@@ -229,7 +221,27 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
 //            return false;
 //        }
 
-        if(!rrdhost_set_receiver(host, rpt)) {
+        RRDHOST_SET_RECEIVER_RESULT result = rrdhost_set_receiver(host, rpt);
+        if (result == RRDHOST_SET_RECEIVER_CLEANUP_BUSY) {
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; internal cleanup is in progress for this node, please retry shortly",
+                STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER, NDLP_INFO);
+
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_BUSY_TRY_LATER);
+            return false;
+        }
+        if (result == RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL) {
+            // the same rejection the accept-time gate sends, so the child backs off identically
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; this host was claimed as a locally collected vnode",
+                STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL, NDLP_WARNING);
+
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_LOCAL_VNODE);
+            return false;
+        }
+        if (result == RRDHOST_SET_RECEIVER_ALREADY_ATTACHED) {
             stream_receiver_log_status(
                 rpt,
                 "rejecting streaming connection; host is already served by another receiver",
@@ -238,6 +250,9 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
             stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_ALREADY_STREAMING);
             return false;
         }
+
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELEASE);
+        __atomic_store_n(&rpt->host->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -295,32 +310,7 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
                        "STREAM RCV '%s' [from [%s]:%s]: cannot set timeout for socket %d",
                        rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
 
-            // Enable TCP keepalive to detect dead connections faster
-            // When a child vanishes (e.g., VM powered off), the socket won't close normally.
-            // TCP keepalive will probe the connection and detect it's dead.
-            int enable = 1;
-            int idle = CONNECTION_PROBE_AFTER_SECONDS;
-            int interval = CONNECTION_PROBE_INTERVAL_SECONDS;
-            int count = CONNECTION_PROBE_COUNT;
-
-            if (setsockopt(rpt->sock.fd, SOL_SOCKET, SO_KEEPALIVE, &enable, sizeof(enable)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot enable SO_KEEPALIVE on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-#ifdef TCP_KEEPIDLE
-            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPIDLE on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPINTVL on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-            if (setsockopt(rpt->sock.fd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count)) != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "STREAM RCV '%s' [from [%s]:%s]: cannot set TCP_KEEPCNT on socket %d",
-                       rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port, rpt->sock.fd);
-#endif
+            stream_receiver_reconcile_keepalive(rpt);
         }
 
         netdata_log_debug(D_STREAM, "Initial response to %s: %s", rpt->remote_ip, initial_response);
@@ -367,6 +357,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rpt->config.update_every = nd_profile.update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
+    bool invalid_hops = false;
 
     while(decoded_query_string) {
         char *value = strsep_skip_consecutive_separators(&decoded_query_string, "&");
@@ -388,8 +379,10 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         else if(!strcmp(name, "machine_guid") && !rpt->machine_guid)
             rpt->machine_guid = strdupz(value);
 
-        else if(!strcmp(name, "update_every"))
+        else if(!strcmp(name, "update_every")) {
             rpt->config.update_every = (int)strtoul(value, NULL, 0);
+            rpt->handshake_update_every = rpt->config.update_every;
+        }
 
         else if(!strcmp(name, "os") && !rpt->os)
             rpt->os = strdupz(value);
@@ -404,8 +397,13 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             rpt->utc_offset = (int32_t)strtol(value, NULL, 0);
 
         else if(!strcmp(name, "hops")) {
-            rpt->hops = (int16_t)strtol(value, NULL, 0);
-            rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
+            int16_t hops;
+            if(stream_receiver_parse_hops(value, &hops)) {
+                rpt->hops = hops;
+                rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
+            }
+            else
+                invalid_hops = true;
         }
 
         else if(!strcmp(name, "ml_capable"))
@@ -469,6 +467,16 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     }
 
     // check if we should accept this connection
+
+    if(invalid_hops) {
+        stream_receiver_log_status(
+            rpt,
+            "rejecting streaming connection; request has an invalid hops value",
+            STREAM_HANDSHAKE_PARENT_DENIED_ACCESS, NDLP_WARNING);
+
+        stream_receiver_free(rpt);
+        return stream_receiver_response_permission_denied(w);
+    }
 
     if(!rpt->key || !*rpt->key) {
         stream_receiver_log_status(
@@ -615,10 +623,14 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
     {
         RRDHOST *existing = rrdhost_find_by_guid(rpt->machine_guid);
-        // RRDHOST_OPTION_VIRTUAL_HOST is only set by local collectors (pluginsd_host_define_end),
+        // RRDHOST_FLAG_VIRTUAL_HOST is only set by local collectors (pluginsd_host_define_end),
         // never by streaming. The stale detection in pluginsd_host() clears it when a vnode stops
         // being collected, so archived/orphaned vnodes will not have this flag set.
         // No additional checks for RRDHOST_FLAG_COLLECTOR_ONLINE or RRDHOST_FLAG_ARCHIVED are needed.
+        //
+        // This is the fast path: it rejects before we take over the socket and before host creation.
+        // It is not authoritative - the collector may claim the vnode while this connection is still
+        // being set up - so rrdhost_set_receiver() re-checks the flag under the receiver lock.
         if(existing && rrdhost_is_virtual(existing)) {
             stream_receiver_takeover_web_connection(w, rpt);
 
@@ -679,7 +691,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
      */
 
     {
-        time_t age = 0;
+        usec_t age_s = 0;
         bool receiver_stale = false;
         bool receiver_working = false;
 
@@ -691,9 +703,11 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         if (host) {
             rrdhost_receiver_lock(host);
             if (host->receiver) {
-                age =(time_t)((now_monotonic_usec() - host->receiver->thread.last_traffic_ut) / USEC_PER_SEC);
+                usec_t last_traffic_ut = host->receiver->thread.last_traffic_ut;
+                age_s = last_traffic_ut ?
+                    clocks_usec_delta_or_zero(now_monotonic_usec(), last_traffic_ut) / USEC_PER_SEC : 0;
 
-                if (age < 30)
+                if (age_s < 30)
                     receiver_working = true;
                 else
                     receiver_stale = true;
@@ -731,8 +745,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             char msg[200 + 1];
             snprintfz(msg, sizeof(msg) - 1,
                       "rejecting streaming connection; multiple connections for the same host, "
-                      "old connection was last used %ld secs ago%s",
-                      age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
+                      "old connection was last used %" PRIu64 " secs ago%s",
+                      age_s, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
 
             stream_receiver_log_status(rpt, msg, STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED, NDLP_WARNING);
 

@@ -1,0 +1,66 @@
+# Bidirectional Forwarding Detection (BFD) session metrics for Cisco devices.
+# MIB: CISCO-IETF-BFD-MIB (1.3.6.1.4.1.9.10.137)
+# Provides sub-second failure detection for routed adjacencies, L3 loopback interfaces,
+# and non-physical peer links. Universal across IOS, IOS-XE, NX-OS, IOS-XR.
+
+metrics:
+  - MIB: CISCO-IETF-BFD-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.10.137.1.2
+      name: ciscoBfdSessTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.10.137.1.2.1.6
+        name: ciscoBfdSessState
+        chart_meta:
+          description: BFD session operational state
+          family: 'Network/BFD/Session/State'
+          unit: "{status}"
+        mapping:
+          1: admin_down
+          2: down
+          3: init
+          4: up
+          5: failing
+      - OID: 1.3.6.1.4.1.9.10.137.1.2.1.8
+        name: ciscoBfdSessDiag
+        chart_meta:
+          description: BFD session diagnostic code (reason for last state change)
+          family: 'Network/BFD/Session/Diagnostic'
+          unit: "{status}"
+        mapping:
+          0: no_diagnostic
+          1: control_detection_time_expired
+          2: echo_function_failed
+          3: neighbor_signaled_session_down
+          4: forwarding_plane_reset
+          5: path_down
+          6: concatenated_path_down
+          7: administratively_down
+          8: reverse_concatenated_path_down
+      - OID: 1.3.6.1.4.1.9.10.137.1.2.1.18
+        name: ciscoBfdSessDetectMult
+        chart_meta:
+          description: BFD detection multiplier (timeout = interval x multiplier)
+          family: 'Network/BFD/Session/DetectMult'
+          unit: "1"
+    metric_tags:
+      - tag: bfd_session_index
+        index: 1
+      - tag: _bfd_peer_addr
+        symbol:
+          OID: 1.3.6.1.4.1.9.10.137.1.2.1.14
+          name: ciscoBfdSessAddr
+          format: ip_address
+      - tag: _bfd_oper_mode
+        symbol:
+          OID: 1.3.6.1.4.1.9.10.137.1.2.1.9
+          name: ciscoBfdSessOperMode
+        mapping:
+          1: async_with_echo
+          2: async_without_echo
+          3: demand_with_echo
+          4: demand_without_echo
+      - tag: _bfd_local_discr
+        symbol:
+          OID: 1.3.6.1.4.1.9.10.137.1.2.1.3
+          name: ciscoBfdSessDiscriminator

@@ -119,6 +119,14 @@ func TestConfig_Priority(t *testing.T) {
 	}
 }
 
+func TestSourceTypePriority(t *testing.T) {
+	assert.Equal(t, 16, SourceTypePriority(TypeDyncfg))
+	assert.Equal(t, 8, SourceTypePriority(TypeUser))
+	assert.Equal(t, 4, SourceTypePriority(TypeDiscovered))
+	assert.Equal(t, 2, SourceTypePriority(TypeStock))
+	assert.Equal(t, 0, SourceTypePriority("other"))
+}
+
 func TestConfig_Hash(t *testing.T) {
 	tests := map[string]struct {
 		one, two Config
@@ -188,6 +196,15 @@ func TestConfig_SetProvider(t *testing.T) {
 	cfg.SetProvider("name")
 
 	assert.Equal(t, cfg.Provider(), "name")
+}
+
+func TestConfigCloneReturnsUnsupportedValueFailure(t *testing.T) {
+	config := Config{"unsupported": make(chan struct{})}
+
+	cloned, err := config.Clone()
+
+	assert.Nil(t, cloned)
+	assert.ErrorContains(t, err, "YAML marshal panic")
 }
 
 func TestConfig_Apply(t *testing.T) {

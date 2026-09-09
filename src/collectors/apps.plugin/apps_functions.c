@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
+#if defined(OS_LINUX)
+#include "apps-cgroups-enrichment.h"
+#endif
 
 bool enable_function_cmdline = false;
 
@@ -158,7 +161,7 @@ struct fp_maxvals {
 static void fp_emit_columns(BUFFER *wb, struct fp_maxvals *mv, bool show_cmdline, uint64_t total_memory_bytes) {
     buffer_json_member_add_object(wb, "columns");
     {
-        int field_id = 0;
+        size_t field_id = 0;
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
@@ -231,6 +234,10 @@ static void fp_emit_columns(BUFFER *wb, struct fp_maxvals *mv, bool show_cmdline
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE, NULL);
+#endif
+
+#if defined(OS_LINUX)
+        cgroup_topology_emit_rrdf_table_fields(wb, &field_id, true);
 #endif
 
         // CPU utilization
@@ -1164,6 +1171,14 @@ void function_processes(const char *transaction, char *function,
 
         // gid
         buffer_json_add_array_item_uint64(wb, p->gid);
+#endif
+
+#if defined(OS_LINUX)
+        APPS_PROCESS_ENRICHMENT enrichment;
+        netdata_mutex_lock(&apps_pids_mutex);
+        apps_process_enrichment_fill(p, &enrichment);
+        netdata_mutex_unlock(&apps_pids_mutex);
+        apps_emit_process_enrichment_values(wb, &enrichment);
 #endif
 
         // CPU utilization %

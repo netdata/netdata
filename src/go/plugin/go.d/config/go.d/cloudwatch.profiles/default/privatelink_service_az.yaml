@@ -1,0 +1,103 @@
+---
+# Optional service+Availability Zone grain. One endpoint service can create one
+# chart instance per active zone; every child inherits its service's tags.
+version: v1
+display_name: AWS PrivateLink Service by Availability Zone
+namespace: AWS/PrivateLinkServices
+disabled: true
+query:
+  period: 5m
+  lookback: 5m
+  publication_delay: 5m
+instance:
+  dimensions:
+    - name: Az
+      label: availability_zone
+    - name: Service Id
+      label: service_id
+metrics:
+  - id: active_connections
+    metric_name: ActiveConnections
+    statistics: [average]
+  - id: bytes_processed
+    metric_name: BytesProcessed
+    statistics: [average, sum]
+    rate: true
+  - id: new_connections
+    metric_name: NewConnections
+    statistics: [average, sum]
+    rate: true
+  - id: rst_packets_sent
+    metric_name: RstPacketsSent
+    statistics: [average, sum]
+    rate: true
+template:
+  family: PrivateLink
+  context_namespace: privatelink_service_az
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, availability_zone, service_id]
+  charts:
+    - id: aws_cloudwatch_privatelink_service_az_active_connections
+      context: active_connections
+      title: PrivateLink Service Active Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: active_connections_average
+          name: active
+    - id: aws_cloudwatch_privatelink_service_az_average_processed_bytes
+      context: average_processed_bytes
+      title: PrivateLink Service Average Processed Bytes
+      family: Traffic
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: bytes_processed_average
+          name: average
+    - id: aws_cloudwatch_privatelink_service_az_processed_bytes
+      context: processed_bytes
+      title: PrivateLink Service Processed Bytes
+      family: Traffic
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: bytes_processed_sum
+          name: processed
+    - id: aws_cloudwatch_privatelink_service_az_average_new_connections
+      context: average_new_connections
+      title: PrivateLink Service Average New Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: new_connections_average
+          name: average
+    - id: aws_cloudwatch_privatelink_service_az_new_connections
+      context: new_connections
+      title: PrivateLink Service New Connections
+      family: Connections
+      units: connections/s
+      algorithm: absolute
+      dimensions:
+        - selector: new_connections_sum
+          name: new
+    - id: aws_cloudwatch_privatelink_service_az_average_reset_packets_sent
+      context: average_reset_packets_sent
+      title: PrivateLink Service Average Reset Packets Sent
+      family: Packets
+      units: packets
+      algorithm: absolute
+      dimensions:
+        - selector: rst_packets_sent_average
+          name: average
+    - id: aws_cloudwatch_privatelink_service_az_reset_packets_sent
+      context: reset_packets_sent
+      title: PrivateLink Service Reset Packets Sent
+      family: Packets
+      units: packets/s
+      algorithm: absolute
+      dimensions:
+        - selector: rst_packets_sent_sum
+          name: reset_sent

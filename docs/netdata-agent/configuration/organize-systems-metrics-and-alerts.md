@@ -63,27 +63,7 @@ Learn more in our [Spaces and Rooms documentation](/docs/netdata-cloud/organize-
 
 Virtual nodes let you split multi-component systems into distinct, monitorable units. For example, you can monitor each Windows server in your infrastructure as its own node, even when collecting metrics through a single Netdata Agent.
 
-To create a virtual node for your Windows server:
-
-1. Define the virtual node in `/etc/netdata/vnodes/vnodes.conf`:
-
-    ```yaml
-    - hostname: win_server1
-      guid: <value>
-    ```
-
-   :::tip
-   Generate a valid GUID using `uuidgen` on Linux or `[guid]::NewGuid()` in Windows PowerShell.
-   :::
-
-2. Add the vnode configuration to your data collection job in `go.d/windows.conf`:
-
-    ```yaml
-    jobs:
-      - name: win_server1
-        vnode: win_server1
-        url: http://203.0.113.10:9182/metrics
-    ```
+See [Virtual Nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) for the full reference: how to define a vnode via YAML or the dynamic configuration GUI, and how to attach it to a collector job.
 
 ## Host labels
 
@@ -99,14 +79,16 @@ Host labels help you:
 
 Netdata automatically generates host labels when it starts, capturing:
 
-| Label Category | Information Captured                                |
-|----------------|-----------------------------------------------------|
-| System Info    | Kernel version, OS name and version                 |
-| Hardware       | CPU architecture, cores, frequency, RAM, disk space |
-| Environment    | Container details, Kubernetes node status           |
-| Infrastructure | Virtualization layer, Parent-child streaming status |
+| Label Category | Information Captured                                                                        |
+|----------------|---------------------------------------------------------------------------------------------|
+| System Info    | Kernel version; OS family, name, version, release, codename, edition, and build when available |
+| Hardware       | CPU architecture, cores, frequency, RAM, disk space, product ID, product name, product type |
+| Environment    | Container details, Kubernetes node status                                                   |
+| Infrastructure | Virtualization layer, Parent-child streaming status                                         |
 
 View your automatic labels at `http://HOST-IP:19999/api/v1/info`:
+
+Host-label values use Netdata's label sanitizer. For example, commas in hardware model identifiers are exposed as dots in host labels.
 
 ```json
 {
@@ -126,7 +108,10 @@ Add your own labels to categorize systems by any criteria you need.
     ```bash
     cd /etc/netdata   # Replace with your Netdata config directory
     sudo ./edit-config netdata.conf
-    ```
+    :::note
+
+    On Windows, follow [Edit Configuration Files](/docs/netdata-agent/configuration/README.md#edit-configuration-files) instead. The `[host labels]` example, naming rules, and environment variable expansion in steps 2 and 3 below work identically on Windows.
+    :::
 
 2. Add a `[host labels]` section:
 
@@ -153,10 +138,10 @@ Add your own labels to categorize systems by any criteria you need.
         location = ${DC}-${RACK:-default}
     ```
 
-    | Syntax | Behavior |
-    |--------|----------|
-    | `${VAR}` | Replaced with the value of `VAR`. If unset or empty, the label value becomes `[none]` |
-    | `${VAR:-default}` | Replaced with the value of `VAR`. If unset or empty, uses `default` |
+    | Syntax            | Behavior                                                                              |
+    |-------------------|---------------------------------------------------------------------------------------|
+    | `${VAR}`          | Replaced with the value of `VAR`. If unset or empty, the label value becomes `[none]` |
+    | `${VAR:-default}` | Replaced with the value of `VAR`. If unset or empty, uses `default`                   |
 
     Environment variables are resolved when labels are loaded or reloaded. You can mix them with literal text (e.g., `${DC}-${RACK}`).
 
@@ -166,7 +151,36 @@ Add your own labels to categorize systems by any criteria you need.
     netdatacli reload-labels
     ```
 
+    On Windows, run this through `netdatacli.exe` — see [Using netdatacli](/docs/netdata-agent/start-stop-restart.md#windows).
+
 5. Verify your labels at `http://HOST-IP:19999/api/v1/info`
+
+Use custom host labels such as `environment` with [Node Rule-Based Room Assignment](/docs/netdata-cloud/node-rule-based-room-assignment.md) to route Kubernetes Nodes into separate Rooms.
+
+### Remove custom labels
+
+Remove a custom label you no longer need.
+
+1. Edit your Netdata configuration:
+
+    ```bash
+    cd /etc/netdata   # Replace with your Netdata config directory
+    sudo ./edit-config netdata.conf
+    ```
+
+    On Windows, follow [Edit Configuration Files](/docs/netdata-agent/configuration/README.md#edit-configuration-files) instead.
+
+2. In the `[host labels]` section, delete the line for the label you want to remove.
+3. Save the file.
+4. Apply the change without restarting Netdata:
+
+    ```bash
+    netdatacli reload-labels
+    ```
+
+    On Windows, run this through `netdatacli.exe` — see [Using netdatacli](/docs/netdata-agent/start-stop-restart.md#windows).
+
+5. Confirm the label is gone at `http://HOST-IP:19999/api/v1/info`
 
 ### Stream labels from Child to Parent
 

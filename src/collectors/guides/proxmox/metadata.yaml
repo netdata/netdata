@@ -44,8 +44,6 @@ modules:
               module_name: ceph
             - plugin_name: go.d.plugin
               module_name: smartctl
-            - plugin_name: go.d.plugin
-              module_name: sensors
             - plugin_name: proc.plugin
               module_name: /proc/net/dev
             - plugin_name: proc.plugin
@@ -73,7 +71,6 @@ modules:
           - **go.d/zfspool** monitors ZFS pool health, space utilization, and fragmentation (ZFS is common on Proxmox).
           - **go.d/ceph** monitors Ceph cluster health and performance (for Proxmox clusters using Ceph storage).
           - **go.d/smartctl** monitors physical disk SMART health data.
-          - **go.d/sensors** monitors hardware temperature, fan speed, and voltage.
           - **ebpf.plugin** provides kernel-level visibility into VM/container syscalls, file I/O, and network activity.
       supported_platforms:
         include:
@@ -130,7 +127,7 @@ modules:
 
               1. Netdata is installed on the Proxmox host (not inside a VM)
               2. The `/etc/pve/` directory is accessible to the netdata user
-              3. The `cgroup-name.sh` script can read VM/container configuration files
+              3. The `cgroup-name` helper can read VM/container configuration files
           - name: Missing ZFS metrics
             description: |
               If ZFS pool metrics are not showing, ensure the `zfspool` collector is enabled and the `zpool` command is available to the netdata user.

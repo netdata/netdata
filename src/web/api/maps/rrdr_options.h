@@ -40,6 +40,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_LONG_JSON_KEYS  = (1ULL << 31), // Use descriptive long JSON keys instead of cryptic short ones
     RRDR_OPTION_MCP_INFO        = (1ULL << 32), // Include "info" nodes in JSON response sections
     RRDR_OPTION_RFC3339         = (1ULL << 33), // Return timestamps in RFC3339 format instead of epoch seconds
+    RRDR_OPTION_CARDINALITY_ALL = (1ULL << 34), // apply cardinality_limit to the summary (NIDL) metadata too, not only to the result
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR     = (1ULL << 63), // internal use only, to let the formatters know we want to render the anomaly rate

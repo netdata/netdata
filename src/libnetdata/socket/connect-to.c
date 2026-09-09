@@ -49,6 +49,31 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     return fd;
 }
 
+static inline int timeval_to_poll_timeout_ms(const struct timeval *timeout) {
+    if(!timeout)
+        return 1000;
+
+    if(timeout->tv_sec <= 0 && timeout->tv_usec <= 0)
+        return 0;
+
+    uint64_t timeout_ms = 0;
+
+    if(timeout->tv_sec > 0) {
+        if((uint64_t)timeout->tv_sec > (uint64_t)INT_MAX / MSEC_PER_SEC)
+            return INT_MAX;
+
+        timeout_ms = (uint64_t)timeout->tv_sec * MSEC_PER_SEC;
+    }
+
+    if(timeout->tv_usec > 0)
+        timeout_ms += (uint64_t)timeout->tv_usec / USEC_PER_MS;
+
+    if(timeout_ms > INT_MAX)
+        return INT_MAX;
+
+    return (int)timeout_ms;
+}
+
 // connect_to_this_ip46()
 // protocol    IPPROTO_TCP, IPPROTO_UDP
 // socktype    SOCK_STREAM, SOCK_DGRAM
@@ -154,8 +179,7 @@ int connect_to_this_ip46(
                            "Waiting for connection to ip %s port %s to be established",
                            hostBfr, servBfr);
 
-                    // Convert 'struct timeval' to milliseconds for poll():
-                    int timeout_ms = timeout ? (timeout->tv_sec * 1000 + timeout->tv_usec / 1000) : 1000;
+                    int timeout_ms = timeval_to_poll_timeout_ms(timeout);
 
                     switch(wait_on_socket_or_cancel_with_timeout(NULL, fd, timeout_ms, POLLOUT, NULL)) {
                         case  0: // proceed
@@ -351,8 +375,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         return -ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
     }
 
-    char buffer[strlen(definition) + 1];
-    strcpy(buffer, definition);
+    CLEAN_CHAR_P *buffer = strdupz(definition);
 
     char default_service[10 + 1];
     snprintfz(default_service, 10, "%d", default_port);
@@ -403,8 +426,8 @@ void foreach_entry_in_connection_string(const char *destination, bool (*callback
         // is there anything?
         if(!*s || s == e) break;
 
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
+        CLEAN_CHAR_P *buf = mallocz((size_t)(e - s) + 1);
+        strncpyz(buf, s, (size_t)(e - s));
 
         if(callback(buf, data)) break;
 
@@ -425,12 +448,12 @@ static bool connect_to_one_of_callback(char *entry, void *data) {
     struct connect_to_one_of_data *t = data;
 
     if(t->reconnects_counter)
-        t->reconnects_counter++;
+        (*t->reconnects_counter)++;
 
     t->sock = connect_to_this(entry, t->default_port, t->timeout);
     if(t->sock != -1) {
         if(t->connected_to && t->connected_to_size) {
-            strncpyz(t->connected_to, entry, t->connected_to_size);
+            strncpyz(t->connected_to, entry, t->connected_to_size - 1);
             t->connected_to[t->connected_to_size - 1] = '\0';
         }
 

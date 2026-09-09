@@ -41,28 +41,10 @@ size_t rrdr_dimension_ids(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS opt
 }
 
 ALWAYS_INLINE
-void query_target_functions(BUFFER *wb, const char *key, RRDR *r) {
-    QUERY_TARGET *qt = r->internal.qt;
-    const long query_used = qt->query.used;
-
-    DICTIONARY *funcs = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
-    RRDINSTANCE_ACQUIRED *ria = NULL;
-    for (long c = 0; c < query_used ; c++) {
-        QUERY_METRIC *qm = query_metric(qt, c);
-        QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-        if(qi->ria == ria)
-            continue;
-
-        ria = qi->ria;
-        chart_functions_to_dict(rrdinstance_acquired_functions(ria), funcs, NULL, 0);
-    }
-
+void query_target_functions(BUFFER *wb, const char *key, RRDR *r __maybe_unused) {
+    // chart-scoped functions no longer exist; the key stays, always empty,
+    // so the payload shape is unchanged
     buffer_json_member_add_array(wb, key);
-    void *t; (void)t;
-    dfe_start_read(funcs, t)
-        buffer_json_add_array_item_string(wb, t_dfe.name);
-    dfe_done(t);
-    dictionary_destroy(funcs);
     buffer_json_array_close(wb);
 }
 

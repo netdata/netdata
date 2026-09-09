@@ -3,6 +3,8 @@
 #ifndef NETDATA_CGROUP_INTERNALS_H
 #define NETDATA_CGROUP_INTERNALS_H 1
 
+#include "netipc/netipc_protocol.h"
+
 #ifdef NETDATA_INTERNAL_CHECKS
 #define CGROUP_PROCFILE_FLAG PROCFILE_FLAG_DEFAULT
 #else
@@ -27,6 +29,54 @@ struct pids {
 
     unsigned long long pids_current;
 };
+
+#if defined(OS_LINUX)
+typedef struct cgroup_ebpfgo_cachestat {
+    uint64_t add_to_page_cache_lru;
+    uint64_t mark_page_accessed;
+    uint64_t account_page_dirtied;
+    uint64_t mark_buffer_dirty;
+} cgroup_ebpfgo_cachestat_t;
+
+typedef struct cgroup_ebpfgo_publish_cachestat {
+    uint64_t ct;
+
+    long long ratio;
+    long long dirty;
+    long long hit;
+    long long miss;
+
+    cgroup_ebpfgo_cachestat_t current;
+    cgroup_ebpfgo_cachestat_t prev;
+} cgroup_ebpfgo_publish_cachestat_t;
+
+/* Per-interval directory-cache totals for one cgroup.  Unlike cachestat, the
+ * raw cumulative counters are not mirrored here: the per-PID deltas are summed
+ * directly from shared memory, so nothing downstream needs them. */
+typedef struct cgroup_ebpfgo_publish_dcstat {
+    uint64_t ct;
+
+    long long ratio;
+    long long reference;
+    long long slow;
+    long long not_found;
+} cgroup_ebpfgo_publish_dcstat_t;
+
+typedef struct cgroup_ebpfgo_socket {
+    uint64_t bytes_sent;
+    uint64_t bytes_received;
+    uint64_t call_tcp_sent;
+    uint64_t call_tcp_received;
+    uint64_t retransmit;
+    uint64_t call_udp_sent;
+    uint64_t call_udp_received;
+    uint64_t call_close;
+    uint64_t call_tcp_v4_connection;
+    uint64_t call_tcp_v6_connection;
+    uint32_t socket_update_every_s;
+} cgroup_ebpfgo_socket_t;
+
+#endif
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
 struct memory {
@@ -131,10 +181,24 @@ struct cgroup_network_interface {
 };
 
 enum cgroups_container_orchestrator {
-    CGROUPS_ORCHESTRATOR_UNSET,
-    CGROUPS_ORCHESTRATOR_UNKNOWN,
-    CGROUPS_ORCHESTRATOR_K8S
+    CGROUPS_ORCHESTRATOR_UNKNOWN = 0,
+    CGROUPS_ORCHESTRATOR_SYSTEMD = 1,
+    CGROUPS_ORCHESTRATOR_DOCKER  = 2,
+    CGROUPS_ORCHESTRATOR_K8S     = 3,
+    CGROUPS_ORCHESTRATOR_KVM     = 4,
+    CGROUPS_ORCHESTRATOR_LXC     = 5,
+    CGROUPS_ORCHESTRATOR_PODMAN  = 6,
+    CGROUPS_ORCHESTRATOR_NSPAWN  = 7,
 };
+
+_Static_assert((int)CGROUPS_ORCHESTRATOR_UNKNOWN == (int)NIPC_ORCHESTRATOR_UNKNOWN, "cgroups UNKNOWN enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_SYSTEMD == (int)NIPC_ORCHESTRATOR_SYSTEMD, "cgroups SYSTEMD enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_DOCKER == (int)NIPC_ORCHESTRATOR_DOCKER, "cgroups DOCKER enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_K8S == (int)NIPC_ORCHESTRATOR_K8S, "cgroups K8S enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_KVM == (int)NIPC_ORCHESTRATOR_KVM, "cgroups KVM enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_LXC == (int)NIPC_ORCHESTRATOR_LXC, "cgroups LXC enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_PODMAN == (int)NIPC_ORCHESTRATOR_PODMAN, "cgroups PODMAN enum must match netipc");
+_Static_assert((int)CGROUPS_ORCHESTRATOR_NSPAWN == (int)NIPC_ORCHESTRATOR_NSPAWN, "cgroups NSPAWN enum must match netipc");
 
 
 // *** WARNING *** The fields are not thread safe. Take care of safe usage.
@@ -150,6 +214,7 @@ struct cgroup {
     bool function_ready; // true after the first iteration of chart creation/update
 
     char pending_renames;
+    bool container_orchestrator_resolved;
 
     char *id;
     uint32_t hash;
@@ -160,7 +225,7 @@ struct cgroup {
     uint32_t hash_chart_id;
 
     // 'cgroup_name' label value.
-    // by default this is the *id (path), later changed to the resolved name (cgroup-name.sh) or systemd service name.
+    // by default this is the *id (path), later changed to the resolved name (cgroup-name) or systemd service name.
     char *name;
 
     RRDLABELS *chart_labels;
@@ -184,6 +249,47 @@ struct cgroup {
     struct blkio io_queued;                     // operations
 
     struct pids pids_current;
+
+#if defined(OS_LINUX)
+    // eBPF cachestat snapshot mirrored from the legacy ebpf.plugin cgroup path.
+    cgroup_ebpfgo_publish_cachestat_t cachestat;
+
+    RRDSET *st_cachestat_ratio;
+    RRDSET *st_cachestat_dirties;
+    RRDSET *st_cachestat_hits;
+    RRDSET *st_cachestat_misses;
+
+    // eBPF dcstat (directory cache) snapshot from ebpfgo.plugin SHM.
+    cgroup_ebpfgo_publish_dcstat_t dcstat;
+
+    RRDSET *st_dcstat_ratio;
+    RRDSET *st_dcstat_reference;
+    RRDSET *st_dcstat_not_cache;
+    RRDSET *st_dcstat_not_found;
+
+    // eBPF socket snapshot from ebpfgo.plugin SHM.
+    cgroup_ebpfgo_socket_t net;
+
+    RRDSET *st_net_conn_ipv4;
+    RRDSET *st_net_conn_ipv6;
+    RRDSET *st_net_total_bandwidth;
+    RRDDIM *st_net_bw_rd_received;
+    RRDDIM *st_net_bw_rd_sent;
+    RRDSET *st_net_tcp_recv;
+    RRDSET *st_net_tcp_send;
+    RRDSET *st_net_retransmit;
+    RRDSET *st_net_udp_send;
+    RRDSET *st_net_udp_recv;
+    long    last_socket_divisor; // tracks divisor to detect ebpfgo.plugin restarts
+
+    // PIDs from cgroup.procs, extracted once per tick and shared across all
+    // eBPFGo modules.  Populated by cgroup_ebpfgo_refresh_pid_lists() and
+    // freed by cgroup_ebpfgo_release_pid_lists(); both called from
+    // sys_fs_cgroup.c.  The procfile is closed immediately after extraction
+    // so no FDs are held during collection.
+    pid_t  *ebpf_pids;
+    size_t  ebpf_pids_count;
+#endif
 
     struct cgroup_network_interface *interfaces;
 
@@ -275,6 +381,8 @@ extern char services_chart_id_prefix[];
 extern netdata_mutex_t cgroup_root_mutex;
 
 void cgroup_discovery_worker(void *ptr);
+void cgroup_discovery_update_charts(int update_every);
+bool cgroup_discovery_signal_if_unknown(void);
 
 extern bool is_inside_k8s;
 extern long system_page_size;
@@ -289,6 +397,7 @@ extern bool cgroup_enable_pressure;
 extern bool cgroup_enable_cpuacct_cpu_shares;
 
 extern int cgroup_check_for_new_every;
+extern int cgroup_name_timeout_ms;
 extern int cgroup_update_every;
 
 extern char *cgroup_cpuacct_base;
@@ -301,6 +410,10 @@ extern char *cgroup_unified_base;
 extern int cgroup_root_count;
 extern int cgroup_root_max;
 extern int cgroup_max_depth;
+extern bool discovery_signal_pending;
+extern uint64_t cgroup_discovery_generation;
+extern uint64_t cgroup_discovery_scans_natural;
+extern uint64_t cgroup_discovery_scans_opportunistic;
 
 extern SIMPLE_PATTERN *enabled_cgroup_paths;
 extern SIMPLE_PATTERN *enabled_cgroup_names;
@@ -325,6 +438,12 @@ extern uint32_t throttled_time_hash;
 extern uint32_t throttled_usec_hash;
 
 extern struct cgroup *cgroup_root;
+
+void discovery_classify_orchestrator(struct cgroup *cg);
+void discovery_orchestrator_begin_cycle(void);
+#ifdef NETDATA_INTERNAL_CHECKS
+void discovery_orchestrator_set_proxmox_pve_present_for_testing(bool present);
+#endif
 
 enum cgroups_type { CGROUPS_AUTODETECT_FAIL, CGROUPS_V1, CGROUPS_V2 };
 
@@ -351,7 +470,7 @@ static inline int matches_enabled_cgroup_names(char *name) {
 }
 
 static inline int matches_enabled_cgroup_renames(char *id) {
-    return simple_pattern_matches(enabled_cgroup_renames, id);
+    return cgroups_rename_script && simple_pattern_matches(enabled_cgroup_renames, id);
 }
 
 static inline int matches_systemd_services_cgroups(char *id) {
@@ -367,7 +486,7 @@ static inline int matches_entrypoint_parent_process_comm(const char *comm) {
 }
 
 static inline int is_cgroup_systemd_service(struct cgroup *cg) {
-    return (int)(cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE);
+    return (int)(cg && (cg->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE));
 }
 
 static inline int k8s_is_kubepod(struct cgroup *cg) {
@@ -387,8 +506,8 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
     return buffer;
 }
 
-#define RRDFUNCTIONS_CGTOP_HELP "Lists active containers and cgroups with resource usage including CPU, memory, disk I/O, and network traffic."
-#define RRDFUNCTIONS_SYSTEMD_SERVICES_HELP "Shows systemd service cgroups with their process counts and resource consumption (CPU, memory, I/O)."
+#define FUNCTION_CGTOP_HELP "Lists active containers and cgroups with resource usage including CPU, memory, disk I/O, and network traffic."
+#define FUNCTION_SYSTEMD_SERVICES_HELP "Shows systemd service cgroups with their process counts and resource consumption (CPU, memory, I/O)."
 
 int cgroup_function_cgroup_top(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
 int cgroup_function_systemd_top(BUFFER *wb, const char *function, BUFFER *payload, const char *source);
@@ -443,5 +562,48 @@ void update_io_some_pressure_chart(struct cgroup *cg);
 void update_io_some_pressure_stall_time_chart(struct cgroup *cg);
 void update_io_full_pressure_chart(struct cgroup *cg);
 void update_io_full_pressure_stall_time_chart(struct cgroup *cg);
+
+#if defined(OS_LINUX)
+// Shared helper: find the best non-empty cgroup.procs file across mount points.
+procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf_size, const char *cg_id);
+
+// Pre-pass: open cgroup.procs per cgroup, extract PIDs into cg->ebpf_pids, close procfile immediately.
+// Post-pass: free cg->ebpf_pids for each cgroup.
+// Call refresh before any eBPFGo module update, release after all modules finish.
+void cgroup_ebpfgo_refresh_pid_lists(void);
+void cgroup_ebpfgo_release_pid_lists(void);
+
+// Refreshes the ebpfgo SHM snapshot; returns true when valid data is present.
+bool cgroup_ebpfgo_cachestat_refresh(void);
+// Controls whether cachestat charts update this tick (set after reading SHM flags).
+void cgroup_ebpfgo_cachestat_set_snapshot_ready(bool ready);
+void cgroup_ebpfgo_cachestat_update_locked(void);
+void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg);
+
+// Controls whether dcstat charts update this tick (set after reading SHM flags).
+void cgroup_ebpfgo_dcstat_set_snapshot_ready(bool ready);
+void cgroup_ebpfgo_dcstat_update_locked(void);
+void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg);
+
+void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready);
+void cgroup_ebpfgo_socket_update_locked(void);
+void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg);
+#else
+static inline void cgroup_ebpfgo_refresh_pid_lists(void) {}
+static inline void cgroup_ebpfgo_release_pid_lists(void) {}
+
+static inline bool cgroup_ebpfgo_cachestat_refresh(void) { return false; }
+static inline void cgroup_ebpfgo_cachestat_set_snapshot_ready(bool ready) { (void)ready; }
+static inline void cgroup_ebpfgo_cachestat_update_locked(void) {}
+static inline void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg) { (void)cg; }
+
+static inline void cgroup_ebpfgo_dcstat_set_snapshot_ready(bool ready) { (void)ready; }
+static inline void cgroup_ebpfgo_dcstat_update_locked(void) {}
+static inline void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg) { (void)cg; }
+
+static inline void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready) { (void)ready; }
+static inline void cgroup_ebpfgo_socket_update_locked(void) {}
+static inline void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg) { (void)cg; }
+#endif
 
 #endif // NETDATA_CGROUP_INTERNALS_H

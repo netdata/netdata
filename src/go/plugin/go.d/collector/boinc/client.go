@@ -50,7 +50,7 @@ func (c *boincClient) disconnect() {
 }
 
 func (c *boincClient) authenticate() error {
-	// https://boinc.berkeley.edu/trac/wiki/GuiRpcProtocol#Authentication
+	// https://github.com/BOINC/boinc/wiki/GuiRpcProtocol#authentication
 
 	req := &boincRequest{
 		Auth1: &struct{}{},

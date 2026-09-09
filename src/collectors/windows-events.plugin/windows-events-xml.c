@@ -27,6 +27,28 @@ const char *append_the_rest(BUFFER *buffer, const char *xml, const char *end) {
 
 static const char *parse_node(BUFFER *buffer, const char *xml, const char *end, int level);
 
+static const char *find_string_in_slice(const char *start, const char *end, const char *needle, size_t needle_len) {
+    if(!needle_len)
+        return start;
+
+    if(!start || !end || start >= end || (size_t)(end - start) < needle_len)
+        return NULL;
+
+    for(const char *p = start; (size_t)(end - p) >= needle_len; p++) {
+        if(*p == *needle && memcmp(p, needle, needle_len) == 0)
+            return p;
+    }
+
+    return NULL;
+}
+
+static const char *find_char_in_slice(const char *start, const char *end, char c) {
+    if(!start || !end || start >= end)
+        return NULL;
+
+    return memchr(start, c, end - start);
+}
+
 // Helper: Parse the value (between > and <) and return the next position to parse
 const char *parse_value_and_closing_tag(BUFFER *buffer, const char *xml, const char *end, int level) {
     const char *start = xml;
@@ -35,7 +57,7 @@ const char *parse_value_and_closing_tag(BUFFER *buffer, const char *xml, const c
     // const char *tag_start = NULL, *tag_end = NULL;
     while (xml < end) {
         if(*xml == '<') {
-            if(xml + 1 < end && *(xml + 1) == '/') {
+            if((size_t)(end - xml) > 1 && *(xml + 1) == '/') {
                 // a closing tag
                 xml += 2;
 
@@ -106,11 +128,11 @@ const char *parse_field_value(BUFFER *buffer, const char *xml, const char *end) 
 
 // Parse a field name and return the next position to parse
 const char *parse_field(BUFFER *buffer, const char *xml, const char *end) {
-    while(isspace((uint8_t)*xml) && xml < end) xml++;
+    while(xml < end && isspace((uint8_t)*xml)) xml++;
 
     const char *start = xml;
 
-    while (*xml != '=' && xml < end)
+    while (xml < end && *xml != '=')
         xml++;
 
     // Append the field name
@@ -132,7 +154,7 @@ const char *parse_field(BUFFER *buffer, const char *xml, const char *end) {
 
 // Parse a node (handles fields and subnodes) and return the next position to parse
 static inline const char *parse_node(BUFFER *buffer, const char *xml, const char *end, int level) {
-    if(*xml != '<')
+    if(xml >= end || *xml != '<')
         return append_the_rest(buffer, xml, end);
 
     const char *start = xml++; // skip the <
@@ -215,6 +237,9 @@ static inline void buffer_pretty_print_xml_object(BUFFER *buffer, const char *xm
 }
 
 void buffer_pretty_print_xml(BUFFER *buffer, const char *xml, size_t xml_len) {
+    if(!xml || !xml_len)
+        return;
+
     const char *end = xml + xml_len;
     buffer_pretty_print_xml_object(buffer, xml, end);
 }
@@ -223,7 +248,12 @@ void buffer_pretty_print_xml(BUFFER *buffer, const char *xml, size_t xml_len) {
 
 bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_t xml_len, const char *prefix, const char *keys[],
                                           void (*cb)(BUFFER *, const char *, const char *, const char *)) {
-    if(!keys || !*keys[0]) {
+    if(!xml)
+        return false;
+
+    const char *limit = xml + xml_len;
+
+    if(!keys || !keys[0] || !*keys[0]) {
         buffer_pretty_print_xml(buffer, xml, xml_len);
         return true;
     }
@@ -233,26 +263,31 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
         if(!*keys[k]) continue;
 
         size_t klen = strlen(keys[k]);
+        const char *search_end = end ? end : limit;
         char *tag_open = mallocz(klen + 2);
         tag_open[0] = '<';
         strcpy(&tag_open[1], keys[k]);
         tag_open[klen + 1] = '\0';
 
-        const char *new_start = strstr(start, tag_open);
+        const char *new_start = find_string_in_slice(start, search_end, tag_open, klen + 1);
         freez(tag_open);
         if(!new_start)
             return false;
 
         start = new_start + klen + 1;
+        if(start >= search_end)
+            return false;
 
         if(*start != '>' && !isspace((uint8_t)*start))
             return false;
 
         if(*start != '>') {
-            start = strchr(start, '>');
+            start = find_char_in_slice(start, search_end, '>');
             if(!start) return false;
         }
         start++; // skip the >
+        if(start > search_end)
+            return false;
 
         char *tag_close = mallocz(klen + 4);
         tag_close[0] = '<';
@@ -261,9 +296,9 @@ bool buffer_extract_and_print_xml_with_cb(BUFFER *buffer, const char *xml, size_
         tag_close[klen + 2] = '>';
         tag_close[klen + 3] = '\0';
 
-        const char *new_end = strstr(start, tag_close);
+        const char *new_end = find_string_in_slice(start, search_end, tag_close, klen + 3);
         freez(tag_close);
-        if(!new_end || (end && new_end > end))
+        if(!new_end)
             return false;
 
         end = new_end;
@@ -300,10 +335,11 @@ static void print_value_cb(BUFFER *buffer, const char *prefix, const char *start
     char *d = started;
     const char *s = start;
 
-    while(s < end && s) {
-        if(*s == '&' && s + 3 < end) {
+    while(s && s < end) {
+        size_t remaining = end - s;
+        if(*s == '&' && remaining > 3) {
             if(*(s + 1) == '#') {
-                if(s + 4 < end && *(s + 2) == '1' && *(s + 4) == ';') {
+                if(remaining > 4 && *(s + 2) == '1' && *(s + 4) == ';') {
                     if (*(s + 3) == '0') {
                         s += 5;
                         *d++ = '\n';
@@ -319,7 +355,7 @@ static void print_value_cb(BUFFER *buffer, const char *prefix, const char *start
                     continue;
                 }
             }
-            else if(s + 3 < end && *(s + 2) == 't' && *(s + 3) == ';') {
+            else if(*(s + 2) == 't' && *(s + 3) == ';') {
                 if(*(s + 1) == 'l') {
                     s += 4;
                     *d++ = '<';

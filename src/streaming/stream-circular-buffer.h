@@ -26,10 +26,10 @@ typedef struct stream_circular_buffer_stats {
     size_t bytes_uncompressed;
     size_t bytes_sent;
 
-    uint32_t bytes_size;
-    uint32_t bytes_max_size;
-    uint32_t bytes_outstanding;
-    uint32_t bytes_available;
+    size_t bytes_size;
+    size_t bytes_max_size;
+    size_t bytes_outstanding;
+    size_t bytes_available;
 
     double buffer_ratio;
 

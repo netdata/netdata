@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: ebpf-go.plugin
+module_name: dns
+taxonomy_optout:
+  reason: Collector taxonomy is not yet authored for ebpf-go.plugin while the dns module migration is still in progress.

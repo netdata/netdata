@@ -4,6 +4,7 @@ package ndexec
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -339,4 +340,66 @@ func TestRunUnprivilegedWithOptionsUsage(t *testing.T) {
 	assert.Equal(t, "foo", string(out))
 	assert.True(t, usage.User >= 0)
 	assert.True(t, usage.System >= 0)
+}
+
+func TestRunUnprivilegedWithOptionsUsageContextCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses Unix process-group cancellation")
+	}
+
+	tmp := t.TempDir()
+	ready := filepath.Join(tmp, "ready")
+	leaked := filepath.Join(tmp, "leaked")
+
+	target := filepath.Join(tmp, "target.sh")
+	require.NoError(t, os.WriteFile(target, []byte(`#!/bin/sh
+(
+	touch "$1"
+	sleep 0.4
+	touch "$2"
+) &
+wait
+`), 0o755))
+
+	helper := filepath.Join(tmp, "helper.sh")
+	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o755))
+	t.Cleanup(SetRunnerPathsForTests(helper, ""))
+
+	cancelCause := errors.New("execution owner stopped")
+	ctx, cancel := context.WithCancelCause(t.Context())
+	result := make(chan error, 1)
+	go func() {
+		_, _, _, err := RunUnprivilegedWithOptionsUsageContext(
+			ctx,
+			nil,
+			3*time.Second,
+			RunOptions{},
+			target,
+			ready,
+			leaked,
+		)
+		result <- err
+	}()
+
+	waitUntil := time.Now().Add(10 * time.Second)
+	for {
+		if _, err := os.Stat(ready); err == nil {
+			break
+		}
+		if time.Now().After(waitUntil) {
+			require.FailNow(t, "target did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	cancel(cancelCause)
+	select {
+	case err := <-result:
+		require.ErrorIs(t, err, cancelCause)
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "canceled execution did not return")
+	}
+
+	time.Sleep(2 * time.Second)
+	require.NoFileExists(t, leaked)
 }

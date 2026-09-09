@@ -18,7 +18,7 @@
       list:
         - title: ''
           description: |
-            - The incoming webhook URL as given by flock.com. You can use the same on all your Netdata servers (or you can have multiple if you like). Read more about flock webhooks and how to get one [here](https://admin.flock.com/webhooks).
+            - The incoming webhook URL as given by flock.com. You can use the same on all your Netdata servers (or you can have multiple if you like). Read more about flock webhooks and how to get one [here](https://support.flock.com/hc/en-us/articles/360006943354-Incoming-webhooks).
             - Access to the terminal where Netdata Agent is running
     configuration:
       file:

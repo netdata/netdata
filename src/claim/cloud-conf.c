@@ -115,8 +115,17 @@ bool cloud_conf_save(void) {
         return false;
     }
 
-    fprintf(fp, "%s", buffer_tostring(wb));
-    fclose(fp);
+    int written = fprintf(fp, "%s", buffer_tostring(wb));
+    int saved_errno = errno;
+    if(fclose(fp) != 0 || written < 0) {
+        if(written >= 0)
+            saved_errno = errno;
+
+        errno = saved_errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot save file '%s'.", filename);
+        return false;
+    }
+
     return true;
 }
 

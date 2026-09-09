@@ -2,25 +2,27 @@
 
 package snmp
 
-func (c *Collector) collectPing(mx map[string]int64) error {
-	if c.prober == nil {
+import "context"
+
+func (c *Collector) collectPing(ctx context.Context, mx map[string]int64) error {
+	if c.pingClient == nil {
 		return nil
 	}
 
-	stats, err := c.prober.Ping(c.Hostname)
+	sample, err := c.pingClient.ProbeAndTrack(ctx, c.Hostname)
 	if err != nil {
 		return err
 	}
 
-	if stats.PacketsRecv == 0 {
+	if sample.PacketsRecv == 0 {
 		// do not emit metrics if no replies
 		return nil
 	}
 
-	mx["ping_rtt_min"] = stats.MinRtt.Microseconds()
-	mx["ping_rtt_max"] = stats.MaxRtt.Microseconds()
-	mx["ping_rtt_avg"] = stats.AvgRtt.Microseconds()
-	mx["ping_rtt_stddev"] = stats.StdDevRtt.Microseconds()
+	mx["ping_rtt_min"] = sample.RTT.Min.Microseconds()
+	mx["ping_rtt_max"] = sample.RTT.Max.Microseconds()
+	mx["ping_rtt_avg"] = sample.RTT.Avg.Microseconds()
+	mx["ping_rtt_stddev"] = sample.RTT.StdDev.Microseconds()
 
 	return nil
 }

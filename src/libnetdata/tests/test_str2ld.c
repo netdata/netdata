@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
-#include "../required_dummies.h"
 #include <setjmp.h>
 #include <cmocka.h>
 

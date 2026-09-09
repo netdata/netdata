@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Prepare tools
         id: prepare
         run: |
@@ -74,11 +74,11 @@ jobs:
       # build failure for one version doesn't prevent us from publishing
       # successfully built and tested packages for another version.
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Fetch base image
         id: fetch-images

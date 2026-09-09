@@ -50,7 +50,6 @@ Examining last 1 minute `successful` web server responses:
 
 ## References
 
--   <https://en.wikipedia.org/wiki/Moving_average#exponential-moving-average>
+-   <https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average>
 -   <https://en.wikipedia.org/wiki/Exponential_smoothing>.
-
 

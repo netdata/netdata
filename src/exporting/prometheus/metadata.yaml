@@ -4,6 +4,7 @@
   id: 'export-prometheus-remote'
   meta: &meta
     name: 'Prometheus Remote Write'
+    description: 'Export Netdata metrics to Prometheus-compatible storage through remote write for long-term analysis.'
     link: 'https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage'
     categories:
       - export
@@ -164,6 +165,7 @@
   meta:
     <<: *meta
     name: AppOptics
+    description: 'Export Netdata metrics to AppOptics through Prometheus remote write for long-term storage and analysis.'
     link: https://www.solarwinds.com/appoptics
     icon_filename: 'solarwinds.svg'
     keywords:
@@ -175,6 +177,7 @@
   meta:
     <<: *meta
     name: Azure Data Explorer
+    description: 'Export Netdata metrics to Azure Data Explorer through Prometheus remote write for long-term storage and analysis.'
     link: https://azure.microsoft.com/en-us/pricing/details/data-explorer/
     icon_filename: 'azuredataex.jpg'
     keywords:
@@ -185,6 +188,7 @@
   meta:
     <<: *meta
     name: Azure Event Hub
+    description: 'Export Netdata metrics to Azure Event Hub through Prometheus remote write for long-term storage and analysis.'
     link: https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-about
     icon_filename: 'azureeventhub.png'
     keywords:
@@ -195,6 +199,7 @@
   meta:
     <<: *meta
     name: New Relic
+    description: 'Export Netdata metrics to New Relic through Prometheus remote write for long-term storage and analysis.'
     link: https://newrelic.com/
     icon_filename: 'newrelic.svg'
     keywords:
@@ -207,6 +212,7 @@
   meta:
     <<: *meta
     name: QuasarDB
+    description: 'Export Netdata metrics to QuasarDB through Prometheus remote write for long-term storage and analysis.'
     link: https://doc.quasar.ai/master/
     icon_filename: 'quasar.jpeg'
     keywords:
@@ -220,6 +226,7 @@
   meta:
     <<: *meta
     name: Splunk SignalFx
+    description: 'Export Netdata metrics to Splunk SignalFx through Prometheus remote write for long-term storage and analysis.'
     link: https://www.splunk.com/en_us/products/observability.html
     icon_filename: 'splunk.svg'
     keywords:
@@ -233,6 +240,7 @@
   meta:
     <<: *meta
     name: TiKV
+    description: 'Export Netdata metrics to TiKV through Prometheus remote write for long-term storage and analysis.'
     link: https://tikv.org/
     icon_filename: 'tikv.png'
     keywords:
@@ -245,6 +253,7 @@
   meta:
     <<: *meta
     name: Thanos
+    description: 'Export Netdata metrics to Thanos through Prometheus remote write for long-term storage and analysis.'
     link: https://thanos.io/
     icon_filename: 'thanos.png'
     keywords:
@@ -257,6 +266,7 @@
   meta:
     <<: *meta
     name: VictoriaMetrics
+    description: 'Export Netdata metrics to VictoriaMetrics through Prometheus remote write for long-term storage and analysis.'
     link: https://victoriametrics.com/products/open-source/
     icon_filename: 'victoriametrics.png'
     keywords:
@@ -269,6 +279,7 @@
   meta:
     <<: *meta
     name: VMware Aria
+    description: 'Export Netdata metrics to VMware Aria through Prometheus remote write for long-term storage and analysis.'
     link: https://www.vmware.com/products/aria-operations-for-applications.html
     icon_filename: 'aria.png'
     keywords:
@@ -283,6 +294,7 @@
   meta:
     <<: *meta
     name: Chronix
+    description: 'Export Netdata metrics to Chronix through Prometheus remote write for long-term storage and analysis.'
     link: https://dbdb.io/db/chronix
     icon_filename: 'chronix.png'
     keywords:
@@ -295,6 +307,7 @@
   meta:
     <<: *meta
     name: Cortex
+    description: 'Export Netdata metrics to Cortex through Prometheus remote write for long-term storage and analysis.'
     link: https://cortexmetrics.io/
     icon_filename: 'cortex.png'
     keywords:
@@ -307,6 +320,7 @@
   meta:
     <<: *meta
     name: CrateDB
+    description: 'Export Netdata metrics to CrateDB through Prometheus remote write for long-term storage and analysis.'
     link: https://crate.io/
     icon_filename: 'crate.svg'
     keywords:
@@ -319,6 +333,7 @@
   meta:
     <<: *meta
     name: ElasticSearch
+    description: 'Export Netdata metrics to Elasticsearch through Prometheus remote write for long-term storage and analysis.'
     link: https://www.elastic.co/
     icon_filename: 'elasticsearch.svg'
     keywords:
@@ -331,6 +346,7 @@
   meta:
     <<: *meta
     name: OpeanSearch
+    description: 'Export Netdata metrics to OpenSearch through Prometheus remote write for long-term storage and analysis.'
     link: https://opensearch.org/
     icon_filename: 'opensearch.svg'
     keywords:
@@ -343,6 +359,7 @@
   meta:
     <<: *meta
     name: Gnocchi
+    description: 'Export Netdata metrics to Gnocchi through Prometheus remote write for long-term storage and analysis.'
     link: https://wiki.openstack.org/wiki/Gnocchi
     icon_filename: 'gnocchi.svg'
     keywords:
@@ -355,6 +372,7 @@
   meta:
     <<: *meta
     name: Google BigQuery
+    description: 'Export Netdata metrics to Google BigQuery through Prometheus remote write for long-term storage and analysis.'
     link: https://cloud.google.com/bigquery/
     icon_filename: 'bigquery.png'
     keywords:
@@ -367,6 +385,7 @@
   meta:
     <<: *meta
     name: IRONdb
+    description: 'Export Netdata metrics to IRONdb through Prometheus remote write for long-term storage and analysis.'
     link: https://docs.circonus.com/irondb/
     icon_filename: 'irondb.png'
     keywords:
@@ -379,6 +398,7 @@
   meta:
     <<: *meta
     name: Kafka
+    description: 'Export Netdata metrics to Kafka through Prometheus remote write for long-term storage and analysis.'
     link: https://kafka.apache.org/
     icon_filename: 'kafka.svg'
     keywords:
@@ -391,6 +411,7 @@
   meta:
     <<: *meta
     name: M3DB
+    description: 'Export Netdata metrics to M3DB through Prometheus remote write for long-term storage and analysis.'
     link: https://m3db.io/
     icon_filename: 'm3db.png'
     keywords:
@@ -403,6 +424,7 @@
   meta:
     <<: *meta
     name: MetricFire
+    description: 'Export Netdata metrics to MetricFire through Prometheus remote write for long-term storage and analysis.'
     link: https://www.metricfire.com/
     icon_filename: 'metricfire.png'
     keywords:
@@ -415,6 +437,7 @@
   meta:
     <<: *meta
     name: PostgreSQL
+    description: 'Export Netdata metrics to PostgreSQL through Prometheus remote write for long-term storage and analysis.'
     link: https://www.postgresql.org/
     icon_filename: 'postgres.svg'
     keywords:
@@ -427,6 +450,7 @@
   meta:
     <<: *meta
     name: Wavefront
+    description: 'Export Netdata metrics to Wavefront through Prometheus remote write for long-term storage and analysis.'
     link: https://docs.wavefront.com/wavefront_data_ingestion.html
     icon_filename: 'wavefront.png'
     keywords:
@@ -439,6 +463,7 @@
   meta:
     <<: *meta
     name: TimescaleDB
+    description: 'Export Netdata metrics to TimescaleDB through Prometheus remote write for long-term storage and analysis.'
     link: https://www.timescale.com/
     icon_filename: 'timescale.png'
     keywords:
@@ -451,6 +476,7 @@
   meta:
     <<: *meta
     name: GreptimeDB
+    description: 'Export Netdata metrics to GreptimeDB through Prometheus remote write for long-term storage and analysis.'
     link: https://greptime.com/product/db
     icon_filename: 'greptimedb.svg'
     keywords:

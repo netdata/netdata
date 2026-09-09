@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Prepare tools
         id: prepare
         run: |
@@ -63,11 +63,11 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
       fail-fast: false  # We want to check everything, so don’t bail on the first failure.
-      max-parallel: 2  # Cap of two jobs at a time to limit impact on other CI.
+      max-parallel: 8
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       # Actually check the EOL date for the platform.
       - name: Check EOL Date
         id: check

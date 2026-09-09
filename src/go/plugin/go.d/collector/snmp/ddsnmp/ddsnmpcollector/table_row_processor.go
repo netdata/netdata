@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package ddsnmpcollector
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -29,10 +32,14 @@ type (
 	}
 	// tableRowProcessingContext contains context needed for processing a row
 	tableRowProcessingContext struct {
-		config        ddprofiledefinition.MetricsConfig
-		columnOIDs    map[string]ddprofiledefinition.SymbolConfig
-		crossTableCtx *crossTableContext
-		orderedTags   []orderedTagConfig
+		processing         *processingObserver
+		config             ddprofiledefinition.MetricsConfig
+		columnOIDs         map[string][]ddprofiledefinition.SymbolConfig
+		crossTableCtx      *crossTableContext
+		orderedTags        []orderedTagConfig
+		symbolMode         tableSymbolMode
+		rejected           *uint64
+		dependencyRejected *uint64
 	}
 )
 
@@ -46,74 +53,121 @@ func newTableRowProcessor(log *logger.Logger) *tableRowProcessor {
 }
 
 func (p *tableRowProcessor) processRow(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
-	if err := p.processRowTags(row, ctx); err != nil {
-		p.log.Debugf("Error processing tags for row %s: %v", row.index, err)
-	}
+	p.processRowTags(row, ctx)
 
 	return p.processRowMetrics(row, ctx)
 }
 
-func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProcessingContext) error {
+func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProcessingContext) {
 	// Collect tags in the order they appear in the profile
 	for _, orderedTag := range ctx.orderedTags {
+		var err error
+		dependency := false
 		switch orderedTag.tagType {
 		case tagTypeSameTable:
-			p.processSingleSameTableTag(row, orderedTag.config)
+			err = p.processSingleSameTableTag(row, orderedTag.config, ctx.processing)
 		case tagTypeCrossTable:
+			dependency = true
 			if ctx.crossTableCtx != nil {
-				p.processSingleCrossTableTag(row, orderedTag.config, ctx)
+				err = p.processSingleCrossTableTag(row, orderedTag.config, ctx)
 			}
 		case tagTypeIndex:
-			p.processSingleIndexTag(row, orderedTag.config)
+			err = p.processSingleIndexTag(row, orderedTag.config)
 		}
+		if err == nil {
+			continue
+		}
+		if orderedTag.tagType == tagTypeIndex {
+			ctx.processing.record(metricTagDisplayName(orderedTag.config), "", "index_processing")
+		}
+		if ctx.rejected != nil {
+			*ctx.rejected++
+		}
+		if dependency && ctx.dependencyRejected != nil {
+			*ctx.dependencyRejected++
+		}
+		p.log.Debugf("Error processing tag %s for row %s: %v", metricTagDisplayName(orderedTag.config), row.index, err)
 	}
-
-	return nil
 }
 
-func (p *tableRowProcessor) processSingleSameTableTag(row *tableRowData, tagCfg ddprofiledefinition.MetricTagConfig) {
+func (p *tableRowProcessor) processSingleSameTableTag(
+	row *tableRowData,
+	tagCfg ddprofiledefinition.MetricTagConfig,
+	processing *processingObserver,
+) error {
 	columnOID := trimOID(tagCfg.Symbol.OID)
 	pdu, ok := row.pdus[columnOID]
 	if !ok {
-		return
+		if processing != nil {
+			processing.record(metricTagDisplayName(tagCfg), columnOID+"."+row.index, "missing_input")
+		}
+		return nil
 	}
 
-	ta := tagAdder{tags: row.tags}
-	if err := p.tagProc.processTag(tagCfg, pdu, ta); err != nil {
-		p.log.Debugf("Error processing tag %s: %v", tagCfg.Tag, err)
-	}
+	ta := tagAdder{tags: row.tags, processing: processing}
+	return p.tagProc.processTag(tagCfg, pdu, ta)
 }
 
-func (p *tableRowProcessor) processSingleCrossTableTag(row *tableRowData, tagCfg ddprofiledefinition.MetricTagConfig, ctx *tableRowProcessingContext) {
-	if err := p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx); err != nil {
-		p.log.Debugf("Error resolving cross-table tag %s: %v", tagCfg.Tag, err)
-	}
+func (p *tableRowProcessor) processSingleCrossTableTag(
+	row *tableRowData,
+	tagCfg ddprofiledefinition.MetricTagConfig,
+	ctx *tableRowProcessingContext,
+) error {
+	return p.crossTableResolver.resolveCrossTableTag(tagCfg, row.index, ctx.crossTableCtx, ctx.processing)
 }
 
-func (p *tableRowProcessor) processSingleIndexTag(row *tableRowData, tagCfg ddprofiledefinition.MetricTagConfig) {
-	tagName, indexValue, ok := p.processIndexTag(tagCfg, row.index)
-	if !ok {
-		p.log.Debugf("Cannot extract position %d from index %s", tagCfg.Index, row.index)
-		return
+func (p *tableRowProcessor) processSingleIndexTag(
+	row *tableRowData,
+	tagCfg ddprofiledefinition.MetricTagConfig,
+) error {
+	tagName, indexValue, err := p.processIndexTag(tagCfg, row.index)
+	if err != nil {
+		return err
 	}
 
 	ta := tagAdder{tags: row.tags}
 	ta.addTag(tagName, indexValue)
+	return nil
 }
 
-func (p *tableRowProcessor) processIndexTag(cfg ddprofiledefinition.MetricTagConfig, index string) (string, string, bool) {
-	indexValue, ok := p.extractIndexPosition(index, cfg.Index)
-	if !ok {
-		return "", "", false
+func (p *tableRowProcessor) processIndexTag(cfg ddprofiledefinition.MetricTagConfig, index string) (string, string, error) {
+	tagName := metricTagDisplayName(cfg)
+
+	rawValue := index
+	if cfg.Index != 0 {
+		indexValue, ok := p.extractIndexPosition(index, cfg.Index)
+		if !ok {
+			return "", "", fmt.Errorf("position %d not found", cfg.Index)
+		}
+		rawValue = indexValue
 	}
 
-	tagName := ternary(cfg.Tag != "", cfg.Tag, fmt.Sprintf("index%d", cfg.Index))
-
-	if v, ok := cfg.Mapping[indexValue]; ok {
-		indexValue = v
+	if cfg.Index == 0 && len(cfg.IndexTransform) > 0 {
+		rawValue = p.crossTableResolver.applyIndexTransform(index, cfg.IndexTransform)
+		if rawValue == "" {
+			return "", "", fmt.Errorf("index transformation failed")
+		}
 	}
 
-	return tagName, indexValue, true
+	value, err := processRawIndexTagValue(cfg, rawValue)
+	if err != nil {
+		return "", "", err
+	}
+
+	return tagName, value, nil
+}
+
+func metricTagDisplayName(cfg ddprofiledefinition.MetricTagConfig) string {
+	switch {
+	case cfg.Tag != "":
+		return cfg.Tag
+	case cfg.Symbol.Name != "":
+		return cfg.Symbol.Name
+	case cfg.Index != 0:
+		return fmt.Sprintf("index%d", cfg.Index)
+	default:
+		return "index"
+	}
 }
 
 // extractPosition extracts a specific position from an index
@@ -140,30 +194,77 @@ func (p *tableRowProcessor) extractIndexPosition(index string, position uint) (s
 	return index, n == position && index != ""
 }
 
-func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
-	metrics := make([]ddsnmp.Metric, 0, len(ctx.columnOIDs))
+func (p *tableRowProcessor) extractIndexPositionFromEnd(index string, position uint) (string, bool) {
+	if position == 0 || index == "" {
+		return "", false
+	}
 
-	for columnOID, sym := range ctx.columnOIDs {
+	end := len(index)
+	for n := uint(1); ; n++ {
+		start := strings.LastIndexByte(index[:end], '.')
+		if n == position {
+			if start == -1 {
+				return index[:end], end > 0
+			}
+			return index[start+1 : end], start+1 < end
+		}
+		if start == -1 {
+			return "", false
+		}
+		end = start
+	}
+}
+
+func (p *tableRowProcessor) processRowMetrics(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
+	symbolCount := 0
+	for _, syms := range ctx.columnOIDs {
+		symbolCount += len(syms)
+	}
+	metrics := make([]ddsnmp.Metric, 0, symbolCount)
+
+	for columnOID, syms := range ctx.columnOIDs {
 		pdu, ok := row.pdus[columnOID]
 		if !ok {
+			if ctx.processing != nil {
+				for _, sym := range syms {
+					ctx.processing.record(sym.Name, columnOID+"."+row.index, "missing_input")
+				}
+			}
 			continue
 		}
 
-		metric, err := p.createMetric(sym, pdu, row)
-		if err != nil {
-			p.log.Debugf("Error creating metric %s: %v", sym.Name, err)
-			continue
-		}
+		for _, sym := range syms {
+			metric, err := p.createMetric(sym, pdu, row, ctx.symbolMode)
+			if err != nil {
+				ctx.processing.record(sym.Name, pdu.Name, "conversion")
+				if ctx.rejected != nil {
+					*ctx.rejected++
+				}
+				p.log.Debugf("Error creating metric %s: %v", sym.Name, err)
+				continue
+			}
+			if metric == nil {
+				ctx.processing.record(sym.Name, pdu.Name, "empty_date")
+				continue
+			}
 
-		metrics = append(metrics, *metric)
+			metrics = append(metrics, *metric)
+		}
 	}
 
 	return metrics, nil
 }
 
-func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, row *tableRowData) (*ddsnmp.Metric, error) {
+func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, row *tableRowData, mode tableSymbolMode) (*ddsnmp.Metric, error) {
+	if mode == tableSymbolModePresence {
+		return buildTableMetric(sym, pdu, 0, row.tags, row.staticTags, row.tableName)
+	}
+
 	value, err := p.valProc.processValue(sym, pdu)
 	if err != nil {
+		if errors.Is(err, errNoTextDateValue) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("error processing value: %w", err)
 	}
 
@@ -171,6 +272,18 @@ func (p *tableRowProcessor) createMetric(sym ddprofiledefinition.SymbolConfig, p
 }
 
 type (
+	crossTableLookupValueIndexKey struct {
+		refTableOID     string
+		lookupColumnOID string
+		format          string
+		extractPattern  string
+		matchPattern    string
+		matchValue      string
+	}
+	crossTableLookupValueIndex struct {
+		mapping     ddprofiledefinition.MappingConfig
+		rowsByValue map[string][]string
+	}
 	// crossTableResolver handles resolving tags from other tables
 	crossTableResolver struct {
 		log          *logger.Logger
@@ -178,9 +291,10 @@ type (
 	}
 	// crossTableContext contains all data needed for cross-table resolution
 	crossTableContext struct {
-		walkedData     map[string]map[string]gosnmp.SnmpPDU // tableOID -> PDUs
-		tableNameToOID map[string]string                    // tableName -> tableOID
-		rowTags        map[string]string
+		walkedData         map[string]map[string]gosnmp.SnmpPDU                            // tableOID -> PDUs
+		tableNameToOID     map[string]string                                               // tableName -> tableOID
+		lookupValueIndexes map[crossTableLookupValueIndexKey][]*crossTableLookupValueIndex // lookup semantics -> normalized value index
+		rowTags            map[string]string
 	}
 )
 
@@ -191,29 +305,52 @@ func newCrossTableResolver(log *logger.Logger) *crossTableResolver {
 	}
 }
 
+func newCrossTableContext(
+	walkedData map[string]map[string]gosnmp.SnmpPDU,
+	tableNameToOID map[string]string,
+) *crossTableContext {
+	return &crossTableContext{
+		walkedData:     walkedData,
+		tableNameToOID: tableNameToOID,
+	}
+}
+
 // resolveCrossTableTag resolves a tag value from another table
-func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.MetricTagConfig, index string, ctx *crossTableContext) error {
+func (r *crossTableResolver) resolveCrossTableTag(tagCfg ddprofiledefinition.MetricTagConfig, index string, ctx *crossTableContext, processing *processingObserver) error {
+	field := metricTagDisplayName(tagCfg)
 	refTableOID, err := r.findReferencedTableOID(tagCfg.Table, ctx.tableNameToOID)
 	if err != nil {
+		processing.record(field, tagCfg.Symbol.OID, "dependency_processing")
 		return err
 	}
 
 	refTablePDUs, err := r.getReferencedTableData(tagCfg.Table, refTableOID, ctx.walkedData)
 	if err != nil {
+		processing.record(field, tagCfg.Symbol.OID, "dependency_processing")
 		return err
 	}
 
 	lookupIndex, err := r.transformIndex(index, tagCfg.IndexTransform)
 	if err != nil {
+		processing.record(field, tagCfg.Symbol.OID, "dependency_processing")
 		return err
+	}
+
+	if r.requiresLookupByValue(tagCfg) {
+		lookupIndex, err = r.resolveLookupIndexByValue(tagCfg, lookupIndex, refTableOID, refTablePDUs, ctx)
+		if err != nil {
+			processing.record(field, tagCfg.LookupSymbol.OID, "dependency_processing")
+			return err
+		}
 	}
 
 	pdu, err := r.lookupValue(tagCfg, lookupIndex, refTablePDUs)
 	if err != nil {
+		processing.record(field, trimOID(tagCfg.Symbol.OID)+"."+lookupIndex, "missing_dependency")
 		return err
 	}
 
-	ta := tagAdder{tags: ctx.rowTags}
+	ta := tagAdder{tags: ctx.rowTags, processing: processing}
 
 	return r.tagProcessor.processTag(tagCfg, pdu, ta)
 }
@@ -265,8 +402,12 @@ func (r *crossTableResolver) lookupValue(tagCfg ddprofiledefinition.MetricTagCon
 	return pdu, nil
 }
 
-// applyTransform applies index transformation rules to extract a subset of the index
-// Example: index "1.6.0.36.155.53.3.246", transform [{start: 1, end: 7}] → "6.0.36.155.53.3.246"
+// applyTransform applies index transformation rules to extract a subset of the index.
+// Indices are 0-based; end is inclusive.
+// Examples:
+//   - index "1.6.0.36.155.53.3.246", transform [{start: 1, end: 7}]    → "6.0.36.155.53.3.246"
+//   - index "7.0.80.86.171.205.239", transform [{start: 1}]            → "0.80.86.171.205.239"  (start>0, end==0 ⇒ to tail)
+//   - index "1.4.10.0.0.1.99",       transform [{start: 0, drop_right: 1}] → "1.4.10.0.0.1"
 func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddprofiledefinition.MetricIndexTransform) string {
 	if len(transforms) == 0 {
 		return index
@@ -277,8 +418,16 @@ func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddpr
 
 	for _, transform := range transforms {
 		start, end := transform.Start, transform.End
+		if transform.DropRight > 0 {
+			if transform.DropRight >= uint(len(parts)) {
+				return ""
+			}
+			end = uint(len(parts)) - transform.DropRight - 1
+		} else if transform.Start > 0 && transform.End == 0 {
+			end = uint(len(parts) - 1)
+		}
 
-		if int(start) >= len(parts) || end < start || int(end) >= len(parts) {
+		if start >= uint(len(parts)) || end < start || end >= uint(len(parts)) {
 			return ""
 		}
 
@@ -288,8 +437,4 @@ func (r *crossTableResolver) applyIndexTransform(index string, transforms []ddpr
 	}
 
 	return strings.Join(result, ".")
-}
-
-func (r *crossTableResolver) isCrossTable(tagCfg ddprofiledefinition.MetricTagConfig, currentTableName string) bool {
-	return tagCfg.Table != "" && tagCfg.Table != currentTableName && tagCfg.Index == 0
 }

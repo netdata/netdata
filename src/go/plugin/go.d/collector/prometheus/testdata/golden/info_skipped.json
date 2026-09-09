@@ -1,0 +1,20 @@
+[
+  {
+    "context": "prometheus.test_metric",
+    "labels": {
+      "label1": "value1"
+    },
+    "dims": [
+      {
+        "name": "test_metric",
+        "algo": "absolute",
+        "value": 11
+      }
+    ],
+    "soft": {
+      "units": "metric",
+      "family": "test_metric",
+      "type": "line"
+    }
+  }
+]

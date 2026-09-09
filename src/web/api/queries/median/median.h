@@ -15,12 +15,13 @@ struct tg_median {
 };
 
 static inline void tg_median_create_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    long entries = r->view.group;
+    size_t entries = r->view.group;
     if(entries < 10) entries = 10;
 
     struct tg_median *g = (struct tg_median *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_median));
-    g->series = onewayalloc_mallocz(r->internal.owa, entries * sizeof(NETDATA_DOUBLE));
-    g->series_size = (size_t)entries;
+    g->series = onewayalloc_mallocz(
+        r->internal.owa, onewayalloc_mul_or_fatal(entries, sizeof(*g->series), "median series"));
+    g->series_size = entries;
 
     g->percent = def;
     if(options && *options) {
@@ -81,7 +82,10 @@ static inline void tg_median_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_median *g = (struct tg_median *)r->time_grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
-        g->series = onewayalloc_doublesize( r->internal.owa, g->series, g->series_size * sizeof(NETDATA_DOUBLE));
+        g->series = onewayalloc_doublesize(
+            r->internal.owa,
+            g->series,
+            onewayalloc_mul_or_fatal(g->series_size, sizeof(*g->series), "median series"));
         g->series_size *= 2;
     }
 

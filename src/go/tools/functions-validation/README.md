@@ -1,5 +1,9 @@
 # Functions Validation (CLI + Containers)
 
+**Place in the documentation set.** The project skill `.agents/skills/topology-authoring/SKILL.md` cites sections
+of this document by heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer exists, so
+renaming or removing a heading here updates the skill in the same change.
+
 ## TL;DR
 - Bring up databases with Docker Compose.
 - Use `go.d.plugin --function` with the configs in `./config`.
@@ -22,10 +26,26 @@ src/go/go.d.plugin \
 ```
 
 ## Validate output
+
 ```
 echo '{"status":200,"type":"table","columns":{},"data":[]}' | \
   (cd src/go && go run ./tools/functions-validation/validate)
 ```
+
+## Validate topology v1 fixtures
+
+```
+(cd src/go && \
+  go run ./tools/functions-validation/validate \
+    --schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json \
+    --input tools/functions-validation/fixtures/topology-v1/network-connections.json)
+```
+
+Topology v1 validation uses the JSON Schema and additional compact-table
+semantic checks: decoded column lengths must match `rows`, dictionary indexes
+must be in range, actor/link references must point to existing rows, and
+correlation rules must reference existing actor/link types and point/claim key
+columns.
 
 ## Validate output (require rows)
 ```
@@ -69,3 +89,4 @@ src/go/go.d.plugin \
 - MSSQL uses an init container to enable Query Store and seed data.
 - MongoDB enables the profiler to populate `system.profile`.
 - The validator reads the canonical schema at `src/plugins.d/FUNCTION_UI_SCHEMA.json`.
+- Topology v1 fixtures live under `src/go/tools/functions-validation/fixtures/topology-v1/`.

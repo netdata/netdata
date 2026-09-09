@@ -33,4 +33,7 @@ var (
 	errRuntimeSnapshotWrite = errors.New("metrix: runtime store supports stateful writes only")
 	errRuntimeFreshness     = errors.New("metrix: runtime store freshness is fixed to FreshnessCommitted")
 	errRuntimeWindowCycle   = errors.New("metrix: runtime store does not support window=cycle")
+
+	// ErrHostScopeConflict reports inconsistent metadata for the same non-default host scope key.
+	ErrHostScopeConflict = errors.New("metrix: host scope metadata conflict")
 )

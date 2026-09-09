@@ -10,23 +10,34 @@ import (
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func (c *Collector) validateConfig() error {
 	if c.Hostname == "" {
-		return errors.New("SNMP hostname is required")
+		return snmputils.WithFailure(errors.New("SNMP hostname is required"), "configuration", "missing_hostname")
 	}
 	if c.Vnode.GUID != "" {
 		if err := uuid.Validate(c.Vnode.GUID); err != nil {
-			return fmt.Errorf("invalid Vnode GUID: %v", err)
+			return snmputils.WithFailure(fmt.Errorf("invalid Vnode GUID: %v", err), "configuration", "invalid_vnode_id")
 		}
 	}
 	return nil
 }
 
 func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
+	client, err := c.newConfiguredSNMPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Info(snmputils.SnmpClientConnInfo(client))
+
+	return client, nil
+}
+
+func (c *Collector) newConfiguredSNMPClient() (gosnmp.Handler, error) {
 	client := c.newSnmpClient()
 
 	client.SetTarget(c.Hostname)
@@ -48,7 +59,7 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 		client.SetVersion(gosnmp.Version2c)
 	case gosnmp.Version3:
 		if c.User.Name == "" {
-			return nil, errors.New("username is required for SNMPv3")
+			return nil, snmputils.WithFailure(errors.New("username is required for SNMPv3"), "client", "missing_v3_username")
 		}
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
@@ -60,16 +71,18 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 			PrivacyProtocol:          snmputils.ParseSNMPv3PrivProtocol(c.User.PrivProto),
 			PrivacyPassphrase:        c.User.PrivKey,
 		})
+		// Context name addresses a specific MIB view on multi-context
+		// agents (virtual routers, logical partitions, snmpsim virtual
+		// devices). Empty string means the default context.
+		client.SetContextName(c.User.ContextName)
 	default:
-		return nil, fmt.Errorf("invalid SNMP version: %s", c.Options.Version)
+		return nil, snmputils.WithFailure(fmt.Errorf("invalid SNMP version: %s", c.Options.Version), "client", "invalid_snmp_version")
 	}
-
-	c.Info(snmputils.SnmpClientConnInfo(client))
 
 	return client, nil
 }
 
-func (c *Collector) initProber() (ping.Prober, error) {
+func (c *Collector) initPinger() (pinger.Client, error) {
 	// base timeout = update_every seconds
 	timeout := time.Duration(c.UpdateEvery) * time.Second
 
@@ -78,8 +91,14 @@ func (c *Collector) initProber() (ping.Prober, error) {
 	const maxTimeout = 3 * time.Second
 	timeout = max(min(timeout, maxTimeout), minTimeout)
 
-	conf := c.Ping.ProberConfig
-	conf.Timeout = timeout
-
-	return c.newProber(conf, c.Logger), nil
+	return c.newPinger(pinger.Config{
+		Probe: pinger.ProbeConfig{
+			Network:    c.Ping.Network,
+			Interface:  c.Ping.Interface,
+			Privileged: c.Ping.Privileged,
+			Packets:    c.Ping.Packets,
+			Interval:   c.Ping.Interval,
+			Timeout:    timeout,
+		},
+	}, c.Logger)
 }

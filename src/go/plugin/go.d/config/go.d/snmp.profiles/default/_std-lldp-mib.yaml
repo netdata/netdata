@@ -1,0 +1,67 @@
+# LLDP-MIB profile for topology discovery.
+# MIB: LLDP-MIB (IEEE 802.1AB)
+
+extends:
+  - _std-topology-lldp-mib.yaml
+
+metrics:
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.1.0
+      name: lldpStatsRemTablesLastChangeTime
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.2.0
+      name: lldpStatsRemTablesInserts
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.3.0
+      name: lldpStatsRemTablesDeletes
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.4.0
+      name: lldpStatsRemTablesDrops
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.5.0
+      name: lldpStatsRemTablesAgeouts
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.2.6
+      name: lldpStatsTxPortTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.2.6.1.2
+        name: lldpStatsTxPortFramesTotal
+    metric_tags:
+      - tag: lldp_loc_port_num
+        symbol:
+          OID: 1.0.8802.1.1.2.1.2.6.1.1
+          name: lldpStatsTxPortNum
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.2.7
+      name: lldpStatsRxPortTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.2.7.1.2
+        name: lldpStatsRxPortFramesDiscardedTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.3
+        name: lldpStatsRxPortFramesErrors
+      - OID: 1.0.8802.1.1.2.1.2.7.1.4
+        name: lldpStatsRxPortFramesTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.5
+        name: lldpStatsRxPortTLVsDiscardedTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.6
+        name: lldpStatsRxPortTLVsUnrecognizedTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.7
+        name: lldpStatsRxPortAgeoutsTotal
+    metric_tags:
+      - tag: lldp_loc_port_num
+        symbol:
+          OID: 1.0.8802.1.1.2.1.2.7.1.1
+          name: lldpStatsRxPortNum

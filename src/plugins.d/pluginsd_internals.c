@@ -59,16 +59,49 @@ void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     parser_init_repertoire(parser, repertoire);
 
     if (repertoire & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING))
-        pluginsd_inflight_functions_init(parser);
+        pluginsd_calls_init(parser);
 }
 
 void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
 
-    pluginsd_inflight_functions_cleanup(parser);
+    // 1. a RESULT_BEGIN..END span cut short by death: release the stashed
+    //    item (forcing a 2xx code to 503 - a truncated stream must not report
+    //    success) so the sweep below can deliver it and the dictionary is not
+    //    queued-for-destruction forever behind our reference
+    pluginsd_calls_release_deferred(parser);
+
+    // 2. mark the transport dead and drain the dispatchers: after this no
+    //    execute/cancel/progress/GC holds or can acquire the parser.
+    //    Drain-safety (streaming): this runs UNDER rrdhost_receiver_lock
+    //    (rrdhost_clear_receiver), which is safe because no dispatcher send
+    //    path takes the receiver lock (send_to_child takes only its own
+    //    spinlock; the opcode path takes the stream-thread queue) - and it is
+    //    LOAD-BEARING the other way too: the remaining child-directed senders
+    //    (command-nodeid, stream-path) send under the receiver lock and are
+    //    serialized with this drain by that same lock. Moving parser_destroy
+    //    out of the receiver lock would expose them to the freed parser; a
+    //    future send path taking the receiver lock would deadlock this drain.
+    //    Both directions are constraints.
+    if(parser->inflight.transport)
+        nrpc_transport_mark_dead_and_drain(parser->inflight.transport);
+
+    // 3. destroy the container: pre-destroy drain + the destroy-time 503
+    //    sweep answer every caller still waiting on this plugin
+    pluginsd_calls_cleanup(parser);
+
+    // 4. free the parser, THEN drop the transport's base ref: survivors
+    //    (registry entries, dyncfg nodes, in-flight-call pins) keep holding a valid
+    //    but dead transport until they release it; its destructor never
+    //    touches the parser
+    struct nrpc_transport *transport = parser->inflight.transport;
+    parser->inflight.transport = NULL;
 
     freez(parser);
+
+    if(transport)
+        nrpc_transport_owner_release(transport);
 }
 
 

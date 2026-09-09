@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/context/v1/stream.pb.h"
+#include "context/v1/stream.pb.h"
 
 #include "context_stream.h"
 

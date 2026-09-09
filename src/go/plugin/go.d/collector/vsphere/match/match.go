@@ -26,80 +26,72 @@ type ClusterMatcher interface {
 	Match(*rs.Cluster) bool
 }
 
+type DatastoreClusterMatcher interface {
+	Match(*rs.StoragePod) bool
+}
+
+type VSANClusterMatcher interface {
+	Match(*rs.Cluster) bool
+}
+
+type VSANHostMatcher interface {
+	Match(*rs.Host) bool
+}
+
+type VSANVMMatcher interface {
+	Match(*rs.VM) bool
+}
+
 type (
-	hostDCMatcher      struct{ m matcher.Matcher }
-	hostClusterMatcher struct{ m matcher.Matcher }
-	hostHostMatcher    struct{ m matcher.Matcher }
-	vmDCMatcher        struct{ m matcher.Matcher }
-	vmClusterMatcher   struct{ m matcher.Matcher }
-	vmHostMatcher      struct{ m matcher.Matcher }
-	vmVMMatcher        struct{ m matcher.Matcher }
-	orHostMatcher      struct{ lhs, rhs HostMatcher }
-	orVMMatcher        struct{ lhs, rhs VMMatcher }
-	andHostMatcher     struct{ lhs, rhs HostMatcher }
-	andVMMatcher       struct{ lhs, rhs VMMatcher }
+	resourceMatcher[T any] interface {
+		Match(*T) bool
+	}
+	fieldMatcher[T any] struct {
+		m   matcher.Matcher
+		get func(*T) string
+	}
+	orMatcher[T any]  struct{ lhs, rhs resourceMatcher[T] }
+	andMatcher[T any] struct{ lhs, rhs resourceMatcher[T] }
 )
 
-func (m hostDCMatcher) Match(host *rs.Host) bool      { return m.m.MatchString(host.Hier.DC.Name) }
-func (m hostClusterMatcher) Match(host *rs.Host) bool { return m.m.MatchString(host.Hier.Cluster.Name) }
-func (m hostHostMatcher) Match(host *rs.Host) bool    { return m.m.MatchString(host.Name) }
-func (m vmDCMatcher) Match(vm *rs.VM) bool            { return m.m.MatchString(vm.Hier.DC.Name) }
-func (m vmClusterMatcher) Match(vm *rs.VM) bool       { return m.m.MatchString(vm.Hier.Cluster.Name) }
-func (m vmHostMatcher) Match(vm *rs.VM) bool          { return m.m.MatchString(vm.Hier.Host.Name) }
-func (m vmVMMatcher) Match(vm *rs.VM) bool            { return m.m.MatchString(vm.Name) }
-func (m orHostMatcher) Match(host *rs.Host) bool      { return m.lhs.Match(host) || m.rhs.Match(host) }
-func (m orVMMatcher) Match(vm *rs.VM) bool            { return m.lhs.Match(vm) || m.rhs.Match(vm) }
-func (m andHostMatcher) Match(host *rs.Host) bool     { return m.lhs.Match(host) && m.rhs.Match(host) }
-func (m andVMMatcher) Match(vm *rs.VM) bool           { return m.lhs.Match(vm) && m.rhs.Match(vm) }
-
-func newAndHostMatcher(lhs, rhs HostMatcher, others ...HostMatcher) andHostMatcher {
-	m := andHostMatcher{lhs: lhs, rhs: rhs}
-	switch len(others) {
-	case 0:
-		return m
-	default:
-		return newAndHostMatcher(m, others[0], others[1:]...)
-	}
+func (m fieldMatcher[T]) Match(v *T) bool {
+	return m.m.MatchString(m.get(v))
 }
 
-func newAndVMMatcher(lhs, rhs VMMatcher, others ...VMMatcher) andVMMatcher {
-	m := andVMMatcher{lhs: lhs, rhs: rhs}
-	switch len(others) {
-	case 0:
-		return m
-	default:
-		return newAndVMMatcher(m, others[0], others[1:]...)
-	}
+func (m orMatcher[T]) Match(v *T) bool {
+	return m.lhs.Match(v) || m.rhs.Match(v)
 }
 
-func newOrHostMatcher(lhs, rhs HostMatcher, others ...HostMatcher) orHostMatcher {
-	m := orHostMatcher{lhs: lhs, rhs: rhs}
-	switch len(others) {
-	case 0:
-		return m
-	default:
-		return newOrHostMatcher(m, others[0], others[1:]...)
-	}
+func (m andMatcher[T]) Match(v *T) bool {
+	return m.lhs.Match(v) && m.rhs.Match(v)
 }
 
-func newOrVMMatcher(lhs, rhs VMMatcher, others ...VMMatcher) orVMMatcher {
-	m := orVMMatcher{lhs: lhs, rhs: rhs}
-	switch len(others) {
+func chainAnd[T any](ms []resourceMatcher[T]) resourceMatcher[T] {
+	switch len(ms) {
 	case 0:
-		return m
-	default:
-		return newOrVMMatcher(m, others[0], others[1:]...)
+		return nil
+	case 1:
+		return ms[0]
 	}
+	m := andMatcher[T]{lhs: ms[0], rhs: ms[1]}
+	for _, next := range ms[2:] {
+		m = andMatcher[T]{lhs: m, rhs: next}
+	}
+	return m
 }
 
-func newOrDSMatcher(lhs, rhs DatastoreMatcher, others ...DatastoreMatcher) orDSMatcher {
-	m := orDSMatcher{lhs: lhs, rhs: rhs}
-	switch len(others) {
+func chainOr[T any](ms []resourceMatcher[T]) resourceMatcher[T] {
+	switch len(ms) {
 	case 0:
-		return m
-	default:
-		return newOrDSMatcher(m, others[0], others[1:]...)
+		return nil
+	case 1:
+		return ms[0]
 	}
+	m := orMatcher[T]{lhs: ms[0], rhs: ms[1]}
+	for _, next := range ms[2:] {
+		m = orMatcher[T]{lhs: m, rhs: next}
+	}
+	return m
 }
 
 type (
@@ -107,191 +99,208 @@ type (
 	HostIncludes      []string
 	DatastoreIncludes []string
 	ClusterIncludes   []string
+
+	DatastoreClusterIncludes []string
+	VSANClusterIncludes      []string
+	VSANHostIncludes         []string
+	VSANVMIncludes           []string
 )
 
 type (
-	dsDCMatcher  struct{ m matcher.Matcher }
-	dsDSMatcher  struct{ m matcher.Matcher }
-	orDSMatcher  struct{ lhs, rhs DatastoreMatcher }
-	andDSMatcher struct{ lhs, rhs DatastoreMatcher }
+	datastoreClusterMatcher struct{ m matcher.Matcher }
+	vsanClusterMatcher      struct{ m matcher.Matcher }
+	vsanHostMatcher         struct{ m matcher.Matcher }
+	vsanVMMatcher           struct{ m matcher.Matcher }
 )
 
-func (m dsDCMatcher) Match(ds *rs.Datastore) bool  { return m.m.MatchString(ds.Hier.DC.Name) }
-func (m dsDSMatcher) Match(ds *rs.Datastore) bool  { return m.m.MatchString(ds.Name) }
-func (m orDSMatcher) Match(ds *rs.Datastore) bool  { return m.lhs.Match(ds) || m.rhs.Match(ds) }
-func (m andDSMatcher) Match(ds *rs.Datastore) bool { return m.lhs.Match(ds) && m.rhs.Match(ds) }
-
-type (
-	clusterDCMatcher   struct{ m matcher.Matcher }
-	clusterNameMatcher struct{ m matcher.Matcher }
-	orClusterMatcher   struct{ lhs, rhs ClusterMatcher }
-	andClusterMatcher  struct{ lhs, rhs ClusterMatcher }
-)
-
-func (m clusterDCMatcher) Match(c *rs.Cluster) bool   { return m.m.MatchString(c.Hier.DC.Name) }
-func (m clusterNameMatcher) Match(c *rs.Cluster) bool { return m.m.MatchString(c.Name) }
-func (m orClusterMatcher) Match(c *rs.Cluster) bool   { return m.lhs.Match(c) || m.rhs.Match(c) }
-func (m andClusterMatcher) Match(c *rs.Cluster) bool  { return m.lhs.Match(c) && m.rhs.Match(c) }
-
-func newOrClusterMatcher(lhs, rhs ClusterMatcher, others ...ClusterMatcher) orClusterMatcher {
-	m := orClusterMatcher{lhs: lhs, rhs: rhs}
-	switch len(others) {
-	case 0:
-		return m
-	default:
-		return newOrClusterMatcher(m, others[0], others[1:]...)
+// NewPatternListMatcher parses ordered glob patterns with optional !-prefixed exclusions.
+func NewPatternListMatcher(name string, patterns []string) (matcher.Matcher, error) {
+	m, err := matcher.NewSimplePatternListMatcher(patterns)
+	if err != nil {
+		return nil, patternListError(name, err)
 	}
+	return m, nil
+}
+
+func patternListError(name string, err error) error {
+	if err.Error() == "invalid empty negative pattern" || strings.HasPrefix(err.Error(), "invalid pattern") {
+		return fmt.Errorf("%s has %w", name, err)
+	}
+	return fmt.Errorf("%s %w", name, err)
+}
+
+func (m datastoreClusterMatcher) Match(pod *rs.StoragePod) bool {
+	return m.m.MatchString(datastoreClusterPath(pod)) ||
+		m.m.MatchString(pod.Name) ||
+		m.m.MatchString(pod.ID)
+}
+
+func (m vsanClusterMatcher) Match(cluster *rs.Cluster) bool {
+	return m.m.MatchString(vsanClusterPath(cluster)) ||
+		m.m.MatchString(cluster.Name) ||
+		m.m.MatchString(cluster.ID) ||
+		m.m.MatchString("vsan_uuid:"+cluster.VSANUUID)
+}
+
+func (m vsanHostMatcher) Match(host *rs.Host) bool {
+	return m.m.MatchString(vsanHostPath(host)) ||
+		m.m.MatchString(host.Name) ||
+		m.m.MatchString(host.ID) ||
+		m.m.MatchString("vsan_node_uuid:"+host.VSANNodeUUID)
+}
+
+func (m vsanVMMatcher) Match(vm *rs.VM) bool {
+	return m.m.MatchString(vsanVMPath(vm)) ||
+		m.m.MatchString(vm.Name) ||
+		m.m.MatchString(vm.ID) ||
+		m.m.MatchString("instance_uuid:"+vm.InstanceUUID)
+}
+
+func datastoreClusterPath(pod *rs.StoragePod) string {
+	if pod.Hier.DC.Name == "" {
+		return "/" + pod.Name
+	}
+	return "/" + pod.Hier.DC.Name + "/" + pod.Name
+}
+
+func vsanClusterPath(cluster *rs.Cluster) string {
+	if cluster.Hier.DC.Name == "" {
+		return "/" + cluster.Name
+	}
+	return "/" + cluster.Hier.DC.Name + "/" + cluster.Name
+}
+
+func vsanHostPath(host *rs.Host) string {
+	return "/" + host.Hier.DC.Name + "/" + host.Hier.Cluster.Name + "/" + host.Name
+}
+
+func vsanVMPath(vm *rs.VM) string {
+	return "/" + vm.Hier.DC.Name + "/" + vm.Hier.Cluster.Name + "/" + vm.Hier.Host.Name + "/" + vm.Name
+}
+
+func (dci DatastoreClusterIncludes) Parse() (DatastoreClusterMatcher, error) {
+	m, err := NewPatternListMatcher("datastore_cluster_include", []string(dci))
+	if err != nil {
+		return nil, err
+	}
+	return datastoreClusterMatcher{m}, nil
+}
+
+func (vci VSANClusterIncludes) Parse() (VSANClusterMatcher, error) {
+	m, err := NewPatternListMatcher("vsan_cluster_include", []string(vci))
+	if err != nil {
+		return nil, err
+	}
+	return vsanClusterMatcher{m}, nil
+}
+
+func (vhi VSANHostIncludes) Parse() (VSANHostMatcher, error) {
+	m, err := NewPatternListMatcher("vsan_host_include", []string(vhi))
+	if err != nil {
+		return nil, err
+	}
+	return vsanHostMatcher{m}, nil
+}
+
+func (vvi VSANVMIncludes) Parse() (VSANVMMatcher, error) {
+	m, err := NewPatternListMatcher("vsan_vm_include", []string(vvi))
+	if err != nil {
+		return nil, err
+	}
+	return vsanVMMatcher{m}, nil
 }
 
 func (vi VMIncludes) Parse() (VMMatcher, error) {
-	var ms []VMMatcher
-	for _, v := range vi {
-		m, err := parseVMInclude(v)
-		if err != nil {
-			return nil, err
-		}
-		if m == nil {
-			continue
-		}
-		ms = append(ms, m)
-	}
-
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return newOrVMMatcher(ms[0], ms[1], ms[2:]...), nil
-	}
+	return parseIncludes[rs.VM]("VM include", []string(vi), parseVMInclude)
 }
 
 func (hi HostIncludes) Parse() (HostMatcher, error) {
-	var ms []HostMatcher
-	for _, v := range hi {
-		m, err := parseHostInclude(v)
-		if err != nil {
-			return nil, err
-		}
-		if m == nil {
-			continue
-		}
-		ms = append(ms, m)
-	}
-
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return newOrHostMatcher(ms[0], ms[1], ms[2:]...), nil
-	}
+	return parseIncludes[rs.Host]("host include", []string(hi), parseHostInclude)
 }
 
 func (di DatastoreIncludes) Parse() (DatastoreMatcher, error) {
-	var ms []DatastoreMatcher
-	for _, v := range di {
-		m, err := parseDatastoreInclude(v)
-		if err != nil {
-			return nil, err
-		}
-		if m == nil {
-			continue
-		}
-		ms = append(ms, m)
-	}
-
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return newOrDSMatcher(ms[0], ms[1], ms[2:]...), nil
-	}
+	return parseIncludes[rs.Datastore]("datastore include", []string(di), parseDatastoreInclude)
 }
-
-const (
-	datacenterIdx = iota
-	clusterIdx
-	hostIdx
-	vmIdx
-)
 
 func cleanInclude(include string) string {
 	return strings.Trim(include, "/")
 }
 
-func parseHostInclude(include string) (HostMatcher, error) {
-	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
-	}
-
-	include = cleanInclude(include)
-	parts := strings.Split(include, "/") // /dc/clusterIdx/hostIdx
-	var ms []HostMatcher
-
-	for i, v := range parts {
-		m, err := parseSubInclude(v)
+func parseIncludes[T any](name string, includes []string, parse func(string) (resourceMatcher[T], error)) (resourceMatcher[T], error) {
+	var ms []resourceMatcher[T]
+	for _, v := range includes {
+		m, err := parse(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse %s %q: %w", name, v, err)
 		}
-		switch i {
-		case datacenterIdx:
-			ms = append(ms, hostDCMatcher{m})
-		case clusterIdx:
-			ms = append(ms, hostClusterMatcher{m})
-		case hostIdx:
-			ms = append(ms, hostHostMatcher{m})
-		default:
+		if m == nil {
+			continue
 		}
+		ms = append(ms, m)
 	}
-
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return newAndHostMatcher(ms[0], ms[1], ms[2:]...), nil
-	}
+	return chainOr(ms), nil
 }
 
-func parseVMInclude(include string) (VMMatcher, error) {
+func parsePathInclude[T any](include, name, expected string, segments []func(*T) string) (resourceMatcher[T], error) {
 	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
+		return nil, fmt.Errorf("bad %s include format %q: expected %s", name, include, expected)
 	}
 
 	include = cleanInclude(include)
-	parts := strings.Split(include, "/") // /dc/clusterIdx/hostIdx/vmIdx
-	var ms []VMMatcher
+	parts := strings.Split(include, "/")
+	ms := make([]resourceMatcher[T], 0, min(len(parts), len(segments)))
 
 	for i, v := range parts {
 		m, err := parseSubInclude(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse %s include segment index=%d value=%q: %w", name, i, v, err)
 		}
-		switch i {
-		case datacenterIdx:
-			ms = append(ms, vmDCMatcher{m})
-		case clusterIdx:
-			ms = append(ms, vmClusterMatcher{m})
-		case hostIdx:
-			ms = append(ms, vmHostMatcher{m})
-		case vmIdx:
-			ms = append(ms, vmVMMatcher{m})
+		if i >= len(segments) {
+			continue
 		}
+		ms = append(ms, fieldMatcher[T]{m: m, get: segments[i]})
 	}
 
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return newAndVMMatcher(ms[0], ms[1], ms[2:]...), nil
-	}
+	return chainAnd(ms), nil
+}
+
+var hostPathSegments = []func(*rs.Host) string{
+	func(host *rs.Host) string { return host.Hier.DC.Name },
+	func(host *rs.Host) string { return host.Hier.Cluster.Name },
+	func(host *rs.Host) string { return host.Name },
+}
+
+var vmPathSegments = []func(*rs.VM) string{
+	func(vm *rs.VM) string { return vm.Hier.DC.Name },
+	func(vm *rs.VM) string { return vm.Hier.Cluster.Name },
+	func(vm *rs.VM) string { return vm.Hier.Host.Name },
+	func(vm *rs.VM) string { return vm.Name },
+}
+
+var clusterPathSegments = []func(*rs.Cluster) string{
+	func(cluster *rs.Cluster) string { return cluster.Hier.DC.Name },
+	func(cluster *rs.Cluster) string { return cluster.Name },
+}
+
+var datastorePathSegments = []func(*rs.Datastore) string{
+	func(ds *rs.Datastore) string { return ds.Hier.DC.Name },
+	func(ds *rs.Datastore) string { return ds.Name },
+}
+
+func parseHostInclude(include string) (resourceMatcher[rs.Host], error) {
+	return parsePathInclude(include, "host", "/<datacenter>/<cluster>/<host>", hostPathSegments)
+}
+
+func parseVMInclude(include string) (resourceMatcher[rs.VM], error) {
+	return parsePathInclude(include, "VM", "/<datacenter>/<cluster>/<host>/<vm>", vmPathSegments)
+}
+
+func parseClusterInclude(include string) (resourceMatcher[rs.Cluster], error) {
+	return parsePathInclude(include, "cluster", "/<datacenter>/<cluster>", clusterPathSegments)
+}
+
+func parseDatastoreInclude(include string) (resourceMatcher[rs.Datastore], error) {
+	return parsePathInclude(include, "datastore", "/<datacenter>/<datastore>", datastorePathSegments)
 }
 
 func parseSubInclude(sub string) (matcher.Matcher, error) {
@@ -310,100 +319,5 @@ func isIncludeFormatValid(line string) bool {
 }
 
 func (ci ClusterIncludes) Parse() (ClusterMatcher, error) {
-	var ms []ClusterMatcher
-	for _, v := range ci {
-		m, err := parseClusterInclude(v)
-		if err != nil {
-			return nil, err
-		}
-		if m == nil {
-			continue
-		}
-		ms = append(ms, m)
-	}
-
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return newOrClusterMatcher(ms[0], ms[1], ms[2:]...), nil
-	}
-}
-
-const (
-	clDCIdx = iota
-	clClusterIdx
-)
-
-func parseClusterInclude(include string) (ClusterMatcher, error) {
-	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
-	}
-
-	include = cleanInclude(include)
-	parts := strings.Split(include, "/") // /dc/cluster
-	var ms []ClusterMatcher
-
-	for i, v := range parts {
-		m, err := parseSubInclude(v)
-		if err != nil {
-			return nil, err
-		}
-		switch i {
-		case clDCIdx:
-			ms = append(ms, clusterDCMatcher{m})
-		case clClusterIdx:
-			ms = append(ms, clusterNameMatcher{m})
-		default:
-		}
-	}
-
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return andClusterMatcher{lhs: ms[0], rhs: ms[1]}, nil
-	}
-}
-
-const (
-	dsDatacenterIdx = iota
-	dsDatastoreIdx
-)
-
-func parseDatastoreInclude(include string) (DatastoreMatcher, error) {
-	if !isIncludeFormatValid(include) {
-		return nil, fmt.Errorf("bad include format: %s", include)
-	}
-
-	include = cleanInclude(include)
-	parts := strings.Split(include, "/") // /dc/datastore
-	var ms []DatastoreMatcher
-
-	for i, v := range parts {
-		m, err := parseSubInclude(v)
-		if err != nil {
-			return nil, err
-		}
-		switch i {
-		case dsDatacenterIdx:
-			ms = append(ms, dsDCMatcher{m})
-		case dsDatastoreIdx:
-			ms = append(ms, dsDSMatcher{m})
-		default:
-		}
-	}
-
-	switch len(ms) {
-	case 0:
-		return nil, nil
-	case 1:
-		return ms[0], nil
-	default:
-		return andDSMatcher{lhs: ms[0], rhs: ms[1]}, nil
-	}
+	return parseIncludes[rs.Cluster]("cluster include", []string(ci), parseClusterInclude)
 }

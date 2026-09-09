@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: process_runtime
+cases:
+  platform_disabled:
+    environment:
+      process_runtime: {platform_runtime: disabled}
+    fixture: fixtures/process_runtime_process_only.prom
+    coverage: true
+    expected: {verdict: PASS}
+  cpython:
+    environment:
+      process_runtime: {platform_runtime: cpython}
+    fixture: fixtures/process_runtime_all_metrics.prom
+    coverage: true
+    expected: {verdict: PASS}
+  jvm:
+    environment:
+      process_runtime: {platform_runtime: jvm}
+    fixture: fixtures/process_runtime_jvm_metrics.prom
+    coverage: true
+    expected: {verdict: PASS}

@@ -3,6 +3,7 @@
 id: 'export-aws-kinesis'
 meta:
   name: 'AWS Kinesis'
+  description: 'Export Netdata metrics to Amazon Kinesis Data Streams for downstream storage, processing, and analysis.'
   link: 'https://aws.amazon.com/kinesis/'
   categories:
     - export
@@ -85,7 +86,7 @@ setup:
           description: 'The hostname to be used for sending data to the external database server.'
           required: false
         - name: 'prefix'
-          default_value: 'Netdata'
+          default_value: 'netdata'
           description: 'The prefix to add to all metrics.'
           required: false
         - name: 'update every'

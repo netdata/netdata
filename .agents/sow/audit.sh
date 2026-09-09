@@ -1,0 +1,542 @@
+#!/usr/bin/env bash
+# Read-only audit for the project-local SOW system.
+# Never modifies files.
+
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if [ -t 1 ]; then
+  RED=$'\033[0;31m'
+  GREEN=$'\033[0;32m'
+  YELLOW=$'\033[1;33m'
+  BLUE=$'\033[0;34m'
+  NC=$'\033[0m'
+else
+  RED=""
+  GREEN=""
+  YELLOW=""
+  BLUE=""
+  NC=""
+fi
+
+failures=0
+warnings=0
+
+ok() {
+  echo "  ${GREEN}OK${NC}  $*"
+}
+
+fail() {
+  echo "  ${RED}--${NC}  $*"
+  failures=$((failures + 1))
+}
+
+warn() {
+  echo "  ${YELLOW}--${NC}  $*"
+  warnings=$((warnings + 1))
+}
+
+section() {
+  echo
+  echo "${BLUE}-- $* --${NC}"
+}
+
+read_sow_status() {
+  awk '
+    { sub(/\r$/, "") }
+    function clean(s, a) {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+      gsub(/`/, "", s)
+      gsub(/\*\*/, "", s)
+      sub(/^Status:[[:space:]]*/, "", s)
+      sub(/^status:[[:space:]]*/, "", s)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+      split(s, a, /[[:space:]|—]+/)
+      print a[1]
+      exit
+    }
+    /^Status:[[:space:]]*/ { clean($0) }
+    /^status:[[:space:]]*/ { clean($0) }
+    /^\*\*Status:\*\*[[:space:]]*/ { clean($0) }
+    /^## Status[[:space:]]*$/ { in_status = 1; next }
+    in_status && NF { clean($0) }
+  ' "$1" 2>/dev/null
+}
+
+echo "${BLUE}=== SOW audit (cwd=$(pwd)) ===${NC}"
+
+# Heading slugs of one markdown file, one per line, in document order, following GitHub's rule for ATX headings
+# (up to three leading spaces) whose rendered title is plain text: code spans are flattened, inline HTML tags are
+# removed, and markdown links reduce to their text; then the title is lowercased; letters, digits, spaces, hyphens,
+# and underscores are kept, everything else dropped; spaces become hyphens; a repeated slug gets -1, -2, ...; a
+# generated suffix that collides with a literal title gets a further suffix (this script's disambiguation; GitHub's
+# own numbering differs there, so such titles are outside the convention). Fenced code blocks (``` or ~~~, up to
+# three leading spaces, closed only by a fence of the same character at least as long with nothing but whitespace
+# after it) and HTML comment blocks (from an opener anywhere on a line to the next closer) are ignored. Non-ASCII titles and setext headings are outside the convention (see .agents/skills/README.md).
+md_heading_slugs() {
+  md_markdown_lines "$1" | awk '
+    /^ {0,3}#{1,6}[ \t]/ {
+      h = $0
+      sub(/^ *#+[ \t]+/, "", h)
+      sub(/[ \t]+#+[ \t]*$/, "", h)
+      sub(/[ \t]+$/, "", h)
+      while (match(h, /`[^`]+`/)) {
+        span = substr(h, RSTART + 1, RLENGTH - 2); gsub(/[<>]/, "", span)
+        h = substr(h, 1, RSTART - 1) span substr(h, RSTART + RLENGTH)
+      }
+      gsub(/`/, "", h)
+      gsub(/<[^>]*>/, "", h)
+      while (match(h, /\[[^]]*\]\([^()]*(\([^()]*\)[^()]*)*\)/)) {
+        link = substr(h, RSTART, RLENGTH)
+        text = link; sub(/\]\([^()]*(\([^()]*\)[^()]*)*\)$/, "", text); sub(/^\[/, "", text)
+        if (text == link) break
+        h = substr(h, 1, RSTART - 1) text substr(h, RSTART + RLENGTH)
+      }
+      h = tolower(h)
+      gsub(/[^a-z0-9 _-]/, "", h)
+      gsub(/ /, "-", h)
+      slug = h
+      if (h in seen) { do { seen[h]++; slug = h "-" seen[h] } while (slug in seen) } else seen[h] = 0
+      if (!(slug in seen)) seen[slug] = 0
+      print slug
+    }'
+}
+
+# The lines of a markdown file that are neither inside a fenced code block nor inside an HTML comment block; the
+# heading and citation scans both read markdown through this filter.
+md_markdown_lines() {
+  awk '
+    {
+      line = $0
+      if (incomment) { if (index(line, "-->")) incomment = 0; next }
+      if (match(line, /^ {0,3}(`{3,}|~{3,})/)) {
+        t = substr(line, RSTART, RLENGTH); sub(/^ */, "", t)
+        c = substr(t, 1, 1); l = length(t)
+        rest = substr(line, RSTART + RLENGTH)
+        if (!infence) { infence = 1; fchar = c; flen = l; next }
+        else if (c == fchar && l >= flen && rest ~ /^[ \t]*$/) { infence = 0; next }
+      }
+      if (infence) next
+      if ((o = index(line, "<!--")) > 0 && !index(substr(line, o), "-->")) {
+        incomment = 1
+        if (o > 1) print substr(line, 1, o - 1)
+        next
+      }
+      print line
+    }' "$1"
+}
+
+section "initialization marker"
+if [ -f AGENTS.md ]; then
+  if grep -q "^Project SOW status: initialized$" AGENTS.md; then
+    ok "marker present in AGENTS.md"
+  else
+    fail "AGENTS.md exists but Project SOW status marker is missing"
+  fi
+else
+  fail "AGENTS.md is missing"
+fi
+
+section "AGENTS.md machine contracts"
+if grep -qF "CRITICAL: Never write raw sensitive data to durable artifacts." AGENTS.md 2>/dev/null; then
+  ok "CRITICAL sensitive-data warning"
+else
+  fail "CRITICAL sensitive-data warning is missing from AGENTS.md"
+fi
+
+section "SOW layout"
+for path in .agents/sow/q .agents/sow/specs; do
+  if [ -d "$path" ]; then
+    ok "$path exists"
+  else
+    warn "$path is missing (run .agents/sow/worktree-link.sh)"
+  fi
+done
+
+# Committed framework files (everything else under .agents/sow/ is local-only).
+for path in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
+  if [ -f "$path" ]; then
+    ok "$path exists"
+  else
+    fail "$path is missing"
+  fi
+done
+
+for q in pending current "done"; do
+  if [ -d ".agents/sow/q/$q" ]; then
+    ok ".agents/sow/q/$q exists"
+  else
+    warn ".agents/sow/q/$q missing (run .agents/sow/worktree-link.sh)"
+  fi
+done
+[ ! -d .agents/sow/q/active ] || warn "retired queue .agents/sow/q/active exists; run .agents/sow/worktree-link.sh to fold it into current/"
+
+section "tracking invariants"
+for f in .agents/sow/SOW.template.md .agents/sow/audit.sh .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
+  if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+    ok "$f is tracked"
+  else
+    fail "$f is not tracked (framework files must be committed)"
+  fi
+done
+for p in .agents/sow/q .agents/sow/specs; do
+  if git check-ignore -q "$p" 2>/dev/null; then
+    ok "$p is gitignored"
+  else
+    fail "$p is NOT gitignored (SOW working memory must be local-only)"
+  fi
+done
+tracked_local=$(git ls-files .agents/sow/q .agents/sow/specs 2>/dev/null)
+if [ -z "$tracked_local" ]; then
+  ok "no committed SOW/spec working files"
+else
+  printf '%s\n' "$tracked_local"
+  fail "SOW/spec working files are committed (must be local-only)"
+fi
+
+section "SOW files (local-only)"
+total_sows=0
+[ -d .agents/sow/q ] && total_sows=$(find -L .agents/sow/q -type f -name 'SOW-*.md' 2>/dev/null | wc -l | tr -d ' ')
+ok "$total_sows local SOW working file(s) under .agents/sow/q (local-only, never committed)"
+
+# Structural completeness is advisory and checked only for in-flight SOWs in the
+# current queue; pending stubs and completed (done/) history are exempt.
+# Required sections come from the template (the SOW schema). Each '## ' heading may
+# carry one tag written exactly '<!-- sow:VALUE -->': none = required in every SOW
+# (umbrellas included); implementation = required except in umbrella SOWs;
+# umbrella-only = required in umbrella SOWs; optional = never required. Malformed,
+# unknown, or multiple tags are reported and the heading is treated as required
+# everywhere. Two field labels are pinned as a security contract: the handling plan
+# (in the gate, every SOW) and the gate label (in Validation, non-umbrella SOWs).
+sow_base_sections=(); sow_impl_sections=(); sow_umbrella_sections=()
+sow_heading_text() { printf '%s\n' "$1" | tr -d '\r' | sed -E 's/[[:space:]]*<!--.*-->[[:space:]]*$//; s/[[:space:]]+$//'; }
+while IFS= read -r h; do
+  [ -n "$h" ] || continue
+  text=$(sow_heading_text "$h")
+  # Every HTML comment mentioning sow: counts; only one, in the exact trailing form, is a valid tag.
+  ncomment=$(printf '%s\n' "$h" | grep -o -- '<!--[^>]*-->' | grep -ci -- 'sow:')
+  tag_list=$(printf '%s\n' "$h" | sed -E 's/[[:space:]]+$//' | grep -o -- '<!-- sow:[a-z-]* -->$' | sed -E 's/^<!-- sow:([a-z-]*) -->$/\1/')
+  tag=""
+  if [ "$ncomment" -gt 1 ]; then
+    warn "template heading carries several sow: tags; treated as required everywhere: $h"
+  elif [ "$ncomment" -eq 1 ] && [ -n "$tag_list" ]; then
+    tag="$tag_list"
+  elif [ "$ncomment" -eq 1 ]; then
+    warn "template heading carries a malformed sow: tag; treated as required everywhere: $h"
+  fi
+  case "$tag" in
+    optional)       ;;
+    umbrella-only)  sow_umbrella_sections+=("$text") ;;
+    implementation) sow_impl_sections+=("$text") ;;
+    "")             sow_base_sections+=("$text") ;;
+    *) warn "template heading carries unknown sow: tag '$tag'; treated as required everywhere: $h"
+       sow_base_sections+=("$text") ;;
+  esac
+done < <(awk '/^[[:space:]]*(```|~~~)/ { fence = !fence; next } !fence && /^## /' .agents/sow/SOW.template.md 2>/dev/null)
+pinned_sow_fields_all=("Sensitive data handling plan:")
+pinned_sow_fields_impl=("Sensitive data gate:")
+[ "${#sow_base_sections[@]}" -gt 0 ] || warn "no untagged '## ' heading in .agents/sow/SOW.template.md; structural SOW check skipped"
+
+# $1 needle, $2 file. A '## ' needle must equal a whole heading line; any other
+# needle ("Label:") must start a line once a list marker and bold markers are
+# dropped. Lines inside ``` or ~~~ fences are ignored. The needle travels via the environment
+# so a backslash in a heading is not reinterpreted by awk.
+sow_has_line() {
+  local mode=prefix; case "$1" in "## "*) mode=exact ;; esac
+  n="$1" awk -v m="$mode" '
+    BEGIN { n = ENVIRON["n"] }
+    { sub(/\r$/, "") }
+    /^[[:space:]]*(```|~~~)/ { fence = !fence; next }
+    fence { next }
+    { sub(/[[:space:]]*<!--.*-->[[:space:]]*$/, ""); sub(/[[:space:]]+$/, "") }
+    m == "exact" && $0 == n { f = 1 }
+    m == "prefix" { l = $0; sub(/^[[:space:]]*[-*]+[[:space:]]+/, "", l); gsub(/\*\*/, "", l); gsub(/`/, "", l); if (index(l, n) == 1) f = 1 }
+    END { exit !f }' "$2"
+}
+active_count=0
+if [ -d .agents/sow/q/current ]; then
+  while IFS= read -r sow; do
+    [ -n "$sow" ] || continue
+    active_count=$((active_count + 1))
+    status=$(read_sow_status "$sow")
+
+    case "$status" in
+      planning|ready|in-progress|paused|completed)
+        ok "$sow status=$status"
+        ;;
+      "")
+        fail "$sow has no Status"
+        ;;
+      *)
+        fail "$sow has invalid Status: $status"
+        ;;
+    esac
+
+    [ "${#sow_base_sections[@]}" -gt 0 ] || continue
+    # Every SOW: base sections + the handling-plan label. Umbrellas add the
+    # umbrella-only sections; others add implementation sections + the gate label.
+    needles=("${sow_base_sections[@]}" "${pinned_sow_fields_all[@]}")
+    case "$sow" in
+      *-umbrella.md) needles+=(${sow_umbrella_sections[@]+"${sow_umbrella_sections[@]}"}) ;;
+      *)             needles+=(${sow_impl_sections[@]+"${sow_impl_sections[@]}"} "${pinned_sow_fields_impl[@]}") ;;
+    esac
+    for needle in "${needles[@]}"; do
+      if sow_has_line "$needle" "$sow"; then
+        ok "$sow contains $needle"
+      else
+        warn "$sow is missing $needle"
+      fi
+    done
+  done < <(find -L .agents/sow/q/current -type f -name 'SOW-*.md' 2>/dev/null | sort)
+fi
+
+if [ "$active_count" -eq 0 ]; then
+  ok "no in-flight SOWs in .agents/sow/q/current"
+fi
+
+section "spec index"
+if [ -f .agents/sow/specs/README.md ]; then
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    rel=${spec#.agents/sow/specs/}
+    if grep -qF "]($rel)" .agents/sow/specs/README.md; then
+      ok "$rel is listed in specs/README.md"
+    else
+      warn "$rel is missing from specs/README.md (specs are local-only; index is advisory)"
+    fi
+  done < <(find .agents/sow/specs -maxdepth 1 -type f -name '*.md' ! -name README.md 2>/dev/null | sort)
+
+  while IFS= read -r link; do
+    [ -n "$link" ] || continue
+    if [ -f ".agents/sow/specs/$link" ]; then
+      ok "spec index link resolves: $link"
+    else
+      warn "spec index link is broken: $link (specs are local-only; index is advisory)"
+    fi
+  done < <(grep -oE '\]\([A-Za-z0-9._-]+\.md\)' .agents/sow/specs/README.md 2>/dev/null | sed 's/^](//; s/)$//' | sort -u)
+else
+  ok "no local specs/README.md (specs are local-only; nothing to index)"
+fi
+
+# Specs relocated out of the local-only specs dir into committed homes. A
+# committed reference to their old .agents/sow/specs/ path is a dangling ref and
+# must be repointed (vs the unreferenced bulk, which is genuinely local-only).
+# Listed as paths relative to .agents/sow/specs/ (not basenames) so a nested
+# local spec that happens to share a filename is not misflagged.
+relocated_specs="sensitive-data-discipline.md go-v2-host-scope.md topology-function-schema.md topology-modes-correlation-aggregation.md taxonomy.md"
+
+section "spec references"
+if command -v rg >/dev/null 2>&1; then
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    refrel=${ref#.agents/sow/specs/}
+    if [ -f "$ref" ]; then
+      ok "spec reference resolves: $ref"
+    else
+      case " $relocated_specs " in
+        *" $refrel "*) fail "reference to a relocated spec — repoint to its committed home, or to the document that now owns its facts: $ref" ;;
+        *) warn "spec reference unresolved (specs are local-only; may be absent here): $ref" ;;
+      esac
+    fi
+  done < <(
+    # Scan committed surfaces only; .agents/sow/specs is local-only working memory.
+    # The path class allows '/' so nested specs (e.g. snmp-traps/...) are caught.
+    rg --no-filename -o '\.agents/sow/specs/[A-Za-z0-9._/-]+\.md' \
+      AGENTS.md .agents/skills docs src \
+      -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
+      -g '!TODO*.md' -g '!**/TODO*.md' \
+      2>/dev/null | sort -u
+  )
+else
+  warn "ripgrep not available; skipped spec reference audit"
+fi
+
+section "legacy SOW references"
+if command -v rg >/dev/null 2>&1; then
+  legacy_refs=$(rg --line-number 'SOW-[0-9]{4}\b' \
+    AGENTS.md .agents .github docs src \
+    -g '*.md' -g 'SKILL.md' -g '*.sh' -g '*.yml' \
+    -g '!TODO*.md' \
+    -g '!**/TODO*.md' \
+    -g '!**/.agents/sow/q/**' \
+    -g '!**/.agents/sow/specs/**' \
+    2>/dev/null || true)
+
+  if [ -n "$legacy_refs" ]; then
+    printf '%s\n' "$legacy_refs"
+    fail "legacy SOW-NNNN references remain in durable files"
+  else
+    ok "no legacy SOW-NNNN references in durable files"
+  fi
+else
+  warn "ripgrep not available; skipped legacy SOW reference audit"
+fi
+
+section "skills layout"
+if [ -d .agents/skills ]; then
+  # .agents/skills/README.md, section "## Areas", owns the allowed prefixes: the first cell of each table row.
+  skill_areas=$(awk '
+    /^## / { in_areas = ($0 == "## Areas") }
+    in_areas && /^\|/ { split($0, c, "|"); gsub(/[` \t]/, "", c[2]); if (c[2] ~ /^[a-z][a-z0-9]*$/) print c[2] }
+  ' .agents/skills/README.md 2>/dev/null)
+  skills_bad=0
+  if [ -z "$skill_areas" ]; then
+    fail "no area table found under '## Areas' in .agents/skills/README.md"
+    skills_bad=1
+  fi
+  index_block=$(awk '/^Skills index \(/ { p = 1 } /^Public skills \(/ { p = 0 } p' AGENTS.md)
+  for dir in .agents/skills/*; do
+    name=$(basename "$dir")
+    if [ -L "$dir" ]; then
+      case "$(readlink "$dir")" in
+        ../../docs/netdata-ai/skills/*/..*|../../docs/netdata-ai/skills/*/*)
+          fail "public skill symlink $name must point at a directory directly under docs/netdata-ai/skills/"; skills_bad=1 ;;
+        ../../docs/netdata-ai/skills/*) ;;
+        *) fail "public skill symlink $name does not point into docs/netdata-ai/skills/"; skills_bad=1 ;;
+      esac
+      if [ ! -f "$dir/SKILL.md" ]; then
+        fail "public skill symlink $name does not resolve to a SKILL.md"
+        skills_bad=1
+      fi
+      continue
+    fi
+    [ -d "$dir" ] || continue
+    if [ ! -f "$dir/SKILL.md" ]; then
+      fail "skill $name has no SKILL.md"
+      skills_bad=1
+      continue
+    fi
+    area=${name%%-*}
+    case " $(printf '%s ' $skill_areas)" in
+      *" $area "*) ;;
+      *) fail "skill $name: prefix '$area' is not an area listed in .agents/skills/README.md"; skills_bad=1 ;;
+    esac
+    if ! printf '%s' "$name" | grep -Eq "^${area}-[a-z0-9]+(-[a-z0-9]+)*$"; then
+      fail "skill $name: name is not <area>-<topic>"
+      skills_bad=1
+    fi
+    fm_name=$(awk '{ sub(/\r$/, "") } NR == 1 { sub(/^\357\273\277/, "") } NR == 1 && $0 != "---" { exit } NR > 1 && /^---/ { exit }
+      /^name:/ { sub(/^name:[ \t]*/, ""); sub(/[ \t]+$/, ""); print; exit }' "$dir/SKILL.md" | sed "s/^[\"']//; s/[\"']\$//")
+    if [ "$fm_name" != "$name" ]; then
+      fail "skill $name: frontmatter name '$fm_name' differs from the directory name"
+      skills_bad=1
+    fi
+    if ! printf '%s\n' "$index_block" | grep -Fq "\`$name\`"; then
+      fail "skill $name is not in the AGENTS.md skills index"
+      skills_bad=1
+    fi
+  done
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    if [ ! -e ".agents/skills/$entry" ]; then
+      fail "the AGENTS.md skills index names $entry, which has no directory"
+      skills_bad=1
+    fi
+  done < <(printf '%s\n' "$index_block" | grep -oE '^ *- `[a-z0-9-]+`:' | sed -E 's/^ *- `([a-z0-9-]+)`:/\1/')
+  # Every .agents/skills/... path named in tracked files must exist; renames leave stale pointers otherwise.
+  # A capture ending in "-" is a glob prefix such as .agents/skills/collectors-*/ and is skipped.
+  skill_refs=$(git grep -h -o -E '\.agents/skills/[A-Za-z0-9_./-]+' -- . ':!CHANGELOG.md') && refs_rc=0 || refs_rc=$?
+  if [ "$refs_rc" -gt 1 ]; then
+    fail "git grep failed while collecting .agents/skills/ path references (exit $refs_rc)"
+    skills_bad=1
+  fi
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    case "$ref" in *-) continue ;; esac
+    if [ ! -e "$ref" ]; then
+      fail "reference to a missing skill path: $ref"
+      skills_bad=1
+    fi
+  done < <(printf '%s\n' "$skill_refs" | sed 's/[.,;:)]*$//' | sort -u)
+  # Relative ../ paths in skill files (source lines and markdown links), runtime and public, must resolve from the
+  # file's directory.
+  while IFS='|' read -r file ref; do
+    [ -n "$ref" ] || continue
+    if [ ! -e "$(dirname "$file")/$ref" ]; then
+      fail "$file points at a missing relative path: $ref"
+      skills_bad=1
+    fi
+  done < <(git grep -n -o -E '(source "([^/.]*/)?|\]\()(\.\./)+[A-Za-z0-9_./-]+' \
+             -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
+             | sed -E 's/^([^:]*):[0-9]+:(source "([^/.]*\/)?|\]\()/\1|/; s/[.,;:)]*$//' | sort -u)
+  # Owner-section anchors. A skill cites a section of the document that owns a fact as `path/to/doc.md#anchor`
+  # (heading slug, see md_heading_slugs). The file must exist and a heading with that slug must exist, so renaming
+  # or removing a heading in an owner document fails here until every skill that cites it is updated. Paths are
+  # repo-relative (with or without a leading /), or relative to the citing file when they start with ./ or ../.
+  # A token starting with // is the tail of a URL and is not a citation. Citations inside fenced code blocks or HTML
+  # comments of a markdown skill file are not scanned.
+  while IFS='|' read -r file ref; do
+    [ -n "$ref" ] || continue
+    case "$ref" in //*) continue ;; esac
+    path=${ref%%#*}
+    anchor=${ref#*#}
+    case "$path" in
+      ./*|../*) target="$(dirname "$file")/$path" ;;
+      /*) target="${path#/}" ;;
+      *) target="$path" ;;
+    esac
+    if [ ! -f "$target" ]; then
+      fail "$file cites $ref but $target does not exist"
+      skills_bad=1
+    elif ! md_heading_slugs "$target" | grep -Fx -- "$anchor" >/dev/null; then
+      fail "$file cites $ref but no heading in $target has the anchor #$anchor"
+      skills_bad=1
+    fi
+  done < <(git ls-files -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
+             | while IFS= read -r skill_file; do
+                 [ -f "$skill_file" ] || continue
+                 case "$skill_file" in *.md) src=$(md_markdown_lines "$skill_file") ;; *) src=$(cat "$skill_file") ;; esac
+                 printf '%s\n' "$src" | grep -o -E '[A-Za-z0-9_./-]+\.md#[A-Za-z0-9_-]+' \
+                   | sed "s|^|$skill_file\||"
+               done | sort -u)
+  if [ "$skills_bad" -eq 0 ]; then
+    ok "skills are area-prefixed and indexed, frontmatter names match, public symlinks resolve, every skill path reference resolves, and every owner-section anchor resolves to a heading"
+  fi
+else
+  warn "no .agents/skills directory"
+fi
+
+section "sensitive data"
+scan_files=()
+
+# Scan only committed durable artifacts. SOW working files (.agents/sow/q) and
+# specs (.agents/sow/specs) are local-only and never committed, so — like
+# .local/ — they are not durable artifacts and are not part of this hard gate.
+for path in AGENTS.md CLAUDE.md GEMINI.md .agents/ENV.md \
+            .agents/sow/SOW.template.md .agents/sow/audit.sh \
+            .agents/sow/scan-sensitive.sh .agents/sow/worktree-link.sh; do
+  [ -f "$path" ] && scan_files+=("$path")
+done
+
+if [ -d .agents/skills ]; then
+  while IFS= read -r file; do
+    scan_files+=("$file")
+  done < <(find -L .agents/skills -type f 2>/dev/null | sort)
+fi
+
+if [ -d .agents/skill-verification ]; then
+  while IFS= read -r file; do
+    scan_files+=("$file")
+  done < <(find .agents/skill-verification -type f 2>/dev/null | sort)
+fi
+
+if [ "${#scan_files[@]}" -eq 0 ]; then
+  warn "no files selected for sensitive-data scan"
+elif bash .agents/sow/scan-sensitive.sh "${scan_files[@]}"; then
+  ok "sensitive-data scan passed (${#scan_files[@]} files)"
+else
+  fail "sensitive-data scan found potential leaks"
+fi
+
+section "summary"
+if [ "$failures" -eq 0 ]; then
+  if [ "$warnings" -eq 0 ]; then
+    echo "${GREEN}PASS${NC}  no SOW audit failures or warnings"
+  else
+    echo "${YELLOW}PASS${NC}  no SOW audit failures; warnings=$warnings"
+  fi
+  exit 0
+fi
+
+echo "${RED}FAIL${NC}  failures=$failures warnings=$warnings"
+exit 1

@@ -118,6 +118,7 @@ struct simple_connector_data {
 
     BUFFER *header;
     BUFFER *buffer;
+    BUFFER *response;
     size_t buffered_metrics;
     size_t buffered_bytes;
 
@@ -205,6 +206,7 @@ struct instance {
     int skip_chart;
 
     BUFFER *labels_buffer;
+    BUFFER *metric_prefix_buffer;
 
     time_t after;
     time_t before;
@@ -264,6 +266,12 @@ int mark_scheduled_instances(struct engine *engine);
 void prepare_buffers(struct engine *engine);
 
 size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
+
+// UTF-8 primitives shared by the text-protocol connectors (Graphite plaintext, OpenTSDB telnet).
+// Both frame their records with whitespace, so both need to decode UTF-8 before deciding what to
+// neutralize. Keep the decoding here and the per-protocol replacement decision in each connector.
+size_t exporting_utf8_decode(const char *src, size_t len, uint32_t *codepoint);
+bool exporting_unicode_is_whitespace(uint32_t codepoint);
 
 int rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int rrdset_is_exportable(struct instance *instance, RRDSET *st);

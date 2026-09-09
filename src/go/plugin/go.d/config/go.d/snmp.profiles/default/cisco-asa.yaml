@@ -3,6 +3,8 @@
 extends:
   - _system-base.yaml
   - _cisco-asa.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 metadata:
   device:

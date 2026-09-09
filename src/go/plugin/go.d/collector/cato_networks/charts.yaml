@@ -1,0 +1,282 @@
+version: v1
+context_namespace: cato_networks
+groups:
+  - family: sites
+    metrics:
+      - site_connectivity_status
+      - site_operational_status
+      - site_hosts
+      - site_bytes_upstream_max
+      - site_bytes_downstream_max
+      - site_lost_upstream_percent
+      - site_lost_downstream_percent
+      - site_packets_discarded_upstream
+      - site_packets_discarded_downstream
+      - site_jitter_upstream_ms
+      - site_jitter_downstream_ms
+      - site_rtt_ms
+      - site_last_mile_latency_ms
+      - site_last_mile_packet_loss_percent
+    charts:
+      - id: site_hosts
+        title: Cato site hosts
+        context: site_hosts
+        units: hosts
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_hosts
+            name: hosts
+      - id: site_connectivity_status
+        title: Cato site connectivity status
+        context: site_connectivity_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_connectivity_status
+      - id: site_operational_status
+        title: Cato site operational status
+        context: site_operational_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_operational_status
+      - id: site_traffic
+        title: Cato site traffic
+        context: site_traffic
+        units: bytes
+        type: area
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_bytes_upstream_max
+            name: upstream
+          - selector: site_bytes_downstream_max
+            name: downstream
+      - id: site_packet_loss
+        title: Cato site packet loss
+        context: site_packet_loss
+        units: percentage
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_lost_upstream_percent
+            name: upstream
+          - selector: site_lost_downstream_percent
+            name: downstream
+      - id: site_discarded_packets
+        title: Cato site discarded packets
+        context: site_discarded_packets
+        units: packets
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_packets_discarded_upstream
+            name: upstream
+          - selector: site_packets_discarded_downstream
+            name: downstream
+      - id: site_jitter
+        title: Cato site jitter
+        context: site_jitter
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_jitter_upstream_ms
+            name: upstream
+          - selector: site_jitter_downstream_ms
+            name: downstream
+      - id: site_latency
+        title: Cato site latency
+        context: site_latency
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_rtt_ms
+            name: rtt
+          - selector: site_last_mile_latency_ms
+            name: last_mile
+      - id: site_last_mile_packet_loss
+        title: Cato site last mile packet loss
+        context: site_last_mile_packet_loss
+        units: percentage
+        type: line
+        instances:
+          by_labels: [site_id]
+        label_promotion: [site_name, pop_name]
+        dimensions:
+          - selector: site_last_mile_packet_loss_percent
+            name: loss
+  - family: devices
+    metrics:
+      - device_connection_status
+    charts:
+      - id: device_connection_status
+        title: Cato device connection status
+        context: device_connection_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, device_id]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: device_connection_status
+  - family: interfaces
+    metrics:
+      - interface_connection_status
+      - interface_tunnel_uptime_seconds
+      - interface_bytes_upstream_max
+      - interface_bytes_downstream_max
+      - interface_lost_upstream_percent
+      - interface_lost_downstream_percent
+      - interface_packets_discarded_upstream
+      - interface_packets_discarded_downstream
+      - interface_jitter_upstream_ms
+      - interface_jitter_downstream_ms
+      - interface_rtt_ms
+    charts:
+      - id: interface_connection_status
+        title: Cato interface connection status
+        context: interface_connection_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: interface_connection_status
+      - id: interface_tunnel_uptime
+        title: Cato interface tunnel uptime
+        context: interface_tunnel_uptime
+        units: seconds
+        type: line
+        instances:
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: interface_tunnel_uptime_seconds
+            name: uptime
+      - id: interface_traffic
+        title: Cato interface traffic
+        context: interface_traffic
+        units: bytes
+        type: area
+        instances:
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: interface_bytes_upstream_max
+            name: upstream
+          - selector: interface_bytes_downstream_max
+            name: downstream
+      - id: interface_packet_loss
+        title: Cato interface packet loss
+        context: interface_packet_loss
+        units: percentage
+        type: line
+        instances:
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: interface_lost_upstream_percent
+            name: upstream
+          - selector: interface_lost_downstream_percent
+            name: downstream
+      - id: interface_discarded_packets
+        title: Cato interface discarded packets
+        context: interface_discarded_packets
+        units: packets
+        type: line
+        instances:
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: interface_packets_discarded_upstream
+            name: upstream
+          - selector: interface_packets_discarded_downstream
+            name: downstream
+      - id: interface_jitter
+        title: Cato interface jitter
+        context: interface_jitter
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: interface_jitter_upstream_ms
+            name: upstream
+          - selector: interface_jitter_downstream_ms
+            name: downstream
+      - id: interface_latency
+        title: Cato interface latency
+        context: interface_latency
+        units: milliseconds
+        type: line
+        instances:
+          by_labels: [site_id, device_id, interface_id, interface_name]
+        label_promotion: [site_name, device_name]
+        dimensions:
+          - selector: interface_rtt_ms
+            name: rtt
+  - family: bgp
+    metrics:
+      - bgp_session_status
+      - bgp_routes
+      - bgp_routes_limit
+      - bgp_routes_limit_status
+      - bgp_rib_out_routes
+    charts:
+      - id: bgp_session_status
+        title: Cato BGP session status
+        context: bgp_session_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, peer_ip, peer_asn]
+        label_promotion: [site_name]
+        dimensions:
+          - selector: bgp_session_status
+      - id: bgp_routes
+        title: Cato BGP routes
+        context: bgp_routes
+        units: routes
+        type: line
+        instances:
+          by_labels: [site_id, peer_ip, peer_asn]
+        label_promotion: [site_name]
+        dimensions:
+          - selector: bgp_routes
+            name: accepted
+          - selector: bgp_routes_limit
+            name: limit
+          - selector: bgp_rib_out_routes
+            name: rib_out
+      - id: bgp_routes_limit_status
+        title: Cato BGP route limit status
+        context: bgp_routes_limit_status
+        units: status
+        type: line
+        instances:
+          by_labels: [site_id, peer_ip, peer_asn]
+        label_promotion: [site_name]
+        dimensions:
+          - selector: bgp_routes_limit_status

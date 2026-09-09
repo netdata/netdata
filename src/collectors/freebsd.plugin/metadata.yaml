@@ -5,6 +5,7 @@ modules:
       module_name: vm.loadavg
       monitored_instance:
         name: vm.loadavg
+        description: "Monitor FreeBSD one-, five-, and fifteen-minute system load averages through sysctl."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -103,6 +104,7 @@ modules:
       module_name: vm.vmtotal
       monitored_instance:
         name: vm.vmtotal
+        description: "Monitor FreeBSD active, running, and blocked process counts plus total real memory in use."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -204,6 +206,7 @@ modules:
       module_name: kern.cp_time
       monitored_instance:
         name: kern.cp_time
+        description: "Monitor total FreeBSD CPU utilization across user, system, interrupt, idle, and nice states."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -317,6 +320,7 @@ modules:
       module_name: dev.cpu.temperature
       monitored_instance:
         name: dev.cpu.temperature
+        description: "Monitor per-core CPU temperatures on FreeBSD through the sysctl interface."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.hardware-and-sensors
@@ -393,6 +397,7 @@ modules:
       module_name: dev.cpu.0.freq
       monitored_instance:
         name: dev.cpu.0.freq
+        description: "Monitor the current FreeBSD CPU scaling frequency through sysctl."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -469,6 +474,7 @@ modules:
       module_name: hw.intrcnt
       monitored_instance:
         name: hw.intrcnt
+        description: "Monitor the total hardware interrupt rate reported by FreeBSD through sysctl."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -551,6 +557,7 @@ modules:
       module_name: vm.stats.sys.v_intr
       monitored_instance:
         name: vm.stats.sys.v_intr
+        description: "Monitor the FreeBSD device interrupt rate reported by the virtual memory subsystem."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -627,6 +634,7 @@ modules:
       module_name: vm.stats.sys.v_soft
       monitored_instance:
         name: vm.stats.sys.v_soft
+        description: "Monitor the FreeBSD software interrupt rate reported by the virtual memory subsystem."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -703,6 +711,7 @@ modules:
       module_name: vm.stats.sys.v_swtch
       monitored_instance:
         name: vm.stats.sys.v_swtch
+        description: "Monitor the FreeBSD CPU context-switch rate reported by the virtual memory subsystem."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -785,6 +794,7 @@ modules:
       module_name: vm.swap_info
       monitored_instance:
         name: vm.swap_info
+        description: "Monitor used and free swap space on FreeBSD through the kernel management interface."
         link: ""
         categories:
           - data-collection.operating-systems
@@ -867,6 +877,7 @@ modules:
       module_name: system.ram
       monitored_instance:
         name: system.ram
+        description: "Monitor FreeBSD system RAM across free, active, inactive, wired, cache, and buffer states."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -1057,6 +1068,7 @@ modules:
       module_name: vm.stats.vm.v_pgfaults
       monitored_instance:
         name: vm.stats.vm.v_pgfaults
+        description: "Monitor FreeBSD memory page faults, copy-on-write faults, and I/O-requiring faults."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -1137,6 +1149,7 @@ modules:
       module_name: kern.ipc.sem
       monitored_instance:
         name: kern.ipc.sem
+        description: "Monitor FreeBSD System V IPC semaphore set and semaphore counts."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -1229,6 +1242,7 @@ modules:
       module_name: kern.ipc.shm
       monitored_instance:
         name: kern.ipc.shm
+        description: "Monitor FreeBSD System V shared memory segment counts, allocation, and usage."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -1311,6 +1325,7 @@ modules:
       module_name: kern.ipc.msq
       monitored_instance:
         name: kern.ipc.msq
+        description: "Monitor FreeBSD System V IPC message queue counts, sizes, and message activity."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -1400,6 +1415,7 @@ modules:
       module_name: uptime
       monitored_instance:
         name: uptime
+        description: "Monitor how long a FreeBSD system has been running through the monotonic system clock."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.operating-systems
@@ -1476,6 +1492,7 @@ modules:
       module_name: net.isr
       monitored_instance:
         name: net.isr
+        description: "Monitor FreeBSD network interrupt service routine dispatch, queue, and drop statistics."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -1780,6 +1797,7 @@ modules:
       module_name: net.inet.tcp.states
       monitored_instance:
         name: net.inet.tcp.states
+        description: "Monitor the number of active FreeBSD TCP connections reported by the kernel."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2047,6 +2065,7 @@ modules:
       module_name: net.inet.udp.stats
       monitored_instance:
         name: net.inet.udp.stats
+        description: "Monitor FreeBSD IPv4 UDP packet traffic, socket errors, and datagram processing."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2148,6 +2167,7 @@ modules:
       module_name: net.inet.icmp.stats
       monitored_instance:
         name: net.inet.icmp.stats
+        description: "Monitor FreeBSD IPv4 ICMP traffic, errors, redirects, and message types through sysctl."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2250,6 +2270,7 @@ modules:
       module_name: net.inet.ip.stats
       monitored_instance:
         name: net.inet.ip.stats
+        description: "Monitor FreeBSD IPv4 packet traffic, forwarding, fragmentation, reassembly, and errors."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2368,6 +2389,7 @@ modules:
       module_name: net.inet6.ip6.stats
       monitored_instance:
         name: net.inet6.ip6.stats
+        description: "Monitor FreeBSD IPv6 packet traffic, forwarding, fragmentation, reassembly, and errors."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2488,6 +2510,7 @@ modules:
       module_name: net.inet6.icmp6.stats
       monitored_instance:
         name: net.inet6.icmp6.stats
+        description: "Monitor FreeBSD IPv6 ICMP traffic, errors, redirects, and message types through sysctl."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2653,6 +2676,7 @@ modules:
       module_name: ipfw
       monitored_instance:
         name: ipfw
+        description: "Monitor FreeBSD IPFW firewall memory, packet, byte, and rule statistics through a raw socket."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2762,6 +2786,7 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: getifaddrs
+        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, and collision events."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2981,6 +3006,7 @@ modules:
       module_name: getmntinfo
       monitored_instance:
         name: getmntinfo
+        description: "Monitor disk space and inode usage for each FreeBSD mount point through getmntinfo."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.storage
@@ -3093,6 +3119,7 @@ modules:
       module_name: zfs
       monitored_instance:
         name: zfs
+        description: "Monitor FreeBSD ZFS ARC, L2ARC, transaction, I/O, and filesystem performance metrics."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.storage

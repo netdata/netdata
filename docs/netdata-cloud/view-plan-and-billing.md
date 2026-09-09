@@ -19,11 +19,11 @@ Billing options include monthly (pay-as-you-go) and yearly (annual prepayment).
 
 #### Active Nodes and Billing
 
-Billing is based solely on active nodes, excluding offline or stale instances. Daily and P90 metrics ensure fair pricing by mitigating transient increases in node activity.
+Billing is based solely on active nodes, excluding offline or stale instances. You're billed for the maximum number of concurrently running nodes throughout the month, excluding 10% of the top spikes (p90 over time). This automated metering applies to self-service paid plans.
 
 #### Committed Nodes
 
-Yearly plans offer a discounted rate for a pre-defined number of committed nodes. Any usage exceeding this commitment will be billed at the standard rate.
+Yearly plans offer a discounted rate for a pre-defined number of committed nodes. Overage is the amount by which your [active node count](#active-nodes-and-billing) for the billing period exceeds your committed nodes, and it is billed at the standard rate.
 
 #### Plan Changes and Credit Balance
 
@@ -148,5 +148,16 @@ Calculating the residual value from unused time on your current plan.
 Deducting any applicable discounts.
 Subtracting credit from your balance, if necessary.
 Applying tax to the final amount, if positive. Negative results adjust your customer credit balance.
+
+</details>
+
+<details>
+<summary>How Does Node Counting Work When a Collector Monitors Multiple Devices or Resources?</summary>
+
+Billing follows the same active node model for every integration: each running Netdata Agent connected to Netdata Cloud counts as one billable node, no matter how many devices, hosts, or resources a single collector job discovers or monitors.
+
+Most collectors that discover many sub-entities — for example hosts and VMs behind a hypervisor, or devices reachable over a network — report them as labeled chart dimensions under the collecting Agent's own node identity. The number of sub-entities discovered or monitored, including ones that are offline or powered down, does not by itself add billable nodes. Only an explicit [Virtual Node](/docs/learn/node-identities.md#virtual-nodes-vnodes) attached to the job adds one additional node for that job.
+
+Some collectors instead automatically create a separate virtual node for each discovered or monitored resource, with no explicit vnode configuration required. For those, each such resource does count as a billable node. Check the specific collector's own configuration reference to see whether it uses per-resource virtual nodes.
 
 </details>

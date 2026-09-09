@@ -24,18 +24,18 @@ func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 
 	for _, m := range c.mx.tables {
 		if m.bloatSize != nil {
-			m.bloatSize = newInt(0)
+			m.bloatSize = new(int64(0))
 		}
 		if m.bloatSizePerc != nil {
-			m.bloatSizePerc = newInt(0)
+			m.bloatSizePerc = new(int64(0))
 		}
 	}
 	for _, m := range c.mx.indexes {
 		if m.bloatSize != nil {
-			m.bloatSize = newInt(0)
+			m.bloatSize = new(int64(0))
 		}
 		if m.bloatSizePerc != nil {
-			m.bloatSizePerc = newInt(0)
+			m.bloatSizePerc = new(int64(0))
 		}
 	}
 
@@ -61,13 +61,13 @@ func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 		}
 		if c.hasTableMetrics(table, dbname, schema) {
 			v := c.getTableMetrics(table, dbname, schema)
-			v.bloatSize = newInt(tableWasted)
-			v.bloatSizePerc = newInt(calcPercentage(tableWasted, v.totalSize))
+			v.bloatSize = new(tableWasted)
+			v.bloatSizePerc = new(calcPercentage(tableWasted, v.totalSize))
 		}
 		if iname != "?" && c.hasIndexMetrics(iname, table, dbname, schema) {
 			v := c.getIndexMetrics(iname, table, dbname, schema)
-			v.bloatSize = newInt(idxWasted)
-			v.bloatSizePerc = newInt(calcPercentage(idxWasted, v.size))
+			v.bloatSize = new(idxWasted)
+			v.bloatSizePerc = new(calcPercentage(idxWasted, v.size))
 		}
 	})
 }

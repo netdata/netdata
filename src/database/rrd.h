@@ -77,6 +77,10 @@ extern netdata_rwlock_t rrd_rwlock;
 #define rrd_rdunlock() netdata_rwlock_rdunlock(&rrd_rwlock)
 #define rrd_wrunlock() netdata_rwlock_wrunlock(&rrd_rwlock)
 
+// returns 0 when the read lock was taken. For threads that MUST NOT block on it - a writer can hold
+// rrd_wrlock() while waiting on another thread, so blocking here can close a cycle.
+#define rrd_tryrdlock() netdata_rwlock_tryrdlock(&rrd_rwlock)
+
 // --------------------------------------------------------------------------------------------------------------------
 
 STRING *rrd_string_strdupz(const char *s);
@@ -113,8 +117,7 @@ static inline uint32_t get_uint32_id() {
 //#include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
 #include "contexts/rrdcontext.h"
-#include "rrdcollector.h"
-#include "rrdfunctions.h"
+#include "nrpc/nrpc.h"
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
 #endif

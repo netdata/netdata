@@ -2,6 +2,19 @@
 
 #include "api_v2_calls.h"
 
+static bool weights_parse_limit(const char *value, size_t *result) {
+    size_t n = 0;
+    if(!*value)
+        return false;
+    for(const char *p = value; *p; p++) {
+        if(*p < '0' || *p > '9' || n > (SIZE_MAX - (size_t)(*p - '0')) / 10)
+            return false;
+        n = n * 10 + (size_t)(*p - '0');
+    }
+    *result = n;
+    return true;
+}
+
 int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format, size_t api_version) {
     if (!netdata_ready_load())
         return HTTP_RESP_SERVICE_UNAVAILABLE;
@@ -13,6 +26,8 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     time_t timeout_ms = 0;
     size_t tier = 0;
     size_t cardinality_limit = 0;
+    size_t limit = 0;
+    bool cardinality_limit_supplied = false;
     const char *time_group_options = NULL, *scope_contexts = NULL, *scope_nodes = NULL, *scope_instances = NULL, *scope_labels = NULL, *scope_dimensions = NULL,
                *contexts = NULL, *nodes = NULL, *instances = NULL, *dimensions = NULL, *labels = NULL, *alerts = NULL;
 
@@ -51,8 +66,21 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         else if (!strcmp(name, "timeout"))
             timeout_ms = str2l(value);
             
-        else if (!strcmp(name, "cardinality_limit"))
-            cardinality_limit = str2ul(value);
+        else if (!strcmp(name, "cardinality_limit") || !strcmp(name, "limit")) {
+            size_t parsed;
+            if(!weights_parse_limit(value, &parsed)) {
+                buffer_flush(w->response.data);
+                w->response.data->content_type = CT_APPLICATION_JSON;
+                buffer_strcat(w->response.data, "{\"error\":\"Weights limits must be nonnegative integers within the supported range.\"}");
+                return HTTP_RESP_BAD_REQUEST;
+            }
+            if(!strcmp(name, "cardinality_limit")) {
+                cardinality_limit = parsed;
+                cardinality_limit_supplied = true;
+            }
+            else
+                limit = parsed;
+        }
 
         else if((api_version == 1 && !strcmp(name, "group")) || (api_version >= 2 && !strcmp(name, "time_group")))
             time_group_method = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
@@ -147,7 +175,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
         .options = options,
         .tier = tier,
         .timeout_ms = timeout_ms,
-        .cardinality_limit = cardinality_limit,
+        .cardinality_limit = cardinality_limit_supplied ? cardinality_limit : limit,
 
         .interrupt_callback = web_client_interrupt_callback,
         .interrupt_callback_data = w,

@@ -86,6 +86,7 @@ void health_alarm_entry_aral_init(void);
 struct aral_statistics *health_alarm_entry_aral_stats(void);
 ALARM_ENTRY *health_alarm_entry_create(void);
 void health_alarm_entry_destroy(ALARM_ENTRY *ae);
+void health_alarm_entry_assign_unique_id(RRDHOST *host, ALARM_ENTRY *ae);
 
 void *health_cmdapi_thread(void *ptr);
 
@@ -95,7 +96,6 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);
 #define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)
-bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, nd_uuid_t *transitions_id);
 
 int alert_variable_lookup_trace(RRDHOST *host, RRDSET *st, const char *variable, BUFFER *wb);
 

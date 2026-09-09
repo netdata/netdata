@@ -9,58 +9,98 @@ import (
 )
 
 func orderedMaterializedDimensionNames(dimensions map[string]*materializedDimensionState) []string {
-	type staticEntry struct {
-		name  string
-		order int
-	}
-	staticEntries := make([]staticEntry, 0, len(dimensions))
-	dynamicNames := make([]string, 0, len(dimensions))
+	staticEntries := make([]staticDimensionOrderEntry, 0, len(dimensions))
+	dynamicEntries := make([]dynamicDimensionOrderEntry, 0, len(dimensions))
 	for name, dim := range dimensions {
 		if dim.static {
-			staticEntries = append(staticEntries, staticEntry{
+			staticEntries = append(staticEntries, staticDimensionOrderEntry{
 				name:  name,
 				order: dim.order,
 			})
 			continue
 		}
-		dynamicNames = append(dynamicNames, name)
+		dynamicEntries = append(dynamicEntries, dynamicDimensionOrderEntry{
+			name:    name,
+			sortKey: dim.sortKey,
+		})
 	}
+	return orderedDimensionNames(staticEntries, dynamicEntries)
+}
+
+type staticDimensionOrderEntry struct {
+	name  string
+	order int
+}
+
+type dynamicDimensionOrderEntry struct {
+	name    string
+	sortKey dimensionSortKey
+}
+
+func orderedDimensionNames(staticEntries []staticDimensionOrderEntry, dynamicEntries []dynamicDimensionOrderEntry) []string {
 	sort.Slice(staticEntries, func(i, j int) bool {
 		if staticEntries[i].order != staticEntries[j].order {
 			return staticEntries[i].order < staticEntries[j].order
 		}
 		return staticEntries[i].name < staticEntries[j].name
 	})
-	sort.Strings(dynamicNames)
-	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
+	sort.Slice(dynamicEntries, func(i, j int) bool {
+		return lessDynamicDimension(dynamicEntries[i], dynamicEntries[j])
+	})
+	out := make([]string, 0, len(staticEntries)+len(dynamicEntries))
 	for _, item := range staticEntries {
 		out = append(out, item.name)
 	}
-	out = append(out, dynamicNames...)
+	for _, item := range dynamicEntries {
+		out = append(out, item.name)
+	}
 	return out
 }
 
-func enforceLifecycleCaps(
+func lessDynamicDimension(lhs, rhs dynamicDimensionOrderEntry) bool {
+	if lhs.sortKey.kind != rhs.sortKey.kind {
+		return lhs.sortKey.kind < rhs.sortKey.kind
+	}
+	if lhs.sortKey.kind == dimensionSortHistogramBucket {
+		if lhs.sortKey.upperBound != rhs.sortKey.upperBound {
+			return lhs.sortKey.upperBound < rhs.sortKey.upperBound
+		}
+	}
+	return lhs.name < rhs.name
+}
+
+func enforceLifecycleCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) ([]RemoveDimensionAction, []RemoveChartAction) {
 	if len(chartsByID) == 0 || state == nil {
 		return nil, nil
 	}
-	removeCharts := enforceChartInstanceCaps(currentSuccessSeq, chartsByID, state)
-	removeDims := enforceDimensionCaps(currentSuccessSeq, chartsByID, state)
+	removeCharts := enforceChartInstanceCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
+	removeDims := enforceDimensionCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
 	return removeDims, removeCharts
 }
 
-func enforceChartInstanceCaps(
+func enforceChartInstanceCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) []RemoveChartAction {
-	observedByTemplate := make(map[string][]string)
+	var observedByTemplate map[string][]string
 	for chartID, cs := range chartsByID {
+		if cs.lifecycle.MaxInstances <= 0 {
+			continue
+		}
+		if observedByTemplate == nil {
+			observedByTemplate = make(map[string][]string)
+		}
 		observedByTemplate[cs.templateID] = append(observedByTemplate[cs.templateID], chartID)
+	}
+	if len(observedByTemplate) == 0 {
+		return nil
 	}
 	for templateID := range observedByTemplate {
 		sort.Strings(observedByTemplate[templateID])
@@ -68,10 +108,10 @@ func enforceChartInstanceCaps(
 
 	existingByTemplate := make(map[string][]string)
 	for chartID, matChart := range state.charts {
+		if _, enabled := observedByTemplate[matChart.templateID]; !enabled {
+			continue
+		}
 		existingByTemplate[matChart.templateID] = append(existingByTemplate[matChart.templateID], chartID)
-	}
-	for templateID := range existingByTemplate {
-		sort.Strings(existingByTemplate[templateID])
 	}
 
 	removeCharts := make([]RemoveChartAction, 0)
@@ -91,9 +131,6 @@ func enforceChartInstanceCaps(
 		// max_instances is a soft cap:
 		// currently active chart instances are never evicted in the same successful cycle.
 		maxInstances := lifecycle.MaxInstances
-		if maxInstances <= 0 {
-			continue
-		}
 
 		existingIDs := existingByTemplate[templateID]
 		existingSet := make(map[string]struct{}, len(existingIDs))
@@ -161,7 +198,20 @@ func enforceChartInstanceCaps(
 			// If all existing instances are active and no new ones were observed, overflow remains
 			// and the soft cap may be temporarily exceeded.
 			for i := len(newObserved) - 1; i >= 0 && overflow > 0; i-- {
-				delete(chartsByID, newObserved[i])
+				chartID := newObserved[i]
+				if observe != nil {
+					cs := chartsByID[chartID]
+					fact := PlanRouteDiagnostic{
+						Decision: PlanRouteLifecycleRejected,
+						Reason:   PlanRouteReasonChartInstanceCap,
+						ChartID:  chartID,
+					}
+					if cs != nil {
+						fact.ChartTemplateID = cs.templateID
+					}
+					observe(fact)
+				}
+				delete(chartsByID, chartID)
 				overflow--
 			}
 		}
@@ -169,42 +219,49 @@ func enforceChartInstanceCaps(
 	return removeCharts
 }
 
-func enforceDimensionCaps(
+func enforceDimensionCapsWithObserver(
 	currentSuccessSeq uint64,
 	chartsByID map[string]*chartState,
 	state *materializedState,
+	observe func(PlanRouteDiagnostic),
 ) []RemoveDimensionAction {
 	// Per-chart dimension caps: evict least-recently-seen inactive dims first, then drop new dims.
-	removeDims := make([]RemoveDimensionAction, 0)
-	chartIDs := make([]string, 0, len(chartsByID))
-	for chartID := range chartsByID {
+	var chartIDs []string
+	for chartID, cs := range chartsByID {
+		if cs.lifecycle.Dimensions.MaxDims <= 0 {
+			continue
+		}
+		if chartIDs == nil {
+			chartIDs = make([]string, 0, len(chartsByID))
+		}
 		chartIDs = append(chartIDs, chartID)
 	}
+	if len(chartIDs) == 0 {
+		return nil
+	}
 	sort.Strings(chartIDs)
+
+	removeDims := make([]RemoveDimensionAction, 0)
 	for _, chartID := range chartIDs {
 		cs := chartsByID[chartID]
 		maxDims := cs.lifecycle.Dimensions.MaxDims
-		if maxDims <= 0 {
-			continue
-		}
 		matChart := state.charts[chartID]
 		existingCount := 0
 		if matChart != nil {
 			existingCount = len(matChart.dimensions)
 		}
 
-		newNames := make([]string, 0, cs.observedCount)
+		newCount := 0
 		for name, entry := range cs.entries {
 			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
 				continue
 			}
 			if matChart == nil || matChart.dimensions[name] == nil {
-				newNames = append(newNames, name)
+				newCount++
 			}
 		}
-		sort.Strings(newNames)
 
-		total := existingCount + len(newNames)
+		total := existingCount + newCount
 		if total <= maxDims {
 			continue
 		}
@@ -263,6 +320,15 @@ func enforceDimensionCaps(
 				if matChart != nil && matChart.dimensions[name] != nil {
 					continue
 				}
+				if observe != nil {
+					observe(PlanRouteDiagnostic{
+						Decision:        PlanRouteLifecycleRejected,
+						Reason:          PlanRouteReasonDimensionCap,
+						ChartTemplateID: cs.templateID,
+						ChartID:         chartID,
+						DimensionName:   name,
+					})
+				}
 				delete(cs.entries, name)
 				cs.observedCount--
 				overflow--
@@ -272,52 +338,70 @@ func enforceDimensionCaps(
 	return removeDims
 }
 
-func collectExpiryRemovals(
-	currentSuccessSeq uint64,
-	state *materializedState,
-) ([]RemoveDimensionAction, []RemoveChartAction) {
+func collectExpiryRemovals(currentSuccessSeq uint64, state *materializedState) ([]RemoveDimensionAction, []RemoveChartAction) {
 	if state == nil || len(state.charts) == 0 {
 		return nil, nil
 	}
-
-	chartIDs := make([]string, 0, len(state.charts))
-	for chartID := range state.charts {
-		chartIDs = append(chartIDs, chartID)
+	type expiryCandidate struct {
+		chartID     string
+		chart       *materializedChartState
+		dimensions  []string
+		removeChart bool
 	}
-	sort.Strings(chartIDs)
-
-	toRemoveChart := make(map[string]struct{})
-	for _, chartID := range chartIDs {
-		matChart := state.charts[chartID]
-		if shouldExpire(matChart.lastSeenSuccessSeq, currentSuccessSeq, matChart.lifecycle.ExpireAfterCycles) {
-			toRemoveChart[chartID] = struct{}{}
-		}
-	}
-
-	removeDims := make([]RemoveDimensionAction, 0)
-	for _, chartID := range chartIDs {
-		if _, removed := toRemoveChart[chartID]; removed {
+	var candidates []expiryCandidate
+	dimensionCount, chartCount := 0, 0
+	for chartID, chart := range state.charts {
+		if shouldExpire(chart.lastSeenSuccessSeq, currentSuccessSeq, chart.lifecycle.ExpireAfterCycles) {
+			candidates = append(candidates, expiryCandidate{
+				chartID:     chartID,
+				chart:       chart,
+				removeChart: true,
+			})
+			chartCount++
 			continue
 		}
-		matChart := state.charts[chartID]
-		expireAfter := matChart.lifecycle.Dimensions.ExpireAfterCycles
-		if expireAfter <= 0 || len(matChart.dimensions) == 0 {
+		expireAfter := chart.lifecycle.Dimensions.ExpireAfterCycles
+		if expireAfter <= 0 {
 			continue
 		}
-
-		dimNames := make([]string, 0, len(matChart.dimensions))
-		for name := range matChart.dimensions {
-			dimNames = append(dimNames, name)
-		}
-		sort.Strings(dimNames)
-		for _, name := range dimNames {
-			dim := matChart.dimensions[name]
-			if !shouldExpire(dim.lastSeenSuccessSeq, currentSuccessSeq, expireAfter) {
-				continue
+		var names []string
+		for name, dim := range chart.dimensions {
+			if shouldExpire(dim.lastSeenSuccessSeq, currentSuccessSeq, expireAfter) {
+				names = append(names, name)
 			}
+		}
+		if len(names) > 0 {
+			candidates = append(candidates, expiryCandidate{
+				chartID:    chartID,
+				chart:      chart,
+				dimensions: names,
+			})
+			dimensionCount += len(names)
+		}
+	}
+	// Order only expired identities, before constructing the larger wire actions.
+	// Exact output sizing also avoids repeated copies during mass expiry.
+	if len(candidates) > 1 {
+		sort.Slice(candidates, func(i, j int) bool { return candidates[i].chartID < candidates[j].chartID })
+	}
+	removeDims := make([]RemoveDimensionAction, 0, dimensionCount)
+	removeCharts := make([]RemoveChartAction, 0, chartCount)
+	for _, candidate := range candidates {
+		chartID, chart := candidate.chartID, candidate.chart
+		if candidate.removeChart {
+			removeCharts = append(removeCharts, RemoveChartAction{
+				ChartID: chartID,
+				Meta:    chart.meta,
+			})
+			delete(state.charts, chartID)
+			continue
+		}
+		sort.Strings(candidate.dimensions)
+		for _, name := range candidate.dimensions {
+			dim := chart.dimensions[name]
 			removeDims = append(removeDims, RemoveDimensionAction{
 				ChartID:    chartID,
-				ChartMeta:  matChart.meta,
+				ChartMeta:  chart.meta,
 				Name:       name,
 				Hidden:     dim.hidden,
 				Float:      dim.float,
@@ -325,59 +409,30 @@ func collectExpiryRemovals(
 				Multiplier: dim.multiplier,
 				Divisor:    dim.divisor,
 			})
-			matChart.removeDimension(name)
+			chart.removeDimension(name)
 		}
-	}
-
-	removeCharts := make([]RemoveChartAction, 0, len(toRemoveChart))
-	for _, chartID := range chartIDs {
-		if _, removed := toRemoveChart[chartID]; !removed {
-			continue
-		}
-		matChart := state.charts[chartID]
-		if matChart == nil {
-			continue
-		}
-		removeCharts = append(removeCharts, RemoveChartAction{
-			ChartID: chartID,
-			Meta:    matChart.meta,
-		})
-		delete(state.charts, chartID)
 	}
 	return removeDims, removeCharts
 }
 
 func orderedObservedDimensionNames(entries map[string]*dimBuildEntry, seenSeq uint64) []string {
-	type staticEntry struct {
-		name  string
-		order int
-	}
-	staticEntries := make([]staticEntry, 0, len(entries))
-	dynamicNames := make([]string, 0, len(entries))
+	staticEntries := make([]staticDimensionOrderEntry, 0, len(entries))
+	dynamicEntries := make([]dynamicDimensionOrderEntry, 0, len(entries))
 	for name, entry := range entries {
 		if entry == nil || entry.seenSeq != seenSeq {
 			continue
 		}
 		if entry.static {
-			staticEntries = append(staticEntries, staticEntry{
+			staticEntries = append(staticEntries, staticDimensionOrderEntry{
 				name:  name,
 				order: entry.order,
 			})
 			continue
 		}
-		dynamicNames = append(dynamicNames, name)
+		dynamicEntries = append(dynamicEntries, dynamicDimensionOrderEntry{
+			name:    name,
+			sortKey: entry.sortKey,
+		})
 	}
-	sort.Slice(staticEntries, func(i, j int) bool {
-		if staticEntries[i].order != staticEntries[j].order {
-			return staticEntries[i].order < staticEntries[j].order
-		}
-		return staticEntries[i].name < staticEntries[j].name
-	})
-	sort.Strings(dynamicNames)
-	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
-	for _, entry := range staticEntries {
-		out = append(out, entry.name)
-	}
-	out = append(out, dynamicNames...)
-	return out
+	return orderedDimensionNames(staticEntries, dynamicEntries)
 }

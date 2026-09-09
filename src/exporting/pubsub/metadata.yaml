@@ -3,6 +3,7 @@
 id: 'export-google-pubsub'
 meta:
   name: 'Google Cloud Pub Sub'
+  description: 'Export Netdata metrics to Google Cloud Pub/Sub for downstream storage, processing, and analysis.'
   link: 'https://cloud.google.com/pubsub'
   categories:
     - export
@@ -69,7 +70,7 @@ setup:
           description: 'The hostname to be used for sending data to the external database server.'
           required: false
         - name: 'prefix'
-          default_value: 'Netdata'
+          default_value: 'netdata'
           description: 'The prefix to add to all metrics.'
           required: false
         - name: 'update every'

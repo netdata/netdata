@@ -42,6 +42,34 @@ void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flag
 
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
+typedef struct rrdcalc_runtime_snapshot {
+    RRDCALC_STATUS status;
+    RRDCALC_FLAGS run_flags;
+    NETDATA_DOUBLE value;
+    time_t last_updated;
+    time_t last_status_change;
+    NETDATA_DOUBLE last_status_change_value;
+    usec_t global_id;
+    nd_uuid_t last_transition_id;
+    time_t next_update;
+    time_t db_after;
+    time_t db_before;
+    time_t delay_up_to_timestamp;
+    time_t last_repeat;
+    int delay_last;
+    uint32_t times_repeat;
+} RRDCALC_RUNTIME_SNAPSHOT;
+
+// Tracks this alert's membership in host->rrdcalc_by_name. Three states, not a
+// bool: an alert that has been unlinked must be distinguishable from one that was
+// never linked, otherwise the internal-checks verification cannot tell a
+// legitimate in-flight removal from an alert insert() forgot to index.
+typedef enum __attribute__((packed)) {
+    RRDCALC_NAME_INDEX_NEVER = 0,   // never linked into the index
+    RRDCALC_NAME_INDEX_LINKED,      // currently linked
+    RRDCALC_NAME_INDEX_UNLINKED,    // was linked, then removed
+} RRDCALC_NAME_INDEX_STATE;
+
 struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
@@ -80,6 +108,11 @@ struct rrdcalc {
     int delay_down_current;         // the current down notification delay duration
     int delay_last;                 // the last delay we used
 
+    struct {
+        RW_SPINLOCK spinlock;
+        RRDCALC_RUNTIME_SNAPSHOT state;
+    } runtime_snapshot;
+
     // ------------------------------------------------------------------------
     // the chart this alarm it is linked to
 
@@ -88,6 +121,19 @@ struct rrdcalc {
 
     struct rrdcalc *next;
     struct rrdcalc *prev;
+
+    // ------------------------------------------------------------------------
+    // host->rrdcalc_by_name list links
+    // Distinct from next/prev above, which thread the chart's alert list.
+
+    struct rrdcalc *name_next;
+    struct rrdcalc *name_prev;
+    RRDCALC_NAME_INDEX_STATE name_index_state;
+
+    // The rrdcalc_root_index item owning this RRDCALC, captured in the insert
+    // callback. Readers reaching this alert through the name index acquire a
+    // reference on it, which is what keeps the RRDCALC alive for them.
+    const DICTIONARY_ITEM *name_item;
 };
 
 #define rrdcalc_name(rc) string2str((rc)->config.name)
@@ -113,6 +159,59 @@ struct rrdcalc {
 #define foreach_rrdcalc_in_rrdhost_done(rc) \
     dfe_done(rc)
 
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete);
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
+RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
+
+static inline bool rrdcalc_rrdset_read_lock_if_matches(RRDCALC *rc, RRDSET *st) {
+    if(unlikely(!st))
+        return false;
+
+    rw_spinlock_read_lock(&st->alerts.spinlock);
+    // cppcheck-suppress knownConditionTrueFalse
+    if(unlikely(rc->rrdset != st)) {
+        rw_spinlock_read_unlock(&st->alerts.spinlock);
+        return false;
+    }
+
+    return true;
+}
+
+static inline RRDSET *rrdcalc_rrdset_read_lock(RRDCALC *rc) {
+    RRDSET *st = rc->rrdset;
+    if(unlikely(!rrdcalc_rrdset_read_lock_if_matches(rc, st)))
+        return NULL;
+
+    return st;
+}
+
+static inline void rrdcalc_rrdset_read_unlock(RRDSET *st) {
+    rw_spinlock_read_unlock(&st->alerts.spinlock);
+}
+
+static inline RRDSET_ACQUIRED *rrdcalc_rrdset_acquire_linked(RRDHOST *host, RRDCALC *rc, RRDSET **rrdset) {
+    *rrdset = NULL;
+
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(host, rrdcalc_chart_name(rc), true);
+    if(unlikely(!rsa))
+        return NULL;
+
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
+    if(unlikely(!st)) {
+        dictionary_acquired_item_release(host->rrdset_root_index, (const DICTIONARY_ITEM *)rsa);
+        return NULL;
+    }
+
+    if(unlikely(!rrdcalc_rrdset_read_lock_if_matches(rc, st))) {
+        rrdset_acquired_release(rsa);
+        return NULL;
+    }
+
+    rrdcalc_rrdset_read_unlock(st);
+    *rrdset = st;
+    return rsa;
+}
+
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)
 
 void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
@@ -122,6 +221,12 @@ void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca);
 RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca);
 
 const char *rrdcalc_status2string(RRDCALC_STATUS status);
+
+void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uuid_t *transition_id);
+void rrdcalc_runtime_snapshot_publish_run_flags(RRDCALC *rc);
+void rrdcalc_runtime_snapshot_publish_repeat_state(RRDCALC *rc);
+void rrdcalc_runtime_snapshot_get(RRDCALC *rc, RRDCALC_RUNTIME_SNAPSHOT *snapshot);
+void rrdcalc_runtime_strings_acquire(RRDCALC *rc, STRING **summary, STRING **info);
 
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id);
 
@@ -137,6 +242,29 @@ void rrdcalc_delete_all(RRDHOST *host);
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host);
 void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
+
+// Snapshot the host's alerts whose config.name is `name`, returning how many
+// exist. Each returned entry is an ACQUIRED rrdcalc_root_index item that the
+// caller MUST release with dictionary_acquired_item_release(); use
+// dictionary_acquired_item_value() to reach the RRDCALC.
+//
+// If the count exceeds dst_size nothing is acquired and nothing is written - the
+// caller retries with a larger buffer - so there is never a partial set to
+// release.
+//
+// Alerts being deleted are skipped, so the count can be lower than the number of
+// links in the index.
+//
+// The name-index lock is taken and released inside, deliberately: it must not be
+// held while the caller acquires chart locks (see rrdcalc_name_index_del()).
+size_t rrdcalc_by_name_snapshot(RRDHOST *host, STRING *name, const DICTIONARY_ITEM **dst, size_t dst_size);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Verifies that `rc` and the name index agree about `rc`, and fatal()s if they do
+// not. `rc` must be alive for the duration of the call (the caller holds a
+// reference on it).
+void rrdcalc_name_index_verify(RRDHOST *host, RRDCALC *rc);
+#endif
 
 void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock);
 

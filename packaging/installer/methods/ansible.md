@@ -110,7 +110,7 @@ Adjust the `dbengine_multihost_disk_space` variable to change the metrics retent
 
 Since this node connects to Netdata Cloud, we'll view its dashboards there instead of using its IP or hostname. The playbook disables the local dashboard by setting `web_mode` to `none`, adding a small security boost by preventing unwanted access.
 
-You can read more about this decision, or other ways to lock down the local dashboard, in our [node security documentation](https://learn.netdata.cloud/docs/netdata-agent/security/overview).
+You can read more about this decision, or other ways to lock down the local dashboard, in our [node security documentation](https://learn.netdata.cloud/docs/netdata-agent/configuration/securing-agents).
 
 :::tip
 
@@ -126,6 +126,6 @@ Execute the playbook from your administration system:
 ansible-playbook -i hosts tasks/main.yml
 ```
 
-Ansible connects to your node(s) via SSH, collects [facts](https://docs.ansible.com/ansible/latest/user_guide/playbooks_vars_facts.html#ansible-facts) about the system, and then applies the defined tasks.
+Ansible connects to your node(s) via SSH, collects [facts](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_vars_facts.html#ansible-facts) about the system, and then applies the defined tasks.
 
 The task to install Netdata may take a few minutes per node. Once the playbook reaches the "connect to Cloud" task, your nodes will start appearing in your Space in Netdata Cloud.

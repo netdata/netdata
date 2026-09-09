@@ -15,4 +15,4 @@ allocative = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-nix = { workspace = true, features = ["time"] }
+nix = { workspace = true, features = ["time", "hostname"] }

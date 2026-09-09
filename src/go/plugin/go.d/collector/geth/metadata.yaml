@@ -6,6 +6,7 @@ modules:
       module_name: geth
       monitored_instance:
         name: Go-ethereum
+        description: "Monitor Go-ethereum chain data, transactions, peers, network traffic, reorgs, runtime, and RPC calls."
         link: https://github.com/ethereum/go-ethereum
         icon_filename: geth.png
         categories:
@@ -145,13 +146,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:6060/debug/metrics/prometheus
-                
+
                   - name: remote
                     url: http://192.0.2.1:6060/debug/metrics/prometheus
     troubleshooting:

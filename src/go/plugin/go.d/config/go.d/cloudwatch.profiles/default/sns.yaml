@@ -1,0 +1,113 @@
+---
+version: v1
+display_name: Amazon SNS
+namespace: AWS/SNS
+query:
+  period: 5m
+instance:
+  dimensions:
+    - name: TopicName
+      label: topic_name
+metrics:
+  - id: number_of_messages_published
+    metric_name: NumberOfMessagesPublished
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_delivered
+    metric_name: NumberOfNotificationsDelivered
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_failed
+    metric_name: NumberOfNotificationsFailed
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_filtered_out
+    metric_name: NumberOfNotificationsFilteredOut
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_filtered_out_invalid_attributes
+    metric_name: NumberOfNotificationsFilteredOut-InvalidAttributes
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_filtered_out_invalid_message_body
+    metric_name: NumberOfNotificationsFilteredOut-InvalidMessageBody
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_redriven_to_dlq
+    metric_name: NumberOfNotificationsRedrivenToDlq
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_failed_to_redrive_to_dlq
+    metric_name: NumberOfNotificationsFailedToRedriveToDlq
+    statistics: [sum]
+    rate: true
+  - id: publish_size
+    metric_name: PublishSize
+    statistics: [average]
+  # ----------------------------------------------------------------------------------------
+  # Additional filtered-out breakdown metrics at the {TopicName} grain can be added the same way.
+  # ----------------------------------------------------------------------------------------
+  # Filtered-out breakdowns (NumberOfNotificationsFilteredOut-MessageAttributes / -MessageBody /
+  # -NoMessageAttributes) are also at {TopicName}. SMS (PhoneNumber grain),
+  # mobile-push (Application/Platform grains), and account-level SMS spend need their own profiles.
+  # See: https://docs.aws.amazon.com/sns/latest/dg/sns-monitoring-using-cloudwatch.html
+template:
+  family: SNS
+  context_namespace: sns
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, topic_name]
+  charts:
+    - id: aws_cloudwatch_sns_published
+      context: messages_published
+      title: SNS Messages Published
+      family: Messages
+      units: messages/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_messages_published_sum
+          name: published
+    - id: aws_cloudwatch_sns_notifications
+      context: notifications
+      title: SNS Notifications
+      family: Notifications
+      units: notifications/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_notifications_delivered_sum
+          name: delivered
+        - selector: number_of_notifications_failed_sum
+          name: failed
+        - selector: number_of_notifications_filtered_out_sum
+          name: filtered_out
+    - id: aws_cloudwatch_sns_publish_size
+      context: publish_size
+      title: SNS Published Message Size
+      family: Messages
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: publish_size_average
+          name: size
+    - id: aws_cloudwatch_sns_invalid_notifications
+      context: invalid_notifications
+      title: SNS Invalid Notifications
+      family: Notifications
+      units: notifications/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_notifications_filtered_out_invalid_attributes_sum
+          name: invalid_attributes
+        - selector: number_of_notifications_filtered_out_invalid_message_body_sum
+          name: invalid_message_body
+    - id: aws_cloudwatch_sns_dlq
+      context: dlq_redrive
+      title: SNS Dead-Letter Queue Redrive
+      family: Notifications
+      units: notifications/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_notifications_redriven_to_dlq_sum
+          name: redriven
+        - selector: number_of_notifications_failed_to_redrive_to_dlq_sum
+          name: failed_redrive

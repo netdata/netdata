@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+version: v1
+profile: vllm
+metadata_example:
+  integration_id: collector-go.d.plugin-prometheus-vllm
+  example_name: Native vLLM
+  job_name: vllm
+future_inputs:
+  native_future_family:
+    name: vllm:future_native_family
+    type: gauge
+  ray_future_family:
+    name: ray_vllm_future_ray_family
+    type: gauge
+cases:
+  native_core:
+    environment:
+      vllm:
+        transport: native
+        capabilities: []
+      fastapi: {inprogress: disabled, status_grouping: grouped, highr_population: all, streaming_duration: included, custom_labels: none, metric_naming: default, inprogress_naming: default}
+      process_runtime: {platform_runtime: cpython}
+      python_gc: {}
+    fixture: fixtures/vllm_core_metrics.prom
+    coverage: true
+    expected: {verdict: PASS}
+  native:
+    environment:
+      vllm:
+        transport: native
+        capabilities:
+          - speculative_decoding
+          - diffusion_decoding
+          - kv_residency
+          - kv_offload
+          - nixl
+          - hf3fs
+          - mooncake
+          - realtime
+          - tool_parser
+      fastapi: {inprogress: disabled, status_grouping: grouped, highr_population: all, streaming_duration: included, custom_labels: none, metric_naming: default, inprogress_naming: default}
+      process_runtime: {platform_runtime: cpython}
+      python_gc: {}
+    fixture: fixtures/vllm_all_metrics.prom
+    coverage: true
+    expected: {verdict: PASS}
+  ray:
+    environment:
+      vllm:
+        transport: ray
+        capabilities:
+          - speculative_decoding
+          - diffusion_decoding
+          - kv_residency
+          - kv_offload
+          - nixl
+          - hf3fs
+          - mooncake
+    fixture: fixtures/vllm_ray_all_metrics.prom
+    coverage: true
+    expected: {verdict: PASS}
+    job:
+      metadata_example:
+        integration_id: collector-go.d.plugin-prometheus-vllm
+        example_name: vLLM on Ray
+        job_name: vllm-ray
+  ray_without_optional_identity:
+    environment:
+      vllm:
+        transport: ray
+        capabilities:
+          - speculative_decoding
+          - diffusion_decoding
+          - kv_residency
+          - kv_offload
+          - nixl
+          - hf3fs
+          - mooncake
+    fixture: fixtures/vllm_ray_without_optional_identity.prom
+    coverage: true
+    expected: {verdict: PASS}
+    job:
+      metadata_example:
+        integration_id: collector-go.d.plugin-prometheus-vllm
+        example_name: vLLM on Ray
+        job_name: vllm-ray

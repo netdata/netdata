@@ -4,10 +4,15 @@ package httpx
 
 import (
 	"crypto/tls"
+	"errors"
+	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
 )
+
+var ErrResponseTooLarge = errors.New("HTTP response exceeds size limit")
 
 func noRedirect(*http.Request, []*http.Request) error {
 	return http.ErrUseLastResponse
@@ -22,8 +27,9 @@ func NoProxyClient(timeout time.Duration) *http.Client {
 	transport.Proxy = nil
 
 	return &http.Client{
-		Timeout:   timeout,
-		Transport: transport,
+		Timeout:       timeout,
+		Transport:     transport,
+		CheckRedirect: noRedirect,
 	}
 }
 
@@ -65,4 +71,21 @@ func TruncateBody(body []byte) string {
 		return s[:maxLen] + "..."
 	}
 	return s
+}
+
+func ReadResponseBody(r io.Reader, limit int64) ([]byte, error) {
+	if limit < 0 {
+		return nil, errors.New("HTTP response size limit cannot be negative")
+	}
+	if limit == math.MaxInt64 {
+		return nil, errors.New("HTTP response size limit is too large")
+	}
+	body, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > limit {
+		return body[:limit], ErrResponseTooLarge
+	}
+	return body, nil
 }

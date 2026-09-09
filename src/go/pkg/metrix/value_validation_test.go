@@ -71,7 +71,9 @@ func TestValueValidationScenarios(t *testing.T) {
 						Count: 1,
 						Sum:   1,
 						Quantiles: []QuantilePoint{
-							{Quantile: 0.5, Value: math.NaN()},
+							// A NaN quantile value is accepted (stored, then rendered
+							// downstream as a gap), so only an Inf value panics here.
+							{Quantile: 0.5, Value: math.Inf(1)},
 						},
 					})
 				})

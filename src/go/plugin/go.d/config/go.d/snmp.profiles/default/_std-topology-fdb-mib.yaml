@@ -1,0 +1,36 @@
+# Classic BRIDGE-MIB forwarding database topology.
+
+extends:
+  - _std-topology-bridge-base-mib.yaml
+
+topology:
+  - kind: fdb_entry
+    MIB: BRIDGE-MIB
+    table:
+      OID: 1.3.6.1.2.1.17.4.3
+      name: dot1dTpFdbTable
+    symbols:
+      - OID: 1.3.6.1.2.1.17.4.3.1.2
+        name: fdb_entry
+    metric_tags:
+      - tag: fdb_mac
+        symbol:
+          name: dot1dTpFdbAddress
+          format: mac_address
+        index_transform:
+          - start: 0
+            end: 5
+      - tag: fdb_bridge_port
+        symbol:
+          OID: 1.3.6.1.2.1.17.4.3.1.2
+          name: dot1dTpFdbPort
+      - tag: fdb_status
+        symbol:
+          OID: 1.3.6.1.2.1.17.4.3.1.3
+          name: dot1dTpFdbStatus
+        mapping:
+          1: other
+          2: invalid
+          3: learned
+          4: self
+          5: mgmt

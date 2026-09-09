@@ -47,7 +47,7 @@ func TestEnforceChartInstanceCapsSoftWhenAllExistingAreActive(t *testing.T) {
 				},
 			}
 
-			removeCharts := enforceChartInstanceCaps(currentSuccessSeq, chartsByID, &state)
+			removeCharts := enforceChartInstanceCapsWithObserver(currentSuccessSeq, chartsByID, &state, nil)
 			assert.Empty(t, removeCharts)
 			assert.Len(t, chartsByID, 2)
 			assert.Len(t, state.charts, 2)

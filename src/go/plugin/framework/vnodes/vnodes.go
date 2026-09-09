@@ -11,11 +11,13 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
-	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
@@ -31,10 +33,11 @@ func Load(dir string) map[string]*VirtualNode {
 }
 
 type VirtualNode struct {
-	Name     string            `yaml:"name" json:"name"`
-	Hostname string            `yaml:"hostname" json:"hostname"`
-	GUID     string            `yaml:"guid" json:"guid"`
-	Labels   map[string]string `yaml:"labels,omitempty" json:"labels"`
+	Name       string            `yaml:"name"                  json:"name"`
+	Hostname   string            `yaml:"hostname"              json:"hostname"`
+	GUID       string            `yaml:"guid"                  json:"guid"`
+	Labels     map[string]string `yaml:"labels,omitempty"      json:"labels"`
+	StaleAfter *confopt.Duration `yaml:"stale_after,omitempty" json:"stale_after,omitempty"`
 
 	Source     string `yaml:"-" json:"-"`
 	SourceType string `yaml:"-" json:"-"`
@@ -47,6 +50,11 @@ func (v *VirtualNode) Copy() *VirtualNode {
 
 	labels := make(map[string]string, len(v.Labels))
 	maps.Copy(labels, v.Labels)
+	var staleAfter *confopt.Duration
+	if v.StaleAfter != nil {
+		value := *v.StaleAfter
+		staleAfter = &value
+	}
 
 	return &VirtualNode{
 		Name:       v.Name,
@@ -55,6 +63,7 @@ func (v *VirtualNode) Copy() *VirtualNode {
 		Source:     v.Source,
 		SourceType: v.SourceType,
 		Labels:     labels,
+		StaleAfter: staleAfter,
 	}
 }
 
@@ -62,11 +71,34 @@ func (v *VirtualNode) Equal(vn *VirtualNode) bool {
 	return v.Name == vn.Name &&
 		v.Hostname == vn.Hostname &&
 		v.GUID == vn.GUID &&
+		staleAfterEqual(v.StaleAfter, vn.StaleAfter) &&
 		maps.Equal(v.Labels, vn.Labels)
+}
+
+func staleAfterEqual(a, b *confopt.Duration) bool {
+	return a == nil && b == nil || a != nil && b != nil && *a == *b
+}
+
+// HostLabels materializes lifecycle configuration without changing the operator's labels.
+func (v *VirtualNode) HostLabels() map[string]string {
+	labels := maps.Clone(v.Labels)
+	if v.StaleAfter == nil {
+		return labels
+	}
+	if *v.StaleAfter == 0 {
+		delete(labels, "_node_stale_after_seconds")
+		return labels
+	}
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels["_node_stale_after_seconds"] = strconv.FormatInt(int64(v.StaleAfter.Duration()/time.Second), 10)
+	return labels
 }
 
 func readConfDir(dir string) map[string]*VirtualNode {
 	vnodes := make(map[string]*VirtualNode)
+	guids := make(map[string]string)
 
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -113,20 +145,6 @@ func readConfDir(dir string) map[string]*VirtualNode {
 		}
 
 		for _, v := range cfg {
-			if v.Hostname == "" || v.GUID == "" {
-				log.Warningf("skipping virtual node '%+v': required fields are missing (%s)", v, path)
-				continue
-			}
-			if err := uuid.Validate(v.GUID); err != nil {
-				log.Warningf("skipping virtual node '%+v': invalid GUID: %v (%s)", v, err, path)
-				continue
-			}
-			if _, ok := vnodes[v.Hostname]; ok {
-				log.Warningf("skipping virtual node '%+v': duplicate node (%s)", v, path)
-				continue
-			}
-
-			v := v
 
 			if v.Name != "" && v.Name != v.Hostname {
 				log.Warningf(
@@ -141,9 +159,26 @@ func readConfDir(dir string) map[string]*VirtualNode {
 			} else {
 				v.SourceType = "user"
 			}
+			guidKey, err := validateConfigured(&v)
+			if err != nil {
+				log.Warningf("skipping virtual node '%+v': %v (%s)", v, err, path)
+				continue
+			}
+			if _, ok := vnodes[v.Hostname]; ok {
+				log.Warningf("skipping virtual node '%+v': duplicate hostname (%s)", v, path)
+				continue
+			}
+			if other, ok := guids[guidKey]; ok {
+				log.Warningf(
+					"skipping virtual node '%+v': duplicate GUID already used by '%s' (%s)",
+					v, other, path,
+				)
+				continue
+			}
 
 			log.Debugf("adding virtual node'%+v' (%s)", v, path)
 			vnodes[v.Hostname] = &v
+			guids[guidKey] = v.Hostname
 		}
 
 		return nil

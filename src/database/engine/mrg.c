@@ -7,8 +7,49 @@ struct aral_statistics mrg_aral_statistics;
 // ----------------------------------------------------------------------------
 // private helpers
 
+static void mrg_lock_all_partitions(MRG *mrg) {
+    for(size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++)
+        mrg_index_write_lock(mrg, partition);
+}
+
+static void mrg_unlock_all_partitions(MRG *mrg) {
+    for(size_t partition = UUIDMAP_PARTITIONS; partition > 0; partition--)
+        mrg_index_write_unlock(mrg, partition - 1);
+}
+
+static void mrg_destroy_restore_claimed_metrics(METRIC **claimed, size_t used) {
+    for(size_t i = 0; i < used ;i++) {
+        REFCOUNT expected = REFCOUNT_DELETED;
+        bool restored = __atomic_compare_exchange_n(&claimed[i]->refcount, &expected, 0,
+                                                    false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+        internal_fatal(!restored, "DBENGINE METRIC: cannot restore destroy-claimed metric refcount");
+    }
+}
+
+static bool mrg_destroy_claim_metric(METRIC *metric, METRIC ***claimed, size_t *used, size_t *size) {
+    if(!refcount_acquire_for_deletion(&metric->refcount))
+        return false;
+
+    if(*used == *size) {
+        internal_fatal(*size > SIZE_MAX / 2,
+                       "DBENGINE METRIC: too many metrics to claim during destroy");
+
+        size_t new_size = *size ? *size * 2 : 1024;
+        internal_fatal(new_size > SIZE_MAX / sizeof(**claimed),
+                       "DBENGINE METRIC: too many metrics to claim during destroy");
+
+        *claimed = reallocz(*claimed, new_size * sizeof(**claimed));
+        *size = new_size;
+    }
+
+    (*claimed)[(*used)++] = metric;
+    return true;
+}
+
 static MRG *mrg_create_internal(bool load_from_db) {
-    MRG *mrg = callocz(1, sizeof(MRG));
+    MRG *mrg;
+    (void)posix_memalignz((void **)&mrg, _Alignof(MRG), sizeof(*mrg));
+    memset(mrg, 0, sizeof(*mrg));
 
     for(size_t i = 0; i < _countof(mrg->index) ; i++) {
         rw_spinlock_init(&mrg->index[i].rw_spinlock);
@@ -49,12 +90,13 @@ size_t mrg_destroy(MRG *mrg) {
         return 0;
 
     size_t referenced = 0;
+    size_t claimed_used = 0, claimed_size = 0;
+    METRIC **claimed = NULL;
+
+    mrg_lock_all_partitions(mrg);
 
     // Traverse all partitions
     for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
-        // Lock the partition to prevent new entries while we're cleaning up
-        mrg_index_write_lock(mrg, partition);
-
         Word_t uuid_index = 0;
         Pvoid_t *uuid_pvalue;
 
@@ -82,31 +124,55 @@ size_t mrg_destroy(MRG *mrg) {
                 METRIC *metric = *section_pvalue;
 
                 // Try to acquire metric for deletion
-                if (!refcount_acquire_for_deletion(&metric->refcount))
+                if (!mrg_destroy_claim_metric(metric, &claimed, &claimed_used, &claimed_size))
                     referenced++;
-
-                uuidmap_free(metric->uuid);
-                MRG_STATS_DELETED_METRIC(mrg, partition, metric->section);
-                aral_freez(mrg->index[partition].aral, metric);
             }
+        }
+    }
 
-            JudyLFreeArray(&sections_judy, PJE0);
+    if(referenced) {
+        mrg_destroy_restore_claimed_metrics(claimed, claimed_used);
+        freez(claimed);
+        mrg_unlock_all_partitions(mrg);
+        return referenced;
+    }
+
+    for(size_t i = 0; i < claimed_used ;i++) {
+        METRIC *metric = claimed[i];
+        uuidmap_free(metric->uuid);
+        MRG_STATS_DELETED_METRIC(mrg, metric->partition, metric->section);
+        aral_freez(mrg->index[metric->partition].aral, metric);
+    }
+    freez(claimed);
+
+    for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
+        Word_t uuid_index = 0;
+        Pvoid_t *uuid_pvalue;
+
+        for (uuid_pvalue = JudyLFirst(mrg->index[partition].uuid_judy, &uuid_index, PJE0);
+             uuid_pvalue != NULL && uuid_pvalue != PJERR;
+             uuid_pvalue = JudyLNext(mrg->index[partition].uuid_judy, &uuid_index, PJE0)) {
+
+            if(*uuid_pvalue)
+                JudyLFreeArray(uuid_pvalue, PJE0);
         }
 
         JudyLFreeArray(&mrg->index[partition].uuid_judy, PJE0);
-
-        // Unlock the partition
-        mrg_index_write_unlock(mrg, partition);
-
-        // Destroy the aral for this partition
-        aral_destroy(mrg->index[partition].aral);
     }
+
+    // destroy the ARALs while still holding all partition locks:
+    // metric_add_and_acquire() allocates from them under a partition lock,
+    // so it cannot race with this teardown
+    for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++)
+        aral_destroy(mrg->index[partition].aral);
+
+    mrg_unlock_all_partitions(mrg);
 
     // Unregister the aral statistics
     pulse_aral_unregister_statistics(&mrg_aral_statistics);
 
     // Free the MRG structure
-    freez(mrg);
+    posix_memalign_freez(mrg);
 
     return referenced;
 }
@@ -121,10 +187,31 @@ METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
 
 ALWAYS_INLINE
 METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
-    UUIDMAP_ID id = uuidmap_create(*uuid);
-    METRIC *metric = metric_get_and_acquire_by_id(mrg, id, section);
-    uuidmap_free(id);
-    return metric;
+    // This is a pure lookup, so resolve the uuid to its id WITHOUT creating it
+    // and WITHOUT taking a reference on it.
+    //
+    // It used to call uuidmap_create()/uuidmap_free() around the lookup, which
+    // was wrong twice over. Functionally, a miss inserted the uuid into the
+    // uuidmap only for the matching free to delete it again -- create/delete
+    // churn for something we only ever used as a search key. And for
+    // performance, uuidmap_free() takes the partition WRITE lock on every call,
+    // so every metric lookup serialized on it; during MRG population that is one
+    // exclusive acquisition per metric per journal file across only
+    // UUIDMAP_PARTITIONS partitions.
+    //
+    // Using the id as a bare key is safe here: every METRIC in the MRG holds its
+    // own uuidmap reference for its whole lifetime (metric_add_and_acquire()
+    // takes it, metric_release() releases it via uuidmap_free()), so an id that
+    // resolves to a metric is
+    // necessarily still alive. If the uuid is unknown there can be no metric for
+    // it, and if the entry died the lookup simply misses -- ids are unique for the
+    // lifetime of the uuidmap, so a stale id cannot alias a different uuid. (The
+    // sequence only restarts on a successful uuidmap_destroy(), which cannot
+    // happen while any METRIC still holds its reference.)
+    UUIDMAP_ID id = uuidmap_peek_id(*uuid);
+    if(!id) return NULL;
+
+    return metric_get_and_acquire_by_id(mrg, id, section);
 }
 
 ALWAYS_INLINE
@@ -163,6 +250,11 @@ nd_uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
 ALWAYS_INLINE
 UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg __maybe_unused, METRIC *metric) {
     return uuidmap_dup(metric->uuid);
+}
+
+ALWAYS_INLINE
+UUIDMAP_ID mrg_metric_uuidmap_id(MRG *mrg __maybe_unused, METRIC *metric) {
+    return metric->uuid;
 }
 
 ALWAYS_INLINE
@@ -304,6 +396,21 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
     time_t first, last;
     mrg_metric_get_retention(mrg, metric, &first, &last, NULL);
     return (first && last && first < last);
+}
+
+static inline bool mrg_metric_clean_samples_from_snapshot(
+    time_t first_time_s,
+    time_t latest_time_s_clean,
+    uint32_t update_every_s,
+    uint64_t *samples)
+{
+    *samples = 0;
+
+    if (!update_every_s || first_time_s <= 0 || latest_time_s_clean <= 0 || first_time_s >= latest_time_s_clean)
+        return false;
+
+    *samples = (uint64_t)(latest_time_s_clean - first_time_s) / update_every_s;
+    return *samples > 0;
 }
 
 ALWAYS_INLINE_HOT
@@ -451,16 +558,30 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     if (likely(!added)) {
         uint64_t old_samples = 0;
 
-        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
-            old_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+        uint32_t latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
+        time_t latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
+        time_t metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
+        if (update_every_s)
+            mrg_metric_clean_samples_from_snapshot(
+                metric_first_time_s,
+                latest_time_s_clean,
+                latest_update_every_s,
+                &old_samples);
 
         mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
 
         uint64_t new_samples = 0;
-        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
-            new_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+        latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
+        latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
+        metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
+        if (update_every_s)
+            mrg_metric_clean_samples_from_snapshot(
+                metric_first_time_s,
+                latest_time_s_clean,
+                latest_update_every_s,
+                &new_samples);
 
-        if (journal_samples)
+        if (journal_samples && new_samples > old_samples)
             *journal_samples += (new_samples - old_samples);
     }
     else {

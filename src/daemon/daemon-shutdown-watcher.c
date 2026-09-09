@@ -16,9 +16,9 @@ static ND_THREAD *watcher_thread;
 static BUFFER *steps_timings = NULL;
 
 NEVER_INLINE
-static void shutdown_timed_out(void) {
+static void shutdown_timed_out(const char *step) {
     // keep this as a separate function, to have it logged like this in sentry
-    daemon_status_file_shutdown_timeout(steps_timings);
+    daemon_status_file_shutdown_timeout(step, steps_timings);
 
     // NOTE: We intentionally skip adding a Sentry breadcrumb here because:
     // 1. During shutdown timeout, the status file has already been saved with timeout info
@@ -44,7 +44,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
 {
     if(!steps_timings) {
         steps_timings = buffer_create(0, NULL);
-        buffer_strcat(steps_timings, STACK_TRACE_INFO_PREFIX " shutdown steps timings");
+        buffer_strcat(steps_timings, DAEMON_STATUS_FILE_ROLLING_SHUTDOWN_TIMINGS_HEADER);
     }
 
     usec_t step_start_time = now_monotonic_usec();
@@ -111,7 +111,7 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id, usec_t shutdo
                 watcher_steps[step_id].msg, step_duration_txt);
 #endif
 
-        shutdown_timed_out();
+        shutdown_timed_out(watcher_steps[step_id].msg);
     }
 }
 
@@ -132,6 +132,7 @@ void watcher_main(void *arg)
         WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETEC_AND_TRAIN_THREADS, shutdown_start_time);
@@ -145,7 +146,6 @@ void watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS, shutdown_start_time);
-    watcher_wait_for_step(WATCHER_STEP_ID_STOP_WEBSOCKET_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_JOIN_STATIC_THREADS, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);

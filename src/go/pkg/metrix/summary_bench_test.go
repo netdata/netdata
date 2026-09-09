@@ -139,11 +139,11 @@ func BenchmarkSummarySnapshotObservePoint(b *testing.B) {
 	}
 }
 
-func benchmarkCycleController(b *testing.B, s CollectorStore) CycleController {
-	b.Helper()
+func benchmarkCycleController(tb testing.TB, s CollectorStore) CycleController {
+	tb.Helper()
 	managed, ok := AsCycleManagedStore(s)
 	if !ok {
-		b.Fatalf("store does not expose cycle control")
+		tb.Fatalf("store does not expose cycle control")
 	}
 	return managed.CycleController()
 }

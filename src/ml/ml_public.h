@@ -9,7 +9,7 @@ extern "C" {
 
 #include "database/rrd.h"
 #include "web/api/queries/rrdr.h"
-#include "database/sqlite/vendored/sqlite3.h"
+#include "sqlite3.h"
 
 bool ml_capable();
 bool ml_enabled(RRDHOST *rh);
@@ -20,6 +20,10 @@ void ml_fini(void);
 
 void ml_start_threads(void);
 void ml_stop_threads(void);
+
+// ASAN-only: releases per-worker ML resources. Must run after all producers are
+// gone (see the comment on the definition in ml_public.cc).
+void ml_workers_free(void);
 
 void ml_host_new(RRDHOST *rh);
 void ml_host_delete(RRDHOST *rh);

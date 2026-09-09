@@ -21,17 +21,3 @@ func cloneConfig(in Config) Config {
 	}
 	return out
 }
-
-func cloneStoreStatus(status StoreStatus) StoreStatus {
-	out := status
-	out.LastValidation = cloneValidationStatus(status.LastValidation)
-	return out
-}
-
-func cloneValidationStatus(status *ValidationStatus) *ValidationStatus {
-	if status == nil {
-		return nil
-	}
-	copyStatus := *status
-	return &copyStatus
-}

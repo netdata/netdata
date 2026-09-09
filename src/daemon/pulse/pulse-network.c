@@ -155,7 +155,7 @@ static void pulse_aclk_time_heatmap(void) {
         rds[_countof(rds) - 1] = rrddim_add(st, "+inf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    for(size_t i = 0; i < _countof(rds) - 1 ;i++) {
+    for(size_t i = 0; i < _countof(rds) ;i++) {
         size_t old_value = 0, new_value = 0;
         __atomic_exchange(&aclk_time_heatmap.array[i].count, &new_value, &old_value, __ATOMIC_RELAXED);
         rrddim_set_by_pointer(st, rds[i], (collected_number)old_value);
@@ -334,6 +334,73 @@ void pulse_network_do(bool extended __maybe_unused) {
         }
 
         pulse_aclk_time_heatmap();
+
+        {
+            // In-flight QoS1 messages vs the broker's MQTT 5.0 Receive Maximum.
+            // When "in flight" approaches "receive maximum" the agent is at the
+            // broker's window limit. Always available (not extended) since it is
+            // the primary signal for the MQTT 5.0 Receive Maximum behavior.
+            static RRDSET *st_aclk_inflight = NULL;
+            static RRDDIM *rd_in_flight = NULL, *rd_receive_max = NULL;
+
+            if (unlikely(!st_aclk_inflight)) {
+                st_aclk_inflight = rrdset_create_localhost(
+                    "netdata",
+                    "aclk_mqtt_inflight",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.aclk_mqtt_inflight",
+                    "Netdata ACLK MQTT In-Flight QoS1 Window",
+                    "messages",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 2,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+                rrdlabels_add(st_aclk_inflight->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+
+                rd_in_flight = rrddim_add(st_aclk_inflight, "in flight", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_receive_max = rrddim_add(st_aclk_inflight, "receive maximum", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+
+            rrddim_set_by_pointer(st_aclk_inflight, rd_in_flight, (collected_number)t.mqtt.packets_waiting_puback);
+            rrddim_set_by_pointer(st_aclk_inflight, rd_receive_max, (collected_number)t.mqtt.rx_maximum);
+            rrdset_done(st_aclk_inflight);
+        }
+
+        {
+            // QoS1/2 messages the broker never acknowledged. This client does not
+            // retransmit, so anything counted here was dropped: the cloud never
+            // confirmed it. Always available (not extended) since it is the only
+            // signal that outbound messages are being lost, and it reads zero on a
+            // healthy link.
+            static RRDSET *st_aclk_timeouts = NULL;
+            static RRDDIM *rd_timed_out = NULL;
+
+            if (unlikely(!st_aclk_timeouts)) {
+                st_aclk_timeouts = rrdset_create_localhost(
+                    "netdata",
+                    "aclk_mqtt_puback_timeouts",
+                    NULL,
+                    PULSE_NETWORK_CHART_FAMILY,
+                    "netdata.aclk_mqtt_puback_timeouts",
+                    "Netdata ACLK MQTT Messages Dropped Without a PUBACK",
+                    "messages/s",
+                    "netdata",
+                    "pulse",
+                    PULSE_NETWORK_CHART_PRIORITY + 6,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+                rrdlabels_add(st_aclk_timeouts->rrdlabels, "endpoint", "aclk", RRDLABEL_SRC_AUTO);
+
+                rd_timed_out = rrddim_add(st_aclk_timeouts, "timed out", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st_aclk_timeouts, rd_timed_out, (collected_number)t.mqtt.packets_timed_out);
+            rrdset_done(st_aclk_timeouts);
+        }
 
         if(extended) {
             static RRDSET *st_aclk_queue_size = NULL;

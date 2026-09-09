@@ -274,7 +274,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
             struct ps_property *pr;
             if (likely(ps))
             {
-                for(pr = ps->property_root; pr && !read_error; pr = pr->next) {
+                for(pr = ps->property_root; pr && !read_error; ) {
+                    struct ps_property *next = pr->next;
                     struct ps_property_dim *pd;
                     for(pd = pr->property_dim_root; pd; pd = pd->next) {
                         if(likely(!pd->always_zero)) {
@@ -286,6 +287,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                     collector_error("Cannot open file '%s'", pd->filename);
                                     read_error = 1;
                                     power_supply_free(ps);
+                                    ps = NULL;
                                     break;
                                 }
                             }
@@ -295,6 +297,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                 collector_error("Cannot read file '%s'", pd->filename);
                                 read_error = 1;
                                 power_supply_free(ps);
+                                ps = NULL;
                                 break;
                             }
                             buffer[r] = '\0';
@@ -311,6 +314,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             }
                         }
                     }
+
+                    if(unlikely(read_error))
+                        break;
+
+                    pr = next;
                 }
             }
         }

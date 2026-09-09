@@ -8,25 +8,76 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 )
 
 type jobV2CleanupSnapshot struct {
-	charts               map[string]chartengine.ChartMeta
-	host                 jobV2HostRef
-	staleVnodeSuppressed bool
+	scopeKey   string
+	charts     map[string]chartengine.ChartMeta
+	host       jobV2HostRef
+	owner      *hostoutput.Owner
+	definition *hostoutput.Definition
 }
 
-func (s *jobV2HostState) captureCleanupSnapshot(vnode vnodes.VirtualNode) jobV2CleanupSnapshot {
-	if s == nil {
-		return jobV2CleanupSnapshot{}
+func (j *JobV2) captureScopeCleanupSnapshots() []jobV2CleanupSnapshot {
+	if j == nil || len(j.scopeStates) == 0 {
+		return nil
 	}
-	host := s.cleanupOwner
-	return jobV2CleanupSnapshot{
-		charts:               maps.Clone(s.cleanupCharts),
-		host:                 host,
-		staleVnodeSuppressed: shouldSuppressCleanupForStaleVnode(host, vnode),
+	keys := sortedScopeStateKeys(j.scopeStates)
+
+	snapshots := make([]jobV2CleanupSnapshot, 0, len(keys))
+	for _, key := range keys {
+		state := j.scopeStates[key]
+		if state == nil {
+			continue
+		}
+		snapshot := jobV2CleanupSnapshot{
+			host:   state.host.cleanupOwner,
+			charts: maps.Clone(state.host.cleanupCharts),
+		}
+		snapshot.scopeKey = key
+		snapshot.owner = state.host.owner
+		snapshot.definition = state.host.cleanupDefinition
+		if state.scopeKey == defaultHostScopeKey && j.module != nil && j.module.VirtualNode() != nil &&
+			j.vnodeName == "" {
+			vnode := j.currentVnode()
+			info := netdataapi.HostInfo{
+				GUID:     vnode.GUID,
+				Hostname: vnode.Hostname,
+				Labels:   vnode.HostLabels(),
+			}
+			if info.GUID == snapshot.host.guid {
+				if definition, err := hostoutput.NewDefinition(info); err == nil {
+					snapshot.definition = definition
+				}
+			}
+		}
+		snapshots = append(snapshots, snapshot)
 	}
+	return snapshots
+}
+
+func (j *JobV2) releaseAllScopeOwners() {
+	if j == nil {
+		return
+	}
+	for _, state := range j.scopeStates {
+		if state != nil {
+			state.host.owner.Release()
+		}
+	}
+}
+
+func (j *JobV2) clearAllScopeStateAfterCleanup() {
+	if j == nil {
+		return
+	}
+	for _, state := range j.scopeStates {
+		if state != nil {
+			state.host.clearAfterCleanup()
+		}
+	}
+	clear(j.scopeStates)
 }
 
 func (s *jobV2HostState) clearAfterCleanup() {
@@ -34,8 +85,9 @@ func (s *jobV2HostState) clearAfterCleanup() {
 		return
 	}
 	clear(s.cleanupCharts)
-	s.definedHost = jobV2HostRef{}
-	s.definedInfo = netdataapi.HostInfo{}
+	s.owner = nil
+	s.ownerGUID = ""
+	s.cleanupDefinition = nil
 	s.engineHost = jobV2HostRef{}
 	s.cleanupOwner = jobV2HostRef{}
 }
@@ -58,11 +110,7 @@ func buildJobV2CleanupPlan(charts map[string]chartengine.ChartMeta) chartengine.
 			Meta:    charts[chartID],
 		})
 	}
-	return chartengine.Plan{Actions: actions}
-}
-
-func shouldSuppressCleanupForStaleVnode(cleanupHost jobV2HostRef, vnode vnodes.VirtualNode) bool {
-	return cleanupHost.isVnode() &&
-		vnode.GUID == cleanupHost.guid &&
-		vnode.Labels["_node_stale_after_seconds"] != ""
+	return chartengine.Plan{
+		Actions: actions,
+	}
 }

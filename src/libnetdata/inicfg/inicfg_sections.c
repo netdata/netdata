@@ -36,6 +36,8 @@ void inicfg_section_remove_and_delete(struct config *root, struct config_section
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "INTERNAL ERROR: Cannot remove section '%s', it was not inserted before.",
                string2str(sect->name));
+        if(have_sect_lock)
+            SECTION_UNLOCK(sect);
         return;
     }
 

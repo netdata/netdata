@@ -17,6 +17,21 @@ struct bearer_token {
     time_t expires_s;
 };
 
+static void bearer_token_insert_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data) {
+    bool *inserted = data;
+    if(inserted)
+        *inserted = true;
+}
+
+static DICTIONARY *bearer_tokens_dictionary_create(void) {
+    DICTIONARY *dict = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL, sizeof(struct bearer_token));
+    dictionary_register_insert_callback(dict, bearer_token_insert_callback, NULL);
+    return dict;
+}
+
 static void bearer_tokens_path(char out[FILENAME_MAX]) {
     filename_from_path_entry(out, netdata_configured_varlib_dir, "bearer_tokens", NULL);
 }
@@ -44,15 +59,16 @@ static void bearer_token_delete_from_disk(nd_uuid_t *token) {
 }
 
 static void bearer_token_cleanup(bool force) {
-    static time_t attempts = 0;
+    static uint32_t cleanup_attempts = 0;
 
-    if(++attempts % 1000 != 0 && !force)
+    uint32_t attempts = __atomic_add_fetch(&cleanup_attempts, 1, __ATOMIC_RELAXED);
+    if(attempts % 1000 != 0 && !force)
         return;
 
     time_t now_s = now_realtime_sec();
 
     struct bearer_token *z;
-    dfe_start_read(netdata_authorized_bearers, z) {
+    dfe_start_write(netdata_authorized_bearers, z) {
         if(z->expires_s < now_s) {
             nd_uuid_t uuid;
             if(uuid_parse_flexi(z_dfe.name, uuid) == 0)
@@ -93,6 +109,24 @@ static uint64_t bearer_token_signature(nd_uuid_t token, struct bearer_token *bt)
     return XXH3_64bits(&signature_payload, sizeof(signature_payload));
 }
 
+static bool bearer_token_write_file(FILE *fp, const char *data, size_t len) {
+    size_t written = fwrite(data, 1, len, fp);
+    int saved_errno = errno;
+    bool failed = ferror(fp) || written != len;
+
+    if(fclose(fp) != 0) {
+        if(!failed)
+            saved_errno = errno;
+
+        failed = true;
+    }
+
+    if(failed)
+        errno = saved_errno;
+
+    return !failed;
+}
+
 static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
@@ -117,37 +151,52 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
         return false;
     }
 
-    if(fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) != buffer_strlen(wb)) {
-        fclose(fp);
+    if(!bearer_token_write_file(fp, buffer_tostring(wb), buffer_strlen(wb))) {
+        int saved_errno = errno;
         unlink(filename);
+        errno = saved_errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot save file '%s'", filename);
         return false;
     }
 
-    fclose(fp);
     return true;
 }
 
-static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name, time_t created_s, time_t expires_s, bool save) {
+static const DICTIONARY_ITEM *bearer_token_set_and_acquire(
+    nd_uuid_t token, HTTP_USER_ROLE user_role, HTTP_ACCESS access,
+    nd_uuid_t cloud_account_id, const char *client_name,
+    time_t created_s, time_t expires_s, bool *inserted) {
     char uuid_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(token, uuid_str);
 
-    struct bearer_token t = { 0 }, *bt;
-    const DICTIONARY_ITEM  *item = dictionary_set_and_acquire_item(netdata_authorized_bearers, uuid_str, &t, sizeof(t));
-    bt = dictionary_acquired_item_value(item);
+    struct bearer_token candidate = {
+        .access = access,
+        .user_role = user_role,
+        .created_s = created_s,
+        .expires_s = expires_s,
+    };
+    uuid_copy(candidate.cloud_account_id, cloud_account_id);
+    strncpyz(candidate.client_name, client_name, sizeof(candidate.client_name) - 1);
 
-    if(!bt->created_s) {
-        bt->created_s = created_s;
-        bt->expires_s = expires_s;
-        bt->user_role = user_role;
-        bt->access = access;
+    *inserted = false;
+    return dictionary_set_and_acquire_item_advanced(
+        netdata_authorized_bearers, uuid_str, -1,
+        &candidate, sizeof(candidate), inserted);
+}
 
-        uuid_copy(bt->cloud_account_id, cloud_account_id);
-        strncpyz(bt->client_name, client_name, sizeof(bt->cloud_account_id) - 1);
+static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name, time_t created_s, time_t expires_s, bool save) {
+    bool inserted;
+    const DICTIONARY_ITEM *item = bearer_token_set_and_acquire(
+        token, user_role, access, cloud_account_id, client_name,
+        created_s, expires_s, &inserted);
+    // NULL when netdata_authorized_bearers is being destroyed (shutdown)
+    if(unlikely(!item))
+        return 0;
 
-        if(save)
-            bearer_token_save_to_file(token, bt);
-    }
+    struct bearer_token *bt = dictionary_acquired_item_value(item);
+
+    if(inserted && save)
+        bearer_token_save_to_file(token, bt);
 
     time_t expiration = bt->expires_s;
 
@@ -168,7 +217,7 @@ time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCES
             uuid_eq(cloud_account_id, bt->cloud_account_id) &&                          // the cloud_account_id matches
             strncmp(client_name, bt->client_name, sizeof(bt->client_name) - 1) == 0 &&  // the client_name matches
             uuid_parse_flexi(bt_dfe.name, *uuid) == 0)                               // the token can be parsed
-            return expires_s; /* dfe will cleanup automatically */
+            return bt->expires_s; /* dfe will cleanup automatically */
     }
     dfe_done(bt);
 
@@ -177,12 +226,20 @@ time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCES
         *uuid, user_role, access, cloud_account_id, client_name,
         now_s, now_s + BEARER_TOKEN_EXPIRATION, true);
 
+    if(!expires_s)
+        // the token could not be registered - skip the cleanup, it needs the
+        // same dictionary
+        return 0;
+
     bearer_token_cleanup(false);
 
     return expires_s;
 }
 
-static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, BUFFER *error) {
+// Returns false when the file is invalid (the caller deletes it).
+// *stored is set to false when the token was valid but could not be registered
+// (the bearer tokens dictionary is being destroyed) - the file must be kept.
+static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, BUFFER *error, bool *stored) {
     int64_t version;
     nd_uuid_t token_in_file, cloud_account_id, host_uuid;
     CLEAN_STRING *client_name = NULL;
@@ -235,9 +292,9 @@ static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, B
         return false;
     }
 
-    bearer_create_token_internal(token, user_role, access,
-                                 cloud_account_id, string2str(client_name),
-                                 created_s, expires_s, false);
+    *stored = bearer_create_token_internal(token, user_role, access,
+                                           cloud_account_id, string2str(client_name),
+                                           created_s, expires_s, false) != 0;
 
     return true;
 }
@@ -257,10 +314,19 @@ static bool bearer_token_load_token(nd_uuid_t token) {
     }
 
     CLEAN_BUFFER *error = buffer_create(0, NULL);
-    bool rc = bearer_token_parse_json(token, jobj, error);
+    bool stored = false;
+    bool rc = bearer_token_parse_json(token, jobj, error, &stored);
     if(!rc) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to parse bearer token file '%s': %s", filename, buffer_tostring(error));
         unlink(filename);
+        return false;
+    }
+
+    if(!stored) {
+        // the token is valid but could not be registered - keep the file and
+        // do not run the cleanup, which needs the dictionary we just failed on
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "Could not register the bearer token of file '%s' - the bearer tokens dictionary is unavailable", filename);
         return false;
     }
 
@@ -341,12 +407,13 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
 }
 
 void bearer_tokens_init(void) {
-    netdata_is_protected_by_bearer =
-        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_WEB, "bearer token protection", netdata_is_protected_by_bearer);
+    netdata_bearer_protection_set_enabled(inicfg_get_boolean(
+        &netdata_config,
+        CONFIG_SECTION_WEB,
+        "bearer token protection",
+        netdata_bearer_protection_is_enabled()));
 
-    netdata_authorized_bearers = dictionary_create_advanced(
-        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-        NULL, sizeof(struct bearer_token));
+    netdata_authorized_bearers = bearer_tokens_dictionary_create();
 
     bearer_tokens_load_from_disk();
 }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 #include <linux/netfilter/nfnetlink_conntrack.h>
 #include <libmnl/libmnl.h>
@@ -671,7 +670,7 @@ static void nfacct_send_metrics() {
                     NETDATA_CHART_PRIO_NETFILTER_PACKETS,
                     nfacct_root.update_every,
                     PLUGIN_NFACCT_NAME);
-                printf("DIMENSION %s '' incremental 1 %d\n", d->name, nfacct_root.update_every);
+                printf("DIMENSION %s '' incremental 1 1\n", d->name);
             }
         }
     }
@@ -706,7 +705,7 @@ static void nfacct_send_metrics() {
                     NETDATA_CHART_PRIO_NETFILTER_BYTES,
                     nfacct_root.update_every,
                     PLUGIN_NFACCT_NAME);
-                printf("DIMENSION %s '' incremental 1 %d\n", d->name, 1000 * nfacct_root.update_every);
+                printf("DIMENSION %s '' incremental 1 1000\n", d->name);
             }
         }
     }

@@ -25,6 +25,8 @@ void ml_start_threads(void) {}
 
 void ml_stop_threads(void) {}
 
+void ml_workers_free(void) {}
+
 void ml_host_new(RRDHOST *rh) {
     UNUSED(rh);
 }

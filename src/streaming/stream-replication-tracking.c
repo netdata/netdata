@@ -10,7 +10,7 @@ void replication_tracking_counters(struct rrdhost *host, struct replay_who_count
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_COLLECTOR_ONLINE))
         return;
 
-    bool is_host_local = host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST);
+    bool is_host_local = host == localhost || rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST);
     bool is_host_sending = rrdhost_flag_check(host, RRDHOST_FLAG_STREAM_SENDER_READY_4_METRICS);
 
     RRDSET *st;

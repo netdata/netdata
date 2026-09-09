@@ -631,20 +631,8 @@ fn encode_nodes(source: &str, nodes: &[Node]) -> String {
 ///
 /// # Examples
 ///
-/// ```
-/// use rdp::encode;
-///
-/// // Simple lowercase field - no checksum
-/// assert_eq!(encode("hello"), "e");
-///
-/// // Camel case - includes 2-char checksum
-/// let encoded = encode("helloWorld");
-/// assert_eq!(encoded.len(), 3); // 2-char checksum + 1-char structure
-///
-/// // Complex field with camel case
-/// let encoded = encode("log.body.HostName");
-/// assert_eq!(encoded.len(), 5); // 2-char checksum + 3-char structure
-/// ```
+/// The private unit tests cover the examples because this is an implementation
+/// detail behind `encode_full`.
 fn encode(b: &[u8]) -> String {
     let Some(tokens) = tokenize(b) else {
         let digest = md5::compute(b);
@@ -666,13 +654,8 @@ fn encode(b: &[u8]) -> String {
 ///
 /// # Examples
 ///
-/// ```
-/// # use rdp::compress_runs;
-/// assert_eq!(compress_runs("aaa"), "3a");
-/// assert_eq!(compress_runs("aaaaaaaaaa"), "9aa");  // 10 a's → 9a + a
-/// assert_eq!(compress_runs("aaaaaaaaaaaa"), "9a3a");  // 12 a's → 9a + 3a
-/// assert_eq!(compress_runs("aabbbcc"), "aa3bcc");
-/// ```
+/// The private unit tests cover the examples because this is an implementation
+/// detail behind `encode_full`.
 fn compress_runs(s: &str) -> String {
     if s.is_empty() {
         return String::new();
@@ -755,24 +738,24 @@ fn compress_runs(s: &str) -> String {
 /// use rdp::encode_full;
 ///
 /// // Simple lowercase field
-/// assert_eq!(encode_full(b"hello"), "HELLO_NDE");
+/// assert_eq!(encode_full(b"hello"), "NDE_HELLO");
 ///
 /// // With dot separators - no compression (only 2 consecutive a's)
-/// assert_eq!(encode_full(b"log.body.hostname"), "LB_HOSTNAME_NDAAE");
+/// assert_eq!(encode_full(b"log.body.hostname"), "NDAAE_LB_HOSTNAME");
 ///
 /// // Many nested levels - structure compression (10 a's → 9a + a)
-/// assert_eq!(encode_full(b"my.very.deeply.nested.field.that.ends.in.the.abyss"), "MY_VERY_DEEPLY_NESTED_FIELD_THAT_ENDS_IN_THE_ABYSS_ND9AE");
+/// assert_eq!(encode_full(b"my.very.deeply.nested.field.that.ends.in.the.abyss"), "ND9AE_MY_VERY_DEEPLY_NESTED_FIELD_THAT_ENDS_IN_THE_ABYSS");
 ///
 /// // With camel case (includes checksum - not compressed)
 /// let full = encode_full(b"log.body.HostName");
-/// assert!(full.starts_with("LB_HOSTNAME_ND")); // prefix + normalized + ND + checksum
-/// assert!(full.ends_with("83AAO")); // 2-char checksum + structure (2 a's not compressed)
+/// assert!(full.starts_with("ND83AAO_")); // ND + 2-char checksum + structure
+/// assert!(full.ends_with("LB_HOSTNAME")); // normalized field name
 ///
 /// // With hyphens
-/// assert_eq!(encode_full(b"hello-world"), "HELLO_WORLD_NDCE");
+/// assert_eq!(encode_full(b"hello-world"), "NDCE_HELLO_WORLD");
 ///
 /// // With resource.attributes prefix - compression (3 a's → 3a)
-/// assert_eq!(encode_full(b"resource.attributes.host.name"), "RA_HOST_NAME_ND3AE");
+/// assert_eq!(encode_full(b"resource.attributes.host.name"), "ND3AE_RA_HOST_NAME");
 ///
 /// // With invalid characters (space) - falls back to MD5
 /// let md5_result = encode_full(b"field name");
@@ -793,6 +776,9 @@ fn compress_runs(s: &str) -> String {
 /// ```
 pub fn encode_full(field_name: &[u8]) -> String {
     let encoded = encode(field_name);
+    if encoded.starts_with(REMAPPED_PREFIX) {
+        return encoded;
+    }
 
     // Compress runs in the structure encoding (but not the checksum)
     let compressed = if has_checksum(&encoded) {
@@ -826,4 +812,63 @@ pub fn encode_full(field_name: &[u8]) -> String {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encode_examples_match_private_contract() {
+        assert_eq!(encode(b"hello"), "e");
+
+        let encoded = encode(b"helloWorld");
+        assert_eq!(encoded.len(), 3);
+
+        let encoded = encode(b"log.body.HostName");
+        assert_eq!(encoded.len(), 5);
+    }
+
+    #[test]
+    fn compress_runs_examples_match_private_contract() {
+        assert_eq!(compress_runs("aaa"), "3a");
+        assert_eq!(compress_runs("aaaaaaaaaa"), "9aa");
+        assert_eq!(compress_runs("aaaaaaaaaaaa"), "9a3a");
+        assert_eq!(compress_runs("aabbbcc"), "aa3bcc");
+    }
+
+    #[test]
+    fn encode_full_examples_match_public_contract() {
+        assert_eq!(encode_full(b"hello"), "NDE_HELLO");
+        assert_eq!(encode_full(b"log.body.hostname"), "NDAAE_LB_HOSTNAME");
+        assert_eq!(
+            encode_full(b"my.very.deeply.nested.field.that.ends.in.the.abyss"),
+            "ND9AE_MY_VERY_DEEPLY_NESTED_FIELD_THAT_ENDS_IN_THE_ABYSS"
+        );
+
+        let full = encode_full(b"log.body.HostName");
+        assert!(full.starts_with("ND83AAO_"));
+        assert!(full.ends_with("LB_HOSTNAME"));
+
+        assert_eq!(encode_full(b"hello-world"), "NDCE_HELLO_WORLD");
+        assert_eq!(
+            encode_full(b"resource.attributes.host.name"),
+            "ND3AE_RA_HOST_NAME"
+        );
+
+        let md5_result = encode_full(b"field name");
+        assert!(md5_result.starts_with("ND_"));
+        assert_eq!(md5_result.len(), 35);
+
+        let non_utf8 = b"\xFF\xFE invalid";
+        let result = encode_full(non_utf8);
+        assert!(result.starts_with("ND_"));
+        assert_eq!(result.len(), 35);
+
+        let long_name =
+            b"very.long.deeply.nested.field.name.that.would.definitely.exceed.the.systemd.limit";
+        let result = encode_full(long_name);
+        assert!(result.starts_with("ND_"));
+        assert!(result.len() <= 64);
+    }
 }

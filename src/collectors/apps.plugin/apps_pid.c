@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
+#include "apps-cgroups-lookup-client.h"
 
 static inline void link_pid_to_its_parent(struct pid_stat *p);
 
@@ -138,6 +139,7 @@ void del_pid_entry(pid_t pid) {
     freez(p->limits_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
+    freez(p->cgroup_filename);
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
     freez(p->smaps_rollup_filename);
 #endif
@@ -153,6 +155,11 @@ void del_pid_entry(pid_t pid) {
 
 #if (PROCESSES_HAVE_SERVICE == 1)
     string_freez(p->service_name);
+#endif
+
+#if defined(OS_LINUX)
+    apps_cgroups_lookup_unlink_pid(p);
+    string_freez(p->cgroup_path);
 #endif
 
     string_freez(p->comm_orig);
@@ -441,7 +448,7 @@ static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline)
 
     size_t comm_len = string_strlen(comm);
     char *start = strstr(buf, string2str(comm));
-    while (start) {
+    if (start) {
         char *end = start + comm_len;
         while (*end &&
                !isspace((uint8_t) *end) &&
@@ -912,6 +919,12 @@ static inline void clear_pid_rates(struct pid_stat *p) {
 }
 
 bool collect_data_for_all_pids(void) {
+    // Pull the latest eBPF snapshot at the start of the cycle so every PID
+    // sees the same shared-memory view before /proc accumulation begins.
+#if defined(OS_LINUX)
+    (void)apps_ebpf_shared_memory_refresh();
+#endif
+
     // mark all pids as unread
 #if (INCREMENTAL_DATA_COLLECTION == 0)
     usec_t now_mon_ut = now_monotonic_usec();

@@ -1,0 +1,82 @@
+# Cisco NTP metrics (system clock quality and peer synchronization).
+# MIB: CISCO-NTP-MIB (1.3.6.1.4.1.9.9.168)
+# Universal across IOS, IOS-XE, and NX-OS.
+
+metrics:
+  # ---- NTP system scalars ----
+  - MIB: CISCO-NTP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.168.1.1.1.0
+      name: cntpSysLeap
+      chart_meta:
+        description: NTP leap second indicator (alarm = clock not synchronized)
+        family: 'System/NTP/Leap'
+        unit: "{status}"
+      mapping:
+        0: no_warning
+        1: add_second
+        2: subtract_second
+        3: alarm
+
+  - MIB: CISCO-NTP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.168.1.1.2.0
+      name: cntpSysStratum
+      chart_meta:
+        description: NTP stratum level of the local clock (1=primary, 16=unsynchronized)
+        family: 'System/NTP/Stratum'
+        unit: "{stratum}"
+
+  - MIB: CISCO-NTP-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.168.1.1.11.0
+      name: cntpSysSrvStatus
+      chart_meta:
+        description: NTP service operational status
+        family: 'System/NTP/ServiceStatus'
+        unit: "{status}"
+      mapping:
+        1: unknown
+        2: not_running
+        3: not_synchronized
+        4: sync_to_local
+        5: sync_to_refclock
+        6: sync_to_remote_server
+
+  # ---- NTP peer table ----
+  - MIB: CISCO-NTP-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.168.1.2.1
+      name: cntpPeersVarTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.168.1.2.1.1.9
+        name: cntpPeersStratum
+        chart_meta:
+          description: Stratum level of the NTP peer
+          family: 'System/NTP/Peer/Stratum'
+          unit: "{stratum}"
+      - OID: 1.3.6.1.4.1.9.9.168.1.2.1.1.7
+        name: cntpPeersLeap
+        chart_meta:
+          description: Leap indicator advertised by the NTP peer
+          family: 'System/NTP/Peer/Leap'
+          unit: "{status}"
+        mapping:
+          0: no_warning
+          1: add_second
+          2: subtract_second
+          3: alarm
+      - OID: 1.3.6.1.4.1.9.9.168.1.2.1.1.21
+        name: cntpPeersReach
+        chart_meta:
+          description: Reachability shift register (0-255, 8 bits = 8 recent polls, 255 = all recent polls succeeded)
+          family: 'System/NTP/Peer/Reachability'
+          unit: "1"
+    metric_tags:
+      - tag: ntp_peer_assoc_id
+        index: 1
+      - tag: _ntp_peer_address
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.168.1.2.1.1.3
+          name: cntpPeersPeerAddress
+          format: ip_address

@@ -3,29 +3,40 @@
 package azure_monitor
 
 import (
-	"strings"
-
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
+type observationLabelIdentity [7]string
+
+type scopedLabelIdentity struct {
+	ScopeKey string
+	Labels   observationLabelIdentity
+}
+
+type observationKey struct {
+	Instrument string
+	ScopeKey   string
+	Labels     observationLabelIdentity
+}
+
 type observationState struct {
 	instruments  map[string]*instrumentRuntime
-	accumulators map[string]float64
-	lastObserved map[string]lastObservation
+	accumulators map[observationKey]float64
+	lastObserved map[observationKey]lastObservation
 }
 
 func newObservationState(instruments map[string]*instrumentRuntime) *observationState {
 	return &observationState{
 		instruments:  instruments,
-		accumulators: make(map[string]float64),
-		lastObserved: make(map[string]lastObservation),
+		accumulators: make(map[observationKey]float64),
+		lastObserved: make(map[observationKey]lastObservation),
 	}
 }
 
 func (s *observationState) reset() {
-	s.accumulators = make(map[string]float64)
-	s.lastObserved = make(map[string]lastObservation)
+	s.accumulators = make(map[observationKey]float64)
+	s.lastObserved = make(map[observationKey]lastObservation)
 }
 
 func dueInstrumentsForBatches(batches []queryBatch) map[string]bool {
@@ -40,8 +51,8 @@ func dueInstrumentsForBatches(batches []queryBatch) map[string]bool {
 	return dueInstruments
 }
 
-func (s *observationState) observeSamples(samples []metricSample) map[string]bool {
-	observedThisCycle := make(map[string]bool, len(s.lastObserved))
+func (s *observationState) observeSamples(samples []metricSample) map[observationKey]bool {
+	observedThisCycle := make(map[observationKey]bool, len(s.lastObserved))
 	for _, sample := range samples {
 		key, ok := s.observeSample(sample)
 		if !ok {
@@ -52,14 +63,14 @@ func (s *observationState) observeSamples(samples []metricSample) map[string]boo
 	return observedThisCycle
 }
 
-func (s *observationState) observeSample(sample metricSample) (string, bool) {
+func (s *observationState) observeSample(sample metricSample) (observationKey, bool) {
 	inst, ok := s.instruments[sample.Instrument]
 	if !ok {
-		return "", false
+		return observationKey{}, false
 	}
 
 	values := labelValues(sample.Labels)
-	key := sampleObservationKey(sample.Instrument, values)
+	key := sampleObservationKey(sample.Instrument, sample.Scope, values)
 	value := sample.Value
 
 	if sample.Kind == azureprofiles.SeriesKindCounter {
@@ -67,9 +78,10 @@ func (s *observationState) observeSample(sample metricSample) (string, bool) {
 		value = s.accumulators[key]
 	}
 
-	inst.observe(values, value)
+	inst.observe(sample.Scope, values, value)
 	s.lastObserved[key] = lastObservation{
 		instrument:  sample.Instrument,
+		scope:       sample.Scope,
 		labelValues: append([]string(nil), values...),
 		value:       value,
 	}
@@ -77,7 +89,7 @@ func (s *observationState) observeSample(sample metricSample) (string, bool) {
 	return key, true
 }
 
-func (s *observationState) reobserveCachedObservations(dueInstruments, observedThisCycle map[string]bool) {
+func (s *observationState) reobserveCachedObservations(dueInstruments map[string]bool, observedThisCycle map[observationKey]bool) {
 	for key, obs := range s.lastObserved {
 		if observedThisCycle[key] {
 			continue
@@ -89,17 +101,20 @@ func (s *observationState) reobserveCachedObservations(dueInstruments, observedT
 		if !ok {
 			continue
 		}
-		inst.observe(obs.labelValues, obs.value)
+		inst.observe(obs.scope, obs.labelValues, obs.value)
 	}
 }
 
 // pruneStaleResources removes cache entries for resources that are no longer
 // active for a specific profile/label identity.
 func (s *observationState) pruneStaleResources(current map[string][]resourceInfo) {
-	activeLabels := make(map[string]struct{})
+	activeLabels := make(map[scopedLabelIdentity]struct{})
 	for profileName, resources := range current {
 		for _, resource := range resources {
-			activeLabels[labelIdentity(labelValues(resourceLabels(resource, profileName)))] = struct{}{}
+			activeLabels[scopedLabelIdentity{
+				ScopeKey: resource.HostScope.ScopeKey,
+				Labels:   labelIdentity(labelValues(resourceLabels(resource, profileName))),
+			}] = struct{}{}
 		}
 	}
 
@@ -107,34 +122,32 @@ func (s *observationState) pruneStaleResources(current map[string][]resourceInfo
 		if len(obs.labelValues) == 0 {
 			continue
 		}
-		if _, ok := activeLabels[labelIdentity(obs.labelValues)]; ok {
+		if _, ok := activeLabels[scopedLabelIdentity{ScopeKey: obs.scope.ScopeKey, Labels: labelIdentity(obs.labelValues)}]; ok {
 			continue
 		}
 		delete(s.lastObserved, key)
 	}
 
 	for key := range s.accumulators {
-		if _, ok := activeLabels[labelIdentityFromObservationKey(key)]; ok {
+		if _, ok := activeLabels[scopedLabelIdentity{ScopeKey: key.ScopeKey, Labels: key.Labels}]; ok {
 			continue
 		}
 		delete(s.accumulators, key)
 	}
 }
 
-func sampleObservationKey(instrument string, values []string) string {
-	return instrument + "\x00" + strings.Join(values, "\x00")
-}
-
-func labelIdentity(values []string) string {
-	return strings.Join(values, "\x00")
-}
-
-func labelIdentityFromObservationKey(key string) string {
-	parts := strings.SplitN(key, "\x00", 2)
-	if len(parts) < 2 {
-		return ""
+func sampleObservationKey(instrument string, scope metrix.HostScope, values []string) observationKey {
+	return observationKey{
+		Instrument: instrument,
+		ScopeKey:   scope.ScopeKey,
+		Labels:     labelIdentity(values),
 	}
-	return parts[1]
+}
+
+func labelIdentity(values []string) observationLabelIdentity {
+	var out observationLabelIdentity
+	copy(out[:], values)
+	return out
 }
 
 func labelValues(labels metrix.Labels) []string {

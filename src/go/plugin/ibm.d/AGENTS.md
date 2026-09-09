@@ -1,5 +1,7 @@
 # IBM.d Plugin Developer Guide
 
+CRITICAL: Never write raw sensitive data to durable artifacts. This includes passwords, API keys, bearer tokens, SNMP communities, private keys, connection strings with embedded credentials, session cookies, community member names, customer names, customer identifiers, personal data, non-private IP addresses that can identify customers, private endpoints, account IDs, and proprietary incident details.
+
 This guide is for developers contributing to the IBM.d plugin. For end-user documentation, see [README.md](./README.md).
 
 ## Architecture Overview
@@ -34,6 +36,7 @@ Each module generates these files automatically:
 | File | Generator | Source | Purpose |
 |------|-----------|--------|---------|
 | `zz_generated_contexts.go` | `metricgen` | `contexts.yaml` | Type-safe Go structs for metric contexts |
+| `config_schema.json` | `docgen` | `config.go` | Runtime dynamic-configuration schema |
 | `README.md` | `docgen` | `contexts.yaml` + `config.go` + `module.yaml` | Module documentation |
 | `metadata.yaml` | `docgen` | `contexts.yaml` + `config.go` + `module.yaml` | Netdata integrations metadata |
 
@@ -60,7 +63,8 @@ go generate ./...
 
 This runs both generators:
 1. **metricgen** (via `contexts/doc.go`) → regenerates `zz_generated_contexts.go`
-2. **docgen** (via `generate.go`) → regenerates `README.md` and `metadata.yaml`
+2. **docgen** (via `generate.go`) → regenerates `config_schema.json`,
+   `README.md`, and `metadata.yaml`
 
 #### Regenerate All Modules
 
@@ -110,7 +114,10 @@ The build target downloads the driver if it is not already present; see the pack
 2. Run `go generate ./...` in the module directory (see [Regenerating Code](#regenerating-code)).
 3. Run `gofmt -w contexts/zz_generated_contexts.go` to format generated code.
 4. Validate with `script -c 'sudo /usr/libexec/netdata/plugins.d/ibm.d.plugin -d -m MODULE --dump=3s --dump-summary 2>&1' /dev/null`.
-5. Commit **both** source files and generated files together.
+5. Commit changed runtime outputs (`zz_generated_contexts.go` and
+   `config_schema.json`) with runtime source changes. Inspect generated
+   documentation locally; the post-merge workflow commits `README.md` and
+   `metadata.yaml` in its generated-artifact PR.
 
 ## Testing & Debugging
 
@@ -130,11 +137,13 @@ The flag implicitly enables dump mode and exits once every job has produced at l
 ## Contributing Guidelines
 
 1. Review [`framework/README.md`](framework/README.md) for IBM.D framework details.
-2. Follow [General collector best practices](../BEST-PRACTICES.md).
+2. Follow the Go-area rules in [`../../AGENTS.md`](../../AGENTS.md).
 3. **Never edit auto-generated files** – see [Auto-Generated Files](#auto-generated-files) section.
 4. Always regenerate code after modifying `contexts.yaml`, `config.go`, or `module.yaml`.
 5. Run `gofmt` on generated Go files before committing.
-6. Commit **both** source and generated files together to keep them in sync.
+6. Commit required generated runtime outputs with runtime changes. Do not stage
+   generated documentation; validate it locally and let the post-merge workflow
+   create the generated-artifact PR.
 7. Each module directory (`modules/<name>/`) contains its own README with module-specific notes.
 
 ## Runtime Internals

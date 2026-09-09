@@ -23,4 +23,13 @@ void recursive_config_double_dir_load(
     , size_t depth
 );
 
+// true when a host prefix would be unsafe to prepend to a printf format string.
+// verify_netdata_host_prefix() applies this, and every other site that assigns
+// netdata_configured_host_prefix calls that right after. exported for the one
+// site that cannot - nd_log_initialize_for_external_plugins() - so the rule
+// stays defined once, in paths.c, next to the call sites that motivate it.
+bool netdata_host_prefix_has_format_specifier(const char *prefix);
+
+int paths_unittest(void);
+
 #endif //NETDATA_PATHS_H

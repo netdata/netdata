@@ -1,6 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -35,8 +36,8 @@
         "default": 3
       },
       "vnode": {
-        "title": "Configuration",
-        "description": "",
+        "title": "Virtual node",
+        "description": "Identity of the Virtual Node created for this device when `create_vnode` is enabled.",
         "type": [
           "object",
           "null"
@@ -75,6 +76,7 @@
         "properties": {
           "version": {
             "title": "SNMP version",
+            "description": "SNMP protocol version the device speaks.",
             "type": "string",
             "enum": [
               "1",
@@ -117,7 +119,7 @@
             "description": "The maximum number of OIDs allowed in a single GET request.",
             "type": "integer",
             "minimum": 1,
-            "default": 60
+            "default": 20
           }
         },
         "required": [
@@ -154,6 +156,7 @@
           },
           "auth_proto": {
             "title": "Authentication protocol",
+            "description": "Authentication protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -168,10 +171,12 @@
           },
           "auth_key": {
             "title": "Authentication passphrase",
+            "description": "Authentication protocol pass phrase for SNMPv3 messages.",
             "type": "string"
           },
           "priv_proto": {
             "title": "Privacy protocol",
+            "description": "Privacy protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -179,13 +184,21 @@
               "aes",
               "aes192",
               "aes256",
-              "aes192c"
+              "aes192c",
+              "aes256c"
             ],
             "default": "aes192c"
           },
           "priv_key": {
             "title": "Privacy passphrase",
+            "description": "Privacy protocol pass phrase for SNMPv3 messages.",
             "type": "string"
+          },
+          "context_name": {
+            "title": "Context name",
+            "description": "SNMPv3 context name used to address a specific MIB view on multi-context agents (e.g. virtual routers, logical partitions, snmpsim-simulated devices). Leave empty to use the default context.",
+            "type": "string",
+            "default": ""
           }
         }
       },
@@ -202,8 +215,15 @@
         },
         "uniqueItems": true
       },
+      "ping_only": {
+        "title": "Ping only",
+        "description": "Collect only ICMP round-trip time and skip SNMP profile metrics. Implies ping is enabled regardless of the ping.enabled setting.",
+        "type": "boolean",
+        "default": false
+      },
       "ping": {
         "title": "Ping",
+        "description": "ICMP round-trip measurements collected alongside the SNMP metrics.",
         "type": [
           "object",
           "null"
@@ -211,9 +231,9 @@
         "properties": {
           "enabled": {
             "title": "Enable ping",
+            "description": "Collect ICMP round-trip time alongside SNMP profile metrics. This option does not enable profile-less operation; use ping_only for that.",
             "type": "boolean",
-            "default": true,
-            "description": "Collect ICMP round-trip time using pro-bing alongside SNMP."
+            "default": true
           },
           "network": {
             "title": "Network",
@@ -262,9 +282,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "manual_profiles": {
       "ui:listFlavour": "list",
       "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
@@ -284,9 +301,6 @@
       }
     },
     "user": {
-      "name": {
-        "ui:widget": "password"
-      },
       "level": {
         "ui:widget": "radio",
         "ui:options": {
@@ -310,7 +324,13 @@
       },
       "priv_key": {
         "ui:widget": "password"
+      },
+      "context_name": {
+        "ui:help": "Advanced. Usually left empty. Required when targeting a specific context on multi-context agents or when driving snmpsim virtual devices."
       }
+    },
+    "ping_only": {
+      "ui:help": "A minimal SNMP sysInfo query still runs at startup for device identification, profile matching, and metadata."
     },
     "ping": {
       "interface": {
@@ -335,6 +355,7 @@
         {
           "title": "Ping",
           "fields": [
+            "ping_only",
             "ping"
           ]
         },

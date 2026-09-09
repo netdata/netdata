@@ -51,7 +51,10 @@ static inline double entries_round_to_resolution_dbl2(uint64_t value, uint64_t r
 }
 
 static inline uint64_t entries_round_to_resolution_int(uint64_t value, uint64_t resolution) {
-    return (value + (resolution / 2)) / resolution;
+    uint64_t quotient = value / resolution;
+    uint64_t remainder = value % resolution;
+
+    return quotient + (remainder >= resolution - resolution / 2);
 }
 
 // -------------------------------------------------------------------------------------------------------------------
@@ -111,7 +114,12 @@ bool entries_parse(const char *entries_str, uint64_t *result, const char *defaul
         }
     }
 
-    uint64_t bytes = (uint64_t)round(value * (NETDATA_DOUBLE)su->multiplier);
+    uint64_t bytes;
+    if(!parser_round_number_to_uint64(value * (NETDATA_DOUBLE)su->multiplier, &bytes)) {
+        *result = 0;
+        return false;
+    }
+
     *result = entries_round_to_resolution_int(bytes, su_def->multiplier);
 
     return true;

@@ -10,9 +10,8 @@ import (
 	"strings"
 	"time"
 
-	typesContainer "github.com/docker/docker/api/types/container"
-	docker "github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	docker "github.com/moby/moby/client"
 )
 
 func FromEnv() string {
@@ -36,26 +35,24 @@ func Exec(ctx context.Context, container string, cmd string, args ...string) ([]
 		addr = v
 	}
 
-	cli, err := docker.NewClientWithOpts(docker.WithHost(addr))
+	cli, err := docker.New(docker.WithHost(addr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
 	defer func() { _ = cli.Close() }()
 
-	cli.NegotiateAPIVersion(ctx)
-
-	execCreateConfig := typesContainer.ExecOptions{
+	execCreateConfig := docker.ExecCreateOptions{
 		AttachStderr: true,
 		AttachStdout: true,
 		Cmd:          append([]string{cmd}, args...),
 	}
 
-	createResp, err := cli.ContainerExecCreate(ctx, container, execCreateConfig)
+	createResp, err := cli.ExecCreate(ctx, container, execCreateConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to container exec create (%s): %w", container, err)
 	}
 
-	attachResp, err := cli.ContainerExecAttach(ctx, createResp.ID, typesContainer.ExecAttachOptions{})
+	attachResp, err := cli.ExecAttach(ctx, createResp.ID, docker.ExecAttachOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to container exec attach (%s): %w", container, err)
 	}
@@ -87,7 +84,7 @@ func Exec(ctx context.Context, container string, cmd string, args ...string) ([]
 		return nil, fmt.Errorf("timed out reading response: %w", ctx.Err())
 	}
 
-	inspResp, err := cli.ContainerExecInspect(ctx, createResp.ID)
+	inspResp, err := cli.ExecInspect(ctx, createResp.ID, docker.ExecInspectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to container exec inspect (%s): %w", container, err)
 	}

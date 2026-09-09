@@ -1,5 +1,6 @@
 name: websphere_pmi
 display_name: IBM WebSphere PMI
+page_description: Monitor IBM WebSphere Application Server through the PMI PerfServlet, including JVM, thread pools, JDBC and JMS resources, applications, and clusters.
 description: |
   Collects WebSphere Application Server performance metrics via the PerfServlet (PMI) interface,
   covering JVM, thread pools, JDBC/JMS resources, applications, and clustering information.

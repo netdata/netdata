@@ -6,6 +6,7 @@ modules:
       module_name: traefik
       monitored_instance:
         name: Traefik
+        description: "Monitor Traefik HTTP requests, response codes, processing time, and open connections by entrypoint."
         link: https://traefik.io/
         icon_filename: traefik.svg
         categories:
@@ -181,13 +182,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                   - name: local
                     http://127.0.0.1:8082/metrics
-                
+
                   - name: remote
                     http://192.0.2.0:8082/metrics
     troubleshooting:

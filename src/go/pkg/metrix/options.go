@@ -10,6 +10,49 @@ type optionFunc func(*instrumentConfig)
 
 func (f optionFunc) apply(cfg *instrumentConfig) { f(cfg) }
 
+// CollectorStoreOption configures a collector store at construction time.
+type CollectorStoreOption interface {
+	apply(*collectorStoreConfig)
+}
+
+type collectorStoreConfig struct {
+	expireAfterSuccessCycles uint64
+	maxSeries                int
+	graceCycles              uint64
+	graceSet                 bool
+}
+
+type collectorStoreOptionFunc func(*collectorStoreConfig)
+
+func (f collectorStoreOptionFunc) apply(cfg *collectorStoreConfig) { f(cfg) }
+
+// WithExpireAfterSuccessCycles sets how many successful commits an unobserved series
+// is retained before eviction (0 disables series expiry).
+func WithExpireAfterSuccessCycles(cycles uint64) CollectorStoreOption {
+	return collectorStoreOptionFunc(func(cfg *collectorStoreConfig) {
+		cfg.expireAfterSuccessCycles = cycles
+	})
+}
+
+// WithMaxSeries caps the number of committed series; the oldest are evicted past the
+// cap (0 disables the cap).
+func WithMaxSeries(max int) CollectorStoreOption {
+	return collectorStoreOptionFunc(func(cfg *collectorStoreConfig) {
+		cfg.maxSeries = max
+	})
+}
+
+// WithDescriptorGraceCycles sets how many successful commits a descriptor is kept after
+// its last series is evicted, before the descriptor itself is swept. It defaults to
+// expireAfterSuccessCycles, so the effective descriptor lifetime after a name goes idle
+// is expire+grace; set it explicitly (including 0) to decouple the two.
+func WithDescriptorGraceCycles(cycles uint64) CollectorStoreOption {
+	return collectorStoreOptionFunc(func(cfg *collectorStoreConfig) {
+		cfg.graceCycles = cycles
+		cfg.graceSet = true
+	})
+}
+
 type instrumentConfig struct {
 	freshnessSet bool
 	freshness    FreshnessPolicy

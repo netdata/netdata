@@ -35,6 +35,7 @@ pub enum Message {
     FunctionProgressRequest(Box<FunctionProgressRequest>),
     FunctionProgressResponse(Box<FunctionProgressResponse>),
     ConfigDeclaration(Box<ConfigDeclaration>),
+    Quit,
 }
 
 pub fn name_and_args(buffer: &[u8]) -> Option<(String, Vec<String>)> {
@@ -120,6 +121,8 @@ impl MessageParser {
                 self.current_message = self.parse_function_progress(args);
                 self.current_message.take()
             }
+
+            Command::Quit => Some(Message::Quit),
 
             Command::Begin { args: _ } | Command::Set { args: _ } | Command::End { args: _ } => {
                 None

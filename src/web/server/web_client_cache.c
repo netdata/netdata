@@ -120,7 +120,9 @@ struct web_client *web_client_get_from_cache(void) {
     w->acl = HTTP_ACL_NONE;
     w->mode = HTTP_REQUEST_MODE_GET;
     web_client_reset_permissions(w);
+    web_client_clear_mcp_preview_key(w);
     memset(w->transaction, 0, sizeof(w->transaction));
+    memset(w->mcp_session_id, 0, sizeof(w->mcp_session_id));
     memset(&w->auth, 0, sizeof(w->auth));
 
     return w;
@@ -128,6 +130,7 @@ struct web_client *web_client_get_from_cache(void) {
 
 void web_client_release_to_cache(struct web_client *w) {
     netdata_ssl_close(&w->ssl);
+    web_client_trim_url_decode_buffer_for_cache(w);
 
     // unlink it from the used
     spinlock_lock(&web_clients_cache.used.spinlock);

@@ -13,6 +13,14 @@ struct summary_total_counts {
     size_t failed;
 };
 
+// cardinality_limit always reduces the result dataset (the plotted
+// dimensions); the summary (nodes, instances, dimensions, labels) metadata
+// that powers dashboard filtering is limited only when the caller explicitly
+// asks for it with the cardinality-limit-all option (MCP does)
+static inline size_t query_target_summary_cardinality_limit(QUERY_TARGET *qt) {
+    return (qt->window.options & RRDR_OPTION_CARDINALITY_ALL) ? qt->request.cardinality_limit : 0;
+}
+
 
 // visualizers
 void query_target_total_counts(BUFFER *wb, const char *key, struct summary_total_counts *totals);

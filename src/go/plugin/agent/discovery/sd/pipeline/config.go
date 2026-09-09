@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
@@ -193,12 +192,6 @@ func normalizeYAMLValue(v any) (any, error) {
 	}
 }
 
-// CleanName returns the name sanitized for use in dyncfg IDs.
-// Sanitizes for safe use in IDs and paths.
-func (c Config) CleanName() string {
-	return naming.Sanitize(c.Name)
-}
-
 // UnmarshalYAML implements yaml.Unmarshaler.
 // It converts legacy formats to the canonical format:
 // - discover[] -> discoverer{}
@@ -305,14 +298,6 @@ func mergeJSONArrays(aRaw, bRaw json.RawMessage) (json.RawMessage, error) {
 		return nil, err
 	}
 	return bs, nil
-}
-
-func NewDiscovererPayload(typ string, cfg any) (DiscovererPayload, error) {
-	bs, err := json.Marshal(cfg)
-	if err != nil {
-		return DiscovererPayload{}, err
-	}
-	return DiscovererPayload{Kind: typ, Config: bs}, nil
 }
 
 // MarshalYAML implements yaml.Marshaler.

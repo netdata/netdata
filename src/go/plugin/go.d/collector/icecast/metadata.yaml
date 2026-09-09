@@ -5,6 +5,7 @@ modules:
       module_name: icecast
       monitored_instance:
         name: Icecast
+        description: "Monitor Icecast listener counts for each source through the status-json.xsl statistics endpoint."
         link: "https://icecast.org/"
         categories:
           - data-collection.applications

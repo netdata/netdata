@@ -175,26 +175,24 @@ static void free_device(DICTIONARY *dict, const char *name)
     dictionary_del(dict, name);
 }
 
-static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
-    ff = procfile_readall(ff);
-    if (!ff)
+static inline int read_mm_stat(procfile **p_ff, MM_STAT *stats) {
+    *p_ff = procfile_readall(*p_ff);
+    if (!*p_ff)
         return -1;
-    if (procfile_lines(ff) < 1) {
-        procfile_close(ff);
-        return -1;
-    }
-    if (procfile_linewords(ff, 0) < 7) {
-        procfile_close(ff);
+
+    if (procfile_lines(*p_ff) < 1 || procfile_linewords(*p_ff, 0) < 7) {
+        procfile_close(*p_ff);
+        *p_ff = NULL;
         return -1;
     }
 
-    stats->orig_data_size = str2ull(procfile_word(ff, 0), NULL);
-    stats->compr_data_size = str2ull(procfile_word(ff, 1), NULL);
-    stats->mem_used_total = str2ull(procfile_word(ff, 2), NULL);
-    stats->mem_limit = str2ull(procfile_word(ff, 3), NULL);
-    stats->mem_used_max = str2ull(procfile_word(ff, 4), NULL);
-    stats->same_pages = str2ull(procfile_word(ff, 5), NULL);
-    stats->pages_compacted = str2ull(procfile_word(ff, 6), NULL);
+    stats->orig_data_size = str2ull(procfile_word(*p_ff, 0), NULL);
+    stats->compr_data_size = str2ull(procfile_word(*p_ff, 1), NULL);
+    stats->mem_used_total = str2ull(procfile_word(*p_ff, 2), NULL);
+    stats->mem_limit = str2ull(procfile_word(*p_ff, 3), NULL);
+    stats->mem_used_max = str2ull(procfile_word(*p_ff, 4), NULL);
+    stats->same_pages = str2ull(procfile_word(*p_ff, 5), NULL);
+    stats->pages_compacted = str2ull(procfile_word(*p_ff, 6), NULL);
     return 0;
 }
 
@@ -206,7 +204,7 @@ static int collect_zram_metrics(const DICTIONARY_ITEM *item, void *entry, void *
     MM_STAT mm;
     int value;
 
-    if (unlikely(read_mm_stat(dev->file, &mm) < 0)) {
+    if (unlikely(read_mm_stat(&dev->file, &mm) < 0)) {
         free_device(dict, name);
         return -1;
     }

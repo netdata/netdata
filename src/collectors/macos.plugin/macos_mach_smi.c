@@ -88,10 +88,10 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
     if (likely(do_ram || do_swapio || do_pgfaults)) {
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
-        count = sizeof(vm_statistics64_data_t);
+        count = HOST_VM_INFO64_COUNT;
         kr = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&vm_statistics, &count);
 #else
-        count = sizeof(vm_statistics_data_t);
+        count = HOST_VM_INFO_COUNT;
         kr = host_statistics(host, HOST_VM_INFO, (host_info_t)&vm_statistics, &count);
 #endif
         if (unlikely(kr != KERN_SUCCESS)) {

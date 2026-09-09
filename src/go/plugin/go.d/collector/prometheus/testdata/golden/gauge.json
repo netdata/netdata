@@ -1,0 +1,38 @@
+[
+  {
+    "context": "prometheus.test_gauge_metric",
+    "labels": {
+      "label1": "value1"
+    },
+    "dims": [
+      {
+        "name": "test_gauge_metric",
+        "algo": "absolute",
+        "value": 11
+      }
+    ],
+    "soft": {
+      "units": "metric",
+      "family": "test_gauge",
+      "type": "line"
+    }
+  },
+  {
+    "context": "prometheus.test_gauge_metric",
+    "labels": {
+      "label1": "value2"
+    },
+    "dims": [
+      {
+        "name": "test_gauge_metric",
+        "algo": "absolute",
+        "value": 12.5
+      }
+    ],
+    "soft": {
+      "units": "metric",
+      "family": "test_gauge",
+      "type": "line"
+    }
+  }
+]

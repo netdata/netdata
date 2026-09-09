@@ -20,6 +20,19 @@ bitflags! {
     }
 }
 
+impl serde::Serialize for HttpAccess {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.bits().serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for HttpAccess {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let bits = u32::deserialize(deserializer)?;
+        Ok(Self::from_bits_truncate(bits))
+    }
+}
+
 impl HttpAccess {
     pub const ALL: Self = Self::from_bits_truncate(0x7FF);
 

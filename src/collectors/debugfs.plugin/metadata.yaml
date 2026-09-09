@@ -68,7 +68,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Additinal parameters for collector
+              description: Additional parameters for collector
               default_value: ""
               required: false
         examples:
@@ -164,7 +164,7 @@ modules:
       data_collection:
         metrics_description: >
           Collects zswap performance metrics on Linux systems.
-        method_description: 'Parse data from `debugfs file.'
+        method_description: 'Parse data from `debugfs` file.'
       supported_platforms:
         include:
           - Linux
@@ -211,7 +211,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Additinal parameters for collector
+              description: Additional parameters for collector
               default_value: ""
               required: false
         examples:
@@ -306,7 +306,7 @@ modules:
       data_collection:
         metrics_description: >
           Collects power capping performance metrics on Linux systems.
-        method_description: 'Parse data from `debugfs file.'
+        method_description: 'Read Intel RAPL energy counters from the powercap `sysfs` interface under `/sys/devices/virtual/powercap`.'
       supported_platforms:
         include:
           - Linux
@@ -316,14 +316,14 @@ modules:
         description: >
           This integration requires read access to files under `/sys/devices/virtual/powercap`, which are accessible
           only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to
-          debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing
+          these files. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing
           file read permission checks and directory read and execute permission checks. If file capabilities are not
           usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
       default_behavior:
         auto_detection:
           description: >
-            Assuming that debugfs is mounted and the required permissions are available, this integration will
-            automatically detect whether or not the system is using zswap.
+            Assuming the kernel exposes the Intel RAPL powercap interface and the required permissions are available,
+            this integration runs automatically.
         limits:
           description: ''
         performance_impact:
@@ -331,12 +331,11 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: 'filesystem'
+          - title: 'Check that the kernel exposes the powercap interface'
             description: >
-              The debugfs filesystem must be mounted on your host for plugin to collect data.
-              You can run the command-line (`sudo mount -t debugfs none /sys/kernel/debug/`) to mount it locally.
-              It is also recommended to modify your fstab (5) avoiding necessity to mount the filesystem
-              before starting netdata.
+              The Intel RAPL powercap driver must be loaded, so that `intel-rapl` zones exist under
+              `/sys/devices/virtual/powercap`. It is present on supported Intel and AMD processors with a recent Linux
+              kernel and needs no mount.
       configuration:
         file:
           name: 'netdata.conf'
@@ -353,7 +352,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Additinal parameters for collector
+              description: Additional parameters for collector
               default_value: ""
               required: false
         examples:
@@ -390,3 +389,438 @@ modules:
                 - name: dram
                 - name: core
                 - name: uncore
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: audit
+      monitored_instance:
+        name: Linux Audit Subsystem
+        description: 'Monitor Linux kernel audit status, backlog utilization, lost events, failure mode, and enabled state.'
+        link: 'https://man7.org/linux/man-pages/man8/auditd.8.html'
+        categories:
+          - data-collection.operating-systems
+        icon_filename: 'linux.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - audit
+        - auditd
+        - backlog
+        - security
+        - kernel panic
+        - compliance
+    overview:
+      data_collection:
+        metrics_description: >
+          Monitors Linux kernel audit subsystem status via NETLINK_AUDIT.
+          Tracks audit backlog depth, backlog utilization, lost events,
+          and configuration (failure mode, enabled state).
+          Critical for detecting audit backlog overflow conditions that
+          cause kernel panics when failure mode is set to 2 (panic).
+        method_description: 'Query kernel audit status via NETLINK_AUDIT socket (AUDIT_GET)'
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          This integration requires root privileges or CAP_AUDIT_CONTROL capability
+          to query the kernel audit subsystem via netlink. The Netdata installer
+          grants this capability to debugfs.plugin automatically. The module
+          detects missing privileges and disables itself gracefully.
+      default_behavior:
+        auto_detection:
+          description: >
+            Automatically detects and monitors the Linux audit subsystem when
+            the kernel supports NETLINK_AUDIT. Gracefully disables itself if
+            audit is not available.
+        limits:
+          description: ''
+        performance_impact:
+          description: >
+            Minimal. Performs a single netlink query per collection cycle.
+            No file I/O, no process forking.
+    setup:
+      prerequisites:
+        list:
+          - title: 'Linux kernel with audit support'
+            description: >
+              The Linux kernel must have audit support enabled (CONFIG_AUDIT=y).
+              Most distribution kernels include this by default.
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: audit_backlog_utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
+        metric: audit.backlog_utilization
+        info: >
+          Linux audit backlog utilization has exceeded the warning threshold
+          while failure mode is set to panic. Kernel panic is imminent if
+          backlog overflows.
+      - name: audit_lost_events
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
+        metric: audit.lost
+        info: >
+          Linux audit subsystem is losing events (backlog overflow, rate
+          limiting, or memory pressure).
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "Monitor the Linux kernel audit subsystem status and backlog health."
+      availability: []
+      scopes:
+        - name: global
+          description: "Audit subsystem status for the entire system."
+          labels: []
+          metrics:
+            - name: audit.backlog
+              description: Audit Backlog
+              unit: "events"
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: audit.backlog_utilization
+              description: Audit Backlog Utilization
+              unit: "%"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: audit.lost
+              description: Audit Lost Events
+              unit: "events/s"
+              chart_type: area
+              dimensions:
+                - name: lost
+            - name: audit.enabled
+              description: Audit Enabled State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: disabled
+                - name: enabled
+                - name: immutable
+            - name: audit.failure
+              description: Audit Failure Mode
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: silent
+                - name: printk
+                - name: panic
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: libsensors
+      monitored_instance:
+        name: Linux Hardware Sensors (libsensors)
+        link: 'https://hwmon.wiki.kernel.org/lm_sensors'
+        categories:
+          - data-collection.hardware-and-sensors
+        icon_filename: 'microchip.svg'
+        description: 'Collect hardware sensor readings from Linux hwmon chips, including temperature, voltage, current, fan speed, power, energy, humidity, and intrusion state.'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - sensors
+        - temperature
+        - voltage
+        - fan
+        - current
+        - power
+        - energy
+        - humidity
+        - hwmon
+        - lm-sensors
+    overview:
+      data_collection:
+        metrics_description: >
+          Collects hardware sensor readings (temperature, voltage, fan speed, current, power,
+          energy, humidity and intrusion state) from all hardware monitoring chips exposed by
+          the Linux hwmon subsystem. Every sensor gets its own chart, a cross-platform
+          temperature histogram summarizes all temperature sensors in fixed bands, and a live
+          `sensors` function lists every discovered sensor with its current reading and state.
+        method_description: >
+          Uses a bundled copy of the libsensors library (the same library behind the `sensors`
+          command) to enumerate and read the hardware monitoring chips exposed under
+          `/sys/class/hwmon`.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          The hwmon sysfs attributes are generally world-readable, so no additional permissions
+          beyond the ones the debugfs plugin already has are required.
+      default_behavior:
+        auto_detection:
+          description: >
+            All hardware monitoring chips exposed by the hwmon subsystem are detected and
+            collected automatically. The collection interval is automatically raised above the
+            configured update every when reading the sensors is slow.
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additional parameters for collector
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: >
+        Per-sensor charts are created for every supported reading of every discovered sensor;
+        the alarm charts expose only the states each sensor driver actually supports. The
+        temperature histogram is a single host-wide chart with the same fixed bands on every
+        operating system: each dimension is a DISJOINT band named after its EXCLUSIVE upper
+        bound in degrees Celsius, and every temperature sensor is counted in exactly one band.
+      availability: []
+      scopes:
+        - name: sensor
+          description: "These metrics refer to a hardware sensor chip feature."
+          labels:
+            - name: feature
+              description: Stable sensor feature identifier
+            - name: label
+              description: Human-readable sensor label
+            - name: chip_id
+              description: Sensor chip identifier
+            - name: path
+              description: The hwmon sysfs path of the sensor chip
+            - name: subsystem
+              description: Hardware subsystem the sensor chip belongs to
+            - name: driver
+              description: Kernel driver providing the sensor
+          metrics:
+            - name: system.hw.sensor.temperature.input
+              description: Sensor Temperature
+              unit: "degrees Celsius"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.temperature.alarm
+              description: Sensor Temperature Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.voltage.input
+              description: Sensor Voltage
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.voltage.average
+              description: Sensor Voltage Average
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: system.hw.sensor.voltage.alarm
+              description: Sensor Voltage Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.fan.input
+              description: Sensor Fan Speed
+              unit: "rotations per minute"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.fan.alarm
+              description: Sensor Fan Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.current.input
+              description: Sensor Current
+              unit: "Amperes"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.current.average
+              description: Sensor Current Average
+              unit: "Amperes"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: system.hw.sensor.current.alarm
+              description: Sensor Current Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.power.input
+              description: Sensor Power
+              unit: "Watts"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.power.average
+              description: Sensor Power Average
+              unit: "Watts"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: system.hw.sensor.power.alarm
+              description: Sensor Power Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.energy.input
+              description: Sensor Energy
+              unit: "Joules"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.energy.alarm
+              description: Sensor Energy Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.humidity.input
+              description: Sensor Humidity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.humidity.alarm
+              description: Sensor Humidity Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.intrusion.alarm
+              description: Sensor Intrusion Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+        - name: global
+          description: "Host-wide summary of all temperature sensors."
+          labels: []
+          metrics:
+            - name: system.hw.sensor.temperature.histogram
+              description: Distribution of all temperature sensors in fixed bands
+              unit: "sensors"
+              chart_type: heatmap
+              dimensions:
+                - name: "40"
+                - name: "50"
+                - name: "60"
+                - name: "70"
+                - name: "80"
+                - name: "85"
+                - name: "90"
+                - name: "95"
+                - name: "100"
+                - name: "+Inf"

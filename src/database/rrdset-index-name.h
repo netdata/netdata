@@ -13,6 +13,7 @@ void rrdset_index_del_name(RRDHOST *host, RRDSET *st);
 
 extern RRDHOST *localhost;
 RRDSET *rrdset_find_byname(RRDHOST *host, const char *name);
+RRDSET_ACQUIRED *rrdset_find_byname_and_acquire(RRDHOST *host, const char *name);
 #define rrdset_find_byname_localhost(name)  rrdset_find_byname(localhost, name)
 
 /* This will not return charts that are archived */

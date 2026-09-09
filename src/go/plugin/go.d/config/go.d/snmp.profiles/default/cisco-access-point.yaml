@@ -1,5 +1,6 @@
 extends:
   - cisco.yaml
+  - _std-topology-interface-mib.yaml
 
 metadata:
   device:

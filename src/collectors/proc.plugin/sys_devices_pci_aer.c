@@ -119,7 +119,7 @@ static void find_all_pci_aer(AER_TYPE types) {
 
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
-        if(de->d_type == DT_DIR && de->d_name[0] == 'p' && de->d_name[1] == 'c' && de->d_name[2] == 'i' && isdigit(de->d_name[3]))
+        if(de->d_type == DT_DIR && de->d_name[0] == 'p' && de->d_name[1] == 'c' && de->d_name[2] == 'i' && isdigit((uint8_t)de->d_name[3]))
             recursively_find_pci_aer(types, pci_aer_dirname, de->d_name, 1);
     }
     closedir(dir);

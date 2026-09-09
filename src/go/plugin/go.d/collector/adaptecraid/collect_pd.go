@@ -104,6 +104,12 @@ func parsePhysDevInfo(bs []byte) (map[string]*physicalDevice, error) {
 		}
 
 		switch {
+		case strings.HasPrefix(line, "Device is"):
+			// Skip non-disk entries such as "Device is an Enclosure Services Device".
+			if line != "Device is a Hard drive" {
+				delete(devices, pd.number)
+				pd = nil
+			}
 		case strings.HasPrefix(line, "State"):
 			pd.state = getColonSepValue(line)
 		case strings.HasPrefix(line, "Reported Location"):

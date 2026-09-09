@@ -1,0 +1,487 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Generated Netdata collector taxonomy artifact.",
+  "additionalProperties": false,
+  "properties": {
+    "taxonomy_schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "netdata_commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generated_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "netdata_commit",
+        "generated_at"
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/section"
+      }
+    },
+    "placements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/placement"
+      }
+    },
+    "opted_out_collectors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/optout"
+      }
+    }
+  },
+  "required": [
+    "taxonomy_schema_version",
+    "source",
+    "sections",
+    "placements",
+    "opted_out_collectors"
+  ],
+  "$defs": {
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "parent_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "short_name": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "section_order": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "deprecated"
+          ]
+        },
+        "deprecation": {
+          "type": "object"
+        },
+        "_extra": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "title",
+        "section_order",
+        "status"
+      ]
+    },
+    "snapshot": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "unresolved_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "expires": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "item_path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "context",
+        "reason",
+        "owner",
+        "expires",
+        "item_path"
+      ]
+    },
+    "unresolved_references": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unresolved_reference"
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "owned_context",
+            "group",
+            "flatten",
+            "selector",
+            "context",
+            "grid",
+            "first_available",
+            "view_switch"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "short_name": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {},
+        "tooltip": {
+          "type": "string"
+        },
+        "menu_pattern": {
+          "type": "string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object"
+        },
+        "section_filters": {
+          "type": "object"
+        },
+        "dyncfg": {
+          "type": "object"
+        },
+        "context": {
+          "type": "string"
+        },
+        "contexts": {
+          "type": "array",
+          "items": {}
+        },
+        "context_prefix": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "context_prefix_exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "collect_plugin": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "chart_library": {
+          "type": "string"
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "group_by_label": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "aggregation_method": {
+          "type": "string"
+        },
+        "selected_dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dimensions_sort": {
+          "type": "string"
+        },
+        "colors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "layout": {
+          "type": "object"
+        },
+        "table_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "table_sort_by": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "labels": {
+          "type": "object"
+        },
+        "value_range": {
+          "type": "array"
+        },
+        "eliminate_zero_dimensions": {
+          "type": "boolean"
+        },
+        "context_items": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "post_group_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "show_post_aggregations": {
+          "type": "boolean"
+        },
+        "grouping_method": {
+          "type": "string"
+        },
+        "sparkline": {
+          "type": "boolean"
+        },
+        "renderer": {
+          "type": "object"
+        },
+        "single_node": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "$ref": "#/$defs/node"
+            }
+          ]
+        },
+        "multi_node": {
+          "$ref": "#/$defs/node"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "resolved_contexts": {
+          "$ref": "#/$defs/snapshot",
+          "description": "Literal metric contexts owned by this node after selector expansion and child aggregation. FE consumers use this as the node's owned/renderable context snapshot."
+        },
+        "referenced_contexts": {
+          "$ref": "#/$defs/snapshot",
+          "description": "Metric contexts referenced by display widgets under this node but owned elsewhere in the structural tree. FE consumers use this for widget context wiring, not ownership."
+        },
+        "unresolved_references": {
+          "$ref": "#/$defs/unresolved_references",
+          "description": "Explicit staged widget references that do not resolve yet, with owner/reason/expiry metadata preserved for downstream consumers."
+        },
+        "_extra": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "resolved_contexts",
+        "referenced_contexts",
+        "unresolved_references"
+      ]
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "collector_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "plugin_name": {
+          "type": "string"
+        },
+        "module_name": {
+          "type": "string"
+        },
+        "source_path": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "section_id": {
+          "type": "string"
+        },
+        "section_path": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "short_name": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "families": {},
+        "tooltip": {
+          "type": "string"
+        },
+        "menu_pattern": {
+          "type": "string"
+        },
+        "hide_sub_icon": {
+          "type": "boolean"
+        },
+        "force_visibility": {
+          "type": "boolean"
+        },
+        "fallback_icon": {
+          "type": "string"
+        },
+        "include_grand_parents": {
+          "type": "boolean"
+        },
+        "properties": {
+          "type": "object"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "resolved_contexts": {
+          "$ref": "#/$defs/snapshot",
+          "description": "Literal metric contexts owned by this placement after selector expansion and item aggregation. FE consumers use this as the placement's owned/renderable context snapshot."
+        },
+        "referenced_contexts": {
+          "$ref": "#/$defs/snapshot",
+          "description": "Metric contexts referenced by display widgets under this placement but owned elsewhere in the structural tree. FE consumers use this for widget context wiring, not ownership."
+        },
+        "unresolved_references": {
+          "$ref": "#/$defs/unresolved_references",
+          "description": "Explicit staged widget references in this placement that do not resolve yet, with owner/reason/expiry metadata preserved for downstream consumers."
+        },
+        "single_node": {
+          "type": "object"
+        },
+        "_extra": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "collector_ids",
+        "plugin_name",
+        "module_name",
+        "source_path",
+        "id",
+        "section_id",
+        "section_path",
+        "title",
+        "items",
+        "resolved_contexts",
+        "referenced_contexts",
+        "unresolved_references"
+      ]
+    },
+    "optout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "collector_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "plugin_name": {
+          "type": "string"
+        },
+        "module_name": {
+          "type": "string"
+        },
+        "source_path": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "collector_ids",
+        "plugin_name",
+        "module_name",
+        "source_path",
+        "reason"
+      ]
+    }
+  }
+}

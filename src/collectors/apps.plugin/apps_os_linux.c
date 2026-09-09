@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
+#include "apps-cgroups-path.h"
+#include "apps-cgroups-lookup-client.h"
 #include <limits.h>
 #include <unistd.h>
 
 #if defined(OS_LINUX)
 
 #define MAX_PROC_PID_LIMITS 8192
+#define PROC_PID_CGROUP_INITIAL_SIZE 4096
+#define PROC_PID_CGROUP_CONTENT_MAX (64 * 1024)
 #define PROC_PID_LIMITS_MAX_OPEN_FILES_KEY "\nMax open files "
 
 int max_fds_cache_seconds = 60;
@@ -805,6 +809,98 @@ bool apps_os_read_pid_status_linux(struct pid_stat *p, void *ptr __maybe_unused)
     return true;
 }
 
+/* REQUIRES apps_pids_mutex held by caller; MUST NOT lock apps_pids_mutex itself. */
+static bool apps_os_pid_cgroup_fail(struct pid_stat *p, int error)
+{
+    apps_cgroups_lookup_unlink_pid(p);
+    string_freez(p->cgroup_path);
+    p->cgroup_path = NULL;
+    errno = error;
+    return false;
+}
+
+bool apps_os_read_pid_cgroup_linux(struct pid_stat *p, void *ptr __maybe_unused)
+{
+    if (unlikely(!p->cgroup_filename)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cgroup", netdata_configured_host_prefix, p->pid);
+        p->cgroup_filename = strdupz(filename);
+    }
+
+    int fd = open(p->cgroup_filename, procfile_open_flags);
+    if (fd == -1)
+        return apps_os_pid_cgroup_fail(p, errno);
+
+    size_t content_capacity = PROC_PID_CGROUP_INITIAL_SIZE;
+    char *content = mallocz(content_capacity + 1);
+    size_t used = 0;
+    bool truncated = false;
+
+    for (;;) {
+        if (used == content_capacity) {
+            if (content_capacity < PROC_PID_CGROUP_CONTENT_MAX) {
+                content_capacity *= 2;
+                if (content_capacity > PROC_PID_CGROUP_CONTENT_MAX)
+                    content_capacity = PROC_PID_CGROUP_CONTENT_MAX;
+
+                content = reallocz(content, content_capacity + 1);
+                continue;
+            }
+
+            char extra;
+            ssize_t bytes = read(fd, &extra, 1);
+            if (bytes > 0) {
+                truncated = true;
+                break;
+            }
+            if (bytes == 0)
+                break;
+            if (errno == EINTR)
+                continue;
+
+            int saved_errno = errno;
+            close(fd);
+            freez(content);
+            return apps_os_pid_cgroup_fail(p, saved_errno);
+        }
+
+        ssize_t bytes = read(fd, content + used, content_capacity - used);
+        if (bytes > 0) {
+            used += (size_t)bytes;
+            continue;
+        }
+
+        if (bytes == 0)
+            break;
+
+        if (errno == EINTR)
+            continue;
+
+        int saved_errno = errno;
+        close(fd);
+        freez(content);
+        return apps_os_pid_cgroup_fail(p, saved_errno);
+    }
+
+    close(fd);
+
+    if (used == 0 || truncated) {
+        freez(content);
+        return apps_os_pid_cgroup_fail(p, truncated ? ENAMETOOLONG : EINVAL);
+    }
+
+    content[used] = '\0';
+
+    char path[FILENAME_MAX + 1];
+    bool parsed = apps_cgroup_parse_proc_pid_cgroup_content(content, path, sizeof(path));
+    freez(content);
+    if (!parsed)
+        return apps_os_pid_cgroup_fail(p, EINVAL);
+
+    apps_cgroups_lookup_set_pid_cgroup_path(p, path);
+    return true;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // global CPU utilization
 
@@ -936,7 +1032,8 @@ bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->values[PDF_THREADS] = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
-    kernel_uint_t collected_starttime = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
+    p->starttime = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
+    kernel_uint_t collected_starttime = p->starttime / system_hz;
     p->values[PDF_UPTIME] = (system_uptime_secs > collected_starttime)?(system_uptime_secs - collected_starttime):0;
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));

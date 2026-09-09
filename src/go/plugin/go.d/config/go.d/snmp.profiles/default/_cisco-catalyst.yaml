@@ -84,6 +84,43 @@ metrics:
           description: "Number of output packets dropped by the interface"
           family: 'Network/Interface/Queue/Drops/Out'
           unit: "{drop}/s"
+      # L1/L2 error counters — primary debug signals for cabling/SFP/duplex issues
+      - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.4
+        name: cieIfInRuntsErrs
+        chart_meta:
+          description: "Number of runt packets received (frames smaller than 64 bytes)"
+          family: 'Network/Interface/Errors/L1'
+          unit: "{error}/s"
+      - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.5
+        name: cieIfInGiantsErrs
+        chart_meta:
+          description: "Number of giant packets received (frames larger than MTU)"
+          family: 'Network/Interface/Errors/L1'
+          unit: "{error}/s"
+      - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.6
+        name: cieIfInFramingErrs
+        chart_meta:
+          description: "Number of framing error packets received"
+          family: 'Network/Interface/Errors/L1'
+          unit: "{error}/s"
+      - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.7
+        name: cieIfInOverrunErrs
+        chart_meta:
+          description: "Number of overrun error packets received (hardware buffer exhaustion)"
+          family: 'Network/Interface/Errors/L1'
+          unit: "{error}/s"
+      - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.8
+        name: cieIfInIgnored
+        chart_meta:
+          description: "Number of input packets ignored by the interface"
+          family: 'Network/Interface/Errors/L1'
+          unit: "{error}/s"
+      - OID: 1.3.6.1.4.1.9.9.276.1.1.1.1.9
+        name: cieIfInAbortErrs
+        chart_meta:
+          description: "Number of input packets aborted"
+          family: 'Network/Interface/Errors/L1'
+          unit: "{error}/s"
     metric_tags:
       - tag: interface
         MIB: IF-MIB
@@ -91,3 +128,22 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+
+  # STP topology change detection (BRIDGE-MIB scalars)
+  - MIB: BRIDGE-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.17.2.4.0
+      name: dot1dStpTimeSinceTopologyChange
+      scale_factor: 0.01
+      chart_meta:
+        description: Time since the last STP topology change was detected
+        family: 'Network/Bridge/STP/TopologyChange'
+        unit: "s"
+  - MIB: BRIDGE-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.17.2.5.0
+      name: dot1dStpTopChanges
+      chart_meta:
+        description: Rate of STP topology changes detected
+        family: 'Network/Bridge/STP/TopologyChange'
+        unit: "{change}/s"

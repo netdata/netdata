@@ -32,6 +32,7 @@ func copyLabels(dst, src map[string]string) {
 	maps.Copy(dst, src)
 }
 
+//go:fix inline
 func ptr[T any](v T) *T {
-	return &v
+	return new(v)
 }

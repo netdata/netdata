@@ -1,0 +1,128 @@
+# Wireless controller and access point monitoring for Fortinet FortiGate devices
+# fgWcInfo scalars: controller summary (AP count, station count, capacity)
+# fgWcWtpSessionTable: per-AP connection state, uptime, CPU, memory, stations, traffic
+
+metrics:
+  ### Wireless controller summary scalars
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.14.2.4.0
+      name: fgWcInfoWtpManaged
+      chart_meta:
+        description: Number of wireless access points managed by this controller
+        family: 'Network/Wireless/Controller/AccessPoints/Managed'
+        unit: "{ap}"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.14.2.3.0
+      name: fgWcInfoWtpCapacity
+      chart_meta:
+        description: Maximum number of wireless access points this controller can manage
+        family: 'Network/Wireless/Controller/AccessPoints/Capacity'
+        unit: "{ap}"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.14.2.5.0
+      name: fgWcInfoWtpSessions
+      chart_meta:
+        description: Number of wireless access points currently connecting to this controller
+        family: 'Network/Wireless/Controller/AccessPoints/Connecting'
+        unit: "{ap}"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.14.2.7.0
+      name: fgWcInfoStationCount
+      chart_meta:
+        description: Number of wireless client stations currently connected
+        family: 'Network/Wireless/Controller/Stations/Active'
+        unit: "{station}"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.14.2.6.0
+      name: fgWcInfoStationCapacity
+      chart_meta:
+        description: Maximum number of wireless client stations supported
+        family: 'Network/Wireless/Controller/Stations/Capacity'
+        unit: "{station}"
+
+  ### Per-AP session table
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.14.4.4
+      name: fgWcWtpSessionTable
+    symbols:
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.7
+        name: fgWcWtpSessionConnectionState
+        chart_meta:
+          description: Wireless access point connection state to controller
+          family: 'Network/Wireless/AccessPoint/Status/Connection'
+          unit: "{status}"
+        mapping:
+          0: other
+          1: offLine
+          2: onLine
+          3: downloadingImage
+          4: connectedImage
+          5: other2
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.8
+        name: fgWcWtpSessionWtpUpTime
+        scale_factor: 0.01
+        chart_meta:
+          description: Time since the wireless access point last booted
+          family: 'Network/Wireless/AccessPoint/Uptime'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.17
+        name: fgWcWtpSessionWtpStationCount
+        chart_meta:
+          description: Number of client stations currently connected to this access point
+          family: 'Network/Wireless/AccessPoint/Clients/Active'
+          unit: "{station}"
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.18
+        name: fgWcWtpSessionWtpByteRxCount
+        scale_factor: 8
+        chart_meta:
+          description: Traffic received by this wireless access point
+          family: 'Network/Wireless/AccessPoint/Traffic/In'
+          unit: "bit/s"
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.19
+        name: fgWcWtpSessionWtpByteTxCount
+        scale_factor: 8
+        chart_meta:
+          description: Traffic transmitted by this wireless access point
+          family: 'Network/Wireless/AccessPoint/Traffic/Out'
+          unit: "bit/s"
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.20
+        name: fgWcWtpSessionWtpCpuUsage
+        chart_meta:
+          description: Current CPU usage of the wireless access point
+          family: 'Network/Wireless/AccessPoint/CPU/Usage'
+          unit: "%"
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.21
+        name: fgWcWtpSessionWtpMemoryUsage
+        chart_meta:
+          description: Current memory usage of the wireless access point
+          family: 'Network/Wireless/AccessPoint/Memory/Usage'
+          unit: "%"
+      - OID: 1.3.6.1.4.1.12356.101.14.4.4.1.22
+        name: fgWcWtpSessionWtpMemoryCapacity
+        scale_factor: 1024
+        chart_meta:
+          description: Total physical memory installed on the wireless access point
+          family: 'Network/Wireless/AccessPoint/Memory/Total'
+          unit: "By"
+    metric_tags:
+      - tag: wtp_id
+        index: 1
+      - tag: _wtp_model
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.14.4.4.1.12
+          name: fgWcWtpSessionWtpModelNumber
+      - tag: _wtp_profile
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.14.4.4.1.11
+          name: fgWcWtpSessionWtpProfileName
+      - tag: _wtp_ip
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.14.4.4.1.3
+          name: fgWcWtpSessionWtpIpAddress
+          format: ip_address

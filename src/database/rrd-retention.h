@@ -13,8 +13,8 @@ typedef struct rrd_storage_tier {
     size_t group_seconds;             // Granularity in seconds
     char granularity_human[32];       // Human-readable granularity string
 
-    size_t metrics;                   // Number of metrics in this tier
-    size_t samples;                   // Number of samples in this tier
+    uint64_t metrics;                 // Number of metrics in this tier
+    uint64_t samples;                 // Number of samples in this tier
 
     uint64_t disk_used;               // Disk space used in bytes
     uint64_t disk_max;                // Maximum available disk space in bytes

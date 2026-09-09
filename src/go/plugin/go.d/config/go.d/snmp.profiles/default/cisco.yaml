@@ -3,6 +3,8 @@
 extends:
   - _system-base.yaml
   - _cisco-base.yaml
+  - _cisco-licensing-traditional.yaml
+  - _cisco-licensing-smart.yaml
 
 selector:
   - sysobjectid:

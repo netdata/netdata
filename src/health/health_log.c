@@ -42,6 +42,29 @@ void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
 // ----------------------------------------------------------------------------
 extern __thread bool is_health_thread;
 
+static inline void health_alarm_entry_assign_unique_id_unsafe(RRDHOST *host, ALARM_ENTRY *ae) {
+    if(unlikely(!ae->unique_id))
+        ae->unique_id = host->health_log.next_log_id++;
+}
+
+void health_alarm_entry_assign_unique_id(RRDHOST *host, ALARM_ENTRY *ae) {
+    if(!host || !ae)
+        return;
+
+    rw_spinlock_write_lock(&host->health_log.spinlock);
+    health_alarm_entry_assign_unique_id_unsafe(host, ae);
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
+}
+
+static inline void health_alarm_log_insert_entry_unsafe(RRDHOST *host, ALARM_ENTRY *ae) {
+    ALARM_ENTRY *t;
+
+    for(t = host->health_log.alarms ; t && t->unique_id > ae->unique_id ; t = t->next)
+        ;
+
+    DOUBLE_LINKED_LIST_INSERT_ITEM_BEFORE_UNSAFE(host->health_log.alarms, t, ae, prev, next);
+}
+
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
     if (async) {
@@ -184,13 +207,12 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *recipient = rc->config.recipient;
     STRING *source = rc->config.source;
     STRING *units = rc->config.units;
-    STRING *summary = rc->summary;
-    STRING *info = rc->info;
+    STRING *summary = NULL;
+    STRING *info = NULL;
+    rrdcalc_runtime_strings_acquire(rc, &summary, &info);
 
     if (duration < 0)
         duration = 0;
-
-    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = health_alarm_entry_create();
     ae->name = string_dup(name);
@@ -211,7 +233,6 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->source = string_dup(source);
     ae->units = string_dup(units);
 
-    ae->unique_id = host->health_log.next_log_id++;
     ae->alarm_id = alarm_id;
     ae->alarm_event_id = alarm_event_id;
     ae->when = when;
@@ -222,13 +243,13 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
     ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
-    ae->summary = string_dup(summary);
-    ae->info = string_dup(info);
+    ae->summary = summary;
+    ae->info = info;
     ae->old_status = old_status;
     ae->new_status = new_status;
     ae->duration = duration;
     ae->delay = delay;
-    ae->delay_up_to_timestamp = when + delay;
+    ae->delay_up_to_timestamp = nd_time_t_add_saturating(when, delay);
     ae->flags |= flags;
 
     ae->last_repeat = 0;
@@ -242,20 +263,20 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
 inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async)
 {
-    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
-
     __atomic_add_fetch(&host->health_transitions, 1, __ATOMIC_RELAXED);
 
-    // link it
-    rw_spinlock_write_lock(&host->health_log.spinlock);
-    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
-    rw_spinlock_write_unlock(&host->health_log.spinlock);
-
-    // match previous alarms
-    rw_spinlock_read_lock(&host->health_log.spinlock);
     ALARM_ENTRY *update_ae = NULL;
-    for(ALARM_ENTRY *t = host->health_log.alarms ; t ; t = t->next) {
-        if(t != ae && t->alarm_id == ae->alarm_id) {
+
+    rw_spinlock_write_lock(&host->health_log.spinlock);
+
+    health_alarm_entry_assign_unique_id_unsafe(host, ae);
+    health_alarm_log_insert_entry_unsafe(host, ae);
+
+    // Match the previous older entry for this alert. The list is ordered by
+    // descending unique_id, so entries before ae are newer and must not be
+    // marked as updated by ae.
+    for(ALARM_ENTRY *t = ae->next ; t ; t = t->next) {
+        if(t->alarm_id == ae->alarm_id) {
             if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
                 t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
                 t->updated_by_id = ae->unique_id;
@@ -263,7 +284,8 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
 
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
-                    ae->non_clear_duration += t->non_clear_duration;
+                    ae->non_clear_duration =
+                        nd_time_t_add_saturating(ae->non_clear_duration, t->non_clear_duration);
 
                 update_ae = t;
             }
@@ -272,7 +294,11 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
             break;
         }
     }
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
+
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
+
+    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
+
     if (update_ae)
         health_alarm_log_save(host, update_ae, async);
 
@@ -342,7 +368,7 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
-        if(ae->when < now - retention && 
+        if(nd_time_t_add_compare(now, -(intmax_t)retention, ae->when) > 0 &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
            __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
             

@@ -42,9 +42,11 @@ All capabilities are set automatically during Netdata installation using the [of
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/bind)                             |           ISC Bind            |
 | [boinc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/boinc)                           |             BOINC             |
 | [cassandra](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cassandra)                   |           Cassandra           |
+| [cato_networks](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cato_networks)           |         Cato Networks         |
 | [ceph](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ceph)                             |             Ceph              |
 | [chrony](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/chrony)                         |            Chrony             |
 | [clickhouse](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/clickhouse)                 |          ClickHouse           |
+| [cloudwatch](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cloudwatch)                 |       Amazon CloudWatch       |
 | [cockroachdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/cockroachdb)               |          CockroachDB          |
 | [consul](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/consul)                         |            Consul             |
 | [coredns](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/coredns)                       |            CoreDNS            |
@@ -67,7 +69,6 @@ All capabilities are set automatically during Netdata installation using the [of
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/freeradius)                 |          FreeRADIUS           |
 | [gearman](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/gearman)                       |            Gearman            |
-| [haproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/haproxy)                       |            HAProxy            |
 | [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hdfs)                             |             HDFS              |
 | [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hpssa)                           |        HPE Smart Array        |
@@ -102,6 +103,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [openldap](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openldap)                     |           OpenLDAP            |
 | [openvpn](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn)                       |            OpenVPN            |
 | [openvpn_status_log](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/openvpn_status_log) |            OpenVPN            |
+| [panos](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/panos)                           |   Palo Alto Networks PAN-OS   |
 | [pgbouncer](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pgbouncer)                   |           PgBouncer           |
 | [oracledb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/oracledb)                     |           Oracle DB           |
 | [phpdaemon](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/phpdaemon)                   |           phpDaemon           |
@@ -123,9 +125,9 @@ All capabilities are set automatically during Netdata installation using the [of
 | [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rethinkdb)                   |           RethinkDB           |
 | [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/riakkv)                         |            Riak KV            |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rspamd)                         |            Rspamd             |
+| [s3check](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/s3check)                        | S3 Compatible Object Storage |
 | [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/samba)                           |             Samba             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/scaleio)                       |       Dell EMC ScaleIO        |
-| [sensors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/sensors)                       |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp)                             |             SNMP              |
 | [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squid)                           |             Squid             |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squidlog)                     |             Squid             |
@@ -232,3 +234,9 @@ Then run the plugin in debug mode, specifying your target collector:
 ```
 
 Replace `<collector_name>` with the [specific collector](#available-collectors) you wish to debug.
+
+Debug mode (`-d`) collects data continuously and does **not** exit on its own — press **Ctrl+C** to stop it when you are done.
+
+Output appears once per collection interval (`update_every`), which varies by collector (commonly 1–60 seconds). Wait at least one full interval before concluding the collector is broken.
+
+If you see no output after waiting, the collector likely failed to connect to its target or has no configured job — check the log lines printed above for connection or autodetection errors.

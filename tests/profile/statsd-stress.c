@@ -90,16 +90,16 @@ static void *spam_thread(void *__data) {
 		for(i = 0; i < metrics ;i++) {
 			if (sendto(s, packets[i], lengths[i], 0, (void *)data->si_other, data->slen) < 0) {
 				printf("C ==> DROPPED\n");
+				for(size_t j = 0; j < metrics ;j++)
+					free(packets[j]);
+				free(packets);
+				free(lengths);
+				close(s);
 				return NULL;
 			}
 			data->counter++;
 		}
 	}
-
-	free(packets);
-	free(lengths);
-	close(s);
-	return NULL;
 }
 
 int main(int argc, char *argv[])

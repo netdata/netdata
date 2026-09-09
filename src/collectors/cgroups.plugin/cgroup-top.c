@@ -117,7 +117,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused, 
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_CGTOP_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_CGTOP_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_pids = 0.0;
@@ -360,7 +360,7 @@ int cgroup_function_systemd_top(BUFFER *wb, const char *function __maybe_unused,
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_CGTOP_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_SYSTEMD_SERVICES_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_pids = 0.0;

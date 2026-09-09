@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -70,7 +70,9 @@ jobs:
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-static.py
             .github/scripts/gen-matrix-build.py
+            .github/scripts/prepare-topology-ip-intel-stock.sh
             .github/scripts/run-updater-check.sh
+            src/go/tools/topology-ip-intel-downloader/
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
@@ -79,8 +81,9 @@ jobs:
             packaging/*.version
             packaging/*.checksums
           files_ignore: |
-            **/*.md
+            packaging/**/*.md
             packaging/repoconfig/
+            src/go/tools/topology-ip-intel-downloader/README.md
       - name: Check static build files
         id: check-static-build-files
         uses: step-security/changed-files@v45
@@ -92,10 +95,15 @@ jobs:
             .github/scripts/build-static.sh
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-static.py
+            .github/scripts/prepare-topology-ip-intel-stock.sh
+            src/go/tools/topology-ip-intel-downloader/
+            src/go/go.mod
+            src/go/go.sum
             packaging/makeself/
           files_ignore: |
-            **/*.md
+            packaging/**/*.md
             packaging/repoconfig/
+            src/go/tools/topology-ip-intel-downloader/README.md
       - name: List all changed files in pattern
         continue-on-error: true
         if: github.event_name != 'workflow_dispatch'
@@ -118,7 +126,7 @@ jobs:
         id: check-go
         run: |
           if [ '${{ github.event_name }}' == 'pull_request' ]; then
-            if echo "${{ steps.check-source-files.outputs.other_changed_files }}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+            if [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
               echo 'skip-go=' >> "${GITHUB_OUTPUT}"
             else
               echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
@@ -154,7 +162,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -174,7 +182,7 @@ jobs:
         run: |
           mkdir -p artifacts/
           tar --create --file "artifacts/netdata-$(git describe).tar.gz" \
-              --sort=name --posix --auto-compress --exclude=artifacts/ --exclude=.git \
+              --sort=name --posix --auto-compress --exclude=artifacts --exclude=.git \
               --exclude=.gitignore --exclude=.gitattributes --exclude=.gitmodules \
               --transform "s/^\\.\\//netdata-$(git describe)\\//" --verbose .
           cd artifacts/
@@ -182,10 +190,11 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -222,7 +231,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Prepare tools
         id: prepare
         run: |
@@ -256,11 +265,87 @@ jobs:
             && github.repository == 'netdata/netdata'
           }}
 
+  prepare-static-topology-ip-intel-stock:
+    name: Prepare static topology-ip-intel stock payload
+    runs-on: ubuntu-latest
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Setup Go
+        id: setup-go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+      - name: Prepare synthetic stock payload
+        id: prepare-synthetic
+        if: needs.file-check.outputs.run == 'true' && github.event_name == 'pull_request'
+        run: |
+          .github/scripts/prepare-topology-ip-intel-stock.sh \
+            --mode synthetic \
+            --output-dir "${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+      - name: Prepare release stock payload
+        id: prepare-release
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: nick-invision/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 1800
+          command: >
+            .github/scripts/prepare-topology-ip-intel-stock.sh
+            --mode release
+            --output-dir "${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+      - name: Upload topology-ip-intel stock payload
+        id: upload-stock
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: static-topology-ip-intel-stock
+          path: ${{ github.workspace }}/.topology-ip-intel-stock/
+          include-hidden-files: true
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Static topology stock payload preparation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to prepare the static topology-ip-intel stock payload.
+              Checkout: ${{ steps.checkout.outcome }}
+              Setup Go: ${{ steps.setup-go.outcome }}
+              Prepare synthetic payload: ${{ steps.prepare-synthetic.outcome }}
+              Prepare release payload: ${{ steps.prepare-release.outcome }}
+              Upload stock payload: ${{ steps.upload-stock.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
   build-static: # Build the static binary archives, and store them as artifacts.
     name: Build Static
     needs:
       - file-check
       - static-matrix
+      - prepare-static-topology-ip-intel-stock
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.static-matrix.outputs.matrix) }}
@@ -273,7 +358,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           submodules: recursive
@@ -294,7 +379,7 @@ jobs:
       - name: Cache
         if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: artifacts/cache
           key: ${{ steps.cache-key.outputs.key }}
@@ -305,18 +390,71 @@ jobs:
           sudo apt-get update
           sudo apt-get upgrade -y
           sudo apt-get install -y qemu-user-static
+      - name: Download topology-ip-intel stock payload
+        id: fetch-topology-stock
+        if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
+        uses: actions/download-artifact@v8
+        with:
+          name: static-topology-ip-intel-stock
+          path: ${{ github.workspace }}/.topology-ip-intel-stock
       - name: Build
+        id: build
         if: needs.file-check.outputs.run == 'true'
         run: |
           [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
+          if [ "${{ matrix.arch }}" != "armv6l" ]; then
+            export NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR="${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+          fi
           .github/scripts/build-static.sh ${{ matrix.arch }}
+      - name: Verify topology-ip-intel stock payload
+        id: verify-topology-stock
+        if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
+            -maxdepth 1 \
+            -type f \
+            -name 'netdata-${{ matrix.arch }}-*.gz.run' \
+            ! -name '*-latest.gz.run' \
+            -print \
+            -quit)"
+          if [ -z "${archive}" ]; then
+            printf >&2 'ERROR: static archive for %s was not produced\n' '${{ matrix.arch }}'
+            exit 1
+          fi
+
+          extract_dir="$(mktemp -d)"
+          trap 'rm -rf -- "${extract_dir}"' EXIT
+          (
+            cd "${extract_dir}"
+            sh "${archive}" --tar xf \
+              ./usr/share/netdata/topology-ip-intel/README.md \
+              ./usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb \
+              ./usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb \
+              ./usr/share/netdata/topology-ip-intel/topology-ip-intel.json
+          )
+
+          for path in \
+            README.md \
+            topology-ip-asn.mmdb \
+            topology-ip-geo.mmdb \
+            topology-ip-intel.json
+          do
+            if [ ! -s "${extract_dir}/usr/share/netdata/topology-ip-intel/${path}" ]; then
+              printf >&2 'ERROR: static archive has a missing or empty topology IP intelligence file: %s\n' "${path}"
+              exit 1
+            fi
+          done
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -332,7 +470,9 @@ jobs:
               Fix Tags: ${{ steps.fix-tags.outcome }}
               Mark stable: ${{ steps.channel.outcome }}
               Set up QEMU: ${{ steps.qemu.outcome }}
+              Download topology stock payload: ${{ steps.fetch-topology-stock.outcome }}
               Build: ${{ steps.build.outcome }}
+              Verify topology stock payload: ${{ steps.verify-topology-stock.outcome }}
               Store: ${{ steps.store.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
@@ -355,7 +495,7 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: Write-Output "SKIPPED"
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
@@ -364,9 +504,9 @@ jobs:
       - name: Set Up Go
         id: golang
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: "^1.25"
+          go-version: "^1.27"
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
@@ -380,7 +520,7 @@ jobs:
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.2.0
+        uses: azure/artifact-signing-action@v2.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -403,7 +543,7 @@ jobs:
       - name: Sign Installer
         id: sign-installer
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.2.0
+        uses: azure/artifact-signing-action@v2.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -418,10 +558,11 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -462,7 +603,7 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: Write-Output "SKIPPED"
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
@@ -471,15 +612,11 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            pattern: windows-*-installer
-            path: dist-artifacts
-            merge-multiple: true
-          attempt_limit: 3
-          attempt_delay: 2000
+          pattern: windows-*-installer
+          path: dist-artifacts
+          merge-multiple: true
       - name: Install Netdata
         id: install-netdata
         if: needs.file-check.outputs.run == 'true'
@@ -535,7 +672,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Prepare Environment
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -543,27 +680,19 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            pattern: dist-*
-            path: dist-artifacts
-            merge-multiple: true
-          attempt_limit: 3
-          attempt_delay: 2000
+          pattern: dist-*
+          path: dist-artifacts
+          merge-multiple: true
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            pattern: windows-*-installer
-            path: dist-artifacts
-            merge-multiple: true
-          attempt_limit: 3
-          attempt_delay: 2000
+          pattern: windows-*-installer
+          path: dist-artifacts
+          merge-multiple: true
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
@@ -577,10 +706,11 @@ jobs:
       - name: Store Artifacts
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: final-artifacts
           path: artifacts/*
+          compression-level: 0
           retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -629,24 +759,22 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest
+          mkdir -p download/latest latest "download/$(cat packaging/version)"
           mv artifacts/* download/latest
+          cp -a download/latest/* latest
+          cp -a download/latest/* "download/$(cat packaging/version)"
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
@@ -698,24 +826,22 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest
+          mkdir -p download/latest latest "download/$(cat packaging/version)"
           mv artifacts/* download/latest
+          cp -a download/latest/* latest
+          cp -a download/latest/* "download/$(cat packaging/version)"
           ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
@@ -767,31 +893,29 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest
+          mkdir -p download/latest latest "download/$(cat packaging/version)"
           mv artifacts/* download/latest
+          cp -a download/latest/* latest
+          cp -a download/latest/* "download/$(cat packaging/version)"
           ls -al download/latest
       - name: Run Updater Check
         id: check
         if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host \
-                 -v $PWD:/netdata -w /netdata \
+                 -v "$PWD":/netdata -w /netdata \
                  ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -829,26 +953,22 @@ jobs:
     steps:
       - name: Checkout Main Repo
         id: checkout-main
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: main
       - name: Checkout Nightly Repo
         id: checkout-nightly
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: netdata/netdata-nightlies
           path: nightlies
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: final-artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: final-artifacts
       - name: Prepare version info
         id: version
         run: |
@@ -872,11 +992,11 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Checkout netdata main Repo # Checkout back to netdata/netdata repo to the update latest packaged versions
         id: checkout-netdata
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Init python environment for publish release metadata
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         id: init-python
         with:
           python-version: "3.12"
@@ -964,17 +1084,13 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: final-artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: final-artifacts
       - name: Create Release
         id: create-release
         uses: ncipollo/release-action@v1
@@ -1031,7 +1147,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Prepare tools
         id: prepare
         run: |
@@ -1074,7 +1190,7 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix: ${{ fromJson(needs.src-matrix.outputs.matrix) }}
     steps:
       - name: Skip Check
@@ -1084,7 +1200,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Setup Buildx
@@ -1092,20 +1208,16 @@ jobs:
         uses: docker/setup-buildx-action@v4
       - name: Build test environment
         id: build
-        uses: Wandalen/wretry.action@v3
+        uses: docker/build-push-action@v7
         with:
-          action: docker/build-push-action@v6
-          with: |
-            push: false
-            load: true
-            file: .github/dockerfiles/Dockerfile.build_test
-            build-args: |
-              BASE=${{ matrix.distro }}
-              PRE=${{ matrix.env_prep }}
-              RMJSONC=${{ matrix.jsonc_removal }}
-            tags: test:${{ matrix.artifact_key }}
-          attempt_limit: 3
-          attempt_delay: 15000
+          push: false
+          load: true
+          file: .github/dockerfiles/Dockerfile.build_test
+          build-args: |
+            BASE=${{ matrix.distro }}
+            PRE=${{ matrix.env_prep }}
+            RMJSONC=${{ matrix.jsonc_removal }}
+          tags: test:${{ matrix.artifact_key }}
       - name: netdata-installer on ${{ matrix.distro }}
         id: build-cloud
         if: needs.file-check.outputs.run == 'true'
@@ -1144,7 +1256,6 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
       matrix:
         include:
           - name: macos-14-M1
@@ -1158,7 +1269,7 @@ jobs:
         id: skip
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
@@ -1168,6 +1279,10 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           brew install bash
+      - name: Install ndsudo test dependencies
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        run: |
+          brew install jq smartmontools
       - name: Install netdata dependencies
         id: install-nd-dep
         if: needs.file-check.outputs.run == 'true'
@@ -1177,7 +1292,24 @@ jobs:
         id: build-source
         if: needs.file-check.outputs.run == 'true'
         run: |
-          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build
+          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build --enable-plugin-otel --disable-plugin-go --disable-plugin-scripts
+      - name: Test ndsudo argument validation
+        id: test-ndsudo
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        run: |
+          ./tests/ndsudo-macos.sh /usr/local/netdata/usr/libexec/netdata/plugins.d/ndsudo
+      - name: Test spawn-server unit tests
+        id: test-spawn-server
+        # The spawn servers depend on platform primitives: posix_spawn with POSIX_SPAWN_SETSIGDEF,
+        # and the signal disposition and mask a child inherits across exec. Passing on Linux does
+        # not establish the behaviour here, and macOS is where netdata/netdata#23730 was observed -
+        # a child that inherited an ignored SIGPIPE, so closing its stdio left it running. Until now
+        # these tests ran only on ubuntu (tests/run-unit-tests.sh), so that platform-specific
+        # behaviour was verified nowhere.
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        timeout-minutes: 5
+        run: |
+          ./tests/spawn-server-tests.sh
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
@@ -1201,6 +1333,8 @@ jobs:
               Setup runner: ${{ steps.install-bash.outcome }}
               Install netdata required packages: ${{ steps.install-nd-dep.outcome }}
               Build from source: ${{ steps.build-source.outcome }}
+              Test ndsudo argument validation: ${{ steps.test-ndsudo.outcome }}
+              Test spawn-server unit tests: ${{ steps.test-spawn-server.outcome }}
               Test Agent runtime: ${{ steps.test-agent.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

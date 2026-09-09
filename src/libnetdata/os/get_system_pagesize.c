@@ -21,6 +21,8 @@ size_t os_get_system_page_size(void) {
 
 #else
 
+#include <unistd.h>
+
 size_t os_get_system_page_size(void) {
     static long int page_size = 0;
 

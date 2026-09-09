@@ -76,7 +76,7 @@ func (c *Collector) doQueryDatabaseSize() error {
 		case "datname":
 			db = value
 		case "size":
-			c.getDBMetrics(db).size = newInt(parseInt(value))
+			c.getDBMetrics(db).size = new(parseInt(value))
 		}
 	})
 }

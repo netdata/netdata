@@ -1,0 +1,21 @@
+{
+  "data": {
+    "site": {
+      "siteBgpStatus": {
+        "status": [
+          {
+            "remoteIp": "192.0.2.10",
+            "bgpSession": "Established",
+            "bfdSession": "Up",
+            "routesFromPeer": ["10.0.0.0/8"],
+            "routesToPeer": ["0.0.0.0/0"],
+            "rejectedRoutesFromPeer": []
+          }
+        ],
+        "rawStatus": [
+          "{\"Remote_IP\":\"192.0.2.10\",\"Remote_ASN\":\"64512\",\"Local_IP\":\"198.51.100.10\",\"Local_ASN\":\"65000\",\"BGP_Session\":\"Established\",\"Incoming_Connection\":{\"State\":\"Established\",\"Transport\":\"TCP\"},\"Outgoing_Connection\":{\"State\":\"Established\",\"Transport\":\"TCP\"},\"routes_count\":\"12\",\"routes_count_limit\":\"100\",\"routes_count_limit_exceeded\":false,\"RIB_out\":[{\"subnet\":\"10.0.0.0/8\"}]}"
+        ]
+      }
+    }
+  }
+}

@@ -33,14 +33,6 @@ type Discovery struct {
 	names []string
 }
 
-func (d *Discovery) String() string {
-	return d.Name()
-}
-
-func (d *Discovery) Name() string {
-	return "dummy discovery"
-}
-
 func (d *Discovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	d.Info("instance is started")
 	defer func() { d.Info("instance is stopped") }()

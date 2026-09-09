@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup-name-config.h"
+#include "cgroup-netipc.h"
+#include "cgroup_ebpfgo_shared_memory.h"
 
 // main cgroups thread worker jobs
 #define WORKER_CGROUPS_LOCK 0
@@ -23,6 +26,7 @@ bool cgroup_enable_cpuacct = true;
 bool cgroup_enable_cpuacct_cpu_shares = false;
 
 int cgroup_check_for_new_every = 10;
+int cgroup_name_timeout_ms = 120000;
 int cgroup_update_every = 1;
 char *cgroup_cpuacct_base = NULL;
 char *cgroup_cpuset_base = NULL;
@@ -33,6 +37,10 @@ char *cgroup_unified_base = NULL;
 int cgroup_root_count = 0;
 int cgroup_root_max = 1000;
 int cgroup_max_depth = 0;
+bool discovery_signal_pending = false;
+uint64_t cgroup_discovery_generation = 0;
+uint64_t cgroup_discovery_scans_natural = 0;
+uint64_t cgroup_discovery_scans_opportunistic = 0;
 SIMPLE_PATTERN *enabled_cgroup_paths = NULL;
 SIMPLE_PATTERN *enabled_cgroup_names = NULL;
 SIMPLE_PATTERN *search_cgroup_paths = NULL;
@@ -95,12 +103,18 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     } else if (ret == 0) {
         collector_info("Cannot get the output of \"%s\" within timeout (%d ms)", exec, timeout);
     } else {
-        while (fgets(buf, MAXSIZE_PROC_CMDLINE, spawn_popen_stdout(pi)) != NULL) {
+        FILE *child_stdout = spawn_popen_stdout(pi);
+        if(unlikely(!child_stdout)) {
+            spawn_popen_kill(pi, 0);
+            return retval;
+        }
+
+        while (fgets(buf, MAXSIZE_PROC_CMDLINE, child_stdout) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
                 if (!*begin)
                     break;
-                while (isalpha(*end))
+                while (isalpha((uint8_t)*end))
                     end++;
                 *end = 0;
                 for (int i = 0; cgroups_systemd_options[i].name; i++) {
@@ -160,7 +174,13 @@ static enum cgroups_type cgroups_try_detect_version()
         collector_error("cannot run 'grep cgroup /proc/filesystems'");
         return CGROUPS_AUTODETECT_FAIL;
     }
-    while (fgets(buf, MAXSIZE_PROC_CMDLINE, spawn_popen_stdout(pi)) != NULL) {
+    FILE *child_stdout = spawn_popen_stdout(pi);
+    if(unlikely(!child_stdout)) {
+        spawn_popen_kill(pi, 0);
+        return CGROUPS_AUTODETECT_FAIL;
+    }
+
+    while (fgets(buf, MAXSIZE_PROC_CMDLINE, child_stdout) != NULL) {
         if (strstr(buf, "cgroup2")) {
             cgroups2_available = 1;
             break;
@@ -209,12 +229,43 @@ static enum cgroups_type cgroups_try_detect_version()
     return CGROUPS_V2;
 }
 
-void set_cgroup_base_path(char *filename, char *path) {
+void set_cgroup_base_path(char *filename, const char *path) {
     if (strncmp(netdata_configured_host_prefix, path, strlen(netdata_configured_host_prefix)) == 0) {
         snprintfz(filename, FILENAME_MAX, "%s", path);
     } else {
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, path);
     }
+}
+
+static void cgroup_find_v1_mount(struct mountinfo *root, char *filename,
+                                  const char *subsystem, const char *default_path,
+                                  char **base)
+{
+    struct mountinfo *mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", subsystem);
+    if (!mi)
+        mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", subsystem);
+
+    const char *s;
+    if (!mi) {
+        collector_error("CGROUP: cannot find %s mountinfo. Assuming default: %s", subsystem, default_path);
+        s = default_path;
+    } else
+        s = mi->mount_point;
+
+    set_cgroup_base_path(filename, s);
+    *base = strdupz(filename);
+}
+
+void cgroups_init(void) {
+    time_t timeout_s = inicfg_get_duration_seconds(
+        &netdata_config, "plugin:cgroups", "cgroup-name timeout", 120);
+    cgroup_name_timeout_ms = cgroup_name_timeout_ms_from_seconds(timeout_s);
+
+    char timeout_env[32];
+    snprintfz(timeout_env, sizeof(timeout_env), "%d", cgroup_name_timeout_ms);
+
+    // The process environment must be finalized before worker threads start.
+    nd_setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", timeout_env, 1);
 }
 
 void read_cgroup_plugin_configuration() {
@@ -251,63 +302,11 @@ void read_cgroup_plugin_configuration() {
     char filename[FILENAME_MAX + 1], *s;
     struct mountinfo *mi, *root = mountinfo_read(0);
     if (!cgroup_use_unified_cgroups) {
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
-        if (!mi) {
-            collector_error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
-            s = "/sys/fs/cgroup/cpuacct";
-        } else
-            s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_cpuacct_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
-        if (!mi) {
-            collector_error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
-            s = "/sys/fs/cgroup/cpuset";
-        } else
-            s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_cpuset_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
-        if (!mi) {
-            collector_error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
-            s = "/sys/fs/cgroup/blkio";
-        } else
-            s = mi->mount_point;
-        set_cgroup_base_path(filename, s);
-        cgroup_blkio_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
-        if (!mi) {
-            collector_error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
-            s = "/sys/fs/cgroup/memory";
-        } else {
-            s = mi->mount_point;
-        }
-        set_cgroup_base_path(filename, s);
-        cgroup_memory_base = strdupz(filename);
-
-        mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "pids");
-        if (!mi)
-            mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "pids");
-        if (!mi) {
-            collector_error("CGROUP: cannot find pids mountinfo. Assuming default: /sys/fs/cgroup/pids");
-            s = "/sys/fs/cgroup/pids";
-        } else {
-            s = mi->mount_point;
-        }
-
-        set_cgroup_base_path(filename, s);
-        cgroup_pids_base = strdupz(filename);
+        cgroup_find_v1_mount(root, filename, "cpuacct", "/sys/fs/cgroup/cpuacct", &cgroup_cpuacct_base);
+        cgroup_find_v1_mount(root, filename, "cpuset",  "/sys/fs/cgroup/cpuset",  &cgroup_cpuset_base);
+        cgroup_find_v1_mount(root, filename, "blkio",   "/sys/fs/cgroup/blkio",   &cgroup_blkio_base);
+        cgroup_find_v1_mount(root, filename, "memory",  "/sys/fs/cgroup/memory",  &cgroup_memory_base);
+        cgroup_find_v1_mount(root, filename, "pids",    "/sys/fs/cgroup/pids",    &cgroup_pids_base);
     } else {
         //TODO: can there be more than 1 cgroup2 mount point?
         //there is no cgroup2 specific super option - for now use 'rw' option
@@ -403,8 +402,25 @@ void read_cgroup_plugin_configuration() {
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
-    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
-    cgroups_rename_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    char legacy_cgroup_name[FILENAME_MAX];
+    snprintfz(legacy_cgroup_name, sizeof(legacy_cgroup_name),
+              "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name", netdata_configured_primary_plugins_dir);
+    const char *configured_cgroup_name =
+        inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    if (cgroup_name_is_legacy_default_helper(configured_cgroup_name, legacy_cgroup_name)) {
+        collector_info("CGROUP: migrating legacy cgroup-name helper '%s' to '%s'.",
+                       configured_cgroup_name, filename);
+        configured_cgroup_name =
+            inicfg_set(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    }
+    if (configured_cgroup_name && *configured_cgroup_name && access(configured_cgroup_name, X_OK) == 0)
+        cgroups_rename_script = configured_cgroup_name;
+    else {
+        cgroups_rename_script = NULL;
+        collector_error("CGROUP: cgroup-name helper '%s' is not executable; cgroup renaming is disabled.",
+                       configured_cgroup_name ? configured_cgroup_name : "");
+    }
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_primary_plugins_dir);
     cgroups_network_interface_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup network interfaces", filename);
@@ -440,7 +456,7 @@ void read_cgroup_plugin_configuration() {
         inicfg_get(&netdata_config, 
             "plugin:cgroups",
             "cgroups to match as systemd services",
-            " !/system.slice/*/*.service "
+            " !/system.slice/*.service/*.service "
             " /system.slice/*.service "),
         NULL,
         SIMPLE_PATTERN_EXACT,
@@ -1077,6 +1093,26 @@ static inline int update_memory_limits(struct cgroup *cg) {
 // ----------------------------------------------------------------------------
 // generate charts
 
+static void cgroup_update_io_pids_charts(struct cgroup *cg) {
+    if (likely(cg->io_service_bytes.updated))
+        update_io_serviced_bytes_chart(cg);
+    if (likely(cg->io_serviced.updated))
+        update_io_serviced_ops_chart(cg);
+    if (likely(cg->throttle_io_service_bytes.updated))
+        update_throttle_io_serviced_bytes_chart(cg);
+    if (likely(cg->throttle_io_serviced.updated))
+        update_throttle_io_serviced_ops_chart(cg);
+    if (likely(cg->io_queued.updated))
+        update_io_queued_ops_chart(cg);
+    if (likely(cg->io_merged.updated))
+        update_io_merged_ops_chart(cg);
+    if (likely(cg->pids_current.updated))
+        update_pids_current_chart(cg);
+    cgroup_ebpfgo_cachestat_update_charts(cg);
+    cgroup_ebpfgo_dcstat_update_charts(cg);
+    cgroup_ebpfgo_socket_update_charts(cg);
+}
+
 void update_cgroup_systemd_services_charts() {
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
         if (unlikely(!cg->enabled || cg->pending_renames || !is_cgroup_systemd_service(cg)))
@@ -1099,28 +1135,7 @@ void update_cgroup_systemd_services_charts() {
                 update_mem_activity_chart(cg);
             }
         }
-        if (likely(cg->io_service_bytes.updated)) {
-            update_io_serviced_bytes_chart(cg);
-        }
-        if (likely(cg->io_serviced.updated)) {
-            update_io_serviced_ops_chart(cg);
-        }
-        if (likely(cg->throttle_io_service_bytes.updated)) {
-            update_throttle_io_serviced_bytes_chart(cg);
-        }
-        if (likely(cg->throttle_io_serviced.updated)) {
-            update_throttle_io_serviced_ops_chart(cg);
-        }
-        if (likely(cg->io_queued.updated)) {
-            update_io_queued_ops_chart(cg);
-        }
-        if (likely(cg->io_merged.updated)) {
-            update_io_merged_ops_chart(cg);
-        }
-
-        if (likely(cg->pids_current.updated)) {
-            update_pids_current_chart(cg);
-        }
+        cgroup_update_io_pids_charts(cg);
 
         cg->function_ready = true;
     }
@@ -1243,33 +1258,7 @@ void update_cgroup_charts() {
             update_mem_failcnt_chart(cg);
         }
 
-        if (likely(cg->io_service_bytes.updated)) {
-            update_io_serviced_bytes_chart(cg);
-        }
-
-        if (likely(cg->io_serviced.updated)) {
-            update_io_serviced_ops_chart(cg);
-        }
-
-        if (likely(cg->throttle_io_service_bytes.updated)) {
-            update_throttle_io_serviced_bytes_chart(cg);
-        }
-
-        if (likely(cg->throttle_io_serviced.updated)) {
-            update_throttle_io_serviced_ops_chart(cg);
-        }
-
-        if (likely(cg->io_queued.updated)) {
-            update_io_queued_ops_chart(cg);
-        }
-
-        if (likely(cg->io_merged.updated)) {
-            update_io_merged_ops_chart(cg);
-        }
-
-        if (likely(cg->pids_current.updated)) {
-                update_pids_current_chart(cg);
-        }
+        cgroup_update_io_pids_charts(cg);
 
         if (cg->options & CGROUP_OPTIONS_IS_UNIFIED) {
             if (likely(cg->cpu_pressure.updated)) {
@@ -1354,6 +1343,8 @@ static void cgroup_main_cleanup(void *pptr) {
         }
     }
 
+    cgroup_ebpfgo_shared_memory_close();
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -1424,17 +1415,29 @@ void cgroups_main(void *ptr) {
         return;
     }
 
-    rrd_function_add_inline(localhost, NULL, "containers-vms", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT / 2, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_CGTOP_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            cgroup_function_cgroup_top);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .name = "containers-vms",
+        .help = FUNCTION_CGTOP_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT / 2,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = cgroup_function_cgroup_top,
+    });
 
-    rrd_function_add_inline(localhost, NULL, "systemd-services", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT / 3, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_SYSTEMD_SERVICES_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            cgroup_function_systemd_top);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .name = "systemd-services",
+        .help = FUNCTION_SYSTEMD_SERVICES_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT / 3,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = cgroup_function_systemd_top,
+    });
 
     heartbeat_t hb;
     heartbeat_init(&hb, cgroup_update_every * USEC_PER_SEC);
@@ -1457,6 +1460,18 @@ void cgroups_main(void *ptr) {
             cgroups_check = 0;
         }
 
+        bool shm_ready = cgroup_ebpfgo_cachestat_refresh();
+        // Independently gate each module based on which one stamped the SHM
+        // this cycle; this allows socket charts to work without cachestat and
+        // cachestat charts to work without socket.
+        uint32_t shm_flags = shm_ready ? cgroup_ebpfgo_shared_memory_flags() : 0;
+        bool cachestat_ok = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_CACHESTAT);
+        bool dcstat_ok    = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_DCSTAT);
+        bool socket_ok    = shm_ready && (shm_flags & EBPFGO_SHM_FLAG_SOCKET);
+        cgroup_ebpfgo_cachestat_set_snapshot_ready(cachestat_ok);
+        cgroup_ebpfgo_dcstat_set_snapshot_ready(dcstat_ok);
+        cgroup_ebpfgo_socket_set_snapshot_ready(socket_ok);
+
         worker_is_busy(WORKER_CGROUPS_LOCK);
         netdata_mutex_lock(&cgroup_root_mutex);
 
@@ -1467,6 +1482,19 @@ void cgroups_main(void *ptr) {
             netdata_mutex_unlock(&cgroup_root_mutex);
             break;
         }
+
+        if (cachestat_ok || dcstat_ok || socket_ok)
+            cgroup_ebpfgo_refresh_pid_lists();
+
+        if (cachestat_ok)
+            cgroup_ebpfgo_cachestat_update_locked();
+        if (dcstat_ok)
+            cgroup_ebpfgo_dcstat_update_locked();
+        if (socket_ok)
+            cgroup_ebpfgo_socket_update_locked();
+
+        if (cachestat_ok || dcstat_ok || socket_ok)
+            cgroup_ebpfgo_release_pid_lists();
 
         worker_is_busy(WORKER_CGROUPS_CHART);
 
@@ -1480,5 +1508,8 @@ void cgroups_main(void *ptr) {
 
         worker_is_idle();
         netdata_mutex_unlock(&cgroup_root_mutex);
+
+        cgroup_netipc_lookup_update_charts(cgroup_update_every);
+        cgroup_discovery_update_charts(cgroup_update_every);
     }
 }

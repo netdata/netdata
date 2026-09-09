@@ -2,7 +2,7 @@
 
 #include "alarm_stream.h"
 
-#include "proto/alarm/v1/stream.pb.h"
+#include "alarm/v1/stream.pb.h"
 
 #include "libnetdata/libnetdata.h"
 
@@ -176,6 +176,11 @@ struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t l
 
 void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr)
 {
+    if (!ptr)
+        return;
+
+    freez(ptr->node_id);
+    freez(ptr->claim_id);
     freez(ptr->snapshot_uuid);
     freez(ptr);
 }
@@ -197,6 +202,11 @@ alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *
     return msg;
 }
 
+void destroy_alarm_snapshot_proto(alarm_snapshot_proto_ptr_t snapshot)
+{
+    delete (AlarmSnapshot *)snapshot;
+}
+
 void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data)
 {
     AlarmSnapshot *alarm_snapshot = (AlarmSnapshot *)snapshot;
@@ -213,10 +223,11 @@ char *generate_alarm_snapshot_bin(size_t *len, alarm_snapshot_proto_ptr_t snapsh
     *len = PROTO_COMPAT_MSG_SIZE_PTR(alarm_snapshot);
     char *bin = (char*)mallocz(*len);
     if (!alarm_snapshot->SerializeToArray(bin, *len)) {
-        delete alarm_snapshot;
+        freez(bin);
+        destroy_alarm_snapshot_proto(snapshot);
         return NULL;
     }
 
-    delete alarm_snapshot;
+    destroy_alarm_snapshot_proto(snapshot);
     return bin;
 }

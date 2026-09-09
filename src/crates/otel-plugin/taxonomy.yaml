@@ -1,0 +1,8 @@
+taxonomy_version: 1
+plugin_name: otel.plugin
+module_name: otel
+taxonomy_optout:
+  reason: >-
+    otel.plugin creates metric charts dynamically from incoming OTLP data;
+    the set of contexts depends entirely on the user's instrumentation and
+    cannot be statically placed in the dashboard taxonomy.

@@ -59,6 +59,46 @@
       name: Synthetic Testing
       description: ""
       children: []
+- id: network-performance-monitoring
+  name: Network Performance Monitoring
+  description: "Monitor the network fabric end to end with Netdata: per-vendor device metrics over SNMP and vendor APIs, BGP, licensing, network topologies, network flows, SNMP traps, and syslog from network devices."
+  children:
+    - id: network-performance-monitoring.device-metrics
+      name: Device Metrics
+      description: "Per-vendor metrics from routers, switches, firewalls, access points, load balancers, and other network devices, collected over SNMP profiles and vendor APIs."
+      children: []
+    - id: network-performance-monitoring.licensing
+      name: Licensing Monitoring
+      description: "Track license state, entitlements, and expiry across supported network device vendors."
+      children: []
+    - id: network-performance-monitoring.topologies
+      name: Topologies
+      description: "Discover and visualize how the network is connected: L2/L3 device topology, live network connections, streaming, and virtual infrastructure."
+      children: []
+    - id: network-performance-monitoring.bgp
+      name: BGP Monitoring
+      description: "Monitor BGP peering and routing health across network devices and software routing stacks."
+      children: []
+    - id: network-performance-monitoring.flows
+      name: Network Flows
+      description: "Network flow ingestion and enrichment data sources for NetFlow / IPFIX / sFlow analysis"
+      children:
+        - id: network-performance-monitoring.flows.sources
+          name: Flow Protocols
+          description: "Flow protocols Netdata receives directly from routers, switches, and software exporters"
+          children: []
+        - id: network-performance-monitoring.flows.enrichment-methods
+          name: Enrichment Methods
+          description: "Configurable data sources that label flow records with operational context: geolocation, AS / BGP routing, network ownership, exporter / interface metadata, classifiers, and inner-packet decapsulation"
+          children: []
+    - id: network-performance-monitoring.traps
+      name: SNMP Traps
+      description: "Receive, decode, store, query, and forward SNMP Trap and INFORM events from network devices."
+      children: []
+    - id: network-performance-monitoring.syslog
+      name: Syslog from Network Devices
+      description: "Ingest syslog from network devices via the OpenTelemetry Collector."
+      children: []
 - id: logs
   name: Logs
   description: "Monitoring logs on your infrastructure"
