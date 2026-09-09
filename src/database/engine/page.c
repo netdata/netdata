@@ -311,6 +311,24 @@ void pgd_init_arals(void) {
                 0,
                 &pgd_aral_statistics,
                 NULL, NULL, false, false, true);
+
+            // these pools hold dbengine page data, and they are what
+            // netdata.conf's memory deduplication (ksm) option documents as
+            // "the dbengine page cache". uncompressed data pages (raw
+            // ARRAY_32BIT, and ARRAY_TIER1 which every tier above 0 uses
+            // regardless of 'dbengine page type') are plain value arrays, so
+            // constant-valued metrics can produce identical bytes.
+            // expect a poor yield, though: every ARAL element carries a trailer
+            // holding a tagged pointer to its owning ARAL page, so two base
+            // pages taken from different ARAL pages differ at every element
+            // trailer no matter what the data is. Only base pages within one
+            // ARAL page can match. A measurement with the default gorilla tier
+            // 0 saw no merging at all.
+            // the pools are also keyed by size, so a few of them serve PGD and
+            // gorilla_writer_t (see aral_sizes[] above), which never merge -
+            // they are the smallest size classes and are not worth a separate
+            // arena to keep out.
+            aral_enable_ksm(arals[arals_slot(slot, partition)]);
         }
     }
 
