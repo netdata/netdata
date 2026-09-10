@@ -154,6 +154,11 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t collected_metrics = UINT32_MAX;
     uint32_t replicating_instances = UINT32_MAX;
 
+    // One replication snapshot for the whole function: the status decision below and the reported
+    // instances/completion MUST come from the same read, or a caller can be handed
+    // status=replicating with instances=0 and completion=100.
+    NETDATA_DOUBLE replication_completion = NAN;
+
     time_t last_connected;
     time_t last_disconnected;
     uint32_t connections;
@@ -176,13 +181,23 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             status = RRDHOST_INGEST_STATUS_ONLINE;
             since = netdata_start_time;
         }
-        else if (
-            (replicating_instances = rrdhost_receiver_replicating_charts(host)) > 0 ||
-            !(collected_metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED)))
-            status = RRDHOST_INGEST_STATUS_REPLICATING;
+        else {
+            // Under the receiver lock: stream_receiver_replication_reset() zeroes `charts` and
+            // `charts_started` separately, and holds this lock across both (rrdhost_set_receiver() and
+            // rrdhost_clear_receiver()). Reading the pair outside it would let a reset interleave
+            // between the helper's two loads and produce started < remaining, i.e. a `null` completion
+            // on the API. This is the whole reason the helper needs no re-read.
+            rrdhost_receiver_lock(host);
+            replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
+            rrdhost_receiver_unlock(host);
 
-        else
-            status = RRDHOST_INGEST_STATUS_ONLINE;
+            collected_metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+
+            if(replicating_instances > 0 || !collected_metrics)
+                status = RRDHOST_INGEST_STATUS_REPLICATING;
+            else
+                status = RRDHOST_INGEST_STATUS_ONLINE;
+        }
     }
     else {
         if(!connections)
@@ -211,9 +226,15 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             rrdhost_receiver_lock(host);
             if (host->receiver && (flags & RRDHOST_FLAG_COLLECTOR_ONLINE)) {
                 has_receiver = true;
-                s->ingest.replication.instances = replicating_instances == UINT32_MAX ? rrdhost_receiver_replicating_charts(host) : replicating_instances;
-                s->ingest.replication.completion = host->stream.rcv.status.replication.percent;
-                s->ingest.replication.in_progress = s->ingest.replication.instances > 0;
+                // reuse the snapshot taken for the status decision; only read again on the paths
+                // that never needed replication data to reach their status (this block already holds
+                // the receiver lock, so that read has the same protection)
+                if(replicating_instances == UINT32_MAX)
+                    replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
+
+                s->ingest.replication.instances = replicating_instances;
+                s->ingest.replication.completion = replication_completion;
+                s->ingest.replication.in_progress = replicating_instances > 0;
 
                 s->ingest.capabilities = host->receiver->capabilities;
                 s->ingest.peers = nd_sock_socket_peers(&host->receiver->sock);

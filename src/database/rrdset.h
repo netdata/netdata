@@ -84,6 +84,36 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 #define rrdset_is_discoverable(st) (rrdset_is_replicating(st) || !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
 
 // --------------------------------------------------------------------------------------------------------------------
+// Receiver replication ownership.
+//
+// The SINGLE implementation of the receiver-replication claim and release. Every lifecycle site uses
+// these - the parser's CHART_DEFINITION_END, both REPLAY_END branches, the connect/disconnect reset,
+// and chart teardown. Do NOT open-code the flag CAS plus the counter movement anywhere else: the
+// ownership invariant is only enforceable while it lives in one place. Contract and its two exceptions:
+// .agents/sow/specs/streaming-receiver-replication-accounting.md
+//
+// claim():   true when THIS call caused the not-replicating -> replicating transition, i.e. the chart's
+//            contribution is now held. False means the chart already held one and this call's
+//            speculative increment has been withdrawn.
+// release(): returns the OLD flags; releases the contribution only if this call cleared IN_PROGRESS.
+//            `also_clear` carries extra flags to clear in the same atomic transition.
+bool rrdhost_receiver_replication_claim(RRDSET *st);
+RRDSET_FLAGS rrdhost_receiver_replication_release(RRDSET *st, RRDSET_FLAGS also_clear);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Refused (would-be-underflow) releases, so a test can detect an over-release that the refusal itself
+// hides from the counter.
+extern size_t rrdhost_receiver_replication_refusals;
+
+// Test-only: pause one claiming thread between its counter writes and its flag publish, so a unit test
+// can drive that interleaving deterministically instead of hoping for it.
+void rrdhost_receiver_replication_race_hook_arm(RRDSET *st);
+bool rrdhost_receiver_replication_race_hook_is_waiting(void);
+void rrdhost_receiver_replication_race_hook_release(void);
+void rrdhost_receiver_replication_race_hook_disarm(void);
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
 
 struct rrdset {
     nd_uuid_t chart_uuid;                             // the global UUID for this chart
