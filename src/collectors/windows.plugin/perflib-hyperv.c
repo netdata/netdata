@@ -44,6 +44,17 @@ static void get_and_sanitize_instance_value(
             rrddim_set_by_pointer(p->st, p->rd_##field, (collected_number)p->field.current.Data);                    \
     } while (0)
 
+static inline NETDATA_DOUBLE hyperv_average_timer_seconds(COUNTER_DATA *counter)
+{
+    if (!counter->updated || counter->current.CounterType != PERF_AVERAGE_TIMER ||
+        counter->current.Data < counter->previous.Data || counter->current.Time <= counter->previous.Time ||
+        !counter->current.Frequency)
+        return 0;
+
+    return (((double)(counter->current.Data - counter->previous.Data) / (double)counter->current.Frequency) /
+            (double)(counter->current.Time - counter->previous.Time));
+}
+
 #define HYPERV_MISSING_CYCLES 12
 
 #define HYPERV_MARK_SEEN(p, item)                                                                                       \
@@ -224,7 +235,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
                 p->st_vm_memory_physical_guest_visible = rrdset_create_localhost(
                     "vm_memory_physical_guest_visible",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_memory_physical_guest_visible",
@@ -238,7 +249,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
                 p->st_pressure = rrdset_create_localhost(
                     "vm_memory_pressure_current",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_memory_pressure_current",
@@ -252,7 +263,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
                 p->st_pressure_limits = rrdset_create_localhost(
                     "vm_memory_pressure_limits",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_memory_pressure_limits",
@@ -266,7 +277,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
                 p->st_vm_memory_operations = rrdset_create_localhost(
                     "vm_memory_operations",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_memory_operations",
@@ -280,7 +291,7 @@ static bool do_hyperv_memory(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
                 p->st_vm_memory_added_removed = rrdset_create_localhost(
                     "vm_memory_added_removed",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_memory_added_removed",
@@ -365,14 +376,14 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
         get_and_sanitize_instance_value(
             pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer));
 
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+            continue;
+
         struct hypervisor_partition *p = dictionary_set(item->instance, windows_shared_buffer, NULL, sizeof(*p));
 
         if (!p->collected_metadata) {
             p->collected_metadata = true;
         }
-
-        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
-            continue;
 
         HYPERV_MARK_SEEN(p, item);
 
@@ -402,7 +413,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
 
             p->st_vm_vid_remote_physical_pages = rrdset_create_localhost(
                 "vm_vid_remote_physical_pages",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_vid_remote_physical_pages",
@@ -416,7 +427,7 @@ static bool do_hyperv_vid_partition(PERF_DATA_BLOCK *pDataBlock, int update_ever
 
             p->st_vm_vid_preferred_numa_node = rrdset_create_localhost(
                 "vm_vid_preferred_numa_node",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_vid_preferred_numa_node",
@@ -705,7 +716,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_gpa_space_pages = rrdset_create_localhost(
                 "root_partition_gpa_space_pages",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_gpa_space_pages",
@@ -723,7 +734,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_gpa_space_modifications = rrdset_create_localhost(
                 "root_partition_gpa_space_modifications",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_gpa_space_modifications",
@@ -740,7 +751,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_attached_devices = rrdset_create_localhost(
                 "root_partition_attached_devices",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_attached_devices",
@@ -756,7 +767,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_deposited_pages = rrdset_create_localhost(
                 "root_partition_deposited_pages",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_deposited_pages",
@@ -772,7 +783,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_DeviceDMAErrors = rrdset_create_localhost(
                 "root_partition_device_dma_errors",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_device_dma_errors",
@@ -789,7 +800,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_DeviceInterruptErrors = rrdset_create_localhost(
                 "root_partition_device_interrupt_errors",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_device_interrupt_errors",
@@ -806,7 +817,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_DeviceInterruptMappings = rrdset_create_localhost(
                 "root_partition_device_interrupt_mappings",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_device_interrupt_mappings",
@@ -823,7 +834,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_DeviceInterruptThrottleEvents = rrdset_create_localhost(
                 "root_partition_device_interrupt_throttle_events",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_device_interrupt_throttle_events",
@@ -840,7 +851,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_GPAPages = rrdset_create_localhost(
                 "root_partition_gpa_pages",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_gpa_pages",
@@ -856,7 +867,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_IOTLBFlushCost = rrdset_create_localhost(
                 "root_partition_io_tlb_flush_cost",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_io_tlb_flush_cost",
@@ -872,7 +883,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_IOTLBFlushesSec = rrdset_create_localhost(
                 "root_partition_io_tlb_flush",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_io_tlb_flush",
@@ -888,7 +899,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_AddressSpaces = rrdset_create_localhost(
                 "root_partition_address_space",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_address_space",
@@ -904,7 +915,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_RecommendedVirtualTLBSize = rrdset_create_localhost(
                 "root_partition_recommended_virtual_tlb_size",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_recommended_virtual_tlb_size",
@@ -921,7 +932,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_SkippedTimerTicks = rrdset_create_localhost(
                 "root_partition_skipped_timer_ticks",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_skipped_timer_ticks",
@@ -938,7 +949,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_VirtualTLBPages = rrdset_create_localhost(
                 "root_partition_virtual_tlb_pages",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_virtual_tlb_pages",
@@ -954,7 +965,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->st_VirtualTLBFlushEntriesSec = rrdset_create_localhost(
                 "root_partition_virtual_tlb_flush_entries",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_virtual_tlb_flush_entries",
@@ -1174,7 +1185,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             if (!p->st_bytes) {
                 p->st_bytes = rrdset_create_localhost(
                     "vm_storage_device_bytes",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_bytes",
@@ -1195,7 +1206,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             if (!p->st_errors) {
                 p->st_errors = rrdset_create_localhost(
                     "vm_storage_device_errors",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_errors",
@@ -1215,7 +1226,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             if (!p->st_queue_length) {
                 p->st_queue_length = rrdset_create_localhost(
                     "vm_storage_device_queue_length",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_queue_length",
@@ -1238,7 +1249,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             if (!p->st_latency) {
                 p->st_latency = rrdset_create_localhost(
                     "vm_storage_device_latency",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_latency",
@@ -1259,7 +1270,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             if (!p->st_throughput) {
                 p->st_throughput = rrdset_create_localhost(
                     "vm_storage_device_throughput",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_throughput",
@@ -1280,7 +1291,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             if (!p->st_normalized_throughput) {
                 p->st_normalized_throughput = rrdset_create_localhost(
                     "vm_storage_device_normalized_throughput",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_normalized_throughput",
@@ -1305,7 +1316,7 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             if (!p->st_io_quota_replenishment_rate) {
                 p->st_io_quota_replenishment_rate = rrdset_create_localhost(
                     "vm_storage_device_io_quota_replenishment_rate",
-                    windows_shared_buffer,
+                    id,
                     NULL,
                     HYPERV,
                     HYPERV ".vm_storage_device_io_quota_replenishment_rate",
@@ -1337,8 +1348,11 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
         SETP_DIM_VALUE(st_errors, ErrorCount);
         SETP_DIM_VALUE(st_queue_length, QueueLength);
         SETP_DIM_VALUE(st_queue_length, LowerQueueLength);
-        SETP_DIM_VALUE(st_latency, Latency);
-        SETP_DIM_VALUE(st_latency, LowerLatency);
+        if (p->Latency.updated)
+            rrddim_set_by_pointer_double(p->st_latency, p->rd_Latency, hyperv_average_timer_seconds(&p->Latency));
+        if (p->LowerLatency.updated)
+            rrddim_set_by_pointer_double(
+                p->st_latency, p->rd_LowerLatency, hyperv_average_timer_seconds(&p->LowerLatency));
         SETP_DIM_VALUE(st_throughput, Throughput);
         SETP_DIM_VALUE(st_normalized_throughput, NormalizedThroughput);
         SETP_DIM_VALUE(st_io_quota_replenishment_rate, IOQuotaReplenishmentRate);
@@ -2015,7 +2029,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
             p->st_send_receive_packets = rrdset_create_localhost(
                 "vm_net_interface_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_packets",
@@ -2037,7 +2051,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
             p->st_send_receive_bytes = rrdset_create_localhost(
                 "vm_net_interface_traffic",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_traffic",
@@ -2058,7 +2072,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
             p->st_IPsecoffloadBytes = rrdset_create_localhost(
                 "vm_net_interface_ipsec_traffic",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_ipsec_traffic",
@@ -2079,7 +2093,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
             p->st_DirectedPackets = rrdset_create_localhost(
                 "vm_net_interface_directed_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_directed_packets",
@@ -2100,7 +2114,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
             p->st_BroadcastPackets = rrdset_create_localhost(
                 "vm_net_interface_broadcast_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_broadcast_packets",
@@ -2121,7 +2135,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
 
             p->st_MulticastPackets = rrdset_create_localhost(
                 "vm_net_interface_multicast_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_net_interface_multicast_packets",
@@ -2280,7 +2294,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
 
             p->st_HypervisorProcessor = rrdset_create_localhost(
                 "vm_cpu_usage_by_run_context",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vm_cpu_usage_by_run_context",
