@@ -244,34 +244,6 @@ ebpf_module_t ebpf_modules[] = {
      .maps_per_core = CONFIG_BOOLEAN_YES,
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
-    {.info = {.thread_name = "fd", .config_name = "fd", .thread_description = NETDATA_EBPF_FD_MODULE_DESC},
-     .functions =
-         {.start_routine = ebpf_fd_thread,
-          .apps_routine = ebpf_fd_create_apps_charts,
-          .bpf_unload = ebpf_fd_unload_bpf},
-     .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
-     .update_every = EBPF_DEFAULT_UPDATE_EVERY,
-     .global_charts = 1,
-     .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
-     .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT,
-     .cgroup_charts = CONFIG_BOOLEAN_NO,
-     .mode = MODE_ENTRY,
-     .optional = 0,
-     .maps = NULL,
-     .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE,
-     .names = NULL,
-     .cfg = &fd_config,
-     .config_file = NETDATA_FD_CONFIG_FILE,
-     .kernels =
-         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_11 | NETDATA_V5_14,
-     .load = EBPF_LOAD_LEGACY,
-     .targets = fd_targets,
-     .probe_links = NULL,
-     .objects = NULL,
-     .thread = NULL,
-     .maps_per_core = CONFIG_BOOLEAN_YES,
-     .lifetime = EBPF_DEFAULT_LIFETIME,
-     .running_time = 0},
     {.info =
          {.thread_name = "hardirq", .config_name = "hardirq", .thread_description = NETDATA_EBPF_HARDIRQ_MODULE_DESC},
      .functions = {.start_routine = ebpf_hardirq_thread, .apps_routine = NULL},
@@ -480,14 +452,6 @@ struct netdata_static_thread ebpf_threads[] = {
      .init_routine = NULL,
      .start_routine = NULL},
     {.name = "EBPF MOUNT",
-     .config_section = NULL,
-     .config_name = NULL,
-     .env_name = NULL,
-     .enabled = 1,
-     .thread = NULL,
-     .init_routine = NULL,
-     .start_routine = NULL},
-    {.name = "EBPF FD",
      .config_section = NULL,
      .config_name = NULL,
      .env_name = NULL,
@@ -1083,7 +1047,6 @@ static void ebpf_parse_args(int argc, char **argv)
         {"filesystem", no_argument, 0, 0},
         {"disk", no_argument, 0, 0},
         {"mount", no_argument, 0, 0},
-        {"filedescriptor", no_argument, 0, 0},
         {"hardirq", no_argument, 0, 0},
         {"softirq", no_argument, 0, 0},
         {"oomkill", no_argument, 0, 0},
@@ -1176,14 +1139,6 @@ static void ebpf_parse_args(int argc, char **argv)
 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info(
                     "EBPF enabling \"MOUNT\" chart, because it was started with the option \"[-]-mount\".");
-#endif
-                break;
-            }
-            case EBPF_MODULE_FD_IDX: {
-                select_threads |= 1 << EBPF_MODULE_FD_IDX;
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info(
-                    "EBPF enabling \"FILEDESCRIPTOR\" chart, because it was started with the option \"[-]-filedescriptor\".");
 #endif
                 break;
             }
