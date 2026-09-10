@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# analyze-local.sh -- run codacy-analysis-cli locally on the working tree.
+# analyze-local.sh -- run Codacy CLI v2 locally on the working tree.
 #
 # Mirrors what Codacy CI would run on the same source. Useful BEFORE
 # `git push` to catch findings in seconds, not minutes.
@@ -13,8 +13,8 @@ usage() {
     cat <<'EOF'
 analyze-local.sh [options]
 
-Runs the official codacy-analysis-cli (https://github.com/codacy/codacy-analysis-cli)
-on the current working tree and writes a JSON dump under
+Runs Codacy CLI v2 (https://github.com/codacy/codacy-cli-v2) on the current working
+tree and writes a dump under
 <repo>/.local/audits/codacy/. The cli respects the repo's .codacy.yml
 exclude_paths.
 
@@ -22,21 +22,19 @@ Options:
   --tool <name>          run a single tool (e.g. shellcheck, markdownlint).
                          Omit to run all tools applicable to changed files.
   --directory <path>     analyze a subpath (default: <repo-root>)
-  --format json|sarif    output format (default: json)
+  --format json|sarif    output format (default: sarif)
   --output PATH          explicit dump path (default: auto under .local/audits/codacy/)
-  --runner docker|local  installer to use (default: auto -- prefer local
-                         binary, fall back to docker)
+  --runner local         Codacy CLI v2 executable to use (default: auto)
   -h, --help
 
-Required tools: docker (default) OR a local codacy-analysis-cli binary.
-CODACY_CLI_VERSION=<tag> in the environment pins the docker image tag (default: latest);
-this script does not read .env.
+Required tool: a local codacy-cli executable. Set CODACY_CLI_V2_VERSION to verify the
+installed executable before analysis; this script does not download or upgrade tools.
 EOF
 }
 
 TOOL=
 SUBDIR=
-FORMAT=json
+FORMAT=sarif
 OUTPUT=
 RUNNER=auto
 
@@ -76,8 +74,12 @@ fi
 if [ -z "$OUTPUT" ]; then
     suffix=""
     [ -n "$TOOL" ] && suffix="-${TOOL}"
-    OUTPUT="${audit_dir}/local${suffix}-$(date -u +%Y%m%dT%H%M%SZ).${FORMAT}"
+    OUTPUT="${audit_dir}/local${suffix}-$(date -u +%Y%m%dT%H%M%SZ)-$$.${FORMAT}"
 fi
+
+OUTPUT_DIR="$(dirname "$OUTPUT")"
+mkdir -p "$OUTPUT_DIR"
+OUTPUT="$(cd "$OUTPUT_DIR" && pwd)/$(basename "$OUTPUT")"
 
 case "$FORMAT" in
     json|sarif) ;;
@@ -87,14 +89,13 @@ esac
 # Pick a runner.
 if [ "$RUNNER" = "auto" ]; then
     if command -v codacy-analysis-cli >/dev/null 2>&1; then
+        echo -e "${CA_RED}[ERROR]${CA_NC} legacy codacy-analysis-cli found; install Codacy CLI v2 as 'codacy-cli'." >&2
+        exit 2
+    elif command -v codacy-cli >/dev/null 2>&1; then
         RUNNER=local
-    elif command -v docker >/dev/null 2>&1; then
-        RUNNER=docker
     else
-        echo -e "${CA_RED}[ERROR]${CA_NC} neither 'codacy-analysis-cli' nor 'docker' found in PATH." >&2
-        echo "Install options:" >&2
-        echo "  - docker:   https://docs.docker.com/get-docker/" >&2
-        echo "  - cli:      https://github.com/codacy/codacy-analysis-cli#install" >&2
+        echo -e "${CA_RED}[ERROR]${CA_NC} 'codacy-cli' (Codacy CLI v2) not found in PATH." >&2
+        echo "Install: https://github.com/codacy/codacy-cli-v2#installation" >&2
         exit 2
     fi
 fi
@@ -103,30 +104,21 @@ echo -e "${CA_GRAY}[analyze-local] runner=${RUNNER} format=${FORMAT} dir=${SUBDI
 
 case "$RUNNER" in
     local)
-        # Local binary expects host paths.
-        local_args=(analyze --directory "$SUBDIR" --format "$FORMAT")
+        if [ -n "${CODACY_CLI_V2_VERSION:-}" ]; then
+            installed_version="$(codacy-cli version 2>/dev/null || true)"
+            case "$installed_version" in
+                *"${CODACY_CLI_V2_VERSION}"*) ;;
+                *) echo -e "${CA_RED}[ERROR]${CA_NC} codacy-cli version does not match CODACY_CLI_V2_VERSION=${CODACY_CLI_V2_VERSION}" >&2; exit 2 ;;
+            esac
+        fi
+        if [ ! -f "$SUBDIR/.codacy/codacy.yaml" ]; then
+            (cd "$SUBDIR" && codacy-cli init) >"$OUTPUT.init.log" 2>&1
+        fi
+        (cd "$SUBDIR" && codacy-cli install) >"$OUTPUT.install.log" 2>&1
+        local_args=(analyze "$SUBDIR" --format "$FORMAT" --output "$OUTPUT")
         [ -n "$TOOL" ] && local_args+=(--tool "$TOOL")
         rc=0
-        codacy-analysis-cli "${local_args[@]}" > "$OUTPUT" 2> "$OUTPUT.log" || rc=$?
-        ;;
-    docker)
-        # Per https://github.com/codacy/codacy-analysis-cli the CLI
-        # spawns one child container per tool and needs:
-        #   - the host docker socket (docker-in-docker)
-        #   - CODACY_CODE pointing at the host path of the source
-        #   - the source bind-mounted at the SAME path inside the
-        #     CLI container so child containers can resolve it
-        cli_args=(analyze --directory "$SUBDIR" --format "$FORMAT")
-        [ -n "$TOOL" ] && cli_args+=(--tool "$TOOL")
-        # The container gets the host docker socket, so a moving tag is a supply-chain
-        # surface; CODACY_CLI_VERSION lets a caller pin it without changing the default.
-        rc=0
-        docker run --rm \
-                --env CODACY_CODE="$SUBDIR" \
-                --volume /var/run/docker.sock:/var/run/docker.sock \
-                --volume "$SUBDIR":"$SUBDIR" \
-                "codacy/codacy-analysis-cli:${CODACY_CLI_VERSION:-latest}" \
-                "${cli_args[@]}" > "$OUTPUT" 2> "$OUTPUT.log" || rc=$?
+        codacy-cli "${local_args[@]}" > "$OUTPUT.stdout.log" 2> "$OUTPUT.log" || rc=$?
         ;;
     *)
         echo -e "${CA_RED}[ERROR]${CA_NC} unknown --runner '${RUNNER}'" >&2
@@ -160,7 +152,7 @@ if [ "$FORMAT" = "json" ]; then
     if [ "$rc" -ne 0 ]; then
         echo -e "${CA_YELLOW}[analyze-local] cli exit ${rc} (expected when findings are present)${CA_NC}" >&2
     fi
-    rm -f "$OUTPUT.log"  # the CLI's stderr is kept only when the run failed
+    rm -f "$OUTPUT.log" "$OUTPUT.stdout.log" "$OUTPUT.init.log" "$OUTPUT.install.log"
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT}" >&2
 else
     # SARIF is JSON too; count results across runs so the same failed-versus-clean rule applies.
@@ -177,7 +169,7 @@ else
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc} with 0 findings: a failed analysis, not a clean tree" >&2
         exit 4
     fi
-    rm -f "$OUTPUT.log"
+    rm -f "$OUTPUT.log" "$OUTPUT.stdout.log" "$OUTPUT.init.log" "$OUTPUT.install.log"
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT} (${FORMAT} format)" >&2
 fi
 

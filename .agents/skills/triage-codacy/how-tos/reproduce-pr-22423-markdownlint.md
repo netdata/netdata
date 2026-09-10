@@ -8,7 +8,7 @@ This how-to walks through reproducing those 864 findings on the pre-exclusion st
 
 ## Prerequisite
 
-- `docker` available (or `codacy-analysis-cli` installed locally).
+- Codacy CLI v2 (`codacy-cli`) installed locally.
 - `<repo>/.env` need NOT contain `CODACY_TOKEN` -- `analyze-local.sh` runs the CLI anonymously.
 
 ## Step 1 -- check out the pre-exclusion state
@@ -26,17 +26,14 @@ git checkout d7791e6838 -- .codacy.yml      # restore the pre-exclusion .codacy.
 .agents/skills/triage-codacy/scripts/analyze-local.sh --tool markdownlint
 ```
 
-Expected: a JSON dump under `<repo>/.local/audits/codacy/local-markdownlint-<ts>.json`. The CLI returns non-zero when findings exist (this is normal; the script tolerates it).
+Expected: a SARIF dump under `<repo>/.local/audits/codacy/local-markdownlint-<ts>-<pid>.sarif`. The CLI returns non-zero when findings exist (this is normal; the script tolerates it).
 
 ## Step 3 -- count findings
 
 ```bash
-DUMP="$(ls -1t .local/audits/codacy/local-markdownlint-*.json | head -1)"
+DUMP="$(ls -1t .local/audits/codacy/local-markdownlint-*.sarif | head -1)"
 jq '
-    if type=="array" then length
-    elif type=="object" and has("issues") then (.issues | length)
-    elif type=="object" and has("results") then (.results | length)
-    else 0 end
+    [.runs[]?.results[]?] | length
 ' "$DUMP"
 ```
 
@@ -52,8 +49,8 @@ git checkout HEAD -- .codacy.yml
 
 ```bash
 .agents/skills/triage-codacy/scripts/analyze-local.sh --tool markdownlint
-DUMP="$(ls -1t .local/audits/codacy/local-markdownlint-*.json | head -1)"
-jq '[ ... | select(.filePath | startswith(".agents/") or startswith("docs/netdata-ai/skills/")) ] | length' "$DUMP"
+DUMP="$(ls -1t .local/audits/codacy/local-markdownlint-*.sarif | head -1)"
+jq '[.runs[]?.results[]? | select(.locations[]?.physicalLocation.artifactLocation.uri | startswith(".agents/") or startswith("docs/netdata-ai/skills/"))] | length' "$DUMP"
 ```
 
 (The exact jq filter depends on the dump shape -- consult the dump structure first via `jq 'keys' "$DUMP"`.)
@@ -62,12 +59,12 @@ Expected: zero rows in the excluded trees.
 
 ## What this validates
 
-- `analyze-local.sh` runs end-to-end against the configured runner (docker or local binary).
+- `analyze-local.sh` runs end-to-end against the installed Codacy CLI v2.
 - The CLI honours `.codacy.yml` exclude_paths (or, if it doesn't, we have empirical evidence to handle that gap in a GitHub issue or branch-local SOW).
-- The bundled markdownlint version produces a count consistent with what Codacy CI reports.
+- The configured markdownlint tool produces a count that can be compared with what Codacy CI reports.
 
 ## Troubleshooting
 
-- **Docker pull is slow on first run**: `codacy/codacy-analysis-cli:latest` is a few hundred MB. Subsequent runs use the warm cache.
-- **Different count than 864**: tool-version drift between the bundled `codacy-analysis-cli` and Codacy Cloud is normal. ~10% tolerance is fine. Anything wider warrants checking the CLI version vs Cloud's reported version.
-- **CLI exits with non-zero**: that's expected when findings are present. The script suppresses this; the JSON dump is still valid.
+- **First run installs tools**: Codacy CLI v2 bootstraps `.codacy/codacy.yaml` and installs its configured analyzers. Keep the installed CLI and tool versions pinned when comparing results.
+- **Different count than 864**: tool-version drift between the installed Codacy CLI v2 analyzers and Codacy Cloud is normal. Check the CLI version and `.codacy` tool configuration before comparing counts.
+- **CLI exits with non-zero**: that's expected when findings are present. The script preserves the SARIF dump and validates its result count.

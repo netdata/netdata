@@ -1,6 +1,6 @@
 ---
 name: triage-codacy
-description: Codacy Cloud workflow for this repository -- run Codacy's analyzers locally before `git push` (mirrors what Codacy CI runs), and fetch/cluster Codacy issues for any PR via the v3 API. Use when the user mentions Codacy, "codacy analysis", `codacy-analysis-cli`, "codacy issues on PR", "fix codacy CI", "codacy markdownlint findings", or any Codacy gate failing on a netdata-org PR. Ships scripts analyze-local.sh (docker/binary runner for codacy-analysis-cli) and pr-issues.sh (paginated v3 issue fetch + group-by tool/pattern/severity/file). Token-safe -- CODACY_TOKEN never reaches assistant-visible stdout. Read-only by design; write actions (mark FP, mark fixed) require a GitHub issue or branch-local SOW.
+description: Codacy Cloud workflow for this repository -- run Codacy CLI v2 analyzers locally before `git push` (mirrors what Codacy CI runs), and fetch/cluster Codacy issues for any PR via the v3 API. Use when the user mentions Codacy, "codacy analysis", `codacy-cli`, "codacy issues on PR", "fix codacy CI", "codacy markdownlint findings", or any Codacy gate failing on a netdata-org PR. Ships scripts analyze-local.sh (Codacy CLI v2 runner) and pr-issues.sh (paginated v3 issue fetch + group-by tool/pattern/severity/file). Token-safe -- CODACY_TOKEN never reaches assistant-visible stdout. Read-only by design; write actions (mark FP, mark fixed) require a GitHub issue or branch-local SOW.
 ---
 
 # Codacy audit skill
@@ -33,7 +33,9 @@ Each concrete question that requires non-trivial analysis (multiple wrapper call
 
 In scope:
 
-- Local pre-push analysis via `codacy-analysis-cli` (auto-detects local binary, falls back to docker).
+- Local pre-push analysis via Codacy CLI v2 (`codacy-cli`), using repository-local `.codacy/codacy.yaml`.
+- Anonymous mode uses local linter configuration and Codacy defaults; authenticated `init` is required for Cloud configuration parity.
+- CLI v2 does not currently provide every legacy Cloud analyzer used here, including ShellCheck and markdownlint; those findings require maintained direct integrations or a reviewed parity update before claiming equivalent coverage.
 - Read-only PR-issue queries against the v3 API.
 - Token-safe wrappers (sentinel-driven no-leak self-test).
 
@@ -50,11 +52,11 @@ Out of scope until a real use case creates a GitHub issue or branch-local SOW:
 | `CODACY_TOKEN` | Account API token, header `api-token: <value>`. Required by `pr-issues.sh` and any wrapper that calls `_codacyaudit_run`. NOT required by `analyze-local.sh` (the CLI runs anonymously). |
 | `CODACY_HOST` | Defaults to `https://api.codacy.com`. Override only if Codacy moves the API host. |
 | `CODACY_PROVIDER` | Defaults to `gh` (GitHub). |
-| `CODACY_CLI_VERSION` | Optional, not a secret, and read from the process environment only (`analyze-local.sh` does not source `.env`): `CODACY_CLI_VERSION=1.2.3 analyze-local.sh` pins the docker image tag; defaults to `latest`. |
+| `CODACY_CLI_V2_VERSION` | Optional, not a secret, and read from the process environment only (`analyze-local.sh` does not source `.env`): verifies the installed `codacy-cli` version before analysis. |
 | `CODACY_ORG` | Defaults to `netdata`. |
 | `CODACY_REPO` | Defaults to `netdata`. |
 
-All values except `CODACY_CLI_VERSION` live in `<repo>/.env` (gitignored). See `<repo>/.agents/ENV.md` for setup (where
+All values except `CODACY_CLI_V2_VERSION` live in `<repo>/.env` (gitignored). See `<repo>/.agents/ENV.md` for setup (where
 each value comes from, sample formats, common mistakes).
 
 ## Scripts (in scripts/)
@@ -62,15 +64,15 @@ each value comes from, sample formats, common mistakes).
 | Script | Purpose |
 |---|---|
 | `_lib.sh` | Helpers (`codacyaudit_*` prefix). Token-safe; ships `codacyaudit_selftest_no_token_leak`. |
-| `analyze-local.sh` | Run `codacy-analysis-cli` locally; auto-pick local-binary or docker; write JSON dump under `.local/audits/codacy/`. |
+| `analyze-local.sh` | Initialize/install Codacy CLI v2 and run it locally; write SARIF dumps under `.local/audits/codacy/`. |
 | `pr-issues.sh` | Fetch all Codacy issues for a PR via the v3 API; cluster summary on stdout; full JSON dump on disk. |
 
 ## Workflow -- pre-push prevention
 
 ```
 $ .agents/skills/triage-codacy/scripts/analyze-local.sh
-[analyze-local] runner=docker format=json dir=<repo>
-[analyze-local] wrote 0 finding(s) to <repo>/.local/audits/codacy/local-<ts>.json
+[analyze-local] runner=local format=sarif dir=<repo>
+[analyze-local] wrote 0 finding(s) to <repo>/.local/audits/codacy/local-<ts>-<pid>.sarif
 ```
 
 Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
@@ -84,10 +86,7 @@ evidence", not as green. If GitHub check-run annotations are empty too, use
 and re-check after the next push.
 
 One common local cause is gitignored generated output with restrictive file
-permissions. For example, if local scratch output under `.local/` contains files
-not readable by the Docker container, Codacy logs `Could not read file` messages
-and the saved `.json` dump is plain text. Fix or move the local generated output
-before trusting local analyzer output.
+permissions. Fix or move local generated output before trusting analyzer output.
 
 Operational gotcha: the public Codacy v3 analysis endpoint can expose PR issue
 details even when GitHub check-run annotations are empty and no `CODACY_TOKEN`
