@@ -129,24 +129,54 @@ cp "$MAP_FILE" "$FIXTURE/map"
         self.assertEqual(sum(line.startswith('user\t') for line in mappings), 4096)
         self.assertIn('/home/redacted-user-overflow/file', (self.root / 'users').read_text())
 
-    def test_seed_hostnames_uses_mapping_limit(self):
+    def test_seed_overflow_keeps_names_for_later_captures(self):
         (self.root / 'nodes.json').write_text(json.dumps([
             {'hostname': f'node-{n}.example.test'} for n in range(4100)]))
+        (self.root / 'evidence.log').write_text('node-4095.example.test node-4096.example.test node-4099.example.test\n')
         self.stub('curl', 'cat "$FIXTURE/nodes.json"\n')
         self.run_fixture('''
 seed_hostnames
+collect_file evidence.log fixture "$FIXTURE/evidence.log"
 cp "$MAP_FILE" "$FIXTURE/map"
 ''')
-        self.assertEqual(len((self.root / 'map').read_text().splitlines()), 4096)
+        mappings = (self.root / 'map').read_text().splitlines()
+        self.assertEqual(len(mappings), 4100)
+        self.assertEqual(sum('\tprivate-host-' in line for line in mappings), 4096)
+        evidence = (self.root / 'work/evidence.log').read_text()
+        self.assertNotIn('.example.test', evidence)
+        self.assertIn('private-host-4096', evidence)
+        self.assertEqual(evidence.count('redacted-host-overflow'), 2)
 
-    def test_seed_hostnames_withholds_overflow_and_failure(self):
-        (self.root / 'nodes.json').write_text(json.dumps({'hostname': 'node.example.test', 'data': 'x' * 100}))
-        self.stub('curl', 'cat "$FIXTURE/nodes.json"; exit "${FIXTURE_EXIT:-0}"\n')
-        for cap, code in ((64, '0'), (1024, '28')):
-            with self.subTest(cap=cap, code=code):
-                self.env['FIXTURE_EXIT'] = code
-                self.run_fixture(f'API_CAP={cap}\nseed_hostnames\ncp "$MAP_FILE" "$FIXTURE/map"\n')
-                self.assertEqual((self.root / 'map').read_text(), '')
+    def test_large_discovery_response_keeps_hostname_knowledge(self):
+        (self.root / 'nodes.json').write_text(json.dumps({
+            'hostname': 'large-parent.example.test', 'data': 'x' * (2 * 1024 * 1024)}))
+        (self.root / 'evidence.log').write_text('large-parent.example.test\n')
+        self.stub('curl', 'cat "$FIXTURE/nodes.json"\n')
+        self.run_fixture('''
+seed_hostnames
+collect_file evidence.log fixture "$FIXTURE/evidence.log"
+collect_api api.json fixture /api/v2/node_instances
+''')
+        self.assertNotIn('large-parent.example.test', (self.root / 'work/evidence.log').read_text())
+        self.assertIn('cap', json.loads((self.root / 'work/api.json').read_text())['error'])
+
+    def test_failed_seed_response_is_not_used(self):
+        self.stub('curl', 'printf \'{"hostname":"incomplete.example.test"}\'; exit 28\n')
+        self.run_fixture('seed_hostnames\ncp "$MAP_FILE" "$FIXTURE/map"\n')
+        self.assertEqual((self.root / 'map').read_text(), '')
+
+    def test_no_obfuscation_skips_discovery_but_redacts_secrets(self):
+        self.stub('curl', 'touch "$FIXTURE/discovery-called"; exit 1\n')
+        (self.root / 'config').write_text('password=SENTINEL\nnode.example.test\n')
+        self.run_fixture('''
+OBFUSCATE=0
+seed_hostnames
+collect_file config fixture "$FIXTURE/config"
+''')
+        self.assertFalse((self.root / 'discovery-called').exists())
+        result = (self.root / 'work/config').read_text()
+        self.assertNotIn('SENTINEL', result)
+        self.assertIn('node.example.test', result)
 
     def test_archive_pipeline_propagates_tar_failure(self):
         self.stub('tar', 'case "$*" in *--zstd*|*--owner*) exit 1;; esac\nprintf partial; exit 9\n')

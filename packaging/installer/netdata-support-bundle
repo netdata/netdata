@@ -67,7 +67,7 @@ init_defaults() {
   LOG_CAP=5242880          # 5 MiB per log file
   FILE_CAP=1048576         # 1 MiB per config/state file
   API_CAP=2097152          # 2 MiB per API response
-  MAP_LIMIT=4096           # per pseudonym category, including seeded hostnames
+  MAP_LIMIT=4096           # numbered pseudonyms per category
   NDPORT=19999
   api_ok=0
 }
@@ -254,13 +254,17 @@ sanitize_file() {
     nsec = split("api key,apikey,token,password,passwd,pwd,secret,community,bearer,webhook,license key,auth,credential,cookie,passphrase,proxy user,proxy pass,username,dsn,private key,access key,session,recipient,account sid,priv key", SK, ",");
     for (i = 1; i <= nsec; i++) gsub(/[-_]/, " ", SK[i]);
     nip = 0;
-    while ((getline line < mapfile) > 0) {
+    while (obf == 1 && (getline line < mapfile) > 0) {
       split(line, a, "\t");
       if (a[1] == "ip") { ipmap[a[2]] = a[3]; nip++; }
       else if (a[1] == "host") hostmap[a[2]] = a[3];
       else if (a[1] == "user") { nusers++; usermap[a[2]] = a[3]; if (a[3] ~ /^user-[0-9]+$/) { un = a[3]; sub(/user-/, "", un); if (un + 0 > nusr) nusr = un + 0 } }
       else if (a[1] == "ip6") { ip6map[a[2]] = a[3]; nip6++; }
-      else if (a[1] == "fqdn") { fqmap[a[2]] = a[3]; nfq++; index_hostname(a[2]); }
+      else if (a[1] == "fqdn") {
+        fqmap[a[2]] = a[3];
+        if (a[3] ~ /^private-host-[0-9]+$/) nfq++;
+        index_hostname(a[2]);
+      }
     }
     close(mapfile);
   }
@@ -399,8 +403,11 @@ sanitize_file() {
   }
   function pseudo_fqdn(h) {
     if (!(h in fqmap)) {
-      if (nfq >= map_limit) return "redacted-host-overflow";  # cap: non-correlating
-      nfq++; fqmap[h] = "private-host-" nfq; index_hostname(h);
+      # Keep overflow identities recognizable in later files, even though they
+      # share one non-correlating placeholder after the numbered-map budget.
+      if (nfq >= map_limit) fqmap[h] = "redacted-host-overflow";
+      else { nfq++; fqmap[h] = "private-host-" nfq; }
+      index_hostname(h);
       print "fqdn\t" h "\t" fqmap[h] >> mapfile;
     }
     return fqmap[h];
@@ -1179,9 +1186,12 @@ STREAMVEC
 
 # Discover hostnames before collecting files so pseudonyms correlate throughout.
 seed_hostnames() {
+  [ "$OBFUSCATE" = 1 ] || return 0
   deadline_exceeded && return 0
-  capture_output "$STAGING/node-seed.json" "$((API_CAP + 1))" 0 api_request 5 /api/v2/node_instances
-  [ "$CAPTURE_RC" = 0 ] && [ "$CAPTURE_BYTES" -le "$API_CAP" ] || return 0
+  # Discovery must retain every returned name, including on large parents.
+  # The request is timed; storage and matching memory scale with the response.
+  # API artifacts still use their ordinary size cap through collect_api.
+  api_request 5 /api/v2/node_instances > "$STAGING/node-seed.json" 2>>"$ERRORS" || return 0
   tr ',{' '\n' < "$STAGING/node-seed.json" | awk '
     match($0, /"(nm|hostname)" *: *"/) {
       value = substr($0, RSTART + RLENGTH); sub(/".*/, "", value);

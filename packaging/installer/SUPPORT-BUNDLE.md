@@ -421,9 +421,10 @@ Two passes, one sweep, applied to **every** collected file:
    - MAC addresses → `[MAC]`; email addresses → `[EMAIL]`;
    - this host's hostname/FQDN → `redacted-host`; the invoking user's name →
      `redacted-user`;
-   - ordinary FQDNs → `private-host-N`; only public Netdata service domains and
-     a small exact allowlist of known Netdata filenames are preserved (a broad
-     suffix exemption would leak names such as `customer.key`);
+   - on Unix, hostnames under private suffixes (`.internal`, `.local`, `.lan`,
+     `.corp`, `.intranet`, `.localdomain`) → `private-host-N`; other names are
+     recognized when preseeded from the API or discovered in stream destinations.
+     Arbitrary public-domain names are not generically classified as private;
    - child/mirrored node hostnames (pre-seeded from the local API before
      collection, so they pseudonymize consistently in every file) and
      `stream.conf` `destination` hosts regardless of TLD → `private-host-N`;
@@ -441,11 +442,20 @@ Two passes, one sweep, applied to **every** collected file:
 
 The private map is written next to the bundle (`*.pseudonym-map.tsv`) so the
 **user** can decode references if support asks "what is private-host-2?" — it
-is never included in the bundle itself. Unix pseudonym mappings are capped at 4096 entries per category (IPv4, IPv6,
-private hostnames and users), including hostnames preseeded from the API and the
-invoking user. Windows uses a shared 4096-entry map. Past the applicable cap,
-values get a non-correlating placeholder. Unix hostname preseeding also observes
-the API response-size cap and rejects failed or truncated responses.
+is never included in the bundle itself. Unix numbered pseudonyms are capped at 4096 per category (IPv4, IPv6,
+private hostnames and users). Further identities use a non-correlating placeholder.
+Every discovered hostname is retained in the private map and matching index,
+including names assigned `redacted-host-overflow`, so overflow names remain
+recognizable in later captures. Windows uses a shared 4096-entry map.
+
+Unix hostname discovery has a request timeout but no response-size cutoff: losing
+a returned name would prevent its later obfuscation. Discovery storage, private
+hostname-map size and index memory therefore scale with the returned names;
+ordinary API artifacts retain their 2 MiB cap. The index is rebuilt per sanitized
+file and costs memory proportional to total distinct hostname-prefix bytes.
+`--no-obfuscate` skips discovery and index construction while retaining secret
+redaction. Failed discovery does not provide reliable child-hostname knowledge;
+generic private-suffix and destination rules still apply.
 
 Redaction here is defense in depth, not a substitute for exclusion: files that
 are pure secrets (see exclusion list) are never read at all. Files containing
@@ -516,7 +526,8 @@ PII obfuscation. Preserve this order and the stream.conf context when editing.
 Mapped hostnames use a prefix index instead of scanning the entire map for every
 record. Matching preserves the existing ASCII word boundaries and chooses the
 longest complete match when names overlap. All hostname/user insertion, including
-preseeding, follows the same bounded mapping helpers.
+preseeding, follows the shared numbering/overflow policy above. Retaining overflow
+hostname identities is necessary for cross-file obfuscation.
 
 Unix fixture tests source the script with `ND_SUPPORT_BUNDLE_SOURCE_ONLY=1`, then
 call initialization and the real collectors with private synthetic paths. This
