@@ -70,6 +70,13 @@ func assertSharedPidMemoryLayout() {
 
 type SharedPidMemoryPublisher struct {
 	ptr *C.struct_shared_pid_memory
+
+	// total is the row capacity the segment was created with.  Kept on the Go
+	// side because shared_pid_memory_publish() silently CLAMPS a longer batch to
+	// it (count = ctx->total) and returns success, so without this the loss is
+	// invisible.  The entries slice is sorted ascending by pid, which makes the
+	// clamp drop the highest PIDs deterministically.
+	total uint32
 }
 
 func NewSharedPidMemoryPublisher(shmName, semName string, total uint32, updateEverySec uint32) (*SharedPidMemoryPublisher, error) {
@@ -85,12 +92,22 @@ func NewSharedPidMemoryPublisher(shmName, semName string, total uint32, updateEv
 		return nil, fmt.Errorf("open shared pid memory failed")
 	}
 
-	return &SharedPidMemoryPublisher{ptr: ctx}, nil
+	return &SharedPidMemoryPublisher{ptr: ctx, total: total}, nil
 }
 
 func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat, flags uint32) error {
 	if p == nil || p.ptr == nil {
 		return nil
+	}
+
+	// The C side clamps instead of failing, so surface the overflow here or the
+	// dropped rows are silent.  Rate limited: once the fleet is over capacity it
+	// stays over capacity, and this runs every publish interval.
+	if p.total > 0 && uint32(len(entries)) > p.total {
+		rateLimitedStderr("shm.capacity",
+			"ebpf-go.plugin: shared memory holds %d rows but %d PIDs are active; "+
+				"the highest %d PIDs are not published (raise 'pid table size')\n",
+			p.total, len(entries), uint32(len(entries))-p.total)
 	}
 
 	var ptr unsafe.Pointer

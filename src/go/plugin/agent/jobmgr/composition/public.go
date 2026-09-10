@@ -61,8 +61,9 @@ type RuntimeService interface {
 // the mutable registries and constructs the provider, secret-creator, resolver,
 // vnode-metadata, UID, and frame authorities exactly once.
 type Config struct {
-	Input  io.Reader // plugin stdin
-	Output io.Writer // plugin stdout
+	SNMPVnodeAcquirer vnodes.SNMPAcquirer
+	Input             io.Reader // plugin stdin
+	Output            io.Writer // plugin stdout
 
 	PluginName string                // plugin name (go.d / ibm.d / scripts.d)
 	Modules    collectorapi.Registry // enabled collector module registry
@@ -73,8 +74,8 @@ type Config struct {
 	RunJob                []string                         // allow-list filter of job names (empty = allow all)
 	AutoEnable            bool                             // publish discovered jobs as Running vs Accepted
 
-	InitialSecrets []secretstore.Config           // initial secret store configs
-	InitialVnodes  map[string]*vnodes.VirtualNode // file-configured vnodes
+	InitialSecrets []secretstore.Config      // initial secret store configs
+	InitialVnodes  map[string]*vnodes.Config // file-configured vnodes
 
 	Services []ProcessService // optional process-owned background services
 
@@ -125,10 +126,13 @@ func NewProcess(config Config) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	initialVnodes := make(map[string]*vnodes.VirtualNode, len(config.InitialVnodes))
+	initialVnodes := make(map[string]*vnodes.Config, len(config.InitialVnodes))
 	for id, vnode := range config.InitialVnodes {
 		if vnode == nil {
 			return nil, fmt.Errorf("jobmgr composition: initial vnode %q is nil", id)
+		}
+		if vnode.IsSNMP() && config.SNMPVnodeAcquirer == nil {
+			return nil, fmt.Errorf("SNMP vnode mode is unavailable in this plugin")
 		}
 		initialVnodes[id] = vnode.Copy()
 	}
@@ -164,12 +168,13 @@ func NewProcess(config Config) (*Process, error) {
 		KeepAlive:       config.KeepAlive,
 		Modules:         modules,
 		Jobs: runJobServices{
-			PluginName:    config.PluginName,
-			Defaults:      defaults,
-			Resolver:      resolver,
-			StoreCreators: creatorCatalog,
-			Runtime:       config.Runtime,
-			InitialVnodes: initialVnodes,
+			PluginName:        config.PluginName,
+			Defaults:          defaults,
+			Resolver:          resolver,
+			StoreCreators:     creatorCatalog,
+			Runtime:           config.Runtime,
+			InitialVnodes:     initialVnodes,
+			SNMPVnodeAcquirer: config.SNMPVnodeAcquirer,
 		},
 		Secrets: runSecretServices{
 			Initial: initialSecrets,

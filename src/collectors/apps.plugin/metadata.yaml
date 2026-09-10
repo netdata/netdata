@@ -171,6 +171,30 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: files
+            - name: app.ebpf_file_open
+              description: Number of open files
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
+            - name: app.ebpf_file_open_error
+              description: Fails to open files.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
+            - name: app.ebpf_file_closed
+              description: Files closed.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
+            - name: app.ebpf_file_close_error
+              description: Fails to close files.
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
             - name: app.swap_usage
               description: Apps swap usage
               unit: MiB

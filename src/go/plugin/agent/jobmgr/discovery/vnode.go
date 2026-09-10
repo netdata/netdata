@@ -6,6 +6,7 @@ import (
 	"cmp"
 	"errors"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -22,235 +23,328 @@ var (
 	ErrVNodeNoChange         = errors.New("vnode configuration: no change")
 )
 
-// VNodeConfiguration owns immutable configured-vnode values and their atomic
-// revision changes.
+// AcquisitionToken identifies one configuration incarnation and acquisition
+// setting generation. Label-only edits preserve it; remove/re-add never does.
+type AcquisitionToken struct{ name string }
+type vnodeRecord struct {
+	config   *vnodes.Config
+	metadata *vnodes.Metadata
+	token    *AcquisitionToken
+	snapshot jobruntime.VnodeSnapshot
+	failed   bool
+	pending  bool
+}
+
+// VNodeConfiguration separates authored secrets, acquired metadata and public snapshots.
+// Records are immutable after commit; pointer comparison also fences remove/re-add ABA.
 type VNodeConfiguration struct {
-	mu sync.Mutex // guards records
-
-	records     map[string]jobruntime.VnodeSnapshot // committed vnode snapshots by name
+	mu          sync.Mutex
+	records     map[string]*vnodeRecord
 	definitions map[string]*hostoutput.Definition
+	guids       map[string]string
+	hostnames   map[string]string
 }
-
-type PreparedVNode struct {
-	state *preparedVNodeState
-}
-
+type PreparedVNode struct{ state *preparedVNodeState }
 type ConfiguredVNode struct {
-	ID       string                   // vnode name
-	Snapshot jobruntime.VnodeSnapshot // the vnode snapshot (hostname, GUID, labels)
+	ID       string
+	Config   *vnodes.Config
+	Snapshot jobruntime.VnodeSnapshot
+	Failed   bool
+	Pending  bool
 }
-
 type preparedVNodeState struct {
-	mu         sync.Mutex               // guards consumed
-	consumed   bool                     // the prepared edit has been committed or aborted
-	owner      *VNodeConfiguration      // the vnode configuration this edit belongs to
-	id         string                   // vnode name
-	expected   uint64                   // revision the edit was prepared against (optimistic check)
-	next       jobruntime.VnodeSnapshot // the snapshot to commit
-	remove     bool                     // the edit removes the vnode
-	definition *hostoutput.Definition
+	mu          sync.Mutex
+	consumed    bool
+	owner       *VNodeConfiguration
+	id          string
+	expected    *vnodeRecord
+	next        *vnodeRecord
+	remove      bool
+	definition  *hostoutput.Definition
+	metadataErr error
 }
 
-func NewVNodeConfigurationWithInitial(initial map[string]*vnodes.VirtualNode) (*VNodeConfiguration, error) {
-	configuration := &VNodeConfiguration{
-		records:     make(map[string]jobruntime.VnodeSnapshot),
-		definitions: make(map[string]*hostoutput.Definition),
-	}
-	ids := slices.Sorted(maps.Keys(initial))
-	for _, id := range ids {
-		vnode := initial[id]
-		if vnode == nil {
+func NewVNodeConfigurationWithInitial(initial map[string]*vnodes.Config) (*VNodeConfiguration, error) {
+	vc := &VNodeConfiguration{records: make(map[string]*vnodeRecord), definitions: make(map[string]*hostoutput.Definition), guids: make(map[string]string), hostnames: make(map[string]string)}
+	for _, id := range slices.Sorted(maps.Keys(initial)) {
+		c := initial[id].Copy()
+		if c == nil {
 			continue
 		}
-		vnode = vnode.Copy()
-		if vnode.Name == "" {
-			vnode.Name = id
+		if c.Name == "" {
+			c.Name = id
 		}
-		if vnode.Name != id {
+		if c.Name != id {
 			return nil, errors.New("vnode configuration: initial identity differs from map key")
 		}
-		prepared, err := configuration.PrepareUpsert(id, 0, vnode)
+		prepared, err := vc.PrepareUpsert(id, 0, c)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := prepared.Commit(); err != nil {
+		if _, err = prepared.Commit(); err != nil {
 			return nil, err
 		}
 	}
-	return configuration, nil
+	return vc, nil
 }
-
-func (vc *VNodeConfiguration) PrepareUpsert(
-	id string,
-	expected uint64,
-	vnode *vnodes.VirtualNode,
-) (PreparedVNode, error) {
-	if vc == nil || id == "" || id != strings.TrimSpace(id) || expected == ^uint64(0) || vnode == nil {
+func (vc *VNodeConfiguration) PrepareUpsert(id string, expected uint64, config *vnodes.Config) (PreparedVNode, error) {
+	if vc == nil || id == "" || id != strings.TrimSpace(id) || expected == ^uint64(0) || config == nil || config.Name != id {
 		return PreparedVNode{}, errors.New("vnode configuration: invalid preparation")
-	}
-	nextVNode := vnode.Copy()
-	definition, err := hostoutput.NewDefinition(
-		netdataapi.HostInfo{
-			GUID:     nextVNode.GUID,
-			Hostname: nextVNode.Hostname,
-			Labels:   nextVNode.HostLabels(),
-		},
-	)
-	if err != nil {
-		return PreparedVNode{}, err
 	}
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
 	current := vc.records[id]
-	if current.Revision != expected {
+	if recordRevision(current) != expected {
 		return PreparedVNode{}, ErrVNodeRevision
 	}
-	if current.Vnode != nil && vnodeConfigurationEqual(current.Vnode, nextVNode) {
-		return PreparedVNode{}, ErrVNodeNoChange
-	}
-	if previous := vc.definitions[hostoutput.GUIDKey(nextVNode.GUID)]; previous.Equal(definition) {
-		definition = previous
-	}
-	metadataRevision := uint64(1)
-	if current.Vnode != nil {
-		metadataRevision = current.MetadataRevision
-		if !vnodeMetadataEqual(current.Vnode, nextVNode) {
-			if metadataRevision == ^uint64(0) {
-				return PreparedVNode{}, errors.New("vnode configuration: metadata revision wrapped")
-			}
-			metadataRevision++
+	next := &vnodeRecord{config: config.Copy()}
+	next.config.NormalizeCredentials()
+	if current != nil {
+		if reflect.DeepEqual(current.config, next.config) {
+			return PreparedVNode{}, ErrVNodeNoChange
 		}
+		if err := current.config.ValidateUpdate(next.config); err != nil {
+			return PreparedVNode{}, err
+		}
+		next.metadata = current.metadata
+		next.token = current.token
+		next.failed = current.failed
+		next.pending = current.pending
 	}
-	state := &preparedVNodeState{
-		definition: definition,
-		owner:      vc,
-		id:         strings.Clone(id),
-		expected:   expected,
-		next: jobruntime.VnodeSnapshot{
-			Vnode:            nextVNode,
-			Revision:         expected + 1,
-			MetadataRevision: metadataRevision,
-		},
+	if next.config.IsSNMP() && (current == nil || !current.config.SameAcquisition(next.config)) {
+		next.token = &AcquisitionToken{name: id}
+		next.failed = false
+		next.pending = true
 	}
-	return PreparedVNode{
-		state: state,
-	}, nil
+	return vc.prepareLocked(id, current, next, false)
 }
 
+// PrepareMetadata applies the current authored overrides, even when they changed
+// while this request was in flight. Errors retain the last usable acquisition.
+func (vc *VNodeConfiguration) PrepareMetadata(token *AcquisitionToken, metadata *vnodes.Metadata, failed bool) (PreparedVNode, error) {
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	if token == nil {
+		return PreparedVNode{}, ErrVNodeRevision
+	}
+	current := vc.records[token.name]
+	if current == nil || current.token != token {
+		return PreparedVNode{}, ErrVNodeRevision
+	}
+	next := *current
+	var metadataErr error
+	next.failed = failed
+	next.pending = false
+	if metadata != nil && (!failed || current.metadata == nil) {
+		next.metadata = metadata.Copy()
+	}
+	if resolved := next.config.Resolve(next.metadata); resolved != nil {
+		if err := vnodes.ValidateConfigured(resolved); err != nil {
+			metadataErr = err
+			next.metadata = current.metadata
+			next.failed = true
+		}
+	}
+	prepared, err := vc.prepareLocked(token.name, current, &next, false)
+	if err != nil {
+		// Conflicting acquired hostnames cannot replace valid last-known metadata.
+		metadataErr = err
+		next.metadata = current.metadata
+		next.failed = true
+		prepared, err = vc.prepareLocked(token.name, current, &next, false)
+	}
+	if err == nil {
+		prepared.state.metadataErr = metadataErr
+	}
+	return prepared, err
+}
+
+// MetadataError explains a rejected acquisition whose last-good fallback was
+// prepared successfully. Callers report it only after committing that fallback.
+func (pv PreparedVNode) MetadataError() error {
+	if pv.state == nil {
+		return nil
+	}
+	return pv.state.metadataErr
+}
 func (vc *VNodeConfiguration) PrepareRemove(id string, expected uint64) (PreparedVNode, error) {
 	if vc == nil || id == "" || id != strings.TrimSpace(id) || expected == 0 || expected == ^uint64(0) {
 		return PreparedVNode{}, errors.New("vnode configuration: invalid removal")
 	}
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
-	current, ok := vc.records[id]
-	if !ok || current.Revision != expected {
+	current := vc.records[id]
+	if current == nil || recordRevision(current) != expected {
 		return PreparedVNode{}, ErrVNodeRevision
 	}
-	state := &preparedVNodeState{
-		owner:    vc,
-		id:       strings.Clone(id),
-		expected: expected,
-		next: jobruntime.VnodeSnapshot{
-			Revision:         expected + 1,
-			MetadataRevision: current.MetadataRevision,
-		},
-		remove: true,
+	return vc.prepareLocked(id, current, &vnodeRecord{}, true)
+}
+func recordRevision(r *vnodeRecord) uint64 {
+	if r == nil {
+		return 0
 	}
-	return PreparedVNode{
-		state: state,
-	}, nil
+	return r.snapshot.Revision
+}
+func (vc *VNodeConfiguration) prepareLocked(id string, current, next *vnodeRecord, remove bool) (PreparedVNode, error) {
+	revision := recordRevision(current)
+	if revision == ^uint64(0) {
+		return PreparedVNode{}, ErrVNodeRevision
+	}
+	next.snapshot = jobruntime.VnodeSnapshot{Revision: revision + 1}
+	if current != nil {
+		next.snapshot.MetadataRevision = current.snapshot.MetadataRevision
+	}
+	var definition *hostoutput.Definition
+	if !remove {
+		resolved := next.config.Resolve(next.metadata)
+		if resolved != nil {
+			var err error
+			definition, err = hostoutput.NewDefinition(netdataapi.HostInfo{GUID: resolved.GUID, Hostname: resolved.Hostname, Labels: resolved.HostLabels()})
+			if err != nil {
+				return PreparedVNode{}, err
+			}
+			if previous := vc.definitions[hostoutput.GUIDKey(resolved.GUID)]; previous.Equal(definition) {
+				definition = previous
+			}
+			if current == nil || current.snapshot.Vnode == nil || !vnodeMetadataEqual(current.snapshot.Vnode, resolved) {
+				if next.snapshot.MetadataRevision == ^uint64(0) {
+					return PreparedVNode{}, ErrVNodeRevision
+				}
+				next.snapshot.MetadataRevision++
+			}
+		}
+		next.snapshot.Vnode = resolved
+		if err := vc.validateUniqueLocked(id, next.config, resolved); err != nil {
+			return PreparedVNode{}, err
+		}
+	}
+	return PreparedVNode{state: &preparedVNodeState{owner: vc, id: id, expected: current, next: next, remove: remove, definition: definition}}, nil
+}
+func recordHostname(config *vnodes.Config, resolved *vnodes.VirtualNode) string {
+	if resolved != nil {
+		return resolved.Hostname
+	}
+	return config.Hostname
+}
+func (vc *VNodeConfiguration) validateUniqueLocked(id string, config *vnodes.Config, resolved *vnodes.VirtualNode) error {
+	if other, ok := vc.guids[hostoutput.GUIDKey(config.IdentityGUID())]; ok && other != id {
+		return errors.New("duplicate configured vnode GUID")
+	}
+	if hostname := recordHostname(config, resolved); hostname != "" {
+		if other, ok := vc.hostnames[hostname]; ok && other != id {
+			return errors.New("duplicate configured vnode hostname")
+		}
+	}
+	return nil
 }
 
 func (pv PreparedVNode) Commit() (jobruntime.VnodeSnapshot, error) {
 	if pv.state == nil {
 		return jobruntime.VnodeSnapshot{}, ErrVNodePreparedConsumed
 	}
-	state := pv.state
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if state.consumed {
+	s := pv.state
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.consumed {
 		return jobruntime.VnodeSnapshot{}, ErrVNodePreparedConsumed
 	}
-	configuration := state.owner
-	configuration.mu.Lock()
-	defer configuration.mu.Unlock()
-	current := configuration.records[state.id]
-	if current.Revision != state.expected {
+	vc := s.owner
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	if vc.records[s.id] != s.expected {
 		return jobruntime.VnodeSnapshot{}, ErrVNodeRevision
 	}
-	state.consumed = true
-	if current.Vnode != nil {
-		delete(configuration.definitions, hostoutput.GUIDKey(current.Vnode.GUID))
+	if !s.remove {
+		if err := vc.validateUniqueLocked(s.id, s.next.config, s.next.snapshot.Vnode); err != nil {
+			return jobruntime.VnodeSnapshot{}, err
+		}
 	}
-	if state.remove {
-		delete(configuration.records, state.id)
-		return state.next.Copy(), nil
+	s.consumed = true
+	if s.expected != nil {
+		delete(vc.guids, hostoutput.GUIDKey(s.expected.config.IdentityGUID()))
+		delete(vc.hostnames, recordHostname(s.expected.config, s.expected.snapshot.Vnode))
 	}
-	configuration.records[state.id] = state.next.Copy()
-	key := hostoutput.GUIDKey(state.next.Vnode.GUID)
-	configuration.definitions[key] = state.definition
-	return state.next.Copy(), nil
+	if s.expected != nil && s.expected.snapshot.Vnode != nil {
+		delete(vc.definitions, hostoutput.GUIDKey(s.expected.snapshot.Vnode.GUID))
+	}
+	if s.remove {
+		delete(vc.records, s.id)
+	} else {
+		vc.records[s.id] = s.next
+		vc.guids[hostoutput.GUIDKey(s.next.config.IdentityGUID())] = s.id
+		if hostname := recordHostname(s.next.config, s.next.snapshot.Vnode); hostname != "" {
+			vc.hostnames[hostname] = s.id
+		}
+		if s.next.snapshot.Vnode != nil {
+			vc.definitions[hostoutput.GUIDKey(s.next.snapshot.Vnode.GUID)] = s.definition
+		}
+	}
+	return s.next.snapshot.Copy(), nil
 }
-
 func (pv PreparedVNode) Abort() error {
 	if pv.state == nil {
 		return ErrVNodePreparedConsumed
 	}
-	state := pv.state
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	if state.consumed {
+	s := pv.state
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.consumed {
 		return ErrVNodePreparedConsumed
 	}
-	state.consumed = true
+	s.consumed = true
 	return nil
 }
-
 func (vc *VNodeConfiguration) Lookup(id string) (jobruntime.VnodeSnapshot, bool) {
 	if vc == nil {
 		return jobruntime.VnodeSnapshot{}, false
 	}
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
-	snapshot, ok := vc.records[id]
-	return snapshot.Copy(), ok
+	r, ok := vc.records[id]
+	if !ok {
+		return jobruntime.VnodeSnapshot{}, false
+	}
+	return r.snapshot.Copy(), true
 }
-
-// Definition returns immutable metadata for authority selection inside frame admission.
+func (vc *VNodeConfiguration) Authored(id string) (ConfiguredVNode, bool) {
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	r, ok := vc.records[id]
+	if !ok {
+		return ConfiguredVNode{}, false
+	}
+	return configuredVNode(id, r), true
+}
+func configuredVNode(id string, r *vnodeRecord) ConfiguredVNode {
+	return ConfiguredVNode{ID: id, Config: r.config.Copy(), Snapshot: r.snapshot.Copy(), Failed: r.failed, Pending: r.pending}
+}
+func (vc *VNodeConfiguration) Acquisition(id string) (*AcquisitionToken, vnodes.SNMPConfig) {
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	r := vc.records[id]
+	if r == nil || r.token == nil {
+		return nil, vnodes.SNMPConfig{}
+	}
+	return r.token, r.config.ModeSNMP.Copy()
+}
 func (vc *VNodeConfiguration) Definition(guid string) *hostoutput.Definition {
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
 	return vc.definitions[hostoutput.GUIDKey(guid)]
 }
-
 func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 	if vc == nil {
 		return nil
 	}
 	vc.mu.Lock()
 	entries := make([]ConfiguredVNode, 0, len(vc.records))
-	for id, snapshot := range vc.records {
-		entries = append(entries, ConfiguredVNode{
-			ID:       id,
-			Snapshot: snapshot.Copy(),
-		})
+	for id, r := range vc.records {
+		entries = append(entries, configuredVNode(id, r))
 	}
 	vc.mu.Unlock()
-	slices.SortFunc(entries, func(a, b ConfiguredVNode) int {
-		return cmp.Compare(a.ID, b.ID)
-	})
+	slices.SortFunc(entries, func(a, b ConfiguredVNode) int { return cmp.Compare(a.ID, b.ID) })
 	return entries
 }
-
-func vnodeConfigurationEqual(left, right *vnodes.VirtualNode) bool {
-	return left.Equal(right) &&
-		left.Source == right.Source &&
-		left.SourceType == right.SourceType &&
-		vnodeMetadataEqual(left, right)
-}
-
 func vnodeMetadataEqual(left, right *vnodes.VirtualNode) bool {
-	return left.Hostname == right.Hostname && left.GUID == right.GUID &&
-		maps.Equal(left.HostLabels(), right.HostLabels())
+	return left.Hostname == right.Hostname && left.GUID == right.GUID && maps.Equal(left.HostLabels(), right.HostLabels())
 }

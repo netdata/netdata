@@ -74,6 +74,10 @@ struct netdata_ebpf_cachestat_runtime {
      * the runtime, freed in close().  Callers must not free out->items. */
     struct netdata_ebpf_cachestat_pid_snapshot *items_buf;
     size_t items_cap;
+    /* (map key -> TGID) pairs from the last apps snapshot.  Eviction needs
+     * them because the snapshot reports TGIDs while the map is keyed by
+     * something else entirely — see struct nd_ebpf_key_tgid. */
+    struct nd_ebpf_key_table pid_keys;
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     union {
         struct cachestat_bpf *base;
@@ -637,33 +641,22 @@ int netdata_cachestat_runtime_snapshot(
     if (fd < 0)
         return -1;
 
-    /* Re-query the actual post-load map type; bpf_map__set_type can silently
-     * fail before load, leaving a non-percpu map while percpu_u64_cap > 1. */
-    enum bpf_map_type mtype = bpf_map__type(map);
-    int count = (mtype == BPF_MAP_TYPE_PERCPU_ARRAY && rt->percpu_u64_cap > 0)
-                ? rt->percpu_u64_cap : 1;
-    (void)maps_per_core;
     uint64_t *values = rt->percpu_u64;
     if (!values)
         return -1;
 
-    struct {
-        uint64_t *dst;
-        uint32_t key;
-    } entries[] = {
+    (void)maps_per_core;
+
+    const struct nd_ebpf_snap_global_entry entries[] = {
         {&out->add_to_page_cache_lru, 0},
         {&out->mark_page_accessed, 1},
         {&out->account_page_dirtied, 2},
         {&out->mark_buffer_dirty, 3},
     };
 
-    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
-        uint32_t key = entries[i].key;
-        *entries[i].dst = 0;
-
-        if (bpf_map_lookup_elem(fd, &key, values) == 0)
-            *entries[i].dst = nd_ebpf_sum_percpu_u64(values, count);
-    }
+    nd_ebpf_global_snap_aggregate(
+        map, fd, values, rt->percpu_u64_cap,
+        entries, sizeof(entries) / sizeof(entries[0]));
 
     return 0;
 }
@@ -683,6 +676,22 @@ static void cachestat_snapshot_merge_same_pid(void *dst_v, const void *src_v)
     dst->mark_buffer_dirty += src->mark_buffer_dirty;
     if (!dst->comm[0] && src->comm[0])
         nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), src->comm, sizeof(src->comm));
+}
+
+/* nd_ebpf_apps_snap_iterate() per-CPU fold callback. */
+static void cachestat_apps_snap_fold(void *dst_v, const void *values_v, int i)
+{
+    struct netdata_ebpf_cachestat_pid_snapshot *dst = dst_v;
+    const struct netdata_ebpf_cachestat_pid_entry *values = values_v;
+
+    if (values[i].ct > dst->ct)
+        dst->ct = values[i].ct;
+    dst->add_to_page_cache_lru += values[i].add_to_page_cache_lru;
+    dst->mark_page_accessed += values[i].mark_page_accessed;
+    dst->account_page_dirtied += values[i].account_page_dirtied;
+    dst->mark_buffer_dirty += values[i].mark_buffer_dirty;
+    if (!dst->comm[0] && values[i].name[0])
+        nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), values[i].name, sizeof(values[i].name));
 }
 
 int netdata_cachestat_runtime_snapshot_apps(
@@ -721,80 +730,26 @@ int netdata_cachestat_runtime_snapshot_apps(
     if (fd < 0)
         return -1;
 
-    /* Re-query the actual post-load map type; bpf_map__set_type can silently
-     * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
-    enum bpf_map_type mtype = bpf_map__type(map);
-    int count = (mtype == BPF_MAP_TYPE_PERCPU_HASH && rt->percpu_entries_cap > 0)
-                ? rt->percpu_entries_cap : 1;
     (void)maps_per_core;
 
     struct netdata_ebpf_cachestat_pid_entry *values = rt->percpu_entries;
     if (!values)
         return -1;
 
-    /* Single-pass with a growable persistent output buffer: no pre-count pass,
-     * no per-cycle alloc/free.  items_buf doubles when full; capacity persists
-     * across cycles so steady-state has zero allocations. */
-    size_t out_count = 0;
-    uint32_t key = 0, next_key = 0;
-    bool first_iter = true;
-
-    while (bpf_map_get_next_key(fd, first_iter ? NULL : &key, &next_key) == 0) {
-        first_iter = false;
-        if (bpf_map_lookup_elem(fd, &next_key, values)) {
-            key = next_key;
-            memset(values, 0, (size_t)count * sizeof(*values));
-            continue;
-        }
-
-        /* Grow items_buf on demand — amortised O(1) per entry. */
-        nd_ebpf_snapshot_reserve(
-            (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf), out_count);
-
-        /*
-         * With NETDATA_APPS_LEVEL_ALL the BPF key is the thread ID (TID).
-         * The process TGID is stored in values[i].tgid by the BPF program.
-         * We must index shared memory by TGID so that cgroup.procs lookups
-         * (which use TGIDs) succeed.  Fall back to next_key only when every
-         * per-CPU entry has tgid==0 (race at entry creation; counters are
-         * also zero in that case so the entry is harmless).
-         */
-        uint32_t tgid = nd_ebpf_snapshot_tgid(
-            values, count, sizeof(*values), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid), next_key);
-
-        struct netdata_ebpf_cachestat_pid_snapshot *dst = &rt->items_buf[out_count];
-        memset(dst, 0, sizeof(*dst));
-        dst->pid = tgid;
-
-        for (int i = 0; i < count; i++) {
-            if (values[i].ct > dst->ct)
-                dst->ct = values[i].ct;
-            dst->add_to_page_cache_lru += values[i].add_to_page_cache_lru;
-            dst->mark_page_accessed += values[i].mark_page_accessed;
-            dst->account_page_dirtied += values[i].account_page_dirtied;
-            dst->mark_buffer_dirty += values[i].mark_buffer_dirty;
-            if (!dst->comm[0] && values[i].name[0])
-                nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), values[i].name, sizeof(values[i].name));
-        }
-        out_count++;
-
-        key = next_key;
-        memset(values, 0, (size_t)count * sizeof(*values));
-    }
+    size_t out_count = nd_ebpf_apps_snap_iterate(
+        map, fd, rt->percpu_entries_cap, values,
+        sizeof(*values),
+        offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid),
+        offsetof(struct netdata_ebpf_cachestat_pid_entry, ct),
+        (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf),
+        cachestat_apps_snap_fold, cachestat_snapshot_merge_same_pid,
+        &rt->pid_keys);
 
     if (out_count == 0) {
         out->items = NULL;
         out->count = 0;
         return 0;
     }
-
-    /*
-     * Multiple threads of the same process produce separate BPF entries with
-     * the same TGID.  Sort by pid (TGID) and merge consecutive same-pid
-     * entries so each shared-memory slot represents one process.
-     */
-    out_count = nd_ebpf_snapshot_merge_same_pid(
-        rt->items_buf, out_count, sizeof(*rt->items_buf), cachestat_snapshot_merge_same_pid);
 
     out->items = rt->items_buf;
     out->count = out_count;
@@ -814,7 +769,8 @@ int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *
         return -1;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pid(cachestat_runtime_object(rt), "cstat_pid", pid, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        cachestat_runtime_object(rt), "cstat_pid", &rt->pid_keys, &pid, 1, rt->percpu_entries, sizeof(*rt->percpu_entries), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid), offsetof(struct netdata_ebpf_cachestat_pid_entry, ct), rt->percpu_entries_cap, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -836,7 +792,8 @@ int netdata_cachestat_runtime_delete_pids(
         return 0;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pids(cachestat_runtime_object(rt), "cstat_pid", pids, count, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        cachestat_runtime_object(rt), "cstat_pid", &rt->pid_keys, pids, count, rt->percpu_entries, sizeof(*rt->percpu_entries), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid), offsetof(struct netdata_ebpf_cachestat_pid_entry, ct), rt->percpu_entries_cap, &map_missing);
     if (!map_missing)
         return rc;
 
@@ -877,6 +834,7 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
     freez(rt->percpu_u64);
     freez(rt->percpu_entries);
     freez(rt->items_buf);
+    nd_ebpf_key_table_free(&rt->pid_keys);
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
         cachestat_destroy_ring_buffer(rt);

@@ -25,6 +25,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
+	govnode "github.com/netdata/netdata/go/plugins/plugin/go.d/vnode"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 )
@@ -69,6 +70,7 @@ func main() {
 	runModePolicy := policy.Agent(isTerminal)
 
 	a := agent.New(agent.Config{
+		SNMPVnodeAcquirer:         govnode.SNMP{},
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),

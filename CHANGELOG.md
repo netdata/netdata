@@ -270,6 +270,14 @@
 - Fix(mcp): advertise minItems on required array parameters ([#23809](https://github.com/netdata/netdata/issues/23809))
 - Test(go.d): fix staged secret mutation quarantine test flake ([#23816](https://github.com/netdata/netdata/issues/23816))
 - Refactor(go.d/snmp): extract reusable device identity acquisition ([#23817](https://github.com/netdata/netdata/issues/23817))
+- Fix(spawn): make SIGPIPE regression tests deterministic ([#23815](https://github.com/netdata/netdata/issues/23815))
+- Feat(go.d): make configured vnode metadata authoritative ([#23820](https://github.com/netdata/netdata/issues/23820))
+- Drop Debian 11 from CI and package builds. ([#23813](https://github.com/netdata/netdata/issues/23813))
+- Feat(go.d/snmp): add Meraki products L2 topology profile ([#23821](https://github.com/netdata/netdata/issues/23821))
+- Otel traces: expose the search view through the Functions protocol ([#23738](https://github.com/netdata/netdata/issues/23738))
+- Update bundle script ([#23818](https://github.com/netdata/netdata/issues/23818))
+- Fix dictionary GC use-after-free on reentrant delete callbacks ([#23819](https://github.com/netdata/netdata/issues/23819))
+- Otel traces: embed a window aggregate in the Functions search view ([#23739](https://github.com/netdata/netdata/issues/23739))
 
 ## [2.11.0] - 2026-08-12
 

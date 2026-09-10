@@ -125,7 +125,9 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
 ```
 
 - The discriminator is a radio; its `ui:help` compares the modes (when to choose which).
-- Branch section keys are `<discriminator>_<value>`; each branch carries its own `required`.
+- Branch section keys SHOULD be `<discriminator>_<value>`. When multiple discriminator values share one shape,
+  semantic keys MAY be used (for example `version` with `credentials` and `credentials3`). Each branch MUST carry
+  its own `required`; the renderer constraints below still apply.
 - A branch key MUST NOT also be a plain sibling property (it would render for every mode).
 - With tabs, branch keys MUST be listed on a tab (they render only while their mode is selected); an unlisted branch
   key is dropped like any other property.

@@ -67,7 +67,7 @@ type CollectorV2Runner interface {
 	Run(context.Context) error
 }
 
-// ConfiguredVnodeConsumer is an optional CollectorV2 capability. It receives an
+// ConfiguredVnodeConsumer is an optional CollectorV1 or CollectorV2 capability. It receives an
 // owned snapshot before Init/Check and,
 // when configuration changes, synchronously before Collect on the job goroutine.
 // Consumers must not treat this as a source of generated host identity.

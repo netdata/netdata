@@ -201,21 +201,21 @@ func BenchmarkConfiguredHostPublication(b *testing.B) {
 			p := hostoutput.New()
 			d := testHostDefinition(b, "node")
 			guid := d.Info().GUID
-			definitions := make(map[string]*vnodes.VirtualNode, count)
+			definitions := make(map[string]*vnodes.Config, count)
 			for i := 0; i < count; i++ {
 				key := fmt.Sprint(i)
-				definitions[key] = &vnodes.VirtualNode{
+				definitions[key] = &vnodes.Config{VirtualNode: vnodes.VirtualNode{
 					Name:     key,
 					GUID:     key,
 					Hostname: key,
-				}
+				}}
 			}
-			definitions[guid] = &vnodes.VirtualNode{
+			definitions[guid] = &vnodes.Config{VirtualNode: vnodes.VirtualNode{
 				Name:     guid,
 				GUID:     guid,
 				Hostname: d.Info().Hostname,
 				Labels:   d.Info().Labels,
-			}
+			}}
 			configuration, err := discovery.NewVNodeConfigurationWithInitial(definitions)
 			require.NoError(b, err)
 			p.Bind(configuration.Definition)
@@ -401,7 +401,7 @@ func TestV1FencedCollectionPreservesCommittedState(t *testing.T) {
 				Hostname: "device",
 				GUID:     guid,
 			}
-			cfgs, err := discovery.NewVNodeConfigurationWithInitial(map[string]*vnodes.VirtualNode{"device": &vnode})
+			cfgs, err := discovery.NewVNodeConfigurationWithInitial(map[string]*vnodes.Config{"device": &vnodes.Config{VirtualNode: vnode}})
 			require.NoError(t, err)
 			publisher := hostoutput.New()
 			cfg := jobruntime.JobConfig{
@@ -447,7 +447,7 @@ func TestV1FencedCollectionPreservesCommittedState(t *testing.T) {
 				if tc.hostSwitch {
 					next := vnode
 					next.GUID = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee"
-					edit, err := cfgs.PrepareUpsert("device", 1, &next)
+					edit, err := cfgs.PrepareUpsert("device", 1, &vnodes.Config{VirtualNode: next})
 					require.NoError(t, err)
 					_, err = edit.Commit()
 					require.NoError(t, err)
