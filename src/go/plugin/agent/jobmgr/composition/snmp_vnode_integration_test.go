@@ -99,6 +99,18 @@ func newVNodeSNMPPeer(t *testing.T, community, hostname string, metrics bool) *v
 	return peer
 }
 
+func loadVNodeSNMPMetricProfile(t *testing.T) string {
+	t.Helper()
+	const name = "apc-ups"
+	// Cold catalog loading is fixture setup, not part of the vnode readiness deadline.
+	profiles := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
+		ManualProfiles: []string{name},
+	}).Project(ddsnmp.ConsumerMetrics).Profiles()
+	require.Len(t, profiles, 1)
+	require.NotEmpty(t, profiles[0].Definition.Metrics)
+	return name
+}
+
 func TestSNMPVnodeFileAcquisitionAndNamedJobs(t *testing.T) {
 	for _, withSNMPJob := range []bool{false, true} {
 		t.Run(fmt.Sprint(withSNMPJob), func(t *testing.T) {
@@ -136,6 +148,7 @@ func TestSNMPVnodeFileAcquisitionAndNamedJobs(t *testing.T) {
   autodetection_retry: 1
 `, server.URL+"?auto")
 			if withSNMPJob {
+				profile := loadVNodeSNMPMetricProfile(t)
 				jobYAML += fmt.Sprintf(`
 - module: snmp
   name: metrics
@@ -144,10 +157,12 @@ func TestSNMPVnodeFileAcquisitionAndNamedJobs(t *testing.T) {
   options:
     port: %d
   vnode: router
-  manual_profiles: [apc-ups]
+  manual_profiles: [%s]
   update_every: 1
   autodetection_retry: 1
-`, collector.port)
+  ping:
+    enabled: false
+`, collector.port, profile)
 			}
 			require.NoError(t, yaml.Unmarshal([]byte(jobYAML), &jobs))
 			for _, job := range jobs {
@@ -237,6 +252,7 @@ func TestSNMPVnodeFileAcquisitionAndNamedJobs(t *testing.T) {
 }
 
 func TestSNMPLegacyLocalVnodeDynCfgRoundTrip(t *testing.T) {
+	profile := loadVNodeSNMPMetricProfile(t)
 	peer := newVNodeSNMPPeer(t, "fixture-local", "device-name", true)
 	var jobs []confgroup.Config
 	require.NoError(t, yaml.Unmarshal([]byte(fmt.Sprintf(`
@@ -251,11 +267,11 @@ func TestSNMPLegacyLocalVnodeDynCfgRoundTrip(t *testing.T) {
     hostname: local-router
     labels:
       site: before
-  manual_profiles: [apc-ups]
+  manual_profiles: [%s]
   update_every: 1
   ping:
     enabled: false
-`, peer.port)), &jobs))
+`, peer.port, profile)), &jobs))
 	jobs[0].SetSourceType(confgroup.TypeUser)
 	jobs[0].SetSource("file=legacy-fixture")
 	jobs[0].SetProvider("test")
