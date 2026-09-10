@@ -114,17 +114,12 @@ index-friendly, what each enum value means for triage).
 | `finding-crashes.md` | Recipe: signal crashes (SIGSEGV / SIGBUS / SIGFPE / SIGABRT) on stable. |
 | `finding-fatals.md` | Recipe: deliberate fatals (OOM, disk full, asserts). |
 | `recipes/INDEX.md` | Live catalog of recipes (find-by-function, find-by-version, find-related-to-work). |
-| `how-tos/INDEX.md` | Live catalog: every analysis question becomes a how-to entry. |
+| `how-tos/INDEX.md` | Catalog of reusable investigation how-tos. |
 
-## Live how-to rule (mandatory)
+## Knowledge Capture
 
-If asked a concrete question about agent-events that requires
-non-trivial analysis (multiple file reads, running queries,
-cross-referencing with producer source) AND the answer is not
-already documented in the per-domain guides above or in
-`recipes/`, the assistant MUST author a new how-to under
-`how-tos/<slug>.md` and add a one-line entry to
-`how-tos/INDEX.md` BEFORE completing the task.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Investigation recipes live in `how-tos/` and
+are listed in `./how-tos/INDEX.md`; check the per-domain guides and `recipes/` before adding another recipe.
 
 ## Scripts (in scripts/)
 

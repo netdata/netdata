@@ -16,9 +16,7 @@ auto-detect the repo root and write all artifacts under `<repo-root>/.local/`.
 
 ## MANDATORY — keep this skill alive
 
-**If you (the agent) discover a new pattern, gotcha, working flow, correction,
-or any piece of knowledge while running this skill — update this `SKILL.md`
-AND commit it BEFORE proceeding. Knowledge that isn't committed is lost.**
+Capture timing and authorization for operational discoveries follow `AGENTS.md#knowledge-capture`.
 
 Examples of things to capture:
 - New rule with a known FP pattern (and the exact comment to use)

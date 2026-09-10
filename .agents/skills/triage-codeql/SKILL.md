@@ -15,9 +15,7 @@ The skill operates on whatever repo this checkout points at — it derives the
 
 ## MANDATORY — keep this skill alive
 
-**If you (the agent) discover a new pattern, gotcha, working flow, correction,
-or any piece of knowledge while running this skill — update this `SKILL.md`
-AND commit it BEFORE proceeding. Knowledge that isn't committed is lost.**
+Capture timing and authorization for operational discoveries follow `AGENTS.md#knowledge-capture`.
 
 Examples of things to capture:
 - A CodeQL rule with a known FP pattern + the canonical comment to use

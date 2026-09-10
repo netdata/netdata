@@ -7,9 +7,8 @@ a Sonnet-class assistant with `../SKILL.md` + `../how-tos/INDEX.md`
 below, captures the transcript, and grades it against the
 verification harness rubric.
 
-When the assistant cannot answer or has to perform analysis not
-already documented under `../how-tos/`, the assistant must author
-a new how-to and add it to the index before completing.
+Verification questions do not authorize guide edits. Record unanswered questions and reusable discoveries as
+sanitized local evidence under `AGENTS.md#knowledge-capture`; documentation implementation is separately authorized.
 
 ## Anchor: target nodes
 
