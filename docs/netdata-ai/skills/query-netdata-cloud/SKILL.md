@@ -47,20 +47,21 @@ skill [`query-netdata-agents`](../query-netdata-agents/SKILL.md).
 
 ---
 
+## Knowledge Capture
+
+- For answer-only questions, deliver the requested answer. If the work reveals a reusable, evidence-backed recipe
+  not already documented, you MUST preserve it in a sanitized local follow-up note for separately authorized
+  documentation work. If no writable workspace is available, include the sanitized follow-up in the response.
+- Editing this skill or its guides requires authorization; discovering a missing recipe does not grant it.
+  Documentation coupled to already-authorized implementation MUST be updated within that work, including
+  [`how-tos/INDEX.md`](./how-tos/INDEX.md) when a recipe changes. Commit and publication require authorization too.
+- Prefer updating an existing guide over duplicating it. Keep recipes operator-facing: fetching or using Cloud
+  data. Developer contract validation for collectors, topology producers, schemas, fixtures, UI adapters, or
+  aggregator handoffs belongs in the relevant project developer skill, not in this public skill.
+
 ## Mandatory Requirements (READ FIRST)
 
-1. **If you analyze, you author a how-to.** When asked a concrete
-   question about a Netdata environment that isn't already covered
-   by an existing how-to under [`how-tos/`](./how-tos/), you MUST
-   author a new how-to in this directory and add it to
-   [`how-tos/INDEX.md`](./how-tos/INDEX.md) BEFORE completing the
-   task. The catalog is meant to be **live** -- the next assistant
-   should not redo the same analysis from scratch. Keep this
-   catalog operator-facing: recipes here should explain how to fetch
-   or use Cloud data. Developer contract validation for collectors,
-   topology producers, schemas, fixtures, UI adapters, or aggregator
-   handoffs belongs in the relevant project developer skill, not in
-   this public skill.
+1. **Preserve reusable discoveries** under [Knowledge Capture](#knowledge-capture).
 2. **Use the token-safe wrappers.** Every example in this skill
    uses `agents_query_cloud` (and friends) from
    `../query-netdata-agents/scripts/_lib.sh`. Never paste raw

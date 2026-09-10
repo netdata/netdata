@@ -3,16 +3,8 @@
 Live catalog of analysis-derived how-tos for the
 repo-mirror-sources skill.
 
-**Live-catalog rule** (also stated in `../SKILL.md`): if an
-assistant is asked a concrete question about the mirror that
-required non-trivial analysis (multiple file reads, running
-the script with custom flags, debugging a failed sync) AND
-the answer is not already documented in `../SKILL.md`, the
-assistant MUST author a new `how-tos/<slug>.md` and add a row
-to this INDEX BEFORE completing the task.
-
-This is durable. Skipping it means the next assistant repeats
-the same analysis from scratch.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Add authorized mirror recipes here when
+`../SKILL.md` does not already cover the question.
 
 ## Catalog
 
@@ -32,7 +24,7 @@ not-yet-documented questions)
    - A "How I figured this out" footer naming the files read
      and the commands run.
 2. Add a row to the table above with topic, slug, short notes.
-3. Commit alongside the work that prompted the analysis.
+3. Git operations follow `AGENTS.md#git-and-pr-workflow`.
 
 ## When NOT to add a how-to
 

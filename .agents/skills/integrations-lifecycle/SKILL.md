@@ -50,10 +50,8 @@ Citations in this skill name files and symbols, never line numbers; open the fil
 
 ## Live how-to rule
 
-When a concrete question about the pipeline needs non-trivial analysis (reading several scripts, running the pipeline,
-cross-referencing schemas) and no file above answers it, the assistant MUST write `how-tos/<slug>.md` and add its row to
-`how-tos/INDEX.md` before completing the task, so the next assistant does not repeat the analysis. When an existing
-guide almost answers it, update that guide instead.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Pipeline recipes live in `how-tos/` and are
+listed in `./how-tos/INDEX.md`; prefer updating an existing guide when it already covers most of the question.
 
 ## Path discipline
 

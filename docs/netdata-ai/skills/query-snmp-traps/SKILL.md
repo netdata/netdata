@@ -29,13 +29,21 @@ Log Function request shape from
 | Convert custom MIBs into trap profiles | [how-tos/convert-custom-mibs-to-trap-profiles.md](./how-tos/convert-custom-mibs-to-trap-profiles.md) |
 | Operational how-tos catalog | [how-tos/INDEX.md](./how-tos/INDEX.md) |
 
+## Knowledge Capture
+
+- For answer-only questions, deliver the requested answer. If the work reveals a reusable, evidence-backed recipe
+  not already documented, you MUST preserve it in a sanitized local follow-up note for separately authorized
+  documentation work. If no writable workspace is available, include the sanitized follow-up in the response.
+- Editing this skill or its guides requires authorization; discovering a missing recipe does not grant it.
+  Documentation coupled to already-authorized implementation MUST be updated within that work, including
+  [`how-tos/INDEX.md`](./how-tos/INDEX.md) when a recipe changes. Commit and publication require authorization too.
+- Prefer updating an existing guide over duplicating it. Keep recipes operator-facing: querying and interpreting
+  SNMP traps. Developer validation, schema work, collector implementation, fixtures, and project handoff notes
+  belong in project developer documentation, not in this public skill.
+
 ## Mandatory Requirements
 
-1. **If you analyze, you author a how-to.** When asked a concrete
-   SNMP trap query question that is not already covered under
-   [`how-tos/`](./how-tos/), author a new how-to and add it to
-   [`how-tos/INDEX.md`](./how-tos/INDEX.md) before completing the
-   task.
+1. **Preserve reusable discoveries** under [Knowledge Capture](#knowledge-capture).
 2. **Use token-safe wrappers.** Source
    `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`,
    call `agents_load_env`, then use `agents_call_function`,

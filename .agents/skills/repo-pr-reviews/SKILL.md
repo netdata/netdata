@@ -550,9 +550,7 @@ If a new AI reviewer appears in the project, classify it by adding to
 
 ## MANDATORY -- keep this skill alive
 
-If you (the agent) discover a new pattern, gotcha, working flow, correction,
-or any piece of knowledge while running this skill -- update this `SKILL.md`
-AND commit it BEFORE proceeding. Knowledge that isn't committed is lost.
+Capture timing and authorization for operational discoveries follow `AGENTS.md#knowledge-capture`.
 
 Examples of things to capture:
 - A new AI reviewer bot that appears in the project (add to the directory + `PR_AI_BOT_RE`)
