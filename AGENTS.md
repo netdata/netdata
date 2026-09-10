@@ -599,9 +599,10 @@ docs, code, and tests, not in specs.
   deferred work follows Followup Discipline. Commit, push, and publication requirements never grant authorization
   to perform those actions.
 - Developer skills that give capture instructions MUST point to this section for timing and authorization.
-  Public/operator skills MUST carry a self-contained operator-facing version because they can be used outside this
-  checkout; their catalogs
-  SHOULD point to that skill-local rule rather than repeat it. Preserve operator/developer audience boundaries.
+- Public/operator skills MUST carry a self-contained operator-facing version because they can be used outside this
+  checkout.
+- Public/operator skill catalogs SHOULD point to their skill-local rule rather than repeat it.
+- Preserve operator/developer audience boundaries.
 
 ### Project Skills
 

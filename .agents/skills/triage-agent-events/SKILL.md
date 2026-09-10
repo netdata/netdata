@@ -116,7 +116,7 @@ index-friendly, what each enum value means for triage).
 | `recipes/INDEX.md` | Live catalog of recipes (find-by-function, find-by-version, find-related-to-work). |
 | `how-tos/INDEX.md` | Catalog of reusable investigation how-tos. |
 
-## Live how-to rule (mandatory)
+## Knowledge Capture
 
 Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Investigation recipes live in `how-tos/` and
 are listed in `./how-tos/INDEX.md`; check the per-domain guides and `recipes/` before adding another recipe.
