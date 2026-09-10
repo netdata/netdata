@@ -32,36 +32,46 @@ concurrency:
 
 jobs:
   posix:
-    name: POSIX sanitization (${{ matrix.shell }})
+    name: POSIX sanitization (${{ matrix.shell }}, ${{ matrix.awk }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shell:
-          - sh
-          - dash
-          - busybox
+        include:
+          - shell: sh
+            awk: gawk
+          - shell: dash
+            awk: mawk
+          - shell: busybox
+            awk: busybox
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install BusyBox
-        if: matrix.shell == 'busybox'
-        run: sudo apt-get update && sudo apt-get install -y busybox
+      - name: Install Unix validation tools
+        run: sudo apt-get update && sudo apt-get install -y busybox gawk mawk shellcheck
 
-      - name: Parse and run adversarial self-test
+      - name: Parse and run fixture suites
         env:
           TEST_SHELL: ${{ matrix.shell }}
+          TEST_AWK: ${{ matrix.awk }}
+          ND_SUPPORT_BUNDLE_DEMOTED: '1'
         run: |
           set -eu
+          tools_dir="$RUNNER_TEMP/support-bundle-tools"
+          mkdir -p "$tools_dir"
+          ln -s "$(command -v "$TEST_AWK")" "$tools_dir/awk"
+          export PATH="$tools_dir:$PATH"
           if [ "$TEST_SHELL" = busybox ]; then
             busybox sh -n packaging/installer/netdata-support-bundle
             busybox sh packaging/installer/netdata-support-bundle --selftest
-            SUPPORT_BUNDLE_TEST_SHELL="busybox sh" python3 packaging/installer/tests/test_snmp_diagnostics.py -v
+            export SUPPORT_BUNDLE_TEST_SHELL="busybox sh"
           else
             "$TEST_SHELL" -n packaging/installer/netdata-support-bundle
             "$TEST_SHELL" packaging/installer/netdata-support-bundle --selftest
-            SUPPORT_BUNDLE_TEST_SHELL="$TEST_SHELL" python3 packaging/installer/tests/test_snmp_diagnostics.py -v
+            export SUPPORT_BUNDLE_TEST_SHELL="$TEST_SHELL"
           fi
+          python3 -m unittest discover -s packaging/installer/tests -p 'test_*.py' -v
+          shellcheck packaging/installer/netdata-support-bundle
 
   posix-e2e:
     name: POSIX end-to-end bundle
@@ -116,6 +126,8 @@ jobs:
           trap 'kill "$fixture_root_pid" "$fixture_child_pid" 2>/dev/null || true; wait "$fixture_root_pid" 2>/dev/null || true' EXIT
           output=$(mktemp -d)
           extract=$(mktemp -d)
+          printf '{"cause":"UNTRUSTED-TMP-SENTINEL"}\n' > /tmp/status-netdata.json
+          sudo sh -c 'printf "fixture\n" > /var/lib/netdata/private-job-INVENTORY-SENTINEL'
           sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 --include-snmp-diagnostics -o "$output"
           bundle=$(find "$output" -maxdepth 1 \( -name '*.tar.gz' -o -name '*.tar.zst' \) -print -quit)
           test -n "$bundle"
@@ -154,17 +166,37 @@ jobs:
           [ "$(head -c 3 "$sc" | od -An -tx1 | tr -d ' \n')" = efbbbf ] || { echo 'the UTF-8 BOM was not preserved' >&2; exit 1; }
           [ "$(tr -dc '\r' < "$sc" | wc -c)" -ge 4 ] || { echo 'CRLF line endings were not preserved' >&2; exit 1; }
 
+          if grep -R -qE 'UNTRUSTED-TMP-SENTINEL|INVENTORY-SENTINEL' "$root"; then
+            echo 'unsafe crash or state filename evidence included' >&2
+            exit 1
+          fi
+          python3 - "$root" <<'VALIDATE'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          manifest = json.loads((root / 'MANIFEST.json').read_text())
+          rows = {row['path']: row for row in manifest['files']}
+          files = {str(p.relative_to(root)) for p in root.rglob('*')
+                   if p.is_file() and p.name != 'MANIFEST.json'}
+          assert len(rows) == len(manifest['files']), 'duplicate manifest rows'
+          assert files == set(rows), (files - set(rows), set(rows) - files)
+          for path, row in rows.items():
+              assert (root / path).stat().st_size == row['bytes'], path
+          assert not any(p.name.endswith(('.raw', '.rc', '.san', '.tmp')) for p in root.rglob('*'))
+          VALIDATE
+
   macos-posix:
     name: macOS POSIX sanitization
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - name: Parse and run adversarial self-test
+        env:
+          ND_SUPPORT_BUNDLE_DEMOTED: '1'
         run: |
           set -eu
           sh -n packaging/installer/netdata-support-bundle
           sh packaging/installer/netdata-support-bundle --selftest
-          python3 packaging/installer/tests/test_snmp_diagnostics.py -v
+          python3 -m unittest discover -s packaging/installer/tests -p 'test_*.py' -v
 
   powershell-core:
     name: PowerShell 7 sanitization

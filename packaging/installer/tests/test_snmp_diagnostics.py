@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Exercise the shipped collector helpers and manifest against a private fixture.
 
-The prefix contains the real option parser, staging, sanitizer and collectors.
-Stop before host discovery to avoid collecting workstation data. CI additionally
-runs complete installed-path bundles on POSIX and Windows.
+Unix tests source the real functions and initialize only private fixture state.
+Windows tests retain checked section extraction. CI additionally runs complete
+installed-path bundles on POSIX and Windows.
 """
 import json
 import os
@@ -50,9 +50,9 @@ class SnmpDiagnosticsTests(unittest.TestCase):
         shell = os.environ.get("SUPPORT_BUNDLE_TEST_SHELL", "sh")
         windows = shell in ("powershell", "pwsh")
         script = INSTALLER / ("netdata-support-bundle.ps1" if windows else "netdata-support-bundle")
-        source = script.read_text()
-        prefix, manifest, _ = collection_sections(source, windows)
         if windows:
+            source = script.read_text()
+            prefix, manifest, _ = collection_sections(source, windows)
             body = r'''
 $Work = Join-Path $env:SNMP_FIXTURE 'work'
 New-Item -ItemType Directory -Path $Work -Force | Out-Null
@@ -72,6 +72,13 @@ $RuntimeSecs = 0; $NetdataProc = $null; $ApiOk = $false
                 args.append("-IncludeSnmpDiagnostics")
         else:
             body = r'''
+set -u
+ND_SUPPORT_BUNDLE_SOURCE_ONLY=1 . "$SUPPORT_BUNDLE_SCRIPT"
+init_defaults
+parse_options "$@"
+init_staging
+detect_timeout
+HOST_SHORT=""; HOST_FQDN=""; RUN_USER=""
 WORK="$SNMP_FIXTURE/work"
 mkdir -p "$WORK"
 LIBDIR="$SNMP_FIXTURE/lib"
@@ -82,9 +89,9 @@ collect_file config.txt 'fixture config' "$SNMP_FIXTURE/config.txt"
 NETDATA_PID=""; api_ok=0; IS_CONTAINER=0
 '''
             path = fixture / "run.sh"
-            path.write_text(prefix + body + manifest)
+            path.write_text(body + "\nwrite_manifest\n")
             args = (shell.split() + [str(path)] + (["--include-snmp-diagnostics"] if include else []))
-        env = dict(os.environ, SNMP_FIXTURE=str(fixture), SNMP_EXPIRED=str(int(deadline)), ND_SUPPORT_BUNDLE_DEMOTED="1")
+        env = dict(os.environ, SNMP_FIXTURE=str(fixture), SNMP_EXPIRED=str(int(deadline)), ND_SUPPORT_BUNDLE_DEMOTED="1", SUPPORT_BUNDLE_SCRIPT=str(script))
         env["PATH"] = str(fixture / "bin") + os.pathsep + env["PATH"]
         result = subprocess.run(args, env=env, text=True, capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -238,7 +245,7 @@ $before = [GC]::GetTotalAllocatedBytes($true)
 
     def test_collection_section_boundaries(self):
         # Mutate source only in memory: malformed extracts must never execute.
-        for windows in (False, True):
+        for windows in (True,):
             source = (INSTALLER / ("netdata-support-bundle.ps1" if windows else "netdata-support-bundle")).read_text()
             environment = next(line for line in source.splitlines(True) if line.startswith("# --- environment detection"))
             manifest = next(line for line in source.splitlines(True) if line.startswith("# emit MANIFEST.json LAST"))
