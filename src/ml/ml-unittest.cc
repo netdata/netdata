@@ -1115,6 +1115,52 @@ static void test_reset_generation_cancels_model_publish()
                    "successful publication path should leave training_in_progress unchanged");
 }
 
+static void test_dimension_predict_detects_anomaly()
+{
+    fprintf(stderr, "  test_dimension_predict_detects_anomaly...\n");
+
+    unsigned saved_diff_n = Cfg.diff_n;
+    unsigned saved_lag_n = Cfg.lag_n;
+    size_t saved_max_samples_to_smooth = Cfg.max_samples_to_smooth;
+    double saved_threshold = Cfg.dimension_anomaly_score_threshold;
+
+    Cfg.diff_n = 0;
+    Cfg.lag_n = 1;
+    Cfg.max_samples_to_smooth = 1;
+    Cfg.dimension_anomaly_score_threshold = 0.5;
+
+    RRDSET rs = {};
+    rs.update_every = 1;
+    RRDDIM rd = {};
+    rd.rrdset = &rs;
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+    dim.rd = &rd;
+    dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+
+    ml_kmeans_inlined_t model = {};
+    model.cluster_centers[0].set_size(6);
+    model.cluster_centers[1].set_size(6);
+    for (long i = 0; i < 6; i++)
+        model.cluster_centers[1](i) = 1.0;
+    model.min_dist = 0.0;
+    model.max_dist = 100.0;
+    dim.km_contexts.push_back(model);
+
+    ML_TEST_ASSERT(!ml_dimension_predict(&dim, 0.0, true),
+                   "the first value should only warm up prediction history");
+    ML_TEST_ASSERT(!ml_dimension_predict(&dim, 0.0, true),
+                   "a value matching the normal model should not be anomalous");
+    ML_TEST_ASSERT(ml_dimension_predict(&dim, 100.0, true),
+                   "a value outside the normal model should be anomalous");
+
+    Cfg.diff_n = saved_diff_n;
+    Cfg.lag_n = saved_lag_n;
+    Cfg.max_samples_to_smooth = saved_max_samples_to_smooth;
+    Cfg.dimension_anomaly_score_threshold = saved_threshold;
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -1147,6 +1193,7 @@ extern "C" int ml_unittest()
     test_kmeans_timestamp_rejection();
     test_downstream_model_short_circuit_and_requeue();
     test_reset_generation_cancels_model_publish();
+    test_dimension_predict_detects_anomaly();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 
