@@ -47,8 +47,8 @@ static void get_and_sanitize_instance_value(
 static inline NETDATA_DOUBLE hyperv_average_timer_seconds(COUNTER_DATA *counter)
 {
     if (!counter->updated || counter->current.CounterType != PERF_AVERAGE_TIMER ||
-        counter->current.Data < counter->previous.Data || counter->current.Time <= counter->previous.Time ||
-        !counter->current.Frequency)
+        counter->current.Data < counter->previous.Data || !counter->previous.Time ||
+        counter->current.Time <= counter->previous.Time || !counter->current.Frequency)
         return 0;
 
     return (((double)(counter->current.Data - counter->previous.Data) / (double)counter->current.Frequency) /
