@@ -237,7 +237,7 @@ operation table. Shared consumers do not duplicate executions. Walk timing inclu
 pagination, but ends before local PDU-map/row processing; profile phase totals remain inclusive. Preparation is finalized
 on all exits, and scalar timing includes failed and topology scalar work. Missing execution accounting means not recorded.
 A successful Handler return does not prove table completeness; terminal gosnmp response reasons are not yet available.
-See the [diagnostics tool](../../../../tools/snmp-diagnostics/README.md#collection-cost) for interpretation and exclusions.
+See the [diagnostics tool](/src/go/tools/snmp-diagnostics/README.md#collection-cost) for interpretation and exclusions.
 
 BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
 every configured identity, descriptor, signal, tag source, and cross-table dependency. `Missing` counts configured scalar
@@ -781,7 +781,7 @@ no user-facing disable option. Publication failures do not stop metric collectio
 The support-bundle scripts include original files only with `--include-snmp-diagnostics` or `-IncludeSnmpDiagnostics`.
 They preserve compressed bytes and report incomplete copies. The files and decoded reports are sensitive: connection
 credentials are excluded, but device-returned values and inventory are not sanitized or pseudonymized. See
-[Collect SNMP troubleshooting data](../../../../../../docs/npm/device-metrics/collect-snmp-troubleshooting-data.md)
+[Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md)
 for the operator workflow.
 
 ## Portable Archive Codec And Replay Boundary
@@ -808,7 +808,7 @@ features.
 ## Maintainer Diagnostic Tool
 
 `src/go/tools/snmp-diagnostics` is the source-only, read-only maintainer command; it is not installed with the Agent.
-The [tool README](../../../../tools/snmp-diagnostics/README.md#usage) owns supported inputs, selectors, operations, and
+The [tool README](/src/go/tools/snmp-diagnostics/README.md#usage) owns supported inputs, selectors, operations, and
 output interpretation, including direct support-bundle access and lifecycle selection.
 
 The command uses the shared diagnostic codec and topology facade, with no second replay engine, daemon, or network

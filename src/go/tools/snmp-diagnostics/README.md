@@ -104,8 +104,8 @@ Acquisition `MetricValueReferences` describe values before normalization, duplic
 derivation, and hidden-metric filtering. Their ordinals are not indexes into the final `profiles[].metrics` slice.
 Profile metrics describe a later processing stage; `metric_decisions.sample_ids` links collector emission decisions to
 the final `samples` map. Several decisions can target the same sample. See the collector architecture's [metric
-emission](../../plugin/go.d/collector/snmp/ARCHITECTURE.md#metric-emission) section for row identity and accumulation,
-and the profile guide's [virtual metrics](../../plugin/go.d/collector/snmp/profile-format.md#virtual-metrics) section
+emission](/src/go/plugin/go.d/collector/snmp/ARCHITECTURE.md#metric-emission) section for row identity and accumulation,
+and the profile guide's [virtual metrics](/src/go/plugin/go.d/collector/snmp/profile-format.md#virtual-metrics) section
 for derived values. The acquisition boundary is defined by `AcquisitionValueReference` in
 `ddsnmp/ddsnmpcollector/acquisition_report.go` under the SNMP collector.
 
@@ -127,8 +127,8 @@ Normal inspection copies stored BGP and licensing state through `captureNormalBG
 does not run their Function handlers. For licensing, `normalized_at` dates the stored normalized set. Interpret that
 state using the collector architecture's consumer rules:
 
-- [BGP collection and retained rows](../../plugin/go.d/collector/snmp/ARCHITECTURE.md#bgp-collection-and-retained-rows)
-- [Licensing normalization and collection results](../../plugin/go.d/collector/snmp/ARCHITECTURE.md#licensing-normalization-and-collection-results)
+- [BGP collection and retained rows](/src/go/plugin/go.d/collector/snmp/ARCHITECTURE.md#bgp-collection-and-retained-rows)
+- [Licensing normalization and collection results](/src/go/plugin/go.d/collector/snmp/ARCHITECTURE.md#licensing-normalization-and-collection-results)
 
 ### Topology replay and inspection
 
@@ -136,7 +136,7 @@ For topology, `summary` reports captured cuts and an ordered registration invent
 topology-v1 payload. Inspection reports one device or link across captured evidence, graph, and rendered topology
 stages. Link reports also include family-wide source context; that context is not causal provenance for the inspected
 link. Stage availability and retained-success/latest-attempt interpretation are explained in
-[Offline Diagnostic Inspection](../../plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#offline-diagnostic-inspection).
+[Offline Diagnostic Inspection](/src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#offline-diagnostic-inspection).
 
 Use `summary` to find a device registration ID. Use `--link-index` to inspect one existing link by its zero-based row in
 the `links` table emitted by `replay`. The index belongs to that archive and query option set; do not reuse it with a

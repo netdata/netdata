@@ -5,10 +5,10 @@ Paths and symbols below are relative to this collector directory unless a link p
 
 **Place in the documentation set.** This document owns normal profile selection, sample emission, and BGP/licensing
 consumer behavior. The project skill `.agents/skills/triage-snmp-diagnostics/SKILL.md` cites its heading anchors; update
-those references when moving a section. The [profile guide](profile-format.md) owns user-facing profile syntax and
-rules. The [diagnostics CLI README](../../../../tools/snmp-diagnostics/README.md#normal-device-evidence) owns tool usage
+those references when moving a section. The [profile guide](/src/go/plugin/go.d/collector/snmp/profile-format.md) owns user-facing profile syntax and
+rules. The [diagnostics CLI README](/src/go/tools/snmp-diagnostics/README.md#normal-device-evidence) owns tool usage
 and evidence interpretation. Topology production remains in the
-[SNMP topology architecture](../snmp_topology/ARCHITECTURE.md).
+[SNMP topology architecture](/src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md).
 
 ## Collection Boundaries
 
@@ -20,16 +20,16 @@ and evidence interpretation. Topology production remains in the
 | Diagnostic capture | `normal_diagnostics*.go`, `diagnostics/` | Capture adapters plus shared documents, codecs, and file publication |
 
 Acquisition success, emitted samples, stored consumer state, and a Function response are distinct stages. Use the
-[diagnostic stage interpretation](../../../../tools/snmp-diagnostics/README.md#acquisition-processing-and-samples)
+[diagnostic stage interpretation](/src/go/tools/snmp-diagnostics/README.md#acquisition-processing-and-samples)
 when correlating them. File cadence, retention, and publication remain documented under
-[Diagnostic Files And Publication](../snmp_topology/ARCHITECTURE.md#diagnostic-files-and-publication).
+[Diagnostic Files And Publication](/src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#diagnostic-files-and-publication).
 
 ## Profile Selection
 
 For normal SNMP collection, `setupProfiles` uses `manual_profiles` only when `sysObjectID` is empty. A non-empty but
 unmatched `sysObjectID` does not fall back to that list. After catalog matching, consumer projection keeps metrics,
 BGP, and licensing definitions for normal collection; topology has its own
-[composition](../snmp_topology/ARCHITECTURE.md#topology-profile-composition).
+[composition](/src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#topology-profile-composition).
 A matched profile with no data for the requested consumer can disappear from that consumer's collection set. When
 investigating selection, compare the captured profile context's selected profiles and projection, not only profile
 names.
@@ -43,17 +43,17 @@ The normal SNMP collector skips a table metric when its resolved tag map is empt
 non-empty identifying tag values; the SNMP row index is not automatically part of the emitted series identity.
 
 The collector's `tableMetricKey` combines the metric name with non-empty public tag values, ordered by tag key.
-[Underscore-prefixed tags](profile-format.md#underscore-prefixed-tags) do not distinguish chart IDs. Rows that reach
+[Underscore-prefixed tags](/src/go/plugin/go.d/collector/snmp/profile-format.md#underscore-prefixed-tags) do not distinguish chart IDs. Rows that reach
 `collectProfileTableMetrics` with the same key accumulate their ordinary numeric values into one sample; multi-value
 mapped dimensions use assignment instead. A captured row can therefore be present without having a distinct chart
 series, and a final sample can combine several rows.
 
 `collect_snmp.go` owns these emission decisions; `normal_diagnostics.go` records their relationship to captured samples.
-Profile authoring details remain in the [table metric guide](profile-format.md#table-metrics-multiple-rows).
+Profile authoring details remain in the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).
 
 ## BGP Collection And Retained Rows
 
-Profile syntax and peer identity requirements are documented in [BGP rows](profile-format.md#bgp-rows).
+Profile syntax and peer identity requirements are documented in [BGP rows](/src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows).
 
 The acquisition layer admits a typed BGP row only when it has a signal and the identity required by its row kind.
 `bgpRowHasSignals` and `bgpRowIdentityComplete` in `ddsnmp/ddsnmpcollector/collector_bgp.go` define this boundary.
@@ -73,7 +73,7 @@ successful current measurement.
 
 ## Licensing Normalization And Collection Results
 
-Profile syntax, signal definitions, and date formats are documented in [Licensing rows](profile-format.md#licensing-rows).
+Profile syntax, signal definitions, and date formats are documented in [Licensing rows](/src/go/plugin/go.d/collector/snmp/profile-format.md#licensing-rows).
 
 The normal collector converts typed profile rows through `licenseRowFromTyped` in `licensing.go`. A row needs an
 identity and at least one typed signal; vendor text or perpetual/unlimited descriptors alone are insufficient.
