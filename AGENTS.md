@@ -620,6 +620,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     pack regeneration and compression, category/severity taxonomy changes
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
     `health-alert-authoring` (alerts on a collector's contexts).
+  - Also relevant: `triage-snmp-diagnostics` (offline SNMP evidence investigations).
 - Integrations.
   - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` schemas and validation, `integrations/`
     generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
@@ -649,6 +650,10 @@ and the rule for adding one; each skill's frontmatter description is the authori
     locally from a PR or docs branch; loads `docs-learn-site-structure` first
   - Also relevant: `integrations-lifecycle` (generated integration pages are published on Learn).
 - Triage.
+  - `triage-snmp-diagnostics`: offline SNMP support bundles and diagnostic files with `src/go/tools/snmp-diagnostics`;
+    topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`,
+    `validate`, `summary`, `inspect-device`, `inspect-link`, and `replay`. Not live queries, traps, or
+    collector/profile authoring
   - `triage-coverity`: Coverity Scan defect triage
   - `triage-sonarqube`: SonarCloud findings triage
   - `triage-codeql`: GitHub Code Scanning / CodeQL triage
@@ -735,6 +740,7 @@ renames:
 | `triage-codacy` | `codacy/` | local analysis output, PR issue fetches |
 | `triage-codeql` | `graphql/` | Code Scanning fetches and dismissals |
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
+| `triage-snmp-diagnostics` | `snmp-diagnostics/` | private bundle inspections, replay output, and incident reports |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
 | `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change |
