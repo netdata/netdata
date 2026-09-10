@@ -1579,7 +1579,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_total_packets = rrdset_create_localhost(
                 "vswitch_total_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_total_packets",
@@ -1596,7 +1596,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_packets = rrdset_create_localhost(
                 "vswitch_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_packets",
@@ -1614,7 +1614,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_directed_packets = rrdset_create_localhost(
                 "vswitch_directed_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_directed_packets",
@@ -1634,7 +1634,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_broadcast_packets = rrdset_create_localhost(
                 "vswitch_broadcast_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_broadcast_packets",
@@ -1654,7 +1654,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_multicast_packets = rrdset_create_localhost(
                 "vswitch_multicast_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_multicast_packets",
@@ -1674,7 +1674,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_dropped_packets = rrdset_create_localhost(
                 "vswitch_dropped_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_dropped_packets",
@@ -1694,7 +1694,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_ext_dropped_packets = rrdset_create_localhost(
                 "vswitch_extensions_dropped_packets",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_extensions_dropped_packets",
@@ -1714,7 +1714,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_flooded = rrdset_create_localhost(
                 "vswitch_packets_flooded",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_packets_flooded",
@@ -1731,7 +1731,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_learned_mac = rrdset_create_localhost(
                 "vswitch_learned_mac_addresses",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_learned_mac_addresses",
@@ -1748,7 +1748,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_purged_mac = rrdset_create_localhost(
                 "vswitch_purged_mac_addresses",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_purged_mac_addresses",
@@ -1765,7 +1765,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_send_channel_moves = rrdset_create_localhost(
                 "vswitch_send_channel_moves",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_send_channel_moves",
@@ -1784,7 +1784,7 @@ static bool do_hyperv_switch(PERF_DATA_BLOCK *pDataBlock, int update_every, void
 
             p->st_vmq_moves = rrdset_create_localhost(
                 "vswitch_vmq_moves",
-                windows_shared_buffer,
+                id,
                 NULL,
                 HYPERV,
                 HYPERV ".vswitch_vmq_moves",
