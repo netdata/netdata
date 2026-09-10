@@ -2316,6 +2316,9 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
         struct hypervisor_processor *p;
         dfe_start_read(item->instance, p)
         {
+            if (p->last_seen != item->generation)
+                continue;
+
             rrddim_set_by_pointer(
                 p->st_HypervisorProcessor, p->rd_HypervisorRunTime, (collected_number)p->HypervisorRunTime_total);
             rrddim_set_by_pointer(
