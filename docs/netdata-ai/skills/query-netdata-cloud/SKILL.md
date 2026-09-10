@@ -52,6 +52,8 @@ skill [`query-netdata-agents`](../query-netdata-agents/SKILL.md).
 - For answer-only questions, deliver the requested answer. If the work reveals a reusable, evidence-backed recipe
   not already documented, you MUST preserve it in a sanitized local follow-up note for separately authorized
   documentation work. If no writable workspace is available, include the sanitized follow-up in the response.
+- Briefly report reusable documentation discoveries and proposed updates in the answer-only final response, even
+  when recorded locally. Obtain authorization before those guide edits; do not delay the answer while awaiting it.
 - During authorized implementation, you MUST update this skill or its guides for reusable, evidence-backed
   discoveries made while doing the work, even when the documentation is not required for the code change. This
   needs no separate authorization. Keep [`how-tos/INDEX.md`](./how-tos/INDEX.md) consistent and report the updates.

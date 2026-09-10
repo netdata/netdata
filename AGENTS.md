@@ -412,10 +412,11 @@ Review findings are leads until verified against the shipped code and its contra
   that no checkpoint commit or squash was performed. A review requirement never grants Git authorization.
 - Recurrence: if findings keep clustering in one subsystem for ~2-3 rounds, stop patching individual cases, name the
   missing invariant, and propose one class-level fix as a user decision.
-- Obtaining a review: spawn independent, full-scope reviewers with clean context, or run the external assistants
-  the user names. For performance-sensitive code at least one reviewer MUST carry an explicit hot-path performance
-  lens. Record each reviewer and its findings under Validation in the SOW when one exists; otherwise report the
-  findings and review scope directly to the user.
+- Obtaining a review: the coordinating assistant spawns independent, full-scope reviewers with clean context, or runs
+  the external assistants the user names. Delegated reviewers MUST NOT launch other agents; include this restriction
+  in each review assignment. For performance-sensitive code at least one reviewer MUST carry an explicit hot-path
+  performance lens. Record each reviewer and its findings under Validation in the SOW when one exists; otherwise
+  report the findings and review scope directly to the user.
 - One complete review round is the default. Repeat the same full scope only when a verified shipping blocker
   required a material change to shipped implementation or behavior, or when the prior review could not assess the
   complete change.
@@ -501,7 +502,7 @@ evidence-backed reason it is unaffected.
 - `.github/workflows/sow.yml` rejects pull requests that commit SOW working files or specs: anything tracked under
   `.agents/sow/q/**`, `.agents/sow/specs/**`, or a legacy top-level `.agents/sow/{active,pending,current,done}/`.
   A hit means a file was force-added and MUST be removed before merge. It also scans changed instruction, skill, and
-  framework files for raw sensitive data.
+  framework files, including canonical public skills under `docs/netdata-ai/skills/**`, for raw sensitive data.
 - These checks are guards, not substitutes for the Validation Gate. The assistant still owns the scoped knowledge
   transfer required by SOW Lifecycle before merge.
 
@@ -585,6 +586,9 @@ docs, code, and tests, not in specs.
   a reusable discovery in a sanitized local note under `<repo-root>/.local/audits/<subject>/followups.md`, using the
   existing skill audit directory when one applies. Include the finding, supporting evidence, and proposed owning
   guide. If no writable local workspace is available, include that sanitized follow-up in the response instead.
+- Report reusable documentation discoveries briefly in the answer-only final response, with the proposed update.
+  Obtain authorization before implementing those documentation changes; do not delay the requested answer while
+  awaiting it. A local note does not replace notifying the user.
 - During authorized implementation, assistants MUST update missing or outdated documentation for reusable,
   evidence-backed discoveries made while doing the work, even when the documentation is not required for the code
   change. This capture is part of the task and needs no separate authorization. Keep affected guides, skills, and
@@ -633,8 +637,10 @@ Public skill convention (`docs/netdata-ai/skills/`):
 - Skill verification harness inputs (seed questions, grader rubrics, runner scripts, transcript-generation prompts)
   live under `.agents/skill-verification/<skill>/`, never under `docs/netdata-ai/skills/<skill>/`.
 - Each public skill is reachable from `.agents/skills/<skill-name>` via a relative symlink
-  (`.agents/skills/<name>` -> `../../docs/netdata-ai/skills/<name>`), created with `ln -srfn` and verified with
-  `readlink -f .agents/skills/<name>`.
+  (`.agents/skills/<name>` -> `../../docs/netdata-ai/skills/<name>`). From the repository root, create a new link with
+  `ln -s ../../docs/netdata-ai/skills/<name> .agents/skills/<name>`. Inspect an existing path instead of overwriting it;
+  replacement follows Git And PR Workflow. Verify the target with `readlink .agents/skills/<name>` and verify that
+  `.agents/skills/<name>/SKILL.md` resolves to a file.
 - Scripts MUST follow the existing `_lib.sh` shape: `set -euo pipefail`; ANSI colors as real ESC bytes via
   `$'\033[...]'`; `<prefix>_repo_root` via `git rev-parse --show-toplevel`; `<prefix>_load_env` sourcing `<repo>/.env`
   with `: "${VAR:?}"` validation; `<prefix>_audit_dir` creating the skill's `<repo>/.local/audits/<dir>/` (Local-Only
@@ -720,7 +726,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     `AE_*` fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
   - Also relevant: `repo-pr-reviews` (pulls SonarCloud findings for a PR).
 - Repo.
-  - `repo-pr-reviews`: PR comment and review iteration
+  - `repo-pr-reviews`: inspecting or addressing PR comments and reviews
   - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
     reset-to-default safety; `--repo` scoping
   - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; the authoring rules (point
