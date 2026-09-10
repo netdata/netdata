@@ -92,6 +92,9 @@ These sections identify consumer source symbols where code inspection is needed.
   settle whether a chart was created or displayed; use the normal-evidence owner to bound that conclusion.
 - For a source-level explanation, check the producer version against the code being read. Treat replay through a
   different checkout as a version-qualified experiment. Do not edit captured values to make a replay succeed.
+- For discovery targets, collector enablement, polling settings, or profile overrides, inspect relevant files under
+  `04-config/` and persisted UI/API configuration under `06-state/dyncfg/`, when available. Compare them with the
+  diagnostic evidence; persisted configuration may differ from what the collector used at capture time.
 
 ## Correlate Companion Logs
 
