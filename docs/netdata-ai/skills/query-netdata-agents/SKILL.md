@@ -51,9 +51,12 @@ implementation.
 - For answer-only questions, deliver the requested answer. If the work reveals a reusable, evidence-backed recipe
   not already documented, you MUST preserve it in a sanitized local follow-up note for separately authorized
   documentation work. If no writable workspace is available, include the sanitized follow-up in the response.
-- Editing this skill or its guides requires authorization; discovering a missing recipe does not grant it.
-  Documentation coupled to already-authorized implementation MUST be updated within that work, including
-  [`how-tos/INDEX.md`](./how-tos/INDEX.md) when a recipe changes. Commit and publication require authorization too.
+- During authorized implementation, you MUST update this skill or its guides for reusable, evidence-backed
+  discoveries made while doing the work, even when the documentation is not required for the code change. This
+  needs no separate authorization. Keep [`how-tos/INDEX.md`](./how-tos/INDEX.md) consistent and report the updates.
+- Guide edits arising from answer-only questions require separate authorization. Documentation capture records
+  observed behavior; it does not authorize additional implementation or new product contracts. Commit and
+  publication require authorization too.
 - Prefer updating an existing guide over duplicating it. Keep recipes operator-facing: fetching or using Agent
   data. Developer contract validation for topology producers, schemas, fixtures, UI adapters, or aggregator
   handoffs belongs in the relevant project developer skill, not in this public skill.

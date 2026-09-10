@@ -191,6 +191,9 @@ removes debt beats a smaller one that preserves it.
 
 ### Scope Discipline At Every Step
 
+- Documentation capture during authorized implementation is part of that task under Knowledge Capture, even when
+  the discovered gap is not required to complete the code change. This does not authorize additional implementation
+  or changes to product behavior or contracts.
 - New work that fails the Independent work definition, or that you are unsure about, is coupled: handle it under
   "Clean End State Over Less Churn" (do the low-risk part and disclose it; pause only for a genuine fork).
 - Genuinely independent work: do NOT silently bundle it. Submit it as a separately authorized PR first and rebase
@@ -310,11 +313,11 @@ Before non-trivial work:
   superseded by newer user instructions.
 - Completion of a standalone or step SOW, when the authorized deliverable is complete and any changes are ready to
   merge (umbrellas: see "Umbrella And Step SOWs"):
-  1. Finish authorized implementation, coupled docs and skills, validation, and follow-up mapping.
+  1. Finish authorized implementation, documentation capture under Knowledge Capture, validation, and follow-up mapping.
   2. Transfer durable knowledge needed for the approved deliverable into project skills, docs, code, and tests (and
-     specs once re-introduced). Other discoveries, including those from tracked answer-only work, follow Knowledge
-     Capture and MAY remain sanitized local notes. Closure does not authorize documentation outside the approved
-     scope. The SOW MUST NOT be the sole record of a delivered project contract.
+     specs once re-introduced). Document reusable discoveries from implementation under Knowledge Capture. Discoveries
+     from tracked answer-only work MAY remain sanitized local notes without authorizing guide edits. The SOW MUST NOT
+     be the sole record of a delivered project contract.
   3. Set `Status: completed` and move the file to `.agents/sow/q/done/` (unless the user asks to discard it).
 
 ### Umbrella And Step SOWs
@@ -582,9 +585,12 @@ docs, code, and tests, not in specs.
   a reusable discovery in a sanitized local note under `<repo-root>/.local/audits/<subject>/followups.md`, using the
   existing skill audit directory when one applies. Include the finding, supporting evidence, and proposed owning
   guide. If no writable local workspace is available, include that sanitized follow-up in the response instead.
-- Documentation implementation requires separate authorization unless it is coupled to already-authorized
-  implementation work. In that case, keep affected guides and catalogs consistent before completing the work.
-  Unrelated discoveries remain independent work under Scope Discipline At Every Step.
+- During authorized implementation, assistants MUST update missing or outdated documentation for reusable,
+  evidence-backed discoveries made while doing the work, even when the documentation is not required for the code
+  change. This capture is part of the task and needs no separate authorization. Keep affected guides, skills, and
+  catalogs consistent before completing the work; describe the updates in the final report.
+- Documentation work arising from answer-only questions requires separate authorization. Documentation capture
+  records observed behavior; it does not authorize additional implementation or new product contracts.
 - Local notes are private evidence, not shared project contracts or automatic follow-up commitments. Accepted
   deferred work follows Followup Discipline. Commit, push, and publication requirements never grant authorization
   to perform those actions.
@@ -603,8 +609,8 @@ Project skills are memory of HOW to work here.
 - Output/reference skills may also exist under product documentation or generated skill directories. Do not rename,
   shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related
   public/operator workflow changes.
-- Skill updates coupled to an authorized implementation change MUST ship in the same PR. Capture of discoveries
-  from answer-only tasks and unrelated findings follows Knowledge Capture and Scope Discipline At Every Step.
+- Skill updates required by Knowledge Capture during authorized implementation MUST ship in the same PR. Discoveries
+  from answer-only tasks follow its local-note and authorization rules.
 - Every change to a skill MUST end with a slimming pass over the touched files: remove restatements, merged-in
   duplicates, and rules that now live elsewhere, keeping every rule (a removed directive is moved or superseded by a
   recorded decision, never dropped). Skills accrete bloat with each update; report line counts before and after.
