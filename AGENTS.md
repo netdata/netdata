@@ -651,9 +651,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - Also relevant: `integrations-lifecycle` (generated integration pages are published on Learn).
 - Triage.
   - `triage-snmp-diagnostics`: offline SNMP support bundles and diagnostic files with `src/go/tools/snmp-diagnostics`;
-    topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`, `validate`,
-    `summary`, `inspect-device`, `inspect-link`, and `replay`. Not live queries, traps, or collector/profile
-    authoring
+    topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`,
+    `validate`, `summary`, `inspect-device`, `inspect-link`, and `replay`. Not live queries, traps, or
+    collector/profile authoring
   - `triage-coverity`: Coverity Scan defect triage
   - `triage-sonarqube`: SonarCloud findings triage
   - `triage-codeql`: GitHub Code Scanning / CodeQL triage

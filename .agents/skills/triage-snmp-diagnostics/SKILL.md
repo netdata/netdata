@@ -56,7 +56,7 @@ cost owner before scanning a large tar repeatedly.
 | Missing/stale BGP peer or wrong peer state | Normal device inspection | Profile BGP rows and source operations → peer cache and refresh outcome. For a missing topology BGP edge, use the topology path too. |
 | Missing/wrong license inventory or usage | Normal device inspection | Profile license rows and source operations → normalized licensing state. |
 | Discovery, initialization, or missing device evidence | Lifecycle `summary` | Candidate/runtime state and failure → available device cuts → matching logs/configuration. |
-| Slow SNMP collection | Topology device inspection | Collection contexts and referenced operations, interpreted through the collection-cost owner; correlate normal attempt timing if relevant. |
+| Slow SNMP collection | The affected collector's device inspection | Normal attempt timestamps and referenced operation timing, or topology collection contexts and detailed accounting; use the collection-cost owner for Handler timing limits. |
 
 Topology summaries identify registrations. For normal evidence, select a run from the listing and identify the device
 from its normal summary; a lifecycle inventory can help only after its producer run matches. Do not require a topology
