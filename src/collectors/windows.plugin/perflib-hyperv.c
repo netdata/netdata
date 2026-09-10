@@ -2342,6 +2342,22 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
     return true;
 }
 
+#define HYPERV_ASSERT_STATE_PREFIX(type)                                                                                \
+    _Static_assert(                                                                                                      \
+        offsetof(type, collected_metadata) == offsetof(struct hyperv_instance_state, collected_metadata) &&              \
+            offsetof(type, charts_created) == offsetof(struct hyperv_instance_state, charts_created) &&                  \
+            offsetof(type, last_seen) == offsetof(struct hyperv_instance_state, last_seen) &&                            \
+            offsetof(type, missing_cycles) == offsetof(struct hyperv_instance_state, missing_cycles),                     \
+        #type " must start with hyperv_instance_state")
+
+HYPERV_ASSERT_STATE_PREFIX(struct hypervisor_memory);
+HYPERV_ASSERT_STATE_PREFIX(struct hypervisor_partition);
+HYPERV_ASSERT_STATE_PREFIX(struct hypervisor_root_partition);
+HYPERV_ASSERT_STATE_PREFIX(struct hypervisor_storage_device);
+HYPERV_ASSERT_STATE_PREFIX(struct hypervisor_switch);
+HYPERV_ASSERT_STATE_PREFIX(struct hypervisor_network_adapter);
+HYPERV_ASSERT_STATE_PREFIX(struct hypervisor_processor);
+
 #define HYPERV_CLEANUP_CHARTS(name, type, ...)                                                                          \
     static void hyperv_cleanup_##name(void *value)                                                                      \
     {                                                                                                                   \
@@ -2411,16 +2427,10 @@ static void hyperv_reconcile_instances(hyperv_perf_item *item)
     void *value;
     dfe_start_write(item->instance, value)
     {
-        struct hyperv_instance_state state;
-        memcpy(&state, value, sizeof(state));
-        if (state.last_seen != item->generation && ++state.missing_cycles >= HYPERV_MISSING_CYCLES) {
+        struct hyperv_instance_state *state = value;
+        if (state->last_seen != item->generation && ++state->missing_cycles >= HYPERV_MISSING_CYCLES) {
             item->cleanup(value);
             dictionary_del(item->instance, value_dfe.name);
-        }
-        else if (state.missing_cycles != 0) {
-            memcpy((char *)value + offsetof(struct hyperv_instance_state, missing_cycles),
-                   &state.missing_cycles,
-                   sizeof(state.missing_cycles));
         }
     }
     dfe_done(value);
