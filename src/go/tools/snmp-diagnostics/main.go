@@ -95,6 +95,10 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 		return 2
 	}
 
+	if err := validateSelection(operation, options); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
 	input, err := openInput(options.inputPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "error: open input: %v\n", err)
@@ -102,10 +106,6 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 	}
 	defer input.Close()
 	if operation == "list" {
-		if options.normal || options.previousRun || options.registrationID != 0 || options.lifecycle || options.checkpoint != 0 {
-			fmt.Fprintln(stderr, "error: list does not support evidence selectors")
-			return 1
-		}
 		if input.root == nil {
 			fmt.Fprintln(stderr, "error: list requires a diagnostics directory or support bundle")
 			return 1
@@ -346,4 +346,20 @@ func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (openedArchi
 	}
 	archive, err := snmptopology.InspectDiagnosticDocument(document)
 	return openedArchive{topology: archive}, err
+}
+
+func validateSelection(operation string, options commandOptions) error {
+	if operation == "list" && (options.normal || options.previousRun || options.registrationID != 0 || options.lifecycle || options.checkpoint != 0) {
+		return errors.New("list does not support evidence selectors")
+	}
+	if options.previousRun && !options.normal {
+		return errors.New("--previous-run requires --normal")
+	}
+	if options.lifecycle && (options.normal || options.checkpoint != 0) {
+		return errors.New("--lifecycle cannot be combined with --normal or --checkpoint")
+	}
+	if options.normal && (options.registrationID == 0 || options.checkpoint != 0) {
+		return errors.New("--normal requires --registration-id and cannot select a topology checkpoint")
+	}
+	return nil
 }

@@ -127,12 +127,6 @@ func (input *diagnosticInput) list() diagnosticListing {
 }
 
 func (input *diagnosticInput) selectDocument(options commandOptions) (io.ReadCloser, error) {
-	if options.previousRun && !options.normal {
-		return nil, errors.New("--previous-run requires --normal")
-	}
-	if options.lifecycle && (options.normal || options.checkpoint != 0) {
-		return nil, errors.New("--lifecycle cannot be combined with --normal or --checkpoint")
-	}
 	if input.file != nil {
 		if options.lifecycle || options.normal || options.checkpoint != 0 {
 			return nil, errors.New("evidence selectors require a diagnostics directory or support bundle")
@@ -159,9 +153,6 @@ func selectDocumentName(root fs.FS, options commandOptions) (string, error) {
 		return snmpdiag.LifecycleFilename, nil
 	}
 	if options.normal {
-		if options.registrationID == 0 || options.checkpoint != 0 {
-			return "", errors.New("--normal requires --registration-id and cannot select a topology checkpoint")
-		}
 		files, err := snmpdiag.ListNormalFilesFS(root)
 		if err != nil {
 			return "", fmt.Errorf("normal evidence index: %w", err)

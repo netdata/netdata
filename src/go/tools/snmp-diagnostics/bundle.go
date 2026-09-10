@@ -61,7 +61,7 @@ func (b *bundleFS) Close() error { return b.file.Close() }
 
 func (b *bundleFS) index() error {
 	roots := make(map[string]bool)
-	add := func(name string, info fs.FileInfo, member *zip.File, reader func() (io.ReadCloser, error)) error {
+	add := func(name string, info fs.FileInfo, member *zip.File, reader io.Reader) error {
 		name = strings.TrimPrefix(name, "./")
 		name = strings.TrimSuffix(name, "/")
 		if name == "." || name == "" {
@@ -85,18 +85,11 @@ func (b *bundleFS) index() error {
 			return fmt.Errorf("bundle evidence is not a regular file: %q", name)
 		}
 		entry := bundleEntry{info: info, zip: member}
-		if info.Mode().IsRegular() && (relative == bundleStatusPath || relative == bundleDiagnosticPath+"/normal/runs.json") {
-			r, err := reader()
-			if err != nil {
-				return fmt.Errorf("open bundle metadata %q: %w", name, err)
-			}
-			entry.metadata, err = io.ReadAll(r)
-			closeErr := r.Close()
+		if member == nil && info.Mode().IsRegular() && (relative == bundleStatusPath || relative == bundleDiagnosticPath+"/normal/runs.json") {
+			var err error
+			entry.metadata, err = io.ReadAll(reader)
 			if err != nil {
 				return fmt.Errorf("read bundle metadata %q: %w", name, err)
-			}
-			if closeErr != nil {
-				return closeErr
 			}
 		}
 		b.entries[name] = entry
@@ -108,7 +101,7 @@ func (b *bundleFS) index() error {
 			return err
 		}
 		for _, member := range archive.File {
-			if err := add(member.Name, member.FileInfo(), member, member.Open); err != nil {
+			if err := add(member.Name, member.FileInfo(), member, nil); err != nil {
 				return err
 			}
 		}
@@ -131,7 +124,7 @@ func (b *bundleFS) index() error {
 			if relevant && header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA && header.Typeflag != tar.TypeDir {
 				return fmt.Errorf("bundle evidence is not a regular file: %q", header.Name)
 			}
-			if err := add(header.Name, header.FileInfo(), nil, func() (io.ReadCloser, error) { return io.NopCloser(archive), nil }); err != nil {
+			if err := add(header.Name, header.FileInfo(), nil, archive); err != nil {
 				return err
 			}
 		}
@@ -211,10 +204,12 @@ func (b *bundleFS) Open(name string) (fs.File, error) {
 	var reader io.ReadCloser
 	var err error
 	_, relative, _ := bundleMember(name)
-	if relative == bundleStatusPath || relative == bundleDiagnosticPath+"/normal/runs.json" {
-		reader = io.NopCloser(bytes.NewReader(entry.metadata))
-	} else if entry.zip != nil {
+	if entry.zip != nil {
+		// ZIP can isolate a damaged metadata member without preventing access
+		// to intact topology/lifecycle documents elsewhere in the container.
 		reader, err = entry.zip.Open()
+	} else if relative == bundleStatusPath || relative == bundleDiagnosticPath+"/normal/runs.json" {
+		reader = io.NopCloser(bytes.NewReader(entry.metadata))
 	} else {
 		reader, err = b.openTarMember(name)
 	}

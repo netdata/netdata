@@ -363,3 +363,74 @@ func TestTarBundleHardLinks(t *testing.T) {
 		})
 	}
 }
+
+func TestZIPMetadataReadFailureIsolation(t *testing.T) {
+	for name, tc := range map[string]struct {
+		member    string
+		component string
+	}{
+		"status checksum":    {bundleStatusPath, "collection_status"},
+		"run index checksum": {bundleDiagnosticPath + "/normal/runs.json", "normal"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			filename := writeBundle(t, ".zip", testBundleRoot+"/", bundleFixture(t))
+			data, err := os.ReadFile(filename)
+			require.NoError(t, err)
+			original, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+			require.NoError(t, err)
+			var corrupt bytes.Buffer
+			writer := zip.NewWriter(&corrupt)
+			for _, member := range original.File {
+				header := member.FileHeader
+				if header.Name == testBundleRoot+"/"+tc.member {
+					header.CRC32 ^= 1
+				}
+				destination, err := writer.CreateRaw(&header)
+				require.NoError(t, err)
+				source, err := member.OpenRaw()
+				require.NoError(t, err)
+				_, err = io.Copy(destination, source)
+				require.NoError(t, err)
+			}
+			require.NoError(t, writer.Close())
+			require.NoError(t, os.WriteFile(filename, corrupt.Bytes(), 0600))
+			code, out, message := runBundleCommand(t, filename, "list")
+			require.Zero(t, code, message)
+			var listing diagnosticListing
+			require.NoError(t, json.Unmarshal([]byte(out), &listing))
+			assert.NotEmpty(t, listing.Errors[tc.component])
+			assert.True(t, listing.Lifecycle)
+			assert.Len(t, listing.Topology, 2)
+			for _, args := range [][]string{{"validate"}, {"validate", "--lifecycle"}} {
+				code, _, message := runBundleCommand(t, filename, args...)
+				require.Zero(t, code, message)
+			}
+			if tc.component == "normal" {
+				code, _, message := runBundleCommand(t, filename, "summary", "--normal", "--registration-id", "7")
+				require.Equal(t, 1, code)
+				assert.Contains(t, message, "normal evidence index")
+			}
+		})
+	}
+}
+
+func TestInvalidSelectionDoesNotOpenInput(t *testing.T) {
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"list selector":           {[]string{"list", "--normal"}, "list does not support"},
+		"lifecycle normal":        {[]string{"summary", "--lifecycle", "--normal"}, "--lifecycle cannot"},
+		"normal missing id":       {[]string{"summary", "--normal"}, "--normal requires"},
+		"normal checkpoint":       {[]string{"summary", "--normal", "--registration-id", "7", "--checkpoint", "8"}, "cannot select a topology"},
+		"previous without normal": {[]string{"summary", "--previous-run"}, "--previous-run requires"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			filename := filepath.Join(t.TempDir(), "missing.tar.zst")
+			code, _, message := runBundleCommand(t, filename, tc.args...)
+			require.Equal(t, 1, code)
+			assert.Contains(t, message, tc.want)
+			assert.NotContains(t, message, "open input")
+		})
+	}
+}
