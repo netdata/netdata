@@ -30,22 +30,56 @@ int aclk_connection_counter = 0;
 mqtt_wss_client mqttwss_client;
 
 static bool aclk_connected = false;
+
+// PUBACK timeouts counted for the life of the MQTT client, cached here so a reader does not have
+// to reach mqttwss_client for them. That pointer belongs to the ACLK thread, which frees it on
+// exit without clearing the global, while aclk_state_json() runs on web and command threads - and
+// shutdown reaps the ACLK thread before it waits for those, so reading through it off-thread is a
+// use-after-free. Updated below on the ACLK thread while the client is still alive.
+static uint32_t aclk_pubacks_timed_out_since_start = 0;
+
 static inline void aclk_set_connected(void) {
-    __atomic_store_n(&aclk_connected, true, __ATOMIC_RELAXED);
+    // RELEASE for the same reason as the store in aclk_set_disconnected(): a reader that observes
+    // us online goes on to reach mqttwss_client and the state built behind it, and this is what
+    // publishes those writes to it.
+    __atomic_store_n(&aclk_connected, true, __ATOMIC_RELEASE);
 
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
+// Copy the live counter into the cache. ACLK thread only: it reaches mqttwss_client, so it must
+// run while that client is still alive. The counter only ever grows, so a later call cannot lower
+// what a reader already saw.
+static inline void aclk_cache_pubacks_timed_out(void) {
+    if(!mqttwss_client)
+        return;
+
+    struct mqtt_wss_stats stats = mqtt_wss_get_stats(mqttwss_client);
+    __atomic_store_n(&aclk_pubacks_timed_out_since_start,
+                     (uint32_t)stats.mqtt.packets_timed_out, __ATOMIC_RELAXED);
+}
+
 static inline void aclk_set_disconnected(void) {
-    __atomic_store_n(&aclk_connected, false, __ATOMIC_RELAXED);
+    // Refresh the cache BEFORE going offline. A reader that saw offline first would fall back to
+    // the cache while it still held the previous disconnection's value - a "since start" count
+    // going backwards. (mqtt_wss_reset_stats() below does not clear this counter - it lives in the
+    // mqtt_ng client, which outlives the connection - but the cache is still taken here, because
+    // this is where we know the client is reachable.)
+    aclk_cache_pubacks_timed_out();
 
     if(mqttwss_client)
         mqtt_wss_reset_stats(mqttwss_client);
+
+    // RELEASE, paired with the ACQUIRE in aclk_online(): it publishes the cache store above. With
+    // both relaxed, a weakly ordered CPU could let a reader see us offline while the cache still
+    // held the previous disconnection's value, which is the backwards-going count this ordering
+    // exists to prevent.
+    __atomic_store_n(&aclk_connected, false, __ATOMIC_RELEASE);
 
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
 }
 
 inline bool aclk_online(void) {
-    return __atomic_load_n(&aclk_connected, __ATOMIC_RELAXED);
+    return __atomic_load_n(&aclk_connected, __ATOMIC_ACQUIRE);
 }
 
 bool aclk_online_for_contexts(void) {
@@ -953,6 +987,11 @@ exit_full:
     free_topic_cache();
     if (client_to_reset)
         aclk_mqtt_client_reset();
+    // Last chance to read the counter: the graceful disconnect above kept servicing the connection
+    // for a few seconds, and PUBACKs timing out in that window landed after the snapshot taken
+    // when we went offline.
+    aclk_cache_pubacks_timed_out();
+
     mqtt_wss_destroy(mqttwss_client);
 exit:
     if (aclk_env) {
@@ -1224,6 +1263,15 @@ char *aclk_state(void)
         }
         rrd_rdunlock();
     }
+    else {
+        // Offline, the per-connection values above describe a connection that is gone and are
+        // omitted rather than printed as zeros, which would read as current readings. The timeout
+        // counter is cumulative though, so it is still reported - from the cache, for the same
+        // reason aclk_state_json() does. Leading newline because the offline branch above ends
+        // without one.
+        buffer_sprintf(wb, "\nMQTT Messages Dropped Without a PUBACK (since start): %u\n",
+                       (unsigned)__atomic_load_n(&aclk_pubacks_timed_out_since_start, __ATOMIC_RELAXED));
+    }
 
     ret = strdupz(buffer_tostring(wb));
     buffer_free(wb);
@@ -1267,6 +1315,9 @@ char *aclk_state_json(void)
 
     bool aclk_is_online = aclk_online();
 
+    // Only read the live stats while online - see aclk_pubacks_timed_out_since_start for why the
+    // offline path must not reach mqttwss_client. Offline, every gauge published below describes a
+    // connection that no longer exists and must read 0 anyway.
     struct mqtt_wss_stats aclk_stats;
 
     if (aclk_is_online)
@@ -1330,7 +1381,12 @@ char *aclk_state_json(void)
     tmp = json_object_new_int((int32_t) aclk_stats.mqtt.packets_waiting_puback);
     json_object_object_add(msg, "pending-mqtt-pubacks", tmp);
 
-    tmp = json_object_new_int((int32_t) aclk_stats.mqtt.packets_timed_out);
+    // Cumulative, so it must survive a disconnect: zeroing it with the rest would report no PUBACK
+    // timeouts at all exactly when an operator reads this to find out why the link dropped.
+    uint32_t pubacks_timed_out = aclk_is_online ?
+        (uint32_t)aclk_stats.mqtt.packets_timed_out :
+        __atomic_load_n(&aclk_pubacks_timed_out_since_start, __ATOMIC_RELAXED);
+    tmp = json_object_new_int((int32_t) pubacks_timed_out);
     json_object_object_add(msg, "timed-out-mqtt-pubacks-since-start", tmp);
 
     tmp = json_object_new_int((int32_t) aclk_stats.mqtt.rx_maximum);

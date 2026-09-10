@@ -17,6 +17,7 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	}
 
 	pms, err := c.ddSnmpColl.Collect()
+	c.captureCollectionFailures()
 	if err != nil {
 		c.markBGPCollectFailed(err)
 		return err
@@ -36,13 +37,18 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 
 	c.finalizeIfaceCache()
 	c.finalizeProfileMetrics()
+	c.commitNormalConsumers(pms)
 
 	return nil
 }
 
 func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
 	for _, m := range metrics {
-		if m.IsTable || m.Name == "" {
+		if m.IsTable {
+			continue
+		}
+		if m.Name == "" {
+			c.recordNormalMetric(m, "missing_name", nil)
 			continue
 		}
 
@@ -52,13 +58,19 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 		}
 
 		if len(m.MultiValue) == 0 {
-			mx[metricIDFromName(m.Name)] = m.Value
+			id := metricIDFromName(m.Name)
+			mx[id] = m.Value
+			c.recordNormalMetric(m, "set", []string{id})
 			continue
 		}
 
+		var ids []string
 		for k, v := range m.MultiValue {
-			mx[metricIDFromName(m.Name, k)] = v
+			id := metricIDFromName(m.Name, k)
+			mx[id] = v
+			ids = append(ids, id)
 		}
+		c.recordNormalMetric(m, "set", ids)
 	}
 }
 
@@ -66,12 +78,21 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 	seen := make(map[string]bool)
 
 	for _, m := range metrics {
-		if !m.IsTable || m.Name == "" || len(m.Tags) == 0 {
+		if !m.IsTable {
+			continue
+		}
+		if m.Name == "" || len(m.Tags) == 0 {
+			reason := "missing_tags"
+			if m.Name == "" {
+				reason = "missing_name"
+			}
+			c.recordNormalMetric(m, reason, nil)
 			continue
 		}
 
 		key := tableMetricKey(m)
 		if key == "" {
+			c.recordNormalMetric(m, "missing_table_key", nil)
 			continue
 		}
 
@@ -83,11 +104,17 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 
 		if len(m.MultiValue) == 0 {
-			mx[metricIDFromKey(key)] += m.Value
+			id := metricIDFromKey(key)
+			mx[id] += m.Value
+			c.recordNormalMetric(m, "sum", []string{id})
 		} else {
+			var ids []string
 			for k, v := range m.MultiValue {
-				mx[metricIDFromKey(key, k)] = v
+				id := metricIDFromKey(key, k)
+				mx[id] = v
+				ids = append(ids, id)
 			}
+			c.recordNormalMetric(m, "set", ids)
 		}
 
 		if isIfaceMetric(m.Name) {
@@ -114,6 +141,7 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 
 		px := fmt.Sprintf("snmp_device_prof_%s_stats_", name)
 		mx[px+"timings_scalar"] = pm.Stats.Timing.Scalar.Milliseconds()
+		mx[px+"timings_preparation"] = pm.Stats.Timing.Preparation.Milliseconds()
 		mx[px+"timings_table"] = pm.Stats.Timing.Table.Milliseconds()
 		mx[px+"timings_licensing"] = pm.Stats.Timing.Licensing.Milliseconds()
 		mx[px+"timings_bgp"] = pm.Stats.Timing.BGP.Milliseconds()
@@ -135,6 +163,7 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 		mx[px+"table_cache_misses"] = pm.Stats.TableCache.Misses
 		mx[px+"errors_snmp"] = pm.Stats.Errors.SNMP
 		mx[px+"errors_processing_scalar"] = pm.Stats.Errors.Processing.Scalar
+		mx[px+"errors_processing_preparation"] = pm.Stats.Errors.Processing.Preparation
 		mx[px+"errors_processing_table"] = pm.Stats.Errors.Processing.Table
 		mx[px+"errors_processing_licensing"] = pm.Stats.Errors.Processing.Licensing
 		mx[px+"errors_processing_bgp"] = pm.Stats.Errors.Processing.BGP

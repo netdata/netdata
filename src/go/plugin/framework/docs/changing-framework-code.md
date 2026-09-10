@@ -17,7 +17,7 @@ This guide applies when changing or extending any of these areas:
 - `src/go/plugin/framework/chartemit`
 - `src/go/plugin/framework/functions`
 - `src/go/plugin/framework/vnodes`
-- `src/go/plugin/framework/vnoderegistry`
+- `src/go/plugin/framework/hostoutput`
 - `src/go/plugin/framework/dyncfg`
 - `src/go/plugin/framework/confgroup`
 - `src/go/plugin/framework/runtimecomp`
@@ -215,7 +215,7 @@ Use this checklist when the changed package is involved.
 
 ### host scopes and vnodes
 
-See `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`.
+See `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md`.
 
 - Scope identity MUST use deterministic stable IDs.
 - Framework changes MUST preserve collector-provided `_vnode_type` labels. The
@@ -235,8 +235,8 @@ See `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`
 
 ### topology
 
-See `.agents/skills/project-create-topology/SKILL.md` and
-`.agents/skills/project-create-topology/topology-function-schema.md`.
+See `.agents/skills/topology-authoring/SKILL.md` and
+`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
 
 - New topology producers MUST use `src/go/pkg/topology/v1`.
 - Payload changes MUST validate against
@@ -305,7 +305,7 @@ Examples:
 - Runtime wiring and dyncfg lifecycle:
   - `go test -race -count=1 ./plugin/agent/jobmgr/...`
   - REQUIRED when changing `collectorapi`, `jobruntime`, `dyncfg`,
-    `confgroup`, `vnoderegistry`, or runtime wiring behavior.
+    `confgroup`, `hostoutput`, or runtime wiring behavior.
   - Representative files include `manager_v2_test.go`, `job_factory_test.go`,
     `sim_test.go`, `dyncfg_collector_test.go`, and `dyncfg_vnode_test.go`.
 - Function/topology payloads:
@@ -323,7 +323,7 @@ Framework changes often require durable artifact updates. Check each class:
 - framework package READMEs
 - specs under `.agents/sow/specs/`
 - collector authoring docs under `src/go/plugin/go.d/docs/`
-- integrations-lifecycle skill and artifacts if collector metadata/taxonomy
+- integrations-lifecycle skill and artifacts if collector metadata
   changes
 - public Function/topology schemas and guides if protocol behavior changes
 

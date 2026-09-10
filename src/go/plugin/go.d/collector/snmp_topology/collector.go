@@ -18,13 +18,13 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -32,29 +32,35 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-// Register registers the SNMP topology collector with shared SNMP-family state.
-func Register(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) {
-	collectorapi.Register("snmp_topology", newCreator(deviceStore, trapEnrichment, reverseDNS))
-}
-
-func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) collectorapi.Creator {
+// Creator constructs registration with explicit SNMP-family dependencies.
+func Creator(
+	deviceStore *ddsnmp.DeviceStore,
+	trapEnrichment *TrapEnrichmentHandle,
+	reverseDNS *reversedns.Resolver,
+	publisher *snmpdiag.Publisher,
+) collectorapi.Creator {
 	if deviceStore == nil {
-		panic("snmp_topology Register requires a non-nil device store")
+		panic("snmp_topology Creator requires a non-nil device store")
 	}
 	if trapEnrichment == nil {
-		panic("snmp_topology Register requires a non-nil trap enrichment handle")
+		panic("snmp_topology Creator requires a non-nil trap enrichment handle")
 	}
 	if reverseDNS == nil {
-		panic("snmp_topology Register requires a non-nil reverse DNS resolver")
+		panic("snmp_topology Creator requires a non-nil reverse DNS resolver")
 	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		UpdateEvery:     60,
-		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment, reverseDNS) },
-		Config:          func() any { return &Config{} },
-		InstancePolicy:  collectorapi.InstancePolicySingle,
-		SharedFunctions: topologyMethods,
-		MethodHandler:   topologyFunctionHandler,
+		CreateV2: func() collectorapi.CollectorV2 {
+			c := newCollector(deviceStore, trapEnrichment, reverseDNS)
+			c.diagnosticPublisher = publisher
+			return c
+		},
+		JobConfigLifecycle: &topologyJobConfigLifecycle{publisher: publisher},
+		Config:             func() any { return &Config{} },
+		InstancePolicy:     collectorapi.InstancePolicySingle,
+		SharedFunctions:    topologyMethods,
+		MethodHandler:      topologyFunctionHandler,
 	}
 }
 
@@ -74,13 +80,12 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		panic("snmp_topology New requires a non-nil reverse DNS resolver")
 	}
 	metricStore := metrix.NewCollectorStore()
-	return &Collector{
-		deviceStates:          make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
-		topologyRegistry:      newTopologyRegistryWithResolver(reverseDNS),
-		deviceSource:          deviceStore,
-		deviceLifecycleSource: deviceStore,
-		trapEnrichment:        trapEnrichment,
-		newSnmpClient:         gosnmp.NewHandler,
+	c := &Collector{
+		deviceStates:     make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState),
+		topologyRegistry: newTopologyRegistryWithResolver(reverseDNS),
+		deviceSource:     deviceStore,
+		trapEnrichment:   trapEnrichment,
+		newSnmpClient:    gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
@@ -88,15 +93,16 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 			return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
 		},
 		now:                          time.Now,
-		acquisitionLimits:            defaultTopologyAcquisitionLimits,
-		diagnosticGlobalLimits:       defaultTopologyDiagnosticGlobalLimits,
 		projectTopologyDiagnosticCut: projectTopologyDiagnosticCut,
-		publishDiagnosticArchive:     !terminal.IsTerminal(),
-		diagnosticArchivePath:        defaultTopologyDiagnosticArchivePath(),
-		publishDiagnosticArchiveFile: publishTopologyDiagnosticArchiveFile,
 		store:                        metricStore,
 		metrics:                      newCollectorMetrics(metricStore),
 	}
+	c.diagnosticProvider = &topologyDiagnosticProvider{
+		registry: c.topologyRegistry,
+		aborted:  &c.lastAbortedTopologyDiagnostic,
+		source:   deviceStore,
+	}
+	return c
 }
 
 type (
@@ -108,9 +114,8 @@ type (
 		generationSequence              uint64
 		topologyRegistry                *topologyRegistry
 		deviceSource                    deviceSource
-		deviceLifecycleSource           deviceLifecycleSource
 		trapEnrichment                  *TrapEnrichmentHandle
-		lastAbortedTopologyDiagnostic   atomic.Pointer[topologyAbortedSweepDiagnostic]
+		lastAbortedTopologyDiagnostic   atomic.Pointer[topologydiag.AbortedSweep]
 		topologyDiagnosticAbortSequence atomic.Uint64
 
 		refreshMu sync.Mutex
@@ -120,17 +125,15 @@ type (
 		store   metrix.CollectorStore
 		metrics *collectorMetrics
 
-		topologyProfiles             func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient                func() gosnmp.Handler
-		newDdSnmpColl                func(ddsnmpcollector.Config) ddCollector
-		resolveTargetIPs             func(context.Context, string) ([]netip.Addr, error)
-		now                          func() time.Time
-		acquisitionLimits            topologyAcquisitionLimits
-		diagnosticGlobalLimits       topologyAcquisitionLimits
+		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
+		newSnmpClient    func() gosnmp.Handler
+		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
+		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
+		now              func() time.Time
+
 		projectTopologyDiagnosticCut topologyDiagnosticCutProjector
-		publishDiagnosticArchive     bool
-		diagnosticArchivePath        string
-		publishDiagnosticArchiveFile func(string, topologyDiagnostics) error
+		diagnosticPublisher          *snmpdiag.Publisher
+		diagnosticProvider           *topologyDiagnosticProvider
 	}
 	deviceSource interface {
 		Entries() []ddsnmp.DeviceEntry
@@ -160,6 +163,7 @@ func (c *Collector) Collect(context.Context) error {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) Run(ctx context.Context) error {
+	defer c.releaseDiagnosticProvider()
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
@@ -170,16 +174,6 @@ func (c *Collector) Run(ctx context.Context) error {
 
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
-	var diagnosticArchiveRefreshes chan struct{}
-	if c.publishDiagnosticArchive {
-		diagnosticArchiveRefreshes = make(chan struct{}, 1)
-		publisherDone := make(chan struct{})
-		go func() {
-			defer close(publisherDone)
-			c.runTopologyDiagnosticArchivePublisher(ctx, diagnosticArchiveRefreshes)
-		}()
-		defer func() { <-publisherDone }()
-	}
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
 	defer ticker.Stop()
@@ -191,12 +185,6 @@ func (c *Collector) Run(ctx context.Context) error {
 		case <-ticker.C:
 			c.refreshTopologyRecovering(ctx)
 			c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
-			if diagnosticArchiveRefreshes != nil {
-				select {
-				case diagnosticArchiveRefreshes <- struct{}{}:
-				default:
-				}
-			}
 		}
 	}
 }
@@ -218,26 +206,17 @@ const (
 type topologyRefreshDevicePlan struct {
 	registrationID ddsnmp.DeviceRegistrationID
 	device         ddsnmp.DeviceConnectionInfo
-	target         topologyTargetResolutionEvidence
+	target         topologydiag.TargetResolutionEvidence
 }
-
-type deviceRefreshOutcome uint8
-
-const (
-	deviceRefreshOutcomeUnknown deviceRefreshOutcome = iota
-	deviceRefreshOutcomeSuccess
-	deviceRefreshOutcomeNoProfiles
-	deviceRefreshOutcomeFailed
-)
 
 type deviceRefreshState struct {
 	generation          *topologyDeviceGeneration
-	latestAttempt       *topologyAcquisitionCapture
+	latestAttempt       *topologydiag.AcquisitionCapture
 	attemptOrdinal      uint64
 	lastAttempt         time.Time
 	lastSuccess         time.Time
 	nextRetry           time.Time
-	outcome             deviceRefreshOutcome
+	outcome             topologydiag.RefreshOutcome
 	consecutiveFailures uint32
 }
 
@@ -256,6 +235,7 @@ func (c *Collector) refreshEvery() time.Duration {
 }
 
 func (c *Collector) Cleanup(context.Context) {
+	c.releaseDiagnosticProvider()
 	c.unpublishTrapTopologyEnrichment()
 
 	c.refreshMu.Lock()
@@ -269,7 +249,7 @@ func (c *Collector) Cleanup(context.Context) {
 
 func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	start := safeTopologyDiagnosticTime(c)
-	phase := topologyDiagnosticSweepPhaseRegistrationCut
+	phase := topologydiag.DiagnosticSweepPhaseRegistrationCut
 	var activeRegistrationID ddsnmp.DeviceRegistrationID
 	var hasActiveRegistration bool
 	var registrationCount, selectedCount int
@@ -277,7 +257,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		if recovered := recover(); recovered != nil {
 			c.publishAbortedTopologyDiagnostic(
 				start,
-				topologyDiagnosticAbortPanic,
+				topologydiag.DiagnosticAbortPanic,
 				phase,
 				activeRegistrationID,
 				hasActiveRegistration,
@@ -320,16 +300,8 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		}
 	}
 	selectedCount = len(plans)
-	acquisitionUsage := newTopologyAcquisitionUsage(
-		entries,
-		seen,
-		selected,
-		previousStates,
-		nextStates,
-		c.currentTopologyDiagnosticGlobalLimits(),
-	)
 
-	phase = topologyDiagnosticSweepPhaseTargetResolution
+	phase = topologydiag.DiagnosticSweepPhaseTargetResolution
 	c.resolveTopologyTargetManagementIPs(
 		ctx,
 		plans,
@@ -342,22 +314,21 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 			break
 		}
 		attemptedAt := c.currentTime()
-		phase = topologyDiagnosticSweepPhaseDeviceRefresh
+		phase = topologydiag.DiagnosticSweepPhaseDeviceRefresh
 		activeRegistrationID = plan.registrationID
 		hasActiveRegistration = true
 		state := nextStates[plan.registrationID]
 		state.lastAttempt = attemptedAt
-		perDeviceLimits := c.currentTopologyAcquisitionLimits()
-		attemptID := topologyAcquisitionAttemptID{
-			registrationID: plan.registrationID,
-			ordinal:        state.attemptOrdinal + 1,
+
+		attemptID := topologydiag.AcquisitionAttemptID{
+			RegistrationID: plan.registrationID,
+			Ordinal:        state.attemptOrdinal + 1,
 		}
 		snapshot, outcome, attempt := c.refreshDeviceTopology(
 			ctx,
 			attemptID,
 			plan.device,
 			plan.target,
-			perDeviceLimits,
 		)
 		if ctx.Err() != nil {
 			break
@@ -365,25 +336,20 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		hasActiveRegistration = false
 		completedAt := c.currentTime()
 
-		state.attemptOrdinal = attemptID.ordinal
+		state.attemptOrdinal = attemptID.Ordinal
 		state.outcome = outcome
+		state.latestAttempt = attempt
 		switch outcome {
-		case deviceRefreshOutcomeSuccess:
-			attempt = acquisitionUsage.include(attempt)
+		case topologydiag.RefreshOutcomeSuccess:
 			snapshot.acquisition = attempt
-			state.latestAttempt = attempt
 			successfulSnapshots[plan.registrationID] = snapshot
 			state.lastSuccess = completedAt
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
-		case deviceRefreshOutcomeNoProfiles:
-			state = acquisitionUsage.includeRetainedSuccess(state)
-			state.latestAttempt = acquisitionUsage.include(attempt)
+		case topologydiag.RefreshOutcomeNoProfiles:
 			state.consecutiveFailures = 0
 			state.nextRetry = completedAt.Add(refreshEvery)
 		default:
-			state = acquisitionUsage.includeRetainedSuccess(state)
-			state.latestAttempt = acquisitionUsage.include(attempt)
 			if ctx.Err() != nil {
 				break
 			}
@@ -401,7 +367,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 	if ctx.Err() != nil {
 		c.publishAbortedTopologyDiagnostic(
 			start,
-			topologyDiagnosticAbortCanceled,
+			topologydiag.DiagnosticAbortCanceled,
 			phase,
 			activeRegistrationID,
 			hasActiveRegistration,
@@ -414,7 +380,7 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		return stats
 	}
 
-	phase = topologyDiagnosticSweepPhaseCommit
+	phase = topologydiag.DiagnosticSweepPhaseCommit
 	hasActiveRegistration = false
 	pruneUnregisteredDeviceStates(nextStates, seen)
 	publishedAt := c.currentTime()
@@ -445,9 +411,9 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		seen:           seen,
 		previousStates: previousStates,
 		states:         nextStates,
-		limits:         c.currentTopologyDiagnosticGlobalLimits(),
 	})
 	c.topologyRegistry.publishGeneration(generation)
+	c.recordDiagnosticCheckpoint()
 	stats.cachedDevices = generation.deviceCount()
 	stats.completedAt = c.currentTime()
 	stats.duration = stats.completedAt.Sub(start)
@@ -484,63 +450,64 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 // changing the generation currently visible to readers.
 func (c *Collector) refreshDeviceTopology(
 	ctx context.Context,
-	attemptID topologyAcquisitionAttemptID,
+	attemptID topologydiag.AcquisitionAttemptID,
 	dev ddsnmp.DeviceConnectionInfo,
-	target topologyTargetResolutionEvidence,
-	acquisitionLimits topologyAcquisitionLimits,
-) (*topologyDeviceSnapshot, deviceRefreshOutcome, *topologyAcquisitionCapture) {
+	target topologydiag.TargetResolutionEvidence,
+) (*topologyDeviceSnapshot, topologydiag.RefreshOutcome, *topologydiag.AcquisitionCapture) {
 	recorder := newTopologyAcquisitionRecorder(
 		attemptID,
-		topologySemanticDeviceInputFromConnection(dev),
+		topologyDeviceInputFromConnection(dev),
 		target,
-		acquisitionLimits,
 	)
 	mainObserver := recorder.beginContext(0, "", "")
 	if ctx.Err() != nil {
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		recorder.recordInterruption(ctx.Err())
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
 	snmpClient, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
 	if err != nil {
 		if recorder.evidence != nil {
-			recorder.evidence.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
+			recorder.evidence.Client = failedAcquisitionPhase(topologydiag.AcquisitionFailureClientConfiguration, err)
 			if ctx := recorder.contextByOrdinal(0); ctx != nil {
-				ctx.client = failedAcquisitionPhase(topologyAcquisitionFailureClientConfiguration)
+				ctx.Client = failedAcquisitionPhase(topologydiag.AcquisitionFailureClientConfiguration, err)
 			}
 		}
 		recorder.completeContext(0, notObservedAcquisitionPhase())
-		c.warnTopologyRefreshFailure(attemptID.registrationID, topologyRefreshFailureClient,
+		c.warnTopologyRefreshFailure(attemptID.RegistrationID, topologyRefreshFailureClient,
 			"device '%s': failed to create SNMP client: %v", dev.Hostname, err)
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 	if recorder.evidence != nil {
-		recorder.evidence.client = successfulAcquisitionPhase()
+		recorder.evidence.Client = successfulAcquisitionPhase()
 		if ctx := recorder.contextByOrdinal(0); ctx != nil {
-			ctx.client = successfulAcquisitionPhase()
+			ctx.Client = successfulAcquisitionPhase()
 		}
 	}
+	snmpClient = recorder.sourceClient(snmpClient)
 	if dev.MaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(dev.MaxRepetitions)
 	}
 	if err := snmpClient.Connect(); err != nil {
 		if recorder.evidence != nil {
-			recorder.evidence.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
+			recorder.evidence.Connect = failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect, err)
 			if ctx := recorder.contextByOrdinal(0); ctx != nil {
-				ctx.connect = failedAcquisitionPhase(topologyAcquisitionFailureConnect)
+				ctx.Connect = failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect, err)
 			}
 		}
 		recorder.completeContext(0, notObservedAcquisitionPhase())
 		if ctx.Err() != nil {
-			return nil, deviceRefreshOutcomeFailed, recorder.finish()
+			recorder.recordInterruption(ctx.Err())
+			return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 		}
-		c.warnTopologyRefreshFailure(attemptID.registrationID, topologyRefreshFailureConnect,
+		c.warnTopologyRefreshFailure(attemptID.RegistrationID, topologyRefreshFailureConnect,
 			"device '%s': failed to connect: %v", dev.Hostname, err)
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 	if recorder.evidence != nil {
-		recorder.evidence.connect = successfulAcquisitionPhase()
+		recorder.evidence.Connect = successfulAcquisitionPhase()
 		if ctx := recorder.contextByOrdinal(0); ctx != nil {
-			ctx.connect = successfulAcquisitionPhase()
+			ctx.Connect = successfulAcquisitionPhase()
 		}
 	}
 	stopContextClose := closeSNMPClientOnContextCancel(ctx, snmpClient)
@@ -548,76 +515,94 @@ func (c *Collector) refreshDeviceTopology(
 	defer func() { _ = snmpClient.Close() }()
 
 	if ctx.Err() != nil {
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		recorder.recordInterruption(ctx.Err())
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
-	profiles := c.getTopologyProfiles(dev)
+	profiles, profileContext := c.getTopologyProfiles(dev)
+	if recorder.evidence != nil {
+		recorder.evidence.ProfileContext = profileContext
+	}
 	if len(profiles) == 0 {
 		if recorder.evidence != nil {
-			recorder.evidence.profiles = topologyAcquisitionPhaseEvidence{outcome: topologyAcquisitionPhaseEmpty}
+			recorder.evidence.Profiles = topologydiag.AcquisitionPhaseEvidence{Outcome: topologydiag.AcquisitionPhaseEmpty}
 		}
 		recorder.completeContext(0, notObservedAcquisitionPhase())
-		return nil, deviceRefreshOutcomeNoProfiles, recorder.finish()
+		return nil, topologydiag.RefreshOutcomeNoProfiles, recorder.finish()
 	}
 	if recorder.evidence != nil {
-		recorder.evidence.profiles = successfulAcquisitionPhase()
+		recorder.evidence.Profiles = successfulAcquisitionPhase()
 	}
 
 	if ctx.Err() != nil {
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		recorder.recordInterruption(ctx.Err())
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
 	coll := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient:                 snmpClient,
-		Profiles:                   profiles,
-		Log:                        c.Logger,
-		SysObjectID:                dev.SysObjectID,
-		DisableBulkWalk:            dev.DisableBulkWalk,
-		InitialAcquisitionObserver: mainObserver,
+		SnmpClient:          snmpClient,
+		Profiles:            profiles,
+		Log:                 c.Logger,
+		SysObjectID:         dev.SysObjectID,
+		DisableBulkWalk:     dev.DisableBulkWalk,
+		AcquisitionObserver: mainObserver,
 	})
 
 	pms, err := coll.Collect()
+	if source, ok := coll.(interface {
+		CollectionFailures() ddsnmp.CollectionFailures
+	}); ok {
+		if context := recorder.contextByOrdinal(0); context != nil {
+			context.Failures = source.CollectionFailures()
+		}
+	}
 	if err != nil {
 		if recorder.evidence != nil {
-			recorder.evidence.collection = failedAcquisitionPhase(topologyAcquisitionFailureCollection)
+			recorder.evidence.Collection = failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection, err)
 		}
-		recorder.completeContext(0, failedAcquisitionPhase(topologyAcquisitionFailureCollection))
+		recorder.completeContext(0, failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection, err))
 		if ctx.Err() != nil {
-			return nil, deviceRefreshOutcomeFailed, recorder.finish()
+			recorder.recordInterruption(ctx.Err())
+			return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 		}
-		c.warnTopologyRefreshFailure(attemptID.registrationID, topologyRefreshFailureCollection,
+		c.warnTopologyRefreshFailure(attemptID.RegistrationID, topologyRefreshFailureCollection,
 			"device '%s': topology collection failed: %v", dev.Hostname, err)
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 	if recorder.evidence != nil {
-		recorder.evidence.collection = successfulAcquisitionPhase()
+		recorder.evidence.Collection = successfulAcquisitionPhase()
 	}
 	recorder.completeContext(0, successfulAcquisitionPhase())
 
 	if ctx.Err() != nil {
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		recorder.recordInterruption(ctx.Err())
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
-	sysUptime, err := snmputils.GetSysUptime(snmpClient)
-	if err != nil && ctx.Err() == nil {
-		if recorder.evidence != nil {
-			recorder.evidence.sysUptime = failedAcquisitionPhase(topologyAcquisitionFailureSysUptime)
+	sysUptime, uptimeFailure, err := snmputils.GetSysUptimeWithDiagnostics(snmpClient)
+	if recorder.evidence != nil {
+		if uptimeFailure.Reason != "" {
+			uptimeFailure.Operation = "sys_uptime"
+			recorder.evidence.SysUptime = topologydiag.AcquisitionPhaseEvidence{Outcome: topologydiag.AcquisitionPhaseFailed, Failure: topologydiag.AcquisitionFailureSysUptime, Detail: uptimeFailure}
+		} else {
+			recorder.evidence.SysUptime = successfulAcquisitionPhase()
 		}
+	}
+	if err != nil && ctx.Err() == nil {
 		c.Debugf("device '%s': failed to query system uptime: %v", dev.Hostname, err)
-	} else if err == nil && recorder.evidence != nil {
-		recorder.evidence.sysUptime = successfulAcquisitionPhase()
 	}
 
 	if ctx.Err() != nil {
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		recorder.recordInterruption(ctx.Err())
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
 	// Build the next device generation off-registry. Function readers keep
 	// seeing the previous global generation until collection is fully ingested.
-	deviceInput := topologySemanticDeviceInputFromConnection(dev)
+	deviceInput := topologyDeviceInputFromConnection(dev)
 	next := newTopologyBuilderFromSemanticInput(
 		deviceInput,
-		target.addresses,
+		target.Addresses,
 		c.currentTime(),
 		c.refreshEvery()+2*c.deviceCheckEvery(),
 	)
@@ -628,12 +613,13 @@ func (c *Collector) refreshDeviceTopology(
 	applyTopologySemanticEvent(next, topologySemanticEvent{kind: topologySemanticEventBGPPeers, profiles: pms})
 	c.collectTopologyVTPVLANContexts(ctx, next, dev, recorder)
 	if ctx.Err() != nil {
-		return nil, deviceRefreshOutcomeFailed, recorder.finish()
+		recorder.recordInterruption(ctx.Err())
+		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 	snapshot := c.freezeTopologyBuilder(next)
 	attempt := recorder.finish()
 	snapshot.acquisition = attempt
-	return snapshot, deviceRefreshOutcomeSuccess, attempt
+	return snapshot, topologydiag.RefreshOutcomeSuccess, attempt
 }
 
 func (c *Collector) warnTopologyRefreshFailure(registrationID ddsnmp.DeviceRegistrationID, class, format string, args ...any) {
@@ -655,26 +641,26 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 	for i := range plans {
 		host := strings.TrimSpace(plans[i].device.Hostname)
 		if host == "" {
-			plans[i].target.outcome = topologyTargetResolutionEmpty
+			plans[i].target.Outcome = topologydiag.TargetResolutionEmpty
 			continue
 		}
 		if addr, isIP := parseTopologyIPAddress(host); isIP {
-			plans[i].target = topologyTargetResolutionEvidence{
-				outcome:   topologyTargetResolutionLiteral,
-				addresses: normalizeTargetManagementIPs([]netip.Addr{addr}),
+			plans[i].target = topologydiag.TargetResolutionEvidence{
+				Outcome:   topologydiag.TargetResolutionLiteral,
+				Addresses: normalizeTargetManagementIPs([]netip.Addr{addr}),
 			}
 			continue
 		}
 		if c.resolveTargetIPs != nil {
 			jobs = append(jobs, lookupJob{planIndex: i, registrationID: plans[i].registrationID})
 		} else {
-			plans[i].target.outcome = topologyTargetResolutionUnavailable
+			plans[i].target.Outcome = topologydiag.TargetResolutionUnavailable
 		}
 	}
 	if len(jobs) == 0 || budget <= 0 || maxWorkers <= 0 || ctx.Err() != nil {
 		if ctx.Err() == nil && (budget <= 0 || maxWorkers <= 0) {
 			for _, job := range jobs {
-				plans[job.planIndex].target.outcome = topologyTargetResolutionUnavailable
+				plans[job.planIndex].target.Outcome = topologydiag.TargetResolutionUnavailable
 			}
 		}
 		return
@@ -713,8 +699,8 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 	wg.Wait()
 	if ctx.Err() == nil {
 		for _, job := range jobs {
-			if plans[job.planIndex].target.outcome == topologyTargetResolutionUnknown {
-				plans[job.planIndex].target.outcome = topologyTargetResolutionUnavailable
+			if plans[job.planIndex].target.Outcome == topologydiag.TargetResolutionUnknown {
+				plans[job.planIndex].target.Outcome = topologydiag.TargetResolutionUnavailable
 			}
 		}
 	}
@@ -732,20 +718,6 @@ func closeSNMPClientOnContextCancel(ctx context.Context, client gosnmp.Handler) 
 	return func() { close(done) }
 }
 
-func (c *Collector) currentTopologyAcquisitionLimits() topologyAcquisitionLimits {
-	if c.acquisitionLimits.maxRecords == 0 || c.acquisitionLimits.maxLogicalBytes == 0 {
-		return defaultTopologyAcquisitionLimits
-	}
-	return c.acquisitionLimits
-}
-
-func (c *Collector) currentTopologyDiagnosticGlobalLimits() topologyAcquisitionLimits {
-	if c.diagnosticGlobalLimits.maxRecords == 0 || c.diagnosticGlobalLimits.maxLogicalBytes == 0 {
-		return defaultTopologyDiagnosticGlobalLimits
-	}
-	return c.diagnosticGlobalLimits
-}
-
 func (c *Collector) currentTime() time.Time {
 	if c != nil && c.now != nil {
 		return c.now()
@@ -754,25 +726,25 @@ func (c *Collector) currentTime() time.Time {
 }
 
 func (c *Collector) resolveDeviceTargetManagementIPs(ctx context.Context, dev ddsnmp.DeviceConnectionInfo) []netip.Addr {
-	return c.resolveDeviceTargetManagementEvidence(ctx, dev).addresses
+	return c.resolveDeviceTargetManagementEvidence(ctx, dev).Addresses
 }
 
 func (c *Collector) resolveDeviceTargetManagementEvidence(
 	ctx context.Context,
 	dev ddsnmp.DeviceConnectionInfo,
-) topologyTargetResolutionEvidence {
+) topologydiag.TargetResolutionEvidence {
 	host := strings.TrimSpace(dev.Hostname)
 	if host == "" {
-		return topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty}
+		return topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty}
 	}
 	if addr, isIP := parseTopologyIPAddress(host); isIP {
-		return topologyTargetResolutionEvidence{
-			outcome:   topologyTargetResolutionLiteral,
-			addresses: normalizeTargetManagementIPs([]netip.Addr{addr}),
+		return topologydiag.TargetResolutionEvidence{
+			Outcome:   topologydiag.TargetResolutionLiteral,
+			Addresses: normalizeTargetManagementIPs([]netip.Addr{addr}),
 		}
 	}
 	if c.resolveTargetIPs == nil {
-		return topologyTargetResolutionEvidence{outcome: topologyTargetResolutionUnavailable}
+		return topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionUnavailable}
 	}
 
 	timeout := topologyTargetLookupMaxTimeout
@@ -787,16 +759,18 @@ func (c *Collector) resolveDeviceTargetManagementEvidence(
 		if ctx.Err() == nil {
 			c.Debugf("device '%s': failed to resolve topology management target: %v", host, err)
 		}
-		return topologyTargetResolutionEvidence{outcome: topologyTargetResolutionFailed}
+		return topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionFailed}
 	}
 	addresses := normalizeTargetManagementIPs(addrs)
 	if len(addresses) == 0 {
-		return topologyTargetResolutionEvidence{outcome: topologyTargetResolutionEmpty}
+		return topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionEmpty}
 	}
-	return topologyTargetResolutionEvidence{outcome: topologyTargetResolutionResolved, addresses: addresses}
+	return topologydiag.TargetResolutionEvidence{Outcome: topologydiag.TargetResolutionResolved, Addresses: addresses}
 }
 
-func cloneDeviceRefreshStates(states map[ddsnmp.DeviceRegistrationID]deviceRefreshState) map[ddsnmp.DeviceRegistrationID]deviceRefreshState {
+func cloneDeviceRefreshStates(
+	states map[ddsnmp.DeviceRegistrationID]deviceRefreshState,
+) map[ddsnmp.DeviceRegistrationID]deviceRefreshState {
 	cloned := make(map[ddsnmp.DeviceRegistrationID]deviceRefreshState, len(states))
 	maps.Copy(cloned, states)
 	return cloned
@@ -831,20 +805,25 @@ func failedRefreshRetryDelay(checkEvery, refreshEvery time.Duration, consecutive
 	return min(delay, refreshEvery)
 }
 
-func (c *Collector) findTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+func resolveTopologyProfileView(dev ddsnmp.DeviceConnectionInfo) ddsnmp.ProjectedView {
 	return ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{
 		SysObjectID:    dev.SysObjectID,
 		SysDescr:       dev.SysDescr,
 		ManualProfiles: dev.ManualProfiles,
 		ManualPolicy:   ddsnmp.ManualProfileAugment,
-	}).Project(ddsnmp.ConsumerTopology, ddsnmp.ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
+	}).Project(ddsnmp.ConsumerTopology, ddsnmp.ConsumerBGP).FilterBGPToTopologyPeers()
 }
 
-func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+func (c *Collector) findTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
+	return resolveTopologyProfileView(dev).Profiles()
+}
+
+func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) ([]*ddsnmp.Profile, *ddsnmp.ProfileContext) {
 	if c.topologyProfiles != nil {
-		return c.topologyProfiles(dev)
+		return c.topologyProfiles(dev), nil
 	}
-	return c.findTopologyProfiles(dev)
+	view := resolveTopologyProfileView(dev)
+	return view.Profiles(), view.Context()
 }
 
 func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.DeviceConnectionInfo) (gosnmp.Handler, error) {
@@ -868,7 +847,7 @@ func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.Dev
 		client.SetVersion(gosnmp.Version2c)
 	case gosnmp.Version3:
 		if dev.V3User == "" {
-			return nil, fmt.Errorf("username is required for SNMPv3")
+			return nil, snmputils.WithFailure(fmt.Errorf("username is required for SNMPv3"), "client", "missing_v3_username")
 		}
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
@@ -882,7 +861,7 @@ func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.Dev
 		})
 		client.SetContextName(dev.V3ContextName)
 	default:
-		return nil, fmt.Errorf("invalid SNMP version: %s", dev.SNMPVersion)
+		return nil, snmputils.WithFailure(fmt.Errorf("invalid SNMP version: %s", dev.SNMPVersion), "client", "invalid_snmp_version")
 	}
 
 	return client, nil

@@ -43,15 +43,17 @@ type tableCollectionScope struct {
 	profileSource  string
 	mode           tableSymbolMode
 	stats          *ddsnmp.CollectionStats
+	execution      *AcquisitionExecutionReport
 	requests       []*tableCollectionRequest
 	tableNameToOID map[string]string
 	acquisition    map[*tableCollectionRequest]*acquisitionTableObservation
 }
 
 type tableCollectionRequest struct {
-	scope  *tableCollectionScope
-	config ddprofiledefinition.MetricsConfig
-	route  *tableCollectionRoute
+	scope        *tableCollectionScope
+	config       ddprofiledefinition.MetricsConfig
+	route        *tableCollectionRoute
+	dependencies []*tableCollectionRoute
 
 	missing          bool
 	cacheEligible    bool
@@ -62,6 +64,7 @@ type tableCollectionRequest struct {
 }
 
 type tableCollectionRoute struct {
+	sourceOperation        uint64
 	oid                    string
 	requests               []*tableCollectionRequest
 	state                  tableRouteState
@@ -79,15 +82,11 @@ type tableRouteGraph struct {
 	// Forward edges stay request-scoped because only rows eligible for that
 	// request activate its dependencies. Reverse edges are route-scoped because
 	// any current dependency outcome invalidates every cached tag snapshot.
-	dependenciesByRequest map[*tableCollectionRequest][]*tableCollectionRoute
-	dependentsByRoute     map[*tableCollectionRoute]map[string]*tableCollectionRoute
+	dependentsByRoute map[*tableCollectionRoute]map[string]*tableCollectionRoute
 }
 
 func (g *tableRouteGraph) addDependency(req *tableCollectionRequest, dependency *tableCollectionRoute) {
-	if g.dependenciesByRequest == nil {
-		g.dependenciesByRequest = make(map[*tableCollectionRequest][]*tableCollectionRoute)
-	}
-	g.dependenciesByRequest[req] = append(g.dependenciesByRequest[req], dependency)
+	req.dependencies = append(req.dependencies, dependency)
 
 	if g.dependentsByRoute == nil {
 		g.dependentsByRoute = make(map[*tableCollectionRoute]map[string]*tableCollectionRoute)
@@ -96,10 +95,6 @@ func (g *tableRouteGraph) addDependency(req *tableCollectionRequest, dependency 
 		g.dependentsByRoute[dependency] = make(map[string]*tableCollectionRoute)
 	}
 	g.dependentsByRoute[dependency][req.route.oid] = req.route
-}
-
-func (g *tableRouteGraph) dependencies(req *tableCollectionRequest) []*tableCollectionRoute {
-	return g.dependenciesByRequest[req]
 }
 
 func (g *tableRouteGraph) hasDependents(route *tableCollectionRoute) bool {
@@ -148,7 +143,7 @@ func (s *tableCollectionSession) addObservedScope(
 	prof *ddsnmp.Profile,
 	mode tableSymbolMode,
 	stats *ddsnmp.CollectionStats,
-	acquisition *acquisitionTopologyTableScope,
+	acquisition *acquisitionTableScope,
 ) *tableCollectionScope {
 	scope := &tableCollectionScope{
 		profileSource:  prof.SourceFile,
@@ -260,7 +255,7 @@ func (s *tableCollectionSession) buildRoutes() {
 				}
 			}
 
-			if s.collector.missingOIDs[trimOID(req.config.Table.OID)] {
+			if isMissingOID(s.collector.snmpClient, s.collector.missingOIDs, trimOID(req.config.Table.OID)) {
 				req.missing = true
 				req.scope.stats.Errors.MissingOIDs++
 				continue
@@ -388,6 +383,10 @@ func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *table
 		}
 
 		started := time.Now()
+		observation := req.scope.acquisition[req]
+		if observation != nil {
+			observation.staging = true
+		}
 		req.candidateMetrics = s.collector.tryCollectFromCache(
 			req.config,
 			req.scope.profileSource,
@@ -395,6 +394,9 @@ func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *table
 			&req.candidateStats,
 			req.scope.acquisition[req],
 		)
+		if observation != nil {
+			observation.staging = false
+		}
 		req.candidateStats.Timing.Table += time.Since(started)
 		if req.candidateMetrics == nil {
 			return req
@@ -442,7 +444,7 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 			if len(req.config.Symbols) == 0 || !tableHasEligibleRows(req.config, route.pdus) {
 				continue
 			}
-			for _, dependency := range s.graph.dependencies(req) {
+			for _, dependency := range req.dependencies {
 				s.requireFresh(dependency, freshTriggerForRoute(dependency), queue)
 			}
 		}
@@ -451,7 +453,8 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 
 func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, trigger *tableCollectionRequest) {
 	started := time.Now()
-	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats)
+	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats, trigger.scope.execution)
+	route.sourceOperation = sourceRecorder(s.collector.snmpClient).Cursor()
 	trigger.scope.stats.Timing.Table += time.Since(started)
 	if err != nil {
 		route.state = tableRouteFailed
@@ -552,17 +555,22 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			tablesSeen[req.route.oid] = true
 			// A current WALK is successful even when it is empty or auxiliary-only.
 			successful = true
+			var cacheEvidence *AcquisitionCacheInput
+			if req.cacheEligible && sourceRecorder(s.collector.snmpClient) != nil {
+				cacheEvidence = &AcquisitionCacheInput{Kind: "table", RootOID: req.route.oid, CreatedAt: time.Now().UTC(), Marker: len(req.config.Symbols) == 0, Sources: s.cacheSources(req)}
+			}
 			if len(req.config.Symbols) == 0 {
 				if acquisition != nil {
 					acquisition.processed = true
 					acquisition.values = req.route.acquisitionValuesWithin(req.config.Table.OID)
 				}
 				if req.cacheEligible && !req.sharesRouteCache {
-					s.collector.tableCache.cacheMarker(req.config)
+					s.collector.tableCache.cacheMarker(req.config, cacheEvidence)
 				}
 				continue
 			}
 			ctx := &tableProcessingContext{
+				cacheEvidence:  cacheEvidence,
 				config:         req.config,
 				pdus:           req.route.pdus,
 				walkedData:     s.freshData,

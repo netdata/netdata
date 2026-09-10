@@ -78,6 +78,7 @@ func (s *ebpfSharedMemoryStore) RemoveDCStatPIDs(pids []uint32) {
 		delete(s.dcstatPrevCt, pid)
 		delete(s.dcstatMiss, pid)
 	}
+	s.dcstatPIDs = removeFromSortedPIDs(s.dcstatPIDs, pids)
 	s.rebuildEntriesLocked()
 }
 
@@ -108,7 +109,7 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(
 	// issued later are always strictly greater than every token issued before —
 	// the property both consumers rely on and the one the BPF `bpf_ktime_get_ns()`
 	// stamp used to provide, including across a plugin restart.
-	publishToken := s.nextDCStatTokenLocked()
+	publishToken := s.dcstatToken.next()
 
 	for _, app := range apps {
 		current := netdataPublishDCStatPid{
@@ -131,14 +132,7 @@ func (s *ebpfSharedMemoryStore) UpdateDCStatApps(
 		// The published token is synthetic: an active PID is stamped with this
 		// cycle's token and an idle one holds its previous stamp, which is exactly
 		// the contract the C consumers' `ct > last_consumed_ct` gates expect.
-		//
-		// The stamp MUST come from the store-wide clock rather than from a per-PID
-		// increment.  apps.plugin keeps a watermark per PID (`p->ebpf_dcstat_ct`)
-		// and would not care, but cgroup_ebpfgo_dcstat_sum_pids() keeps ONE
-		// watermark per cgroup (`cg->dcstat.ct`) and compares every member PID
-		// against it.  With per-PID counters a long-lived PID's high count would sit
-		// above a freshly added PID's low count forever, so the new PID's activity
-		// would never be counted.
+		// See ebpfFreshnessToken for why the stamp is store-wide and boot-relative.
 		lastCt, seen := s.dcstatPrevCt[app.Pid]
 		publishCt := lastCt
 		if advanced {

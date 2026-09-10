@@ -164,20 +164,24 @@ enrichment:
 
 
 
-### ASN fields are empty
+## Troubleshooting
+
+### Other Problems
+
+#### ASN fields are empty
 
 IP2Location DB1 is country-only. Configure `--asn iptoasn:combined`,
 `--asn caida:prefix2as`, or another ASN provider in the downloader.
 
 
-### City or coordinates are empty
+#### City or coordinates are empty
 
 The DB1 LITE source does not include city, state, latitude, or longitude.
 Use DB-IP city-lite, MaxMind GeoLite2 City, GeoIP2 City, or a custom MMDB
 when those fields are required.
 
 
-### Stale country data
+#### Stale country data
 
 Check the upstream IP2Location LITE page for the current version and next
 update date, then schedule the downloader accordingly. The plugin reloads

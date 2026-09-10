@@ -2,6 +2,18 @@
 
 #include "plugin_macos.h"
 
+// The NVMe SMART user-client interface ships only with the macOS 11.0 SDK and later.
+// Probe the SDK rather than the deployment target: the constants below are macros, not
+// dyld symbols, so a modern SDK targeting an older macOS still compiles and simply finds
+// no matching IOKit services at runtime.
+#if defined(__has_include)
+#if __has_include(<IOKit/storage/nvme/NVMeSMARTLibExternal.h>)
+#define MACOS_NVME_SMART_AVAILABLE 1
+#endif
+#endif
+
+#ifdef MACOS_NVME_SMART_AVAILABLE
+
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOCFPlugIn.h>
 #include <IOKit/IOKitLib.h>
@@ -844,3 +856,22 @@ void macos_nvme_smart_cleanup(void)
     macos_nvme_free_devices();
     nvme_next_device_id = 0;
 }
+
+#else // !MACOS_NVME_SMART_AVAILABLE
+
+int do_macos_nvme_smart(int update_every __maybe_unused, usec_t dt __maybe_unused)
+{
+    collector_info(
+        "MACOS: NVMe SMART collection is unavailable; "
+        "netdata was built against an SDK older than macOS 11.0, which lacks the NVMe SMART user-client interface");
+
+    // returning non-zero permanently disables this module for the lifetime of the plugin
+    return 1;
+}
+
+void macos_nvme_smart_cleanup(void)
+{
+    ;
+}
+
+#endif // MACOS_NVME_SMART_AVAILABLE

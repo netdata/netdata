@@ -75,13 +75,7 @@ func BenchmarkBuildPlanBySeriesCardinality(b *testing.B) {
 				b.Fatalf("load template: %v", err)
 			}
 
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				if _, err := buildPlan(engine, reader); err != nil {
-					b.Fatalf("build plan: %v", err)
-				}
-			}
+			benchmarkSteadySeriesPlan(b, engine, reader, 1, seriesCount)
 		})
 	}
 }
@@ -111,17 +105,7 @@ func BenchmarkBuildPlanRouteDiagnostics(b *testing.B) {
 			if err := engine.LoadYAML([]byte(benchTemplateYAML), 1); err != nil {
 				b.Fatalf("load template: %v", err)
 			}
-			if _, err := buildPlan(engine, reader); err != nil {
-				b.Fatalf("warm build plan: %v", err)
-			}
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				if _, err := buildPlan(engine, reader); err != nil {
-					b.Fatalf("build plan: %v", err)
-				}
-			}
+			benchmarkSteadySeriesPlan(b, engine, reader, 1, seriesCount)
 			if diagnostics && facts == 0 {
 				b.Fatal("diagnostic observer received no facts")
 			}
@@ -141,7 +125,9 @@ func BenchmarkBuildPlanAutogenUnmatchedBaseline(b *testing.B) {
 			reader := benchmarkCollectorReader(b, seriesCount)
 
 			engine, err := New(WithEnginePolicy(EnginePolicy{
-				Autogen: &AutogenPolicy{Enabled: true},
+				Autogen: &AutogenPolicy{
+					Enabled: true,
+				},
 			}))
 			if err != nil {
 				b.Fatalf("new engine: %v", err)
@@ -150,13 +136,7 @@ func BenchmarkBuildPlanAutogenUnmatchedBaseline(b *testing.B) {
 				b.Fatalf("load template: %v", err)
 			}
 
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				if _, err := buildPlan(engine, reader); err != nil {
-					b.Fatalf("build plan: %v", err)
-				}
-			}
+			benchmarkSteadySeriesPlan(b, engine, reader, seriesCount, seriesCount)
 		})
 	}
 }
@@ -202,7 +182,11 @@ func BenchmarkBuildPlanAggregationFanIn(b *testing.B) {
 						if aggregation.value != "" {
 							aggregationLine = "aggregation: " + aggregation.value
 						}
-						tmpl := strings.ReplaceAll(benchAggregationTemplateYAML, "aggregation: AGGREGATION", aggregationLine)
+						tmpl := strings.ReplaceAll(
+							benchAggregationTemplateYAML,
+							"aggregation: AGGREGATION",
+							aggregationLine,
+						)
 
 						b.ReportAllocs()
 						if mode.warm {
@@ -248,7 +232,7 @@ func benchmarkAggregationEngine(b *testing.B, tmpl string) *Engine {
 	return engine
 }
 
-func benchmarkCollectorReader(b *testing.B, seriesCount int) metrix.Reader {
+func benchmarkCollectorReader(b *testing.B, seriesCount int) *benchmarkSequenceReader {
 	b.Helper()
 
 	store := metrix.NewCollectorStore()
@@ -264,11 +248,21 @@ func benchmarkCollectorReader(b *testing.B, seriesCount int) metrix.Reader {
 	cc.BeginCycle()
 	for i := range seriesCount {
 		g.Observe(metrix.SampleValue(i), meter.LabelSet(
-			metrix.Label{Key: "id", Value: strconv.Itoa(i)},
+			metrix.Label{
+				Key:   "id",
+				Value: strconv.Itoa(i),
+			},
 		))
 	}
-	cc.CommitCycleSuccess()
-	return store.Read(metrix.ReadRaw())
+	if err := cc.CommitCycleSuccess(); err != nil {
+		b.Fatalf("commit benchmark cycle: %v", err)
+	}
+	reader := store.Read(metrix.ReadRaw())
+	return &benchmarkSequenceReader{
+		Reader: reader,
+		raw:    reader.(metrix.SeriesIdentityRawIterator),
+		seq:    1,
+	}
 }
 
 func benchmarkAggregationReader(b *testing.B, seriesCount, chartCount int) metrix.Reader {
@@ -287,10 +281,67 @@ func benchmarkAggregationReader(b *testing.B, seriesCount, chartCount int) metri
 	cc.BeginCycle()
 	for i := range seriesCount {
 		g.Observe(metrix.SampleValue(i), meter.LabelSet(
-			metrix.Label{Key: "team", Value: strconv.Itoa(i % chartCount)},
-			metrix.Label{Key: "api_key", Value: strconv.Itoa(i)},
+			metrix.Label{
+				Key:   "team",
+				Value: strconv.Itoa(i % chartCount),
+			},
+			metrix.Label{
+				Key:   "api_key",
+				Value: strconv.Itoa(i),
+			},
 		))
 	}
-	cc.CommitCycleSuccess()
+	if err := cc.CommitCycleSuccess(); err != nil {
+		b.Fatalf("commit benchmark cycle: %v", err)
+	}
 	return store.Read(metrix.ReadRaw())
+}
+
+// Each iteration represents a new successful collection. Repeating a committed
+// sequence intentionally deduplicates updates and does not measure steady planning.
+func benchmarkSteadySeriesPlan(b *testing.B, engine *Engine, reader *benchmarkSequenceReader, charts, series int) {
+	b.Helper()
+	reader.seq = 1
+	if _, err := buildPlan(engine, reader); err != nil {
+		b.Fatalf("warm plan: %v", err)
+	}
+	var plan Plan
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := range b.N {
+		reader.seq = uint64(i) + 2
+		var err error
+		plan, err = buildPlan(engine, reader)
+		if err != nil {
+			b.Fatalf("build plan: %v", err)
+		}
+	}
+	b.StopTimer()
+	updates, values := 0, 0
+	var total int64
+	for _, action := range plan.Actions {
+		update, ok := action.(UpdateChartAction)
+		if !ok {
+			b.Fatalf("unexpected warmed action %T", action)
+		}
+		updates++
+		for _, value := range update.Values {
+			if value.IsEmpty {
+				b.Fatal("unexpected empty value")
+			}
+			values++
+			total += value.Int64
+		}
+	}
+	if updates != charts || values != series || total != int64(series*(series-1)/2) {
+		b.Fatalf(
+			"updates=%d values=%d total=%d; want %d/%d/%d",
+			updates,
+			values,
+			total,
+			charts,
+			series,
+			series*(series-1)/2,
+		)
+	}
 }

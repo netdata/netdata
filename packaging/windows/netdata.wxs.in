@@ -17,10 +17,23 @@
             <Icon Id="NetdataIcon.ico" SourceFile="NetdataWhite.ico"/>
             <Property Id="ARPPRODUCTICON" Value="NetdataIcon.ico" />
 
-            <Property Id="TOKEN" Secure="yes" />
+            <!-- Hidden="yes" keeps a property's value out of the installer log (it puts the name
+                 into MsiHiddenProperties). HideTarget on the ClaimAgent custom action below only
+                 hides that action's command line; without this a verbose install (msiexec /l*v)
+                 still dumps every property by name and value, persisting the claim token on disk.
+                 PROXY is hidden too because a proxy URL can carry user:pass credentials. ROOMS is
+                 an identifier rather than a secret, and support needs it to diagnose a claim that
+                 landed in the wrong room, so it stays visible.
+                 Two documented gaps remain. Under Windows Installer Debug policy 7 a property
+                 given on the command line is logged regardless; for a token typed into the dialog
+                 below that is closable with the Password attribute on the Token control, which
+                 also masks the field - a UI decision, not part of this. The token is also an
+                 argument to NetdataClaim.exe below, which no installer setting can hide from
+                 anything able to read another process's command line. -->
+            <Property Id="TOKEN" Secure="yes" Hidden="yes" />
             <Property Id="ROOMS" Secure="yes" />
             <Property Id="INSECURE" Secure="yes" />
-            <Property Id="PROXY" Secure="yes" />
+            <Property Id="PROXY" Secure="yes" Hidden="yes" />
             <Property Id="URL" Value="https://app.netdata.cloud" />
 
             <Property Id="GPLLICENSE" Value="0" />

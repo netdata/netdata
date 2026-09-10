@@ -291,7 +291,9 @@ If a job was created but no charts appear, the rendered `config_template` produc
 
 ## Troubleshooting
 
-### Permission denied on docker.sock
+### Other Problems
+
+#### Permission denied on docker.sock
 
 The Netdata user must be able to read the Docker socket. On a typical Linux host:
 
@@ -303,16 +305,16 @@ systemctl restart netdata
 In containers, mount the socket read-only and verify the file is readable from inside.
 
 
-### No targets discovered for containers in `host` networking
+#### No targets discovered for containers in `host` networking
 
 `host`-mode containers are intentionally skipped by the Docker discoverer. Enable the `net_listeners` discoverer instead — it picks up locally-listening processes, which includes `host`-mode containers.
 
 
-### Wrong module picked for an image
+#### Wrong module picked for an image
 
 Stock rules match on `.Image` patterns. Custom forks or in-house image names won't match. Add a rule above the stock catch-alls keyed on your own image name (`match "sp" .Image "myorg/nginx myorg/nginx:*"`) or use a `.Labels`-driven rule.
 
 
-### Generated jobs fail to start
+#### Generated jobs fail to start
 
 Common causes: the rendered URL is not reachable from the agent (different network, firewall); credentials baked into the template are wrong; the module's port is not the one Docker reported. Check the rendered job YAML in the agent's debug output.

@@ -1,0 +1,18 @@
+# Candidate L2 topology acquisition for the merakiProducts subtree.
+# SNMP support for these tables is unverified; validate collection on a device
+# before wider rollout. Includes switches, access points, and gateways;
+# excludes the separate Meraki cloud-controller subtree.
+# LLDP inheritance also adds six metadata scalar queries to ordinary SNMP collection.
+
+extends:
+  - _std-topology-interface-mib.yaml
+  - _std-topology-lldp-mib.yaml
+  - _std-topology-cdp-mib.yaml
+  - _std-topology-fdb-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
+  - _std-topology-stp-mib.yaml
+
+selector:
+  - sysobjectid:
+      include:
+        - '^1\.3\.6\.1\.4\.1\.29671\.2\..+$'

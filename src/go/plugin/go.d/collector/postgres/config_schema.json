@@ -98,8 +98,7 @@
                                   "client_secret": {
                                     "title": "Client Secret",
                                     "description": "Service principal client secret.",
-                                    "type": "string",
-                                    "sensitive": true
+                                    "type": "string"
                                   }
                                 },
                                 "required": [
@@ -270,9 +269,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -322,7 +318,8 @@
       "ui:help": "This option determines how frequently (in seconds) Netdata will retry data collection jobs that failed initially, with the value of 60 meaning it retries to start data collection jobs every 60 seconds, while setting it to 0 disables this retry mechanism entirely."
     },
     "dsn": {
-      "ui:placeholder": "postgres://username:password@host:port/dbname"
+      "ui:placeholder": "postgres://username:password@host:port/dbname",
+      "ui:widget": "password"
     },
     "cloud_auth": {
       "provider": {

@@ -227,7 +227,11 @@ enrichment:
 
 
 
-### Default `transform: "."` fails because output rows are missing `prefix`
+## Troubleshooting
+
+### Other Problems
+
+#### Default `transform: "."` fails because output rows are missing `prefix`
 
 The default `.` returns the raw JSON object, not the per-prefix stream the
 plugin expects. You **must** supply a transform that yields one object per
@@ -235,7 +239,7 @@ prefix (with at least a `prefix` field). Use the first example above as your
 starting template.
 
 
-### AWS service name precedence inside one prefix
+#### AWS service name precedence inside one prefix
 
 AWS sometimes lists the same `ip_prefix` under multiple `service` entries
 (e.g. once under `AMAZON` and again under `EC2`). The plugin merges all
@@ -245,7 +249,7 @@ transform with `select(.service != "AMAZON")` so the broader catch-all
 entries are dropped.
 
 
-### Static `networks:` config silently overrides AWS labels
+#### Static `networks:` config silently overrides AWS labels
 
 When a prefix is defined in both this source and `enrichment.networks`, the
 static config wins on every non-empty field. This is by design (operator
@@ -254,7 +258,7 @@ remote feed to be authoritative. See the cross-cutting Network Identity page
 for the full lookup-priority rules.
 
 
-### Empty result from the transform is treated as failure
+#### Empty result from the transform is treated as failure
 
 If the jq filter happens to produce nothing (bad selector, wrong field name,
 upstream JSON shape change), the source backs off as if it errored. Check
@@ -262,7 +266,7 @@ the journal for `network-sources` warnings:
 `journalctl --namespace netdata | grep network-sources`.
 
 
-### TLS verification cannot be disabled
+#### TLS verification cannot be disabled
 
 `tls.skip_verify: true` is rejected by validation. Use `tls.ca_file` for
 custom-CA paths if you front AWS behind an internal TLS-terminating proxy

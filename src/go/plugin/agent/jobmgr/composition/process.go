@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 )
 
 type processControl struct {
@@ -46,23 +47,25 @@ type processInputCompletion struct {
 var errRunDidNotQuiesce = errors.New("jobmgr composition: run did not quiesce")
 
 type processCoreConfig struct {
-	Input           io.Reader                 // plugin stdin
-	Output          io.Writer                 // plugin stdout
-	ShutdownTimeout time.Duration             // per-run shutdown budget
-	KeepAlive       bool                      // emit keepalive frames (long-lived agent mode)
-	Modules         collectorapi.Registry     // collector module registry
-	Jobs            runJobServices            // process-lifetime job services (resolver, catalogs, vnodes)
-	Secrets         runSecretServices         // process-lifetime secret services
-	Discovery       runDiscoveryServices      // discovery services (providers, build context)
-	FinalizeOutput  func()                    // stops the runtime service at process teardown
-	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
+	Input           io.Reader                   // plugin stdin
+	Output          io.Writer                   // plugin stdout
+	ShutdownTimeout time.Duration               // per-run shutdown budget
+	KeepAlive       bool                        // emit keepalive frames (long-lived agent mode)
+	Modules         collectorapi.Registry       // collector module registry
+	Jobs            runJobServices              // process-lifetime job services (resolver, catalogs, vnodes)
+	Secrets         runSecretServices           // process-lifetime secret services
+	Discovery       runDiscoveryServices        // discovery services (providers, build context)
+	StopServices    func(context.Context) error // cancels and joins within the shutdown budget
+	FinalizeOutput  func()                      // stops the runtime service at process teardown
+	Diagnostics     jobmgr.DiagnosticObserver   // process-wide operational log sink
 }
 
 type processCore struct {
 	config      processCoreConfig         // retained process configuration
 	diagnostics jobmgr.DiagnosticObserver // process-wide operational log sink
 
-	uids        *lifecycle.UIDLedger            // process-lifetime UID ledger
+	uids        *lifecycle.UIDLedger // process-lifetime UID ledger
+	publication *hostoutput.Publisher
 	frames      *lifecycle.FrameOwner           // the one process-lifetime frame writer
 	cleanupOut  *joboutput.CleanupOutputGate    // accepted-cleanup output until process finalization
 	ingress     *functionadapter.ProcessIngress // the one process-lifetime stdin reader
@@ -79,7 +82,6 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		config.Jobs.Defaults == nil ||
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
-		config.Jobs.Vnodes == nil ||
 		config.Diagnostics == nil ||
 		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid process construction")
@@ -109,6 +111,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		diagnostics: config.Diagnostics,
 		uids:        lifecycle.NewUIDLedger(),
 		frames:      frames,
+		publication: hostoutput.New(),
 		cleanupOut:  cleanupOut,
 		ingress:     ingress,
 		attempts:    attempts,
@@ -485,6 +488,7 @@ func (pc *processCore) newRun(
 		Diagnostics:     pc.diagnostics,
 		UIDs:            pc.uids,
 		Frames:          pc.frames,
+		Publication:     pc.publication,
 		CleanupOutput:   pc.cleanupOut,
 		Modules:         pc.config.Modules,
 		Jobs:            pc.config.Jobs,
@@ -630,12 +634,6 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	defer cancel()
 	var finishRun *lifecycle.RunSupervisor
 	if current != nil && current.isStarted() {
-		if pc.ingress.State() == functionadapter.ProcessIngressLive {
-			if err := pc.ingress.SealPause(); err != nil {
-				finalErr = errors.Join(finalErr, err)
-			}
-		}
-		current.Stop()
 		budget, err := current.run.BeginShutdown()
 		if err != nil {
 			finalErr = errors.Join(finalErr, err)
@@ -643,6 +641,17 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 			shutdownCtx = budget.Context()
 			finishRun = current.run
 		}
+	}
+	if pc.config.StopServices != nil {
+		finalErr = errors.Join(finalErr, pc.config.StopServices(shutdownCtx))
+	}
+	if current != nil && current.isStarted() {
+		if pc.ingress.State() == functionadapter.ProcessIngressLive {
+			if err := pc.ingress.SealPause(); err != nil {
+				finalErr = errors.Join(finalErr, err)
+			}
+		}
+		current.Stop()
 		if pc.ingress.State() == functionadapter.ProcessIngressLive {
 			if err := pc.ingress.DrainPause(shutdownCtx, 0); err != nil {
 				finalErr = errors.Join(finalErr, err)

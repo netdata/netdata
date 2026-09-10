@@ -24,6 +24,7 @@ import (
 var serviceModulePattern = regexp.MustCompile(`(?m)^\s*(?:-\s*)?module:\s*([A-Za-z0-9_.-]+)\s*$`)
 
 func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
+	registry, _ := NewRegistry(t.TempDir())
 	files, err := filepath.Glob("../config/go.d/sd/*.conf")
 	require.NoError(t, err)
 	require.NotEmpty(t, files)
@@ -50,7 +51,7 @@ func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 				modules = [][]string{{"", rule.ID}}
 			}
 			for _, match := range modules {
-				_, ok := collectorapi.DefaultRegistry.Lookup(match[1])
+				_, ok := registry.Lookup(match[1])
 				assert.Truef(t, ok, "%s service rule %q targets unregistered collector %q", filepath.Base(file), rule.ID, match[1])
 			}
 		}
@@ -58,9 +59,11 @@ func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 }
 
 func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
-	snmpCreator := requireCreator(t, "snmp")
-	topologyCreator := requireCreator(t, "snmp_topology")
-	trapsCreator := requireCreator(t, "snmp_traps")
+	registry, publisher := NewRegistry(t.TempDir())
+	require.NotNil(t, publisher)
+	snmpCreator := requireCreator(t, registry, "snmp")
+	topologyCreator := requireCreator(t, registry, "snmp_topology")
+	trapsCreator := requireCreator(t, registry, "snmp_traps")
 
 	assert.NotNil(t, snmpCreator.Create)
 	assert.Nil(t, snmpCreator.CreateV2)
@@ -109,9 +112,9 @@ func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 	assert.Equal(t, 5*time.Minute, negativeTTL)
 }
 
-func requireCreator(t *testing.T, module string) collectorapi.Creator {
+func requireCreator(t *testing.T, registry collectorapi.Registry, module string) collectorapi.Creator {
 	t.Helper()
-	creator, ok := collectorapi.DefaultRegistry.Lookup(module)
+	creator, ok := registry.Lookup(module)
 	require.True(t, ok, "collector %q is not registered", module)
 	return creator
 }

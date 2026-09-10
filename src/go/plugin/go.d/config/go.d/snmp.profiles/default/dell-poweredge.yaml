@@ -546,12 +546,12 @@ metrics:
           name: amperageProbeIndex
 
   - MIB: MIB-Dell-10892
-    metric_type: gauge # Sent as integers
     table:
       OID: 1.3.6.1.4.1.674.10892.1.600.12
       name: powerSupplyTable
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.5
+        metric_type: gauge # Sent as integers
         name: powerSupplyStatus
         chart_meta:
           family: 'Hardware/PowerSupply/Status'
@@ -566,6 +566,7 @@ metrics:
           6: nonRecoverable
           7: absent
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.11
+        metric_type: gauge # Sent as integers
         name: powerSupplySensorState
         chart_meta:
           family: 'Hardware/PowerSupply/Sensor/State'
@@ -580,6 +581,7 @@ metrics:
           6: acOutOfRangeButPresent
           7: configurationError
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.12
+        metric_type: gauge # Sent as integers
         name: powerSupplyConfigurationErrorType
         chart_meta:
           family: 'Hardware/PowerSupply/ConfigurationError/Type'
@@ -590,18 +592,21 @@ metrics:
           2: revisionMismatch
           3: processorMissing
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.6
+        metric_type: gauge # Sent as integers
         name: powerSupplyOutputWatts
         chart_meta:
           family: 'Hardware/PowerSupply/Output/Power'
           description: Output power in watts of the power supply
           unit: "W"
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.9
+        metric_type: gauge # Sent as integers
         name: powerSupplyMaximumInputVoltage
         chart_meta:
           family: 'Hardware/PowerSupply/Input/Voltage/Maximum'
           description: Maximum input voltage of the power supply
           unit: "V"
       - OID: 1.3.6.1.4.1.674.10892.1.600.12.1.16
+        metric_type: gauge # Sent as integers
         name: powerSupplyCurrentInputVoltage
         chart_meta:
           family: 'Hardware/PowerSupply/Input/Voltage/Current'
@@ -772,12 +777,12 @@ metrics:
           name: coolingDeviceLocationName
 
   - MIB: MIB-Dell-10892
-    metric_type: gauge # Sent as integers
     table:
       OID: 1.3.6.1.4.1.674.10892.1.700.20
       name: temperatureProbeTable
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.700.20.1.5
+        metric_type: gauge # Sent as integers
         name: temperatureProbeStatus
         chart_meta:
           family: 'Hardware/Sensor/Temperature/Status'
@@ -795,6 +800,7 @@ metrics:
           9: nonRecoverableLower
           10: failed
       - OID: 1.3.6.1.4.1.674.10892.1.700.20.1.6
+        metric_type: gauge # Sent as integers
         name: temperatureProbeReading
         chart_meta:
           family: 'Hardware/Sensor/Temperature/Value'
@@ -824,12 +830,12 @@ metrics:
           name: temperatureProbeLocationName
 
   - MIB: MIB-Dell-10892
-    metric_type: gauge # Sent as integers
     table:
       OID: 1.3.6.1.4.1.674.10892.1.1100.30
       name: processorDeviceTable
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.5
+        metric_type: gauge # Sent as integers
         name: processorDeviceStatus
         chart_meta:
           family: 'Hardware/Processor/Status'
@@ -844,6 +850,7 @@ metrics:
           6: nonRecoverable
           7: absent
       - OID: 1.3.6.1.4.1.674.10892.1.1100.30.1.19
+        metric_type: gauge # Sent as integers
         name: processorDeviceThreadCount
         chart_meta:
           family: 'Hardware/Processor/Thread/Count'
@@ -909,12 +916,12 @@ metrics:
           name: processorDeviceStatusLocationName
 
   - MIB: MIB-Dell-10892
-    metric_type: gauge # Sent as integers
     table:
       OID: 1.3.6.1.4.1.674.10892.1.1100.40
       name: cacheDeviceTable
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.5
+        metric_type: gauge # Sent as integers
         name: cacheDeviceStatus
         chart_meta:
           family: 'Hardware/Cache/Status'
@@ -929,6 +936,7 @@ metrics:
           6: nonRecoverable
           7: absent
       - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.9
+        metric_type: gauge # Sent as integers
         name: cacheDeviceStatusState
         chart_meta:
           family: 'Hardware/Cache/Status/State'
@@ -941,12 +949,14 @@ metrics:
           4: userDisabled
           5: biosDisabled
       - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.12
+        metric_type: gauge # Sent as integers
         name: cacheDeviceMaximumSize
         chart_meta:
           family: 'Hardware/Cache/Size/Maximum'
           description: Maximum size of the cache device
           unit: "By"
       - OID: 1.3.6.1.4.1.674.10892.1.1100.40.1.13
+        metric_type: gauge # Sent as integers
         name: cacheDeviceCurrentSize
         chart_meta:
           family: 'Hardware/Cache/Size/Current'
@@ -963,12 +973,12 @@ metrics:
           name: cacheDeviceIndex
 
   - MIB: MIB-Dell-10892
-    metric_type: gauge # Sent as integers
     table:
       OID: 1.3.6.1.4.1.674.10892.1.1100.50
       name: memoryDeviceTable
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.5
+        metric_type: gauge # Sent as integers
         name: memoryDeviceStatus
         chart_meta:
           family: 'Hardware/Memory/Status'
@@ -983,6 +993,7 @@ metrics:
           6: nonRecoverable
           7: absent
       - OID: 1.3.6.1.4.1.674.10892.1.1100.50.1.20
+        metric_type: gauge # Sent as integers
         name: memoryDeviceFailureModes
         chart_meta:
           family: 'Hardware/Memory/FailureModes'
@@ -1014,12 +1025,12 @@ metrics:
           name: memoryDeviceSerialNumberName
 
   - MIB: MIB-Dell-10892
-    metric_type: gauge # Sent as integers
     table:
       OID: 1.3.6.1.4.1.674.10892.1.1100.90
       name: networkDeviceTable
     symbols:
       - OID: 1.3.6.1.4.1.674.10892.1.1100.90.1.3
+        metric_type: gauge # Sent as integers
         name: networkDeviceStatus
         chart_meta:
           family: 'Network/Device/Status'
@@ -1034,6 +1045,7 @@ metrics:
           6: nonRecoverable
           7: absent
       - OID: 1.3.6.1.4.1.674.10892.1.1100.90.1.4
+        metric_type: gauge # Sent as integers
         name: networkDeviceConnectionStatus
         chart_meta:
           family: 'Network/Device/Connection/Status'

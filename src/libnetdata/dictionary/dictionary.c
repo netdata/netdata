@@ -182,6 +182,31 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
     DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(dict);
 
+    // The traversal below MUST stay callback-free.
+    //
+    // item_next is cached without a reference, and that is only safe while nothing can free a
+    // linked item under us:
+    //
+    //  - no other thread can: claiming an item (dict_item_free_or_mark_deleted()) is just a
+    //    negative refcount store; the free happens after item_linked_list_remove() acquires the
+    //    items write lock we are holding, so a linked-but-claimed successor stays allocated;
+    //  - and we must not do it ourselves: dict_item_free_with_hooks() runs the user's delete
+    //    callback, which may delete or garbage collect this same dictionary (the items lock is
+    //    recursive, so nothing stops it) and free the item item_next points to.
+    //
+    // So victims are only DETACHED here - unlinked, unindexed (views, inside
+    // item_check_and_acquire_advanced()), pending-mark cleared and exclusively owned through the
+    // refcount claim - and chained FIFO. Their frees, and therefore every delete callback, run
+    // after the traversal is over, where there is no cursor left to invalidate. A callback that
+    // re-enters the garbage collector then walks a list these victims are no longer part of, so it
+    // can neither see nor free them again.
+    //
+    // That re-entry is safe on a MASTER, whose items lock is recursive. On a view it is not: delivery
+    // below still runs under the view's index write lock, a plain rw_spinlock, so a callback that
+    // re-enters the view through anything taking that lock would deadlock on it. That is a pre-existing limitation of running
+    // callbacks under the locks at all, which this ordering fix does not change.
+    DICTIONARY_ITEM *detached = NULL, *detached_last = NULL;
+
     size_t deleted = 0, pending = 0, examined = 0;
     DICTIONARY_ITEM *item = dict->items.list, *item_next;
     while(item) {
@@ -196,11 +221,33 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
-                pending = item_pending_deletion_clear(dict, item);
-                dict_item_free_with_hooks(dict, item);
+                long int remaining = item_pending_deletion_clear(dict, item);
+
+                // chain the detached victim, in traversal order;
+                // prev/next are dead after the list removal, so ->next is free to reuse
+                item->next = NULL;
+                if(detached_last)
+                    detached_last->next = item;
+                else
+                    detached = item;
+                detached_last = item;
+
                 deleted++;
 
-                if (!pending)
+                // On a master, every victim is a pending-deletion item and they are all counted,
+                // so once the counter reaches zero there is nothing left to find: stop, instead of
+                // scanning the remaining live items on every insert and delete.
+                //
+                // On a view we must keep going. A view item orphaned by a MASTER deletion is
+                // discovered - and only then counted - by item_check_and_acquire_advanced() above,
+                // as this walk reaches it. So a zero counter on a view says nothing about the items
+                // the walk has not visited yet, and stopping here would strand them.
+                //
+                // An item another thread pends after this point is left to the next collection - the
+                // entry check at the top of this function tests the counter. Nothing schedules that
+                // collection, so on a dictionary that then goes idle the victim waits for the next
+                // insert, delete or explicit collect; that is pre-existing behaviour, not a guarantee.
+                if(!is_view && !remaining)
                     break;
             }
         }
@@ -213,13 +260,25 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
         item = item_next;
     }
 
+    // the traversal is over - deliver the victims
+    // (still under the same locks; moving delivery outside them is a separate change)
+    while(detached) {
+        DICTIONARY_ITEM *next = detached->next;
+        dict_item_free_with_hooks(dict, detached);
+        detached = next;
+    }
+
     if(is_view)
         dictionary_index_wrlock_unlock(dict);
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
+    // after delivery: the callbacks above may have changed it
+    pending = (size_t)DICTIONARY_PENDING_DELETES_GET(dict);
+
     (void)deleted;
     (void)examined;
+    (void)pending;
 
     dictionary_internal_error(false, dict, "DICTIONARY: garbage collected dictionary, "
                           "examined %zu items, deleted %zu items, still pending %zu items",

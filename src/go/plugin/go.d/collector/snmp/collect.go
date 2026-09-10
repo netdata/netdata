@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 	"syscall"
 
-	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
@@ -26,8 +24,15 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		ctx = context.Background()
 	}
 
+	initializing := !c.initialized
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
+	}
+
+	if initializing && c.normal.recorder != nil {
+		for ordinal := uint64(1); ordinal <= c.normal.recorder.Cursor(); ordinal++ {
+			c.normal.initialization = append(c.normal.initialization, c.normal.recorder.Operation(ordinal))
+		}
 	}
 
 	if c.PingOnly {
@@ -106,23 +111,42 @@ func (c *Collector) ensureInitialized() error {
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
-			SnmpClient:      c.snmpClient,
-			Profiles:        c.snmpProfiles,
-			Log:             c.Logger,
-			SysObjectID:     si.SysObjectID,
-			DisableBulkWalk: c.disableBulkWalk,
+			SnmpClient:          c.snmpClient,
+			Profiles:            c.snmpProfiles,
+			Log:                 c.Logger,
+			SysObjectID:         si.SysObjectID,
+			DisableBulkWalk:     c.disableBulkWalk,
+			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile),
 		})
 	}
 
-	if c.CreateVnode {
-		if c.ddSnmpColl == nil {
-			c.vnode = c.setupVnode(si, nil)
-		} else {
-			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
-			if err != nil {
-				return err
+	if c.CreateVnode && c.Vnode == "" {
+		var baseLabels map[string]string
+		if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
+			// Allow for collection and transmission delays.
+			baseLabels = map[string]string{
+				"_node_stale_after_seconds": strconv.Itoa(c.VnodeDeviceDownThreshold*c.UpdateEvery + 2),
 			}
-			c.vnode = c.setupVnode(si, deviceMeta)
+		}
+		identity, err := ddsnmp.AcquireDeviceIdentity(si, c.ddSnmpColl, ddsnmp.DeviceIdentityOptions{
+			Address:    c.Hostname,
+			GUID:       c.LocalVnode.GUID,
+			Hostname:   c.LocalVnode.Hostname,
+			BaseLabels: baseLabels,
+			Labels:     c.LocalVnode.Labels,
+		})
+		if c.ddSnmpColl != nil {
+			c.captureCollectionFailures()
+		}
+		if err != nil {
+			return err
+		}
+		c.LocalVnode.GUID = identity.GUID
+		c.LocalVnode.Hostname = identity.Hostname
+		c.vnode = &vnodes.VirtualNode{
+			GUID:     identity.GUID,
+			Hostname: identity.Hostname,
+			Labels:   identity.Labels,
 		}
 	}
 
@@ -136,64 +160,14 @@ func (c *Collector) ensureInitialized() error {
 	return nil
 }
 
-func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
-	if c.Vnode.GUID == "" {
-		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
-	}
-
-	hostnames := []string{
-		c.Vnode.Hostname,
-		si.Name,
-		"snmp-device",
-	}
-	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
-	c.Vnode.Hostname = hostnames[i]
-
-	labels := map[string]string{
-		"_vnode_type":           "snmp",
-		"_net_default_iface_ip": c.Hostname,
-		"address":               c.Hostname,
-	}
-
-	if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
-		// Add 2 seconds buffer to account for collection/transmission delays
-		v := c.VnodeDeviceDownThreshold*c.UpdateEvery + 2
-		labels["_node_stale_after_seconds"] = strconv.Itoa(v)
-	}
-
-	labels["sys_object_id"] = si.SysObjectID
-	labels["name"] = si.Name
-	labels["description"] = si.Descr
-	labels["contact"] = si.Contact
-	labels["location"] = si.Location
-	if si.Vendor != "" {
-		labels["vendor"] = si.Vendor
-	} else if si.Organization != "" {
-		labels["vendor"] = si.Organization
-	}
-	if si.Category != "" {
-		labels["type"] = si.Category
-	}
-	if si.Model != "" {
-		labels["model"] = si.Model
-	}
-
-	labels = ddsnmp.ResolveDeviceMetadata(labels, deviceMeta, c.Vnode.Labels)
-
-	return &vnodes.VirtualNode{
-		GUID:     c.Vnode.GUID,
-		Hostname: c.Vnode.Hostname,
-		Labels:   labels,
-	}
-}
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {
-		return nil, fmt.Errorf("init: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
 
 	if err := snmpClient.Connect(); err != nil {
-		return nil, fmt.Errorf("connect: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
 	}
 
 	if snmpClient.Version() == gosnmp.Version1 {
@@ -208,9 +182,13 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	if c.adjMaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
 	} else {
-		ok, err := c.adjustMaxRepetitions(snmpClient)
+		probeClient := snmpClient
+		if c.normal != nil && c.normal.recorder != nil {
+			probeClient = c.normal.recorder.Wrap(snmpClient)
+		}
+		ok, err := c.adjustMaxRepetitions(probeClient)
 		if err != nil {
-			return nil, fmt.Errorf("re-adjust max repetitions SNMP client: %w", err)
+			return nil, snmputils.WithFailure(fmt.Errorf("re-adjust max repetitions SNMP client: %w", err), "max_repetitions", "")
 		}
 		if !ok {
 			c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")

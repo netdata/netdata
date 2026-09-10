@@ -21,22 +21,22 @@ func firstVendor(values ...string) string {
 }
 
 func (c *Collector) vnodeGUID() string {
-	if c.vnode != nil {
-		return c.vnode.GUID
+	if v := c.deviceVnode(); v != nil {
+		return v.GUID
 	}
 	return ""
 }
 
 func (c *Collector) vnodeHostname() string {
-	if c.vnode != nil {
-		return c.vnode.Hostname
+	if v := c.deviceVnode(); v != nil {
+		return v.Hostname
 	}
 	return ""
 }
 
 func (c *Collector) vnodeLabels() map[string]string {
-	if c.vnode != nil && len(c.vnode.Labels) > 0 {
-		return c.vnode.Labels
+	if v := c.deviceVnode(); v != nil {
+		return v.Labels
 	}
 	return nil
 }
@@ -115,6 +115,12 @@ func (c *Collector) publishDeviceState(info ddsnmp.DeviceConnectionInfo) {
 		c.deviceLifecycleMu.Unlock()
 		return
 	}
+	if c.deviceLifecycleManaged {
+		writer := c.deviceWriter
+		c.deviceLifecycleMu.Unlock()
+		writer.UpdateDevice(info)
+		return
+	}
 	ownerKey := c.deviceLifecycleOwner
 	if ownerKey == "" {
 		ownerKey = fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
@@ -124,7 +130,7 @@ func (c *Collector) publishDeviceState(info ddsnmp.DeviceConnectionInfo) {
 }
 
 func (c *Collector) syncDeviceMetadata(pms []*ddsnmp.ProfileMetrics) {
-	if c.deviceMetadataSynced || c.vnode != nil || c.sysInfo == nil {
+	if c.deviceMetadataSynced || c.deviceVnode() != nil || c.sysInfo == nil {
 		return
 	}
 

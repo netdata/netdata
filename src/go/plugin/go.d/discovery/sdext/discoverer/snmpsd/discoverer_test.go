@@ -281,8 +281,6 @@ func prepareNewTarget(sub subnet, ip string) *target {
 		Model:        "Linux",
 		Probe: snmputils.SysInfoProbe{
 			PDUCount:        5,
-			FirstOID:        snmputils.OidSysDescr,
-			LastOID:         snmputils.OidSysLocation,
 			SeenSysDescr:    true,
 			SeenSysObjectID: true,
 			SeenSysContact:  true,

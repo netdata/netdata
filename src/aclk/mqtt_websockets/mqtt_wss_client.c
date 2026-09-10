@@ -42,6 +42,22 @@ time_t ping_timeout = 0;
 // inside mqtt_wss_connect() and its caller unable to retry or notice a shutdown.
 #define MQTT_WSS_CONNECT_BUDGET_SECS (2 * PING_TIMEOUT)
 
+// Longest a single setup-phase poll() may block. The setup loop can only test
+// service_running(SERVICE_ACLK) between mqtt_wss_service() calls, so this - not the budget above -
+// is what bounds how long a shutdown waits on a quiet peer. Keep it short: the whole pre-CONNACK
+// phase is a handful of round trips, so the extra wakeups cost nothing, and the setup budget is
+// still enforced independently by aclk_timeout_remaining_ms(). The watchdog is not affected: it
+// cannot bound this phase at all (a clean poll() timeout counts as progress).
+#define MQTT_WSS_CONNECT_POLL_SLICE_MS (1 * (int)MSEC_PER_SEC)
+
+// How long one pre-CONNACK service call may block. Split out so the cap is unit-testable: it is
+// what bounds a shutdown's wait, and pinning the constants alone would not catch a caller that
+// stopped applying them. Never exceeds the remaining budget (so the last call cannot overshoot the
+// window) and never exceeds one slice (so SERVICE_ACLK is re-tested at that cadence).
+static int mqtt_wss_connect_poll_ms(int budget_ms) {
+    return MIN(budget_ms, MQTT_WSS_CONNECT_POLL_SLICE_MS);
+}
+
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
 #include <openssl/conf.h>
 #endif
@@ -640,7 +656,7 @@ int mqtt_wss_connect(
             return 2;
         }
 
-        int rc = mqtt_wss_service(client, MIN(budget_ms, 60 * (int)MSEC_PER_SEC));
+        int rc = mqtt_wss_service(client, mqtt_wss_connect_poll_ms(budget_ms));
         if(rc) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Error connecting to MQTT WSS server \"%s\", port %d. Code: %d", host, port, rc);
             mqtt_wss_close_sockfd(client);
@@ -1020,14 +1036,32 @@ int mqtt_wss_client_timeout_unittest(void) {
 
     // The setup budget is a separate window from the watchdog: the watchdog cannot bound the
     // pre-CONNACK phase at all, because a clean poll() timeout refreshes progress. Pin the
-    // derivation and non-degeneracy the same way, and pin the poll cap - the remaining budget is
-    // what stops the last mqtt_wss_service() call from overshooting it.
+    // derivation and non-degeneracy the same way, and pin both caps that bound one service call:
+    // the remaining budget stops the last mqtt_wss_service() from overshooting the window, and the
+    // poll slice stops a quiet peer from delaying a shutdown.
     const int connect_budget_ms = MQTT_WSS_CONNECT_BUDGET_SECS * (int)MSEC_PER_SEC;
     MQTT_WSS_TEST(connect_budget_ms == (2 * PING_TIMEOUT) * (int)MSEC_PER_SEC,
                   "connect budget is no longer derived from PING_TIMEOUT");
     MQTT_WSS_TEST(connect_budget_ms > 0, "connect budget is degenerate");
     MQTT_WSS_TEST(aclk_timeout_remaining_ms(now_monotonic_usec(), connect_budget_ms) > 0,
                   "a fresh connect budget reports no time remaining");
+
+    // The poll slice is what bounds how long a shutdown waits on a quiet peer, so it must stay
+    // well under the budget: at the slice length the setup loop re-tests service_running().
+    MQTT_WSS_TEST(MQTT_WSS_CONNECT_POLL_SLICE_MS > 0, "connect poll slice is degenerate");
+    MQTT_WSS_TEST(MQTT_WSS_CONNECT_POLL_SLICE_MS < connect_budget_ms,
+                  "connect poll slice does not subdivide the connect budget");
+
+    // Pin the cap itself, not just the constants: the shutdown bound only holds while the setup
+    // loop actually applies the slice, and a caller that stopped applying it would leave the two
+    // assertions above passing.
+    MQTT_WSS_TEST(mqtt_wss_connect_poll_ms(connect_budget_ms) == MQTT_WSS_CONNECT_POLL_SLICE_MS,
+                  "a full connect budget is not capped to one poll slice");
+    MQTT_WSS_TEST(mqtt_wss_connect_poll_ms(1) == 1,
+                  "a remaining budget below one slice is not honoured");
+    MQTT_WSS_TEST(mqtt_wss_connect_poll_ms(MQTT_WSS_CONNECT_POLL_SLICE_MS + 1) ==
+                      MQTT_WSS_CONNECT_POLL_SLICE_MS,
+                  "a budget just above one slice is not capped");
 
     if (errors)
         fprintf(stderr, "mqtt wss timeout unittest: %d ERROR(S)\n", errors);

@@ -565,66 +565,68 @@ Metrics:
 
 ## Troubleshooting
 
-### The command cannot be executed
+### Other Problems
+
+#### The command cannot be executed
 
 Confirm that the path in `plugin` exists, is executable, and can be accessed by the `netdata` user. If the check depends on external files or helpers, verify those paths and permissions too.
 
 
-### No performance-data charts appear
+#### No performance-data charts appear
 
 Performance-data charts are created only when the check prints Nagios performance data after the `|` separator. If the command returns only a status line without performance data, Netdata will still show the job state but no extra charts.
 
 
-### Some performance-data values are ignored
+#### Some performance-data values are ignored
 
 Check that each metric uses the Nagios performance-data format `label=value[UOM];warn;crit;min;max` and that multiple metrics are separated by spaces. If a label contains spaces, quote it. Netdata charts the main value for every perfdata metric, and for non-counter metrics it derives threshold state from `warn` and `crit`; it does not create separate charts for raw `min`, `max`, or raw threshold bounds.
 
 
-### The job state does not match the output text
+#### The job state does not match the output text
 
 The visible text does not decide the state. Netdata uses the process exit code instead: `0` for OK, `1` for WARNING, `2` for CRITICAL, and `3` for UNKNOWN. If the check exceeds the configured `timeout`, Netdata reports `timeout` even if the script never had a chance to print its own final state. If the current time is outside `check_period`, Netdata reports `paused` until the check is allowed to run again.
 
 
-### Only the first output line appears as the main status
+#### Only the first output line appears as the main status
 
 This is expected. Netdata uses the first line as the summary shown for the job. Additional lines are kept as long output, and any `|` sections found on later lines are also parsed for performance data.
 
 
-### Macros are not expanded as expected
+#### Macros are not expanded as expected
 
 Check that positional values are provided in `arg_values`, custom service variables are defined in `custom_vars`, and any virtual-node labels needed for host macros are present on the selected `vnode`.
 
 
-### The script works in a shell but fails under Netdata
+#### The script works in a shell but fails under Netdata
 
 Nagios checks run with a limited execution environment rather than inheriting the full Netdata process environment. If the script depends on extra variables, set them explicitly in `environment` instead of relying on ambient shell state.
 
 
-### Built-in alerts cover warning and critical states only
+#### Built-in alerts cover warning and critical states only
 
 This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. Both stock alert families suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `nagios.job.perfdata_threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
 
 
-### Configuration changes are not picked up
+#### Configuration changes are not picked up
 
 After editing `scripts.d/nagios.conf`, restart the Netdata Agent for changes to take effect: `sudo systemctl restart netdata`.
 
 
-### Script stderr output is not visible
+#### Script stderr output is not visible
 
 Netdata captures the check's standard output for status and performance data parsing. Standard error (stderr) is logged by the collector but not used for state or charts. If your script writes errors to stderr, check the Netdata error log for details.
 
 
-### Job state is always timeout
+#### Job state is always timeout
 
 The default timeout is 5 seconds, which is too short for many checks — especially remote checks (`check_nrpe`, `check_ssh`) or HTTP checks with SSL negotiation. Increase the `timeout` value in your job configuration (e.g. `timeout: 30s`).
 
 
-### Check works as root but fails under Netdata
+#### Check works as root but fails under Netdata
 
 The Netdata Agent runs as the `netdata` user. If a check needs to read protected files, access SNMP, or connect to local sockets, it must be accessible to the `netdata` user. Test as that user first: `sudo -u netdata /path/to/check`. Common fixes include adding the `netdata` user to the required system group or using `sudo` with a specific NOPASSWD rule for the check command.
 
 
-### Windows script support
+#### Windows script support
 
 On Windows, point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script. Netdata automatically invokes `.ps1` scripts through `powershell.exe` and `.bat`/`.cmd` scripts through `cmd.exe`. Ensure scripts are stored in directories with appropriate ACLs.

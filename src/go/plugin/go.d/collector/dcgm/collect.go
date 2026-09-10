@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,59 +20,38 @@ import (
 
 const precision = 1000.0
 
-type interconnectThroughputTotals struct {
-	instance            entityInstance
-	pcie                int64
-	nvlink              int64
-	hasPcie             bool
-	hasNvlink           bool
-	hasExplicitNvlinkTt bool
-}
-
 func (c *Collector) collect() (map[string]int64, error) {
 	mfs, err := c.prom.Scrape()
 	if err != nil {
 		return nil, err
 	}
-
 	if mfs.Len() == 0 {
-		c.Warningf("endpoint '%s' returned 0 metric families", c.URL)
+		c.counterSamples = nil
+		c.cache.reset()
+		c.removeStaleChartsAndDims()
 		return nil, nil
 	}
-
 	if c.checkMetrics && !hasDCGMMetricFamilies(mfs) {
 		return nil, fmt.Errorf("'%s' metrics have no DCGM prefix", c.URL)
 	}
 	c.checkMetrics = false
-
 	if c.MaxTS > 0 {
 		if n := calcDCGMMetricSeries(mfs); n > c.MaxTS {
 			return nil, fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
 		}
 	}
-
-	mx := make(map[string]int64)
-	totals := make(map[string]*interconnectThroughputTotals)
-	c.cache.reset()
-
+	selected := make(map[metricKey]collectedValue)
+	nextCounters := make(map[metricKey]counterSample)
+	now := c.now()
 	for _, mf := range mfs {
 		if !isDCGMMetricName(mf.Name()) {
 			continue
 		}
-
 		if c.MaxTSPerMetric > 0 && len(mf.Metrics()) > c.MaxTSPerMetric {
-			c.Debugf(
-				"metric '%s' num of time series (%d) > limit (%d), skipping it",
-				mf.Name(),
-				len(mf.Metrics()),
-				c.MaxTSPerMetric,
-			)
 			continue
 		}
-
 		typ := metricFamilyKind(mf)
 		if typ == sampleUnsupported {
-			c.Debugf("metric '%s' has unsupported Prometheus type '%s', skipping it", mf.Name(), mf.Type())
 			continue
 		}
 		for _, metric := range mf.Metrics() {
@@ -79,186 +59,64 @@ func (c *Collector) collect() (map[string]int64, error) {
 			if !ok || isInvalidMetricValue(value) {
 				continue
 			}
-
-			instance := resolveEntityInstance(metric.Labels())
+			def := fieldCatalog[strings.ToUpper(mf.Name())]
+			instance, parent := metricInstances(metric.Labels(), def)
 			spec := classifyMetric(instance.entity, mf.Name(), mf.Help(), typ)
-			skipPrimary := shouldSkipPrimarySeries(spec.Context.ID, mf.Name())
-			scaled := int64(value * spec.Scale * precision)
-			c.accumulateInterconnectTotals(totals, instance, spec.Context.ID, mf.Name(), scaled)
-			if skipPrimary {
+			spec.DimName = dimensionName(spec, metric.Labels())
+			if spec.Raw {
+				labels := instance.chartLabels[:0]
+				for _, label := range instance.chartLabels {
+					if isIdentityOrMetadataLabel(label.Key) {
+						labels = append(labels, label)
+					}
+				}
+				instance.chartLabels = labels
+			}
+			key := metricKey{
+				name:      mf.Name(),
+				instance:  instance.key,
+				dimension: spec.DimName,
+			}
+			value, ok = c.normalizeValue(value, spec, key, now, nextCounters)
+			if !ok {
 				continue
 			}
-
-			chartKey, chart := c.ensureChart(instance, spec.Context)
-			dimID := c.ensureDim(chartKey, chart, spec, metric.Labels(), typ)
-
-			mx[dimID] += scaled
+			selectValue(selected, collectedValue{
+				instance: instance,
+				parent:   parent,
+				spec:     spec,
+				value:    value,
+				source:   mf.Name(),
+			})
 		}
 	}
-
-	c.emitInterconnectTotals(mx, totals)
+	c.counterSamples = nextCounters
+	c.cache.reset()
+	mx := make(map[string]int64)
+	display := make(map[metricKey]collectedValue)
+	for _, v := range selected {
+		if v.spec.RateSource == "" {
+			c.emitValue(mx, v)
+			continue
+		}
+		v.spec.RateSource = ""
+		selectValue(display, v)
+	}
+	for _, v := range display {
+		if v.spec.Transport != "" && v.spec.Direction == "total" {
+			if v.instance.entity != entityNVLink {
+				continue
+			}
+			v.spec.Context = contextCatalog["dcgm.nvlink.interconnect.combined.throughput"]
+		}
+		c.emitValue(mx, v)
+	}
+	c.emitInterconnectTotals(mx, selected)
 	c.removeStaleChartsAndDims()
-
 	if len(mx) == 0 {
 		return nil, nil
 	}
-
 	return mx, nil
-}
-
-func (c *Collector) accumulateInterconnectTotals(
-	totals map[string]*interconnectThroughputTotals,
-	instance entityInstance,
-	contextID, metricName string,
-	scaled int64,
-) {
-	isPCIe := strings.HasSuffix(contextID, ".interconnect.pcie.throughput")
-	isNVLink := strings.HasSuffix(contextID, ".interconnect.nvlink.throughput")
-	if !isPCIe && !isNVLink {
-		return
-	}
-
-	key := string(instance.entity) + "|" + instance.key
-	tot, ok := totals[key]
-	if !ok {
-		tot = &interconnectThroughputTotals{instance: instance}
-		totals[key] = tot
-	}
-
-	if isPCIe {
-		tot.pcie += scaled
-		tot.hasPcie = true
-		return
-	}
-
-	if isNVLinkTotalMetricName(metricName) {
-		if !tot.hasExplicitNvlinkTt {
-			tot.nvlink = 0
-			tot.hasExplicitNvlinkTt = true
-		}
-		tot.nvlink += scaled
-		tot.hasNvlink = true
-		return
-	}
-
-	if tot.hasExplicitNvlinkTt {
-		return
-	}
-	tot.nvlink += scaled
-	tot.hasNvlink = true
-}
-
-func (c *Collector) emitInterconnectTotals(mx map[string]int64, totals map[string]*interconnectThroughputTotals) {
-	for _, tot := range totals {
-		if !tot.hasPcie && !tot.hasNvlink {
-			continue
-		}
-
-		ctxID := fmt.Sprintf("dcgm.%s.interconnect.total.throughput", tot.instance.entity)
-		spec, ok := contextCatalog[ctxID]
-		if !ok {
-			continue
-		}
-
-		chartKey, chart := c.ensureChart(tot.instance, spec)
-		if tot.hasPcie {
-			dimID := c.ensureDim(chartKey, chart, metricSpec{Context: spec, DimName: "pcie", Scale: 1}, nil, sampleGauge)
-			mx[dimID] += tot.pcie
-		}
-		if tot.hasNvlink {
-			dimID := c.ensureDim(chartKey, chart, metricSpec{Context: spec, DimName: "nvlink", Scale: 1}, nil, sampleGauge)
-			mx[dimID] += tot.nvlink
-		}
-	}
-}
-
-func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (string, *collectorapi.Chart) {
-	chartKey := spec.ID + "|" + instance.key
-	if ch, ok := c.cache.getChart(chartKey); ok {
-		return chartKey, ch.chart
-	}
-
-	chart := &collectorapi.Chart{
-		ID:       makeID(spec.ID, instance.key),
-		Title:    spec.Title,
-		Units:    spec.Units,
-		Fam:      spec.Family,
-		Ctx:      spec.ID,
-		Type:     spec.Type,
-		Priority: spec.Priority,
-		Labels:   append([]collectorapi.Label(nil), instance.chartLabels...),
-	}
-
-	if err := c.Charts().Add(chart); err != nil {
-		c.Warning(err)
-	}
-
-	ch := c.cache.putChart(chartKey, chart)
-	return chartKey, ch.chart
-}
-
-func (c *Collector) ensureDim(
-	chartKey string,
-	chart *collectorapi.Chart,
-	spec metricSpec,
-	lbls promlabels.Labels,
-	typ sampleKind,
-) string {
-	extra := ""
-	if !strings.HasSuffix(spec.Context.ID, ".reliability.xid") {
-		extra = semanticDimSuffix(lbls)
-	}
-	dimName := spec.DimName
-	dimName = normalizeDimName(spec.Context.ID, dimName)
-	if extra != "" {
-		dimName = dimName + "_" + extra
-	}
-
-	dimID := makeID(chart.ID, dimName)
-
-	ch, ok := c.cache.charts[chartKey]
-	if !ok {
-		return dimID
-	}
-
-	if exists := ch.touchDim(dimID); !exists {
-		dim := &collectorapi.Dim{ID: dimID, Name: dimName, Div: int(precision)}
-		switch typ {
-		case sampleCounter:
-			dim.Algo = collectorapi.Incremental
-		default:
-			dim.Algo = collectorapi.Absolute
-		}
-		if shouldHideDimensionByDefault(spec.Context.ID, dimName) {
-			dim.Hidden = true
-		}
-
-		if err := chart.AddDim(dim); err != nil {
-			c.Warning(err)
-		} else {
-			chart.MarkNotCreated()
-		}
-	}
-
-	return dimID
-}
-
-func shouldSkipPrimarySeries(contextID, metricName string) bool {
-	// Keep NVLink total-only bandwidth in the interconnect overview context.
-	return strings.HasSuffix(contextID, ".interconnect.nvlink.throughput") &&
-		isNVLinkTotalMetricName(metricName)
-}
-
-func normalizeDimName(contextID, dimName string) string {
-	if isNVLinkThroughputContext(contextID) && strings.HasSuffix(dimName, "_bytes") {
-		return strings.TrimSuffix(dimName, "_bytes")
-	}
-	return dimName
-}
-
-func isNVLinkThroughputContext(contextID string) bool {
-	return strings.HasSuffix(contextID, ".interconnect.nvlink.throughput") ||
-		strings.HasPrefix(contextID, "dcgm.nvlink.") && strings.HasSuffix(contextID, ".interconnect.throughput")
 }
 
 func metricFamilyKind(mf *prometheus.MetricFamily) sampleKind {
@@ -363,7 +221,7 @@ func resolveEntityInstance(lbls promlabels.Labels) entityInstance {
 		if !ok || v == "" {
 			continue
 		}
-		parts = append(parts, key+"="+v)
+		parts = append(parts, key+"="+url.QueryEscape(v))
 	}
 
 	if len(parts) == 0 {
@@ -381,10 +239,10 @@ func resolveEntityInstance(lbls promlabels.Labels) entityInstance {
 
 func detectEntity(idx map[string]string) metricEntity {
 	switch {
-	case hasLabel(idx, "gpu_i_id") || hasLabel(idx, "gpu_instance_id"):
-		return entityMIG
 	case hasLabel(idx, "nvlink"):
 		return entityNVLink
+	case hasLabel(idx, "gpu_i_id") || hasLabel(idx, "gpu_instance_id"):
+		return entityMIG
 	case hasLabel(idx, "nvswitch"):
 		return entityNVSwitch
 	case hasLabel(idx, "cpucore"):
@@ -411,7 +269,7 @@ func identityKeysForEntity(entity metricEntity) []string {
 	case entityMIG:
 		return append([]string{"gpu", "uuid", "gpu_uuid", "gpu_i_id", "gpu_instance_id", "gpu_i_profile", "gpu_instance_profile"}, workload...)
 	case entityNVLink:
-		return append([]string{"nvswitch", "gpu", "gpu_uuid", "nvlink"}, workload...)
+		return append([]string{"nvswitch", "gpu", "uuid", "gpu_uuid", "gpu_i_id", "gpu_instance_id", "gpu_i_profile", "gpu_instance_profile", "nvlink"}, workload...)
 	case entityNVSwitch:
 		return append([]string{"nvswitch"}, workload...)
 	case entityCPU:
@@ -423,43 +281,15 @@ func identityKeysForEntity(entity metricEntity) []string {
 	}
 }
 
-func semanticDimSuffix(lbls promlabels.Labels) string {
-	if len(lbls) == 0 {
-		return ""
-	}
-
-	// Only keep dynamic, semantically meaningful labels that define distinct series
-	// for a single DCGM field; avoid static identity/metadata labels in dim names.
-	allowed := map[string]bool{
-		"err_code": true,
-	}
-
-	tokens := make([]string, 0, len(lbls))
-	for _, lbl := range lbls {
-		k := strings.ToLower(lbl.Name)
-		if lbl.Value == "" || !allowed[k] {
-			continue
-		}
-		tokens = append(tokens, normalizeLabelKey(k)+"_"+sanitizeID(strings.ToLower(lbl.Value)))
-	}
-
-	if len(tokens) == 0 {
-		return ""
-	}
-
-	sort.Strings(tokens)
-	return strings.Join(tokens, "__")
-}
-
 func normalizeLabelKey(s string) string {
-	s = strings.ToLower(s)
-	return sanitizeID(s)
+	return sanitizeID(strings.ToLower(s))
 }
 
 func buildChartLabels(idx map[string]string) []collectorapi.Label {
 	ignore := map[string]bool{
 		"hostname": true, // host identity is already part of Netdata host model
-		"err_code": true, // used for dynamic XID dimension split, not chart label
+		"err_code": true, // a value of the last-error field, not chart identity
+		"err_msg":  true,
 		"le":       true, // histogram bucket label
 		"quantile": true, // summary label
 		"__name__": true, // metric family name label, if present
@@ -467,7 +297,7 @@ func buildChartLabels(idx map[string]string) []collectorapi.Label {
 
 	keys := make([]string, 0, len(idx))
 	for key, value := range idx {
-		if value == "" || ignore[key] {
+		if value == "" || ignore[key] || isSeriesMetadataLabel(key) {
 			continue
 		}
 		keys = append(keys, key)
@@ -476,62 +306,28 @@ func buildChartLabels(idx map[string]string) []collectorapi.Label {
 	sort.Strings(keys)
 	labels := make([]collectorapi.Label, 0, len(keys))
 	for _, key := range keys {
-		labels = append(labels, collectorapi.Label{Key: normalizeLabelKey(key), Value: idx[key]})
+		labels = append(labels, collectorapi.Label{
+			Key:   normalizeLabelKey(key),
+			Value: idx[key],
+		})
 	}
 	return labels
 }
 
-func shouldHideDimensionByDefault(contextID, dimName string) bool {
-	switch {
-	case strings.HasSuffix(contextID, ".clock.frequency"):
-		return containsAny(dimName,
-			"app_mem_clock",
-			"app_sm_clock",
-			"max_mem_clock",
-			"max_sm_clock",
-			"max_video_clock",
-		)
-	case strings.HasSuffix(contextID, ".thermal.temperature"):
-		return containsAny(dimName,
-			"gpu_max_op_temp",
-			"gpu_temp_limit",
-			"mem_max_op_temp",
-			"shutdown_temp",
-			"slowdown_temp",
-		)
-	case strings.HasSuffix(contextID, ".power.usage"):
-		return containsAny(dimName,
-			"enforced_limit",
-			"power_mgmt_limit",
-			"power_mgmt_limit_def",
-			"power_mgmt_limit_max",
-			"power_mgmt_limit_min",
-		)
-	case strings.HasSuffix(contextID, ".interconnect.pcie.link.generation"):
-		return containsAny(dimName, "max_link_gen")
-	case strings.HasSuffix(contextID, ".interconnect.pcie.link.width"):
-		return containsAny(dimName, "max_link_width")
-	default:
-		return false
-	}
-}
-
-func isNVLinkTotalMetricName(name string) bool {
-	n := strings.ToUpper(name)
-	return strings.Contains(n, "NVLINK") && containsAny(n, "BANDWIDTH_TOTAL", "RX_BANDWIDTH_TOTAL", "TX_BANDWIDTH_TOTAL")
-}
-
+// Display normalization is lossy, so identity uses the framed original parts.
 func makeID(parts ...string) string {
-	raw := strings.Join(parts, "_")
-	id := sanitizeID(raw)
-	if len(id) <= 180 {
-		return id
-	}
-
 	h := fnv.New64a()
-	_, _ = h.Write([]byte(id))
-	checksum := strconv.FormatUint(h.Sum64(), 36)
-	return id[:140] + "_" + checksum
+	var length [20]byte
+	for _, part := range parts {
+		_, _ = h.Write(strconv.AppendInt(length[:0], int64(len(part)), 10))
+		_, _ = h.Write([]byte{':'})
+		_, _ = h.Write([]byte(part))
+	}
+	id := sanitizeID(strings.Join(parts, "_"))
+	if len(id) > 140 {
+		id = id[:140]
+	}
+	return id + "_" + strconv.FormatUint(h.Sum64(), 36)
 }
 
 func sanitizeID(s string) string {
@@ -567,4 +363,12 @@ func sanitizeID(s string) string {
 		id = "n_" + id
 	}
 	return id
+}
+
+func isSeriesMetadataLabel(key string) bool {
+	switch key {
+	case "health_watch", "health_error_code", "health_error_severity", "health_error_category", "clock_event", "xid", "peer_gpu", "link_status":
+		return true
+	}
+	return false
 }

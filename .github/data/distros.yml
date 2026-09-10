@@ -169,19 +169,6 @@ include:
         - arm64
     test:
       ebpf-core: true
-  - <<: *debian
-    version: "11"
-    base_image: debian:bullseye
-    packages:
-      <<: *debian_packages
-      repo_distro: debian/bullseye
-      arches:
-        - i386
-        - amd64
-        - armhf
-        - arm64
-    test:
-      ebpf-core: false
 
   - &fedora
     distro: fedora
@@ -371,6 +358,11 @@ legacy: # Info for platforms we used to support and still need to handle package
         - el/7Client
       arches:
         - x86_64
+  - <<: *debian
+    version: "11"
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/bullseye
   - <<: *debian
     version: "10"
     packages:

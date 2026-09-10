@@ -264,7 +264,7 @@ struct dictionary {
     int32_t entries;                   // how many items are currently in the index (the linked list may have more)
     int32_t referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
     int32_t pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
-    int32_t inflight;                  // how many threads are currently inside the dictionary API (see dictionary_inflight_enter)
+    int32_t inflight;                  // how many threads are currently inside the dictionary API (see dictionary_api_enter)
 
 #ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_t global_pointer_registry_mutex;

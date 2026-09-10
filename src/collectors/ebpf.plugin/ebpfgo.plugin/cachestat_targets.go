@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
+	"io"
 )
 
 type CachestatTarget struct {
@@ -64,56 +62,27 @@ func (t *CachestatTargets) ResolveAccountPageTarget() error {
 	return nil
 }
 
+// selectCachestatAccountPageTarget resolves the account-page target from the
+// live symbol table.  Unlike dcstat, an unresolvable target IS fatal here: the
+// caller has no usable default (AccountPageDirtied ships with an empty name).
 func selectCachestatAccountPageTarget(candidates []string) (string, error) {
-	if len(candidates) == 0 {
-		return "", fmt.Errorf("no cachestat account_page candidates configured")
-	}
-
-	file, err := os.Open("/proc/kallsyms")
+	symbols, err := openProcKallsyms()
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer symbols.Close()
 
-	return selectCachestatAccountPageTargetFromFile(candidates, file)
+	return selectCachestatAccountPageTargetFromReader(candidates, symbols)
 }
 
-func selectCachestatAccountPageTargetFromFile(candidates []string, file *os.File) (string, error) {
-	if len(candidates) == 0 {
-		return "", fmt.Errorf("no cachestat account_page candidates configured")
-	}
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 3 {
-			continue
-		}
-
-		if !isProbeableKallsymsType(fields[1]) {
-			continue
-		}
-
-		symbol := fields[2]
-		for _, candidate := range candidates {
-			if candidate == symbol {
-				return candidate, nil
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
+func selectCachestatAccountPageTargetFromReader(candidates []string, r io.Reader) (string, error) {
+	name, err := selectKallsymsCandidate(candidates, r)
+	if err != nil {
 		return "", err
 	}
-
-	return "", fmt.Errorf("no cachestat account_page target found")
-}
-
-func isProbeableKallsymsType(value string) bool {
-	switch value {
-	case "T", "t", "W", "w":
-		return true
-	default:
-		return false
+	if name == "" {
+		return "", fmt.Errorf("no cachestat account_page target found")
 	}
+
+	return name, nil
 }

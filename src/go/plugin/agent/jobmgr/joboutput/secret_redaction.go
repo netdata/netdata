@@ -108,5 +108,9 @@ func redactResolvedLifecycleError(err error) error {
 	if lifecycle.OwnershipRetained(err) {
 		safe = lifecycle.RetainOwnership(safe)
 	}
+	var preparation *jobConfigPreparationError
+	if errors.As(err, &preparation) {
+		safe = &jobConfigPreparationError{cause: safe, failure: preparation.failure}
+	}
 	return safe
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimechartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 var (
@@ -29,14 +30,16 @@ var (
 
 // Config is an Agent configuration.
 type Config struct {
-	Name            string
-	PluginConfigDir []string
+	SNMPVnodeAcquirer vnodes.SNMPAcquirer
+	Name              string
+	PluginConfigDir   []string
 
 	CollectorsConfigDir       []string
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
 
+	Services        []composition.ProcessService
 	ModuleRegistry  collectorapi.Registry
 	RunModule       string
 	RunJob          []string
@@ -54,6 +57,7 @@ type Config struct {
 
 // Agent represents orchestrator.
 type Agent struct {
+	SNMPVnodeAcquirer vnodes.SNMPAcquirer
 	*logger.Logger
 
 	Name string
@@ -78,6 +82,7 @@ type Agent struct {
 
 	DiscoveryProviders []discovery.ProviderFactory
 
+	Services       []composition.ProcessService
 	ModuleRegistry collectorapi.Registry
 	In             io.Reader
 	Out            io.Writer
@@ -91,6 +96,7 @@ type Agent struct {
 // New creates a new Agent.
 func New(cfg Config) *Agent {
 	a := &Agent{
+		SNMPVnodeAcquirer: cfg.SNMPVnodeAcquirer,
 		Logger: logger.New().With(
 			slog.String("component", "agent"),
 		),
@@ -107,6 +113,7 @@ func New(cfg Config) *Agent {
 		IsInsideK8s:               cfg.IsInsideK8s,
 		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
+		Services:                  cfg.Services,
 		DiscoveryProviders:        cfg.DiscoveryProviders,
 		In:                        os.Stdin,
 		Out:                       safewriter.Stdout,
@@ -186,7 +193,9 @@ func (a *Agent) run(ctx context.Context) error {
 		AutoEnable:            a.runModePolicy.AutoEnableDiscovered,
 		InitialSecrets:        a.setupSecretStoreConfigs(),
 		InitialVnodes:         a.setupVnodeRegistry(),
+		SNMPVnodeAcquirer:     a.SNMPVnodeAcquirer,
 		Runtime:               a.setupRuntimeService(),
+		Services:              a.Services,
 		KeepAlive:             !a.runModePolicy.IsTerminal,
 		ShutdownTimeout:       a.ShutdownTimeout,
 	})

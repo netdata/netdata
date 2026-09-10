@@ -193,7 +193,24 @@ CONFIG go.d:nginx:local_server DELETE
 
 ## JSON Schema for Configuration UI
 
-DynCfg uses JSON Schema to define the structure of configuration objects, which is used to generate the UI.
+The Netdata UI (Cloud and the local dashboard) renders a job's configuration form from the document a plugin returns
+for the `schema` command. That document is NOT a bare JSON Schema. It is an object with two members:
+
+```json
+{
+  "jsonSchema": { "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": {} },
+  "uiSchema": {}
+}
+```
+
+- `jsonSchema`: a draft-07 JSON Schema describing the configuration object (types, defaults, `required`, `enum`,
+  bounds). This drives the field types and the client-side validation.
+- `uiSchema`: a react-jsonschema-form uiSchema, keyed by property name in parallel with `jsonSchema.properties`,
+  carrying presentation hints (`ui:help`, `ui:placeholder`, `ui:widget`, tabs).
+
+A response without the wrapper renders an EMPTY form: the UI reads `jsonSchema` and `uiSchema` and falls back to `{}`
+for a missing member. The agent serves the document verbatim and validates nothing against it; the plugin's own
+validation on `add`/`update` is the only server-side check.
 
 ### Static Schema Files (Optional)
 
@@ -208,43 +225,140 @@ Schema files should be named after the configuration ID with `.json` extension:
 /etc/netdata/schema.d/go.d:nginx.json
 ```
 
-This approach is useful for stable schemas that don't change frequently.
+This approach is useful for stable schemas that don't change frequently. Static files use the same two-member
+wrapper.
 
 ### Dynamic Schema Generation
 
-If no static schema file is found, Netdata will send a `schema` command to the plugin. When handling a `schema` request, the plugin should return a JSON Schema document:
+If no static schema file is found, Netdata will send a `schema` command to the plugin. The plugin returns the wrapper:
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "url": {
-      "type": "string",
-      "format": "uri",
-      "title": "Server URL",
-      "description": "The URL of the Nginx stub_status endpoint"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Nginx collector configuration",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "url": {
+        "title": "URL",
+        "description": "URL of the Nginx stub_status page.",
+        "type": "string",
+        "format": "uri",
+        "default": "http://127.0.0.1/stub_status"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "HTTP request timeout, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password for HTTP basic authentication.",
+        "type": "string"
+      }
     },
-    "timeout": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 60,
-      "title": "Timeout",
-      "description": "Connection timeout in seconds"
-    },
-    "update_every": {
-      "type": "integer",
-      "minimum": 1,
-      "title": "Update Every",
-      "description": "Data collection frequency in seconds"
-    }
+    "required": ["url"]
   },
-  "required": [
-    "url"
-  ]
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        { "title": "Base", "fields": ["update_every", "url", "timeout"] },
+        { "title": "Auth", "fields": ["password"] }
+      ]
+    },
+    "url": {
+      "ui:help": "The `stub_status` page must be enabled in the Nginx configuration.\n\nExample:\n\n```\nlocation /stub_status { stub_status; }\n```"
+    },
+    "password": {
+      "ui:widget": "password"
+    }
+  }
 }
 ```
 
 For templates, the schema will be used when users add new jobs based on the template.
+
+### What The UI Renders
+
+The form is react-jsonschema-form (v6) with Netdata templates and widgets. The table below is the vocabulary a plugin
+schema uses. The UI also honors a few keys plugin forms do not need (`ui:groups` for grouped sections without tabs,
+`ui:classNames` for grid layout, `ui:initiallyExpanded`, `ui:creatable` for free text in a select,
+`ui:validation.warning`); any other `ui:*` key is silently ignored, except that a `ui:widget` value which is neither a
+Netdata widget nor a react-jsonschema-form alias throws and replaces the form with an error view. This section
+describes the UI as verified in September 2026; re-verify against the UI code when it changes.
+
+Text channels, per property:
+
+| Channel | Where it renders | Format |
+|---|---|---|
+| `title` | the field label; the section header for objects; falls back to the raw property name when absent | plain text |
+| `description` | below the input (leaf), under the header (object), below all items (array) | Markdown |
+| `ui:help` | an info icon next to the title; the text appears in a hover tooltip | Markdown |
+| `ui:placeholder` | greyed text inside an empty string input | plain text |
+
+Markdown facts that apply to `description` and `ui:help` alike:
+
+- A single `\n` renders as a SPACE. Use `\n\n` for a new paragraph. Two trailing spaces or a trailing `\` force a
+  line break.
+- Supported: `#` headings, `**bold**`, `-` lists, `` `code` ``, fenced code blocks, `[links](url)` (open in a new
+  tab), pipe tables (unstyled). Not supported: indented code blocks, bare-URL autolinks, raw HTML.
+- The Markdoc tag syntax `{% ... %}` is active; a literal `{%` is interpreted, not printed.
+
+`ui:*` keys the UI honors:
+
+| Key | On | Effect |
+|---|---|---|
+| `ui:flavour: "tabs"` + `ui:options.tabs: [{title, fields}]` | object | renders the object's properties on tabs, tabs in array order; `fields` lists top-level property names of that object (no dotted paths); the order of fields inside a tab follows the object's property order (after `ui:order`), not the order in `fields`; any object at any depth may have its own tabs |
+| `ui:options.rest: [names]` | tabbed object | properties rendered flat above the tab strip |
+| `ui:help` | any property | info tooltip (Markdown) |
+| `ui:placeholder` | string | input placeholder |
+| `ui:widget` | leaf | `password` (masked input with reveal toggle), `textarea`, `radio`, `checkbox`, `select`, `hidden` (rendered nowhere, value kept) |
+| `ui:options.inline: true` | radio | horizontal option layout |
+| `ui:options.rows` | textarea | visible rows (default 2) |
+| `ui:options.enumNames` | enum | display labels for `enum` values (the JSON Schema `enumNames` keyword is ignored) |
+| `ui:listFlavour: "list"` | array | items stacked as a list instead of one-item-per-tab (tabs mode labels items `Rule N`) |
+| `ui:collapsible: true` | object, array item | collapsible body |
+| `ui:order: [names, "*"]` | object | property order |
+| `ui:descriptionPosition: "top"` | any | description above the input |
+| `ui:openEmptyItem: true` | array | adds one item when the array is empty |
+| `ui:options.addable/orderable/removable: false` | array | hides the add, move, remove controls |
+| `ui:options.collapsible`, `ui:options.flavour: "buttonGroup"`, `ui:options.enumOptions`, `ui:options.label: false` | object, radio, enum, any | collapsible alias; segmented radio; explicit option list; hides an object's title and description |
+| `ui:title` | any | overrides `title` |
+
+Behavior an author must design around:
+
+- Tabs: a top-level property missing from every tab and from `ui:options.rest` is silently dropped from the UI, yet
+  its `default` is still materialized and submitted. `ui:flavour: "tabs"` without `ui:options.tabs` renders an empty
+  form. A property listed on two tabs renders twice, bound to one value. Two tabs with the same title collide.
+- Defaults: every `default` in the schema is written into the form data on load, including inside sections the
+  operator never opened, and is submitted with the job. An array with `minItems: N` is auto-filled with N items;
+  declare `minItems` only on an array its parent requires or one with a `default`.
+- Validation: the UI validates live with ajv (types, `required`, `enum`, `minimum`/`maximum`, `pattern`, `format`
+  including `uri`, `ipv4`, `hostname`) and blocks the save while the form is invalid. A schema stricter than the
+  plugin blocks legitimate configs; a looser one offers configs the plugin rejects.
+- `dependencies` with `oneOf` on a `const` discriminator reveals the matching branch's properties inline (no selector
+  widget); the UI drops the form data of inactive branches for TOP-LEVEL dependencies only. A key that is both a
+  branch property and a plain sibling property renders unconditionally. Avoid property-level `oneOf`/`anyOf` (rendered
+  as a branch selector whose first option cannot be selected reliably) and avoid `0`, `false`, and `""` as `enum`
+  values in select-rendered fields.
+- Nullable fields: a two-member union such as `["string", "null"]` renders as the non-null type; any other union
+  (three or more members, or two members without `null`) collapses to its first member.
+- Maps: `additionalProperties: {type: ...}` renders a key/value list with an add button; `patternProperties` alone
+  renders without an add button.
+- Secrets: `ui:widget: "password"` masks the input and is the ONLY signal that redacts the value in the live YAML
+  preview pane. `format: "password"` masks the input but not the preview; any other schema flag (for example a custom
+  `sensitive` field) is ignored by both.
+- Unknown keys in an existing job's data are preserved and submitted; the schema is not a filter.
 
 ## Action Behavior Reference
 
@@ -325,34 +439,28 @@ When receiving:
 FUNCTION abcd1234 60 "config go.d:nginx schema" "member" "netdata-cli"
 ```
 
-Respond with:
+Respond with the two-member schema document described in "JSON Schema for Configuration UI":
 
 ```
 FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
 {
-  "type": "object",
-  "properties": {
-    "url": {
-      "type": "string",
-      "format": "uri",
-      "title": "Server URL",
-      "description": "The URL of the Nginx stub_status endpoint"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Nginx collector configuration",
+    "type": "object",
+    "properties": {
+      "url": {
+        "title": "URL",
+        "description": "URL of the Nginx stub_status page.",
+        "type": "string",
+        "format": "uri"
+      }
     },
-    "timeout": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 60,
-      "title": "Timeout",
-      "description": "Connection timeout in seconds"
-    },
-    "update_every": {
-      "type": "integer",
-      "minimum": 1,
-      "title": "Update Every",
-      "description": "Data collection frequency in seconds"
-    }
+    "required": ["url"]
   },
-  "required": ["url"]
+  "uiSchema": {
+    "url": { "ui:placeholder": "http://127.0.0.1/stub_status" }
+  }
 }
 FUNCTION_RESULT_END
 ```
@@ -450,7 +558,8 @@ CONFIG go.d:nginx:staging CREATE running job /collectors dyncfg netdata-cli sche
 1. **Use Consistent IDs**: Follow the pattern `component:template_name` for templates and `component:template_name:job_name` for jobs
 2. **Validate Thoroughly**: Always validate configuration changes before accepting them
 3. **Include Descriptive Messages**: Provide helpful error messages when rejections occur
-4. **Document Your Schema**: Include clear titles and descriptions for all properties in your JSON Schema
+4. **Document Your Schema**: Give every visible property a `title` and a plain-language `description`; put examples and
+   longer explanations in `ui:help` (see "What The UI Renders")
 5. **Handle Errors Gracefully**: Return appropriate HTTP status codes and error messages
 6. **Update Status Promptly**: When a configuration changes state (e.g., from "accepted" to "running"), update its status
 7. **Clean Up Configurations**: When a monitored resource is gone, delete its configuration with `CONFIG id DELETE`

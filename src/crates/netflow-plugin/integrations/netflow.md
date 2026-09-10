@@ -162,7 +162,11 @@ journal:
 
 
 
-### Verifying flow data is arriving and diagnosing failures
+## Troubleshooting
+
+### Other Problems
+
+#### Verifying flow data is arriving and diagnosing failures
 
 See [Troubleshooting](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/troubleshooting.md) for
 the full diagnostic recipe -- including UDP path checks, template-error analysis,

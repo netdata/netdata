@@ -172,13 +172,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
     // NEEDED BY: do_bandwidth
     struct ifaddrs *ifa, *ifap;
 
-#if !defined(MAC_OS_VERSION_12_0) || (MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_VERSION_12_0)
-#define IOMainPort IOMasterPort
-#endif
-
     /* Get ports and services for drive statistics. */
     if (unlikely(IOMainPort(bootstrap_port, &main_port))) {
-        collector_error("MACOS: IOMasterPort() failed");
+        collector_error("MACOS: IOMainPort()/IOMasterPort() failed");
         do_io = 0;
         collector_error("DISABLED: system.io");
     /* Get the list of all drive objects. */
