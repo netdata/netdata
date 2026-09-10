@@ -92,8 +92,21 @@ These sections identify consumer source symbols where code inspection is needed.
   settle whether a chart was created or displayed; use the normal-evidence owner to bound that conclusion.
 - For a source-level explanation, check the producer version against the code being read. Treat replay through a
   different checkout as a version-qualified experiment. Do not edit captured values to make a replay succeed.
-- Correlate only relevant companion logs/configuration after establishing the evidence timeline. Consult the bundle's
-  sanitization owner before joining identifiers: differently sanitized files may not share literal device names.
+
+## Correlate Companion Logs
+
+- After establishing the evidence timeline, use the bundle inventory to find relevant logs and configuration.
+  Prioritize available `05-logs/collector.log`, `05-logs/journal-netdata.txt`, and
+  `05-logs/journal-namespace-netdata.txt`; an empty collector log is not a reason to skip the journals.
+- Use ordinary archive/text tools for logs. Start with SNMP matches, narrow using `collector=snmp`,
+  `collector=snmp_topology`, and the affected `job` where present, then inspect nearby context. Include relevant
+  `go.d` startup, shutdown, discovery, and job messages; do not restrict the search to warnings/errors or treat
+  every SNMP match as a collector failure (alerts can also match).
+- Correlate message times, jobs, and restarts with the incident and diagnostic capture/run boundaries. Consult the
+  bundle's sanitization owner before joining identifiers: differently sanitized files may not share literal device
+  names.
+- Check log coverage and collection notes before interpreting missing matches; capped captures, missing history,
+  and rate-limited messages cannot establish that no failure occurred. Keep conclusions within the captured window.
 
 ## Report The Finding
 
