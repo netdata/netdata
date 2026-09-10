@@ -613,7 +613,7 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 	collr.Config = prepareV2Config()
 	collr.CreateVnode = true
 	collr.VnodeDeviceDownThreshold = 3
-	collr.Vnode.Labels = map[string]string{"model": "operator-model"}
+	collr.LocalVnode.Labels = map[string]string{"model": "operator-model"}
 	collr.snmpClient = handler
 	collr.snmpProfiles = []*ddsnmp.Profile{
 		{SourceFile: "identity.yaml", Definition: &ddprofiledefinition.ProfileDefinition{
@@ -668,7 +668,7 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 		Hostname: "unifi-ap",
 		Labels:   map[string]string{"model": "operator-model"},
 	}
-	assert.Equal(t, wantConfigVnode, collr.Vnode)
+	assert.Equal(t, wantConfigVnode, collr.LocalVnode)
 
 	collr.Collect(context.Background())
 	assert.Equal(t, 2, metadataCalls, "subsequent collections reuse preparation caches")
@@ -1769,6 +1769,7 @@ func setMockClientSetterExpectWithoutMaxOids(m *snmpmock.MockHandler) {
 	m.EXPECT().Target().AnyTimes()
 	m.EXPECT().Port().AnyTimes()
 	m.EXPECT().Version().AnyTimes()
+	m.EXPECT().ContextName().AnyTimes()
 	m.EXPECT().Community().AnyTimes()
 	m.EXPECT().SetTarget(gomock.Any()).AnyTimes()
 	m.EXPECT().SetPort(gomock.Any()).AnyTimes()

@@ -120,7 +120,7 @@ func (c *Collector) ensureInitialized() error {
 		})
 	}
 
-	if c.CreateVnode {
+	if c.CreateVnode && c.Vnode == "" {
 		var baseLabels map[string]string
 		if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
 			// Allow for collection and transmission delays.
@@ -130,10 +130,10 @@ func (c *Collector) ensureInitialized() error {
 		}
 		identity, err := ddsnmp.AcquireDeviceIdentity(si, c.ddSnmpColl, ddsnmp.DeviceIdentityOptions{
 			Address:    c.Hostname,
-			GUID:       c.Vnode.GUID,
-			Hostname:   c.Vnode.Hostname,
+			GUID:       c.LocalVnode.GUID,
+			Hostname:   c.LocalVnode.Hostname,
 			BaseLabels: baseLabels,
-			Labels:     c.Vnode.Labels,
+			Labels:     c.LocalVnode.Labels,
 		})
 		if c.ddSnmpColl != nil {
 			c.captureCollectionFailures()
@@ -141,8 +141,8 @@ func (c *Collector) ensureInitialized() error {
 		if err != nil {
 			return err
 		}
-		c.Vnode.GUID = identity.GUID
-		c.Vnode.Hostname = identity.Hostname
+		c.LocalVnode.GUID = identity.GUID
+		c.LocalVnode.Hostname = identity.Hostname
 		c.vnode = &vnodes.VirtualNode{
 			GUID:     identity.GUID,
 			Hostname: identity.Hostname,

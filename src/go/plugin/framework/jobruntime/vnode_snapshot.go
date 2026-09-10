@@ -2,7 +2,10 @@
 
 package jobruntime
 
-import "github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+)
 
 type VnodeLookup func(name string) (VnodeSnapshot, bool)
 
@@ -25,5 +28,15 @@ func (s VnodeSnapshot) Copy() VnodeSnapshot {
 		Vnode:            vnode,
 		Revision:         s.Revision,
 		MetadataRevision: s.MetadataRevision,
+	}
+}
+
+// Called during construction or synchronously by the owning job's collection loop.
+// Configuration updates never write job state directly, so this copy has no competing writer.
+func supplyConfiguredVnode(module any, vnode *vnodes.VirtualNode) {
+	if consumer, ok := module.(collectorapi.ConfiguredVnodeConsumer); ok {
+		snapshot := vnode.Copy()
+		snapshot.Labels = snapshot.HostLabels()
+		consumer.SetConfiguredVnode(*snapshot)
 	}
 }

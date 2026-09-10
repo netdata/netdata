@@ -92,11 +92,11 @@ See [VM Templates](/docs/learn/vm-templates.md) for how to avoid this when cloni
 |---------------|-------------------------------------------------------------------------------------------|
 | **Directory** | `vnodes/` in your [Netdata config directory](/docs/netdata-agent/configuration/README.md) |
 | **Format**    | YAML files (`.yaml`, `.yml`, `.conf`)                                                     |
-| **Identity**  | User-defined GUID in config file                                                          |
+| **Identity**  | Configured UUID, or a UUID derived from the SNMP address                                                          |
 
 ### Configuration
 
-Each virtual node is defined in a YAML file:
+Static virtual nodes use the existing YAML format (`mode: static` is optional):
 
 ```yaml
 - hostname: remote-server.example.com
@@ -122,9 +122,71 @@ Each virtual node GUID must be unique across your entire infrastructure. Using t
 
 :::
 
+### Acquiring Virtual Node Identity Through SNMP
+
+With go.d, a vnode can acquire its hostname and host labels independently of any metrics job:
+
+```yaml
+- name: router
+  mode: snmp
+  mode_snmp:
+    address: 192.0.2.1
+    version: 2c
+    credentials:
+      community: example-community
+  labels:
+    site: example-site
+```
+
+- `name` is required and stays the job reference even if the device's hostname changes.
+- `hostname` is an optional override. Otherwise, the vnode uses a usable SNMP `sysName`, then `name`.
+- `guid` is an optional UUID override. Otherwise, the exact `address` string determines the UUID. Different spellings
+  for the same device produce different UUIDs; port and SNMP context do not distinguish UUIDs. Supply unique UUIDs
+  explicitly when multiple virtual nodes use the same address.
+- `labels` override acquired host labels. Removing an override restores the last acquired value.
+- `mode_snmp.port` defaults to `161`, `timeout` to `5s`, and `retries` to `1`; set `retries: 0` to disable request retries.
+  Automatic profile matching enriches system identity; metric profile coverage is not required.
+
+For SNMPv3, replace `credentials` with `credentials3` and set `version: "3"`:
+
+```yaml
+  mode_snmp:
+    address: 192.0.2.1
+    version: "3"
+    credentials3:
+      username: example-user
+      security_level: authPriv
+      auth_protocol: sha512
+      auth_password: example-auth-password
+      priv_protocol: aes192c
+      priv_password: example-priv-password
+```
+
+The version choices are `"1"`, `2c` (default), and `"3"`. SNMPv3 supports `noAuthNoPriv`, `authNoPriv`, and
+`authPriv` (default). Authentication defaults to `sha512`; privacy defaults to `aes192c`. Passwords must contain at
+least eight bytes. Inactive credentials are discarded before validation and retention by go.d: authentication and privacy fields
+for `noAuthNoPriv`, privacy fields for `authNoPriv`, and the credential block for the unselected version. This applies
+to both files and forms; switching back requires entering the discarded credentials again. Active credentials remain
+strictly validated. Optional `credentials3.context_name` selects an SNMP context. These new field names
+apply to vnode acquisition; existing collector and discovery credential names are unchanged. Use literal credentials;
+secret references are not supported in vnode acquisition yet. This does not rewrite source files or scrub the Agent's
+saved copy of the originally submitted DynCfg payload.
+
+A usable `sysObjectID`, `sysName`, or `sysDescr` lets attached jobs start. Failed profile enrichment retries while
+keeping usable system identity. Acquisition retries every 10 seconds after failure and refreshes complete metadata
+hourly. These intervals are internal defaults. Failed refreshes retain the last usable metadata; a successful refresh
+replaces acquired labels. Acquisition continues without metrics jobs, but the node is announced only by ordinary
+job output.
+
+Acquired metadata is held in memory. After a plugin restart, jobs wait for fresh identity acquisition. Label and hostname
+override edits need no network request. Credential edits reacquire metadata while retaining the last usable identity.
+Changing the mode, address, context, or UUID of an existing SNMP vnode is rejected: create a replacement vnode and move
+job references to it. Static vnode updates retain their existing behavior. The scripts.d and ibm.d plugins ignore
+SNMP-mode file definitions and expose only static vnode configuration.
+
 ### Creating Virtual Nodes via the GUI (Dynamic Configuration)
 
-In addition to the YAML file method, you can create, edit, test, and remove virtual nodes directly from the Netdata UI using [dynamic configuration (dyncfg)](/docs/netdata-agent/configuration/dynamic-configuration.md). Both methods produce a working vnode that collectors can attach metrics to, though field requirements differ — see the table below. The Vnodes GUI path is available under the go.d plugin's dynamic configuration view.
+In addition to the YAML file method, you can create, edit, test, and remove virtual nodes directly from the Netdata UI using [dynamic configuration (dyncfg)](/docs/netdata-agent/configuration/dynamic-configuration.md). Both methods configure a vnode that collectors can attach metrics to; SNMP mode first acquires a usable device identity. The Vnodes GUI path is available under the go.d plugin's dynamic configuration view.
 
 :::note
 
@@ -134,7 +196,7 @@ In the Netdata UI, open the node's dynamic configuration view and look for the *
 
 :::
 
-The GUI form exposes `hostname`, `guid`, `labels`, and `stale_after` — the same fields as YAML, minus `name` which the Agent ignores:
+The go.d GUI form selects `static` or `snmp` mode. The resource name entered when creating a vnode is its stable reference name. Static mode uses these fields:
 
 | Field      | Required in the GUI | Description                                                                                                                         |
 |------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -179,19 +241,39 @@ jobs:
     url: http://203.0.113.10:9182/metrics
 ```
 
-The `vnode` value must exactly match the vnode reference name. For YAML definitions, the reference name is always `hostname` and any explicit `name` is ignored; for GUI definitions, use the name assigned when creating the vnode. If that name is not registered, the job fails to start.
+The `vnode` value must exactly match the vnode reference name. For static YAML definitions, use `hostname`; for SNMP YAML definitions, use the required `name`. For GUI definitions, use the resource name assigned when creating the vnode. An unknown name or an SNMP vnode awaiting its first usable identity prevents the job from starting; configured detection retries can start it once the identity is available.
 
 Several jobs can reference the same vnode. Its configured hostname and host labels govern output to its GUID within that plugin process, including collector-generated scopes using the same GUID. Job labels remain chart labels. Removing an unreferenced configured vnode lets generated contributors resume using their own host metadata.
 
 :::note
 
-**SNMP** collectors behave differently: their `create_vnode: true` option auto-creates the vnode from the job configuration, so no separate vnode definition step is needed.
+**SNMP** jobs can use the same `vnode: router` string reference. This takes precedence over `create_vnode`, including its default of `true`. Without a named reference, `create_vnode: true` retains the existing automatic vnode behavior and `local_vnode` configures the job-owned identity. Legacy inline `vnode` objects remain accepted. A named reference supplies identity only: keep the SNMP job's own `hostname`, credentials, and metric profiles configured.
 
 :::
 
+For a vnode created within an SNMP job, configure `local_vnode` instead of a named reference:
+
+```yaml
+jobs:
+  - name: router_metrics
+    hostname: 192.0.2.1
+    community: example-collector-community
+    create_vnode: true
+    local_vnode:
+      hostname: office-router
+      labels:
+        site: office
+```
+
+Existing SNMP configurations using `vnode: { hostname: ..., guid: ..., labels: ... }` keep working.
+Dynamic configuration returns these settings under `local_vnode`, so the form can edit them without changing
+which host receives metrics. Files are not rewritten. Do not specify both the legacy object and `local_vnode`.
+A string `vnode` reference takes precedence over `create_vnode` and `local_vnode`; configure the central vnode to
+change its host labels.
+
 ### How Virtual Nodes Work
 
-1. Define a vnode (YAML file or GUI) with a unique `hostname` and `guid`
+1. Define a static vnode with a unique hostname and UUID, or an SNMP vnode with a stable name and acquisition connection
 2. Configure the collector job with `vnode: <name>` to attach it
 3. Metrics are tagged with the vnode's GUID instead of the Agent's Machine GUID
 4. Cloud sees the vnode as a separate node in your Space
@@ -443,33 +525,35 @@ For virtual nodes, see [Does renaming a virtual node change its identity?](#does
 <details>
 <summary>Does renaming a virtual node change its identity?</summary>
 
-A virtual node's identity is determined by its **`guid`** field — not its `hostname` or `name`. The fields behave as follows:
+A virtual node's identity is determined by its **UUID**. This is either explicitly configured as `guid` or, for an SNMP vnode without an override, derived from its exact configured address. The fields behave as follows:
 
 - **`guid`** — This is the vnode's identity. Changing it creates an entirely new node in Netdata Cloud. The old vnode's historical data remains under the old GUID but is no longer associated with the new one.
-- **`hostname`** — This is used as the internal lookup key in the Agent and as the display name in dashboards. Changing `hostname` while keeping the same `guid` renames the display without creating a new node identity.
-- **`name`** — The Agent ignores this field. When set to a value different from `hostname`, the Agent logs a warning and overrides it with `hostname`.
+- **`hostname`** — The display name, and the reference key for static YAML definitions. Changing it without changing the UUID renames the display. Update job references too when renaming a static YAML definition.
+- **`name`** — Required as the stable reference key for SNMP YAML definitions. Static YAML definitions ignore this field and use `hostname`; GUI definitions use their resource name.
 
-**To preserve data continuity when renaming a vnode**, change only the `hostname` field in its YAML file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and keep the `guid` unchanged. If a true identity change is needed, accept that historical data belongs to the old identity.
+**To preserve data continuity when renaming a vnode**, edit `hostname` in the configuration source you used: its YAML file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md), or its [Vnodes GUI configuration](#creating-virtual-nodes-via-the-gui-dynamic-configuration). Keep any explicit `guid` unchanged. For an SNMP vnode with a derived UUID, keep the exact address unchanged too.
+
+SNMP hostname overrides preserve the stable reference name. Changing an existing SNMP vnode's mode, address, context, or UUID requires a replacement vnode. Historical data belongs to the old UUID.
 
 </details>
 
 <details>
 <summary>How do I find the UUID of my existing vnode?</summary>
 
-The GUID for each virtual node is stored in its YAML configuration file in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md). To look it up:
+If the vnode has an explicit `guid`, that value is its UUID. Look it up in the configuration source:
+
+- **YAML-defined vnode:** read its `guid` in the `vnodes/` directory of your [Netdata config directory](/docs/netdata-agent/configuration/README.md).
+- **GUI-created vnode:** open the node's dynamic configuration view, select **go.d → Vnodes**, and inspect the vnode's `guid`. GUI-created definitions are managed through dynamic configuration; they do not require a YAML file in `vnodes/`.
+
+To inspect YAML definitions:
 
 ```bash
 # Default path — adjust if your Netdata config directory differs.
 cat /etc/netdata/vnodes/*
 ```
 
-Each file contains a `guid` field that uniquely identifies the vnode:
+Static vnodes require an explicit `guid`. SNMP vnodes can omit it in either YAML or the GUI; their UUID is then derived from the exact `mode_snmp.address` string. The derived UUID is not written back into the authored configuration. It becomes visible with the vnode when an attached collector job publishes that node.
 
-```yaml
-- hostname: remote-server.example.com
-  guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-```
-
-The `guid` value is the vnode's UUID. You do **not** need to query any internal database — the YAML configuration file is the authoritative source for the vnode GUID. See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
+See [Virtual Nodes](#virtual-nodes-vnodes) for the full configuration reference.
 
 </details>

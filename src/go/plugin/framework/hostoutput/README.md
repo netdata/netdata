@@ -45,10 +45,11 @@ end-to-end host staleness until that parser ordering is corrected.
 
 ## Collector roles
 
-`VirtualNode()` supplies a collector-generated default host. V2 collectors implementing
+`VirtualNode()` supplies a collector-generated default host. V1 and V2 collectors implementing
 `collectorapi.ConfiguredVnodeConsumer` receive an
 owned configured snapshot initially before Init/Check, and on changed revisions synchronously before Collect.
-Nagios uses this consumer for host macros. Configuration commits never mutate collector state asynchronously.
+Nagios uses this consumer for host macros; SNMP uses it for canonical DeviceStore identity on named attachment.
+Configuration commits never mutate collector state asynchronously.
 A collection already in progress retains its original target; the next collection receives the updated snapshot.
 
 ## V1 output settlement

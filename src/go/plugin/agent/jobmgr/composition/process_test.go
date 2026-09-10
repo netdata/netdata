@@ -627,13 +627,13 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	jobs := testRunJobServices(t)
-	jobs.InitialVnodes = map[string]*vnodes.VirtualNode{
-		"initial": {
+	jobs.InitialVnodes = map[string]*vnodes.Config{
+		"initial": {VirtualNode: vnodes.VirtualNode{
 			Name: "initial", Hostname: "initial",
 			GUID:       "11111111-1111-1111-1111-111111111111",
 			Source:     "file=test",
 			SourceType: confgroup.TypeUser,
-		},
+		}},
 	}
 	process, err := newProcessCore(processCoreConfig{
 		Input:           reader,
@@ -1241,15 +1241,15 @@ func TestProcessCorePublishesConfiguredMetadataForGeneratedJob(t *testing.T) {
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.InitialVnodes = map[string]*vnodes.VirtualNode{
-		"router": {
+	jobs.InitialVnodes = map[string]*vnodes.Config{
+		"router": {VirtualNode: vnodes.VirtualNode{
 			Name:       "router",
 			Hostname:   "configured",
 			GUID:       guid,
 			Source:     "file=test",
 			SourceType: confgroup.TypeUser,
 			Labels:     map[string]string{"site": "athens"},
-		},
+		}},
 	}
 	config := confgroup.Config{
 		"module":       "module",

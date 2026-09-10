@@ -26,12 +26,13 @@ import (
 )
 
 type runJobServices struct {
-	PluginName    string                         // owning plugin name
-	Defaults      confgroup.Registry             // per-module config defaults
-	Resolver      *secretresolver.AtomicResolver // atomic secret resolver (process-fixed)
-	StoreCreators *secretstore.CreatorCatalog    // frozen secret store creator catalog
-	Runtime       runtimecomp.Service            // runtime service dependency
-	InitialVnodes map[string]*vnodes.VirtualNode // file-configured vnodes
+	SNMPVnodeAcquirer vnodes.SNMPAcquirer
+	PluginName        string                         // owning plugin name
+	Defaults          confgroup.Registry             // per-module config defaults
+	Resolver          *secretresolver.AtomicResolver // atomic secret resolver (process-fixed)
+	StoreCreators     *secretstore.CreatorCatalog    // frozen secret store creator catalog
+	Runtime           runtimecomp.Service            // runtime service dependency
+	InitialVnodes     map[string]*vnodes.Config      // file-configured vnodes
 }
 
 type runSecretServices struct {
@@ -155,6 +156,7 @@ func newRunGeneration(
 	if err != nil {
 		return nil, err
 	}
+	vnodeBinding.acquirer = config.Jobs.SNMPVnodeAcquirer
 	vnodeRoute, err := newVNodeInitialRoute(config.Generation, vnodeBinding)
 	if err != nil {
 		return nil, err
@@ -396,6 +398,7 @@ func (rg *runGeneration) startWithRunContext(
 	if err := rg.vnodes.publishInitial(startupCtx, rg.kernel); err != nil {
 		return rg.stopAfterStartFailure(startupCtx, err)
 	}
+	rg.vnodes.startAcquisition(runCtx, rg.kernel)
 	if err := rg.secrets.PublishInitial(startupCtx, rg.kernel); err != nil {
 		return rg.stopAfterStartFailure(startupCtx, err)
 	}
@@ -440,6 +443,7 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
+		rg.vnodes.stopAcquisition()
 		rg.scheduler.StopBackgroundWorkers()
 		rg.kernel.Stop()
 	}
@@ -452,10 +456,11 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 	waitErr := rg.kernel.Wait(ctx)
 	select {
 	case <-rg.kernel.Done():
+		rg.vnodes.stopAcquisition()
 		rg.scheduler.StopBackgroundWorkers()
 	default:
 	}
-	return errors.Join(waitErr, rg.scheduler.WaitBackgroundWorkers(ctx))
+	return errors.Join(waitErr, rg.scheduler.WaitBackgroundWorkers(ctx), rg.vnodes.waitAcquisition(ctx))
 }
 
 type runMetricsRegistration struct {

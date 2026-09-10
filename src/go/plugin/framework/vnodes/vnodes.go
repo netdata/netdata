@@ -28,8 +28,8 @@ var log = logger.New().With(
 	slog.String("component", "vnodes"),
 )
 
-func Load(dir string) map[string]*VirtualNode {
-	return readConfDir(dir)
+func Load(dir string, snmpSupported bool) map[string]*Config {
+	return readConfDir(dir, snmpSupported)
 }
 
 type VirtualNode struct {
@@ -96,9 +96,10 @@ func (v *VirtualNode) HostLabels() map[string]string {
 	return labels
 }
 
-func readConfDir(dir string) map[string]*VirtualNode {
-	vnodes := make(map[string]*VirtualNode)
+func readConfDir(dir string, snmpSupported bool) map[string]*Config {
+	vnodes := make(map[string]*Config)
 	guids := make(map[string]string)
+	hostnames := make(map[string]string)
 
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -137,48 +138,66 @@ func readConfDir(dir string) map[string]*VirtualNode {
 			return nil
 		}
 
-		var cfg []VirtualNode
+		var cfg []Config
 
 		if err := loadConfigFile(&cfg, path); err != nil {
-			log.Warning(err)
+			log.Warningf("invalid vnode configuration file %q", path)
 			return nil
 		}
 
 		for _, v := range cfg {
+			if v.IsSNMP() && !snmpSupported {
+				log.Debugf("skipping virtual node %q: SNMP acquisition is unavailable in this plugin", v.Name)
+				continue
+			}
 
-			if v.Name != "" && v.Name != v.Hostname {
+			if !v.IsSNMP() && v.Name != "" && v.Name != v.Hostname {
 				log.Warningf(
 					"ignoring virtual node name '%s' for hostname '%s'; file-based vnode identity uses hostname",
 					v.Name, v.Hostname,
 				)
 			}
-			v.Name = v.Hostname
+			if !v.IsSNMP() {
+				v.Name = v.Hostname
+			}
 			v.Source = fmt.Sprintf("file=%s", path)
 			if isStockConfig(path) {
 				v.SourceType = "stock"
 			} else {
 				v.SourceType = "user"
 			}
-			guidKey, err := validateConfigured(&v)
+			v.NormalizeCredentials()
+			err := v.Validate()
+			guidKey := v.IdentityGUID()
+			if err == nil {
+				guidKey, err = ConfiguredGUIDKey(guidKey)
+			}
 			if err != nil {
-				log.Warningf("skipping virtual node '%+v': %v (%s)", v, err, path)
+				log.Warningf("skipping virtual node %q: %v (%s)", v.Name, err, path)
 				continue
 			}
-			if _, ok := vnodes[v.Hostname]; ok {
-				log.Warningf("skipping virtual node '%+v': duplicate hostname (%s)", v, path)
+			if _, ok := vnodes[v.Name]; ok {
+				log.Warningf("skipping virtual node %q: duplicate name (%s)", v.Name, path)
 				continue
 			}
 			if other, ok := guids[guidKey]; ok {
 				log.Warningf(
-					"skipping virtual node '%+v': duplicate GUID already used by '%s' (%s)",
-					v, other, path,
+					"skipping virtual node %q: duplicate GUID already used by %q (%s)",
+					v.Name, other, path,
 				)
 				continue
 			}
 
-			log.Debugf("adding virtual node'%+v' (%s)", v, path)
-			vnodes[v.Hostname] = &v
-			guids[guidKey] = v.Hostname
+			if v.Hostname != "" {
+				if _, exists := hostnames[v.Hostname]; exists {
+					log.Warningf("skipping virtual node %q: duplicate hostname (%s)", v.Name, path)
+					continue
+				}
+				hostnames[v.Hostname] = v.Name
+			}
+			log.Debugf("adding virtual node %q (%s)", v.Name, path)
+			vnodes[v.Name] = &v
+			guids[guidKey] = v.Name
 		}
 
 		return nil

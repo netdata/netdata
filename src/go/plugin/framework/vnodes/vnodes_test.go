@@ -12,13 +12,13 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	nodes := Load("testdata")
+	nodes := Load("testdata", false)
 	assert.NotNil(t, nodes)
 	require.Contains(t, nodes, "first")
 	require.Contains(t, nodes, "second")
 	assert.Equal(t, "first", nodes["first"].Name)
 	assert.Equal(t, "second", nodes["second"].Name)
-	assert.NotNil(t, Load("not_exist"))
+	assert.NotNil(t, Load("not_exist", false))
 }
 
 func TestIsStockConfig(t *testing.T) {
@@ -36,7 +36,7 @@ func TestLoad_IgnoresCustomNameInFileAndUsesHostnameIdentity(t *testing.T) {
 `
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o644))
 
-	nodes := Load(dir)
+	nodes := Load(dir, true)
 	require.Len(t, nodes, 1)
 	require.Contains(t, nodes, "host-a")
 	assert.Equal(t, "host-a", nodes["host-a"].Name)
@@ -64,7 +64,7 @@ func TestLoad_SkipsInvalidConfiguredVnodesIndividually(t *testing.T) {
 `
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o644))
 
-	nodes := Load(dir)
+	nodes := Load(dir, true)
 
 	require.Len(t, nodes, 2)
 	require.Contains(t, nodes, "first")
@@ -83,7 +83,7 @@ func TestLoad_SkipsVNodeWhoseSourceCannotBePublished(t *testing.T) {
 `
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o644))
 
-	require.Empty(t, Load(dir))
+	require.Empty(t, Load(dir, true))
 }
 
 func TestValidateConfiguredRejectsLabelNormalization(t *testing.T) {
@@ -131,4 +131,34 @@ func TestValidateConfiguredRejectsLabelNormalization(t *testing.T) {
 			require.ErrorContains(t, ValidateConfigured(vnode), test.wantErr)
 		})
 	}
+}
+
+func TestLoadSNMPKeepsStableNameAndAuthoredHostname(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "snmp.yaml"), []byte(`
+- name: router
+  mode: snmp
+  mode_snmp:
+    address: device
+    credentials:
+      community: fixture-secret
+- name: duplicate-guid
+  mode: snmp
+  mode_snmp:
+    address: device
+    credentials:
+      community: fixture-secret
+- mode: snmp
+  mode_snmp:
+    address: missing-name
+    credentials:
+      community: fixture-secret
+`), 0600))
+	loaded := Load(dir, true)
+	require.Len(t, loaded, 1)
+	require.Contains(t, loaded, "router")
+	require.Empty(t, loaded["router"].Hostname)
+	require.Empty(t, loaded["router"].GUID)
+	require.Equal(t, "fixture-secret", loaded["router"].ModeSNMP.Credentials.Community)
+	require.Nil(t, loaded["router"].Resolve(nil))
 }

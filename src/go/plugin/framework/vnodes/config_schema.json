@@ -16,12 +16,12 @@
       },
       "hostname": {
         "title": "Hostname",
-        "description": "The hostname that identifies this virtual node in the Netdata UI and API. Must be unique within your monitoring environment. Leave empty to use the job name.",
+        "description": "Display hostname override. Static mode defaults to the resource name; SNMP mode uses sysName, then the resource name.",
         "type": "string"
       },
       "guid": {
         "title": "GUID",
-        "description": "Uniquely identifies the node. Must be in [UUID format](https://www.guidgen.com/). Changing this value will result in creating a **new Virtual Node** - the existing Virtual Node and its history will not be modified.",
+        "description": "Unique node UUID. Required in static mode; SNMP mode derives it from the exact address when omitted. An existing SNMP vnode cannot change its identity in place.",
         "type": "string"
       },
       "labels": {
@@ -34,10 +34,276 @@
         "additionalProperties": {
           "type": "string"
         }
+      },
+      "mode": {
+        "title": "Mode",
+        "description": "Use static values or acquire host identity and labels independently through SNMP.",
+        "type": "string",
+        "enum": [
+          "static",
+          "snmp"
+        ],
+        "default": "static"
       }
     },
-    "required": [
-      "guid"
+    "dependencies": {
+      "mode": {
+        "oneOf": [
+          {
+            "properties": {
+              "mode": {
+                "const": "static"
+              }
+            },
+            "required": [
+              "guid"
+            ]
+          },
+          {
+            "properties": {
+              "mode": {
+                "const": "snmp"
+              },
+              "mode_snmp": {
+                "title": "SNMP connection",
+                "description": "Connection used only to acquire virtual node identity and labels. Collector jobs keep their own connection settings.",
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "title": "Address",
+                    "description": "Hostname or IP address of the SNMP device. Its exact spelling determines the default node UUID.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "port": {
+                    "title": "Port",
+                    "description": "UDP port for SNMP requests.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "default": 161
+                  },
+                  "version": {
+                    "title": "SNMP version",
+                    "description": "SNMP protocol version used for identity acquisition.",
+                    "type": "string",
+                    "enum": [
+                      "1",
+                      "2c",
+                      "3"
+                    ],
+                    "default": "2c"
+                  },
+                  "timeout": {
+                    "title": "Timeout",
+                    "description": "Timeout for each SNMP request, in seconds.",
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "default": 5
+                  },
+                  "retries": {
+                    "title": "Retries",
+                    "description": "Number of retries for each SNMP request.",
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 1
+                  }
+                },
+                "required": [
+                  "address"
+                ],
+                "dependencies": {
+                  "version": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "version": {
+                            "enum": [
+                              "1",
+                              "2c"
+                            ]
+                          },
+                          "credentials": {
+                            "title": "Community credentials",
+                            "description": "Credentials for SNMPv1 or SNMPv2c. Use a literal value; secret references are not supported.",
+                            "type": "object",
+                            "properties": {
+                              "community": {
+                                "title": "Community",
+                                "description": "SNMP community string.",
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "community"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "credentials"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "version": {
+                            "const": "3"
+                          },
+                          "credentials3": {
+                            "title": "SNMPv3 credentials",
+                            "description": "User-based SNMPv3 credentials. Use literal passwords; secret references are not supported.",
+                            "type": "object",
+                            "properties": {
+                              "username": {
+                                "title": "Username",
+                                "description": "SNMPv3 username.",
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "context_name": {
+                                "title": "Context name",
+                                "description": "SNMPv3 context. Omit to use the default context.",
+                                "type": "string"
+                              },
+                              "security_level": {
+                                "title": "Security level",
+                                "description": "Whether to authenticate and encrypt SNMPv3 messages.",
+                                "type": "string",
+                                "enum": [
+                                  "noAuthNoPriv",
+                                  "authNoPriv",
+                                  "authPriv"
+                                ],
+                                "default": "authPriv"
+                              }
+                            },
+                            "required": [
+                              "username"
+                            ],
+                            "dependencies": {
+                              "security_level": {
+                                "oneOf": [
+                                  {
+                                    "properties": {
+                                      "security_level": {
+                                        "const": "noAuthNoPriv"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "properties": {
+                                      "security_level": {
+                                        "const": "authNoPriv"
+                                      },
+                                      "auth_protocol": {
+                                        "title": "Authentication protocol",
+                                        "description": "Algorithm used to authenticate SNMPv3 messages.",
+                                        "type": "string",
+                                        "enum": [
+                                          "md5",
+                                          "sha",
+                                          "sha224",
+                                          "sha256",
+                                          "sha384",
+                                          "sha512"
+                                        ],
+                                        "default": "sha512"
+                                      },
+                                      "auth_password": {
+                                        "title": "Authentication password",
+                                        "description": "SNMPv3 authentication passphrase; at least eight bytes.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "auth_password"
+                                    ]
+                                  },
+                                  {
+                                    "properties": {
+                                      "security_level": {
+                                        "const": "authPriv"
+                                      },
+                                      "auth_protocol": {
+                                        "title": "Authentication protocol",
+                                        "description": "Algorithm used to authenticate SNMPv3 messages.",
+                                        "type": "string",
+                                        "enum": [
+                                          "md5",
+                                          "sha",
+                                          "sha224",
+                                          "sha256",
+                                          "sha384",
+                                          "sha512"
+                                        ],
+                                        "default": "sha512"
+                                      },
+                                      "auth_password": {
+                                        "title": "Authentication password",
+                                        "description": "SNMPv3 authentication passphrase; at least eight bytes.",
+                                        "type": "string"
+                                      },
+                                      "priv_protocol": {
+                                        "title": "Privacy protocol",
+                                        "description": "Algorithm used to encrypt SNMPv3 messages.",
+                                        "type": "string",
+                                        "enum": [
+                                          "des",
+                                          "aes",
+                                          "aes192",
+                                          "aes256",
+                                          "aes192c",
+                                          "aes256c"
+                                        ],
+                                        "default": "aes192c"
+                                      },
+                                      "priv_password": {
+                                        "title": "Privacy password",
+                                        "description": "SNMPv3 encryption passphrase; at least eight bytes.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "auth_password",
+                                      "priv_password"
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "required": [
+                          "credentials3"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "mode_snmp"
+            ]
+          }
+        ]
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "not": {
+            "required": [
+              "mode"
+            ]
+          }
+        },
+        "then": {
+          "required": [
+            "guid"
+          ]
+        }
+      }
     ]
   },
   "uiSchema": {
@@ -53,6 +319,70 @@
     "stale_after": {
       "ui:placeholder": "300",
       "ui:help": "In YAML, durations such as `5m` are also accepted. An explicit value overrides `_node_stale_after_seconds` in the host labels."
+    },
+    "ui:order": [
+      "mode",
+      "hostname",
+      "guid",
+      "labels",
+      "stale_after",
+      "mode_snmp"
+    ],
+    "mode": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      },
+      "ui:help": "Static mode uses values you supply. SNMP mode waits for a usable device identity before starting attached jobs."
+    },
+    "mode_snmp": {
+      "ui:order": [
+        "address",
+        "port",
+        "version",
+        "credentials",
+        "credentials3",
+        "timeout",
+        "retries"
+      ],
+      "version": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "timeout": {
+        "ui:placeholder": "5"
+      },
+      "credentials": {
+        "community": {
+          "ui:widget": "password"
+        }
+      },
+      "credentials3": {
+        "ui:order": [
+          "username",
+          "context_name",
+          "security_level",
+          "auth_protocol",
+          "auth_password",
+          "priv_protocol",
+          "priv_password"
+        ],
+        "security_level": {
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true
+          }
+        },
+        "auth_password": {
+          "ui:widget": "password"
+        },
+        "priv_password": {
+          "ui:widget": "password"
+        }
+      },
+      "ui:help": "Changing protocol or security level discards credentials that no longer apply. Switching back requires entering those credentials again."
     }
   }
 }

@@ -4,8 +4,6 @@ package vnodes
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 	"strings"
 	"time"
 
@@ -108,33 +106,4 @@ func ConfiguredGUIDKey(value string) (string, error) {
 		}
 	}
 	return canonical, nil
-}
-
-// ValidateConfiguredSet validates configured vnodes and their set-wide
-// hostname and GUID uniqueness deterministically.
-func ValidateConfiguredSet(initial map[string]*VirtualNode) error {
-	seenHostnames := make(map[string]string)
-	seenGUIDs := make(map[string]string)
-	for _, id := range slices.Sorted(maps.Keys(initial)) {
-		vnode := initial[id]
-		if vnode == nil {
-			return fmt.Errorf("configured vnode %q is nil", id)
-		}
-		if vnode.Name != id {
-			return fmt.Errorf("configured vnode %q identity differs from its map key", id)
-		}
-		guidKey, err := validateConfigured(vnode)
-		if err != nil {
-			return fmt.Errorf("configured vnode %q: %w", id, err)
-		}
-		if other, ok := seenHostnames[vnode.Hostname]; ok {
-			return fmt.Errorf("duplicate configured vnode hostname %q (%s and %s)", vnode.Hostname, other, id)
-		}
-		if other, ok := seenGUIDs[guidKey]; ok {
-			return fmt.Errorf("duplicate configured vnode GUID (%s and %s)", other, id)
-		}
-		seenHostnames[vnode.Hostname] = id
-		seenGUIDs[guidKey] = id
-	}
-	return nil
 }

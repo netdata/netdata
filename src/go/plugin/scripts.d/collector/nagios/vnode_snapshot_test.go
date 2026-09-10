@@ -28,7 +28,7 @@ func TestNamedVnodeSnapshotMatchesRunningCheck(t *testing.T) {
 		GUID:     "11111111-1111-1111-1111-111111111111",
 		Labels:   map[string]string{"_address": "192.0.2.1", "_alias": "old-alias", "site": "old", "removed": "value"},
 	}
-	configuration, err := discovery.NewVNodeConfigurationWithInitial(map[string]*vnodes.VirtualNode{"router": initial})
+	configuration, err := discovery.NewVNodeConfigurationWithInitial(map[string]*vnodes.Config{"router": &vnodes.Config{VirtualNode: *initial}})
 	require.NoError(t, err)
 	publisher := hostoutput.New()
 	publisher.Bind(configuration.Definition)
@@ -81,7 +81,7 @@ func TestNamedVnodeSnapshotMatchesRunningCheck(t *testing.T) {
 	updated.GUID = "22222222-2222-2222-2222-222222222222"
 	updated.Hostname = "new"
 	updated.Labels = map[string]string{"_address": "192.0.2.2", "_alias": "new-alias", "site": "new", "added": "value"}
-	prepared, err := configuration.PrepareUpsert("router", 1, updated)
+	prepared, err := configuration.PrepareUpsert("router", 1, &vnodes.Config{VirtualNode: *updated})
 	require.NoError(t, err)
 	_, err = prepared.Commit()
 	require.NoError(t, err)
