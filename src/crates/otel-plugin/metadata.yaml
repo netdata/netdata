@@ -236,6 +236,27 @@ modules:
                   "redis.cpu.time":
                     - dimension_attribute_key: state
     troubleshooting:
+      errors:
+        list:
+          - error: "`failed to bind gRPC endpoint 127.0.0.1:4317: Address already in use (os error 98)`"
+            when: |
+              Logged in the Agent journal at startup by the `otel-plugin/ingestor` worker, followed by `exited with error code 1 and haven't collected any data. Disabling it.` from the Agent.
+            cause: |
+              Another process already listens on the configured endpoint. Typical sources are a standalone OpenTelemetry Collector on the same host, or several Netdata Agents running in containers that share the host network namespace (`--network host`), where only one of them can own `127.0.0.1:4317`. The plugin binds the endpoint before it advertises anything, so on a conflict it exits once and the Agent disables it until the next Agent restart.
+            fix: |
+              Find the owner with `ss -ltnp 'sport = :4317'`. Then either stop that listener, or give this Agent its own endpoint in `otel.yaml` and point every OTLP sender at the new port (avoid `4318`, the conventional OTLP/HTTP port, which this plugin does not serve):
+
+              ```yaml
+              endpoint:
+                path: 127.0.0.1:14317
+              ```
+
+              When several Agents share one network namespace and only one needs to receive OTLP, disable the plugin on the others in `netdata.conf`:
+
+              ```ini
+              [plugins]
+                otel = no
+              ```
       problems:
         list:
           - name: The plugin does not start
