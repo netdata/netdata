@@ -2412,7 +2412,7 @@ static void hyperv_reconcile_instances(hyperv_perf_item *item)
         memcpy(&state, value, sizeof(state));
         if (state.last_seen != item->generation && ++state.missing_cycles >= HYPERV_MISSING_CYCLES) {
             item->cleanup(value);
-            dictionary_del(item->instance, p_dfe.name);
+            dictionary_del(item->instance, value_dfe.name);
         }
         else if (state.missing_cycles != 0) {
             memcpy((char *)value + offsetof(struct hyperv_instance_state, missing_cycles),
