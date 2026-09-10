@@ -68,10 +68,10 @@ Once inspection locates the affected stage, read only the relevant subsystem det
 
 | Question | Owner sections |
 |---|---|
-| Why this profile or value? | `src/go/plugin/go.d/collector/snmp/profile-format.md#1-selector`, `src/go/plugin/go.d/collector/snmp/profile-format.md#2-extends`, `src/go/plugin/go.d/collector/snmp/profile-format.md#value-transformation` |
-| Why a missing, combined, or derived sample? | `src/go/tools/snmp-diagnostics/README.md#acquisition-processing-and-samples`, `src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows`, `src/go/plugin/go.d/collector/snmp/profile-format.md#virtual-metrics`, `src/go/plugin/go.d/collector/snmp/profile-format.md#chart-metadata` |
+| Why this profile or value? | `src/go/plugin/go.d/collector/snmp/ARCHITECTURE.md#profile-selection`, `src/go/plugin/go.d/collector/snmp/profile-format.md#1-selector`, `src/go/plugin/go.d/collector/snmp/profile-format.md#2-extends`, `src/go/plugin/go.d/collector/snmp/profile-format.md#value-transformation` |
+| Why a missing, combined, or derived sample? | `src/go/tools/snmp-diagnostics/README.md#acquisition-processing-and-samples`, `src/go/plugin/go.d/collector/snmp/ARCHITECTURE.md#metric-emission`, `src/go/plugin/go.d/collector/snmp/profile-format.md#virtual-metrics`, `src/go/plugin/go.d/collector/snmp/profile-format.md#chart-metadata` |
 | Were these inputs refreshed? | `src/go/tools/snmp-diagnostics/README.md#cached-inputs-and-earlier-outcomes` |
-| Why this BGP peer state or licensing result? | `src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows`, `src/go/plugin/go.d/collector/snmp/profile-format.md#licensing-rows`, `src/go/tools/snmp-diagnostics/README.md#cached-state-versus-function-output` |
+| Why this BGP peer state or licensing result? | `src/go/plugin/go.d/collector/snmp/ARCHITECTURE.md#bgp-collection-and-retained-rows`, `src/go/plugin/go.d/collector/snmp/ARCHITECTURE.md#licensing-normalization-and-collection-results`, `src/go/tools/snmp-diagnostics/README.md#cached-state-versus-function-output` |
 | Why these topology observations or refresh state? | `src/go/plugin/go.d/collector/snmp/profile-format.md#41-topology`, `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#topology-profile-composition`, `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#refresh-loop` |
 | Why was a topology actor/link changed or filtered? | `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#graph-build-order` |
 

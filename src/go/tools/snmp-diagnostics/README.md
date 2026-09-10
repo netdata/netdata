@@ -101,12 +101,11 @@ samples together. A `phase: check` attempt records initialization/check evidence
 there is expected. These boundaries are implemented by `finishNormalAttempt` and `Check` in the SNMP collector.
 
 Acquisition `MetricValueReferences` describe values before normalization, duplicate selection, virtual-metric
-derivation,
-and hidden-metric filtering. Their ordinals are not indexes into the final `profiles[].metrics` slice. The profile
-metrics describe a later processing stage; `metric_decisions.sample_ids` links collector emission decisions to the final
-`samples` map. Several decisions can target the same sample. See the profile guide's
-[table metric rules](../../plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows) for row identity
-and accumulation, and its [virtual metrics](../../plugin/go.d/collector/snmp/profile-format.md#virtual-metrics) section
+derivation, and hidden-metric filtering. Their ordinals are not indexes into the final `profiles[].metrics` slice.
+Profile metrics describe a later processing stage; `metric_decisions.sample_ids` links collector emission decisions to
+the final `samples` map. Several decisions can target the same sample. See the collector architecture's [metric
+emission](../../plugin/go.d/collector/snmp/ARCHITECTURE.md#metric-emission) section for row identity and accumulation,
+and the profile guide's [virtual metrics](../../plugin/go.d/collector/snmp/profile-format.md#virtual-metrics) section
 for derived values. The acquisition boundary is defined by `AcquisitionValueReference` in
 `ddsnmp/ddsnmpcollector/acquisition_report.go` under the SNMP collector.
 
@@ -126,10 +125,10 @@ never tried. This is retained negative evidence, not a history of every disappea
 
 Normal inspection copies stored BGP and licensing state through `captureNormalBGP` and `captureNormalLicensing`; it
 does not run their Function handlers. For licensing, `normalized_at` dates the stored normalized set. Interpret that
-state using the profile guide's consumer rules:
+state using the collector architecture's consumer rules:
 
-- [BGP collection and retained rows](../../plugin/go.d/collector/snmp/profile-format.md#bgp-collection-and-retained-rows)
-- [Licensing normalization and collection results](../../plugin/go.d/collector/snmp/profile-format.md#licensing-normalization-and-collection-results)
+- [BGP collection and retained rows](../../plugin/go.d/collector/snmp/ARCHITECTURE.md#bgp-collection-and-retained-rows)
+- [Licensing normalization and collection results](../../plugin/go.d/collector/snmp/ARCHITECTURE.md#licensing-normalization-and-collection-results)
 
 ### Topology replay and inspection
 
