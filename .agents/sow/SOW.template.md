@@ -198,7 +198,8 @@ Deferred clean-end-state remainder:
 Tests or equivalent validation:
 
 - <command/output summary; for reviewer-reported bugs, the failing regression test or the reason automation is
-  impractical plus observable before/after reproduction evidence and any remaining gap.>
+  impractical plus observable reproduction evidence; record the post-fix passing result or non-reproduction evidence
+  from rerunning the same test/reproducer, and explicitly state any remaining validation gap.>
 
 Real-use evidence:
 

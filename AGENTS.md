@@ -256,7 +256,7 @@ Create or reuse a SOW for non-trivial changes:
 - feature work; bug fixes with behavioral impact; refactors; migrations; regressions;
 - documentation or content changes with product/business impact; spec hygiene; project skill changes;
 - process changes; collector changes; packaging, install, or deployment changes;
-- PR review iteration; static analysis triage that changes source, docs, or project policy;
+- PR review iteration or static analysis triage that changes source, docs, or project policy;
 - any intended change with unclear risk.
 
 Trivial work needs no SOW: typo fixes; formatting-only changes; mechanical renames with no behavior change; simple
@@ -404,8 +404,10 @@ Review findings are leads until verified against the shipped code and its contra
   MUST NOT extend the review cycle by themselves.
 - Reproduce a reviewer-reported bug as a FAILING automated regression test before fixing it when feasible. If
   automation is impractical, record why and use concrete observable evidence, such as an executable reproducer,
-  build failure, hardware observation, or incorrect documented behavior. Verify the same failure after the fix;
-  record any remaining validation gap rather than claiming it was tested. Speculation alone is not reproduction.
+  build failure, hardware observation, or incorrect documented behavior. After the fix, rerun the same test or
+  reproducer and confirm the failure no longer occurs. Record the passing result or non-reproduction evidence;
+  if verification is unavailable or incomplete, record the gap instead of claiming success. Speculation alone is
+  not reproduction.
 - Multi-round review: when Git operations are authorized under "Git And PR Workflow", checkpoint-commit each
   validated change (specific files only) before its review and squash at PR time only if history rewriting is
   explicitly approved. Otherwise review the working-tree diff, preserve a record of the reviewed state, and report

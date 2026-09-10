@@ -49,8 +49,10 @@ implementation.
 ## Knowledge Capture
 
 - For answer-only questions, deliver the requested answer. If the work reveals a reusable, evidence-backed recipe
-  not already documented, you MUST preserve it in a sanitized local follow-up note for separately authorized
-  documentation work. If no writable workspace is available, include the sanitized follow-up in the response.
+  not already documented, you MUST preserve a sanitized note with the finding, supporting evidence, and proposed
+  owning guide. In a repository checkout, use `<repo-root>/.local/audits/<subject>/followups.md`, reusing this skill's
+  audit directory when available. Outside a checkout, use an appropriate local workspace. If no writable workspace
+  is available, include the sanitized follow-up in the response instead.
 - Briefly report reusable documentation discoveries and proposed updates in the answer-only final response, even
   when recorded locally. Obtain authorization before those guide edits; do not delay the answer while awaiting it.
 - During authorized implementation, you MUST update this skill or its guides for reusable, evidence-backed
