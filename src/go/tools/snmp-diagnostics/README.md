@@ -26,7 +26,8 @@ go run ./tools/snmp-diagnostics inspect-link --input /path/to/archive.zst \
 The input can be a single diagnostic `.zst` file, the `snmp/diagnostics` directory, an extracted support-bundle
 root, or a support `.tar.zst`, `.tar.gz`, or `.zip` archive. Bundle inputs automatically use `06-state/snmp-diagnostics`.
 Archives may contain that layout directly or under one wrapper directory; ambiguous roots, duplicate relevant members,
-unsafe paths, and linked evidence are rejected. The tool does not extract files.
+unsafe paths, and linked evidence are rejected. The tool does not extract files. Directory inputs confine reads to the
+supplied directory tree; relative symlinks that stay within that tree are allowed.
 
 Directory and bundle input selects the latest topology checkpoint by default. `--checkpoint N` selects a retained
 sequence; `--lifecycle` selects lifecycle state; `--normal --registration-id N` selects a normal device. These evidence
@@ -104,8 +105,9 @@ The tool retains member metadata and collection-status/run-index contents, not d
 inner document is decoded. Tar inventory checks the outer compression stream; ZIP checks the members it reads. Neither
 listing nor validating one selected document is a validation of every file in the support bundle.
 
-Exit codes are `0` for success (including a partial listing with component errors), `1` for input or operation failure,
-and `2` for invalid command-line usage.
+Exit codes are `0` for success (including a partial listing with component errors), `1` for evidence-selection, input, or
+operation errors, and `2` for command/flag parsing and argument-validation errors. Evidence-selector conflicts such as
+`--lifecycle --normal`, or `--previous-run` without `--normal`, return `1`.
 
 ## Collection cost
 

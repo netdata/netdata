@@ -15,10 +15,11 @@ import (
 )
 
 type diagnosticInput struct {
-	root   fs.FS
-	file   *os.File
-	bundle *bundleFS
-	report *bundleReport
+	root      fs.FS
+	directory *os.Root
+	file      *os.File
+	bundle    *bundleFS
+	report    *bundleReport
 }
 
 type bundleReport struct {
@@ -41,16 +42,24 @@ func openInput(filename string) (*diagnosticInput, error) {
 	}
 	input := &diagnosticInput{}
 	if info.IsDir() {
-		root := os.DirFS(filename)
+		directory, err := os.OpenRoot(filename)
+		if err != nil {
+			return nil, err
+		}
+		input.directory = directory
+		// Confine evidence and metadata through the same owned directory handle.
+		root := directory.FS()
 		for _, marker := range []string{"MANIFEST.json", bundleStatusPath, bundleDiagnosticPath} {
 			if _, err := fs.Stat(root, marker); err == nil {
 				input.root, err = fs.Sub(root, bundleDiagnosticPath)
 				if err != nil {
+					directory.Close()
 					return nil, err
 				}
 				input.report = readBundleReport(root, ".")
 				return input, nil
 			} else if !errors.Is(err, fs.ErrNotExist) {
+				directory.Close()
 				return nil, err
 			}
 		}
@@ -92,6 +101,9 @@ func readBundleReport(root fs.FS, prefix string) *bundleReport {
 }
 
 func (input *diagnosticInput) Close() error {
+	if input.directory != nil {
+		return input.directory.Close()
+	}
 	if input.bundle != nil {
 		return input.bundle.Close()
 	}
