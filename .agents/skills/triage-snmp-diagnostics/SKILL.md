@@ -62,6 +62,21 @@ Topology summaries identify registrations. For normal evidence, select a run fro
 from its normal summary; a lifecycle inventory can help only after its producer run matches. Do not require a topology
 checkpoint to investigate normal metrics, BGP, or licensing.
 
+## Explain The Collector Result
+
+Once inspection locates the affected stage, read only the relevant subsystem details:
+
+| Question | Owner sections |
+|---|---|
+| Why this profile or value? | `src/go/plugin/go.d/collector/snmp/profile-format.md#1-selector`, `src/go/plugin/go.d/collector/snmp/profile-format.md#2-extends`, `src/go/plugin/go.d/collector/snmp/profile-format.md#value-transformation` |
+| Why a missing, combined, or derived sample? | `src/go/tools/snmp-diagnostics/README.md#acquisition-processing-and-samples`, `src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows`, `src/go/plugin/go.d/collector/snmp/profile-format.md#virtual-metrics`, `src/go/plugin/go.d/collector/snmp/profile-format.md#chart-metadata` |
+| Were these inputs refreshed? | `src/go/tools/snmp-diagnostics/README.md#cached-inputs-and-earlier-outcomes` |
+| Why this BGP peer state or licensing result? | `src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows`, `src/go/plugin/go.d/collector/snmp/profile-format.md#licensing-rows`, `src/go/tools/snmp-diagnostics/README.md#cached-state-versus-function-output` |
+| Why these topology observations or refresh state? | `src/go/plugin/go.d/collector/snmp/profile-format.md#41-topology`, `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#topology-profile-composition`, `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#refresh-loop` |
+| Why was a topology actor/link changed or filtered? | `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#graph-build-order` |
+
+These sections identify consumer source symbols where code inspection is needed.
+
 ## Trace And Compare
 
 - Work from the affected output back to its recorded inputs. Inspect the relevant profile, row, metric, or peer before

@@ -208,6 +208,14 @@ selector:
 - A profile is applied if **at least one rule** in the `selector` list matches the device.
 - If both `sysobjectid` and `sysdescr` are defined within the same rule, **both must succeed**.
 
+For normal SNMP collection, `setupProfiles` uses `manual_profiles` only when `sysObjectID` is empty. A non-empty but
+unmatched `sysObjectID` does not fall back to that list. After catalog matching, consumer projection keeps metrics,
+BGP, and licensing definitions for normal collection; topology has its own
+[composition](#stock-topology-composition).
+A matched profile with no data for the requested consumer can disappear from that consumer's collection set. When
+investigating selection, compare the captured profile context's selected profiles and projection, not only profile
+names.
+
 **Supported conditions**:
 
 | Key                   | What It Checks                       | Match Criteria (Pass)                            | Fails When...                   |
@@ -786,8 +794,14 @@ ifHCInOctets.2 = 2048
 - `.1`, `.2`, … are `row indexes` that identify the instance (e.g., interface #1, interface #2).
 - Each column (symbol) in the table has its own OID pattern but shares the same row indexes.
 
-> Table metrics **must define at least one tag** (`metric_tags`) to identify each row.
-> Without tags, only a single row can be emitted.
+The normal SNMP collector skips a table metric when its resolved tag map is empty. To keep rows distinct, provide
+non-empty identifying tag values; the SNMP row index is not automatically part of the emitted series identity.
+
+The collector's `tableMetricKey` combines the metric name with non-empty public tag values, ordered by tag key.
+[Underscore-prefixed tags](#underscore-prefixed-tags) do not distinguish chart IDs. Rows that reach
+`collectProfileTableMetrics` with the same key accumulate their ordinary numeric values into one sample; multi-value
+mapped dimensions use assignment instead. A captured row can therefore be present without having a distinct chart
+series, and a final sample can combine several rows.
 
 ```yaml
 metrics:
@@ -2433,6 +2447,24 @@ bgp:
           symbol: { OID: 1.3.6.1.4.1.99999.10.1.8, name: vendorBgpPeerOutUpdates }
 ```
 
+### BGP collection and retained rows
+
+The acquisition layer admits a typed BGP row only when it has a signal and the identity required by its row kind.
+`bgpRowHasSignals` and `bgpRowIdentityComplete` in `ddsnmp/ddsnmpcollector/collector_bgp.go` define this boundary.
+Receiving an identity OID alone does not establish a peer. Successful rows can survive errors elsewhere in the same
+profile; the profile-level BGP result can succeed while acquisition/processing reports contain failures.
+
+The normal collector's `bgpIntegration.prepareProfileMetrics` updates peer state from returned profile results. A
+returned profile with `BGPCollectError` keeps its previous source-owned peers as stale and contributes no current typed
+BGP chart metrics. Sources without that error replace their peer rows, including after partial success. Profiles omitted
+before reaching this BGP consumer do not automatically receive this retention behavior. A top-level SNMP collection
+error leaves the previous peer cache and marks collection failed instead of refreshing it.
+
+`bgpPeerCache` applies a failure-associated freshness window to retained rows: age by itself does not mark successful
+peer data stale. Function requests can suppress expired failed-source entries or report the data unavailable. Compare
+source failures and per-entry update times as well as the overall cache time; retained peer state does not imply a
+successful current measurement.
+
 ## Licensing rows
 
 The SNMP collector ships a **shared device-level licensing pipeline** that
@@ -2530,6 +2562,29 @@ licensing:
             format: snmp_dateandtime
           sentinel: [timer_pre_1971]
 ```
+
+### Licensing normalization and collection results
+
+The normal collector converts typed profile rows through `licenseRowFromTyped` in `licensing.go`. A row needs an
+identity and at least one typed signal; vendor text or perpetual/unlimited descriptors alone are insufficient.
+Remaining-duration signals become absolute expiry times at normalization. `deriveLicenseUsage` can fill missing used
+capacity from capacity minus available, when available is within that capacity, and derive a missing percentage from
+used/capacity when capacity is positive and the license is not unlimited.
+
+The normalized state bucket is not simply the raw vendor text or numeric severity. `normalizeLicenseStateBucket` in
+`licensing_state.go` gives an ignored raw classification priority; otherwise an expired applicable timer or exhausted
+finite usage is broken, and unexpired grace is degraded. An informational raw classification then takes priority over
+typed severity; other rows use typed severity when present, followed by raw-state and signal-based fallbacks.
+
+Charts aggregate the accepted normalized rows through `aggregateLicenseRows` in `licensing_aggregate.go`: state charts
+count rows by bucket, timer charts use the minimum remaining time for each timer kind, and usage uses the maximum
+rounded percentage. Ignored rows contribute only state counts; perpetual expiry and unlimited usage are excluded from
+the corresponding timer/usage aggregates. These charts do not describe one selected license from the drill-down.
+
+Whenever `licensingIntegration.collect` runs, it replaces the cached set, including with empty or partial results.
+A top-level SNMP error returns before this consumer runs and leaves the old set intact. Licensing has no BGP-style
+failure-expiry gate. The `snmp:licenses` Function uses stored state buckets but computes displayed remaining time at
+request time; its timer and bucket can therefore reflect different evaluation times until the next normalization.
 
 ### Parsing vendor expiry dates
 

@@ -93,6 +93,44 @@ Match a source reference's `context_id` and `operation` to a source operation's 
 keys belong to one runtime; producer run ID and runtime ID qualify cross-file comparisons. Normal inspection does not
 replay chart creation or reconstruct the Agent's time-series history.
 
+#### Acquisition, processing, and samples
+
+A normal attempt's `failed` flag includes source-operation and profile-processing failures, even when collection
+returned usable samples from other work. It is not an all-or-nothing poll result. Inspect the recorded failures and
+samples together. A `phase: check` attempt records initialization/check evidence but no sample map; absence of samples
+there is expected. These boundaries are implemented by `finishNormalAttempt` and `Check` in the SNMP collector.
+
+Acquisition `MetricValueReferences` describe values before normalization, duplicate selection, virtual-metric
+derivation,
+and hidden-metric filtering. Their ordinals are not indexes into the final `profiles[].metrics` slice. The profile
+metrics describe a later processing stage; `metric_decisions.sample_ids` links collector emission decisions to the final
+`samples` map. Several decisions can target the same sample. See the profile guide's
+[table metric rules](../../plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows) for row identity
+and accumulation, and its [virtual metrics](../../plugin/go.d/collector/snmp/profile-format.md#virtual-metrics) section
+for derived values. The acquisition boundary is defined by `AcquisitionValueReference` in
+`ddsnmp/ddsnmpcollector/acquisition_report.go` under the SNMP collector.
+
+#### Cached inputs and earlier outcomes
+
+A route's cache source does not imply old metric values: cached table structure can supply the OIDs for a fresh GET.
+`Reused` instead marks an entire route outcome inherited from an earlier attempt. Cached profile tags and metadata can
+therefore coexist with newly acquired metric values. Consult operation timestamps and bindings rather than dating
+all fields from the route's source label. `AcquisitionRouteReport` defines this distinction.
+
+`DiscardedSources` records rejected acquisition candidates, such as a cached GET replaced by a WALK; those operations
+are not the accepted value source. `negative_causes` preserves original missing-OID evidence for configured sources
+whose requests are subsequently suppressed. An absent request in the latest attempt alone does not mean the OID was
+never tried. This is retained negative evidence, not a history of every disappearing table instance.
+
+#### Cached state versus Function output
+
+Normal inspection copies stored BGP and licensing state through `captureNormalBGP` and `captureNormalLicensing`; it
+does not run their Function handlers. For licensing, `normalized_at` dates the stored normalized set. Interpret that
+state using the profile guide's consumer rules:
+
+- [BGP collection and retained rows](../../plugin/go.d/collector/snmp/profile-format.md#bgp-collection-and-retained-rows)
+- [Licensing normalization and collection results](../../plugin/go.d/collector/snmp/profile-format.md#licensing-normalization-and-collection-results)
+
 ### Topology replay and inspection
 
 For topology, `summary` reports captured cuts and an ordered registration inventory. `replay` emits the production
