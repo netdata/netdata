@@ -3,12 +3,17 @@
 This source-only maintainer tool reads built-in SNMP diagnostic files: topology, lifecycle, and normal per-device
 metrics/BGP/licensing evidence. Topology replay and inspection use the collector's production paths. It is run from the repository and is not installed with the Netdata Agent.
 
+**Place in the documentation set.** This README owns the maintainer CLI interface and output interpretation.
+The developer skill `.agents/skills/triage-snmp-diagnostics/SKILL.md` links to its sections for the investigation
+workflow.
+
 > Diagnostic archives can contain device addresses, hostnames, descriptions, inventory data, and topology evidence.
 > Treat an archive and the tool output as sensitive support material.
 
 ## Usage
 
-Run commands from `src/go`:
+Run commands from `src/go`. Every successful operation writes one JSON document to standard output; `validate` checks
+the selected diagnostic document and reports its identity.
 
 ```text
 go run ./tools/snmp-diagnostics validate --input /path/to/archive.zst
@@ -22,6 +27,8 @@ go run ./tools/snmp-diagnostics inspect-link --input /path/to/archive.zst \
   --family lldp \
   --direction bidirectional
 ```
+
+### Input selection
 
 The input can be a single diagnostic `.zst` file, the `snmp/diagnostics` directory, an extracted support-bundle
 root, or a support `.tar.zst`, `.tar.gz`, or `.zip` archive. Bundle inputs automatically use `06-state/snmp-diagnostics`.
@@ -43,6 +50,8 @@ go run ./tools/snmp-diagnostics inspect-device --input /path/to/support-bundle.t
 go run ./tools/snmp-diagnostics replay --input /path/to/support-bundle.tar.zst
 ```
 
+### Collection status and partial listings
+
 `list` takes a directory or bundle without selectors and reports lifecycle availability, topology checkpoints, and indexed
 normal device files without decoding evidence documents. Bundle listings also include `bundle.collection_status`: the
 producer's original collection notes, including why evidence was not requested, unavailable, or partially copied. A
@@ -54,17 +63,43 @@ an invalid normal-run index does not hide topology or lifecycle evidence. Normal
 index; it never guesses current/previous from directory names. A missing index yields no indexed normal devices.
 A selected missing or invalid document fails; the tool does not silently substitute another checkpoint or evidence kind.
 
-Normal files support `validate`, `summary`, and `inspect-device`; replay and link inspection require topology evidence.
+### Normal device evidence
+
+Normal files support `validate`, `summary`, and `inspect-device`; replay and link inspection require topology
+evidence.
 Normal `inspect-device` reports the latest attempt, retained last failure, metric samples, BGP/licensing cache state,
 profile context, and linked source operations. Cached values may originate in an earlier attempt. Compare their source
 and observation timestamps; publication time is not the time every value was collected. Device registration IDs belong to
 a process run, so do not join current lifecycle rows to previous-run normal files or historical topology by ID alone.
 
-Every successful operation writes one JSON document to standard output. `validate` verifies the complete archive and
-reports its identity. `summary` reports the captured cuts and an ordered registration inventory. `replay` emits the
-production topology-v1 payload. The inspection operations report one device or link across captured evidence, graph, and
-rendered topology stages. Link reports also include family-wide source context; that context is not causal provenance for
-the inspected link.
+A normal `summary` identifies one device and gives counts and failure indicators; use `inspect-device` for the
+underlying attempts and evidence. The inspection body is `NormalDevice` from
+`src/go/plugin/go.d/collector/snmp/diagnostics/normal.go`; its producer identity is available through `validate` or
+`summary`. Keep that identity with the inspection report when comparing runs.
+
+The attempt-level fields below live under `latest_attempt` or `last_failed_attempt`; `profile_context`,
+`initialization_sources`, and `source_operations` are device-level fields.
+
+| Evidence | Interpretation |
+|---|---|
+| `latest_attempt` / `last_failed_attempt` | Latest completed attempt and a retained failure; their timestamps qualify any comparison. |
+| `profiles` / `profile_context` | Captured profile selection, acquisition results, processed metrics, and profile rows. |
+| `metric_decisions` / `samples` | Decisions linking processed metrics to sample IDs, and the emitted sample values. |
+| `bgp_cache` / `licensing_cache` | Captured normal-collector state, its update/normalization timestamps, and source references. |
+| `cache_inputs` / `initialization_sources` | Retained inputs that may predate the latest attempt. |
+| `source_operations` | The operation table used by the source references in this device cut. |
+
+Match a source reference's `context_id` and `operation` to a source operation's `context_id` and `ordinal`. Operation
+keys belong to one runtime; producer run ID and runtime ID qualify cross-file comparisons. Normal inspection does not
+replay chart creation or reconstruct the Agent's time-series history.
+
+### Topology replay and inspection
+
+For topology, `summary` reports captured cuts and an ordered registration inventory. `replay` emits the production
+topology-v1 payload. Inspection reports one device or link across captured evidence, graph, and rendered topology
+stages. Link reports also include family-wide source context; that context is not causal provenance for the inspected
+link. Stage availability and retained-success/latest-attempt interpretation are explained in
+[Offline Diagnostic Inspection](../../plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#offline-diagnostic-inspection).
 
 Use `summary` to find a device registration ID. Use `--link-index` to inspect one existing link by its zero-based row in
 the `links` table emitted by `replay`. The index belongs to that archive and query option set; do not reuse it with a
@@ -88,6 +123,8 @@ Replay and inspection accept the production scalar query options:
 --depth all|0..10
 ```
 
+### Read limits and container cost
+
 Decode operations accept human-readable limits for the **selected diagnostic document** (128 MiB compressed and
 512 MiB decoded JSON by default). They can be overridden for a particular invocation:
 
@@ -104,6 +141,8 @@ bundle root avoids those scans.
 The tool retains member metadata and collection-status/run-index contents, not diagnostic payloads. Only the selected
 inner document is decoded. Tar inventory checks the outer compression stream; ZIP checks the members it reads. Neither
 listing nor validating one selected document is a validation of every file in the support bundle.
+
+### Exit codes
 
 Exit codes are `0` for success (including a partial listing with component errors), `1` for evidence-selection, input, or
 operation errors, and `2` for command/flag parsing and argument-validation errors. Evidence-selector conflicts such as

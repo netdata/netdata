@@ -9,8 +9,9 @@ internals: runtime order, package boundaries, the graph build, the diagnostic
 tooling, and the validation commands. What the emitted payload means is owned
 by `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` (its SNMP/L2 Shape
 section); the SNMP profile `topology:` rows are owned by the SNMP profile format
-and the `collectors-snmp-profiles` project skill. The project skill
-`.agents/skills/topology-authoring/SKILL.md` cites sections of this document by
+and the `collectors-snmp-profiles` project skill. The project skills
+`.agents/skills/topology-authoring/SKILL.md` and
+`.agents/skills/triage-snmp-diagnostics/SKILL.md` cite sections of this document by
 heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer
 exists, so renaming or removing a heading here updates the skill in the same
 change.
@@ -806,19 +807,13 @@ features.
 
 ## Maintainer Diagnostic Tool
 
-`src/go/tools/snmp-diagnostics` is a source-only, read-only command run with `go run`; it is not installed with the Agent.
+`src/go/tools/snmp-diagnostics` is the source-only, read-only maintainer command; it is not installed with the Agent.
+The [tool README](../../../../tools/snmp-diagnostics/README.md#usage) owns supported inputs, selectors, operations, and
+output interpretation, including direct support-bundle access and lifecycle selection.
 
-- `list` reports retained topology checkpoints and indexed normal-device files in a directory without decoding them.
-- `validate` and `summary` read a selected topology, lifecycle, or normal document.
-- `inspect-device` exposes lifecycle/topology stages or a normal device's attempts and cache/source lineage.
-- `replay` emits the production topology-v1 payload, and `inspect-link` inspects an existing replay index or candidate
-  identity selector. Both require topology evidence.
-
-Directory input selects the newest topology checkpoint unless explicit selectors choose a checkpoint or a normal device
-in the current/previous run. Lifecycle inspection uses its file path explicitly. The command uses the shared diagnostic
-codec and the topology facade, with no second replay engine, daemon, or network service. Topology query defaults come
-from production; invalid query selectors fail. Successful operations emit one JSON document. Reports remain sensitive;
-the command does not sanitize or upload them. See the [tool README](../../../../tools/snmp-diagnostics/README.md).
+The command uses the shared diagnostic codec and topology facade, with no second replay engine, daemon, or network
+service. Topology query defaults come from production. Reports remain sensitive; the command does not sanitize or
+upload them.
 
 ## Trap Enrichment
 
