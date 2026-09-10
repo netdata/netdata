@@ -224,7 +224,8 @@ collect_state
 ''')
         inventory = (self.root / 'work/06-state/state-tree.txt').read_text()
         self.assertNotIn('SENTINEL', inventory)
-        self.assertIn('files:', inventory)
+        self.assertIn('files: 1\n', inventory)
+        self.assertIn('logical bytes: 12\n', inventory)
 
 
 if __name__ == '__main__':

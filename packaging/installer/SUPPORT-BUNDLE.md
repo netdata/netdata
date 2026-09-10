@@ -412,8 +412,9 @@ Two passes, one sweep, applied to **every** collected file:
    - `[<UUID>]` section headers, which are API keys or machine GUIDs — **except
      in `stream.conf`**, where they are kept (see "The streaming API key
      exception");
-   - `bearer_tokens/` directory listings show a file COUNT only — the
-     filenames are the tokens.
+   - Unix state inventory reports aggregate file counts and sizes without
+     filenames. In particular, `bearer_tokens/` filenames are live tokens and
+     must not appear in inventory output.
 2. **PII — on by default, `--no-obfuscate` / `-NoObfuscate` to disable:**
    - non-loopback IPv4 addresses → `ip-N` and IPv6 → `ip6-N` (stable per
      bundle; compressed, lettered, and numeric-only uncompressed forms;
