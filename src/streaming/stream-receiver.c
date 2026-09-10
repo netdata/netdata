@@ -717,7 +717,7 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
     usec_t idle_ut = rpt->thread.last_traffic_ut ?
         clocks_usec_delta_or_zero(now_monotonic_usec(), rpt->thread.last_traffic_ut) : 0;
     long long idle_s = (long long)(idle_ut / USEC_PER_SEC);
-    double repl_pct = rpt->host ? rpt->host->stream.rcv.status.replication.percent : 0.0;
+    double repl_pct = rpt->host ? (double)rrdhost_receiver_replication_completion(rpt->host, NULL) : 0.0;
 
     errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -1342,9 +1342,7 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
 static void stream_receiver_replication_reset(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
-            rrdhost_receiver_replicating_charts_minus_one(host);
+        rrdhost_receiver_replication_release(st, 0);
 
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_UNKNOWN;
@@ -1364,6 +1362,9 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     __atomic_store_n(&host->stream.rcv.status.replication.counter_in, 0, __ATOMIC_RELAXED);
     __atomic_store_n(&host->stream.rcv.status.replication.counter_out, 0, __ATOMIC_RELAXED);
     __atomic_store_n(&host->stream.rcv.status.replication.backfill_pending, 0, __ATOMIC_RELAXED);
+
+    // the completion cohort belongs to the connection generation that just ended
+    rrdhost_receiver_replicating_charts_started_zero(host);
 }
 
 RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
