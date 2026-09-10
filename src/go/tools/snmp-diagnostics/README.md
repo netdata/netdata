@@ -23,20 +23,37 @@ go run ./tools/snmp-diagnostics inspect-link --input /path/to/archive.zst \
   --direction bidirectional
 ```
 
-The input can be a single `.zst` file or the `snmp/diagnostics` directory (including the copy under
-`06-state/snmp-diagnostics` in a support bundle). Directory input selects the latest topology checkpoint by default;
-`--checkpoint N` selects a retained sequence. Select `lifecycle.zst` explicitly to inspect lifecycle state.
-Only the current diagnostic layout is supported.
+The input can be a single diagnostic `.zst` file, the `snmp/diagnostics` directory, an extracted support-bundle
+root, or a support `.tar.zst`, `.tar.gz`, or `.zip` archive. Bundle inputs automatically use `06-state/snmp-diagnostics`.
+Archives may contain that layout directly or under one wrapper directory; ambiguous roots, duplicate relevant members,
+unsafe paths, and linked evidence are rejected. The tool does not extract files. Directory inputs confine reads to the
+supplied directory tree; relative symlinks that stay within that tree are allowed.
+
+Directory and bundle input selects the latest topology checkpoint by default. `--checkpoint N` selects a retained
+sequence; `--lifecycle` selects lifecycle state; `--normal --registration-id N` selects a normal device. These evidence
+selectors cannot be combined or used with an individual file. `--previous-run` requires `--normal`. Explicit lifecycle-file
+input remains supported. Only the current diagnostic layout is supported.
 
 ```text
-go run ./tools/snmp-diagnostics list --input /path/to/snmp/diagnostics
-go run ./tools/snmp-diagnostics summary --input /path/to/snmp/diagnostics --checkpoint 3
-go run ./tools/snmp-diagnostics summary --input /path/to/snmp/diagnostics/lifecycle.zst
-go run ./tools/snmp-diagnostics inspect-device --input /path/to/snmp/diagnostics --normal --registration-id 7
-go run ./tools/snmp-diagnostics inspect-device --input /path/to/snmp/diagnostics --normal --previous-run --registration-id 7
+go run ./tools/snmp-diagnostics list --input /path/to/support-bundle.tar.zst
+go run ./tools/snmp-diagnostics summary --input /path/to/support-bundle.tar.zst --checkpoint 3
+go run ./tools/snmp-diagnostics summary --input /path/to/support-bundle.tar.zst --lifecycle
+go run ./tools/snmp-diagnostics inspect-device --input /path/to/support-bundle.tar.zst --normal --registration-id 7
+go run ./tools/snmp-diagnostics inspect-device --input /path/to/support-bundle.tar.zst --normal --previous-run --registration-id 7
+go run ./tools/snmp-diagnostics replay --input /path/to/support-bundle.tar.zst
 ```
 
-`list` reports topology checkpoints and normal device files without decoding them. It takes a directory without selectors.
+`list` takes a directory or bundle without selectors and reports lifecycle availability, topology checkpoints, and indexed
+normal device files without decoding evidence documents. Bundle listings also include `bundle.collection_status`: the
+producer's original collection notes, including why evidence was not requested, unavailable, or partially copied. A
+reported `complete` means the producer copied its selected files; it does not validate their contents or establish that
+all files describe one simultaneous sample. Missing/unreadable status is `null`, with an explanation in `errors`.
+
+Listing errors for one component appear in `errors` alongside the remaining inventory, with exit code zero. For example,
+an invalid normal-run index does not hide topology or lifecycle evidence. Normal selection uses only the committed run
+index; it never guesses current/previous from directory names. A missing index yields no indexed normal devices.
+A selected missing or invalid document fails; the tool does not silently substitute another checkpoint or evidence kind.
+
 Normal files support `validate`, `summary`, and `inspect-device`; replay and link inspection require topology evidence.
 Normal `inspect-device` reports the latest attempt, retained last failure, metric samples, BGP/licensing cache state,
 profile context, and linked source operations. Cached values may originate in an earlier attempt. Compare their source
@@ -71,14 +88,26 @@ Replay and inspection accept the production scalar query options:
 --depth all|0..10
 ```
 
-Decode operations accept human-readable reader limits (128 MiB compressed and 512 MiB decoded by default). Their generous defaults are intended for normal Agent-produced
-archives and can be overridden for a particular invocation:
+Decode operations accept human-readable limits for the **selected diagnostic document** (128 MiB compressed and
+512 MiB decoded JSON by default). They can be overridden for a particular invocation:
 
 ```text
 --max-compressed-size 256MiB --max-decoded-size 1GiB
 ```
 
-Exit codes are `0` for success, `1` for archive or operation failure, and `2` for invalid command-line usage.
+These limits do not cap the size or traversal cost of the enclosing support bundle. Compressed tar input requires one
+complete streaming inventory pass, then at most one additional pass to reach the selected document. Even unrelated tar
+payloads must pass through decompression; repeated CLI invocations repeat this work. ZIP input reads central-directory
+metadata and opens relevant members directly. For repeated analysis of a large tar bundle, supplying an already extracted
+bundle root avoids those scans.
+
+The tool retains member metadata and collection-status/run-index contents, not diagnostic payloads. Only the selected
+inner document is decoded. Tar inventory checks the outer compression stream; ZIP checks the members it reads. Neither
+listing nor validating one selected document is a validation of every file in the support bundle.
+
+Exit codes are `0` for success (including a partial listing with component errors), `1` for evidence-selection, input, or
+operation errors, and `2` for command/flag parsing and argument-validation errors. Evidence-selector conflicts such as
+`--lifecycle --normal`, or `--previous-run` without `--normal`, return `1`.
 
 ## Collection cost
 
