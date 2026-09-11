@@ -47,6 +47,24 @@ must be in range, actor/link references must point to existing rows, and
 correlation rules must reference existing actor/link types and point/claim key
 columns.
 
+For direct scalar columns declaring `aggregation: "set"`, semantic validation
+accepts scalar cells and one-dimensional arrays of correctly typed members.
+Null cells and null members require `nullable: true`; empty sets are valid.
+Nested arrays and wrong-typed members are rejected with a row/member location.
+Column metadata and integer reference encoding remain unchanged. Generic JSON
+Schema validation alone does not enforce the column-to-member relationship.
+
+When changing typed-set validation, test all codecs, mixed scalar/set rows,
+member types, empty sets, nullability, nil Go slices, nested direct sets, and
+unchanged reference/array/json behavior. Validate producer-derived aggregates
+with this CLI; generic JSON Schema and optional Python fallback checks alone
+do not prove typed-member validation.
+
+Numeric regressions must also exercise builders before JSON marshaling, which
+otherwise rejects non-finite values and malformed `json.Number` literals before
+the topology validator sees them. Cover large unsigned cells, finite/integral
+checks, and unchanged index bounds in both scalar and set form.
+
 ## Validate output (require rows)
 ```
 src/go/go.d.plugin \

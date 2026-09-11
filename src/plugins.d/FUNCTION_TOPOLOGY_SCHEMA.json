@@ -2474,7 +2474,8 @@
             "evidence_ref",
             "array",
             "json"
-          ]
+          ],
+          "description": "Cell type; for direct scalar columns with aggregation set, also the item type of a one-dimensional set-valued cell. Scalar cells remain valid. Reference cells retain their integer-index encoding."
         },
         "dictionary": {
           "$ref": "#/$defs/id"
@@ -2500,7 +2501,8 @@
           ]
         },
         "aggregation": {
-          "$ref": "#/$defs/aggregation_rule"
+          "$ref": "#/$defs/aggregation_rule",
+          "description": "Column reduction. With set on a direct scalar type, cells may be scalars or one-dimensional arrays whose members satisfy that type and nullable. Empty sets are valid; nested arrays and coercion are not. This relationship is checked by semantic validation; array, json, and reference types retain their existing rules."
         }
       }
     },
