@@ -1342,7 +1342,7 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
 static void stream_receiver_replication_reset(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        rrdhost_receiver_replication_release(st, 0);
+        rrdhost_receiver_replication_release_no_pulse(st, 0);
 
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_UNKNOWN;
@@ -1350,21 +1350,24 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
+    // Safe to zero outside the walk: chart teardown does BOTH its flag CAS and its decrement inside
+    // rrdset_delete_callback(), under the rrdset dictionary WRITE lock, which the walk's read lock
+    // excludes - so a teardown can never be sitting between the two while we iterate. Any teardown
+    // that runs after the walk finds IN_PROGRESS already cleared by the release above and decrements
+    // nothing, and no new claim can arrive because the parser for this connection is gone.
     if(rrdhost_receiver_replicating_charts(host) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %u"
                " - resetting it to zero",
                rrdhost_receiver_replicating_charts(host));
-
-        rrdhost_receiver_replicating_charts_zero(host);
     }
+
+    // one store clears both halves: the outstanding charts and the cohort of the generation that ended
+    rrdhost_receiver_replicating_charts_zero(host);
 
     __atomic_store_n(&host->stream.rcv.status.replication.counter_in, 0, __ATOMIC_RELAXED);
     __atomic_store_n(&host->stream.rcv.status.replication.counter_out, 0, __ATOMIC_RELAXED);
     __atomic_store_n(&host->stream.rcv.status.replication.backfill_pending, 0, __ATOMIC_RELAXED);
-
-    // the completion cohort belongs to the connection generation that just ended
-    rrdhost_receiver_replicating_charts_started_zero(host);
 }
 
 RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {

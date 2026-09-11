@@ -2072,11 +2072,12 @@ static int test_rrdset_rejects_invalid_update_every(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // Receiver replication counter ownership.
 //
-// host->stream.rcv.status.replication.charts counts the charts whose receiver replication is
-// outstanding. The invariant these tests guard: a chart holds at most one contribution, it holds one
-// exactly while RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS is set, and it is released exactly once -
-// by whichever of replay completion, the connect/disconnect reset, or chart teardown wins the
-// transition. The counter must never wrap below zero.
+// The low half of host->stream.rcv.status.replication.charts_started_and_remaining counts charts whose
+// receiver replication is outstanding; the high half counts claims that won the transition in this
+// connection generation. The invariant these tests guard: a chart holds at most one contribution, it
+// holds one exactly while RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS is set, and it is released
+// exactly once - by whichever of replay completion, the connect/disconnect reset, or chart teardown
+// wins the transition. The outstanding half must never wrap below zero.
 
 // These tests drive the PRODUCTION claim and release (rrdhost_receiver_replication_claim /
 // _release, declared in rrdset.h) rather than a parallel copy, so a change to the ownership sequence
@@ -2101,7 +2102,7 @@ static int test_receiver_replication_released_on_chart_teardown(void) {
 
     RRDHOST *host = st->rrdhost;
     uint32_t before = rrdhost_receiver_replicating_charts(host);
-    uint32_t before_started = rrdhost_receiver_replicating_charts_started(host);
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
 
     rrdhost_receiver_replication_claim(st);
 
@@ -2122,7 +2123,7 @@ static int test_receiver_replication_released_on_chart_teardown(void) {
         rc = 1;
     }
 
-    __atomic_store_n(&host->stream.rcv.status.replication.charts_started, before_started, __ATOMIC_RELAXED);
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
 
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     return rc;
@@ -2137,8 +2138,12 @@ static int test_receiver_replication_counter_does_not_wrap(void) {
     int rc = 0;
     RRDHOST *host = localhost;
 
-    uint32_t saved = rrdhost_receiver_replicating_charts(host);
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
     rrdhost_receiver_replicating_charts_zero(host);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    size_t refusals_before = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED);
+#endif
 
     // This deliberate underflow attempt emits one STREAM REPLAY ERROR ... refused line. The line
     // confirms the guard is working and is not a test failure.
@@ -2153,9 +2158,37 @@ static int test_receiver_replication_counter_does_not_wrap(void) {
         rc = 1;
     }
 
-    rrdhost_receiver_replicating_charts_zero(host);
-    while(rrdhost_receiver_replicating_charts(host) < saved)
-        rrdhost_receiver_replicating_charts_plus_one(host);
+#ifdef NETDATA_INTERNAL_CHECKS
+    // Assert the refusal was COUNTED, not just that the counter held. The refusal count is the only
+    // observable an over-release leaves behind, and the stress pass asserts it did NOT move - so if
+    // the increment were ever dropped that assertion would pass vacuously. This is its positive case.
+    size_t refusals = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED) - refusals_before;
+    if(refusals != 1) {
+        fprintf(stderr, "%s: the refused release was counted %zu times, expected exactly 1\n",
+                __FUNCTION__, refusals);
+        rc = 1;
+    }
+#endif
+
+    // The guard must be exact for BOTH decrement shapes. A release moves the outstanding half alone,
+    // so testing that half is enough for it; the claim's withdrawal moves both, and a cohort of zero
+    // with work outstanding must refuse rather than borrow the cohort down to UINT32_MAX. That state
+    // is the one the completion helper keeps as its corruption diagnostic, so it must survive intact.
+    rrdhost_receiver_replication_accounting_set(host, 0, 1);
+    fprintf(stderr, "%s: expecting a second STREAM REPLAY ERROR ... refused line, for the same reason\n",
+            __FUNCTION__);
+    rrdhost_receiver_replication_withdraw(host);
+
+    uint64_t empty_cohort = rrdhost_receiver_replication_accounting(host);
+    if(empty_cohort != rrdhost_receiver_replication_accounting_pack(0, 1)) {
+        fprintf(stderr,
+                "%s: a refused withdrawal against an empty cohort left started=%u remaining=%u, expected 0 and 1\n",
+                __FUNCTION__, rrdhost_receiver_replication_started_of(empty_cohort),
+                rrdhost_receiver_replication_remaining_of(empty_cohort));
+        rc = 1;
+    }
+
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
 
     return rc;
 }
@@ -2184,7 +2217,7 @@ static int test_receiver_replication_release_does_not_steal(void) {
 
     RRDHOST *host = owner->rrdhost;
     uint32_t before = rrdhost_receiver_replicating_charts(host);
-    uint32_t before_started = rrdhost_receiver_replicating_charts_started(host);
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
 
     rrdhost_receiver_replication_claim(owner);
 
@@ -2240,7 +2273,7 @@ static int test_receiver_replication_release_does_not_steal(void) {
         rc = 1;
     }
 
-    __atomic_store_n(&host->stream.rcv.status.replication.charts_started, before_started, __ATOMIC_RELAXED);
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
 
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     return rc;
@@ -2258,10 +2291,8 @@ static int test_receiver_replication_completion_ratio(void) {
     int rc = 0;
     RRDHOST *host = localhost;
 
-    uint32_t saved_charts = rrdhost_receiver_replicating_charts(host);
-    uint32_t saved_started = rrdhost_receiver_replicating_charts_started(host);
-    rrdhost_receiver_replicating_charts_zero(host);
-    rrdhost_receiver_replicating_charts_started_zero(host);
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+    rrdhost_receiver_replication_accounting_set(host, 0, 0);
 
     struct {
         const char *name;
@@ -2275,16 +2306,12 @@ static int test_receiver_replication_completion_ratio(void) {
         { "cohort just claimed, no progress",   10, 10,    0.0, 10 },
         { "cohort half done",                   10,  5,   50.0, 5  },
         { "one instance left of a large cohort", 4,  1,   75.0, 1  },
-        // a duplicate CHART_DEFINITION_END inflates the cohort and is never rolled back, so the same
-        // one outstanding instance reads 50% rather than 0% - conservative by design
-        { "duplicate claim attempt inflated it",  2,  1,   50.0, 1  },
         { "outstanding with no cohort",          0,  3,    NAN, 3  },
         { "counters inconsistent",               2,  5,    NAN, 5  },
     };
 
     for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        __atomic_store_n(&host->stream.rcv.status.replication.charts_started, cases[i].started, __ATOMIC_RELAXED);
-        __atomic_store_n(&host->stream.rcv.status.replication.charts, cases[i].remaining, __ATOMIC_RELAXED);
+        rrdhost_receiver_replication_accounting_set(host, cases[i].started, cases[i].remaining);
 
         uint32_t instances = UINT32_MAX;
         NETDATA_DOUBLE got = rrdhost_receiver_replication_completion(host, &instances);
@@ -2313,8 +2340,7 @@ static int test_receiver_replication_completion_ratio(void) {
 
     // A single chart finishing must not carry the whole host to 100 - that is exactly what the
     // replaced host-level scalar did.
-    __atomic_store_n(&host->stream.rcv.status.replication.charts_started, 100, __ATOMIC_RELAXED);
-    __atomic_store_n(&host->stream.rcv.status.replication.charts, 99, __ATOMIC_RELAXED);
+    rrdhost_receiver_replication_accounting_set(host, 100, 99);
     NETDATA_DOUBLE one_of_a_hundred = rrdhost_receiver_replication_completion(host, NULL);
     if(one_of_a_hundred != 1.0) {
         fprintf(stderr, "%s: one chart of a hundred finishing reported %.2f%%, expected 1.00%%\n",
@@ -2322,16 +2348,72 @@ static int test_receiver_replication_completion_ratio(void) {
         rc = 1;
     }
 
-    __atomic_store_n(&host->stream.rcv.status.replication.charts_started, saved_started, __ATOMIC_RELAXED);
-    __atomic_store_n(&host->stream.rcv.status.replication.charts, saved_charts, __ATOMIC_RELAXED);
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
 
+    return rc;
+}
+
+// A duplicate CHART_DEFINITION_END for an already-replicating chart must withdraw its entire
+// speculative contribution. It must not alter either accounting half or the derived snapshot.
+static int test_receiver_replication_duplicate_claim_does_not_change_accounting(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDHOST *host = localhost;
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+    rrdhost_receiver_replication_accounting_set(host, 0, 0);
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-duplicate", "unittest-rcv-repl-duplicate", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    if(!rrdhost_receiver_replication_claim(st)) {
+        fprintf(stderr, "%s: initial claim did not win\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    uint32_t instances_before = UINT32_MAX;
+    NETDATA_DOUBLE completion_before = rrdhost_receiver_replication_completion(host, &instances_before);
+    uint64_t accounting_before = rrdhost_receiver_replication_accounting(host);
+
+    if(rrdhost_receiver_replication_claim(st)) {
+        fprintf(stderr, "%s: duplicate claim won\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    uint32_t instances_after = UINT32_MAX;
+    NETDATA_DOUBLE completion_after = rrdhost_receiver_replication_completion(host, &instances_after);
+    uint64_t accounting_after = rrdhost_receiver_replication_accounting(host);
+
+    if(accounting_before != rrdhost_receiver_replication_accounting_pack(1, 1) ||
+       accounting_after != accounting_before ||
+       rrdhost_receiver_replicating_charts_started(host) != 1 ||
+       rrdhost_receiver_replicating_charts(host) != 1 ||
+       completion_before != 0.0 || completion_after != completion_before ||
+       instances_before != 1 || instances_after != instances_before) {
+        fprintf(stderr,
+                "%s: duplicate changed accounting=%" PRIu64 "->%" PRIu64
+                " started=%u remaining=%u completion=%.2f->%.2f instances=%u->%u; expected 1,1,0.00,1\n",
+                __FUNCTION__, accounting_before, accounting_after,
+                rrdhost_receiver_replicating_charts_started(host), rrdhost_receiver_replicating_charts(host),
+                (double)completion_before, (double)completion_after, instances_before, instances_after);
+        rc = 1;
+    }
+
+    rrdhost_receiver_replication_release(st, 0);
+    rrdset_free(st);
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
     return rc;
 }
 
 // A2b: the ownership invariant under real concurrency.
 //
 // Two parts. The first pins the exact interleaving the claim-before-publish ordering exists for, using
-// the NETDATA_INTERNAL_CHECKS pause hook: a claimer is stopped between its counter writes and its flag
+// the NETDATA_INTERNAL_CHECKS pause hook: a claimer is stopped between its accounting increment and its flag
 // publish, a release runs against the same chart while it is stopped, then the claimer is let go. With
 // the fix the counter ends balanced; with the claim reordered back to publish-then-increment the
 // release would see a published flag with no contribution behind it.
@@ -2353,6 +2435,13 @@ static void receiver_replication_claim_thread(void *ptr) {
         if(rrdhost_receiver_replication_claim(t->st))
             t->claims++;
 
+        // Every iteration releases, including one whose claim lost. That is deliberate and is what the
+        // refusal assertion rests on: a losing claimer's release can still WIN the flag clear and
+        // consume the contribution the winner holds - a legitimate ownership transfer, the same shape
+        // as REPLAY_END releasing a chart it never claimed. Only the transition confers ownership, so
+        // the counter stays balanced either way, and a release that does not win the clear touches
+        // nothing. Releasing only after a won claim would make every release an owned one, drive
+        // refusals to trivially zero, and stop exercising ownership under contention at all.
         rrdhost_receiver_replication_release(t->st, 0);
     }
 }
@@ -2373,8 +2462,7 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
 
     int rc = 0;
     RRDHOST *host = localhost;
-    uint32_t saved_started = __atomic_load_n(&host->stream.rcv.status.replication.charts_started,
-                                             __ATOMIC_RELAXED);
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // ---- part 1: the deterministic interleaving ------------------------------------------------
@@ -2391,7 +2479,7 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
         claimer.thread = nd_thread_create("rcvrepl-race", NETDATA_THREAD_OPTION_DONT_LOG,
                                           receiver_replication_paused_claim_thread, &claimer);
 
-        // wait for it to park between its counter writes and its flag publish
+        // wait for it to park between its accounting increment and its flag publish
         bool parked = false;
         for(size_t i = 0; i < 5000 && !parked; i++) {
             parked = rrdhost_receiver_replication_race_hook_is_waiting();
@@ -2472,11 +2560,6 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
             claims += t[i].claims;
         }
 
-        // Every thread's last act is a release, so every chart is released by whoever touched it last;
-        // this only covers the case where a chart is left claimed.
-        for(size_t c = 0; c < charts_count; c++)
-            rrdhost_receiver_replication_release(charts[c], 0);
-
         // A LEAKED contribution leaves the counter high, and this catches it.
         uint32_t after = rrdhost_receiver_replicating_charts(host);
         if(after != before) {
@@ -2487,13 +2570,28 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
         }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        // An OVER-release cannot be caught by the counter: rrdhost_receiver_replicating_charts_release()
+        // An OVER-release cannot be caught by the counter: rrdhost_receiver_replicating_charts_decrement()
         // refuses to go below zero, which is precisely what keeps the counter on its baseline and hides
         // the fault. The refusal count is the only observable, so assert on it.
         size_t refusals = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED)
                           - refusals_before;
         if(refusals) {
             fprintf(stderr, "%s: %zu release(s) were refused as unowned - the invariant broke under contention\n",
+                    __FUNCTION__, refusals);
+            rc = 1;
+        }
+#endif
+
+        // Cleanup is deliberately after the leak and refusal assertions, so it cannot erase a failure
+        // this stress pass is meant to detect. Its own releases are still checked below: a refusal
+        // here is the same over-release the pass hunts, just discovered one step later.
+        for(size_t c = 0; c < charts_count; c++)
+            rrdhost_receiver_replication_release(charts[c], 0);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        refusals = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED) - refusals_before;
+        if(refusals) {
+            fprintf(stderr, "%s: %zu release(s) were refused as unowned, including cleanup - the invariant broke\n",
                     __FUNCTION__, refusals);
             rc = 1;
         }
@@ -2509,7 +2607,7 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
             rrdset_free(charts[c]);
     }
 
-    __atomic_store_n(&host->stream.rcv.status.replication.charts_started, saved_started, __ATOMIC_RELAXED);
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     return rc;
 }
@@ -2908,6 +3006,7 @@ int run_all_mockup_tests(void)
     receiver_replication_failures += test_receiver_replication_counter_does_not_wrap();
     receiver_replication_failures += test_receiver_replication_release_does_not_steal();
     receiver_replication_failures += test_receiver_replication_completion_ratio();
+    receiver_replication_failures += test_receiver_replication_duplicate_claim_does_not_change_accounting();
     receiver_replication_failures += test_receiver_replication_ownership_under_concurrency();
     if(receiver_replication_failures)
         return 1;

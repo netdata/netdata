@@ -154,9 +154,8 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t collected_metrics = UINT32_MAX;
     uint32_t replicating_instances = UINT32_MAX;
 
-    // One replication snapshot for the whole function: the status decision below and the reported
-    // instances/completion MUST come from the same read, or the two disagree - a decision taken on a
-    // non-zero instance count paired with a later, already-drained completion of 100.
+    // One replication snapshot for the whole function: its cohort and outstanding-instance halves are
+    // read from one atomic word, so the status decision below and reported instances/completion agree.
     //
     // The snapshot does NOT make status=replicating with instances=0 and completion=100 unreachable,
     // and it is not meant to: the `!collected_metrics` clause below deliberately keeps a connected
@@ -188,14 +187,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             since = netdata_start_time;
         }
         else {
-            // Under the receiver lock: stream_receiver_replication_reset() zeroes `charts` and
-            // `charts_started` separately, and holds this lock across both (rrdhost_set_receiver() and
-            // rrdhost_clear_receiver()). Reading the pair outside it would let a reset interleave
-            // between the helper's two loads and produce started < remaining, i.e. a `null` completion
-            // on the API. This is the whole reason the helper needs no re-read.
-            rrdhost_receiver_lock(host);
             replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
-            rrdhost_receiver_unlock(host);
 
             collected_metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
 
@@ -232,10 +224,15 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             rrdhost_receiver_lock(host);
             if (host->receiver && (flags & RRDHOST_FLAG_COLLECTOR_ONLINE)) {
                 has_receiver = true;
-                // reuse the snapshot taken for the status decision; only read again on the paths
-                // that never needed replication data to reach their status (this block already holds
-                // the receiver lock, so that read has the same protection)
-                if(replicating_instances == UINT32_MAX)
+                // Reuse the snapshot taken for the status decision, so status and reported numbers
+                // agree. Recompute in two cases: the status path never needed replication data, or
+                // the connection generation moved since the snapshot - it was taken outside this
+                // lock, so a disconnect/reconnect in between would leave it describing the previous
+                // generation while `host->receiver` here describes the new one. `connections` is
+                // bumped once per accepted connection under this same lock, so a change means
+                // exactly that, and reporting the mixed pair would be worse than losing the snapshot.
+                if(replicating_instances == UINT32_MAX ||
+                   __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED) != connections)
                     replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
 
                 s->ingest.replication.instances = replicating_instances;

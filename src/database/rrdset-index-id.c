@@ -136,8 +136,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 }
 
 // the destructor - the dictionary is write locked while this runs
-static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
-    RRDHOST *host = rrdhost;
+static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
