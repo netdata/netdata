@@ -143,6 +143,13 @@ void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
                 pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_RUNNING, 0);
         }
 
+        // The receiver side has the same hole, for the same reason. A child can obsolete a chart that
+        // is mid receiver-replication; stream_receiver_replication_check_from_poll() then skips it, so
+        // no REPLAY_END ever arrives and its contribution stays outstanding - pinning InStatus to
+        // `replicating` and holding rrdhost_should_be_cleaned_up() false - until the obsolete chart is
+        // finally deleted. Release it here, through the one implementation that owns the transition.
+        rrdhost_receiver_replication_release(st, 0);
+
         rrdset_metadata_updated(st);
 
         // the chart will not get more updates (data collection)

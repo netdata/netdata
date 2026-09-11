@@ -100,14 +100,23 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 // release(): returns the OLD flags; releases the contribution only if this call cleared IN_PROGRESS.
 //            `also_clear` carries extra flags to clear in the same atomic transition.
 bool rrdhost_receiver_replication_claim(RRDSET *st);
-RRDSET_FLAGS rrdhost_receiver_replication_release(RRDSET *st, RRDSET_FLAGS also_clear);
+// The macro captures the CALLING function, so the refusal log names the release site that
+// over-released (replay completion, its forced branch, the reset, or chart teardown) rather than
+// this one shared implementation.
+RRDSET_FLAGS rrdhost_receiver_replication_release_with_caller(RRDSET *st, RRDSET_FLAGS also_clear, const char *function, bool pulse);
+#define rrdhost_receiver_replication_release(st, also_clear) \
+    rrdhost_receiver_replication_release_with_caller(st, also_clear, __FUNCTION__, true)
+// For the connect/disconnect reset ONLY: it drains the whole generation and its caller has already
+// published the receiver state, so the 1->0 edge here must not republish RCV_RUNNING over it.
+#define rrdhost_receiver_replication_release_no_pulse(st, also_clear) \
+    rrdhost_receiver_replication_release_with_caller(st, also_clear, __FUNCTION__, false)
 
 #ifdef NETDATA_INTERNAL_CHECKS
 // Refused (would-be-underflow) releases, so a test can detect an over-release that the refusal itself
 // hides from the counter.
 extern size_t rrdhost_receiver_replication_refusals;
 
-// Test-only: pause one claiming thread between its counter writes and its flag publish, so a unit test
+// Test-only: pause one claiming thread between its accounting increment and its flag publish, so a unit test
 // can drive that interleaving deterministically instead of hoping for it.
 void rrdhost_receiver_replication_race_hook_arm(RRDSET *st);
 bool rrdhost_receiver_replication_race_hook_is_waiting(void);
