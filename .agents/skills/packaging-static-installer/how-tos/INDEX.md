@@ -1,6 +1,7 @@
 # How-tos catalog: packaging-static-installer
 
-Live catalog. When you solve a static-build problem that takes more than a couple of wrapper calls or that future-you would not reconstruct in 30 seconds from `SKILL.md`, write a how-to here and link it below before closing the task.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Add authorized static-build recipes here and
+keep the catalog consistent with them.
 
 ## Conventions
 

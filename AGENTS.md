@@ -62,8 +62,9 @@ removes debt beats a smaller one that preserves it.
 
 ### Definitions
 
-- **Trivial vs non-trivial work**: defined under "When A SOW Is Required". Trivial work has no SOW and is exempt from
-  the record-the-target, disclosure, and reference-search rules below; the clean-end-state preference still applies.
+- **Work categories**: defined under "When A SOW Is Required". Trivial changes and read-only work are exempt from
+  the implementation record-the-target, disclosure, and reference-search rules below; the clean-end-state preference
+  still applies to changes. Read-only work may use local tracking when the user requests it.
 - **Approved scope**: the union of (a) the issue or user request, (b) the SOW Purpose and Acceptance Criteria as
   recorded in the SOW, and (c) the migration/contract surface they imply.
 - **Coupled item**: code, config, docs, or tests the current change makes redundant or leaves inconsistent (a
@@ -80,8 +81,10 @@ removes debt beats a smaller one that preserves it.
   proceeding, before requesting non-draft review, and before marking the work complete. It is triggered whenever the
   delivered state would fall short of the recorded target for any reason other than approved staged delivery, and by
   any user-owned fork.
-- **Default on doubt**: if unsure whether something is in scope, trivial, coupled, or a user-owned fork, treat it as
-  in-scope, non-trivial, coupled, user-owned, and ask.
+- **Default on doubt**: investigate uncertainty before classifying work. Suspected low-risk coupling follows the
+  explicit include-and-disclose rule under "Clean End State Over Less Churn". Ask when a material scope, contract,
+  or risk fork remains unresolved. If an intended change's risk remains unclear, treat the change as non-trivial;
+  read-only investigation follows "When A SOW Is Required".
 
 ### Clean End State Over Less Churn
 
@@ -93,10 +96,13 @@ removes debt beats a smaller one that preserves it.
   the recorded target is a non-clean state and triggers the Mandatory pause.
 - Open design decision: when the clean end state is itself the user's design decision, do not invent a fixed
   target. Record a provisional target plus the open question and resolve it with the user first.
-- Disclose exclusions: the recorded target MUST list (i) what you remove as redundant and (ii) every coupled item
-  you treat as NOT part of this clean end state, each with its reason and the scope source it rests on. Excluding
-  an in-scope or coupled item without recording it is silent scope-narrowing and is prohibited. The list lets a
-  reviewer or the next agent check your exclusions against their sources.
+- The recorded target MUST account for affected items:
+  - (i) removed or migrated: redundant code, config, docs, tests, and their replacement when applicable;
+  - (ii) intentionally retained: items and references that remain valid in the delivered state, with their rationale;
+  - (iii) deferred or excluded: every coupled item omitted from the delivered state, with its reason, scope source,
+    and required user approval and follow-up tracking.
+  Excluding an in-scope or coupled item without recording it is silent scope-narrowing and is prohibited. Retention
+  under (ii) MUST NOT disguise unfinished migration work; such work belongs under (iii) and the Mandatory pause.
 - You are not the scope authority:
   - Coupled cleanup is in scope. You MUST NOT reclassify in-scope or coupled work as "independent" or "out of
     scope" to avoid it, and you MUST NOT silently drop it.
@@ -107,13 +113,14 @@ removes debt beats a smaller one that preserves it.
 - Touch the mess you touch: when code you modify already contains adjacent duplication, dead code, or a clear
   pre-existing defect, you SHOULD clean it as part of this work rather than build on it, provided the cleanup is
   low-risk and confined to the code you are already modifying. Cleanup reaching into unrelated code is independent
-  work (see "Scope Discipline At Every Step"). If you leave adjacent mess in place, record why under disclosure (ii).
+  work (see "Scope Discipline At Every Step"). If you leave adjacent mess in place, record why under disclosure (iii).
 - Reference search (when replacing a path or altering a contract):
   - You MUST run and record in the SOW (command and result) a search for remaining references to the replaced path
     or contract. Search construction sites and prefixes too, not only literal final names; identifiers here are often
     built dynamically (for example via `fmt.Sprintf`).
-  - Every surviving reference MUST appear in (i) or (ii) with its scope source, or the target is incomplete. An
-    item you did not search for counts as silent scope-narrowing.
+  - Every relevant search hit MUST have a disposition under (i), (ii), or (iii), or the target is incomplete.
+    Legitimate retained references, such as negative regression tests mentioning a retired identifier, belong under
+    (ii). Record and explain unrelated search matches. An item you did not search for counts as silent scope-narrowing.
   - A repository-wide search cannot prove safety for consumers outside this repo (Netdata Cloud, exporters,
     streaming, ML, the docs pipeline). Renaming a shipped public contract is a user-owned breaking decision routed
     through the Mandatory pause, not something the search clears.
@@ -126,8 +133,9 @@ removes debt beats a smaller one that preserves it.
 - Exception evidence: for (a)/(b) you MUST cite specific evidence (file/line, failure class, or test) and route
   through the Mandatory pause; you do not self-certify "unsafe". For (d) track the remainder per Followup Discipline
   with why deferral is acceptable and when it lands; repeatedly shipping partials is debt accumulation, not delivery.
-- Never valid: risk reduction, review convenience, smaller diff, and issue staging are NEVER valid reasons for a
-  non-clean route and MUST NOT be relabeled "unsafe" or "independent".
+- Never valid: unsupported claims of risk reduction, review convenience, smaller diff, and issue staging do not
+  justify a non-clean route and MUST NOT be relabeled "unsafe" or "independent". The evidenced-hazard exception
+  above remains available with the required evidence and user approval.
 - Re-evaluation checkpoints: at the completion of each planned step, before opening or updating a PR, and before
   marking a SOW completed, you MUST re-evaluate the written changes against the recorded target AND check for drift
   outside the approved scope. You SHOULD also re-evaluate whenever you pause to report progress. Do not keep a
@@ -183,10 +191,13 @@ removes debt beats a smaller one that preserves it.
 
 ### Scope Discipline At Every Step
 
+- Documentation capture during authorized implementation is part of that task under Knowledge Capture, even when
+  the discovered gap is not required to complete the code change. This does not authorize additional implementation
+  or changes to product behavior or contracts.
 - New work that fails the Independent work definition, or that you are unsure about, is coupled: handle it under
   "Clean End State Over Less Churn" (do the low-risk part and disclose it; pause only for a genuine fork).
-- Genuinely independent work: do NOT silently bundle it. Submit it as a separate PR first and rebase after it
-  merges, or track it as a GitHub issue per Followup Discipline. Do NOT fold it into this SOW's steps.
+- Genuinely independent work: do NOT silently bundle it. Submit it as a separately authorized PR first and rebase
+  after it merges, or track it per Followup Discipline. Do NOT fold it into this SOW's steps.
 
 ## SOW System
 
@@ -205,8 +216,8 @@ SOWs and specs are local-only working memory, never committed:
   git later, reorganized, as a deliberate decision; until then treat them as local memory.
 - Committed framework files: `.agents/sow/SOW.template.md`, `.agents/sow/audit.sh`, `.agents/sow/scan-sensitive.sh`,
   `.agents/sow/worktree-link.sh`.
-- Durable knowledge that must survive a SOW belongs in project skills, docs, code, and tests (and specs once
-  re-introduced), not in the SOW body.
+- Durable knowledge needed for the approved deliverable belongs in project skills, docs, code, and tests (and specs
+  once re-introduced), not solely in the SOW body. Other discoveries follow Knowledge Capture.
 - Queues under `.agents/sow/q/`. Move the file as its state changes; a queue move is normal lifecycle, not deletion.
 
   | Queue | Meaning | Status values inside |
@@ -230,23 +241,29 @@ SOWs and specs are local-only working memory, never committed:
     already has its own real `.env` keeps it);
   - it is idempotent, never loses data on a name collision, re-points a symlink whose origin moved, and refuses to run
     in a worktree whose origin checkout is not yet on this model (it prints how to update it).
-- Because nothing is committed there is no commit-for-handoff, no remove-before-merge step, and no CI merge guard
-  to clear.
+- Legitimate local SOW files require no commit-for-handoff or remove-before-merge step. The CI guard described under
+  Enforcement rejects working files that were accidentally committed; it does not require deleting local memory.
 
 ### When A SOW Is Required
 
-Create or reuse a SOW for non-trivial work:
+Read-only investigation, explanation, and review require no implementation SOW or branch unless the user requests
+tracking. They MAY save local evidence and sanitized notes under "Knowledge Capture". They MUST NOT change source,
+tracked documentation, Git state, or remote state without separate authorization. When changes are authorized,
+classify those changes below before implementation; a request for review alone does not authorize fixes.
+
+Create or reuse a SOW for non-trivial changes:
 
 - feature work; bug fixes with behavioral impact; refactors; migrations; regressions;
 - documentation or content changes with product/business impact; spec hygiene; project skill changes;
 - process changes; collector changes; packaging, install, or deployment changes;
-- PR review iteration; static analysis triage that changes source, docs, or project policy;
-- any work with unclear risk.
+- PR review iteration or static analysis triage that changes source, docs, or project policy;
+- any intended change with unclear risk.
 
 Trivial work needs no SOW: typo fixes; formatting-only changes; mechanical renames with no behavior change; simple
 low-risk search/replace (still grep the old token to confirm no call site is missed).
 
-Default on doubt applies: unsure means non-trivial.
+Default on doubt applies to intended changes: unresolved risk means non-trivial, not that read-only analysis itself
+requires an implementation gate.
 
 ### Required First Checks
 
@@ -294,10 +311,13 @@ Before non-trivial work:
 - Progress reports and Re-evaluation checkpoints are not stop points. Once a SOW is in progress with its approval
   recorded, continue until it is delivered, failed with evidence, blocked on a real user decision or approval, or
   superseded by newer user instructions.
-- Completion of a standalone or step SOW, when the work is ready to merge (umbrellas: see "Umbrella And Step SOWs"):
-  1. Finish implementation, docs, skills, validation, and follow-up mapping.
-  2. Transfer all durable knowledge into project skills, docs, code, and tests (and specs once re-introduced). The
-     SOW body MUST then hold nothing durable that is not captured elsewhere.
+- Completion of a standalone or step SOW, when the authorized deliverable is complete and any changes are ready to
+  merge (umbrellas: see "Umbrella And Step SOWs"):
+  1. Finish authorized implementation, documentation capture under Knowledge Capture, validation, and follow-up mapping.
+  2. Transfer durable knowledge needed for the approved deliverable into project skills, docs, code, and tests (and
+     specs once re-introduced). Document reusable discoveries from implementation under Knowledge Capture. Discoveries
+     from tracked answer-only work MAY remain sanitized local notes without authorizing guide edits. The SOW MUST NOT
+     be the sole record of a delivered project contract.
   3. Set `Status: completed` and move the file to `.agents/sow/q/done/` (unless the user asks to discard it).
 
 ### Umbrella And Step SOWs
@@ -327,12 +347,13 @@ Staged delivery uses one umbrella SOW plus one SOW per step (each step a mergeab
 
 ### Pre-Implementation Gate
 
-Implementation MUST NOT begin until the SOW's `## Pre-Implementation Gate` section records `Gate status: ready` and the
-SOW's top-level `Status:` is `ready` or `in-progress`. The `Gate status:` line takes only `blocked` (gate incomplete),
+For non-trivial work, implementation MUST NOT begin until the SOW's `## Pre-Implementation Gate` section records
+`Gate status: ready` and the SOW's top-level `Status:` is `ready` or `in-progress`.
+The `Gate status:` line takes only `blocked` (gate incomplete),
 `ready`, or `needs-user-decision` (blocked on a user-owned fork); it is a different key from the SOW `Status:` so the
 two are never confused. Before changing implementation files, or before continuing an existing SOW that lacks the
 section, fill the gate. Gate `ready` additionally requires the goal/plan approval of "Plan Before Non-Trivial Work"
-where that round applies.
+where that round applies. Trivial changes and read-only work retain the exemptions under "When A SOW Is Required".
 
 The gate MUST fill every field of the template's `## Pre-Implementation Gate` section (the template is the SOW schema,
 see "SOW Lifecycle"; field semantics live in its placeholders). Placeholders such as `TBD`, `N/A`, or "to be checked
@@ -351,8 +372,9 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
   NOT be committed.
 - Never `git checkout <file>`, `git reset`, delete files, or rewrite history without explicit user approval. Undo a
   change by editing it out, not by checking the file out.
-- Commit and push only when the user asks or the approved plan says so. Checkpoint commits before review rounds
-  and squashing at PR time are described under "Review".
+- Commit and push only when the user asks or explicitly approves those operations in the plan. Approval to implement
+  a fixed goal is not implicit approval of Git operations subsequently added to the plan. Checkpoint commits and
+  squashing under "Review" remain subject to these authorization rules.
 - Commit messages and PR bodies describe the change. A PR body links the follow-up issues tracked from its SOW.
 
 ### Local SOW Parking
@@ -362,14 +384,16 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
   team-visible GitHub issue yet.
 - Parked SOWs are private memory only: not durable project memory, not visible to other contributors, and not
   acceptable as the only tracking for work that must coordinate a team, block a merge, or survive across machines.
-- Deferred work has two tracking paths: public or team-visible follow-up is a GitHub issue; private or local
-  follow-up is `<repo-root>/.local/sow/`.
+- Eligibility for private deferred-work tracking and the required user acceptance are defined under Followup
+  Discipline. Local discovery notes follow Knowledge Capture and are not approval to defer in-scope work.
 - Active implementation work still MUST use the `.agents/sow/q/` queues.
 
 ### Review
 
 Review findings are leads until verified against the shipped code and its contracts.
 
+- A review request alone is read-only, as defined under "When A SOW Is Required". The fix requirements below apply
+  only when implementation is authorized.
 - A shipping blocker MUST identify a production-reachable trigger, the violated contract or invariant, the
   concrete consequence, and supporting code or test evidence.
 - Failing required validation or an unmet explicit acceptance criterion is also a shipping blocker, regardless of
@@ -378,15 +402,23 @@ Review findings are leads until verified against the shipped code and its contra
   promoted to a blocker. Reject it with evidence, or track it separately when it has independent value.
 - Optional test expansion, documentation polish, and maintainability suggestions without a concrete current defect
   MUST NOT extend the review cycle by themselves.
-- Reproduce a reviewer-reported bug as a FAILING test first, then fix to green. The red test proves the finding,
-  pins the contract, and catches wrong assumptions in your own tests.
-- Multi-round review: checkpoint-commit each validated change (specific files only) before its review and squash at
-  PR time.
+- Reproduce a reviewer-reported bug as a FAILING automated regression test before fixing it when feasible. If
+  automation is impractical, record why and use concrete observable evidence, such as an executable reproducer,
+  build failure, hardware observation, or incorrect documented behavior. After the fix, rerun the same test or
+  reproducer and confirm the failure no longer occurs. Record the passing result or non-reproduction evidence;
+  if verification is unavailable or incomplete, record the gap instead of claiming success. Speculation alone is
+  not reproduction.
+- Multi-round review: when Git operations are authorized under "Git And PR Workflow", checkpoint-commit each
+  validated change (specific files only) before its review and squash at PR time only if history rewriting is
+  explicitly approved. Otherwise review the working-tree diff, preserve a record of the reviewed state, and report
+  that no checkpoint commit or squash was performed. A review requirement never grants Git authorization.
 - Recurrence: if findings keep clustering in one subsystem for ~2-3 rounds, stop patching individual cases, name the
   missing invariant, and propose one class-level fix as a user decision.
-- Obtaining a review: spawn independent, full-scope reviewers with clean context, or run the external assistants
-  the user names. For performance-sensitive code at least one reviewer MUST carry an explicit hot-path performance
-  lens. Record each reviewer and its findings under Validation in the SOW.
+- Obtaining a review: the coordinating assistant spawns independent, full-scope reviewers with clean context, or runs
+  the external assistants the user names. Delegated reviewers MUST NOT launch other agents; include this restriction
+  in each review assignment. For performance-sensitive code at least one reviewer MUST carry an explicit hot-path
+  performance lens. Record each reviewer and its findings under Validation in the SOW when one exists; otherwise
+  report the findings and review scope directly to the user.
 - One complete review round is the default. Repeat the same full scope only when a verified shipping blocker
   required a material change to shipped implementation or behavior, or when the prior review could not assess the
   complete change.
@@ -395,9 +427,17 @@ Review findings are leads until verified against the shipped code and its contra
 
 ### Followup Discipline
 
-"Deferred" is not a terminal outcome. Before a SOW can close, every valid deferred item MUST be implemented in the
-current SOW, explicitly rejected as not worth doing with evidence, or represented by a GitHub issue linked from the
-SOW or PR.
+"Deferred" is not a terminal outcome. Before a SOW can close, every valid deferred item MUST be implemented,
+explicitly rejected as not worth doing with evidence, or tracked as follows:
+
+- Use a GitHub issue linked from the SOW or PR unless the private-tracking exception below applies.
+- In-scope remainders, merge dependencies, and work needed for team coordination MUST have a GitHub issue linked
+  from the SOW or PR. Tracking does not replace the user approval required to deliver a partial clean end state.
+- Genuinely independent personal/local work MAY use a parked SOW under `<repo-root>/.local/sow/` only when the user
+  explicitly accepts private tracking and the item does not block merge, require team coordination, or need to
+  survive across machines. Record that acceptance, the reason, and the path in the active SOW.
+- A local discovery note from Knowledge Capture preserves an observation; it is not an accepted implementation
+  commitment or permission to defer a coupled item. Triage it under these rules if it becomes a deferred work item.
 
 Pre-close, search the SOW for `defer|later|follow-up|future|TODO|pending` and map every hit to implemented,
 rejected, or tracked.
@@ -436,7 +476,7 @@ and each step's Artifact Maintenance Gate records the actual updates):
 - End-user/operator docs: README, docs site, runbooks, published guides, help text, other human-facing docs.
 - End-user/operator skills: output/reference skills copied or consumed outside normal repo work.
 - SOW lifecycle: local-only SOW under `.agents/sow/q/`, durable memory transferred, deferred work tracked as GitHub
-  issues, regressions handled as new linked SOWs.
+  issues or explicitly accepted private tracking per Followup Discipline, regressions handled as new linked SOWs.
 
 This is an assistant responsibility. If a SOW changes behavior, docs, specs, commands, schemas, defaults, workflows,
 examples, or operating procedure, the assistant MUST update every affected artifact in the same SOW or record the
@@ -464,9 +504,9 @@ evidence-backed reason it is unaffected.
 - `.github/workflows/sow.yml` rejects pull requests that commit SOW working files or specs: anything tracked under
   `.agents/sow/q/**`, `.agents/sow/specs/**`, or a legacy top-level `.agents/sow/{active,pending,current,done}/`.
   A hit means a file was force-added and MUST be removed before merge. It also scans changed instruction, skill, and
-  framework files for raw sensitive data.
-- These checks are guards, not substitutes for the Validation Gate. The assistant still owns transferring durable
-  knowledge out of the SOW before merge.
+  framework files, including canonical public skills under `docs/netdata-ai/skills/**`, for raw sensitive data.
+- These checks are guards, not substitutes for the Validation Gate. The assistant still owns the scoped knowledge
+  transfer required by SOW Lifecycle before merge.
 
 ## Durable Artifacts
 
@@ -540,6 +580,32 @@ docs, code, and tests, not in specs.
 - Specs describe current reality, not aspiration. If specs and code disagree, record the discrepancy in the active
   SOW and resolve or track it.
 
+### Knowledge Capture
+
+- Reusable findings supported by evidence and not already documented MUST be captured. Prefer improving an existing
+  guide over creating a duplicate. Routine lookups, speculation, and one-off incident details do not require a recipe.
+- For answer-only investigation or review, deliver the requested answer without starting documentation work. Record
+  a reusable discovery in a sanitized local note under `<repo-root>/.local/audits/<subject>/followups.md`, using the
+  existing skill audit directory when one applies. Include the finding, supporting evidence, and proposed owning
+  guide. If no writable local workspace is available, include that sanitized follow-up in the response instead.
+- Report reusable documentation discoveries briefly in the answer-only final response, with the proposed update.
+  Obtain authorization before implementing those documentation changes; do not delay the requested answer while
+  awaiting it. A local note does not replace notifying the user.
+- During authorized implementation, assistants MUST update missing or outdated documentation for reusable,
+  evidence-backed discoveries made while doing the work, even when the documentation is not required for the code
+  change. This capture is part of the task and needs no separate authorization. Keep affected guides, skills, and
+  catalogs consistent before completing the work; describe the updates in the final report.
+- Documentation work arising from answer-only questions requires separate authorization. Documentation capture
+  records observed behavior; it does not authorize additional implementation or new product contracts.
+- Local notes are private evidence, not shared project contracts or automatic follow-up commitments. Accepted
+  deferred work follows Followup Discipline. Commit, push, and publication requirements never grant authorization
+  to perform those actions.
+- Developer skills that give capture instructions MUST point to this section for timing and authorization.
+- Public/operator skills MUST carry a self-contained operator-facing version because they can be used outside this
+  checkout.
+- Public/operator skill catalogs SHOULD point to their skill-local rule rather than repeat it.
+- Preserve operator/developer audience boundaries.
+
 ### Project Skills
 
 Project skills are memory of HOW to work here.
@@ -550,7 +616,8 @@ Project skills are memory of HOW to work here.
 - Output/reference skills may also exist under product documentation or generated skill directories. Do not rename,
   shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related
   public/operator workflow changes.
-- Skill updates that close gaps or fix outdated pointers MUST ship in the same PR that exposed the issue.
+- Skill updates required by Knowledge Capture during authorized implementation MUST ship in the same PR. Discoveries
+  from answer-only tasks follow its local-note and authorization rules.
 - Every change to a skill MUST end with a slimming pass over the touched files: remove restatements, merged-in
   duplicates, and rules that now live elsewhere, keeping every rule (a removed directive is moved or superseded by a
   recorded decision, never dropped). Skills accrete bloat with each update; report line counts before and after.
@@ -573,8 +640,10 @@ Public skill convention (`docs/netdata-ai/skills/`):
 - Skill verification harness inputs (seed questions, grader rubrics, runner scripts, transcript-generation prompts)
   live under `.agents/skill-verification/<skill>/`, never under `docs/netdata-ai/skills/<skill>/`.
 - Each public skill is reachable from `.agents/skills/<skill-name>` via a relative symlink
-  (`.agents/skills/<name>` -> `../../docs/netdata-ai/skills/<name>`), created with `ln -srfn` and verified with
-  `readlink -f .agents/skills/<name>`.
+  (`.agents/skills/<name>` -> `../../docs/netdata-ai/skills/<name>`). From the repository root, create a new link with
+  `ln -s ../../docs/netdata-ai/skills/<name> .agents/skills/<name>`. Inspect an existing path instead of overwriting it;
+  replacement follows Git And PR Workflow. Verify the target with `readlink .agents/skills/<name>` and verify that
+  `.agents/skills/<name>/SKILL.md` resolves to a file.
 - Scripts MUST follow the existing `_lib.sh` shape: `set -euo pipefail`; ANSI colors as real ESC bytes via
   `$'\033[...]'`; `<prefix>_repo_root` via `git rev-parse --show-toplevel`; `<prefix>_load_env` sourcing `<repo>/.env`
   with `: "${VAR:?}"` validation; `<prefix>_audit_dir` creating the skill's `<repo>/.local/audits/<dir>/` (Local-Only
@@ -585,12 +654,9 @@ Public skill convention (`docs/netdata-ai/skills/`):
   `.env` internally and emit ONLY the response body. Each token-handling lib MUST ship a
   `<prefix>_selftest_no_token_leak` that drives every public wrapper with a sentinel token and asserts it never
   reaches captured stdout.
-- How-tos catalog: each public skill ships `how-tos/INDEX.md`, and the catalog is live. Whenever an assistant
-  answers a concrete operator/end-user question that needs analysis (multiple wrapper calls, jq pipelines, or
-  cross-referencing more than one per-domain guide) and the answer is not yet under `how-tos/`, it MUST author the
-  how-to and add it to `INDEX.md` BEFORE completing the task. Each `SKILL.md` repeats this rule. Skipping it is a
-  framework violation: the next assistant repeats the analysis from scratch. Audience boundaries still apply: a
-  developer validation recipe goes into the matching `.agents/skills/` project skill and its index instead.
+- How-tos catalog: each public skill ships `how-tos/INDEX.md`. Capture timing and authorization follow Knowledge
+  Capture. When an authorized change adds or updates a how-to, keep its catalog consistent. Operator recipes stay
+  in public skills; developer recipes belong in the matching `.agents/skills/` project skill and its index, if any.
 - Skills without an operator audience (for example `triage-coverity`, `triage-sonarqube`, `triage-codeql`,
   `repo-pr-reviews`) stay under `.agents/skills/<name>/` with no public counterpart.
 
@@ -620,6 +686,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     pack regeneration and compression, category/severity taxonomy changes
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
     `health-alert-authoring` (alerts on a collector's contexts).
+  - Also relevant: `triage-snmp-diagnostics` (offline SNMP evidence investigations).
 - Integrations.
   - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` schemas and validation, `integrations/`
     generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
@@ -649,6 +716,10 @@ and the rule for adding one; each skill's frontmatter description is the authori
     locally from a PR or docs branch; loads `docs-learn-site-structure` first
   - Also relevant: `integrations-lifecycle` (generated integration pages are published on Learn).
 - Triage.
+  - `triage-snmp-diagnostics`: offline SNMP support bundles and diagnostic files with `src/go/tools/snmp-diagnostics`;
+    topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`,
+    `validate`, `summary`, `inspect-device`, `inspect-link`, and `replay`. Not live queries, traps, or
+    collector/profile authoring
   - `triage-coverity`: Coverity Scan defect triage
   - `triage-sonarqube`: SonarCloud findings triage
   - `triage-codeql`: GitHub Code Scanning / CodeQL triage
@@ -658,7 +729,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     `AE_*` fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
   - Also relevant: `repo-pr-reviews` (pulls SonarCloud findings for a PR).
 - Repo.
-  - `repo-pr-reviews`: PR comment and review iteration
+  - `repo-pr-reviews`: inspecting or addressing PR comments and reviews
   - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
     reset-to-default safety; `--repo` scoping
   - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; the authoring rules (point
@@ -735,6 +806,7 @@ renames:
 | `triage-codacy` | `codacy/` | local analysis output, PR issue fetches |
 | `triage-codeql` | `graphql/` | Code Scanning fetches and dismissals |
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
+| `triage-snmp-diagnostics` | `snmp-diagnostics/` | private bundle inspections, replay output, and incident reports |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
 | `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change |

@@ -47,20 +47,28 @@ skill [`query-netdata-agents`](../query-netdata-agents/SKILL.md).
 
 ---
 
+## Knowledge Capture
+
+- For answer-only questions, deliver the requested answer. If the work reveals a reusable, evidence-backed recipe
+  not already documented, you MUST preserve a sanitized note with the finding, supporting evidence, and proposed
+  owning guide. In a repository checkout, use `<repo-root>/.local/audits/<subject>/followups.md`, reusing this skill's
+  audit directory when available. Outside a checkout, use an appropriate local workspace. If no writable workspace
+  is available, include the sanitized follow-up in the response instead.
+- Briefly report reusable documentation discoveries and proposed updates in the answer-only final response, even
+  when recorded locally. Obtain authorization before those guide edits; do not delay the answer while awaiting it.
+- During authorized implementation, you MUST update this skill or its guides for reusable, evidence-backed
+  discoveries made while doing the work, even when the documentation is not required for the code change. This
+  needs no separate authorization. Keep [`how-tos/INDEX.md`](./how-tos/INDEX.md) consistent and report the updates.
+- Guide edits arising from answer-only questions require separate authorization. Documentation capture records
+  observed behavior; it does not authorize additional implementation or new product contracts. Commit and
+  publication require authorization too.
+- Prefer updating an existing guide over duplicating it. Keep recipes operator-facing: fetching or using Cloud
+  data. Developer contract validation for collectors, topology producers, schemas, fixtures, UI adapters, or
+  aggregator handoffs belongs in the relevant project developer skill, not in this public skill.
+
 ## Mandatory Requirements (READ FIRST)
 
-1. **If you analyze, you author a how-to.** When asked a concrete
-   question about a Netdata environment that isn't already covered
-   by an existing how-to under [`how-tos/`](./how-tos/), you MUST
-   author a new how-to in this directory and add it to
-   [`how-tos/INDEX.md`](./how-tos/INDEX.md) BEFORE completing the
-   task. The catalog is meant to be **live** -- the next assistant
-   should not redo the same analysis from scratch. Keep this
-   catalog operator-facing: recipes here should explain how to fetch
-   or use Cloud data. Developer contract validation for collectors,
-   topology producers, schemas, fixtures, UI adapters, or aggregator
-   handoffs belongs in the relevant project developer skill, not in
-   this public skill.
+1. **Preserve reusable discoveries** under [Knowledge Capture](#knowledge-capture).
 2. **Use the token-safe wrappers.** Every example in this skill
    uses `agents_query_cloud` (and friends) from
    `../query-netdata-agents/scripts/_lib.sh`. Never paste raw

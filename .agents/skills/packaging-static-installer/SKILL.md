@@ -240,7 +240,9 @@ sh artifacts/netdata-x86_64-latest.gz.run --target /tmp/nd-extract --noexec --ke
 
 ## How to extend this skill
 
-When you discover a new failure mode, an arch-specific quirk, or a workflow that's worth preserving, add a how-to under `how-tos/` and link it from `how-tos/INDEX.md`. Keep `SKILL.md` tight; push detail into how-tos. The catalog is live — every assistant who solves a non-trivial build problem must commit the recipe before moving on.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Authorized recipes for build failures,
+architecture-specific quirks, and reusable workflows belong in `how-tos/`, with an entry in `./how-tos/INDEX.md`.
+Keep `SKILL.md` focused on the workflow and route detailed recipes through the catalog.
 
 ## Source-of-truth pointers
 

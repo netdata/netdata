@@ -16,7 +16,7 @@ each keeps its own `.local/audits/<dir>/` (root `AGENTS.md`, Local-Only Working 
 
 ## MANDATORY -- keep this skill alive
 
-If you (the assistant) discover a new pattern, gotcha, working flow, correction, or any operational knowledge while running this skill -- update this `SKILL.md` AND commit it BEFORE proceeding. Knowledge that isn't committed is lost.
+Capture timing and authorization for operational discoveries follow `AGENTS.md#knowledge-capture`.
 
 Examples worth capturing:
 - New v3 API endpoint or response-shape detail learned the hard way
@@ -27,7 +27,8 @@ Examples worth capturing:
 
 ## MANDATORY -- live how-tos catalog
 
-Each concrete question that requires non-trivial analysis (multiple wrapper calls, jq pipelines, cross-referencing other skills) MUST become a how-to under `how-tos/<slug>.md` AND get an entry in `how-tos/INDEX.md` BEFORE the task is reported complete. Skipping this means the next assistant repeats the analysis from scratch.
+`AGENTS.md#knowledge-capture` governs this catalog. Authorized Codacy recipes live under `how-tos/` and are listed in
+`./how-tos/INDEX.md`.
 
 ## Scope
 

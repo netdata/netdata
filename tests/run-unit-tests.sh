@@ -30,6 +30,11 @@ system_info_unit_test() {
   /bin/sh "$(dirname "$0")/system-info-test.sh"
 }
 
+kickstart_path_unit_test() {
+  echo "Running kickstart path shell tests"
+  /bin/sh "$(dirname "$0")/kickstart-path-sanitizer-test.sh"
+}
+
 spawn_server_unit_tests() {
   # Shared with the macOS CI job, which builds netdata and then runs only this suite.
   bash "$(dirname "$0")/spawn-server-tests.sh"
@@ -40,5 +45,7 @@ install_netdata || exit 1
 c_unit_tests || exit 1
 
 system_info_unit_test || exit 1
+
+kickstart_path_unit_test || exit 1
 
 spawn_server_unit_tests || exit 1

@@ -161,6 +161,5 @@ Each step names the owner section that holds the rules; read it before designing
 - `how-tos/verify-network-connections-layout-tokens.md`: check a live local Agent's link layout tokens and
   correlation wiring without exposing identifiers.
 
-Whenever you answer a developer question that needed analysis across more than one owner document and no how-to
-covers it, write the how-to here and list it above before finishing. Developer recipes stay in this skill; operator
-recipes belong under `docs/netdata-ai/skills/`.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Authorized developer recipes stay in this
+skill and are listed above; operator recipes belong under `docs/netdata-ai/skills/`.

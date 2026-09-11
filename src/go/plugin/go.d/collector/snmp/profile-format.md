@@ -786,8 +786,9 @@ ifHCInOctets.2 = 2048
 - `.1`, `.2`, … are `row indexes` that identify the instance (e.g., interface #1, interface #2).
 - Each column (symbol) in the table has its own OID pattern but shares the same row indexes.
 
-> Table metrics **must define at least one tag** (`metric_tags`) to identify each row.
-> Without tags, only a single row can be emitted.
+Table metrics need at least one resolved tag to be emitted; without tags, they are skipped. Use non-empty identifying
+tags to distinguish rows, such as an interface name or a tag derived from the row index. The SNMP row index is not
+added to the emitted series identity automatically.
 
 ```yaml
 metrics:

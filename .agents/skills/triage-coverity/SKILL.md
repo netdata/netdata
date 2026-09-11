@@ -17,9 +17,7 @@ adhoc; agree the approach with the user up front.
 
 ## MANDATORY — keep this skill alive
 
-If you (the agent) discover a new pattern, gotcha, working flow, correction,
-or any piece of knowledge while running this skill — update this `SKILL.md`
-AND commit it BEFORE proceeding. Knowledge that isn't committed is lost.
+Capture timing and authorization for operational discoveries follow `AGENTS.md#knowledge-capture`.
 
 Examples of things to capture:
 - New view IDs encountered (and what each represents)
