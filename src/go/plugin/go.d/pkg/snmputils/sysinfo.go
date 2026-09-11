@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,7 +32,8 @@ const (
 )
 
 type SysInfo struct {
-	SysObjectID string `json:"-"`
+	SysObjectID string       `json:"-"`
+	Probe       SysInfoProbe `json:"-" yaml:"-"`
 
 	Descr    string `json:"description"`
 	Contact  string `json:"contact"`
@@ -44,8 +46,24 @@ type SysInfo struct {
 	Model        string `json:"model"`
 }
 
-func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
-	pdus, err := client.WalkAll(RootOidMibSystem)
+type SysInfoProbe struct {
+	PDUCount        int
+	SeenSysDescr    bool
+	SeenSysObjectID bool
+	SeenSysContact  bool
+	SeenSysName     bool
+	SeenSysLocation bool
+}
+
+// ScalarClient is sufficient for system and device metadata acquisition.
+type ScalarClient interface {
+	Get([]string) (*gosnmp.SnmpPacket, error)
+	MaxOids() int
+	Version() gosnmp.SnmpVersion
+}
+
+func GetSysInfo(client ScalarClient) (*SysInfo, error) {
+	pdus, err := getSysInfoPDUs(client)
 	if err != nil {
 		return nil, err
 	}
@@ -59,34 +77,128 @@ func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
 
 	for _, pdu := range pdus {
 		oid := strings.TrimPrefix(pdu.Name, ".")
+		si.Probe.PDUCount++
+		if !isPduWithData(pdu) {
+			continue
+		}
 
 		switch oid {
 		case OidSysDescr:
+			si.Probe.SeenSysDescr = true
 			si.Descr, err = PduToString(pdu)
 			si.Descr = valueSanitizer.Replace(si.Descr)
 		case OidSysObject:
+			si.Probe.SeenSysObjectID = true
+			if pdu.Type != gosnmp.ObjectIdentifier {
+				err = fmt.Errorf("expected ObjectIdentifier, got %v", pdu.Type)
+				break
+			}
 			var sysObj string
 			if sysObj, err = PduToString(pdu); err == nil {
 				si.SysObjectID = sysObj
 			}
 		case OidSysContact:
+			si.Probe.SeenSysContact = true
 			si.Contact, err = PduToString(pdu)
 			si.Contact = valueSanitizer.Replace(si.Contact)
 		case OidSysName:
+			si.Probe.SeenSysName = true
 			si.Name, err = PduToString(pdu)
 			si.Name = valueSanitizer.Replace(si.Name)
 		case OidSysLocation:
+			si.Probe.SeenSysLocation = true
 			si.Location, err = PduToString(pdu)
 			si.Location = valueSanitizer.Replace(si.Location)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("OID '%s': %v", pdu.Name, err)
+			return nil, WithFailure(fmt.Errorf("OID %q: %w", pdu.Name, err), "system_identity", "processing")
 		}
 	}
 
 	updateMetadata(si)
 
 	return si, nil
+}
+
+func sysInfoOIDs() []string {
+	return []string{
+		OidSysDescr,
+		OidSysObject,
+		OidSysContact,
+		OidSysName,
+		OidSysLocation,
+	}
+}
+
+func getSysInfoPDUs(client ScalarClient) ([]gosnmp.SnmpPDU, error) {
+	maxOids := client.MaxOids()
+	if maxOids < 1 {
+		return nil, WithFailure(
+			fmt.Errorf("get SNMP system scalars: invalid maximum OIDs per request %d", maxOids),
+			"get",
+			"invalid_configuration",
+		)
+	}
+	version := client.Version()
+
+	oids := sysInfoOIDs()
+	pdus := make([]gosnmp.SnmpPDU, 0, len(oids))
+	for chunk := range slices.Chunk(oids, maxOids) {
+		chunkPDUs, err := getSysInfoChunkPDUs(client, version, chunk)
+		if err != nil {
+			return nil, err
+		}
+		pdus = append(pdus, chunkPDUs...)
+	}
+	return pdus, nil
+}
+
+func getSysInfoChunkPDUs(client ScalarClient, version gosnmp.SnmpVersion, oids []string) ([]gosnmp.SnmpPDU, error) {
+	for len(oids) > 0 {
+		packet, err := client.Get(oids)
+		if err != nil {
+			return nil, WithFailure(fmt.Errorf("get SNMP system scalars: %w", err), "get", "")
+		}
+		if packet == nil {
+			return nil, WithFailure(fmt.Errorf("get SNMP system scalars: nil response"), "get", "nil_response")
+		}
+
+		switch packet.Error {
+		case gosnmp.NoError:
+			return packet.Variables, nil
+		case gosnmp.NoSuchName:
+			if version != gosnmp.Version1 {
+				return nil, WithPacketFailure(fmt.Errorf(
+					"get SNMP system scalars: unexpected response error %s for requested SNMP version %s (index %d)",
+					packet.Error,
+					version,
+					packet.ErrorIndex,
+				), "get", packet)
+			}
+			idx := int(packet.ErrorIndex)
+			if idx < 1 || idx > len(oids) {
+				return nil, WithPacketFailure(fmt.Errorf(
+					"get SNMP system scalars: response error %s with invalid error index %d for %d requested OIDs",
+					packet.Error,
+					packet.ErrorIndex,
+					len(oids),
+				), "get", packet)
+			}
+
+			next := make([]string, 0, len(oids)-1)
+			next = append(next, oids[:idx-1]...)
+			next = append(next, oids[idx:]...)
+			oids = next
+		default:
+			return nil, WithPacketFailure(fmt.Errorf(
+				"get SNMP system scalars: response error %s (index %d)",
+				packet.Error,
+				packet.ErrorIndex,
+			), "get", packet)
+		}
+	}
+
+	return nil, nil
 }
 
 var valueSanitizer = strings.NewReplacer(
@@ -234,7 +346,16 @@ func enterpriseNumbersFileCandidates() []string {
 		filepath.Join("src", "go", "plugin", "go.d", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt"),
 	}
 	if _, file, _, ok := runtime.Caller(0); ok {
-		sourceCandidate := filepath.Join(filepath.Dir(file), "..", "..", "config", "go.d", "snmp.profiles", "metadata", "iana-enterprise-numbers.txt")
+		sourceCandidate := filepath.Join(
+			filepath.Dir(file),
+			"..",
+			"..",
+			"config",
+			"go.d",
+			"snmp.profiles",
+			"metadata",
+			"iana-enterprise-numbers.txt",
+		)
 		candidates = append([]string{sourceCandidate}, candidates...)
 	}
 	return candidates

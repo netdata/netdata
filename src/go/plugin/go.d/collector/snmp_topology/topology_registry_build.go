@@ -16,19 +16,31 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 )
 
-func buildSNMPTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
+type topologyGraphBuildEnvironment struct {
+	resolveDNSName func(ip string) string
+}
+
+func buildSNMPTopologySnapshot(
+	aggregate topologymodel.ObservationAggregate,
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologymodel.Data, bool, error) {
 	if len(aggregate.L2Observations) == 0 {
 		return topologymodel.Data{}, false, nil
 	}
 
 	if options.MapType != topologyoptions.MapTypeAllDevicesLowConfidence {
-		return buildSingleMapTopologySnapshot(aggregate, options)
+		return buildSingleMapTopologySnapshot(aggregate, options, environment)
 	}
 
-	return buildProbableTopologySnapshot(aggregate, options)
+	return buildProbableTopologySnapshot(aggregate, options, environment)
 }
 
-func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
+func buildSingleMapTopologySnapshot(
+	aggregate topologymodel.ObservationAggregate,
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologymodel.Data, bool, error) {
 	result, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
 	if err != nil || !ok {
 		return topologymodel.Data{}, false, err
@@ -38,6 +50,7 @@ func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate
 		aggregate.AgentID,
 		aggregate.CollectedAt,
 		options,
+		environment,
 	)
 	if err != nil {
 		return topologymodel.Data{}, false, err
@@ -49,7 +62,11 @@ func buildSingleMapTopologySnapshot(aggregate topologymodel.ObservationAggregate
 	return data, true, nil
 }
 
-func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate, options topologyoptions.QueryOptions) (topologymodel.Data, bool, error) {
+func buildProbableTopologySnapshot(
+	aggregate topologymodel.ObservationAggregate,
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologymodel.Data, bool, error) {
 	result, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
 	if err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
@@ -65,6 +82,7 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 		aggregate.AgentID,
 		aggregate.CollectedAt,
 		strictOptions,
+		environment,
 	)
 	if err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build strict topology: %w", err)
@@ -79,6 +97,7 @@ func buildProbableTopologySnapshot(aggregate topologymodel.ObservationAggregate,
 		aggregate.AgentID,
 		aggregate.CollectedAt,
 		probableOptions,
+		environment,
 	)
 	if err != nil {
 		return topologymodel.Data{}, false, fmt.Errorf("build probable topology: %w", err)
@@ -146,6 +165,7 @@ func projectSNMPL2TopologyData(
 	agentID string,
 	collectedAt time.Time,
 	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
 ) (topologymodel.Data, error) {
 	projection := topologyengine.ToGraph(result, topologyengine.GraphOptions{
 		SchemaVersion:             topologymodel.SchemaVersion,
@@ -154,7 +174,7 @@ func projectSNMPL2TopologyData(
 		View:                      "summary",
 		AgentID:                   agentID,
 		CollectedAt:               collectedAt,
-		ResolveDNSName:            options.ResolveDNSName,
+		ResolveDNSName:            environment.resolveDNSName,
 		CollapseActorsByIP:        options.CollapseActorsByIP,
 		EliminateNonIPInferred:    options.EliminateNonIPInferred,
 		ProbabilisticConnectivity: topologyoptions.IsMapTypeProbable(options.MapType),

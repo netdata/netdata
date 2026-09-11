@@ -116,3 +116,5 @@ If the chart is absent:
 3. Temporarily add a `debug` exporter with `verbosity: detailed` to the logs pipeline and verify that the body matches the connector condition. Remove the exporter after diagnosis because detailed log output can expose sensitive record content.
 
 To alert on the derived chart, use the standard [Netdata alert configuration reference](/src/health/REFERENCE.md). For the shared endpoint, security, and basic metrics/logs workflows, see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md).
+
+See the upstream [count connector documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/countconnector) and [filter processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/filterprocessor) for every matching condition and option beyond these examples.

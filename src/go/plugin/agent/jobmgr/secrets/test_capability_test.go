@@ -273,20 +273,20 @@ func newStoreTestCapabilityController(
 	config := storeTestCapabilityConfig()
 	key := config.ExposedKey()
 	return &Controller{
-			store:        store,
-			dependencies: NewSecretDependencyIndex(),
-			entries: map[string]secretEntry{
-				key: {
-					config: config,
-					status: dyncfg.StatusRunning,
-				},
+		store:        store,
+		dependencies: NewSecretDependencyIndex(),
+		entries: map[string]secretEntry{
+			key: {
+				config: config,
+				status: dyncfg.StatusRunning,
 			},
-		}, secretTarget{
-			command: dyncfg.CommandTest,
-			key:     key,
-			kind:    secretstore.KindVault,
-			name:    "main",
-		}
+		},
+	}, secretTarget{
+		command: dyncfg.CommandTest,
+		key:     key,
+		kind:    secretstore.KindVault,
+		name:    "main",
+	}
 }
 
 func storeTestCapabilityConfig() secretstore.Config {

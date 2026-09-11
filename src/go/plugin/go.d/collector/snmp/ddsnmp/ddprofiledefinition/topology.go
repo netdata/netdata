@@ -7,47 +7,45 @@ package ddprofiledefinition
 type TopologyKind string
 
 const (
-	KindLldpLocPort          TopologyKind = "lldp_loc_port"
-	KindLldpLocManAddr       TopologyKind = "lldp_loc_man_addr"
-	KindLldpRem              TopologyKind = "lldp_rem"
-	KindLldpRemManAddr       TopologyKind = "lldp_rem_man_addr"
-	KindLldpRemManAddrCompat TopologyKind = "lldp_rem_man_addr_compat"
-	KindCdpCache             TopologyKind = "cdp_cache"
-	KindIfName               TopologyKind = "if_name"
-	KindIfStatus             TopologyKind = "if_status"
-	KindIfDuplex             TopologyKind = "if_duplex"
-	KindIpIfIndex            TopologyKind = "ip_if_index"
-	KindBridgePortIfIndex    TopologyKind = "bridge_port_if_index"
-	KindFdbEntry             TopologyKind = "fdb_entry"
-	KindQbridgeFdbEntry      TopologyKind = "qbridge_fdb_entry"
-	KindQbridgeVlanEntry     TopologyKind = "qbridge_vlan_entry"
-	KindStpPort              TopologyKind = "stp_port"
-	KindVtpVlan              TopologyKind = "vtp_vlan"
-	KindArpEntry             TopologyKind = "arp_entry"
-	KindArpLegacyEntry       TopologyKind = "arp_legacy_entry"
-	KindOSPFNeighbor         TopologyKind = "ospf_neighbor"
+	KindLldpLocPort       TopologyKind = "lldp_loc_port"
+	KindLldpLocManAddr    TopologyKind = "lldp_loc_man_addr"
+	KindLldpRem           TopologyKind = "lldp_rem"
+	KindLldpRemManAddr    TopologyKind = "lldp_rem_man_addr"
+	KindCdpCache          TopologyKind = "cdp_cache"
+	KindIfName            TopologyKind = "if_name"
+	KindIfStatus          TopologyKind = "if_status"
+	KindIfDuplex          TopologyKind = "if_duplex"
+	KindIpIfIndex         TopologyKind = "ip_if_index"
+	KindBridgePortIfIndex TopologyKind = "bridge_port_if_index"
+	KindFdbEntry          TopologyKind = "fdb_entry"
+	KindQbridgeFdbEntry   TopologyKind = "qbridge_fdb_entry"
+	KindQbridgeVlanEntry  TopologyKind = "qbridge_vlan_entry"
+	KindStpPort           TopologyKind = "stp_port"
+	KindVtpVlan           TopologyKind = "vtp_vlan"
+	KindArpEntry          TopologyKind = "arp_entry"
+	KindArpLegacyEntry    TopologyKind = "arp_legacy_entry"
+	KindOSPFNeighbor      TopologyKind = "ospf_neighbor"
 )
 
 var validTopologyKinds = map[TopologyKind]struct{}{
-	KindLldpLocPort:          {},
-	KindLldpLocManAddr:       {},
-	KindLldpRem:              {},
-	KindLldpRemManAddr:       {},
-	KindLldpRemManAddrCompat: {},
-	KindCdpCache:             {},
-	KindIfName:               {},
-	KindIfStatus:             {},
-	KindIfDuplex:             {},
-	KindIpIfIndex:            {},
-	KindBridgePortIfIndex:    {},
-	KindFdbEntry:             {},
-	KindQbridgeFdbEntry:      {},
-	KindQbridgeVlanEntry:     {},
-	KindStpPort:              {},
-	KindVtpVlan:              {},
-	KindArpEntry:             {},
-	KindArpLegacyEntry:       {},
-	KindOSPFNeighbor:         {},
+	KindLldpLocPort:       {},
+	KindLldpLocManAddr:    {},
+	KindLldpRem:           {},
+	KindLldpRemManAddr:    {},
+	KindCdpCache:          {},
+	KindIfName:            {},
+	KindIfStatus:          {},
+	KindIfDuplex:          {},
+	KindIpIfIndex:         {},
+	KindBridgePortIfIndex: {},
+	KindFdbEntry:          {},
+	KindQbridgeFdbEntry:   {},
+	KindQbridgeVlanEntry:  {},
+	KindStpPort:           {},
+	KindVtpVlan:           {},
+	KindArpEntry:          {},
+	KindArpLegacyEntry:    {},
+	KindOSPFNeighbor:      {},
 }
 
 func IsValidTopologyKind(kind TopologyKind) bool {

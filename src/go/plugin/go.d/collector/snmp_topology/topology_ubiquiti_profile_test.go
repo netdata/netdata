@@ -77,7 +77,7 @@ func TestTopologyProductionPath_UniFiQBridgeRendersDefaultManagedFabric(t *testi
 	switchCache := newTestTopologyCache(switchDevice)
 	switchCache.updateTopologyProfileTags(switchMetrics)
 	switchCache.ingestTopologyProfileMetrics(switchMetrics)
-	switchCache.finalizeTopologyCache()
+	switchCache.finalize()
 
 	switchObservation := switchCache.buildEngineObservation(switchCache.localDevice)
 	require.Len(t, switchObservation.FDBEntries, 2)
@@ -97,7 +97,7 @@ func TestTopologyProductionPath_UniFiQBridgeRendersDefaultManagedFabric(t *testi
 	gatewayMetrics := collectTopologyProfileMetrics(t, gatewayDevice, topologyUniFiGatewayPDUs())
 	gatewayCache := newTestTopologyCache(gatewayDevice)
 	gatewayCache.ingestTopologyProfileMetrics(gatewayMetrics)
-	gatewayCache.finalizeTopologyCache()
+	gatewayCache.finalize()
 	apDevice := ddsnmp.DeviceConnectionInfo{
 		Hostname:    "192.0.2.20",
 		SysObjectID: "1.3.6.1.4.1.41112",
@@ -107,12 +107,12 @@ func TestTopologyProductionPath_UniFiQBridgeRendersDefaultManagedFabric(t *testi
 	apMetrics := collectTopologyProfileMetrics(t, apDevice, topologyUniFiAPPDUs())
 	apCache := newTestTopologyCache(apDevice)
 	apCache.ingestTopologyProfileMetrics(apMetrics)
-	apCache.finalizeTopologyCache()
+	apCache.finalize()
 
 	registry := newTopologyRegistry()
-	registry.register(switchCache)
-	registry.register(gatewayCache)
-	registry.register(apCache)
+	publishTestTopologyBuilder(registry, switchCache)
+	publishTestTopologyBuilder(registry, gatewayCache)
+	publishTestTopologyBuilder(registry, apCache)
 	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
 	assert.GreaterOrEqual(t, testCountTopologyLinksByType(data.Links, "bridge"), 1)
@@ -273,10 +273,10 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 			cache := newTestTopologyCache(device)
 			cache.updateTopologyProfileTags(metrics)
 			cache.ingestTopologyProfileMetrics(metrics)
-			cache.finalizeTopologyCache()
+			cache.finalize()
 
 			registry := newTopologyRegistry()
-			registry.register(cache)
+			publishTestTopologyBuilder(registry, cache)
 			data, ok := snapshotTopologyRegistryForTest(registry)
 			require.True(t, ok)
 

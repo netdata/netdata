@@ -1,12 +1,12 @@
 # Passive journal centralization with encryption using self-signed certificates
 
-This page will guide you through creating a **passive** journal centralization setup using **self-signed certificates** for encryption and authorization.
+A **passive** journal centralization setup with a **self-signed certificate authority** for encryption and authorization: the CA certificate is self-signed, and each server and client certificate is signed by that CA.
 
 Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources. With the setup described in this document, on recent systemd versions, Netdata will automatically name all remote sources using the names of the clients, as they are described at their certificates (on older versions, the names will be IPs or reverse DNS lookups of the IPs).
 
 A **passive** journal server waits for clients to push their metrics to it, so in this setup we will:
 
-1. configure a certificates authority and issue self-signed certificates for your servers.
+1. configure a certificate authority and issue certificates for your servers.
 2. configure `systemd-journal-remote` on the server, to listen for incoming connections.
 3. configure `systemd-journal-upload` on the clients, to push their logs to the server.
 

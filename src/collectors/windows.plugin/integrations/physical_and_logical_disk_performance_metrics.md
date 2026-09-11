@@ -68,6 +68,7 @@ No action required.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
+| exclude space metrics on paths | Space-separated, case-insensitive Netdata simple patterns for logical-volume mount points to exclude from disk space collection. Patterns support `*` wildcards and `!` negative terms. For example, `*AssuredRecoveryTemp*` excludes temporary backup volumes with that path component. |  | no |
 
 
 
@@ -96,7 +97,19 @@ sudo ./edit-config netdata.conf
 ```
 
 ##### Examples
-There are no configuration examples.
+
+###### Exclude temporary backup volumes
+
+Exclude logical-volume disk space metrics for mount points that contain `AssuredRecoveryTemp`.
+
+<details open><summary>Configuration</summary>
+
+```yaml
+[plugin:windows:PerflibStorage]
+  exclude space metrics on paths = *AssuredRecoveryTemp*
+
+```
+</details>
 
 
 
@@ -137,9 +150,10 @@ Labels:
 | Label      | Description     |
 |:-----------|:----------------|
 | mount_point | Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:'). |
-| driver_type | Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk). |
+| drive_type | Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk). |
 | filesystem | File system format used on the volume (e.g., NTFS, FAT32). |
 | rw_mode | Current read/write permissions status of the volume (read-only access, read and write access). |
+| serial_number | Volume serial number in hexadecimal format. |
 
 Metrics:
 

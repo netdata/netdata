@@ -13,9 +13,8 @@ import (
 
 func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 	// dev is a shallow copy of the caller's value, so dev.Labels still aliases
-	// the caller's map (e.g. a live topologyCache.localDevice read under RLock).
-	// Clone it before the mutations below so concurrent snapshot readers never
-	// write a shared map (fatal "concurrent map writes").
+	// the builder's map. Clone it before normalization mutates labels so the
+	// immutable generation never shares writable label state with its builder.
 	dev.Labels = maps.Clone(dev.Labels)
 
 	if dev.ChartIDPrefix == "" {
@@ -91,11 +90,4 @@ func normalizeTopologyDevice(dev topologymodel.Device) topologymodel.Device {
 		setTopologyMetadataLabelIfMissing(dev.Labels, "hardware_version", value)
 	}
 	return dev
-}
-
-func topologyDeviceKey(dev topologymodel.Device) string {
-	if dev.ChassisID == "" {
-		return ""
-	}
-	return dev.ChassisIDType + ":" + dev.ChassisID
 }

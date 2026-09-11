@@ -201,7 +201,8 @@ METRIC *mrg_metric_get_and_acquire_by_uuid(MRG *mrg, nd_uuid_t *uuid, Word_t sec
     //
     // Using the id as a bare key is safe here: every METRIC in the MRG holds its
     // own uuidmap reference for its whole lifetime (metric_add_and_acquire()
-    // takes it, metric_del() releases it), so an id that resolves to a metric is
+    // takes it, metric_release() releases it via uuidmap_free()), so an id that
+    // resolves to a metric is
     // necessarily still alive. If the uuid is unknown there can be no metric for
     // it, and if the entry died the lookup simply misses -- ids are unique for the
     // lifetime of the uuidmap, so a stale id cannot alias a different uuid. (The
@@ -249,6 +250,11 @@ nd_uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
 ALWAYS_INLINE
 UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg __maybe_unused, METRIC *metric) {
     return uuidmap_dup(metric->uuid);
+}
+
+ALWAYS_INLINE
+UUIDMAP_ID mrg_metric_uuidmap_id(MRG *mrg __maybe_unused, METRIC *metric) {
+    return metric->uuid;
 }
 
 ALWAYS_INLINE

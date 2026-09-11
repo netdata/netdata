@@ -4,14 +4,14 @@ package snmptopology
 
 import (
 	"net/netip"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-type topologyCache struct {
-	mu         sync.RWMutex
+// topologyBuilder is a mutable, collection-only builder. Runtime readers only
+// receive immutable topologyDeviceGeneration values produced from it.
+type topologyBuilder struct {
 	lastUpdate time.Time
 	updateTime time.Time
 	staleAfter time.Duration
@@ -21,8 +21,8 @@ type topologyCache struct {
 
 	agentID     string
 	localDevice topologymodel.Device
-	// localManagementAddressKeys deduplicates high-cardinality IP-MIB rows during collection.
-	// It is build-only state and is released when the cache is finalized.
+	// localManagementAddressKeys deduplicates local management observations while the builder is mutable.
+	// It is build-only state and is released when the builder is finalized.
 	localManagementAddressKeys map[managementAddressKey]struct{}
 	// targetManagementIPs is private pre-finalization selection evidence.
 	targetManagementIPs []netip.Addr
@@ -31,11 +31,12 @@ type topologyCache struct {
 	lldpRemotes  map[string]*lldpRemote
 	cdpRemotes   map[string]*cdpRemote
 
-	ifNamesByIndex      map[string]string
-	ifStatusByIndex     map[string]ifStatus
-	ifIndexByIP         map[string]string
-	ifNetmaskByIP       map[string]string
-	l3InterfacesByIP    map[string]topologymodel.L3Interface
+	ifNamesByIndex  map[string]string
+	ifStatusByIndex map[string]ifStatus
+	// ipAddressCandidatesByIP is build-only provenance state and is released at finalization.
+	ipAddressCandidatesByIP map[string]ipAddressCandidates
+	// ipAddressesByIP is the single resolved interface-address inventory.
+	ipAddressesByIP     map[string]resolvedIPAddress
 	trapMatchMethodByIP map[string]string
 	bridgePortToIf      map[string]string
 	fdbEntries          map[string]*fdbEntry

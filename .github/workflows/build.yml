@@ -506,7 +506,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@v7
         with:
-          go-version: "^1.26"
+          go-version: "^1.27"
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
@@ -612,15 +612,11 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            pattern: windows-*-installer
-            path: dist-artifacts
-            merge-multiple: true
-          attempt_limit: 3
-          attempt_delay: 2000
+          pattern: windows-*-installer
+          path: dist-artifacts
+          merge-multiple: true
       - name: Install Netdata
         id: install-netdata
         if: needs.file-check.outputs.run == 'true'
@@ -684,27 +680,19 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            pattern: dist-*
-            path: dist-artifacts
-            merge-multiple: true
-          attempt_limit: 3
-          attempt_delay: 2000
+          pattern: dist-*
+          path: dist-artifacts
+          merge-multiple: true
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            pattern: windows-*-installer
-            path: dist-artifacts
-            merge-multiple: true
-          attempt_limit: 3
-          attempt_delay: 2000
+          pattern: windows-*-installer
+          path: dist-artifacts
+          merge-multiple: true
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
@@ -775,14 +763,10 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -846,14 +830,10 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -917,14 +897,10 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -989,14 +965,10 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: final-artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: final-artifacts
       - name: Prepare version info
         id: version
         run: |
@@ -1115,14 +1087,10 @@ jobs:
         uses: actions/checkout@v7
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v3
+        uses: actions/download-artifact@v4
         with:
-          action: actions/download-artifact@v4
-          with: |
-            name: final-artifacts
-            path: final-artifacts
-          attempt_limit: 3
-          attempt_delay: 2000
+          name: final-artifacts
+          path: final-artifacts
       - name: Create Release
         id: create-release
         uses: ncipollo/release-action@v1
@@ -1222,7 +1190,7 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix: ${{ fromJson(needs.src-matrix.outputs.matrix) }}
     steps:
       - name: Skip Check
@@ -1240,20 +1208,16 @@ jobs:
         uses: docker/setup-buildx-action@v4
       - name: Build test environment
         id: build
-        uses: Wandalen/wretry.action@v3
+        uses: docker/build-push-action@v7
         with:
-          action: docker/build-push-action@v6
-          with: |
-            push: false
-            load: true
-            file: .github/dockerfiles/Dockerfile.build_test
-            build-args: |
-              BASE=${{ matrix.distro }}
-              PRE=${{ matrix.env_prep }}
-              RMJSONC=${{ matrix.jsonc_removal }}
-            tags: test:${{ matrix.artifact_key }}
-          attempt_limit: 3
-          attempt_delay: 15000
+          push: false
+          load: true
+          file: .github/dockerfiles/Dockerfile.build_test
+          build-args: |
+            BASE=${{ matrix.distro }}
+            PRE=${{ matrix.env_prep }}
+            RMJSONC=${{ matrix.jsonc_removal }}
+          tags: test:${{ matrix.artifact_key }}
       - name: netdata-installer on ${{ matrix.distro }}
         id: build-cloud
         if: needs.file-check.outputs.run == 'true'
@@ -1385,7 +1349,6 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
       matrix:
         include:
           - name: macos-14-M1
@@ -1428,6 +1391,18 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
         run: |
           ./tests/ndsudo-macos.sh /usr/local/netdata/usr/libexec/netdata/plugins.d/ndsudo
+      - name: Test spawn-server unit tests
+        id: test-spawn-server
+        # The spawn servers depend on platform primitives: posix_spawn with POSIX_SPAWN_SETSIGDEF,
+        # and the signal disposition and mask a child inherits across exec. Passing on Linux does
+        # not establish the behaviour here, and macOS is where netdata/netdata#23730 was observed -
+        # a child that inherited an ignored SIGPIPE, so closing its stdio left it running. Until now
+        # these tests ran only on ubuntu (tests/run-unit-tests.sh), so that platform-specific
+        # behaviour was verified nowhere.
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        timeout-minutes: 5
+        run: |
+          ./tests/spawn-server-tests.sh
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
@@ -1452,6 +1427,7 @@ jobs:
               Install netdata required packages: ${{ steps.install-nd-dep.outcome }}
               Build from source: ${{ steps.build-source.outcome }}
               Test ndsudo argument validation: ${{ steps.test-ndsudo.outcome }}
+              Test spawn-server unit tests: ${{ steps.test-spawn-server.outcome }}
               Test Agent runtime: ${{ steps.test-agent.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

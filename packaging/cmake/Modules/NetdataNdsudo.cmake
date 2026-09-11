@@ -14,7 +14,7 @@ include_guard()
 if(OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
     set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
-    add_executable(ndsudo ${NDSUDO_FILES})
+    add_executable(ndsudo ${NDSUDO_FILES} src/collectors/utils/exec-signals.h)
 
     install(TARGETS ndsudo
             COMPONENT netdata

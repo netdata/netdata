@@ -107,18 +107,12 @@ func collectTopologySnapshotFromDevice(t *testing.T, dev ddsnmp.DeviceConnection
 	coll.refreshTopology(context.Background())
 
 	var snapshot topologymodel.Data
-	cacheKey := dev.Hostname + ":" + strconv.Itoa(dev.Port)
 	require.Eventuallyf(t, func() bool {
-		cache := coll.deviceCaches[cacheKey]
-		if cache == nil {
-			return false
-		}
-
-		var ok bool
 		options := defaultTopologyQueryOptionsForTest()
 		options.CollapseActorsByIP = false
 		options.EliminateNonIPInferred = false
-		snapshot, ok = snapshotTopologyCacheForTestWithOptions(cache, options)
+		var ok bool
+		snapshot, ok = snapshotTopologyRegistryForTestWithOptions(coll.topologyRegistry, options)
 		return ok
 	}, 5*time.Second, 100*time.Millisecond, "topology snapshot did not become available for %q", dev.SysName)
 

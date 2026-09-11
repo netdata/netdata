@@ -258,6 +258,7 @@ set(API_PLUGIN_FILES
         src/web/api/queries/latest/latest.c
         src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
+        src/web/api/queries/weights-ranking.h
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c
         src/web/api/formatters/rrd2json.h
@@ -619,6 +620,7 @@ set(WEB_PLUGIN_FILES
         src/web/server/static/static-threaded.c
         src/web/server/static/static-threaded.h
         src/web/server/web_client.c
+        src/web/server/web_client-unittest.c
         src/web/server/web_client.h
         src/web/server/web_client_cache.c
         src/web/server/web_client_cache.h
@@ -702,6 +704,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_dcstat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_fd.c
         src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
@@ -764,6 +767,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-smb.c
+        src/collectors/windows.plugin/perflib-terminal-services.c
         src/collectors/windows.plugin/perflib-netframework.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c

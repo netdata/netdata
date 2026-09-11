@@ -68,7 +68,7 @@ func TestTopologyCache_RealSnmprecFixtures(t *testing.T) {
 			for _, tags := range data.cdpRemotes {
 				cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindCdpCache, Tags: tags})
 			}
-			cache.finalizeTopologyCache()
+			cache.finalize()
 
 			options := defaultTopologyQueryOptionsForTest()
 			options.CollapseActorsByIP = false

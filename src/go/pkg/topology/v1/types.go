@@ -9,6 +9,10 @@ import "time"
 const (
 	SchemaVersion = "netdata.topology.v1"
 	ResponseType  = "topology"
+
+	NotificationSeverityInfo    = "info"
+	NotificationSeverityWarning = "warning"
+	NotificationSeverityError   = "error"
 )
 
 type Response struct {
@@ -35,6 +39,7 @@ func NewResponse(data Data) Response {
 type Data struct {
 	SchemaVersion string         `json:"schema_version"`
 	Producer      Producer       `json:"producer"`
+	Notifications []Notification `json:"notifications,omitempty"`
 	CollectedAt   time.Time      `json:"collected_at"`
 	ValidAfter    *time.Time     `json:"valid_after,omitempty"`
 	ValidUntil    *time.Time     `json:"valid_until,omitempty"`
@@ -60,6 +65,14 @@ type Producer struct {
 	AgentVersion string   `json:"agent_version,omitempty"`
 	Plugin       string   `json:"plugin,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`
+}
+
+type Notification struct {
+	Severity       string    `json:"severity"`
+	Code           string    `json:"code"`
+	Message        string    `json:"message"`
+	Origin         *Producer `json:"origin,omitempty"`
+	AffectedNodeID string    `json:"affected_node_id,omitempty"`
 }
 
 type View struct {

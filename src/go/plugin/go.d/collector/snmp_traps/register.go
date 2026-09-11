@@ -15,13 +15,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
-// Register registers the SNMP traps collector with shared SNMP-family enrichment state.
-func Register(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) {
-	collectorapi.Register("snmp_traps", newCreator(deviceStore, topologyEnricher, reverseDNS))
-}
-
-func newCreator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) collectorapi.Creator {
-	services := requiredPluginServices("Register", deviceStore, topologyEnricher, reverseDNS)
+// Creator constructs registration with explicit SNMP-family dependencies.
+func Creator(deviceStore *ddsnmp.DeviceStore, topologyEnricher *snmptopology.TrapEnrichmentHandle, reverseDNS *reversedns.Resolver) collectorapi.Creator {
+	services := requiredPluginServices("Creator", deviceStore, topologyEnricher, reverseDNS)
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{

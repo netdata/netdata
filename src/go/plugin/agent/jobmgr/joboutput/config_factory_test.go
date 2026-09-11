@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -316,6 +317,15 @@ func (sensitiveCodedRetryableError) Error() string         { return "resolved-se
 func (sensitiveCodedRetryableError) DyncfgCode() int       { return 429 }
 func (sensitiveCodedRetryableError) DyncfgRetryable() bool { return true }
 
+type sensitiveCodedProcessControlError struct {
+	cause error
+}
+
+func (err *sensitiveCodedProcessControlError) Error() string         { return "resolved-sensitive-control" }
+func (err *sensitiveCodedProcessControlError) Unwrap() error         { return err.cause }
+func (err *sensitiveCodedProcessControlError) DyncfgCode() int       { return 429 }
+func (err *sensitiveCodedProcessControlError) DyncfgRetryable() bool { return true }
+
 func TestResolvedLifecycleRedactionPreservesControlClassifications(t *testing.T) {
 	err := lifecycle.RetainOwnership(errors.Join(
 		lifecycle.ErrTaskPanic,
@@ -329,6 +339,85 @@ func TestResolvedLifecycleRedactionPreservesControlClassifications(t *testing.T)
 	require.Contains(t, redacted.Error(), "redacted")
 	require.ErrorIs(t, redacted, lifecycle.ErrTaskPanic)
 	require.ErrorIs(t, redacted, context.Canceled)
+	require.True(t, lifecycle.OwnershipRetained(redacted))
+	require.True(t, dyncfg.IsRetryableError(redacted))
+	coded, ok := errors.AsType[dyncfg.CodedError](redacted)
+	require.True(t, ok)
+	require.Equal(t, 429, coded.DyncfgCode())
+}
+
+func TestResolvedLifecycleRedactionPreservesPureProcessControlTrees(t *testing.T) {
+	tests := map[string]struct {
+		err  error
+		want []error
+	}{
+		"retired": {
+			err:  fmt.Errorf("resolved-sensitive-retired: %w", jobmgr.ErrProcessAttemptRetired),
+			want: []error{jobmgr.ErrProcessAttemptRetired},
+		},
+		"stopped": {
+			err:  fmt.Errorf("resolved-sensitive-stopped: %w", jobmgr.ErrProcessAttemptStopped),
+			want: []error{jobmgr.ErrProcessAttemptStopped},
+		},
+		"joined": {
+			err: errors.Join(
+				fmt.Errorf("resolved-sensitive-retired: %w", jobmgr.ErrProcessAttemptRetired),
+				fmt.Errorf("resolved-sensitive-stopped: %w", jobmgr.ErrProcessAttemptStopped),
+			),
+			want: []error{jobmgr.ErrProcessAttemptRetired, jobmgr.ErrProcessAttemptStopped},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			redacted := redactResolvedLifecycleError(test.err)
+
+			require.Contains(t, redacted.Error(), "redacted")
+			require.NotContains(t, redacted.Error(), "resolved-sensitive")
+			for _, want := range test.want {
+				require.ErrorIs(t, redacted, want)
+			}
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				redacted,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+		})
+	}
+}
+
+func TestResolvedLifecycleRedactionRejectsMixedProcessControlTree(t *testing.T) {
+	err := errors.Join(
+		fmt.Errorf("resolved-sensitive-stopped: %w", jobmgr.ErrProcessAttemptStopped),
+		errors.New("resolved-sensitive-operational"),
+	)
+
+	redacted := redactResolvedLifecycleError(err)
+
+	require.Contains(t, redacted.Error(), "redacted")
+	require.NotContains(t, redacted.Error(), "resolved-sensitive")
+	require.NotErrorIs(t, redacted, jobmgr.ErrProcessAttemptStopped)
+	require.False(t, jobmgr.ContainsOnlyErrorLeaves(
+		redacted,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
+}
+
+func TestResolvedLifecycleRedactionComposesProcessControlMetadata(t *testing.T) {
+	err := lifecycle.RetainOwnership(&sensitiveCodedProcessControlError{
+		cause: jobmgr.ErrProcessAttemptStopped,
+	})
+
+	redacted := redactResolvedLifecycleError(err)
+
+	require.Contains(t, redacted.Error(), "redacted")
+	require.NotContains(t, redacted.Error(), "resolved-sensitive")
+	require.ErrorIs(t, redacted, jobmgr.ErrProcessAttemptStopped)
+	require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+		redacted,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
 	require.True(t, lifecycle.OwnershipRetained(redacted))
 	require.True(t, dyncfg.IsRetryableError(redacted))
 	coded, ok := errors.AsType[dyncfg.CodedError](redacted)

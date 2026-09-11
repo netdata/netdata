@@ -42,7 +42,7 @@ func inferFDBPairwiseBridgeLinks(
 			continue
 		}
 		owners := aliasOwnerIDs[endpointID]
-		if len(owners) == 0 {
+		if len(owners) != 1 {
 			continue
 		}
 		port := link.port

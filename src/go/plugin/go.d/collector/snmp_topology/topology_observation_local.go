@@ -5,13 +5,12 @@ package snmptopology
 import (
 	"strings"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
+func (c *topologyBuilder) buildEngineObservation(local topologymodel.Device) topologyengine.L2Observation {
 	localManagementIP := normalizeEligibleManagementIP(local.ManagementIP)
 
 	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
@@ -21,7 +20,7 @@ func (c *topologyCache) buildEngineObservation(local topologymodel.Device) topol
 	}
 
 	observation := topologyengine.L2Observation{
-		DeviceID:          ensureTopologyObservationDeviceID(local, baseBridgeAddress),
+		DeviceID:          topologymodel.ObservationDeviceID(local, baseBridgeAddress),
 		Hostname:          strings.TrimSpace(local.SysName),
 		ManagementIP:      localManagementIP,
 		ManagementAliases: engineManagementAliases(local.ManagementAddresses),

@@ -12,7 +12,7 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (c *topologyCache) appendObservedFDBEntries(observation *topologyengine.L2Observation) {
+func (c *topologyBuilder) appendObservedFDBEntries(observation *topologyengine.L2Observation) {
 	if observation == nil {
 		return
 	}
@@ -47,7 +47,7 @@ func (c *topologyCache) appendObservedFDBEntries(observation *topologyengine.L2O
 	}
 }
 
-func (c *topologyCache) appendObservedSTPPorts(observation *topologyengine.L2Observation) {
+func (c *topologyBuilder) appendObservedSTPPorts(observation *topologyengine.L2Observation) {
 	if observation == nil {
 		return
 	}
@@ -88,7 +88,7 @@ func (c *topologyCache) appendObservedSTPPorts(observation *topologyengine.L2Obs
 	}
 }
 
-func (c *topologyCache) appendObservedARPNDEntries(observation *topologyengine.L2Observation) {
+func (c *topologyBuilder) appendObservedARPNDEntries(observation *topologyengine.L2Observation) {
 	if observation == nil {
 		return
 	}

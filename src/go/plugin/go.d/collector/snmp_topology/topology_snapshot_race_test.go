@@ -11,18 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
-// TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels reproduces the
-// concurrent-map-write crash where the snapshot read path mutated a cache-shared
-// map. snapshotEngineObservations holds only an RLock and passes c.localDevice
-// (by value, so Labels still aliases the cache map) to normalizeTopologyDevice,
-// which writes Labels. Two concurrent snapshot readers then write the same map.
-//
-// Run with -race. Before the fix this reports a data race / fatal concurrent map
-// writes; after the fix (normalizeTopologyDevice clones Labels) it passes.
-func TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels(t *testing.T) {
+// Run with -race. The builder is frozen once before publication; every reader
+// then traverses the same immutable generation without a cache lock.
+func TestTopologyRegistry_ConcurrentSnapshotsReadImmutableGeneration(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.lastUpdate = time.Now()
 	cache.localDevice = topologymodel.Device{
 		ManagementIP:  "192.0.2.1",
@@ -46,7 +40,7 @@ func TestTopologyRegistry_ConcurrentSnapshotsDoNotRaceOnDeviceLabels(t *testing.
 		portID:           "Gi0/2",
 		portIDSubtype:    "interfaceName",
 	}
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	const goroutines = 64
 	var wg sync.WaitGroup

@@ -1,0 +1,27 @@
+extends:
+  - _system-base.yaml
+  - _std-if-mib.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-fdb-mib.yaml
+  - _std-topology-stp-mib.yaml
+  - _mikrotik-hardware.yaml
+
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.14988.2 # SwOS
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "MikroTik"
+      type:
+        value: "Switch"
+      model:
+        symbols:
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            extract_value: '([A-Za-z0-9-+]+) SwOS'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr

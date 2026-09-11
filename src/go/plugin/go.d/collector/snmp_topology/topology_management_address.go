@@ -3,12 +3,9 @@
 package snmptopology
 
 import (
-	"encoding/hex"
-	"fmt"
 	"net"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -87,7 +84,7 @@ func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topol
 	return append(addrs, addr)
 }
 
-func (c *topologyCache) appendLocalManagementAddress(addr topologymodel.ManagementAddress) {
+func (c *topologyBuilder) appendLocalManagementAddress(addr topologymodel.ManagementAddress) {
 	if c == nil {
 		return
 	}
@@ -284,14 +281,27 @@ func finalizeLocalManagementAddresses(
 	targets []netip.Addr,
 	netmasks map[string]string,
 ) {
+	finalizeLocalManagementAddressesWithLookup(device, targets, func(ip string) string {
+		return netmasks[ip]
+	})
+}
+
+func finalizeLocalManagementAddressesWithLookup(
+	device *topologymodel.Device,
+	targets []netip.Addr,
+	netmask func(string) string,
+) {
 	if device == nil {
 		return
+	}
+	if netmask == nil {
+		netmask = func(string) string { return "" }
 	}
 
 	var selector managementIPSelector
 	addTarget := func(addr netip.Addr) {
 		addr = addr.Unmap()
-		if isEligibleManagementInterfaceAddress(addr.String(), netmasks[addr.String()]) {
+		if isEligibleManagementInterfaceAddress(addr.String(), netmask(addr.String())) {
 			selector.add(addr, managementAddressSourceCollectorTarget)
 		}
 	}
@@ -306,7 +316,7 @@ func finalizeLocalManagementAddresses(
 	filtered := addrs[:0]
 	for _, addr := range addrs {
 		ip, ok := managementAddressIP(addr)
-		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmasks[ip.String()]) {
+		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmask(ip.String())) {
 			continue
 		}
 		filtered = append(filtered, addr)
@@ -317,30 +327,6 @@ func finalizeLocalManagementAddresses(
 	clear(addrs[len(filtered):])
 	device.ManagementAddresses = filtered
 	device.ManagementIP = selector.selected()
-}
-
-func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
-	lengthStr := strings.TrimSpace(tags[tagLldpRemMgmtAddrLen])
-	length, err := strconv.Atoi(lengthStr)
-	if err != nil || length <= 0 || length > net.IPv6len {
-		return ""
-	}
-
-	addr := make([]byte, 0, length)
-	for i := 1; i <= length; i++ {
-		tag := fmt.Sprintf("%s%d", tagLldpRemMgmtAddrOctetPref, i)
-		v := strings.TrimSpace(tags[tag])
-		if v == "" {
-			return ""
-		}
-		octet, err := strconv.Atoi(v)
-		if err != nil || octet < 0 || octet > 255 {
-			return ""
-		}
-		addr = append(addr, byte(octet))
-	}
-
-	return hex.EncodeToString(addr)
 }
 
 func normalizeLLDPManagementAddress(rawAddr, rawType string) (string, string) {

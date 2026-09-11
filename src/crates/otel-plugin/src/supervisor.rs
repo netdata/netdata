@@ -151,8 +151,13 @@ struct Supervisor {
 
 impl Supervisor {
     /// Record a worker's function declarations in the routing table and forward
-    /// each one to the agent. Shared by the three `configure_*` handshakes,
-    /// which differ only in their request/response/config types.
+    /// each one to the agent. The ledger's and ingestor's declarations are held
+    /// by `run()` until BOTH handshakes succeeded, because the ingestor's Ready
+    /// means "the gRPC endpoint is bound and startup completed": a Function the
+    /// agent has seen outlives the plugin as a restartable collector, so a plugin
+    /// that declared and then died on a bind error would be restarted by the
+    /// agent forever. Legacy-logs registers as soon as it is ready; it is
+    /// configured after the ingestor and is best-effort anyway.
     async fn register_declarations(
         &mut self,
         worker: Worker,
@@ -180,38 +185,41 @@ impl Supervisor {
         Ok(())
     }
 
-    /// Send Configure to the ingestor and register the functions it reports.
-    async fn configure_ingestor(&mut self, config: PluginConfig) -> anyhow::Result<()> {
+    /// Send Configure to the ingestor and return the functions it reports. The
+    /// ingestor sends Ready only once its gRPC endpoint is bound and every
+    /// startup step succeeded, so a failure here (typically the port already in
+    /// use) surfaces before anything has been declared to the agent.
+    async fn configure_ingestor(
+        &mut self,
+        config: PluginConfig,
+    ) -> anyhow::Result<Vec<FunctionDeclaration>> {
         self.ingestor
             .send(IngestorRequest::Configure(Box::new(config)))
             .await
             .context("failed to send Configure to ingestor")?;
 
         match self.ingestor.recv().await.context("ingestor handshake")? {
-            IngestorResponse::Ready { declarations } => {
-                self.register_declarations(Worker::Ingestor, declarations)
-                    .await?;
-            }
+            IngestorResponse::Ready { declarations } => Ok(declarations),
             other => bail!("expected Ready from ingestor, got: {other:?}"),
         }
-        Ok(())
     }
 
-    /// Send Configure to the ledger and register the functions it reports.
-    async fn configure_ledger(&mut self, config: PluginConfig) -> anyhow::Result<()> {
+    /// Send Configure to the ledger and return the functions it reports. The
+    /// caller registers them only after the ingestor handshake also succeeded
+    /// (see `register_declarations`).
+    async fn configure_ledger(
+        &mut self,
+        config: PluginConfig,
+    ) -> anyhow::Result<Vec<FunctionDeclaration>> {
         self.ledger
             .send(LedgerRequest::Configure(Box::new(config)))
             .await
             .context("failed to send Configure to ledger")?;
 
         match self.ledger.recv().await.context("ledger handshake")? {
-            LedgerResponse::Ready { declarations } => {
-                self.register_declarations(Worker::Ledger, declarations)
-                    .await?;
-            }
+            LedgerResponse::Ready { declarations } => Ok(declarations),
             other => bail!("expected Ready from ledger, got: {other:?}"),
         }
-        Ok(())
     }
 
     /// Send Configure to the legacy-logs worker and register the functions it reports.
@@ -755,15 +763,29 @@ pub async fn run() -> anyhow::Result<()> {
         .await
         .context("failed to write TRUST_DURATIONS to agent")?;
 
-    supervisor
+    // The ledger is configured first (it must be listening on the writer socket
+    // before the ingestor connects to it), but its Functions are not forwarded to
+    // the agent until the ingestor has bound its endpoint: bind before declare.
+    // A handshake failure here returns straight out and ChildGuard SIGKILLs the
+    // remaining workers: the ledger does not read its supervisor connection
+    // while it waits in `accept_writer`, so a graceful Shutdown would not reach
+    // it anyway, and legacy-logs treats a pre-Configure Shutdown as an error.
+    let ledger_declarations = supervisor
         .configure_ledger(plugin_config.clone())
         .await
         .context("ledger configuration failed")?;
 
-    supervisor
+    let ingestor_declarations = supervisor
         .configure_ingestor(plugin_config)
         .await
         .context("ingestor configuration failed")?;
+
+    supervisor
+        .register_declarations(Worker::Ledger, ledger_declarations)
+        .await?;
+    supervisor
+        .register_declarations(Worker::Ingestor, ingestor_declarations)
+        .await?;
 
     // The legacy-logs viewer is best-effort and decoupled from the new pipeline:
     // a configure failure disables it but MUST NOT take down the new pipeline.

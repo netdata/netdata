@@ -5,21 +5,10 @@ recipes that combine the per-domain guides into answers for
 specific questions. Each how-to documents the question, the steps
 taken, the wrappers used, and the expected output shape.
 
-## The "if you analyze, you author a how-to" rule
+## Knowledge Capture
 
-The how-tos catalog is meant to be **live**. Every time an AI
-assistant (or human) is asked a question that:
-
-1. The user expects a concrete answer to, AND
-2. Is not already documented in this index, AND
-3. Forces analysis (multiple wrapper calls, jq pipelines, or
-   cross-referencing more than one per-domain guide)
-
-the assistant MUST author a new how-to in this directory and add
-it to the index BELOW before completing the task.
-
-This is mandatory. Skipping it means the next assistant repeats
-the same analysis from scratch.
+Capture timing, authorization, and audience boundaries follow
+[the skill's Knowledge Capture section](../SKILL.md#knowledge-capture).
 
 ## How-to authoring template
 

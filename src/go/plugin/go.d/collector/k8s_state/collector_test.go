@@ -23,10 +23,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 var (
@@ -100,7 +100,10 @@ func TestCollector_Check(t *testing.T) {
 			wantFail: true,
 			prepare: func() *Collector {
 				collr := New()
-				client := &brokenInfoKubeClient{fake.NewClientset()}
+				client := fake.NewClientset()
+				client.PrependReactor("get", "version", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("ServerVersion() error")
+				})
 				collr.newKubeClient = func() (kubernetes.Interface, error) { return client, nil }
 				return collr
 			},
@@ -1166,22 +1169,6 @@ func prepareCronJobJob(name string, cj *batchv1.CronJob) *batchv1.Job {
 			},
 		},
 	}
-}
-
-type brokenInfoKubeClient struct {
-	kubernetes.Interface
-}
-
-func (kc *brokenInfoKubeClient) Discovery() discovery.DiscoveryInterface {
-	return &brokenInfoDiscovery{kc.Interface.Discovery()}
-}
-
-type brokenInfoDiscovery struct {
-	discovery.DiscoveryInterface
-}
-
-func (d *brokenInfoDiscovery) ServerVersion() (*version.Info, error) {
-	return nil, errors.New("brokenInfoDiscovery.ServerVersion() error")
 }
 
 func calcObsoleteCharts(charts collectorapi.Charts) (num int) {

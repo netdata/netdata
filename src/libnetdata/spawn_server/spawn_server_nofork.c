@@ -315,17 +315,33 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
     sigemptyset(&empty_mask);
     if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", rq->cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
+    }
+
+    // POSIX_SPAWN_SETSIGDEF only forces to default the signals that are MEMBERS of the
+    // spawn-sigdefault set, and posix_spawnattr_init() leaves that set empty - so the flag alone
+    // resets nothing. We must populate it explicitly.
+    //
+    // This matters because SIG_IGN dispositions survive execve(). netdata ignores SIGPIPE
+    // (NETDATA_SIGNAL_IGNORE in src/daemon/signal-handler.c), and without this the child inherits
+    // that ignore: closing the child's stdio then yields EPIPE instead of killing it, so a
+    // long-running child never exits when we stop reading it.
+    //
+    // SIGPIPE is the only signal netdata sets to SIG_IGN, so resetting just it is sufficient and
+    // keeps us from overriding dispositions we never set (e.g. ones inherited from the service
+    // manager). Keep this in sync with signals_waiting[] in src/daemon/signal-handler.c.
+    sigset_t default_signals;
+    sigemptyset(&default_signals);
+    sigaddset(&default_signals, SIGPIPE);
+    if (posix_spawnattr_setsigdefault(&attr, &default_signals) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigdefault() failed: %s", rq->cmdline);
+        goto cleanup_attr;
     }
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
     if (posix_spawnattr_setflags(&attr, flags) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", rq->cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
     }
 
     int fds_to_keep[] = {
@@ -356,6 +372,13 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
 
     nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "SPAWN SERVER: process created with pid %d: %s", rq->pid, rq->cmdline);
     return true;
+
+cleanup_attr:
+    // Shared by the attr-configuration failures above; they all own exactly the same two objects.
+    // The request's fds belong to the caller and are closed by request_free().
+    posix_spawn_file_actions_destroy(&file_actions);
+    posix_spawnattr_destroy(&attr);
+    return false;
 }
 
 static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN_REQUEST *rq) {
@@ -413,12 +436,24 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         };
         sigemptyset(&sa.sa_mask);
 
-        if(sigaction(SIGTERM, &sa, NULL) == -1 || sigaction(SIGCHLD, &sa, NULL) == -1) {
+        // SIGPIPE is reset too: netdata ignores it, fork() inherits the ignore, and a callback
+        // child that keeps running on EPIPE instead of dying cannot be stopped by closing its pipes.
+        if(sigaction(SIGTERM, &sa, NULL) == -1 || sigaction(SIGCHLD, &sa, NULL) == -1 ||
+           sigaction(SIGPIPE, &sa, NULL) == -1) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to reset callback child signal handlers.");
             _exit(EXIT_FAILURE);
         }
 
-        mask_rc = pthread_sigmask(SIG_SETMASK, &previous_mask, NULL);
+        // The disposition alone is not enough: SIGPIPE is also BLOCKED here. The block is ours, not
+        // inherited - spawn_server_event_loop() calls signals_block_all() and unblocks only SIGTERM
+        // and SIGCHLD, so previous_mask always carries SIGPIPE blocked, whatever the daemon's mask
+        // was. A blocked SIGPIPE makes write() return EPIPE with the signal left pending, so the
+        // child would survive a closed pipe exactly as if the disposition were still SIG_IGN.
+        // Restore the inherited mask minus SIGPIPE.
+        sigset_t child_mask = previous_mask;
+        sigdelset(&child_mask, SIGPIPE);
+
+        mask_rc = pthread_sigmask(SIG_SETMASK, &child_mask, NULL);
         if(mask_rc != 0) {
             errno = mask_rc;
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to restore callback child signal mask.");
@@ -1136,14 +1171,21 @@ static void spawn_server_process_sigchld(void) {
             send_report_remove_request = true;
         }
         else if(WIFSIGNALED(status)) {
+            // SIGPIPE and SIGTERM are how we stop children on purpose: we close their pipes, or we
+            // signal them. spawn_popen_status_rc() already reports both as a clean exit (rc 0), so
+            // they are not warnings here either - otherwise every recycled plugin logs one.
+            int sig = WTERMSIG(status);
+            ND_LOG_FIELD_PRIORITY prio =
+                (sig == SIGPIPE || sig == SIGTERM) ? NDLP_DEBUG : NDLP_WARNING;
+
             if(WCOREDUMP(status))
                 nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                     "SPAWN SERVER: child with pid %d (request %zu) coredump'd due to signal %d: %s",
-                    pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
+                    pid, request_id, sig, rq ? rq->cmdline : "[request not found]");
             else
-                nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                nd_log(NDLS_COLLECTORS, prio,
                     "SPAWN SERVER: child with pid %d (request %zu) killed by signal %d: %s",
-                    pid, request_id, WTERMSIG(status), rq ? rq->cmdline : "[request not found]");
+                    pid, request_id, sig, rq ? rq->cmdline : "[request not found]");
             send_report_remove_request = true;
         }
         else if(WIFSTOPPED(status)) {
@@ -1533,11 +1575,29 @@ cleanup:
 // --------------------------------------------------------------------------------------------------------------------
 // creating spawn server instances
 
+// Report a child we could not signal. This is not a cosmetic log: a child that cannot be signalled
+// is never terminated by us, and if it also does not exit on its own it leaks for the lifetime of
+// the machine. EPERM here means the child is running with a uid we cannot signal - the usual cause
+// is a setuid-root helper (e.g. ndsudo) that execve()d the target, which puts the child's real uid
+// at 0 while netdata and its spawn server run unprivileged.
+static void spawn_server_log_kill_failure(SPAWN_INSTANCE *instance, int signo) {
+    int e = errno;
+    nd_log(NDLS_COLLECTORS, e == ESRCH ? NDLP_DEBUG : NDLP_ERR,
+           "SPAWN PARENT: cannot send signal %d to child pid %d (request %zu): %s%s: %s",
+           signo, instance->child_pid, instance->request_id, strerror(e),
+           e == EPERM ? " - the child runs with a uid we cannot signal, so it will not be terminated"
+                      : "",
+           instance->cmdline ? instance->cmdline : "[no command line]");
+    errno = e;
+}
+
 void spawn_server_exec_destroy(SPAWN_INSTANCE *instance) {
-    if(instance->child_pid) kill(instance->child_pid, SIGTERM);
+    if(instance->child_pid && kill(instance->child_pid, SIGTERM) != 0)
+        spawn_server_log_kill_failure(instance, SIGTERM);
     if(instance->write_fd != -1) close(instance->write_fd);
     if(instance->read_fd != -1) close(instance->read_fd);
     if(instance->sock != -1) close(instance->sock);
+    freez((void *)instance->cmdline);
     freez(instance);
 }
 
@@ -1572,7 +1632,9 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
     NETDATA_SSL ssl = { 0 };
     int rc = wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
     if(rc == -1 /* thread cancelled */ || rc == 1 /* timeout */)
-        // the child is still running; the caller decides whether to keep waiting or kill it
+        // Nothing was observed - the poll expired, or the wait was cancelled before observing
+        // anything at all. Usually the child is still running, but this is not proof of it; see the
+        // RUNNING note on spawn_server_exec_timedwait() in spawn_server.h.
         return SPAWN_TIMEDWAIT_RUNNING;
 
     if(rc == 2 /* error on the socket */) {
@@ -1633,6 +1695,12 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return rc;
 }
 
+// NOTE on pid safety: every kill below can in principle hit a recycled pid. Our spawn server reaps
+// the child and only then writes the status report, and it writes none at all if the pid is not in
+// its request list - so "no report yet" (SPAWN_TIMEDWAIT_RUNNING) does not mean the pid is still
+// ours. The pre-kill grace makes this worse by discarding its poll result and signalling regardless.
+// Closing the window needs the signalling to move into the spawn server, keyed by request id, so the
+// process that reaps is the one that signals; until then this is a known, accepted race.
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
@@ -1643,16 +1711,16 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         wait_on_socket_or_cancel_with_timeout(&ssl, instance->sock, timeout_ms, POLLIN, &revents);
     }
 
-    // kill the child, if it is still running
+    // we still have a pid recorded for this child - not a liveness check (see the note above)
     if(instance->child_pid) {
-        kill(instance->child_pid, SIGTERM);
+        if(kill(instance->child_pid, SIGTERM) != 0)
+            spawn_server_log_kill_failure(instance, SIGTERM);
 
         // wait a bounded grace for the child to exit after SIGTERM. NOTE: timeout_ms is already
         // consumed above as the pre-kill grace (voluntary exit before SIGTERM); the post-SIGTERM
         // grace uses the fixed default so the caller's grace is not applied twice.
-        // No PID-reuse race on the RUNNING path: the spawn server reaps the child and only then
-        // sends the status report that makes timedwait return EXITED, so a RUNNING result means
-        // the child has not been reaped yet and its PID is still held.
+        // EXITED here is authoritative (the server reaps before it reports); RUNNING is not - see
+        // the pid-safety note above this function.
         int status;
         if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
             return status;
@@ -1661,8 +1729,7 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         // an unbounded blocking wait here - a child we cannot signal (e.g. SIGKILL returns EPERM)
         // would otherwise hang the caller (and shutdown) forever, the very thing this path prevents.
         if(kill(instance->child_pid, SIGKILL) != 0)
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "SPAWN PARENT: SIGKILL of pid %d failed for request No %zu", instance->child_pid, instance->request_id);
+            spawn_server_log_kill_failure(instance, SIGKILL);
 
         if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
             return status;
@@ -1670,8 +1737,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         // could not confirm the child exited within the bounded waits; reclaim the instance so we
         // neither leak it nor block. The spawn server reaps the child if/when it actually dies.
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - reclaiming",
-               instance->child_pid, instance->request_id);
+               "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - reclaiming, "
+               "the child is left running: %s",
+               instance->child_pid, instance->request_id,
+               instance->cmdline ? instance->cmdline : "[no command line]");
         instance->child_pid = 0; // already signalled; skip the SIGTERM in destroy
         spawn_server_exec_destroy(instance);
         return -1;
@@ -1688,6 +1757,11 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     SPAWN_INSTANCE *instance = callocz(1, sizeof(SPAWN_INSTANCE));
     instance->read_fd = -1;
     instance->write_fd = -1;
+
+    if(argv) {
+        CLEAN_BUFFER *wb = argv_to_cmdline_buffer(argv);
+        instance->cmdline = strdupz(buffer_tostring(wb));
+    }
 
     instance->sock = connect_to_spawn_server(server->path, true);
     if(instance->sock == -1)

@@ -274,7 +274,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Other Problems
+
+#### Debug Mode
 
 You can run `freeipmi.plugin` with the debug option enabled, to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
 
@@ -297,7 +299,7 @@ You can run `freeipmi.plugin` with the debug option enabled, to troubleshoot iss
   ```
 
 
-### kimpi0 CPU usage
+#### kimpi0 CPU usage
 
 There have been reports that kipmi is showing increased CPU when the IPMI is queried. To lower the CPU consumption of the system you can issue this command:
 

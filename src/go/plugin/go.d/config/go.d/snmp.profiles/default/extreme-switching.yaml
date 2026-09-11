@@ -18,11 +18,13 @@ metadata:
 
 metric_tags:
   - tag: primary_software_rev
-    OID: 1.3.6.1.4.1.1916.1.1.1.13.0
-    symbol: extremePrimarySoftwareRev
+    symbol:
+      OID: 1.3.6.1.4.1.1916.1.1.1.13.0
+      name: extremePrimarySoftwareRev
   - tag: primary_secondary_rev
-    OID: 1.3.6.1.4.1.1916.1.1.1.14.0
-    symbol: extremeSecondarySoftwareRev
+    symbol:
+      OID: 1.3.6.1.4.1.1916.1.1.1.14.0
+      name: extremeSecondarySoftwareRev
 
 # - EXTREME-SOFTWARE-MONITOR-MIB
 #   https://mibbrowser.online/mibdb_search.php?mib=EXTREME-SOFTWARE-MONITOR-MIB

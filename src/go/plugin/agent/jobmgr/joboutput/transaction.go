@@ -34,11 +34,11 @@ type ResourceTransactionSpec struct {
 // successor cannot acquire its installed-runtime identity after the incumbent
 // has been logically removed.
 type ResourceActivationFallback struct {
-	Change           dyncfg.GraphChange // failed or removed graph postimage
-	AfterGraphCommit func()             // commits source/dependency projections
-	AfterApply       func()             // records pending/retry state
-	Result           lifecycle.SealedResult
-	Cleanup          lifecycle.TaskCleanup
+	Change              dyncfg.GraphChange // failed or removed graph postimage
+	AfterGraphReconcile func()             // reconciles projections after commit or confirmed equality
+	AfterApply          func()             // records pending/retry state
+	Result              lifecycle.SealedResult
+	Cleanup             lifecycle.TaskCleanup
 }
 
 func resourceRemovalDisposition(current lifecycle.ReadyResource) lifecycle.ResourceTransactionDisposition {
@@ -356,16 +356,18 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 				fallbackMutation, mutationErr := spec.Graph.PrepareMutation(
 					[]dyncfg.GraphChange{fallback.Change},
 				)
+				var reconcileAfterSeal func()
 				switch {
 				case mutationErr == nil:
 					if commitErr := commitGraphMutation(spec.Graph, fallbackMutation); commitErr != nil {
 						return lifecycle.AppliedResourceTransaction{}, commitErr
 					}
-					if fallback.AfterGraphCommit != nil {
-						fallback.AfterGraphCommit()
+					if fallback.AfterGraphReconcile != nil {
+						fallback.AfterGraphReconcile()
 					}
 				case errors.Is(mutationErr, dyncfg.ErrGraphNoChange):
-				// The graph already represents the fallback outcome.
+					// The graph already represents the fallback outcome.
+					reconcileAfterSeal = fallback.AfterGraphReconcile
 				default:
 					return lifecycle.AppliedResourceTransaction{}, mutationErr
 				}
@@ -380,6 +382,9 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 					return lifecycle.AppliedResourceTransaction{}, applyErr
 				}
 				appliedSealed = true
+				if reconcileAfterSeal != nil {
+					reconcileAfterSeal()
+				}
 				if fallback.AfterApply != nil {
 					fallback.AfterApply()
 				}

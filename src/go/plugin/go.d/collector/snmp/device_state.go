@@ -5,6 +5,7 @@ package snmp
 import (
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -20,30 +21,42 @@ func firstVendor(values ...string) string {
 }
 
 func (c *Collector) vnodeGUID() string {
-	if c.vnode != nil {
-		return c.vnode.GUID
+	if v := c.deviceVnode(); v != nil {
+		return v.GUID
 	}
 	return ""
 }
 
 func (c *Collector) vnodeHostname() string {
-	if c.vnode != nil {
-		return c.vnode.Hostname
+	if v := c.deviceVnode(); v != nil {
+		return v.Hostname
 	}
 	return ""
 }
 
 func (c *Collector) vnodeLabels() map[string]string {
-	if c.vnode != nil && len(c.vnode.Labels) > 0 {
-		cp := make(map[string]string, len(c.vnode.Labels))
-		maps.Copy(cp, c.vnode.Labels)
-		return cp
+	if v := c.deviceVnode(); v != nil {
+		return v.Labels
 	}
 	return nil
 }
 
-func (c *Collector) deviceStoreKey() string {
+func (c *Collector) deviceStoreOwnerKey() string {
+	c.deviceLifecycleMu.Lock()
+	defer c.deviceLifecycleMu.Unlock()
+	if c.deviceLifecycleOwner != "" {
+		return c.deviceLifecycleOwner
+	}
 	return fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
+}
+
+func (c *Collector) deviceStoreCleanupKey() (string, bool) {
+	c.deviceLifecycleMu.Lock()
+	defer c.deviceLifecycleMu.Unlock()
+	if c.deviceLifecycleOwner != "" {
+		return c.deviceLifecycleOwner, c.deviceLifecycleManaged
+	}
+	return fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port), false
 }
 
 // registerDeviceState exposes the already-configured SNMP job to SNMP-family
@@ -60,7 +73,7 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 		vnodeLabels,
 	)
 
-	c.deviceStore.Register(c.deviceStoreKey(), ddsnmp.DeviceConnectionInfo{
+	c.publishDeviceState(ddsnmp.DeviceConnectionInfo{
 		Hostname:        c.Hostname,
 		Port:            c.Options.Port,
 		SNMPVersion:     c.Options.Version,
@@ -92,8 +105,32 @@ func (c *Collector) registerDeviceState(si *snmputils.SysInfo, profileMetadata m
 	})
 }
 
+func (c *Collector) publishDeviceState(info ddsnmp.DeviceConnectionInfo) {
+	c.deviceLifecycleMu.Lock()
+	if c.deviceLifecycleManaged && !c.deviceLifecycleCommitted {
+		pending := info
+		pending.ManualProfiles = slices.Clone(info.ManualProfiles)
+		pending.VnodeLabels = maps.Clone(info.VnodeLabels)
+		c.deviceLifecyclePending = &pending
+		c.deviceLifecycleMu.Unlock()
+		return
+	}
+	if c.deviceLifecycleManaged {
+		writer := c.deviceWriter
+		c.deviceLifecycleMu.Unlock()
+		writer.UpdateDevice(info)
+		return
+	}
+	ownerKey := c.deviceLifecycleOwner
+	if ownerKey == "" {
+		ownerKey = fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
+	}
+	c.deviceLifecycleMu.Unlock()
+	c.deviceStore.Register(ownerKey, info)
+}
+
 func (c *Collector) syncDeviceMetadata(pms []*ddsnmp.ProfileMetrics) {
-	if c.deviceMetadataSynced || c.vnode != nil || c.sysInfo == nil {
+	if c.deviceMetadataSynced || c.deviceVnode() != nil || c.sysInfo == nil {
 		return
 	}
 

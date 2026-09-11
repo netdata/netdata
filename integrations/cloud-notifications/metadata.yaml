@@ -565,6 +565,17 @@
       | status.reachable | boolean | `true` if host is reachable, `false` otherwise                                                                                |
       | status.text      | string  | Can be `reachable` or `unreachable`                                                                                           |
 
+      #### Source IP addresses
+
+      Netdata Cloud connects to your webhook URL from the currently published set of IP addresses. The set can change, so
+      refresh your allowlist periodically. If your endpoint sits behind a firewall,
+      a WAF, or an IP allowlist, see
+      [Netdata Cloud Outbound IP Addresses](/docs/netdata-cloud/netdata-cloud-outbound-ips.md) for the published list and
+      how to consume it.
+
+      An IP allowlist is a network control, not an identity control — keep one of the authentication mechanisms below in
+      place as well.
+
       #### Extra headers
 
       When setting up a webhook service, the user can specify a set of headers to be included in the HTTP requests sent to the webhook URL.

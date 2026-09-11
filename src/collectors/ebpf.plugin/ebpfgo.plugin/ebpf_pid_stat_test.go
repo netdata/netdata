@@ -93,6 +93,8 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 				{name: "CloseCall", kind: reflect.Uint32, typ: "uint32"},
 				{name: "OpenErr", kind: reflect.Uint32, typ: "uint32"},
 				{name: "CloseErr", kind: reflect.Uint32, typ: "uint32"},
+				// v6: mirrors ebpf_publish_fd_stat.fd_update_every_s.
+				{name: "UpdateEverySec", kind: reflect.Uint32, typ: "uint32"},
 			},
 		},
 		"process": {

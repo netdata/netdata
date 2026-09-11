@@ -1322,7 +1322,7 @@ endif()
 # an option. The guard matters: the component is registered only where the binary
 # is actually installed, so a DEB or RPM run cannot emit an empty package for a
 # macOS-only plugin.
-if(OS_MACOS AND OSLOG AND FOUNDATION)
+if(OS_MACOS AND OSLOG AND FOUNDATION AND HAVE_OSLOG_STORE)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-macos-logs")
 endif()
 # The Windows-only components. CPack never runs on Windows today (the MSI is

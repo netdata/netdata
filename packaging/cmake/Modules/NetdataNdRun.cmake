@@ -10,7 +10,7 @@
 
 include_guard()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c)
+set(NDRUN_FILES src/collectors/utils/nd-run.c src/collectors/utils/exec-signals.h)
 
 #
 # nd-run helper program

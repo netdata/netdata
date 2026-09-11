@@ -26,7 +26,7 @@ set(MACOS_LOGS_PLUGIN_FILES
         src/collectors/macos-logs.plugin/macos-logs-oslog.m
 )
 
-if(OS_MACOS AND OSLOG AND FOUNDATION)
+if(OS_MACOS AND OSLOG AND FOUNDATION AND HAVE_OSLOG_STORE)
         add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
         target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
         target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})

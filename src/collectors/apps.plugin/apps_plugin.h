@@ -28,6 +28,18 @@ struct apps_ebpf_dcstat_totals {
     uint64_t not_found;
     int64_t ratio;
 };
+
+/* Per-target file-descriptor totals.  Unlike dcstat these are MONOTONIC running
+ * totals, not per-interval values: the fd charts use the incremental algorithm
+ * (as the C fd module's did), so the Go plugin's per-interval deltas are summed
+ * into these counters and the agent derives the rate.  Same shape as the
+ * cachestat hit/miss accumulation. */
+struct apps_ebpf_fd_totals {
+    uint64_t open_call;
+    uint64_t close_call;
+    uint64_t open_err;
+    uint64_t close_err;
+};
 #endif
 
 #define OS_FUNC_CONCAT(a, b) a##b
@@ -451,6 +463,7 @@ struct target {
     struct apps_ebpf_cachestat_totals cachestat_totals;
     struct apps_ebpf_cachestat_totals cachestat_totals_prev;
     struct apps_ebpf_dcstat_totals dcstat_totals;
+    struct apps_ebpf_fd_totals fd_totals;
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1)
@@ -667,6 +680,8 @@ struct pid_stat {
     uint64_t ebpf_cachestat_ct;
     // last dcstat ct we consumed; gates per-PID delta accumulation
     uint64_t ebpf_dcstat_ct;
+    // last fd ct we consumed; gates per-PID delta accumulation
+    uint64_t ebpf_fd_ct;
     bool has_ebpf:1;
 #endif
 };
@@ -830,6 +845,10 @@ bool apps_ebpf_cachestat_data_ready(void);
 void apps_ebpf_accumulate_dcstat(void);
 bool apps_ebpf_dcstat_is_available(void);
 bool apps_ebpf_dcstat_data_ready(void);
+void apps_ebpf_accumulate_fd(void);
+bool apps_ebpf_fd_is_available(void);
+bool apps_ebpf_fd_data_ready(void);
+bool apps_ebpf_fd_errors_are_available(void);
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------

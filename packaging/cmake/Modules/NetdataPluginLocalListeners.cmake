@@ -43,3 +43,14 @@ if(OS_LINUX AND MNL_FOUND)
         target_include_directories(local-sockets-mnl-test PRIVATE ${MNL_INCLUDE_DIRS})
         target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
 endif()
+
+if(OS_LINUX)
+        add_executable(local-sockets-namespaces-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_namespaces.c)
+        target_compile_options(local-sockets-namespaces-test PRIVATE
+                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+        target_include_directories(local-sockets-namespaces-test PRIVATE
+                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+        target_link_libraries(local-sockets-namespaces-test libnetdata
+                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
+endif()

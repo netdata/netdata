@@ -13,6 +13,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsSe
 use opentelemetry_proto::tonic::collector::metrics::v1::metrics_service_server::MetricsServiceServer;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
 use tokio::sync::RwLock;
+use tonic::transport::server::TcpIncoming;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 
 mod aggregation;
@@ -40,8 +41,13 @@ const WAL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3
 
 /// Ingestor worker entry point.
 ///
-/// Connects to the supervisor's IPC socket, performs the Configure → Ready
-/// handshake, then runs the gRPC metrics server and chart emission loop.
+/// Connects to the supervisor's IPC socket, receives Configure, then runs the
+/// gRPC server and chart emission loop. `Ready` is sent from inside
+/// `run_ingestor`, only after the endpoint is bound and every startup step has
+/// succeeded: the supervisor forwards the ledger's Function declarations to the
+/// agent only once it sees this worker's Ready, so a startup failure here (a
+/// port already in use, an unreadable TLS key) leaves the plugin un-advertised
+/// and exits it once, instead of advertising Functions it cannot back.
 pub async fn run_worker(socket_path: &str) -> Result<()> {
     tracing::info!(socket = %socket_path, "connecting to supervisor");
 
@@ -62,13 +68,6 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         }
     };
 
-    // Signal ready — ingestor has no function declarations (metrics only)
-    conn.send(IngestorResponse::Ready {
-        declarations: vec![],
-    })
-    .await?;
-    tracing::info!("signaled ready to supervisor");
-
     // Best-effort: log immediately on return, before the supervisor (which
     // SIGKILLs workers the moment the connection closes) can react to the
     // dropped connection. `conn` is owned by `run_ingestor`, so unlike the
@@ -82,6 +81,23 @@ async fn run_ingestor(
     config: PluginConfig,
     mut conn: Connection<IngestorResponse, IngestorRequest>,
 ) -> Result<()> {
+    // Bind the gRPC endpoint FIRST, before this worker's disk setup: a port
+    // conflict is the most likely startup failure (another listener, or another
+    // agent in a shared network namespace), and detecting it here fails fast
+    // before the ingestor touches its WAL directories or the seq high-water
+    // file (the ledger has already done its own disk startup by now). tonic's
+    // `serve(addr)` would bind lazily, only when the server future is polled.
+    let addr: std::net::SocketAddr =
+        config.endpoint.path.parse().with_context(|| {
+            format!("failed to parse endpoint address: {}", config.endpoint.path)
+        })?;
+    // `serve_with_incoming` discards the builder's TCP options, so restore the
+    // TCP_NODELAY default that `serve(addr)` used to apply to accepted sockets.
+    let incoming = TcpIncoming::bind(addr)
+        .with_context(|| format!("failed to bind gRPC endpoint {}", config.endpoint.path))?
+        .with_nodelay(Some(true));
+    tracing::info!(endpoint = %config.endpoint.path, "gRPC endpoint bound");
+
     // Set up metrics pipeline
     let mut ccm = ChartConfigManager::with_default_configs();
     ccm.set_defaults(
@@ -222,12 +238,6 @@ async fn run_ingestor(
         s.sweep_expired_rotations()
     });
 
-    // Parse gRPC endpoint address
-    let addr =
-        config.endpoint.path.parse().with_context(|| {
-            format!("failed to parse endpoint address: {}", config.endpoint.path)
-        })?;
-
     // Build gRPC server (with TLS if configured)
     let mut server_builder = Server::builder();
 
@@ -273,7 +283,16 @@ async fn run_ingestor(
         .add_service(metrics_svc)
         .add_service(logs_svc)
         .add_service(traces_svc)
-        .serve(addr);
+        .serve_with_incoming(incoming);
+
+    // Every fallible startup step is behind us and the listener is bound, so
+    // this is the point at which the supervisor may advertise the plugin. The
+    // ingestor declares no Functions of its own; its Ready gates the ledger's.
+    conn.send(IngestorResponse::Ready {
+        declarations: vec![],
+    })
+    .await?;
+    tracing::info!("signaled ready to supervisor");
 
     // Main loop: forward chart data to supervisor, handle incoming requests, run gRPC
     tokio::select! {

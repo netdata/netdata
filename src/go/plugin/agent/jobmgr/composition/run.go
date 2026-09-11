@@ -20,19 +20,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 type runJobServices struct {
-	PluginName    string                         // owning plugin name
-	Defaults      confgroup.Registry             // per-module config defaults
-	Resolver      *secretresolver.AtomicResolver // atomic secret resolver (process-fixed)
-	StoreCreators *secretstore.CreatorCatalog    // frozen secret store creator catalog
-	Runtime       runtimecomp.Service            // runtime service dependency
-	Vnodes        *vnoderegistry.Registry        // vnode metadata registry
-	InitialVnodes map[string]*vnodes.VirtualNode // file-configured vnodes
+	SNMPVnodeAcquirer vnodes.SNMPAcquirer
+	PluginName        string                         // owning plugin name
+	Defaults          confgroup.Registry             // per-module config defaults
+	Resolver          *secretresolver.AtomicResolver // atomic secret resolver (process-fixed)
+	StoreCreators     *secretstore.CreatorCatalog    // frozen secret store creator catalog
+	Runtime           runtimecomp.Service            // runtime service dependency
+	InitialVnodes     map[string]*vnodes.Config      // file-configured vnodes
 }
 
 type runSecretServices struct {
@@ -40,10 +40,11 @@ type runSecretServices struct {
 }
 
 type runGenerationConfig struct {
-	Generation      uint64                       // this run's generation number
-	ShutdownTimeout time.Duration                // per-run shutdown budget
-	Diagnostics     jobmgr.DiagnosticObserver    // process-wide operational log sink
-	UIDs            *lifecycle.UIDLedger         // process-lifetime UID ledger
+	Generation      uint64                    // this run's generation number
+	ShutdownTimeout time.Duration             // per-run shutdown budget
+	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
+	UIDs            *lifecycle.UIDLedger      // process-lifetime UID ledger
+	Publication     *hostoutput.Publisher
 	Frames          *lifecycle.FrameOwner        // the one frame writer
 	CleanupOutput   *joboutput.CleanupOutputGate // process-lifetime accepted-cleanup output
 	Modules         collectorapi.Registry        // collector module registry
@@ -55,6 +56,8 @@ type runGenerationConfig struct {
 }
 
 type runGeneration struct {
+	publication         *hostoutput.Publisher
+	vnodeConfig         *agentdiscovery.VNodeConfiguration
 	diagnostics         jobmgr.DiagnosticObserver      // operational log sink
 	run                 *lifecycle.RunSupervisor       // run supervisor for this generation
 	tasks               *lifecycle.TaskSupervisor      // task supervisor
@@ -85,6 +88,9 @@ func newRunGeneration(
 			resultErr = errors.Join(resultErr, abortRunConstruction(functions, secretController))
 		}
 	}()
+	if config.Publication == nil {
+		config.Publication = hostoutput.New()
+	}
 	if ctx == nil ||
 		config.Generation == 0 ||
 		config.ShutdownTimeout <= 0 ||
@@ -96,7 +102,6 @@ func newRunGeneration(
 		config.Jobs.Defaults == nil ||
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
-		config.Jobs.Vnodes == nil ||
 		config.SecretEpoch == nil ||
 		config.Attempts == nil ||
 		config.SecretEpoch.generation != config.Generation ||
@@ -151,6 +156,7 @@ func newRunGeneration(
 	if err != nil {
 		return nil, err
 	}
+	vnodeBinding.acquirer = config.Jobs.SNMPVnodeAcquirer
 	vnodeRoute, err := newVNodeInitialRoute(config.Generation, vnodeBinding)
 	if err != nil {
 		return nil, err
@@ -245,7 +251,7 @@ func newRunGeneration(
 		CleanupOutput:   config.CleanupOutput,
 		ConfigModules:   configModules,
 		Runtime:         config.Jobs.Runtime,
-		Vnodes:          config.Jobs.Vnodes,
+		Publication:     config.Publication,
 		Vnode:           vnodeConfig.Lookup,
 		HandlerStager:   functionJobs,
 		HandlerAttacher: functionJobs,
@@ -283,6 +289,7 @@ func newRunGeneration(
 		lifecycle.RealClock{},
 		functions,
 		joinedRunFinalizer{
+			jobs:                dynCfgJobs,
 			functions:           functions,
 			secrets:             secretController,
 			metricsRegistration: metricsRegistration,
@@ -314,6 +321,8 @@ func newRunGeneration(
 		}
 	}
 	return &runGeneration{
+		publication:         config.Publication,
+		vnodeConfig:         vnodeConfig,
 		diagnostics:         config.Diagnostics,
 		run:                 run,
 		tasks:               tasks,
@@ -363,7 +372,7 @@ func (rg *runGeneration) startWithRunContext(
 	rg.mu.Lock()
 	rg.started = true
 	rg.mu.Unlock()
-	if err := rg.dyncfg.BindAutoDetectionRetries(
+	if err := rg.dyncfg.BindBackgroundWorkers(
 		rg.kernel,
 		rg.run.Generation(),
 		func(err error) {
@@ -375,6 +384,7 @@ func (rg *runGeneration) startWithRunContext(
 		rg.kernel.Stop()
 		return err
 	}
+	rg.publication.Bind(rg.vnodeConfig.Definition)
 	if err := rg.run.OpenAdmission(); err != nil {
 		rg.run.Dirty(err)
 		rg.Stop()
@@ -388,6 +398,7 @@ func (rg *runGeneration) startWithRunContext(
 	if err := rg.vnodes.publishInitial(startupCtx, rg.kernel); err != nil {
 		return rg.stopAfterStartFailure(startupCtx, err)
 	}
+	rg.vnodes.startAcquisition(runCtx, rg.kernel)
 	if err := rg.secrets.PublishInitial(startupCtx, rg.kernel); err != nil {
 		return rg.stopAfterStartFailure(startupCtx, err)
 	}
@@ -432,7 +443,8 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
-		rg.scheduler.StopAutoDetectionRetries()
+		rg.vnodes.stopAcquisition()
+		rg.scheduler.StopBackgroundWorkers()
 		rg.kernel.Stop()
 	}
 }
@@ -444,10 +456,11 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 	waitErr := rg.kernel.Wait(ctx)
 	select {
 	case <-rg.kernel.Done():
-		rg.scheduler.StopAutoDetectionRetries()
+		rg.vnodes.stopAcquisition()
+		rg.scheduler.StopBackgroundWorkers()
 	default:
 	}
-	return errors.Join(waitErr, rg.scheduler.WaitAutoDetectionRetries(ctx))
+	return errors.Join(waitErr, rg.scheduler.WaitBackgroundWorkers(ctx), rg.vnodes.waitAcquisition(ctx))
 }
 
 type runMetricsRegistration struct {
@@ -497,6 +510,7 @@ func (rmr *runMetricsRegistration) release() error {
 }
 
 type joinedRunFinalizer struct {
+	jobs                *joboutput.DynCfgJobController
 	functions           *FunctionAssembly
 	secrets             *secretadapter.Controller
 	metricsRegistration *runMetricsRegistration
@@ -506,6 +520,7 @@ func (jrf joinedRunFinalizer) FinalizeRun(ctx context.Context, generation uint64
 	if jrf.functions == nil || jrf.secrets == nil {
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
+	jrf.jobs.FinalizeJobConfigLifecycles()
 	return errors.Join(
 		jrf.metricsRegistration.release(),
 		jrf.functions.FinalizeRun(ctx, generation),

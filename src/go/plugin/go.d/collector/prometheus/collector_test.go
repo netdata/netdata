@@ -1827,6 +1827,15 @@ func TestCollector_CephRGWAlertBoundaries(t *testing.T) {
 func TestCollector_CephMGRAlertContract(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	templates := cephHealthAlertTemplates(t)
+	s3checkTemplates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..",
+		"health", "health.d", "s3check.conf"))
+	templateFor := func(name string) (map[string]string, bool) {
+		if block, ok := s3checkTemplates[name]; ok {
+			return block, true
+		}
+		block, ok := templates[name]
+		return block, ok
+	}
 
 	require.Equal(t, "v1", manifest.Version)
 	require.Equal(t, "source-alert-map", manifest.Kind)
@@ -1870,7 +1879,7 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02", "RGW-M-08", "RGW-M-09", "RGW-M-10",
 		"RGW-S-04", "RGW-S-12", "RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20", "RGW-S-20",
 		"RGW-M-03", "RGW-M-04", "RGW-S-01", "RGW-S-02", "RGW-S-03", "RGW-S-09", "RGW-S-13", "RGW-S-14",
-		"RGW-S-15",
+		"RGW-S-15", "RGW-M-05", "RGW-M-05", "RGW-M-05", "RGW-M-11", "RGW-S-24", "RGW-S-25",
 	}, cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
 	for name, extension := range manifest.NetdataExtensions {
 		require.NotEmptyf(t, extension.Reason, "%s has no extension rationale", name)
@@ -1879,7 +1888,7 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 			require.NotContains(t, templates, name)
 			continue
 		}
-		block, hasTemplate := templates[name]
+		block, hasTemplate := templateFor(name)
 		if hasTemplate && extension.Condition != "" {
 			require.NotEmpty(t, extension.Context)
 			assert.Equal(t, extension.Context, block["on"])
@@ -2128,7 +2137,51 @@ func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
 	require.Equal(t, "web_log.request_processing_time", weblogTemplates["web_log_web_slow"]["on"])
 }
 
-func TestCollector_CephPhase1AlertMatrixComplete(t *testing.T) {
+func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
+	manifest := loadCephAlertManifest(t)
+	expected := make(map[string]cephNetdataExtension)
+	for name, extension := range manifest.NetdataExtensions {
+		if extension.Owner == "s3check" {
+			expected[name] = extension
+		}
+	}
+	require.NotEmpty(t, expected)
+
+	var metadata struct {
+		Modules []struct {
+			Alerts []struct {
+				Name   string `yaml:"name"`
+				Metric string `yaml:"metric"`
+				Info   string `yaml:"info"`
+			} `yaml:"alerts"`
+		} `yaml:"modules"`
+	}
+	content, err := os.ReadFile(filepath.Join("..", "s3check", "metadata.yaml"))
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(content, &metadata))
+	require.Len(t, metadata.Modules, 1)
+
+	metadataMetrics := make(map[string]string)
+	info := make(map[string]string)
+	for _, alert := range metadata.Modules[0].Alerts {
+		metadataMetrics[alert.Name] = alert.Metric
+		info[alert.Name] = alert.Info
+	}
+	require.Len(t, metadataMetrics, len(expected))
+
+	templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..",
+		"health", "health.d", "s3check.conf"))
+	for name, extension := range expected {
+		require.Equalf(t, extension.Context, metadataMetrics[name], "%s metadata context", name)
+		require.Equalf(t, extension.Context, templates[name]["on"], "%s health context", name)
+		require.Equalf(t, extension.Calc, templates[name]["calc"], "%s calculation", name)
+		require.Equalf(t, extension.Units, templates[name]["units"], "%s units", name)
+		require.Equalf(t, extension.Recipient, templates[name]["to"], "%s recipient", name)
+		require.Equalf(t, info[name], templates[name]["info"], "%s metadata info", name)
+	}
+}
+
+func TestCollector_CephDeliveredAlertMatrixComplete(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	got := append(cephManifestSOWIDs(manifest.Alerts), cephManifestExtensionSOWIDs(manifest.NetdataExtensions)...)
 
@@ -2163,6 +2216,8 @@ func TestCollector_CephPhase1AlertMatrixComplete(t *testing.T) {
 		"RGW-M-03", "RGW-M-04", "RGW-M-08", "RGW-M-09", "RGW-M-10", "RGW-S-01", "RGW-S-02",
 		"RGW-S-03", "RGW-S-04", "RGW-S-09", "RGW-S-12", "RGW-S-13", "RGW-S-14", "RGW-S-15",
 		"RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20",
+		// P2-M01/P2-M02
+		"RGW-M-05", "RGW-M-11", "RGW-S-24", "RGW-S-25",
 	}
 
 	require.ElementsMatch(t, want, slices.Compact(slices.Sorted(slices.Values(got))))
@@ -2518,6 +2573,9 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 		}
 	}
 	for name, extension := range manifest.NetdataExtensions {
+		if extension.Owner == "s3check" {
+			continue
+		}
 		if extension.Context != "" && extension.Condition != "" {
 			expected[name] = extension.Context
 		}

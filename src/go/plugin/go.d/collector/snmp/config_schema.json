@@ -1,6 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP collector configuration.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -23,47 +24,21 @@
       },
       "create_vnode": {
         "title": "Create",
-        "description": "If set, the collector will create a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes) for this SNMP device, which will appear as a separate Node in Netdata.",
+        "description": "Create a Virtual Node for this SNMP device when no named vnode reference is set. A named reference takes precedence, including when this option is true.",
         "type": "boolean",
         "default": true
       },
       "vnode_device_down_threshold": {
         "title": "Device Down Threshold",
-        "description": "Number of consecutive failed data collections before marking the device as down.",
+        "description": "Number of consecutive failed data collections before marking a collector-generated vnode as down. Named vnodes use their own stale_after setting.",
         "type": "integer",
         "minimum": 1,
         "default": 3
       },
       "vnode": {
-        "title": "Configuration",
-        "description": "",
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "guid": {
-            "title": "GUID",
-            "description": "A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.",
-            "type": "string"
-          },
-          "hostname": {
-            "title": "Hostname",
-            "description": "The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.",
-            "type": "string"
-          },
-          "labels": {
-            "title": "Labels",
-            "description": "Additional key-value pairs to associate with the Virtual Node.",
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        }
+        "title": "Virtual node",
+        "description": "Name of a centrally configured Virtual Node to attach this job to. Takes precedence over local vnode creation.",
+        "type": "string"
       },
       "options": {
         "title": "Options",
@@ -75,6 +50,7 @@
         "properties": {
           "version": {
             "title": "SNMP version",
+            "description": "SNMP protocol version the device speaks.",
             "type": "string",
             "enum": [
               "1",
@@ -154,6 +130,7 @@
           },
           "auth_proto": {
             "title": "Authentication protocol",
+            "description": "Authentication protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -168,10 +145,12 @@
           },
           "auth_key": {
             "title": "Authentication passphrase",
+            "description": "Authentication protocol pass phrase for SNMPv3 messages.",
             "type": "string"
           },
           "priv_proto": {
             "title": "Privacy protocol",
+            "description": "Privacy protocol for SNMPv3 messages.",
             "type": "string",
             "enum": [
               "none",
@@ -179,12 +158,14 @@
               "aes",
               "aes192",
               "aes256",
-              "aes192c"
+              "aes192c",
+              "aes256c"
             ],
             "default": "aes192c"
           },
           "priv_key": {
             "title": "Privacy passphrase",
+            "description": "Privacy protocol pass phrase for SNMPv3 messages.",
             "type": "string"
           },
           "context_name": {
@@ -216,6 +197,7 @@
       },
       "ping": {
         "title": "Ping",
+        "description": "ICMP round-trip measurements collected alongside the SNMP metrics.",
         "type": [
           "object",
           "null"
@@ -223,9 +205,9 @@
         "properties": {
           "enabled": {
             "title": "Enable ping",
+            "description": "Collect ICMP round-trip time alongside SNMP profile metrics. This option does not enable profile-less operation; use ping_only for that.",
             "type": "boolean",
-            "default": true,
-            "description": "Collect ICMP round-trip time using pro-bing alongside SNMP."
+            "default": true
           },
           "network": {
             "title": "Network",
@@ -265,6 +247,37 @@
             "default": 0.1
           }
         }
+      },
+      "local_vnode": {
+        "title": "Local virtual node",
+        "description": "Configuration for the Virtual Node created by this job when create_vnode is enabled and no named vnode reference is set.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "guid": {
+            "title": "GUID",
+            "description": "A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.",
+            "type": "string"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "description": "The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.",
+            "type": "string"
+          },
+          "labels": {
+            "title": "Labels",
+            "description": "Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
       }
     },
     "required": [
@@ -274,9 +287,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "manual_profiles": {
       "ui:listFlavour": "list",
       "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
@@ -296,9 +306,6 @@
       }
     },
     "user": {
-      "name": {
-        "ui:widget": "password"
-      },
       "level": {
         "ui:widget": "radio",
         "ui:options": {
@@ -358,11 +365,12 @@
           ]
         },
         {
-          "title": "Vnode",
+          "title": "Virtual node",
           "fields": [
+            "vnode",
             "create_vnode",
-            "vnode_device_down_threshold",
-            "vnode"
+            "local_vnode",
+            "vnode_device_down_threshold"
           ]
         },
         {
@@ -378,6 +386,13 @@
           ]
         }
       ]
+    },
+    "vnode": {
+      "ui:placeholder": "office-router",
+      "ui:help": "Define the vnode in the Vnodes configuration first. This reference supplies host identity and labels; the job keeps its own SNMP connection settings."
+    },
+    "local_vnode": {
+      "ui:help": "Use these fields for a vnode created by this job. Legacy vnode objects remain accepted and appear here when opened in the form."
     }
   }
 }

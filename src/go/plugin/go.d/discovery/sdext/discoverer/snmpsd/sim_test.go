@@ -187,11 +187,24 @@ const (
 )
 
 func (m *mockSnmpHandler) setExpectSysInfo() {
-	m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{
-		{Name: snmputils.OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},
-		{Name: snmputils.OidSysContact, Value: []uint8(mockSysContact), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysName, Value: []uint8(mockSysName), Type: gosnmp.OctetString},
-		{Name: snmputils.OidSysLocation, Value: []uint8(mockSysLocation), Type: gosnmp.OctetString},
+	m.EXPECT().MaxOids().Return(60).AnyTimes()
+	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
+		Variables: []gosnmp.SnmpPDU{
+			{Name: snmputils.OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},
+			{Name: snmputils.OidSysContact, Value: []uint8(mockSysContact), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysName, Value: []uint8(mockSysName), Type: gosnmp.OctetString},
+			{Name: snmputils.OidSysLocation, Value: []uint8(mockSysLocation), Type: gosnmp.OctetString},
+		},
 	}, nil).AnyTimes()
+}
+
+func sysInfoOIDsForTest() []string {
+	return []string{
+		snmputils.OidSysDescr,
+		snmputils.OidSysObject,
+		snmputils.OidSysContact,
+		snmputils.OidSysName,
+		snmputils.OidSysLocation,
+	}
 }

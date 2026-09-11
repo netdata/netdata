@@ -1,6 +1,6 @@
 # netdata-support-bundle — the Netdata support bundle
 
-`netdata-support-bundle` collects a **sanitized diagnostic bundle** (tarball on POSIX
+`netdata-support-bundle` collects a **diagnostic bundle** (tarball on POSIX
 systems, zip on Windows) that users attach to support tickets, so support gets
 everything it needs on first contact instead of asking for it over multiple
 round trips.
@@ -44,21 +44,33 @@ sudo sh "$t"
 powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-support-bundle.ps1"
 ```
 
-Both scripts implement the same bundle contract: same directory layout, same
-`MANIFEST.json` schema (`netdata-support-bundle/v1`), same sanitization rules.
-**If you change one script, mirror the change in the other and update this
-document.**
+Both scripts share the directory layout and `MANIFEST.json` schema
+(`netdata-support-bundle/v2`), including the streaming-key and raw SNMP exceptions.
+Platform-specific implementation details are identified below. When changing a
+shared contract, update both implementations unless the work is explicitly scoped
+to one platform; document any resulting difference. The Unix maintainability
+refactor described below does not change the PowerShell implementation.
+
+SNMP troubleshooting uses an explicit raw-evidence option:
+
+```sh
+sudo netdata-support-bundle --include-snmp-diagnostics
+```
+
+The Windows equivalent is `-IncludeSnmpDiagnostics`. Both add existing built-in
+SNMP evidence to the same archive. This evidence is **unsanitized**; share the
+bundle through a restricted support ticket. Default bundles omit these files.
 
 ## Design contract (do not regress these)
 
 | guarantee | implementation |
 |---|---|
-| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, via `timeout` or a portable watchdog — the watchdog kills the direct child only, a documented limitation); global deadline checked before each collector, so the hard runtime bound is deadline + one command timeout; size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only — writes only its private staging dir and the final artifacts, never restarts or reconfigures anything; artifacts are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
+| Minimize system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, via `timeout` or a portable watchdog — the watchdog kills the direct child only, a documented limitation); global deadline checked before collectors (filesystem operations, sanitization and final packaging can exceed the admission deadline); size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only — writes only its private staging dir and the final artifacts, never restarts or reconfigures anything; artifacts are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
 | Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-WAS-DOWN.txt` marker is written instead of API captures |
-| Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below. **One documented exception:** the streaming API key in `stream.conf` is kept verbatim (see "The streaming API key exception") |
+| Standard captures redact secrets | non-optional single-pass sanitizer; see "Sanitization" below. The streaming API key in `stream.conf` is kept verbatim (see "The streaming API key exception"). Explicitly included SNMP evidence bypasses sanitization entirely (see "Raw SNMP evidence") |
 | Source bytes preserved | collected files keep their byte-order mark, their per-line terminators (CRLF/CR/LF, including on lines the sanitizer rewrote) and a missing final newline, so an encoding fault in the user's file is still visible in the bundle |
-| PII pseudonymized by default | IPs (v4+v6), MACs, emails, this host's names, the invoking user, child/mirrored node hostnames and stream destinations are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
-| Caps cannot expose secrets | all caps cut at LINE boundaries, so a secret can never straddle the cut and dodge the line-based sanitizer; a capped tail with no line break at all is withheld entirely; sanitizer failures withhold the file content (fail closed) |
+| Standard captures pseudonymize PII by default | IPs (v4+v6), MACs, emails, this host's names, the invoking user, child/mirrored node hostnames and stream destinations are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
+| Text caps preserve sanitizer boundaries | all caps cut at LINE boundaries, so a secret can never straddle the cut and dodge the line-based sanitizer; a capped tail with no line break at all is withheld entirely; sanitizer failures withhold the file content (fail closed) |
 | Legible to humans AND AI agents | triage-ordered numbered directories; sanitized file copies have no injected provenance headers; provenance headers only on command captures; `MANIFEST.json` indexes every file with safe origin + sanitization state; `summary.txt` opens with a triage read-order |
 
 ## Platform support
@@ -184,14 +196,16 @@ Every item collected maps to a recurring support ask. That mapping is the
 | `netdatacli aclk-state json` | canned Freshdesk ask for cloud issues |
 | netdata self CPU/memory/clients CSVs (10 min, bounded) | replaces the "please send a screenshot of the Netdata memory charts" round trip |
 
-Local API reads target `127.0.0.1:19999` directly and bypass any configured
-proxy, so diagnostic data cannot leave the host through a forced proxy.
+On Unix, all local API reads (including probes and hostname preseeding) use one
+transport targeting `127.0.0.1:19999`. It clears proxy environment variables and
+explicitly disables curl/wget proxy use. Cloud connectivity probes retain the
+normal proxy configuration so they represent the installation's network path.
 
 ### `08-network/` — connectivity
 
 | item | why |
 |---|---|
-| listening sockets (netdata-related) | "dashboard unreachable" and port-conflict tickets |
+| `netdata-sockets.txt` (all visible, platform-supported sockets owned by the Netdata process tree) | dashboard reachability, port conflicts, stuck connections, and plugin networking tickets; TCP states are retained, while UDP and Unix-domain records use their native state representation; unavailable socket classes are reported rather than inferred |
 | DNS config, proxy env/config (sanitized) | claiming-behind-proxy is a recurring theme; DNS misconfiguration breaks cloud connectivity |
 | Netdata Cloud reachability (TCP plus certificate-validating HTTPS/TLS probe; no bundle data sent) | separates network problems from agent problems in one step |
 
@@ -228,13 +242,67 @@ These are excluded by design. **Do not add them.**
 - `/etc/netdata/ssl/` and any `*.pem` / `*.key`
 - dbengine data files (metric data, GBs), `ml.db`, `registry.db` (person GUIDs
   and dashboard URLs)
-- metric values other than netdata's own bounded self-monitoring charts
+- metric values other than netdata's own bounded self-monitoring charts, except
+  values already captured in explicitly requested raw SNMP diagnostic files
 - anything outside netdata's own scope (no full system journals, no other
   services' logs, no packet captures)
 
+## Raw SNMP evidence
+
+`--include-snmp-diagnostics` / `-IncludeSnmpDiagnostics` copies the Agent's
+`<state-dir>/snmp/diagnostics/` into `06-state/snmp-diagnostics/`. No additional
+SNMP requests, decompression, format conversion, or installed decoder are needed.
+
+| Item | Why |
+|---|---|
+| `lifecycle.zst` | Current job preparation/collection outcomes, including devices unavailable to topology. |
+| `topology/checkpoint-*.zst` | Retained self-contained topology evidence and lifecycle cuts for historical reconstruction. |
+| `normal/runs.json` and indexed `normal/<run-id>/device-*.zst` | Current and previous-run per-device metric, BGP, licensing, failure, and source evidence. |
+| `06-state/snmp-diagnostics-status.txt` | Records whether inclusion was requested, missing/unreadable files, copy failures, and complete-file count. |
+
+Only recognized file names and the runs named by the copied `runs.json` are
+selected. Temporary files, unrelated names, symlinked directories/files, and
+Windows reparse points are withheld. An invalid run index is included as raw
+evidence, but no normal device directories are selected from it.
+
+These files contain original device-returned values and identifiers. The
+publisher excludes connection credentials, but arbitrary device data can still
+contain secrets or personal information. **Neither secret redaction nor PII
+obfuscation applies to this directory**, even when ordinary captures are
+sanitized. Preserve it for private support use; do not upload the bundle to a
+public issue. `--no-obfuscate` is independent of this option.
+
+The manifest marks raw entries `sanitized: false` and `pii_obfuscated: false`.
+When any raw files are included, aggregate `secrets_redacted` and
+`pii_obfuscated` are also false. Standard entries retain their own sanitization
+state. The `snmp_diagnostics` object records `requested`, `status`, and `files`;
+status is `not_requested`, `unavailable`, `partial`, or `complete`. Complete
+means all selected files copied successfully and lifecycle evidence was present;
+it is not a simultaneous directory snapshot or proof that every device produced
+evidence. If other files were copied but `lifecycle.zst` is missing, the result
+is `partial`. An empty store remains `unavailable`.
+
+Binary files are streamed whole through temporary staging names, then published
+only after a successful copy. Text tail limits do not apply and no new binary
+byte ceiling is imposed: staging and final archive space scale with the retained
+compressed evidence. The existing command timeout also applies to each binary
+copy (PowerShell checks between buffer operations); final packaging and blocking
+filesystem calls can exceed the collection deadline. Failed or timed-out copies
+are withheld rather than shipped truncated. Windows final ZIP creation uses
+streaming create mode, so packaging does not retain the complete evidence
+payload in memory.
+
+The Agent replaces individual files atomically and rotates them independently.
+A file can disappear between selection and opening; this produces a partial
+result. Files copied together can have different timestamps. The support script
+does not stop the Agent, retry until the directory stabilizes, or join historical
+records to the latest lifecycle cut. See
+[Collect SNMP troubleshooting data](../../docs/npm/device-metrics/collect-snmp-troubleshooting-data.md)
+for capture timing, terminal-mode behavior, and operator instructions.
+
 ## The streaming API key exception
 
-The **streaming API key** is the one credential-shaped value the bundle keeps
+Within standard sanitized captures, the **streaming API key** is kept
 verbatim, in `04-config/stream.conf` only — both the `api key` / `proxy api key`
 values and the parent-side `[<API_KEY>]` / `[<MACHINE_GUID>]` section headers.
 Streaming problems are diagnosed by comparing what the child sends with what the
@@ -344,8 +412,9 @@ Two passes, one sweep, applied to **every** collected file:
    - `[<UUID>]` section headers, which are API keys or machine GUIDs — **except
      in `stream.conf`**, where they are kept (see "The streaming API key
      exception");
-   - `bearer_tokens/` directory listings show a file COUNT only — the
-     filenames are the tokens.
+   - Unix state inventory reports aggregate file counts and sizes without
+     filenames. In particular, `bearer_tokens/` filenames are live tokens and
+     must not appear in inventory output.
 2. **PII — on by default, `--no-obfuscate` / `-NoObfuscate` to disable:**
    - non-loopback IPv4 addresses → `ip-N` and IPv6 → `ip6-N` (stable per
      bundle; compressed, lettered, and numeric-only uncompressed forms;
@@ -353,9 +422,10 @@ Two passes, one sweep, applied to **every** collected file:
    - MAC addresses → `[MAC]`; email addresses → `[EMAIL]`;
    - this host's hostname/FQDN → `redacted-host`; the invoking user's name →
      `redacted-user`;
-   - ordinary FQDNs → `private-host-N`; only public Netdata service domains and
-     a small exact allowlist of known Netdata filenames are preserved (a broad
-     suffix exemption would leak names such as `customer.key`);
+   - on Unix, hostnames under private suffixes (`.internal`, `.local`, `.lan`,
+     `.corp`, `.intranet`, `.localdomain`) → `private-host-N`; other names are
+     recognized when preseeded from the API or discovered in stream destinations.
+     Arbitrary public-domain names are not generically classified as private;
    - child/mirrored node hostnames (pre-seeded from the local API before
      collection, so they pseudonymize consistently in every file) and
      `stream.conf` `destination` hosts regardless of TLD → `private-host-N`;
@@ -373,9 +443,20 @@ Two passes, one sweep, applied to **every** collected file:
 
 The private map is written next to the bundle (`*.pseudonym-map.tsv`) so the
 **user** can decode references if support asks "what is private-host-2?" — it
-is never included in the bundle itself. Pseudonym mappings are capped at 4096
-entries; past the cap, values get a non-correlating placeholder so hostile
-high-cardinality input cannot grow memory or the private map without bound.
+is never included in the bundle itself. Unix numbered pseudonyms are capped at 4096 per category (IPv4, IPv6,
+private hostnames and users). Further identities use a non-correlating placeholder.
+Every discovered hostname is retained in the private map and matching index,
+including names assigned `redacted-host-overflow`, so overflow names remain
+recognizable in later captures. Windows uses a shared 4096-entry map.
+
+Unix hostname discovery has a request timeout but no response-size cutoff: losing
+a returned name would prevent its later obfuscation. Discovery storage, private
+hostname-map size and index memory therefore scale with the returned names;
+ordinary API artifacts retain their 2 MiB cap. The index is rebuilt per sanitized
+file and costs memory proportional to total distinct hostname-prefix bytes.
+`--no-obfuscate` skips discovery and index construction while retaining secret
+redaction. Failed discovery does not provide reliable child-hostname knowledge;
+generic private-suffix and destination rules still apply.
 
 Redaction here is defense in depth, not a substitute for exclusion: files that
 are pure secrets (see exclusion list) are never read at all. Files containing
@@ -400,12 +481,14 @@ by these scripts.
 1. Map the new item to a real support ask (link the ticket/issue class) and
    add it to the right section table above **with its why**.
 2. Use the existing helpers — `collect_cmd` / `collect_file` / `collect_api`
-   (`Save-Cmd` / `Save-File` / `Save-Api` / `Save-CmdRaw` on Windows). They enforce
-   timeouts, size caps, sanitization, and manifest registration. Never write
-   into the bundle directly.
-3. Respect the cost budget: nothing unbounded, nothing that queries metric
-   data without a tight window, nothing that can block longer than the
-   per-command timeout.
+   (`Save-Cmd` / `Save-File` / `Save-Api` / `Save-CmdRaw` on Windows). On Unix,
+   command/API execution is time-limited; regular-file reads and sanitization
+   follow the admission-deadline limitation above. Helpers apply format-specific
+   caps, sanitization and manifest registration. Raw SNMP evidence has its own
+   explicitly unsanitized copy path. Register generated markers in the manifest.
+3. Respect the cost budget: bound command execution and capture sizes; query
+   metric data only with a tight window. Include sanitizer and discovery work in
+   performance checks, since the admission deadline does not interrupt them.
 4. If the item can contain credentials or PII of a NEW shape, extend the sanitizer
    in **both** scripts and add the pattern to the Sanitization section above.
    A COPIED file must go through `collect_file` / `Save-File` so its bytes are
@@ -415,20 +498,64 @@ by these scripts.
    in your PR why it is platform-specific.
 6. Test the redaction: add a vector to the built-in regression suite and run
    `netdata-support-bundle --selftest` (`netdata-support-bundle.ps1 -SelfTest` on Windows) — it must
-   pass on GNU awk, mawk, BusyBox awk, and PowerShell. CI executes both suites.
+   pass on GNU awk, mawk, BusyBox awk, and PowerShell. Unix CI explicitly selects
+   each AWK binary and disables priority re-execution during interpreter tests,
+   so invoking BusyBox sh does not silently test the system sh or system awk.
    For new collection sources also
    plant a sentinel secret in the source, run a collection, and `grep -r` the
    extracted bundle. Zero hits or it does not ship.
 7. Never add anything from the "What is NEVER collected" list, and never make
    the tool write, restart, reconfigure, or otherwise mutate the system.
 
+## Maintaining the Unix implementation
+
+Keep one standalone distributable script. `main()` owns initialization, discovery,
+the nine collection phases, summaries, manifest emission and publication. Helpers
+use function-specific scratch prefixes because POSIX sh has no standard local
+variables. Shared uppercase run state (plus `api_ok` and `have_timeout`) and the
+`CAPTURE_RC` / `CAPTURE_BYTES` helper results are intentional outputs.
+
+`capture_output` preserves producer exit status separately from the POSIX pipeline
+status. `collect_body` shares raw-command/API finalization: a failed capture or
+size overflow becomes a JSON error marker, while successful empty output is
+omitted. Text commands retain their exit/duration trailer. These markers do not
+add a manifest schema or guarantee that a successful producer emitted valid JSON.
+The separate zstd archive pipeline checks both tar and compressor success.
+
+The AWK record action calls ordered secret-redaction stages followed by optional
+PII obfuscation. Preserve this order and the stream.conf context when editing.
+Mapped hostnames use a prefix index instead of scanning the entire map for every
+record. Matching preserves the existing ASCII word boundaries and chooses the
+longest complete match when names overlap. All hostname/user insertion, including
+preseeding, follows the shared numbering/overflow policy above. Retaining overflow
+hostname identities is necessary for cross-file obfuscation.
+
+Unix fixture tests source the script with `ND_SUPPORT_BUNDLE_SOURCE_ONLY=1`, then
+call initialization and the real collectors with private synthetic paths. This
+mode defines functions without running discovery, collection or staging setup.
+Do not replace these fixtures with workstation collection or stub past the helper
+whose behavior is being asserted. Keep the built-in `--selftest` available in the
+standalone artifact and exercise full synthetic bundles in Linux CI.
+
+Run the fixture suites on macOS or a disposable Linux environment with:
+
+```sh
+ND_SUPPORT_BUNDLE_DEMOTED=1 sh packaging/installer/netdata-support-bundle --selftest
+python3 -m unittest discover -s packaging/installer/tests -p 'test_*.py' -v
+```
+
+For interpreter validation, select the shell with `SUPPORT_BUNDLE_TEST_SHELL` and
+put the desired AWK executable at `awk` in a private PATH directory. The workflow
+contains the supported combinations. Windows fixture extraction and PowerShell
+behavior are maintained separately.
+
 ## Bundle format contract
 
-- Schema id: `netdata-support-bundle/v1` (in `MANIFEST.json`). Bump the suffix on
+- Schema id: `netdata-support-bundle/v2` (in `MANIFEST.json`). Bump the suffix on
   breaking layout changes; downstream ticket tooling may parse it. The
   `09-permissions/` section and the top-level `streaming_api_key_redacted` flag
-  were added in tool version 1.1.0 and are purely additive, so the schema id is
-  unchanged.
+  were added in tool version 1.1.0 and are purely additive. Version 2 replaces
+  the listener-only network path with the process-tree socket inventory.
 - Command captures are `.txt` files starting with a
   `# netdata-support-bundle v<version> | command: ... | captured: <utc>` header; on POSIX
   they also end with an `# exit: N | duration: Ns` trailer. PowerShell command

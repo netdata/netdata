@@ -125,6 +125,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rethinkdb)                   |           RethinkDB           |
 | [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/riakkv)                         |            Riak KV            |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rspamd)                         |            Rspamd             |
+| [s3check](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/s3check)                        | S3 Compatible Object Storage |
 | [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/samba)                           |             Samba             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/scaleio)                       |       Dell EMC ScaleIO        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp)                             |             SNMP              |

@@ -904,6 +904,7 @@ func (pjc *preparedJobCandidate) run(
 	}
 	probeErr := probeConstructed(ctx, candidate, candidate.autoDetection)
 	if probeErr != nil {
+		captureJobConfigLifecycle(&candidate)
 		factory = nil
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		if cleanupErr != nil {
@@ -912,6 +913,7 @@ func (pjc *preparedJobCandidate) run(
 		}
 		var failure *autoDetectionFailure
 		if errors.As(probeErr, &failure) {
+			failure.jobConfigLifecycle = candidate.jobConfigSnapshot
 			workerResult <- stagedJobResult{failure: failure}
 			return nil
 		}
@@ -921,7 +923,9 @@ func (pjc *preparedJobCandidate) run(
 	stageErr := factory.stageCandidateHandlers(&candidate)
 	factory = nil
 	if stageErr != nil {
-		failure := autoDetectionFailureFor(candidate, stageErr)
+		failure := autoDetectionFailureFor(candidate, withJobConfigFailure(stageErr, "functions", ""))
+		captureJobConfigLifecycle(&candidate)
+		failure.jobConfigLifecycle = candidate.jobConfigSnapshot
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		if lifecycle.OwnershipRetained(stageErr) || cleanupErr != nil {
 			return joinRetainedCleanup(stageErr, cleanupErr)
@@ -933,6 +937,7 @@ func (pjc *preparedJobCandidate) run(
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		return joinRetainedCleanup(err, cleanupErr)
 	}
+	captureJobConfigLifecycle(&candidate)
 	storeSnapshot := candidate.storeSnapshot
 	candidate.storeSnapshot = nil
 	owner := newStagedJobOwner(

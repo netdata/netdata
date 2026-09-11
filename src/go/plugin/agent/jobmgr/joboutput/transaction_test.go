@@ -736,7 +736,7 @@ func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *
 		MutationPrepared: true,
 		ActivationBusyFallback: &ResourceActivationFallback{
 			Change: dyncfg.GraphChange{ID: "job", Config: &failed},
-			AfterGraphCommit: func() {
+			AfterGraphReconcile: func() {
 				events = append(events, "fallback-graph-commit")
 			},
 			AfterApply: func() {
@@ -774,6 +774,69 @@ func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *
 	nextMutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{ID: "job", Config: &next}})
 	require.NoError(t, err)
 	require.NoError(t, graph.Abort(nextMutation))
+}
+
+func TestPreparedResourceTransactionReconcilesBusyFallbackWhenGraphAlreadyMatches(t *testing.T) {
+	var events []string
+	currentIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+	successorIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 2}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
+	successor := &transactionTestPreparedResource{
+		identity:  successorIdentity,
+		events:    &events,
+		acceptErr: jobmgr.ErrProcessAttemptBusy,
+	}
+	failed := dyncfg.GraphConfig{
+		ID: "job", Module: "module", Name: "job", Status: dyncfg.StatusFailed.String(),
+		Payload: []byte(`{"version":2}`),
+	}
+	graph, err := dyncfg.NewGraph([]dyncfg.GraphConfig{failed})
+	require.NoError(t, err)
+	running := failed
+	running.Status = dyncfg.StatusRunning.String()
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{ID: "job", Config: &running}})
+	require.NoError(t, err)
+	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
+	require.NoError(t, err)
+	busyResult, err := lifecycle.NewSealedResult(503, "application/json", nil)
+	require.NoError(t, err)
+	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+		Scope: lifecycle.ResourceTransactionScope{
+			ID:        "job",
+			Current:   currentIdentity,
+			Successor: successorIdentity,
+		},
+		Disposition:      lifecycle.ResourceTransactionReplaced,
+		Current:          current,
+		Successor:        successor,
+		Graph:            graph,
+		Mutation:         mutation,
+		MutationPrepared: true,
+		ActivationBusyFallback: &ResourceActivationFallback{
+			Change: dyncfg.GraphChange{ID: "job", Config: &failed},
+			AfterGraphReconcile: func() {
+				events = append(events, "fallback-reconcile")
+			},
+			Result:  busyResult,
+			Cleanup: func() error { return nil },
+		},
+		Result:  result,
+		Cleanup: func() error { return nil },
+	})
+	require.NoError(t, err)
+
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"current-stop",
+		"current-finalize",
+		"successor-accept",
+		"fallback-reconcile",
+	}, events)
 }
 
 func TestPreparedResourceTransactionCommitsQuarantineFallbackWithoutPending(t *testing.T) {
@@ -833,7 +896,7 @@ func TestPreparedResourceTransactionCommitsQuarantineFallbackWithoutPending(t *t
 		},
 		ActivationQuarantinedFallback: &ResourceActivationFallback{
 			Change: dyncfg.GraphChange{ID: "job", Config: &failed},
-			AfterGraphCommit: func() {
+			AfterGraphReconcile: func() {
 				events = append(events, "fallback-graph-commit")
 			},
 			AfterApply: func() {

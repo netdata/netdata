@@ -5,9 +5,9 @@ package cloudwatch
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/awsauth"
 )
 
 // collectionInstance contains one profile instance's dimension values in the

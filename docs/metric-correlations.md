@@ -33,6 +33,12 @@ This button is only active if you've selected a valid timeframe.
 
 </details>
 
+:::tip
+
+If you have [annotated](/docs/dashboards-and-charts/chart-annotations.md) the moment you care about, hover the annotation and click **Run metrics correlation**. This runs Metric Correlations on a five-minute window centered on the annotation, with no manual highlighting.
+
+:::
+
 ## Integration with Anomaly Detection
 
 You can combine Metric Correlations with Anomaly Detection for powerful troubleshooting:

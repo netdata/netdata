@@ -11,12 +11,12 @@ import (
 )
 
 func init() {
-	registerTopologyMetricHandler(ddsnmp.KindStpPort, (*topologyCache).updateStpPortEntry)
-	registerTopologyMetricHandler(ddsnmp.KindArpEntry, (*topologyCache).updateArpEntry)
-	registerTopologyMetricHandler(ddsnmp.KindArpLegacyEntry, (*topologyCache).updateArpEntry)
+	registerTopologyMetricHandler(ddsnmp.KindStpPort, (*topologyBuilder).updateStpPortEntry)
+	registerTopologyMetricHandler(ddsnmp.KindArpEntry, (*topologyBuilder).updateArpEntry)
+	registerTopologyMetricHandler(ddsnmp.KindArpLegacyEntry, (*topologyBuilder).updateArpEntry)
 }
 
-func (c *topologyCache) updateStpPortEntry(tags map[string]string) {
+func (c *topologyBuilder) updateStpPortEntry(tags map[string]string) {
 	port := strings.TrimSpace(tags[tagStpPort])
 	if port == "" {
 		return
@@ -64,7 +64,7 @@ func (c *topologyCache) updateStpPortEntry(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) updateArpEntry(tags map[string]string) {
+func (c *topologyBuilder) updateArpEntry(tags map[string]string) {
 	ip := topologyutil.NormalizeIPAddress(tags[tagArpIP])
 	mac := topologyutil.NormalizeMAC(tags[tagArpMac])
 	if ip == "" || mac == "" {

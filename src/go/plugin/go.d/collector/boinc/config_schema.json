@@ -34,8 +34,7 @@
       "password": {
         "title": "Password",
         "description": "The GUI RPC password for authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "vnode": {
         "title": "Vnode",
@@ -48,9 +47,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "autodetection_retry": {
       "ui:help": "This option determines how frequently (in seconds) Netdata will retry data collection jobs that failed initially, with the value of 60 meaning it retries to start data collection jobs every 60 seconds, while setting it to 0 disables this retry mechanism entirely."
     },

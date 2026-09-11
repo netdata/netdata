@@ -2,7 +2,7 @@
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/syslog/otel-collector.md"
 sidebar_label: "OpenTelemetry Collector Setup"
 learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Syslog from Network Devices"
+learn_rel_path: "OpenTelemetry/Syslog from Network Devices"
 keywords: ['syslog', 'opentelemetry', 'otel collector', 'otlp', 'configuration', 'setup']
 endmeta-->
 
@@ -28,7 +28,7 @@ This listens for RFC 3164 (BSD) syslog over UDP, normalizes the fields to OpenTe
 ```yaml
 receivers:
   syslog:
-    location: "Europe/Athens"        # set your timezone — BSD syslog carries none
+    location: "UTC"               # set the devices' timezone, e.g. "Europe/Athens"; BSD syslog carries none
     udp:
       listen_address: "0.0.0.0:53514"
     protocol: rfc3164                 # switch to rfc5424 if your devices use it
@@ -65,7 +65,7 @@ To receive over **TCP** instead (common for RFC 5424), replace the `udp:` block 
 
 ## Confirm it's flowing
 
-Open the **Logs** tab in Netdata, select the hub node, and search for one of your devices by hostname. After the Collector exports a message, it should appear with its parsed severity and facility. No messages usually means the devices aren't pointed at the collector, or a firewall is dropping the listener's port.
+Open the **Logs** tab in Netdata, select the centralization point node, and search for one of your devices by hostname. After the Collector exports a message, it should appear with its parsed severity and facility. No messages usually means the devices aren't pointed at the collector, or a firewall is dropping the listener's port.
 
 ## Make it durable
 
@@ -85,4 +85,4 @@ These are the fields the inline configuration above produces; a production confi
 
 ## What's next
 
-- [Overview](/docs/npm/syslog/README.md) — how syslog fits the hub.
+- [Overview](/docs/npm/syslog/README.md) — how syslog fits the centralization point.

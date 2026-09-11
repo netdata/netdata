@@ -11,13 +11,13 @@ import (
 )
 
 func init() {
-	registerTopologyMetricHandler(ddsnmp.KindFdbEntry, (*topologyCache).updateFdbEntry)
-	registerTopologyMetricHandler(ddsnmp.KindQbridgeFdbEntry, (*topologyCache).updateFdbEntry)
-	registerTopologyMetricHandler(ddsnmp.KindQbridgeVlanEntry, (*topologyCache).updateDot1qVlanMap)
-	registerTopologyMetricHandler(ddsnmp.KindVtpVlan, (*topologyCache).updateVtpVlanEntry)
+	registerTopologyMetricHandler(ddsnmp.KindFdbEntry, (*topologyBuilder).updateFdbEntry)
+	registerTopologyMetricHandler(ddsnmp.KindQbridgeFdbEntry, (*topologyBuilder).updateFdbEntry)
+	registerTopologyMetricHandler(ddsnmp.KindQbridgeVlanEntry, (*topologyBuilder).updateDot1qVlanMap)
+	registerTopologyMetricHandler(ddsnmp.KindVtpVlan, (*topologyBuilder).updateVtpVlanEntry)
 }
 
-func (c *topologyCache) updateFdbEntry(tags map[string]string) {
+func (c *topologyBuilder) updateFdbEntry(tags map[string]string) {
 	mac := topologyutil.NormalizeMAC(topologyutil.FirstNonEmptyString(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
 		c.fdbRowsDroppedNoMAC++
@@ -59,7 +59,7 @@ func (c *topologyCache) updateFdbEntry(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) updateDot1qVlanMap(tags map[string]string) {
+func (c *topologyBuilder) updateDot1qVlanMap(tags map[string]string) {
 	fdbID := strings.TrimSpace(tags[tagDot1qVlanFdbID])
 	if fdbID == "" {
 		return
@@ -83,7 +83,7 @@ func (c *topologyCache) updateDot1qVlanMap(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) updateVtpVlanEntry(tags map[string]string) {
+func (c *topologyBuilder) updateVtpVlanEntry(tags map[string]string) {
 	vlanID := strings.TrimSpace(tags[tagVtpVlanIndex])
 	vlanName := strings.TrimSpace(tags[tagVtpVlanName])
 	if vlanID == "" || vlanName == "" {
@@ -109,7 +109,7 @@ func (c *topologyCache) updateVtpVlanEntry(tags map[string]string) {
 	}
 }
 
-func (c *topologyCache) finalizeFDBVLANs() {
+func (c *topologyBuilder) finalizeFDBVLANs() {
 	for _, entry := range c.fdbEntries {
 		if entry == nil {
 			continue

@@ -63,7 +63,7 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
       fail-fast: false  # We want to check everything, so don’t bail on the first failure.
-      max-parallel: 2  # Cap of two jobs at a time to limit impact on other CI.
+      max-parallel: 8
     steps:
       - name: Checkout
         id: checkout

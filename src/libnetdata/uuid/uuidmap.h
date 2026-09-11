@@ -48,8 +48,10 @@ void uuidmap_free(UUIDMAP_ID id);
 // so it needs no matching uuidmap_free(). Returns 0 when the uuid is unknown.
 //
 // The returned id is a key, not a handle: it must NOT be used to reach the
-// uuidmap entry (uuidmap_uuid(), uuidmap_uuid_ptr(), uuidmap_dup(), ...), because
-// nothing keeps that entry alive. It is safe to use as a lookup key in a
+// uuidmap entry (uuidmap_uuid_ptr(), uuidmap_dup(), ...), because nothing keeps
+// that entry alive. uuidmap_uuid() is the exception and is permitted: it resolves
+// and copies under the map read lock, and returns false once the entry is gone,
+// so it can only ever report a miss. It is safe to use as a lookup key in a
 // structure whose own entries hold uuidmap references: ids are unique for the
 // LIFETIME OF THE MAP, so a stale id can only ever miss, never alias a different
 // uuid.

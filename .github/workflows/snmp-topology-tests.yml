@@ -9,16 +9,20 @@ on:
       - 'src/go/plugin/go.d/collector/snmp/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'docs/npm/device-metrics/collect-snmp-troubleshooting-data.md'
       - 'src/go/pkg/topology/**'
       - 'src/go/pkg/l2topology/**'
+      - 'src/go/tools/snmp-diagnostics/**'
   pull_request:
     paths:
       - '.github/workflows/snmp-topology-tests.yml'
       - 'src/go/plugin/go.d/collector/snmp/**'
       - 'src/go/plugin/go.d/collector/snmp_topology/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'docs/npm/device-metrics/collect-snmp-troubleshooting-data.md'
       - 'src/go/pkg/topology/**'
       - 'src/go/pkg/l2topology/**'
+      - 'src/go/tools/snmp-diagnostics/**'
 
 jobs:
   fixture-tests:
@@ -49,7 +53,7 @@ jobs:
           cp src/go/testdata/snmp/snmprec/aos6.snmprec /tmp/snmpsim-data/lldp2.snmprec
           cp src/go/testdata/snmp/snmprec/ciscosb_sg350x-24p.snmprec /tmp/snmpsim-data/cdp1.snmprec
 
-      - name: Start snmpsim
+      - name: Install test tools and start snmpsim
         shell: bash
         run: |
           set -euo pipefail
@@ -97,7 +101,8 @@ jobs:
           cd src/go
           go test -tags=snmp_topology_fixtures \
             ./plugin/go.d/collector/snmp_topology/... \
-            ./pkg/l2topology/parity/...
+            ./pkg/l2topology/parity/... \
+            ./tools/snmp-diagnostics/...
 
       - name: Stop snmpsim
         if: always()

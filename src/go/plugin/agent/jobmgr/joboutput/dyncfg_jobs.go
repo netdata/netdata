@@ -93,21 +93,34 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 	}, nil
 }
 
-func (dcjc *DynCfgJobController) BindAutoDetectionRetries(
+func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	commands jobmgr.PreparedCommandPort,
 	run uint64,
 	failure func(error),
 ) error {
 	if dcjc == nil || dcjc.scheduler == nil {
-		return errors.New("job output: invalid autodetection retry controller")
+		return errors.New("job output: invalid background worker controller")
 	}
-	return dcjc.scheduler.bindAutoDetectionRetries(
+	if err := dcjc.scheduler.accepted.bind(
+		dcjc.factory,
+		commands,
+		dcjc.planAcceptedActivation,
+		run,
+		failure,
+	); err != nil {
+		return err
+	}
+	if err := dcjc.scheduler.bindBackgroundWorkers(
 		commands,
 		dcjc.planAutoDetectionRetry,
 		dcjc.planPendingJob,
 		run,
 		failure,
-	)
+	); err != nil {
+		dcjc.scheduler.accepted.stopWorker()
+		return err
+	}
+	return nil
 }
 
 func DynCfgJobPrefix(pluginName string) string {

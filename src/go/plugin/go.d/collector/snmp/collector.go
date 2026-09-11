@@ -6,16 +6,17 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -23,24 +24,51 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
-// Register registers the SNMP collector with its shared SNMP-family device store.
-func Register(store *ddsnmp.DeviceStore) {
-	collectorapi.Register("snmp", newCreator(store))
-}
-
-func newCreator(store *ddsnmp.DeviceStore) collectorapi.Creator {
+// Creator constructs registration with explicit SNMP-family dependencies.
+func Creator(store *ddsnmp.DeviceStore, publisher *diagnostics.Publisher) collectorapi.Creator {
 	if store == nil {
-		panic("snmp Register requires a non-nil device store")
+		panic("snmp Creator requires a non-nil device store")
 	}
 	return collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:          func() collectorapi.CollectorV1 { return New(store) },
-		Config:          func() any { return &Config{} },
-		SharedFunctions: snmpMethods,
-		MethodHandler:   snmpFunctionHandler,
+		Create:             func() collectorapi.CollectorV1 { c := New(store); c.diagnosticPublisher = publisher; return c },
+		Config:             func() any { return &Config{} },
+		JobConfigLifecycle: newSNMPJobConfigLifecycle(store, publisher),
+		SharedFunctions:    snmpMethods,
+		MethodHandler:      snmpFunctionHandler,
+	}
+}
+
+func defaultConfig() Config {
+	return Config{
+		CreateVnode:              true,
+		VnodeDeviceDownThreshold: 3,
+		Community:                "public",
+		Options: OptionsConfig{
+			Port:           161,
+			Retries:        1,
+			Timeout:        5,
+			Version:        gosnmp.Version2c.String(),
+			MaxOIDs:        20,
+			MaxRepetitions: 25,
+		},
+		User: UserConfig{
+			SecurityLevel: "authPriv",
+			AuthProto:     "sha512",
+			PrivProto:     "aes192c",
+		},
+		Ping: PingConfig{
+			Enabled: true,
+			ProbeConfig: pinger.ProbeConfig{
+				Privileged: true,
+				Packets:    3,
+				Interval:   confopt.Duration(time.Millisecond * 100),
+				Network:    "ip",
+			},
+		},
 	}
 }
 
@@ -50,39 +78,15 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 		panic("snmp New requires a non-nil device store")
 	}
 	c := &Collector{
-		Config: Config{
-			CreateVnode:              true,
-			VnodeDeviceDownThreshold: 3,
-			Community:                "public",
-			Options: OptionsConfig{
-				Port:           161,
-				Retries:        1,
-				Timeout:        5,
-				Version:        gosnmp.Version2c.String(),
-				MaxOIDs:        20,
-				MaxRepetitions: 25,
-			},
-			User: UserConfig{
-				SecurityLevel: "authPriv",
-				AuthProto:     "sha512",
-				PrivProto:     "aes192c",
-			},
-			Ping: PingConfig{
-				Enabled: true,
-				ProbeConfig: pinger.ProbeConfig{
-					Privileged: true,
-					Packets:    3,
-					Interval:   confopt.Duration(time.Millisecond * 100),
-					Network:    "ip",
-				},
-			},
-		},
+		Config: defaultConfig(),
+		normal: &normalDiagnostics{},
 
-		charts:            &collectorapi.Charts{},
-		seenScalarMetrics: make(map[string]bool),
-		seenTableMetrics:  make(map[string]bool),
-		seenProfiles:      make(map[string]bool),
-		deviceStore:       store,
+		charts:               &collectorapi.Charts{},
+		seenScalarMetrics:    make(map[string]bool),
+		seenTableMetrics:     make(map[string]bool),
+		seenProfiles:         make(map[string]bool),
+		deviceStore:          store,
+		deviceLifecycleStore: store,
 
 		ifaceCache: newIfaceCache(),
 		licensing:  newLicensingIntegration(),
@@ -103,15 +107,29 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 type (
 	Collector struct {
 		collectorapi.Base
-		Config `yaml:",inline" json:""`
+		normal              *normalDiagnostics
+		diagnosticPublisher *diagnostics.Publisher
+		normalWriter        *diagnostics.NormalWriter
+		Config              `yaml:",inline" json:""`
 
-		vnode *vnodes.VirtualNode
+		vnode           *vnodes.VirtualNode
+		configuredVnode *vnodes.VirtualNode
 
-		charts            *collectorapi.Charts
-		seenScalarMetrics map[string]bool
-		seenTableMetrics  map[string]bool
-		seenProfiles      map[string]bool
-		deviceStore       *ddsnmp.DeviceStore
+		charts                   *collectorapi.Charts
+		seenScalarMetrics        map[string]bool
+		seenTableMetrics         map[string]bool
+		seenProfiles             map[string]bool
+		deviceStore              *ddsnmp.DeviceStore
+		deviceLifecycleStore     deviceLifecycleStore
+		deviceWriter             *ddsnmp.DeviceWriter
+		deviceLifecycleMu        sync.Mutex
+		deviceLifecycleOwner     string
+		deviceLifecycleInfo      ddsnmp.DeviceLifecycleInfo
+		deviceLifecycleStatus    ddsnmp.DeviceLifecycleStatus
+		deviceCollectionFailures ddsnmp.CollectionFailures
+		deviceLifecyclePending   *ddsnmp.DeviceConnectionInfo
+		deviceLifecycleManaged   bool
+		deviceLifecycleCommitted bool
 
 		ifaceCache *ifaceCache // interface metrics cache for functions
 		licensing  *licensingIntegration
@@ -129,6 +147,7 @@ type (
 
 		sysInfo              *snmputils.SysInfo
 		snmpProfiles         []*ddsnmp.Profile
+		initialized          bool
 		deviceMetadataSynced bool
 
 		adjMaxRepetitions uint32
@@ -145,19 +164,31 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(context.Context) (err error) {
+	c.beginDeviceLifecycle()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			c.recordDeviceLifecycle(
+				ddsnmp.DeviceLifecyclePhaseInit,
+				ddsnmp.DeviceLifecycleOutcomeFailed,
+			)
+			panic(recovered)
+		}
+		c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseInit, err)
+	}()
+
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation failed: %v", err)
+		return lifecycleFailureError(fmt.Errorf("config validation failed: %v", err), err, "configuration", "invalid_configuration")
 	}
 
 	if _, err := c.initSNMPClient(); err != nil {
-		return fmt.Errorf("failed to initialize SNMP client: %v", err)
+		return lifecycleFailureError(fmt.Errorf("failed to initialize SNMP client: %v", err), err, "client", "invalid_configuration")
 	}
 
 	if c.PingOnly || c.Ping.Enabled {
 		pr, err := c.initPinger()
 		if err != nil {
-			return fmt.Errorf("failed to initialize ping client: %v", err)
+			return lifecycleFailureError(fmt.Errorf("failed to initialize ping client: %v", err), err, "ping", "")
 		}
 		c.pingClient = pr
 	}
@@ -165,22 +196,37 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(ctx context.Context) error {
+func (c *Collector) Check(ctx context.Context) (err error) {
+	c.beginNormalAttempt("check")
+	defer func() { c.finishNormalAttempt(err, nil) }()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = snmputils.WithFailureDetail(fmt.Errorf("SNMP check interrupted"), snmputils.Failure{Reason: "panic"})
+			c.recordDeviceLifecycle(
+				ddsnmp.DeviceLifecyclePhaseCheck,
+				ddsnmp.DeviceLifecycleOutcomeFailed,
+			)
+			panic(recovered)
+		}
+		c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCheck, err)
+	}()
+
 	if c.snmpClient == nil {
 		snmpClient, err := c.initAndConnectSNMPClient()
 		if err != nil {
-			return fmt.Errorf("failed to init and connect SNMP client: %v", err)
+			return lifecycleFailureError(fmt.Errorf("failed to init and connect SNMP client: %v", err), err, "connect", "")
 		}
 		c.snmpClient = snmpClient
+		c.wrapNormalClient()
 	}
 
-	if _, err := snmputils.GetSysInfo(c.snmpClient); err != nil {
+	if err := c.ensureDeviceProfile(); err != nil {
 		return err
 	}
 
 	if c.PingOnly && c.pingClient != nil {
 		if _, err := c.pingClient.Probe(ctx, c.Hostname); err != nil && isPingUnrecoverableError(err) {
-			return fmt.Errorf("ping check failed: %v", err)
+			return lifecycleFailureError(fmt.Errorf("ping check failed: %v", err), err, "ping", "")
 		}
 	}
 
@@ -192,7 +238,20 @@ func (c *Collector) Charts() *collectorapi.Charts {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	c.beginNormalAttempt("collect")
+	c.deviceLifecycleMu.Lock()
+	c.deviceCollectionFailures = ddsnmp.CollectionFailures{}
+	c.deviceLifecycleMu.Unlock()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			c.recordDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed)
+			c.finishNormalAttempt(snmputils.WithFailureDetail(fmt.Errorf("SNMP collection interrupted"), snmputils.Failure{Reason: "panic"}), nil)
+			panic(recovered)
+		}
+	}()
 	mx, err := c.collect(ctx)
+	c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, err)
+	c.finishNormalAttempt(err, mx)
 	if err != nil {
 		c.Error(err)
 	}
@@ -209,7 +268,10 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.funcRouter.Cleanup(ctx)
 	}
 	if c.deviceStore != nil {
-		c.deviceStore.Unregister(c.deviceStoreKey())
+		ownerKey, managed := c.deviceStoreCleanupKey()
+		if !managed {
+			c.deviceStore.Unregister(ownerKey)
+		}
 	}
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()

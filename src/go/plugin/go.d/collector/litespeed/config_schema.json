@@ -23,9 +23,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "update_every": {
       "ui:help": "Data is collected by reading Litespeed's report files, which are updated every 10 seconds. Setting the data collection interval to less than 10 seconds wouldn't provide more recent data."
     }

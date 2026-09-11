@@ -854,7 +854,8 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
     if(unlikely(parser->user.clabel_count++ == 0))
         rrdlabels_unmark_all(st->rrdlabels);
 
-    rrdlabels_add(st->rrdlabels, name, value, str2l(label_source));
+    if(rrdlabels_add_changed(st->rrdlabels, name, value, str2l(label_source)))
+        parser->user.clabel_changed = true;
 
     return PARSER_RC_OK;
 }
@@ -873,18 +874,26 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }
 
-    bool labels_changed = rrdlabels_remove_all_unmarked_and_changed(st->rrdlabels);
+    // rrdlabels_remove_all_unmarked_and_changed() only sees added/removed pairs; a source-only
+    // change lands on an existing slot, so pick that up from the per-CLABEL results.
+    bool labels_changed = rrdlabels_remove_all_unmarked_and_changed(st->rrdlabels) ||
+                          parser->user.clabel_changed;
 
-    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
-    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
-    rrdset_metadata_updated(st);
-
+    // CLABEL_COMMIT arrives on every chart definition the child sends, but the labels are usually
+    // identical to what we already hold. Only flag metadata dirty and bump RRDSET.version when they
+    // actually changed - an unconditional bump re-sends the whole chart definition upstream and
+    // re-queues the chart for context post-processing on every commit.
     if(labels_changed) {
+        rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+        rrdset_metadata_updated(st);
+
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
     parser->user.clabel_count = 0;
+    parser->user.clabel_changed = false;
 
     return PARSER_RC_OK;
 }

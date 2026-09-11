@@ -97,7 +97,7 @@ func TestTopologyBGPPeerFromRowKeepsOnlyDiagnosticRawAddresses(t *testing.T) {
 }
 
 func TestTopologyCacheIngestTopologyBGPPeersSkipsErrorsAndInvalidRows(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 
 	cache.ingestTopologyBGPPeers([]*ddsnmp.ProfileMetrics{
 		nil,

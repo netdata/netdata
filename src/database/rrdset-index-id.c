@@ -535,6 +535,20 @@ RRDSET *rrdset_create_custom(
         };
 
         st_item = rrdset_index_add_and_acquire(host, chart_full_id, &ctr);
+
+        if(unlikely(!st_item))
+            // The index refused the insert, which only happens once
+            // rrdset_index_destroy() has destroyed it - and that runs in
+            // rrdhost_free_unlinked(), after collection on this host has been
+            // stopped and the host unlinked. So we are being called with a
+            // host that is already being freed: retrying can never succeed
+            // (it would spin at 100% CPU forever) and we cannot return NULL,
+            // because rrdset_create() callers dereference the result
+            // unconditionally. The archive path only flushes the index, which
+            // keeps accepting inserts, so this is never the benign case.
+            fatal("RRDSET: chart '%s' of host '%s' cannot be created: the host's chart index is being destroyed. "
+                  "A collector is still creating charts on a host that is being freed.",
+                  chart_full_id, rrdhost_hostname(host));
     }
 
     RRDSET *st = dictionary_acquired_item_value(st_item);

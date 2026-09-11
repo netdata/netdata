@@ -55,7 +55,6 @@ Create a compatibility manifest before implementation. The manifest can live in 
    - chart lifecycle and obsoletion timing.
 5. Integration artifacts.
    - `metadata.yaml`;
-   - `taxonomy.yaml`;
    - health alerts;
    - generated integration page and README symlink;
    - `COLLECTORS.md` / plugin README entries when affected;
@@ -138,7 +137,6 @@ Unless the user approves a breaking change, the migration MUST preserve:
 - health alert lookups;
 - metadata metric descriptions and units;
 - source metadata content that drives generated integration docs;
-- taxonomy coverage and CI behavior;
 - service-discovery behavior;
 - vnode behavior;
 - user-facing lifecycle behavior.
@@ -282,8 +280,7 @@ At minimum:
 - health alert compatibility when alerts exist: each alert `on:` context must exist in the compiled template, and every
   variable referenced by alert calculations must still be provided by a dimension, variable-equivalent design, or
   approved alert change;
-- generated integration artifact consistency when metadata/taxonomy changes;
-- taxonomy coverage checks when chart contexts change;
+- generated integration artifact consistency when metadata changes;
 - host-scope tests if scopes/vnodes are preserved or introduced.
 
 `collecttest.AssertChartCoverage` is not a replacement for chart-identity parity. It verifies that emitted series and
@@ -349,7 +346,7 @@ Also run framework or integration checks when the migration touches those contra
 - chart template/framework changes: `go test -count=1 ./plugin/framework/charttpl ./plugin/framework/chartengine`
 - `metrix` changes: `go test -count=1 ./pkg/metrix/...`
 - runtime/framework changes: follow `src/go/plugin/framework/docs/changing-framework-code.md`
-- metadata/taxonomy/generated docs: follow `.agents/skills/integrations-lifecycle/consistency.md`
+- metadata/generated docs: follow `.agents/skills/integrations-lifecycle/consistency.md`
 
 Record exactly what ran. Full validation MUST NOT be claimed from a narrow command.
 

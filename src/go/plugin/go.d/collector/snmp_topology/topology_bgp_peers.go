@@ -13,13 +13,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func (c *topologyCache) ingestTopologyBGPPeers(pms []*ddsnmp.ProfileMetrics) {
+func (c *topologyBuilder) ingestTopologyBGPPeers(pms []*ddsnmp.ProfileMetrics) {
 	if c == nil {
 		return
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	if c.bgpPeersByKey == nil {
 		c.bgpPeersByKey = make(map[string]topologymodel.BGPPeer)
@@ -86,7 +83,7 @@ func topologyBGPPeerCacheKey(row ddsnmp.BGPRow, peer topologymodel.BGPPeer) stri
 	)
 }
 
-func (c *topologyCache) snapshotBGPPeers(localDeviceID string) []topologymodel.BGPPeer {
+func (c *topologyBuilder) snapshotBGPPeers(localDeviceID string) []topologymodel.BGPPeer {
 	if c == nil || len(c.bgpPeersByKey) == 0 {
 		return nil
 	}
