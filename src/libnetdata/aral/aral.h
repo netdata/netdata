@@ -33,6 +33,10 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
                   struct aral_statistics *stats, const char *filename, const char **cache_dir,
                   bool mmap, bool lockless, bool dont_dump);
 
+// offer the anonymous pages of this ARAL to KSM (kernel same-page merging)
+// must be called right after aral_create(), before any element is allocated
+void aral_enable_ksm(ARAL *ar);
+
 // --------------------------------------------------------------------------------------------------------------------
 
 // return the size of the element, as requested
