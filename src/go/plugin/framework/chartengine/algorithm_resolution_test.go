@@ -135,7 +135,7 @@ groups:
 	require.NoError(t, err)
 	defer second.Abort()
 	assert.Equal(t, program.AlgorithmIncremental, findOnlyCreateDimension(t, second.Plan()).Algorithm)
-	assert.Equal(t, uint64(1), e.stats().RouteCacheHits)
+	assert.Equal(t, float64(1), engineRuntimeMetricValue(t, e, routeCacheHitsMetricName))
 }
 
 func TestBuildPlanAuthoredAlgorithmResolvesPerDimension(t *testing.T) {

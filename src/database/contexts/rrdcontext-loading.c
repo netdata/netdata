@@ -64,7 +64,16 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     };
     if(sd->hidden) trm.flags |= RRD_FLAG_HIDDEN;
 
-    dictionary_set(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
+    if(!dictionary_set(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm))) {
+        // the metrics dictionary is being destroyed; the insert callback never
+        // ran, so free what we duplicated above (mirrors rrdmetric_free()).
+        // NULL is unambiguous here only because value_len > 0 and the name is
+        // valid - see the set-family contract in dictionary.h
+        th_ignored_metrics++;
+        string_freez(trm.id);
+        string_freez(trm.name);
+        uuidmap_free(trm.uuid);
+    }
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);
@@ -150,7 +159,13 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
 
         .hub = *ctx_data,
     };
-    dictionary_set(host->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc));
+    if(!dictionary_set(host->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc)))
+        // the contexts dictionary is being destroyed; the insert callback never
+        // ran, so it never took ownership of the hub strings - only the id we
+        // duplicated above is ours to free (mirrors rrdcontext_freez()).
+        // NULL is unambiguous here only because value_len > 0 and the name is
+        // valid - see the set-family contract in dictionary.h
+        string_freez(trc.id);
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {

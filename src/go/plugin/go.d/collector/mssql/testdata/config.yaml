@@ -1,0 +1,16 @@
+vnode: "test-vnode"
+update_every: 15
+dsn: "sqlserver://localhost:1433"
+timeout: 5
+collect_disabled_jobs: yes
+cloud_auth:
+  provider: none
+functions:
+  top_queries:
+    disabled: no
+    limit: 500
+    time_window_days: 7
+  error_info:
+    disabled: no
+    session_name: "netdata_errors"
+    use_ring_buffer: no

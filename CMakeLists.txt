@@ -95,8 +95,36 @@ include(NetdataCompilerFlags)
 if(OS_MACOS)
   enable_language(OBJC)
   if(OSLOG AND FOUNDATION)
-    add_compile_definitions(HAVE_OSLOG)
+    # macos-logs.plugin needs OSLogStore, which only exists in the 10.15 SDK and later;
+    # the OSLog framework alone (10.12 SDK) is not sufficient.
+    include(CheckOBJCSourceCompiles)
+    check_objc_source_compiles("
+#import <OSLog/OSLog.h>
+int main(void) { OSLogStore *store = nil; return store != nil; }
+" HAVE_OSLOG_STORE)
+    if(HAVE_OSLOG_STORE)
+      add_compile_definitions(HAVE_OSLOG)
+    endif()
   endif()
+
+  # The oldest macOS this source tree is expected to run on (the deployment target floor,
+  # not an SDK version). Collectors that need a newer SDK guard themselves at the source
+  # level and degrade to unavailable, so raising this floor must be a deliberate change to
+  # this value rather than an accident.
+  set(NETDATA_MACOS_MINIMUM_VERSION "10.6")
+
+  # Only validated when the deployment target is explicit; an unset target means the
+  # toolchain default applies, which is always at least as new as the floor.
+  if(CMAKE_OSX_DEPLOYMENT_TARGET AND
+     CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS NETDATA_MACOS_MINIMUM_VERSION)
+    message(FATAL_ERROR
+      "CMAKE_OSX_DEPLOYMENT_TARGET is ${CMAKE_OSX_DEPLOYMENT_TARGET}, but netdata requires "
+      "macOS ${NETDATA_MACOS_MINIMUM_VERSION} or later.\n"
+      "Either raise the deployment target, or lower NETDATA_MACOS_MINIMUM_VERSION in "
+      "CMakeLists.txt and add the source-level guards the older SDK needs.")
+  endif()
+
+  message(STATUS "macOS minimum supported version: ${NETDATA_MACOS_MINIMUM_VERSION}")
 endif()
 
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
@@ -206,7 +234,17 @@ cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROU
 cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
 cmake_dependent_option(ENABLE_CGROUP_NAME "Build the cgroup-name helper" True "OS_LINUX;ENABLE_PLUGIN_GO" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+# eBPF support is 64-bit only: the legacy BPF objects we ship are fetched with no
+# architecture dimension (see NetdataEBPFLegacy.cmake - only libc varies), 32-bit
+# kernels provide no BTF to build CO-RE programs from, and the loaders share struct
+# layouts with the BPF side. On a 32-bit userland the plugin builds and installs but
+# cannot load a single program - it exits 1 and netdata disables it.
+cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX;CMAKE_SIZEOF_VOID_P EQUAL 8" False)
+
+if(OS_LINUX AND NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(STATUS "eBPF plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+endif()
+
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -481,7 +519,13 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_
     endif()
 
     if(GO_FOUND)
-        set(ENABLE_PLUGIN_EBPF_GO ON)
+        # The BPF side is always LP64, and the loader shares struct layouts with it,
+        # so this plugin is only built for 64-bit userlands.
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(ENABLE_PLUGIN_EBPF_GO ON)
+        else()
+            message(STATUS "eBPF Go plugin disabled: requires a 64-bit userland (pointer size is ${CMAKE_SIZEOF_VOID_P} bytes)")
+        endif()
     endif()
 endif()
 
@@ -1386,6 +1430,8 @@ set(DAEMON_FILES
         src/daemon/pipename.h
         src/daemon/unit_test.c
         src/daemon/unit_test.h
+        src/daemon/unit_test_bridge.c
+        src/daemon/unit_test_bridge.h
         src/daemon/dyncfg/dyncfg.c
         src/daemon/dyncfg/dyncfg.h
         src/daemon/dyncfg/dyncfg-files.c
@@ -2835,7 +2881,7 @@ if(CAP_FOUND)
   set(HAVE_CAPABILITY True)
 endif()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c)
+set(NDRUN_FILES src/collectors/utils/nd-run.c src/collectors/utils/exec-signals.h)
 add_executable(nd-run ${NDRUN_FILES})
 if(CAP_FOUND)
   target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
@@ -3078,7 +3124,7 @@ endif()
 if(NEED_NDSUDO)
     set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
-    add_executable(ndsudo ${NDSUDO_FILES})
+    add_executable(ndsudo ${NDSUDO_FILES} src/collectors/utils/exec-signals.h)
 
     install(TARGETS ndsudo
             COMPONENT netdata
@@ -3240,7 +3286,7 @@ if(OS_WINDOWS)
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
-if(OS_MACOS AND OSLOG AND FOUNDATION)
+if(OS_MACOS AND OSLOG AND FOUNDATION AND HAVE_OSLOG_STORE)
         add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
         target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
         target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})
@@ -3433,6 +3479,17 @@ if(OS_LINUX AND MNL_FOUND)
         target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
 endif()
 
+if(OS_LINUX)
+        add_executable(local-sockets-namespaces-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_namespaces.c)
+        target_compile_options(local-sockets-namespaces-test PRIVATE
+                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+        target_include_directories(local-sockets-namespaces-test PRIVATE
+                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+        target_link_libraries(local-sockets-namespaces-test libnetdata
+                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
+endif()
+
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
                 # GCC still performs LTO when linking slim LTO static archives into a
@@ -3585,6 +3642,16 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
         configure_file(src/collectors/windows.plugin/driver/netdata_driver.inf netdata_driver.inf COPYONLY)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$" AND
+   NOT CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        set_property(
+                SOURCE src/daemon/unit_test_bridge.c
+                APPEND PROPERTY COMPILE_OPTIONS "-fno-lto" "-fvisibility=hidden")
+elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+        message(WARNING
+                "Netdata test bridge cannot disable IPO for unsupported C compiler '${CMAKE_C_COMPILER_ID}'")
 endif()
 
 add_executable(netdata

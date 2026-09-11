@@ -117,6 +117,10 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     int z_ret;
     BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
 
+    // set while the compressed buffer is installed in w->response.data; holds the pooled
+    // web client's own buffer so it can be put back before the client is released
+    BUFFER *uncompressed = NULL;
+
     struct web_client *w = web_client_get_from_cache();
     web_client_set_conn_cloud(w);
     w->port_acl = HTTP_ACL_ACLK | default_aclk_http_acl;
@@ -182,9 +186,22 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
             z_buffer->len += bytes_to_cpy;
         } while(z_ret != Z_STREAM_END);
 
-        // so that web_client_build_http_header
-        // puts correct content length into header
-        buffer_free(w->response.data);
+        // web_client_build_http_header() reads the response buffer to size Content-Length
+        // and to emit Content-Type and the cacheability headers, so it has to see the
+        // compressed buffer. Borrow the slot instead of replacing it: response.data belongs
+        // to the pooled web client and web_client_reuse_from_cache() deliberately keeps it,
+        // so freeing it here would make every ACLK query re-grow its response buffer from
+        // NETDATA_WEB_RESPONSE_INITIAL_SIZE.
+        //
+        // Carry the description of the payload across, otherwise the headers would describe
+        // a freshly created buffer (text/plain, cacheable for a day) instead of what the API
+        // handler produced.
+        z_buffer->content_type = w->response.data->content_type;
+        z_buffer->options = w->response.data->options;
+        z_buffer->date = w->response.data->date;
+        z_buffer->expires = w->response.data->expires;
+
+        uncompressed = w->response.data;
         w->response.data = z_buffer;
         z_buffer = NULL;
     }
@@ -204,6 +221,13 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
         w->response.data->len);
 
 cleanup:
+    if (uncompressed) {
+        // give the compressed buffer back to the local, so buffer_free() below releases it
+        // and the pooled client keeps its own already-grown buffer
+        z_buffer = w->response.data;
+        w->response.data = uncompressed;
+    }
+
     web_client_log_completed_request(w, false);
     web_client_release_to_cache(w);
 

@@ -69,7 +69,7 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         qm = tqm;
                     }
 
-                    if(!queried & !(options & RRDR_OPTION_ALL_DIMENSIONS))
+                    if(!queried && !(options & RRDR_OPTION_ALL_DIMENSIONS))
                         continue;
 
                     if(host != last_host) {

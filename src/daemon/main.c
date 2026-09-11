@@ -216,6 +216,9 @@ int log_stack_unittest(void);
 int clocks_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
+int aclk_timeout_unittest(void);
+int https_client_timeout_unittest(void);
+int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
@@ -238,6 +241,10 @@ int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
 int stream_path_json_unittest(void);
+#ifdef OS_WINDOWS
+int perflib_storage_unittest(void);
+int perflib_processor_unittest(void);
+#endif
 int query_plan_unittest(void);
 int api_v1_allmetrics_json_unittest(void);
 int exporting_json_connector_unittest(void);
@@ -270,23 +277,36 @@ int unittest_prepare_rrd(const char **user) {
     return 0;
 }
 
-// Standalone `-W <name>` unittest driver: bring up sqlite + RRD, run one test,
-// tear everything down, and return the test's exit code.
-static int unittest_run_with_rrd(int (*test_fn)(void)) {
+// Library bring-up every `-W` option that creates an RRDHOST needs. Without the
+// rrdlabels ARAL, the first rrdlabels_create() inside rrdhost_create() crashes.
+static int unittest_libs_init(void) {
     unittest_running = true;
 
     if(sqlite_library_init())
         return 1;
     rrdlabels_aral_init(false);
 
+    return 0;
+}
+
+static void unittest_libs_shutdown(void) {
+    sqlite_close_databases();
+    sqlite_library_shutdown();
+    rrdlabels_aral_destroy(false);
+}
+
+// Standalone `-W <name>` unittest driver: bring up sqlite + RRD, run one test,
+// tear everything down, and return the test's exit code.
+static int unittest_run_with_rrd(int (*test_fn)(void)) {
+    if(unittest_libs_init())
+        return 1;
+
     const char *user = NULL;
     int rc = unittest_prepare_rrd(&user);
     if(!rc)
         rc = test_fn();
 
-    sqlite_close_databases();
-    sqlite_library_shutdown();
-    rrdlabels_aral_destroy(false);
+    unittest_libs_shutdown();
     return rc;
 }
 
@@ -484,10 +504,16 @@ int netdata_main(int argc, char **argv) {
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
+                            // summed, not short-circuited: this is the path CI runs, so one
+                            // failing suite must not hide the other two
+                            if (aclk_timeout_unittest() + https_client_timeout_unittest() +
+                                mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
                             if (unit_test_windows_virt_normalize()) return 1;
                             if (unit_test_windows_virt_resolution()) return 1;
                             if (unit_test_windows_container()) return 1;
+                            if (perflib_storage_unittest()) return 1;
+                            if (perflib_processor_unittest()) return 1;
 #endif
 
                             // No call to load the config file on this code-path
@@ -524,6 +550,9 @@ int netdata_main(int argc, char **argv) {
                             if (unittest_waiting_queue()) return 1;
                             if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if (mrg_unittest()) return 1;
+#endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
@@ -619,6 +648,15 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mqttngtest") == 0) {
                             unittest_running = true;
                             return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclktimeouttest") == 0) {
+                            unittest_running = true;
+                            // run all three and report the total, so one failure does not
+                            // hide the others
+                            int errors = aclk_timeout_unittest();
+                            errors += https_client_timeout_unittest();
+                            errors += mqtt_wss_client_timeout_unittest();
+                            return errors ? 1 : 0;
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;
@@ -732,16 +770,16 @@ int netdata_main(int argc, char **argv) {
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
-                            netdata_conf_section_global_run_as_user(&user);
-                            netdata_conf_section_global();
-                            nd_profile.update_every = 1;
-                            registry_init();
-                            if(rrd_init("dbengine-dataset", NULL, true)) {
-                                fprintf(stderr, "rrd_init failed for unittest\n");
+
+                            if(unittest_libs_init())
                                 return 1;
-                            }
-                            generate_dbengine_dataset(history_seconds);
-                            return 0;
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if(!rc)
+                                generate_dbengine_dataset(history_seconds);
+
+                            unittest_libs_shutdown();
+                            return rc;
                         }
                         else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
                             char *endptr;
@@ -769,9 +807,17 @@ int netdata_main(int argc, char **argv) {
                             char workers_str[16];
                             snprintf(workers_str, 15, "%u", workers);
                             setenv("UV_THREADPOOL_SIZE", workers_str, 1);
-                            dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
-                                                 page_cache_mb, disk_space_mb);
-                            return 0;
+
+                            if(unittest_libs_init())
+                                return 1;
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if(!rc)
+                                dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
+                                                     page_cache_mb, disk_space_mb);
+
+                            unittest_libs_shutdown();
+                            return rc;
                         }
 #endif
                         else if(strcmp(optarg, "simple-pattern") == 0) {

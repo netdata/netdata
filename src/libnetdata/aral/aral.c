@@ -80,6 +80,7 @@ typedef enum {
     ARAL_LOCKLESS           = (1 << 0),
     ARAL_ALLOCATED_STATS    = (1 << 1),
     ARAL_DONT_DUMP          = (1 << 2),
+    ARAL_KSM                = (1 << 3),
 } ARAL_OPTIONS;
 
 struct aral_ops {
@@ -157,6 +158,16 @@ static inline bool aral_malloc_use_mmap(ARAL *ar __maybe_unused, size_t size) {
 
 const char *aral_name(ARAL *ar) {
     return ar->config.name;
+}
+
+// Offer this ARAL's anonymous pages to KSM (kernel same-page merging).
+// It is opt-in because KSM has a dedup prospect only for pools whose pages can
+// actually be byte-identical; for the rest, marking them only costs the scanner
+// and adds copy-on-write faults inside the allocation path.
+// Call it right after aral_create() - pages allocated before this point are not
+// marked.
+void aral_enable_ksm(ARAL *ar) {
+    ar->config.options |= ARAL_KSM;
 }
 
 static ALWAYS_INLINE void aral_element_given(ARAL *ar, ARAL_PAGE *page) {
@@ -730,7 +741,9 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
         if (aral_malloc_use_mmap(ar, size)) {
             bool mapped;
             uint8_t *ptr =
-                nd_mmap_advanced(NULL, size, MAP_ANONYMOUS | MAP_PRIVATE, 1, false, ar->config.options & ARAL_DONT_DUMP, NULL);
+                nd_mmap_advanced(NULL, size, MAP_ANONYMOUS | MAP_PRIVATE,
+                                 (ar->config.options & ARAL_KSM) ? 1 : 0,
+                                 false, ar->config.options & ARAL_DONT_DUMP, NULL);
             if (ptr) {
                 mapped = true;
                 stats = &ar->stats->mmap;

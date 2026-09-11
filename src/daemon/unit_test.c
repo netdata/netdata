@@ -1619,6 +1619,81 @@ static int test_rrdmetric_algorithm_follows_rrddim(void) {
     return rc;
 }
 
+static int test_rrddim_add_does_not_bump_metadata_version(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-metadata-version", "unittest-metadata-version", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    RRDDIM *rd = rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    // An unchanged rrddim_add() must not bump the chart metadata version: the streaming sender
+    // treats a bump as "re-send the whole chart definition upstream" (rrdset_check_upstream_exposed()).
+    uint32_t before = rrdset_metadata_version(st);
+    for(int i = 0; i < 5 ;i++)
+        rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: repeated rrddim_add() bumped the chart metadata version (%u -> %u)\n",
+                __FUNCTION__, before, rrdset_metadata_version(st));
+        rc = 1;
+    }
+
+    // Marking a live dimension obsolete is a real state transition, so it MUST bump - exactly once.
+    // Asserting the exact delta (not just "it changed") is what pins the contract: a path that
+    // bumped twice would still re-send the chart definition twice.
+    before = rrdset_metadata_version(st);
+    rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+    if(rrdset_metadata_version(st) != before + 1) {
+        fprintf(stderr, "%s: marking a dimension obsolete bumped the version by %u, expected exactly 1\n",
+                __FUNCTION__, rrdset_metadata_version(st) - before);
+        rc = 1;
+    }
+
+    // ...and repeating the obsolete declaration must not bump it again either.
+    before = rrdset_metadata_version(st);
+    for(int i = 0; i < 5 ;i++)
+        rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: repeated rrddim_is_obsolete() bumped the chart metadata version\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    before = rrdset_metadata_version(st);
+
+    rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+        fprintf(stderr, "%s: obsolete dimension was not revived by rrddim_add()\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrdset_metadata_version(st) != before + 1) {
+        fprintf(stderr, "%s: reviving an obsolete dimension bumped the version by %u, expected exactly 1\n",
+                __FUNCTION__, rrdset_metadata_version(st) - before);
+        rc = 1;
+    }
+
+    // ...and once revived, further identical adds must go quiet again.
+    before = rrdset_metadata_version(st);
+    rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: rrddim_add() on a revived dimension bumped the version again\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrddim_scale_minimum_magnitude(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -1939,7 +2014,7 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         }
     }
 
-    const time_t valid_update_every = 7;
+    const time_t valid_update_every = INT32_MAX;
     previous = rrdset_set_update_every_s(st, valid_update_every);
     if(previous != original_update_every || st->update_every != valid_update_every) {
         fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
@@ -1952,6 +2027,65 @@ static int test_rrdset_rejects_invalid_update_every(void) {
 
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     nd_profile.update_every = old_update_every;
+    return rc;
+}
+
+static int test_inicfg_double_values(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    // NETDATA_DOUBLE values are formatted into fixed size buffers before being stored.
+    // Huge magnitudes must not be silently truncated into a completely different number.
+    // 1e92 is the largest magnitude whose fixed-point form still fits; 1e93 is the first that does not.
+    static const NETDATA_DOUBLE values[] = { 1.5, -0.25, 123456.789, 1e30, 1e92, 1e93, 1e100, -1e100 };
+    struct config cfg = APPCONFIG_INITIALIZER;
+    int rc = 0;
+
+    for(size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+        NETDATA_DOUBLE value = values[i];
+        char name[64];
+
+        // the default value must survive the round-trip through the config
+        snprintfz(name, sizeof(name), "default %zu", i);
+        NETDATA_DOUBLE got = inicfg_get_double(&cfg, "unittest doubles", name, value);
+        if(fabsndd(got - value) > fabsndd(value) * (NETDATA_DOUBLE)0.000001) {
+            fprintf(stderr, "%s: default " NETDATA_DOUBLE_FORMAT_G " returned " NETDATA_DOUBLE_FORMAT_G "\n",
+                    __FUNCTION__, value, got);
+            rc = 1;
+        }
+
+        // and so must a value that was set
+        snprintfz(name, sizeof(name), "set %zu", i);
+        inicfg_set_double(&cfg, "unittest doubles", name, value);
+        got = inicfg_get_double(&cfg, "unittest doubles", name, (NETDATA_DOUBLE)0.0);
+        if(fabsndd(got - value) > fabsndd(value) * (NETDATA_DOUBLE)0.000001) {
+            fprintf(stderr, "%s: set " NETDATA_DOUBLE_FORMAT_G " returned " NETDATA_DOUBLE_FORMAT_G "\n",
+                    __FUNCTION__, value, got);
+            rc = 1;
+        }
+    }
+
+    // a value whose fixed-point form fills the buffer exactly must be kept in fixed-point
+    // (the internal buffer is 100 bytes, so 99 characters is an exact fit, not a truncation)
+    const size_t exact_fit_len = 99;
+    inicfg_set_double(&cfg, "unittest doubles", "exact fit", (NETDATA_DOUBLE)1e92);
+    const char *stored = inicfg_get(&cfg, "unittest doubles", "exact fit", "");
+    size_t stored_len = strnlen(stored, exact_fit_len + 1);
+    if(stored_len != exact_fit_len || strchr(stored, 'e') || strchr(stored, 'E')) {
+        fprintf(stderr, "%s: exact fit stored as '%s' (%zu chars), expected %zu fixed-point characters\n",
+                __FUNCTION__, stored, stored_len, exact_fit_len);
+        rc = 1;
+    }
+
+    // one character more does not fit, so it must switch to the exponential format
+    inicfg_set_double(&cfg, "unittest doubles", "truncated", (NETDATA_DOUBLE)1e93);
+    stored = inicfg_get(&cfg, "unittest doubles", "truncated", "");
+    if(!strchr(stored, 'e') && !strchr(stored, 'E')) {
+        fprintf(stderr, "%s: too long value stored as '%s', expected the exponential format\n",
+                __FUNCTION__, stored);
+        rc = 1;
+    }
+
+    inicfg_free(&cfg);
     return rc;
 }
 
@@ -2265,6 +2399,9 @@ int run_all_mockup_tests(void)
     if(test_rrdmetric_algorithm_follows_rrddim())
         return 1;
 
+    if(test_rrddim_add_does_not_bump_metadata_version())
+        return 1;
+
     if(test_rrddim_scale_minimum_magnitude())
         return 1;
 
@@ -2281,6 +2418,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdr_relative_window_extreme_values())
+        return 1;
+
+    if(test_inicfg_double_values())
         return 1;
 
     if(test_query_window_resampling_boundaries())

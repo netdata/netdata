@@ -415,22 +415,21 @@ func TestEngineResetMaterializedKeepsRouteCacheWarm(t *testing.T) {
 	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	require.NotNil(t, findCreateChartActionInEngineTests(plan1))
-	stats1 := e.stats()
-	require.Greater(t, stats1.RouteCacheMisses, uint64(0))
+	hits1 := engineRuntimeMetricValue(t, e, routeCacheHitsMetricName)
+	require.Greater(t, engineRuntimeMetricValue(t, e, routeCacheMissesMetricName), float64(0))
 
 	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	require.Nil(t, findCreateChartActionInEngineTests(plan2))
-	stats2 := e.stats()
-	require.Greater(t, stats2.RouteCacheHits, stats1.RouteCacheHits)
+	hits2 := engineRuntimeMetricValue(t, e, routeCacheHitsMetricName)
+	require.Greater(t, hits2, hits1)
 
 	e.ResetMaterialized()
 
 	plan3, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	require.NotNil(t, findCreateChartActionInEngineTests(plan3))
-	stats3 := e.stats()
-	require.Greater(t, stats3.RouteCacheHits, stats2.RouteCacheHits)
+	require.Greater(t, engineRuntimeMetricValue(t, e, routeCacheHitsMetricName), hits2)
 }
 
 func findCreateChartActionInEngineTests(plan Plan) *CreateChartAction {

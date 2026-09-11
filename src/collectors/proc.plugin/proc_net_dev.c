@@ -881,36 +881,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1,
                do_events = -1, do_speed = -1, do_duplex = -1, do_operstate = -1, do_carrier = -1, do_mtu = -1;
-    static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL,
-                *proc_net_dev_filename = NULL;
-    static char *path_to_sys_class_net_duplex = NULL;
-    static char *path_to_sys_class_net_operstate = NULL;
-    static char *path_to_sys_class_net_carrier = NULL;
-    static char *path_to_sys_class_net_mtu = NULL;
+    static char *proc_net_dev_filename = NULL;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
         proc_net_dev_filename = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
-        path_to_sys_devices_virtual_net = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/speed");
-        path_to_sys_class_net_speed = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/duplex");
-        path_to_sys_class_net_duplex = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/operstate");
-        path_to_sys_class_net_operstate = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/carrier");
-        path_to_sys_class_net_carrier = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/mtu");
-        path_to_sys_class_net_mtu = strdupz(filename);
 
         enable_new_interfaces = CONFIG_BOOLEAN_YES;
 
@@ -983,7 +960,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->enabled = !simple_pattern_matches(disabled_list, d->name);
 
             char buf[FILENAME_MAX + 1];
-            snprintfz(buf, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/devices/virtual/net/%s", netdata_configured_host_prefix, d->name);
 
             d->virtual = likely(access(buf, R_OK) == 0) ? true : false;
 
@@ -1001,20 +978,20 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed
-                snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_speed, d->name);
+                snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/speed", netdata_configured_host_prefix, d->name);
                 d->filename_speed = strdupz(buf);
 
-                snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
+                snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/duplex", netdata_configured_host_prefix, d->name);
                 d->filename_duplex = strdupz(buf);
             }
 
-            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/operstate", netdata_configured_host_prefix, d->name);
             d->filename_operstate = strdupz(buf);
 
-            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_carrier, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/carrier", netdata_configured_host_prefix, d->name);
             d->filename_carrier = strdupz(buf);
 
-            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_mtu, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/mtu", netdata_configured_host_prefix, d->name);
             d->filename_mtu = strdupz(buf);
 
             snprintfz(buf, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
