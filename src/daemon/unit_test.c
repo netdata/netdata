@@ -2140,6 +2140,12 @@ static int test_receiver_replication_counter_does_not_wrap(void) {
     uint32_t saved = rrdhost_receiver_replicating_charts(host);
     rrdhost_receiver_replicating_charts_zero(host);
 
+    // This deliberate underflow attempt emits one STREAM REPLAY ERROR ... refused line. The line
+    // confirms the guard is working and is not a test failure.
+    fprintf(stderr,
+            "%s: expecting one STREAM REPLAY ERROR ... refused line; it confirms the guard, "
+            "not a test failure\n",
+            __FUNCTION__);
     uint32_t after = rrdhost_receiver_replicating_charts_minus_one(host);
     if(after != 0) {
         fprintf(stderr, "%s: an unbalanced release took the receiver replication counter to %u, expected 0\n",
@@ -2367,6 +2373,8 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
 
     int rc = 0;
     RRDHOST *host = localhost;
+    uint32_t saved_started = __atomic_load_n(&host->stream.rcv.status.replication.charts_started,
+                                             __ATOMIC_RELAXED);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     // ---- part 1: the deterministic interleaving ------------------------------------------------
@@ -2430,11 +2438,13 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
     {
         // Sized for CI, which runs this suite under ASAN in a Debug build
         // (tests/run-unit-tests.sh). Enough contention to interleave, cheap enough not to matter.
-        const size_t threads_count = 8;
-        const size_t charts_count = 4;
+        enum {
+            threads_count = 8,
+            charts_count = 4,
+        };
         const size_t iterations = 500;
 
-        RRDSET *charts[4];
+        RRDSET *charts[charts_count];
         for(size_t c = 0; c < charts_count; c++) {
             char id[64];
             snprintfz(id, sizeof(id), "unittest-rcv-repl-stress-%zu", c);
@@ -2448,7 +2458,7 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
         size_t refusals_before = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED);
 #endif
 
-        struct receiver_replication_race_thread t[8];
+        struct receiver_replication_race_thread t[threads_count];
         for(size_t i = 0; i < threads_count; i++) {
             t[i] = (struct receiver_replication_race_thread){
                 .st = charts[i % charts_count], .iterations = iterations };
@@ -2472,7 +2482,7 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
         if(after != before) {
             fprintf(stderr,
                     "%s: after %zu threads x %zu iterations the counter is %u, expected %u (%zu claims won)\n",
-                    __FUNCTION__, threads_count, iterations, after, before, claims);
+                    __FUNCTION__, (size_t)threads_count, iterations, after, before, claims);
             rc = 1;
         }
 
@@ -2499,6 +2509,7 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
             rrdset_free(charts[c]);
     }
 
+    __atomic_store_n(&host->stream.rcv.status.replication.charts_started, saved_started, __ATOMIC_RELAXED);
     default_rrd_memory_mode = old_default_rrd_memory_mode;
     return rc;
 }

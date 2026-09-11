@@ -155,8 +155,14 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t replicating_instances = UINT32_MAX;
 
     // One replication snapshot for the whole function: the status decision below and the reported
-    // instances/completion MUST come from the same read, or a caller can be handed
-    // status=replicating with instances=0 and completion=100.
+    // instances/completion MUST come from the same read, or the two disagree - a decision taken on a
+    // non-zero instance count paired with a later, already-drained completion of 100.
+    //
+    // The snapshot does NOT make status=replicating with instances=0 and completion=100 unreachable,
+    // and it is not meant to: the `!collected_metrics` clause below deliberately keeps a connected
+    // child in `replicating` until its first metric arrives, and in that window nothing is
+    // outstanding, so the completion helper reports its empty-cohort 100. That pairing is the
+    // pre-first-metric state, not a torn read.
     NETDATA_DOUBLE replication_completion = NAN;
 
     time_t last_connected;
