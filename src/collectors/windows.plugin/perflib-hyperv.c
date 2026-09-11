@@ -624,7 +624,7 @@ void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p)
     p->RecommendedVirtualTLBSize.key = "Recommended Virtual TLB Size";
     p->SkippedTimerTicks.key = "Skipped Timer Ticks";
     p->VirtualTLBPages.key = "Virtual TLB Pages";
-    p->VirtualTLBFlushEntriesSec.key = "Virtual TLB Flush Entries/sec";
+    p->VirtualTLBFlushEntriesSec.key = "Virtual TLB Flush Entires/sec";
 }
 
 // Callback function for inserting root partition metrics into the dictionary
@@ -1261,8 +1261,9 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_Latency = rrddim_add(p->st_latency, "device", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                p->rd_LowerLatency = rrddim_add(p->st_latency, "lower", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_Latency = rrddim_add(p->st_latency, "device", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_LowerLatency =
+                    rrddim_add(p->st_latency, "lower", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(p->st_latency->rrdlabels, "vm_storage_device", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
@@ -1349,10 +1350,15 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
         SETP_DIM_VALUE(st_queue_length, QueueLength);
         SETP_DIM_VALUE(st_queue_length, LowerQueueLength);
         if (p->Latency.updated)
-            rrddim_set_by_pointer_double(p->st_latency, p->rd_Latency, hyperv_average_timer_seconds(&p->Latency));
+            rrddim_set_by_pointer(
+                p->st_latency,
+                p->rd_Latency,
+                (collected_number)(hyperv_average_timer_seconds(&p->Latency) * 1000000.0));
         if (p->LowerLatency.updated)
-            rrddim_set_by_pointer_double(
-                p->st_latency, p->rd_LowerLatency, hyperv_average_timer_seconds(&p->LowerLatency));
+            rrddim_set_by_pointer(
+                p->st_latency,
+                p->rd_LowerLatency,
+                (collected_number)(hyperv_average_timer_seconds(&p->LowerLatency) * 1000000.0));
         SETP_DIM_VALUE(st_throughput, Throughput);
         SETP_DIM_VALUE(st_normalized_throughput, NormalizedThroughput);
         SETP_DIM_VALUE(st_io_quota_replenishment_rate, IOQuotaReplenishmentRate);
