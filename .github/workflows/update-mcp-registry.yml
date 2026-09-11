@@ -53,11 +53,15 @@ jobs:
         run: |
           mcp-publisher login github-oidc
 
-      - name: Validate server.json (dry run)
+      - name: Validate server.json
         id: validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mcp-publisher publish server.json --dry-run
+        # `publish --dry-run` is not a dry run: mcp-publisher has no such flag,
+        # ignores it, and publishes for real, so the next step always failed with
+        # "cannot publish duplicate version". `validate` is the actual no-publish
+        # check.
+        run: mcp-publisher validate server.json
 
       - name: Publish to registry
         id: publish
