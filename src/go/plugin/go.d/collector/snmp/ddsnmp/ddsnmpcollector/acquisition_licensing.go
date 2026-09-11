@@ -45,7 +45,11 @@ func (c *acquisitionProfileCollection) addLicenseReference(route *AcquisitionRou
 	if c == nil || route == nil {
 		return
 	}
-	c.addValueReference(&c.licenseValueReferences, AcquisitionValueReference{RouteOrdinal: route.Ordinal, RowIndex: row, RowOrdinal: uint32(route.Values)})
+	c.addValueReference(&c.licenseValueReferences, AcquisitionValueReference{
+		RouteOrdinal: route.Ordinal,
+		RowIndex:     row,
+		RowOrdinal:   uint32(route.Values),
+	})
 	route.Values++
 }
 
@@ -56,7 +60,7 @@ func firstLicenseRouteOID(cfg ddprofiledefinition.LicensingConfig) string {
 			first = oid
 		}
 	}
-	forEachLicenseValue(cfg, func(value ddprofiledefinition.LicenseValueConfig) { add(licenseValueSymbol(value).OID) })
+	forEachLicenseValue(cfg, func(value ddprofiledefinition.LicenseValueConfig) { add(value.EffectiveSymbol().OID) })
 	for _, tag := range cfg.MetricTags {
 		add(tag.Symbol.OID)
 	}
@@ -64,5 +68,5 @@ func firstLicenseRouteOID(cfg ddprofiledefinition.LicensingConfig) string {
 }
 
 func (ctx licenseValueContext) record(cfg ddprofiledefinition.LicenseValueConfig, oid, reason string) {
-	ctx.processing.record(licenseValueSymbol(cfg).Name, oid, reason)
+	ctx.processing.record(cfg.EffectiveSymbol().Name, oid, reason)
 }

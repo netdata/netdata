@@ -66,6 +66,11 @@ loads `mutating-collectors.md`.
 
 ## Architecture Gate
 
+For configured vnode acquisition and named attachment, use
+`src/go/plugin/framework/vnodes/README.md#ownership` and
+`src/go/plugin/framework/vnodes/README.md#collector-attachment` as the existing ownership contract before proposing
+collector-owned identity polling or shared connection settings.
+
 **When:** a proposal makes one job depend on another job's state (scanning its journals, waiting for its cleanup,
 sharing an operational lock, consulting a registry for permission to run), introduces durable state for otherwise
 independent reads, adds a scheduler or queue, lets cleanup freeze measurement, or builds a generic engine around one

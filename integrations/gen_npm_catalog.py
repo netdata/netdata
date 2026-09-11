@@ -561,13 +561,12 @@ SNMP_TRAPS_SETUP = setup_block(
 TROUBLESHOOTING = {
     'problems': {
         'list': [{
-            'name': 'Collect Live Data for Netdata Support',
+            'name': 'Collect Diagnostics for Netdata Support',
             'description':
-                'For missing SNMP metrics or incomplete SNMP-derived topology, follow '
-                "[Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) "
-                "to create "
-                'a raw SNMP data archive that omits credentials and attach it to a '
-                'restricted Freshdesk ticket.',
+                'For SNMP metrics, BGP, licensing, or topology issues, follow '
+                '[Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) '
+                'to include built-in diagnostics in a support bundle. SNMP evidence is unsanitized; '
+                'share the bundle through a restricted Netdata Support ticket.',
         }],
     },
 }

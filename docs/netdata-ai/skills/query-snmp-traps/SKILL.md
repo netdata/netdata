@@ -29,13 +29,28 @@ Log Function request shape from
 | Convert custom MIBs into trap profiles | [how-tos/convert-custom-mibs-to-trap-profiles.md](./how-tos/convert-custom-mibs-to-trap-profiles.md) |
 | Operational how-tos catalog | [how-tos/INDEX.md](./how-tos/INDEX.md) |
 
+## Knowledge Capture
+
+- For answer-only questions, deliver the requested answer. If the work reveals a reusable, evidence-backed recipe
+  not already documented, you MUST preserve a sanitized note with the finding, supporting evidence, and proposed
+  owning guide. In a repository checkout, use `<repo-root>/.local/audits/<subject>/followups.md`, reusing this skill's
+  audit directory when available. Outside a checkout, use an appropriate local workspace. If no writable workspace
+  is available, include the sanitized follow-up in the response instead.
+- Briefly report reusable documentation discoveries and proposed updates in the answer-only final response, even
+  when recorded locally. Obtain authorization before those guide edits; do not delay the answer while awaiting it.
+- During authorized implementation, you MUST update this skill or its guides for reusable, evidence-backed
+  discoveries made while doing the work, even when the documentation is not required for the code change. This
+  needs no separate authorization. Keep [`how-tos/INDEX.md`](./how-tos/INDEX.md) consistent and report the updates.
+- Guide edits arising from answer-only questions require separate authorization. Documentation capture records
+  observed behavior; it does not authorize additional implementation or new product contracts. Commit and
+  publication require authorization too.
+- Prefer updating an existing guide over duplicating it. Keep recipes operator-facing: querying and interpreting
+  SNMP traps. Developer validation, schema work, collector implementation, fixtures, and project handoff notes
+  belong in project developer documentation, not in this public skill.
+
 ## Mandatory Requirements
 
-1. **If you analyze, you author a how-to.** When asked a concrete
-   SNMP trap query question that is not already covered under
-   [`how-tos/`](./how-tos/), author a new how-to and add it to
-   [`how-tos/INDEX.md`](./how-tos/INDEX.md) before completing the
-   task.
+1. **Preserve reusable discoveries** under [Knowledge Capture](#knowledge-capture).
 2. **Use token-safe wrappers.** Source
    `docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh`,
    call `agents_load_env`, then use `agents_call_function`,

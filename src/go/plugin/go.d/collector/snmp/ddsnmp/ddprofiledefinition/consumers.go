@@ -24,7 +24,3 @@ func (s ConsumerSet) Clone() ConsumerSet {
 func (s ConsumerSet) Contains(consumer ProfileConsumer) bool {
 	return slices.Contains(s, consumer)
 }
-
-func (s ConsumerSet) IsEmpty() bool {
-	return len(s) == 0
-}

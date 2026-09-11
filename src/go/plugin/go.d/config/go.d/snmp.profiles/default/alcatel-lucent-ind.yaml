@@ -43,8 +43,6 @@ selector:
 #       name: chasEntPhysicalTable
 #       OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1
 #     symbols:
-#       - name: alcatel.ind.chasEntPhysical
-#         constant_value_one: true
 
 #       - OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.1
 #         name: alcatel.ind.chasEntPhysAdminStatus

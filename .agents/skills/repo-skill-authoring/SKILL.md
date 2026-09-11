@@ -34,7 +34,8 @@ names.
 | `AGENTS.md#local-only-working-directory` | where skill-change evidence goes, and how this skill's `<dir>` (the `<subject>` in `./change-method.md#changing-a-skill`) is named |
 | `AGENTS.md#clean-end-state-over-less-churn` | the target is recorded before options are generated; the disclosure of what is removed and what is excluded; the reference search when a path is replaced; how coupled cleanup is handled |
 | `AGENTS.md#working-with-the-user` | the user-decision format and when a decision is recorded |
-| `AGENTS.md#review` | the blocker bar, what to do with a finding before acting, red test first, checkpoint commits, when a round repeats, the recurrence guard |
+| `AGENTS.md#review` | review scope, reproduction evidence, authorized checkpoints, repeat and stop conditions |
+| `AGENTS.md#knowledge-capture` | discovery notes, documentation authorization, and coupled skill maintenance |
 | `AGENTS.md#when-a-sow-is-required`, `AGENTS.md#followup-discipline`, `AGENTS.md#validation-gate`, `AGENTS.md#artifact-maintenance-gate` | a skill change is non-trivial work with a SOW; how deferred items are tracked; what Validation must hold and what every close records |
 | `AGENTS.md#git-and-pr-workflow` | staging, and which git actions need explicit approval (deleting a file among them) |
 | `AGENTS.md#open-source-reference-evidence` | the citation form for an owner outside this repository |
@@ -110,9 +111,10 @@ Structure and routing:
 - When a skill serves more than one audience, `SKILL.md` routes by audience and a topic file SHOULD serve one. Split
   into two skills only when the audiences differ and the seam cuts no shared step and no facts that change together;
   otherwise one skill with a router.
-- The live how-tos catalog requirement (`AGENTS.md#project-skills`) binds public skills only. In a runtime skill an
-  index file in any subdirectory (`how-tos/INDEX.md`, `recipes/INDEX.md`) is optional: keep it when `SKILL.md` routes
-  it and every listed file exists, otherwise list the files in `SKILL.md`.
+- The required public catalog shape is owned by `AGENTS.md#project-skills`; capture timing and authorization by
+  `AGENTS.md#knowledge-capture`. In a runtime skill an index file in any subdirectory (`how-tos/INDEX.md`,
+  `recipes/INDEX.md`) is optional: keep it when `SKILL.md` routes it and every listed file exists, otherwise list the
+  files in `SKILL.md`.
 - A peer skill gets one routing sentence. A one-way prerequisite MAY be declared (an entry-point skill, a
   read-this-first skill).
 - Two skills MUST NOT require each other. When two skills claim one directory, each carries one boundary line.

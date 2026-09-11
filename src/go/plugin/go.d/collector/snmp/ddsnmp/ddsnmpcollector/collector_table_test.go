@@ -1404,12 +1404,15 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
 									Name: "processorDeviceStatusReading",
-									Mapping: ddprofiledefinition.NewBitmaskMapping(map[string]string{
-										"1":    "internalError",
-										"2":    "thermalTrip",
-										"128":  "processorPresent",
-										"1024": "processorThrottled",
-									}),
+									Mapping: ddprofiledefinition.MappingConfig{
+										Mode: ddprofiledefinition.MappingModeBitmask,
+										Items: map[string]string{
+											"1":    "internalError",
+											"2":    "thermalTrip",
+											"128":  "processorPresent",
+											"1024": "processorThrottled",
+										},
+									},
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{

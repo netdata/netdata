@@ -290,7 +290,6 @@ void ebpf_swap_unload_bpf(ebpf_module_t *em);
 void ebpf_vfs_unload_bpf(ebpf_module_t *em);
 void ebpf_filesystem_unload_bpf(ebpf_module_t *em);
 void ebpf_mount_unload_bpf(ebpf_module_t *em);
-void ebpf_fd_unload_bpf(ebpf_module_t *em);
 void ebpf_shm_unload_bpf(ebpf_module_t *em);
 void ebpf_sync_unload_bpf(ebpf_module_t *em);
 collected_number get_value_from_structure(char *basis, size_t offset);

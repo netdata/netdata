@@ -166,7 +166,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 				c.snmpProfiles[0].Definition.BGP[0].MetricTags = []ddprofiledefinition.MetricTagConfig{{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: normalTestRoot + ".6.0", Name: "site"}}}
 			}
 			if tc.failure == "cached" {
-				c.snmpProfiles[0].Definition.MetricTags = []ddprofiledefinition.GlobalMetricTagConfig{{MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: normalTestRoot + ".6.0", Name: "site", ExtractValue: "^([0-9]+)$", ExtractValueCompiled: regexp.MustCompile("^([0-9]+)$")}}}}
+				c.snmpProfiles[0].Definition.MetricTags = []ddprofiledefinition.GlobalMetricTagConfig{{MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: normalTestRoot + ".6.0", Name: "site", MatchPattern: "^([0-9]+)$", MatchValue: "$1", MatchPatternCompiled: regexp.MustCompile("^([0-9]+)$")}}}}
 			}
 			require.NoError(t, ddsnmp.CompileTransforms(c.snmpProfiles[0]))
 			job := snmpLifecycleTestRuntimeJob{collector: c}

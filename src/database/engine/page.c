@@ -311,6 +311,32 @@ void pgd_init_arals(void) {
                 0,
                 &pgd_aral_statistics,
                 NULL, NULL, false, false, true);
+
+            // offer to KSM only the pools that hold dbengine page data - what
+            // netdata.conf's memory deduplication (ksm) option documents as
+            // "the dbengine page data". uncompressed data pages (raw
+            // ARRAY_32BIT, and ARRAY_TIER1 which every tier above 0 uses
+            // regardless of 'dbengine page type') are plain value arrays, so
+            // constant-valued metrics can produce identical bytes.
+            // expect a poor yield, though: every ARAL element carries a trailer
+            // holding a tagged pointer to its owning ARAL page, so two base
+            // pages taken from different ARAL pages differ at every element
+            // trailer no matter what the data is. Only base pages within one
+            // ARAL page can match. A measurement with the default gorilla tier
+            // 0 saw no merging at all.
+            // PGD descriptors and gorilla_writer_t are mutable structures that
+            // never merge; marking them would only cost scanner time and
+            // copy-on-write faults, so their size classes are excluded here.
+            // These two classes are also where the smallest pages loaded from
+            // disk end up, since the lookup rounds up: up to 24 bytes of data
+            // (1 point of a tier > 0 page) lands in the sizeof(PGD) class and
+            // up to 32 bytes (2 points) in the sizeof(gorilla_writer_t) one.
+            // They lose nothing by not being offered: in the sizeof(PGD) class
+            // every from-disk page allocates a descriptor next to its data from
+            // the same pool, and each descriptor holds a unique data pointer,
+            // so no base page there can ever be identical to another.
+            if(aral_sizes[slot] != sizeof(PGD) && aral_sizes[slot] != sizeof(gorilla_writer_t))
+                aral_enable_ksm(arals[arals_slot(slot, partition)]);
         }
     }
 

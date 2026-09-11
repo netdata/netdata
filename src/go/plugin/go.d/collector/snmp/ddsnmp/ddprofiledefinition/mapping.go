@@ -32,13 +32,6 @@ func NewExactMapping(items map[string]string) MappingConfig {
 	}
 }
 
-func NewBitmaskMapping(items map[string]string) MappingConfig {
-	return MappingConfig{
-		Mode:  MappingModeBitmask,
-		Items: maps.Clone(items),
-	}
-}
-
 func (m MappingConfig) Clone() MappingConfig {
 	return MappingConfig{
 		Mode:  m.Mode,

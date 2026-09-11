@@ -580,7 +580,7 @@ sidebar:
           - meta:
               label: Collect Troubleshooting Data
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md
-              description: Collect raw SNMP data without credentials for Netdata Support to investigate metrics and topology issues.
+              description: Include built-in SNMP diagnostics in a private support bundle for metrics, BGP, licensing, and topology issues.
           - meta:
               label: Anti-patterns
               edit_url: https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/anti-patterns.md
@@ -993,6 +993,15 @@ sidebar:
             - chat
             - real-time
             - live exhibits
+      - meta:
+          label: Infrastructure Knowledge
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/infrastructure-knowledge.md
+          description: Teach Netdata AI about your infrastructure, in a shared document or in conversation
+          keywords:
+            - infrastructure knowledge
+            - context
+            - memory
+            - infra.md
       - meta:
           label: Insights
           edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md

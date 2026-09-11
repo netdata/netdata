@@ -3,19 +3,8 @@
 Live catalog of analysis-derived how-tos for the
 triage-agent-events skill.
 
-**Live-catalog rule** (also stated in `../SKILL.md`): if an
-assistant is asked a concrete question about agent-events
-that requires non-trivial analysis (multiple file reads,
-multiple queries, cross-referencing producer source) AND the
-answer is not already documented in the per-domain guides
-(`../AE_FIELDS.md`, `../transports.md`, `../update-cadence.md`,
-`../query-discipline.md`, `../finding-crashes.md`,
-`../finding-fatals.md`) or the recipes (`../recipes/`), the
-assistant MUST author a new `how-tos/<slug>.md` and add a
-one-line entry to this INDEX BEFORE completing the task.
-
-This is durable. Skipping it means the next assistant repeats
-the same analysis from scratch.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Check the guides and recipes routed from
+`../SKILL.md` before adding an authorized how-to.
 
 ## Catalog
 
@@ -32,7 +21,7 @@ the same analysis from scratch.
    - A "How I figured this out" footer naming the files read,
      the queries run (with payloads), and the helpers used.
 2. Add a row to the table above with topic, slug, short notes.
-3. Commit alongside the work that prompted the analysis.
+3. Git operations follow `AGENTS.md#git-and-pr-workflow`.
 
 ## When NOT to add a how-to
 

@@ -71,11 +71,13 @@ metadata:
             name: sysDescr
 
 metric_tags:
-  - OID: 1.3.6.1.4.1.14988.1.1.4.1.0
-    symbol: mtxrLicSoftwareId
+  - symbol:
+      OID: 1.3.6.1.4.1.14988.1.1.4.1.0
+      name: mtxrLicSoftwareId
     tag: software_id
-  - OID: 1.3.6.1.4.1.14988.1.1.4.4.0
-    symbol: mtxrLicVersion
+  - symbol:
+      OID: 1.3.6.1.4.1.14988.1.1.4.4.0
+      name: mtxrLicVersion
     tag: license_version
 
 metrics:
