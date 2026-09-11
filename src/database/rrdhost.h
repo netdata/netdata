@@ -267,23 +267,14 @@ struct rrdhost {
                     uint32_t counter_in;            // counts the number of replication statements we have received
                     uint32_t counter_out;           // counts the number of replication statements we have sent
                     uint32_t backfill_pending;      // the number of replication requests pending on us
-                    uint32_t charts;                // the number of charts currently being replicated from a child
-
-                    // Append-only CLAIM-ATTEMPT cohort: how many receiver-replication claim attempts
-                    // this connection generation has admitted. Incremented BEFORE `charts` on every
-                    // attempt and never rolled back, so it is always >= `charts`. Rolling it back on a
-                    // duplicate CHART_DEFINITION_END would create the very read window this ordering
-                    // avoids - a reader could pair the speculative higher `charts` with the
-                    // post-rollback lower `charts_started` - so a duplicate attempt deliberately
-                    // inflates the denominator instead. That under-reports completion and never
-                    // over-reports it.
-                    //
-                    // The ratio built from this is therefore "completed claim attempts among the
-                    // attempts admitted in this connection generation", NOT a monotonic
-                    // transfer-progress clock: admitting new work mid-generation legitimately moves it
-                    // backwards. Zeroed with the rest of this struct by
-                    // stream_receiver_replication_reset() on connect and disconnect.
-                    uint32_t charts_started;
+                    // High 32 bits: charts whose claim won the receiver-replication transition in this
+                    // connection generation. Low 32 bits: charts still outstanding. A duplicate
+                    // CHART_DEFINITION_END moves neither half. The ratio is therefore "completed charts
+                    // among the charts admitted in this connection generation", not a monotonic progress
+                    // clock: admitting new charts mid-generation legitimately moves it backwards.
+                    // Keep this naturally 8-byte aligned: misaligned 64-bit atomics on armv6l/armv7l
+                    // degrade to libatomic calls.
+                    uint64_t charts_started_and_remaining __attribute__((aligned(8)));
                 } replication;
 
                 // single-writer (the receiver thread), relaxed-atomic; read lock-free by the
@@ -456,24 +447,69 @@ extern RRDHOST *localhost;
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
-#define rrdhost_receiver_replicating_charts(host) (__atomic_load_n(&((host)->stream.rcv.status.replication.charts), __ATOMIC_RELAXED))
-// RELEASE, paired with the ACQUIRE load in rrdhost_receiver_replication_completion(): the claim
-// increments `charts_started` first and `charts` second, and this ordering is what makes a reader that
-// observes the published `charts` also observe the matching `charts_started`. Without it both are
-// independent relaxed atomics and a weak-memory reader can pair a new `charts` with a stale
-// `charts_started`, i.e. see started < remaining.
-#define rrdhost_receiver_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->stream.rcv.status.replication.charts), 1, __ATOMIC_RELEASE))
-// Release one receiver-replication contribution. Unlike the sender counterpart this is CHECKED: the
-// counter is a uint32_t with four release sites (replay completion, its forced branch, the connect/
-// disconnect reset, and chart teardown), so an unowned release must not wrap it to UINT32_MAX and
-// pin the host in `replicating` forever. Callers MUST only release a contribution they own, i.e. one
-// whose RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS they observed in their own CAS old-value.
-uint32_t rrdhost_receiver_replicating_charts_release(RRDHOST *host, const char *function);
-#define rrdhost_receiver_replicating_charts_minus_one(host) rrdhost_receiver_replicating_charts_release(host, __FUNCTION__)
-#define rrdhost_receiver_replicating_charts_zero(host) (__atomic_store_n(&((host)->stream.rcv.status.replication.charts), 0, __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_started(host) (__atomic_load_n(&((host)->stream.rcv.status.replication.charts_started), __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_started_plus_one(host) (__atomic_add_fetch(&((host)->stream.rcv.status.replication.charts_started), 1, __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_started_zero(host) (__atomic_store_n(&((host)->stream.rcv.status.replication.charts_started), 0, __ATOMIC_RELAXED))
+static inline uint64_t rrdhost_receiver_replication_accounting(RRDHOST *host) {
+    return __atomic_load_n(&host->stream.rcv.status.replication.charts_started_and_remaining, __ATOMIC_RELAXED);
+}
+
+// One claim attempt: one unit of cohort in the high half, one outstanding chart in the low half. The
+// claim adds it and the duplicate-CHART_DEFINITION_END rollback subtracts it, both in one atomic op,
+// so the two halves can never be observed out of step and a duplicate moves neither.
+//
+// The add is deliberately unguarded, unlike the two subtracts. A carry out of the low half needs 2^32
+// charts outstanding on one host at once, which the address space rules out. A wrap of the high half
+// needs 2^32 won claims inside a single connection generation, and its consequence is a cohort of 0
+// with work outstanding, i.e. the NAN diagnostic - the same wrap and the same reading the separate
+// uint32_t cohort had before it was packed. Neither warrants a CAS retry loop on the claim path.
+#define RRDHOST_RCV_REPLICATION_UNIT (((uint64_t)1 << 32) | 1)
+
+static inline uint64_t rrdhost_receiver_replication_accounting_pack(uint32_t started, uint32_t remaining) {
+    return ((uint64_t)started << 32) | remaining;
+}
+
+static inline uint32_t rrdhost_receiver_replication_remaining_of(uint64_t accounting) {
+    return (uint32_t)accounting;
+}
+
+static inline uint32_t rrdhost_receiver_replication_started_of(uint64_t accounting) {
+    return (uint32_t)(accounting >> 32);
+}
+
+// Reinstall a word saved by rrdhost_receiver_replication_accounting(); the tests save and restore the
+// host's real accounting around the synthetic states they install.
+static inline void rrdhost_receiver_replication_accounting_restore(RRDHOST *host, uint64_t saved) {
+    __atomic_store_n(&host->stream.rcv.status.replication.charts_started_and_remaining, saved, __ATOMIC_RELAXED);
+}
+
+// Test-facing setter: install both halves together so tests cannot create a torn synthetic state.
+static inline void rrdhost_receiver_replication_accounting_set(RRDHOST *host, uint32_t started, uint32_t remaining) {
+    rrdhost_receiver_replication_accounting_restore(host, rrdhost_receiver_replication_accounting_pack(started, remaining));
+}
+
+static inline uint32_t rrdhost_receiver_replicating_charts(RRDHOST *host) {
+    return rrdhost_receiver_replication_remaining_of(rrdhost_receiver_replication_accounting(host));
+}
+
+static inline uint32_t rrdhost_receiver_replicating_charts_started(RRDHOST *host) {
+    return rrdhost_receiver_replication_started_of(rrdhost_receiver_replication_accounting(host));
+}
+
+static inline void rrdhost_receiver_replicating_charts_zero(RRDHOST *host) {
+    rrdhost_receiver_replication_accounting_restore(host, 0);
+}
+
+// Decrement the outstanding half by one, CHECKED - unlike the sender counterpart. `function` names the
+// release site for the refusal log. Callers MUST only decrement a contribution they own, i.e. one whose
+// RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS they observed in their own CAS old-value; the guard is
+// what stops an unowned one corrupting the word, and the refusal is how a test sees it happen. Reach it
+// through rrdhost_receiver_replication_release() (rrdset.h) unless you are a test driving the guard
+// itself: that function is what pairs the decrement with the flag transition that authorises it.
+uint32_t rrdhost_receiver_replicating_charts_decrement(RRDHOST *host, const char *function);
+
+// The duplicate-CHART_DEFINITION_END rollback: withdraw the speculative unit this same thread just
+// added, both halves together. Called by rrdhost_receiver_replication_claim() on a lost CAS, and by
+// the test that drives the guard directly. It is NOT a release - it does not clear the flag.
+uint32_t rrdhost_receiver_replication_withdraw(RRDHOST *host);
+#define rrdhost_receiver_replicating_charts_minus_one(host) rrdhost_receiver_replicating_charts_decrement(host, __FUNCTION__)
 
 // Receiver replication completion, as a percentage over the current connection generation's cohort.
 // Computed from the counters on every read - there is no stored value to go stale. Returns NAN (which
