@@ -62,6 +62,37 @@ void service_exits(void) {
     spinlock_unlock(&service_globals.lock);
 }
 
+// Is any thread other than the caller still registered for any of these services?
+//
+// A pure query: unlike service_wait_exit() it neither signals cancellation nor waits, and it
+// answers for exactly the services asked about. service_wait_exit() returns one bool for its
+// whole mask, so it cannot be used to ask about one service when it was called with several.
+//
+// Threads are removed from this registry by service_exits(), which runs from the per-thread
+// cleanup callbacks registered in main() - after the thread function has returned and
+// therefore after its own cleanup handlers have run. So a "no" here means the thread finished
+// its cleanup, not merely that it was asked to stop.
+bool service_is_running(SERVICE_TYPE service) {
+    bool running = false;
+
+    spinlock_lock(&service_globals.lock);
+
+    Pvoid_t *PValue;
+    Word_t tid = 0;
+    bool first = true;
+    while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+        SERVICE_THREAD *sth = *PValue;
+        if((sth->services & service) && sth->tid != gettid_cached()) {
+            running = true;
+            break;
+        }
+    }
+
+    spinlock_unlock(&service_globals.lock);
+
+    return running;
+}
+
 bool service_running(SERVICE_TYPE service) {
     static __thread SERVICE_THREAD *sth = NULL;
 

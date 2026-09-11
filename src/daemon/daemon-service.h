@@ -26,6 +26,7 @@ typedef void (*force_quit_t)(void *data);
 typedef void (*request_quit_t)(void *data);
 
 void service_exits(void);
+bool service_is_running(SERVICE_TYPE service);
 bool service_running(SERVICE_TYPE service);
 struct service_thread *service_register(request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data);
 

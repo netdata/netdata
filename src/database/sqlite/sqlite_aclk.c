@@ -981,6 +981,12 @@ static void aclk_synchronization_event_loop(void *arg)
                 config->aclk_queries_running,
                 config->alert_push_running,
                 config->aclk_batch_job_is_running);
+
+            // Same reasoning as the metadata loop: these jobs run on libuv threadpool
+            // threads that nothing joins, and they use db_meta. Suppress the SQLite
+            // teardown so their handles and statements outlive this shutdown.
+            sqlite_mark_teardown_unsafe(
+                "an ACLK libuv job outlived the shutdown watchdog and may still be using the databases");
             break;
         }
 
@@ -1238,13 +1244,21 @@ void aclk_synchronization_shutdown(void)
     // on init and still valid
     aclk_mqtt_client_reset();
 
+    // Same two give-up paths as metadata_sync_shutdown(), and the same consequence: if we never
+    // asked the loop to stop, or could not join it, it and its libuv workers may still be using
+    // db_meta when the caller tears SQLite down.
     if (queue_aclk_sync_cmd(ACLK_SYNC_SHUTDOWN, NULL, NULL))
         completion_wait_for(&aclk_sync_config.start_stop_complete);
+    else
+        sqlite_mark_teardown_unsafe(
+            "the ACLK shutdown command could not be queued, so its sync thread is still running");
 
     completion_destroy(&aclk_sync_config.start_stop_complete);
     int rc = nd_thread_join(aclk_sync_config.thread);
-    if (rc)
+    if (rc) {
         nd_log_daemon(NDLP_ERR, "ACLK: Failed to join synchronization thread");
+        sqlite_mark_teardown_unsafe("the ACLK synchronization thread could not be joined");
+    }
     else
         nd_log_daemon(NDLP_INFO, "ACLK: synchronization thread shutdown completed");
 }

@@ -268,6 +268,33 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();
+
+    // Stop the netdatacli command loop. Its handlers use db_meta directly, and commands_exit()
+    // is otherwise reached only from the signal path - on every other exit path the command
+    // thread just keeps running, straight through the SQLite teardown below.
+    //
+    // Drain it HERE, alongside the other thread cancellations, rather than just before the
+    // SQLite teardown. By that later point rrdhosts, dbengine and the metadata loop are already
+    // gone, so waiting there for a handler like remove-stale-node would be waiting for it to
+    // finish operating on subsystems that no longer exist. Draining here also matches what the
+    // signal path already does, so the two orders agree.
+    //
+    // commands_exit() is idempotent and re-entry safe; where it cannot drain (it is called from
+    // the command thread itself, or another thread is already draining) it marks the SQLite
+    // teardown unsafe instead, which is the other half of the same contract.
+    //
+    // Skipped entirely on an abnormal exit: there the teardown is suppressed anyway (see the
+    // abnormal latch below), so the join would buy nothing - while a handler blocked on a lock
+    // held by the thread that is currently fatal()ing would turn that fatal into a 135 s
+    // watchdog SIGABRT, destroying the evidence of what actually went wrong.
+    if (!abnormal)
+        commands_exit();
+
+    // Billed to CANCEL_MAIN_THREADS deliberately: commands_exit() joins the command loop, so its
+    // duration belongs to a thread-stopping step. Completing the step before it would charge the
+    // join to whatever step ran next, which did nothing - and this join is the one thing here
+    // that can plausibly stall a shutdown, so it must not be misattributed in the timings the
+    // status file records.
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
     if (abnormal) {
@@ -326,6 +353,42 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
 
+    // Everything below destroys SQLite state. Before any of it, establish that nobody can
+    // still be using it - and where we cannot establish that, say so and let the teardown
+    // suppress itself rather than free memory out from under a running thread.
+    //
+    // HEALTH is the thread that matters here. It caches prepared statements (the
+    // is_health_thread branches in sqlite_health.c / sqlite_aclk_alert.c) and nothing above
+    // joins it: service_wait_exit() at the top of this function is bounded and proceeds
+    // regardless, and nd_thread_join_threads() only drains threads that have ALREADY exited.
+    // Ask the service registry directly - a thread leaves it from its per-thread cleanup,
+    // which runs after its own cleanup handlers, so "gone" means health finished finalizing
+    // its statements.
+    //
+    // Do NOT try to infer this from the service_wait_exit() call above: it was given a mask of
+    // four services and returns a single bool for all of them, so a slow HTTPD would look
+    // exactly like a live HEALTH and we would suppress teardown on every ordinary shutdown.
+    if (service_is_running(SERVICE_HEALTH))
+        sqlite_mark_teardown_unsafe(
+            "the health thread is still running and may be using its cached SQL statements");
+
+    // An abnormal exit skipped the whole block above: metadata_sync_shutdown() and ml_fini()
+    // never ran, so the metadata thread and its libuv workers were never asked to stop and are
+    // still binding and stepping statements against db_meta, db_context_meta and - through
+    // metadata_scan_host() -> ml_dimension_load_models() - ml_db. None of the latch setters in
+    // those functions can have fired, because neither function was called.
+    //
+    // Zombie detection alone does not cover this: it samples sqlite3_next_stmt() at one instant,
+    // so a worker that is between statements, about to call sqlite3_prepare_v2(), leaves nothing
+    // attached and the teardown would proceed underneath it.
+    //
+    // This is also the path where tearing SQLite down does the most damage: a second crash
+    // inside the teardown masks the fatal that caused the abnormal exit in the first place,
+    // which is exactly the evidence we need to diagnose it.
+    if (abnormal)
+        sqlite_mark_teardown_unsafe(
+            "the shutdown is abnormal, so the metadata and ML subsystems were never stopped");
+
     sqlite_close_databases();
     sqlite_library_shutdown();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
@@ -335,10 +398,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
 
     // unlink the pipe
-    // During the commands_exit() signal-handler path, libuv may already
-    // have unlinked the pipe on close. For other exit paths the command
-    // thread keeps running and we must clean it up here. ENOENT just means
-    // libuv beat us to removing it.
+    // commands_exit() above (or the earlier signal-handler call) has normally stopped the
+    // command loop by now, and libuv unlinks the pipe when it closes. Two exceptions, where the
+    // loop is still live and we unlink from under it: the `netdatacli shutdown-agent` path,
+    // where shutdown runs ON the command event-loop thread so it cannot be joined, and any
+    // abnormal exit, where commands_exit() is skipped entirely. Both are safe - the SQLite
+    // teardown is suppressed on both - but the pipe does go away under a live listener.
+    // ENOENT just means libuv beat us to it.
     const char *pipe = daemon_pipename();
     if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
