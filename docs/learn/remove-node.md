@@ -181,7 +181,7 @@ To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packa
 
 ## Node Decommissioning
 
-You can decommission nodes to avoid getting notifications about them. This action can also be performed in bulk and can also be undone.
+You can mark nodes as pending for decommissioning to avoid getting notifications about them. This action can also be performed in bulk, and it can be undone if needed.
 
 **Steps**:
 
