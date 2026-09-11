@@ -60,6 +60,11 @@ unchanged reference/array/json behavior. Validate producer-derived aggregates
 with this CLI; generic JSON Schema and optional Python fallback checks alone
 do not prove typed-member validation.
 
+Numeric regressions must also exercise builders before JSON marshaling, which
+otherwise rejects non-finite values and malformed `json.Number` literals before
+the topology validator sees them. Cover large unsigned cells, finite/integral
+checks, and unchanged index bounds in both scalar and set form.
+
 ## Validate output (require rows)
 ```
 src/go/go.d.plugin \

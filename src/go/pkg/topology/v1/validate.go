@@ -2582,27 +2582,6 @@ func integerValue(raw any) (int, bool) {
 	}
 }
 
-func numberValue(raw any) (float64, bool) {
-	switch value := raw.(type) {
-	case int:
-		return float64(value), true
-	case int64:
-		return float64(value), true
-	case uint64:
-		return float64(value), true
-	case float64:
-		return value, true
-	case json.Number:
-		n, err := value.Float64()
-		if err != nil {
-			return 0, false
-		}
-		return n, true
-	default:
-		return 0, false
-	}
-}
-
 func maxInt() int {
 	return int(^uint(0) >> 1)
 }

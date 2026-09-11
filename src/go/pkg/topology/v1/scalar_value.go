@@ -2,6 +2,12 @@
 
 package topologyv1
 
+import (
+	"encoding/json"
+	"math"
+	"strconv"
+)
+
 // scalarColumnValueError preserves the item type when set aggregation produces
 // an array. A negative index identifies the cell itself rather than a member.
 func scalarColumnValueError(typ, aggregation string, nullable bool, value any) (int, string) {
@@ -35,15 +41,15 @@ func scalarItemError(typ string, nullable bool, value any) string {
 			return "is not a bool"
 		}
 	case "int":
-		if _, ok := integerValue(value); !ok {
+		if _, ok := scalarNumberValue(value, true); !ok {
 			return "is not an integer"
 		}
 	case "uint":
-		if n, ok := integerValue(value); !ok || n < 0 {
+		if n, ok := scalarNumberValue(value, true); !ok || n < 0 {
 			return "is not a non-negative integer"
 		}
 	case "float", "duration":
-		if _, ok := numberValue(value); !ok {
+		if _, ok := scalarNumberValue(value, false); !ok {
 			return "is not a number"
 		}
 	case "string", "ip", "mac", "timestamp":
@@ -54,4 +60,41 @@ func scalarItemError(typ string, nullable bool, value any) string {
 		return "has unsupported scalar column type"
 	}
 	return ""
+}
+
+// scalarNumberValue validates cells independently of machine-sized indexes.
+// The returned number is only for sign checks; the stored value is unchanged.
+func scalarNumberValue(raw any, integral bool) (float64, bool) {
+	var n float64
+	switch value := raw.(type) {
+	case int:
+		return float64(value), true
+	case int64:
+		return float64(value), true
+	case uint64:
+		return float64(value), true
+	case float64:
+		n = value
+	case json.Number:
+		if !json.Valid([]byte(value)) {
+			return 0, false
+		}
+		if integral {
+			// Integer-form literals retain exact parsing, including the unsigned range.
+			if len(value) > 0 && value[0] == '-' {
+				integer, err := value.Int64()
+				return float64(integer), err == nil
+			}
+			integer, err := strconv.ParseUint(string(value), 10, 64)
+			return float64(integer), err == nil
+		}
+		var err error
+		n, err = value.Float64()
+		if err != nil {
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+	return n, !math.IsNaN(n) && !math.IsInf(n, 0) && (!integral || math.Trunc(n) == n)
 }

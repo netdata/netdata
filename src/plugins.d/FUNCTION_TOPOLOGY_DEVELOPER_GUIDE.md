@@ -268,6 +268,19 @@ for sets. A nil slice serializes as null and follows nullability; a non-nil
 empty slice represents an empty set. These rules apply after decoding any of
 the three column codecs.
 
+Numeric cells and set members must be finite. Types `int` and `uint` require
+integral values, and `uint` also requires a nonnegative value. Go validation
+accepts `int`, `int64`, `uint64`, `float64`, and `json.Number`, including the
+full native `uint64` range; numeric cells are not narrowed to machine-sized
+row or dictionary indexes. Validation preserves the supplied value.
+
+`json.Number` must contain a valid JSON numeric literal. For `int` and `uint`,
+it must use integer-form syntax (no fraction or exponent), fitting `int64`
+when negative or `uint64` when nonnegative. For `float` and `duration`, it must
+parse as a finite `float64`. Callers using the default JSON decoder retain its
+`float64` precision limits; validation does not recover digits already rounded
+during decoding.
+
 Set aggregation does not turn reference cells into arrays of references:
 `string_ref`, `ip_ref`, and `mac_ref` still carry one global dictionary index,
 and row-reference columns still carry one row index. A global dictionary entry
