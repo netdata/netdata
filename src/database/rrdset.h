@@ -89,8 +89,10 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 // The SINGLE implementation of the receiver-replication claim and release. Every lifecycle site uses
 // these - the parser's CHART_DEFINITION_END, both REPLAY_END branches, the connect/disconnect reset,
 // and chart teardown. Do NOT open-code the flag CAS plus the counter movement anywhere else: the
-// ownership invariant is only enforceable while it lives in one place. Contract and its two exceptions:
-// .agents/sow/specs/streaming-receiver-replication-accounting.md
+// ownership invariant is only enforceable while it lives in one place. Every decrement must be either
+// a release that cleared IN_PROGRESS in its own CAS old value, or the speculative-increment rollback
+// in claim() for a duplicate CHART_DEFINITION_END. The rollback does not clear the flag because the
+// chart still holds its contribution; a child resends CHART_DEFINITION_END when it adds dimensions.
 //
 // claim():   true when THIS call caused the not-replicating -> replicating transition, i.e. the chart's
 //            contribution is now held. False means the chart already held one and this call's
