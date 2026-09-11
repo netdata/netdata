@@ -2273,7 +2273,7 @@ try_build_install() {
   archive_name=""
 
   if [ -n "${zstd}" ]; then
-    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst"; then
+    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"; then
       archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
       decompress="${zstd} -dcf"
     else
@@ -2282,7 +2282,7 @@ try_build_install() {
   fi
 
   if [ -z "${archive_name}" ]; then
-    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz"; then
+    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"; then
       archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"
       decompress="$(command -v gzip 2>/dev/null) -dc"
     fi
