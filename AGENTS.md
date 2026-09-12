@@ -738,7 +738,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
     locally from a PR or docs branch; loads `docs-learn-site-structure` first
   - Also relevant: `integrations-lifecycle` (generated integration pages are published on Learn).
 - Triage.
-  - `triage-snmp-diagnostics`: offline SNMP support bundles and diagnostic files with `src/go/tools/snmp-diagnostics`;
+  - `triage-snmp-diagnostics`: offline SNMP evidence investigations and diagnostics-tool/interpretation reviews
+    with `src/go/tools/snmp-diagnostics`;
     topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`,
     `validate`, `summary`, `inspect-device`, `inspect-link`, and `replay`. Not live queries, traps, or
     collector/profile authoring
