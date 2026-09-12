@@ -92,12 +92,13 @@ inspection; token-safe request logging does not sanitize their contents. Start a
        printf 'WARN: %s node responses are partial; aggregated counts may be incomplete.\n' "$partial_nodes" >&2
      fi
      jq -s --argjson requested "$(jq '.selections.TRAP_SEVERITY' <<<"$BODY")" '
-       [ .[]
+       ($requested // []) as $selected
+       | [ .[]
          | .facets[]?
          | select((.id // .name) == "TRAP_SEVERITY")
          | .options[]?
          | {severity: (.id // .name), count: (.count // 0)}
-         | select(.severity as $severity | $requested | index($severity))
+         | select(($selected | length) == 0 or (.severity as $severity | $selected | index($severity)))
        ]
        | group_by(.severity)
        | map({severity: .[0].severity, count: (map(.count) | add)})
@@ -128,7 +129,8 @@ redact identifying details before sharing a node list or copying it into durable
 ## Notes / gotchas
 
 - Severity facets can include unselected options when several fields are selected. The aggregation explicitly
-  keeps only the severities in `BODY`; successful responses alone enter this run’s aggregate. Failed partial
+  keeps only the severities in `BODY` when that selection is nonempty; an omitted, null or empty selection keeps
+  all severities. Successful responses alone enter this run’s aggregate. Failed partial
   responses remain private for diagnosis. Status-200 partial results remain usable but emit a completeness warning.
 - Cloud Log Function calls are node-scoped. Room-wide trap questions
   require listing nodes, querying each node, and aggregating locally.

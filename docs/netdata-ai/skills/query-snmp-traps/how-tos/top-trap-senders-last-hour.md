@@ -59,8 +59,11 @@ inspection; token-safe request logging does not sanitize their contents. Start a
 3. Save the top source-IP facet values privately and print their ranked counts:
 
    ```bash
-   jq '
-     .facets[]?
+   jq -e '
+     if type == "object" and .status == 200
+        and (.data | type == "array") and (.facets | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .facets[]?
      | select((.id // .name) == "TRAP_SOURCE_IP")
      | .options
      | sort_by(-(.count // 0))
@@ -75,8 +78,11 @@ inspection; token-safe request logging does not sanitize their contents. Start a
 4. If hostnames are available, inspect the `_HOSTNAME` facet too:
 
    ```bash
-   jq '
-     .facets[]?
+   jq -e '
+     if type == "object" and .status == 200
+        and (.data | type == "array") and (.facets | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .facets[]?
      | select((.id // .name) == "_HOSTNAME")
      | .options
      | sort_by(-(.count // 0))

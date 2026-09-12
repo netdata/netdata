@@ -64,8 +64,11 @@ inspection; token-safe request logging does not sanitize their contents. Start a
 3. Decode matching rows into a private file, then print a bounded count:
 
    ```bash
-   jq --arg field "$TRAP_VAR_FIELD" '
-     .columns as $c
+   jq -e --arg field "$TRAP_VAR_FIELD" '
+     if type == "object" and .status == 200
+        and (.columns | type == "object") and (.data | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .columns as $c
      | [ .data[]? as $row
          | $c | to_entries | sort_by(.value.index)
          | map({(.key): $row[.value.index]}) | add
@@ -85,24 +88,28 @@ inspection; token-safe request logging does not sanitize their contents. Start a
    ```
 
 4. If local inspection of the structured varbind object is needed,
-   parse it into another private file:
+   parse matching payloads into a private JSON array (an empty response produces `[]`):
 
    ```bash
-   jq '
-     .columns as $c
-     | .data[]? as $row
+   jq -e '
+     if type == "object" and .status == 200
+        and (.columns | type == "object") and (.data | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .columns as $c
+     | [ .data[]? as $row
      | $c | to_entries | sort_by(.value.index)
      | map({(.key): $row[.value.index]}) | add
      | {
          trap: (.TRAP_NAME // .TRAP_OID // ""),
          varbinds: ((.TRAP_JSON // "{}") | try fromjson catch {})
-       }
+       } ]
    ' "$TRAP_QUERY_DIR/varbind-filter.json" > "$TRAP_QUERY_DIR/varbind-audit.json"
    ```
 
 ## Output
 
-Return the matching returned-row count (at most 200). You MAY inspect the private decoded rows and varbind audit
+Return the matching returned-row count (at most 200). This count remains valid for a partial response; it does
+not claim to count every match in the time window. You MAY inspect the private decoded rows and varbind audit
 locally for trap names, categories, severities, messages and the configured field value. These are identifying raw
 data, not sanitized output. Review and redact details before sharing or copying them into durable artifacts.
 

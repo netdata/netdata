@@ -59,8 +59,11 @@ inspection; token-safe request logging does not sanitize their contents. Start a
 
    ```bash
    summarize_dedup() {
-   jq '
-     .columns as $c
+   jq -e '
+     if type == "object" and .status == 200
+        and (.columns | type == "object") and (.data | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .columns as $c
      | [ .data[]? as $row
          | $c | to_entries | sort_by(.value.index)
          | map({(.key): $row[.value.index]}) | add
