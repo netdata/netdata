@@ -38,6 +38,8 @@ gh_require_slug
     def test_rejects_spoofed_authority_and_invalid_repository_path(self):
         for remote in ('https://example.invalid/path/@github.com:example/repo.git',
                        'https://example.invalid/@github.com/example/repo.git',
+                       'https://example.invalid?@github.com/example/repo.git',
+                       'https://example.invalid#@github.com/example/repo.git',
                        'https://github.com.example.invalid/example/repo.git',
                        'https://github.com@evil.example.com/example/repo.git',
                        'git@notgithub.example.com:example/repo.git',

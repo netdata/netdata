@@ -36,7 +36,7 @@ gh_repo_slug() {
          || git -C "${root}" config --get remote.origin.url)"
     if [[ "${url}" =~ ^[^/@:[:space:]]+@github\.com:([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+)$ ]]; then
         slug="${BASH_REMATCH[1]}"
-    elif [[ "${url}" =~ ^(https?|ssh)://([^/@[:space:]]+@)?github\.com/([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+)$ ]]; then
+    elif [[ "${url}" =~ ^(https?|ssh)://([^/@?#[:space:]]+@)?github\.com/([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+)$ ]]; then
         slug="${BASH_REMATCH[3]}"
     else
         return 0
