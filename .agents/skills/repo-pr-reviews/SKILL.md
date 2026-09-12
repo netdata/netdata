@@ -192,7 +192,8 @@ resolves those references. Preserve test cases when sharing duplicated setup.
 
 ### 1c. Note the CI signal as a third source
 
-Run `bash .agents/skills/repo-pr-reviews/scripts/ci-status.sh <PR>` once early to capture which checks are failing
+For complete triage, or when CI belongs to the selected inspection scope, run
+`bash .agents/skills/repo-pr-reviews/scripts/ci-status.sh <PR>` once early to capture which checks are failing
 **right now**. You're looking for failures caused by the current PR
 (typo in a YAML file you added, a script that doesn't pass shellcheck,
 a build that breaks because of the diff). DO NOT fix CI yet -- just note
@@ -294,7 +295,9 @@ handling, refresh the selected finding sources and check CI; report the scope li
 Resolve verified blockers before pushing; handle non-blocking items under the root scope/follow-up rules.
 This reduces stale work but is not an atomic barrier: new feedback can arrive after the fetch.
 
-```
+```bash
+# Complete-triage example. Scoped handling refreshes only its selected finding sources.
+# Both paths check CI before an authorized push.
 bash .agents/skills/repo-pr-reviews/scripts/fetch-all.sh <PR_NUMBER>
 bash .agents/skills/repo-pr-reviews/scripts/fetch-sonar-findings.sh <PR_NUMBER>
 bash .agents/skills/repo-pr-reviews/scripts/ci-status.sh <PR_NUMBER>
