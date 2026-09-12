@@ -703,7 +703,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     artifacts, live verification, the authoring scripts
   - `collectors-snmp-profiles`: authoring/review of SNMP profiles, typed rows, ddsnmp parsing and profile-format docs;
     requires MIB `MAX-ACCESS`/`ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
-  - `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs and their `metrics:`/`charts:` rules, the trap
+  - `collectors-snmp-trap-profiles`: authoring/review of trap profiles and `metrics:`/`charts:` rules, the trap
     `profile-format.md`, the generator `src/go/cmd/snmptrapprofilegen` (shipped as `snmp-trap-profile-gen`), stock
     pack regeneration and compression, category/severity taxonomy changes
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
@@ -830,6 +830,7 @@ renames:
 | `triage-snmp-diagnostics` | `snmp-diagnostics/` | private bundle inspections, replay output, and incident reports |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
+| `collectors-snmp-trap-profiles` | `snmp-trap-profiles/` | private generator artifacts and selected classification caches |
 | `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |
