@@ -10,7 +10,6 @@ NC='\033[0m'
 
 ndsudo="${1:?usage: $0 /path/to/ndsudo}"
 ndsudo_cmd=(sudo "${ndsudo}")
-ndsudo_as_netdata_cmd=(sudo -u netdata "${ndsudo}")
 
 print_command() {
     printf '%b%s >%b %b' "${GRAY}" "$(pwd)" "${NC}" "${YELLOW}" >&2
@@ -50,12 +49,11 @@ run_expect() {
     printf '%b[OK]%b exit code %d\n' "${GREEN}" "${NC}" "${rc}" >&2
 }
 
-run_expect_output() {
-    local expected="$1"
-    local required="$2"
-    local forbidden="$3"
+# A well-formed invocation that reaches the executable search must be refused
+# with exit 4 and a clear message, because the tool is not in ndsudo's search
+# path on macOS.
+run_expect_not_in_path() {
     local output rc
-    shift 3
 
     print_command "$@"
     set +e
@@ -63,89 +61,62 @@ run_expect_output() {
     rc=$?
     set -e
 
-    if [[ "${rc}" -ne "${expected}" ]]; then
+    if [[ "${rc}" -ne 4 || "${output}" != *"not available in PATH"* ]]; then
         printf '%s\n' "${output}" >&2
-        fail_command "expected exit code ${expected}, got ${rc}" "$@"
-        return 1
-    fi
-    if [[ "${output}" != *"${required}"* ]]; then
-        printf '%s\n' "${output}" >&2
-        fail_command "output does not contain the selected first value" "$@"
-        return 1
-    fi
-    if [[ "${output}" == *"${forbidden}"* ]]; then
-        printf '%s\n' "${output}" >&2
-        fail_command "output contains an ignored duplicate value" "$@"
+        fail_command "expected exit 4 with 'not available in PATH', got ${rc}" "$@"
         return 1
     fi
 
-    printf '%s\n' "${output}" >&2
-    printf '%b[OK]%b first duplicate value selected\n' "${GREEN}" "${NC}" >&2
-}
-
-run_expect_smartctl_json() {
-    local expected_device="$1"
-    local output rc
-    shift
-
-    print_command "$@"
-    set +e
-    output=$("$@" 2>&1)
-    rc=$?
-    set -e
-
-    if ! printf '%s' "${output}" | jq -e --arg device "${expected_device}" \
-        '(.smartctl.exit_status | type == "number") and
-         (.smartctl.argv == ["smartctl", "--json", "--all", $device, "--device", "nvme", "--nocheck", "standby"])' \
-        >/dev/null; then
-        printf '%s\n' "${output}" >&2
-        fail_command "normal invocation did not execute smartctl with the expected argv (exit code ${rc})" "$@"
-        return 1
-    fi
-
-    printf '%b[OK]%b normal invocation returned smartctl JSON with the expected argv (exit code %d)\n' \
-        "${GREEN}" "${NC}" "${rc}" >&2
+    printf '%b[OK]%b refused cleanly: not available in PATH (exit 4)\n' "${GREEN}" "${NC}" >&2
 }
 
 print_command sudo test -x "${ndsudo}"
 if ! sudo test -x "${ndsudo}"; then
     fail_command "ndsudo is not executable" sudo test -x "${ndsudo}"
 fi
-print_command command -v jq
-if ! command -v jq >/dev/null; then
-    fail_command "jq is not available" command -v jq
-fi
-print_command command -v smartctl
-if ! command -v smartctl >/dev/null; then
-    fail_command "smartctl is not available" command -v smartctl
-fi
 
 iokit_path='IOService:/ExampleController(Example)@0/Namespace@1'
 
-# The nonexistent synthetic path exercises normal execution without touching a device.
-run_expect_smartctl_json "${iokit_path}" "${ndsudo_as_netdata_cmd[@]}" smartctl-json-device-info \
+# On macOS ndsudo searches Apple-owned directories only (/bin, /sbin,
+# /usr/bin, /usr/sbin): /usr/local and /opt/homebrew are writable by the
+# console admin, so a setuid-root binary searching them would execute
+# admin-planted binaries as root. Apple ships no smartctl, so every
+# invocation that reaches the executable search must fail closed with
+# exit 4 - even when an admin-writable smartctl exists. Argument
+# validation runs before the search and keeps its own exit codes.
+
+# Make sure an admin-writable smartctl exists, so the refusals below prove
+# the search path is closed rather than merely that the tool is missing.
+# The marker file catches any execution of the plant.
+planted=""
+if ! command -v smartctl > /dev/null 2>&1; then
+    sudo mkdir -p /usr/local/bin
+    printf '#!/bin/sh\ntouch /tmp/ndsudo-planted-executed\n' | sudo tee /usr/local/bin/smartctl > /dev/null
+    sudo chmod 755 /usr/local/bin/smartctl
+    planted="/usr/local/bin/smartctl"
+fi
+sudo rm -f /tmp/ndsudo-planted-executed
+
+# Well-formed invocations: refused at the executable search, fail closed.
+run_expect_not_in_path "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
     --deviceName "${iokit_path}" --deviceType nvme --powerMode standby
-run_expect 0 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
-    --deviceName "${iokit_path}" --deviceType nvme --powerMode standby
-run_expect 0 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
+run_expect_not_in_path "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
     --deviceName /dev/disk0 --deviceType nvme --powerMode standby
+run_expect_not_in_path "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
+    --deviceName "${iokit_path}" --deviceName /dev/disk0 --deviceType nvme --powerMode standby
+run_expect_not_in_path "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
+    --deviceType nvme --powerMode standby
 
 printf -v suffix '%*s' 498 ''
 max_path="IOService:/${suffix// /A}@1"
-run_expect 0 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
+run_expect_not_in_path "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
     --deviceName "${max_path}" --deviceType nvme --powerMode standby
 
+# Argument validation rejects bad input before any search happens.
 printf -v suffix '%*s' 499 ''
 overlong_path="IOService:/${suffix// /A}@1"
 run_expect 2 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
     --deviceName "${overlong_path}" --deviceType nvme --powerMode standby
-
-run_expect 5 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
-    --deviceType nvme --powerMode standby
-run_expect_output 0 "${iokit_path}" /dev/disk0 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
-    --deviceName "${iokit_path}" --deviceName /dev/disk0 --deviceType nvme --powerMode standby
-run_expect 2 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
-    --deviceName /dev/disk0 --deviceName "${iokit_path}" --deviceType nvme --powerMode standby
 
 run_expect 2 "${ndsudo_cmd[@]}" --test fail2ban-client-status-jail --jail 'name@example'
 run_expect 2 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
@@ -154,4 +125,17 @@ run_expect 2 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
     --deviceName /dev/disk0 --deviceType 'nvme@example' --powerMode standby
 run_expect 2 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
     --deviceName 'IOService:/Example;Controller@0' --deviceType nvme --powerMode standby
+run_expect 2 "${ndsudo_cmd[@]}" --test smartctl-json-device-info \
+    --deviceName /dev/disk0 --deviceName "${iokit_path}" --deviceType nvme --powerMode standby
+
+run_expect 3 "${ndsudo_cmd[@]}" not-a-command
 run_expect 1 "${ndsudo_cmd[@]}" --test
+
+if [[ -e /tmp/ndsudo-planted-executed ]]; then
+    fail_command "the planted smartctl was EXECUTED by ndsudo" test -e /tmp/ndsudo-planted-executed
+fi
+printf '%b[OK]%b admin-writable smartctl was never executed\n' "${GREEN}" "${NC}" >&2
+
+if [[ -n "${planted}" ]]; then
+    sudo rm -f "${planted}"
+fi

@@ -1,0 +1,189 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Uninstall the Netdata Agent installed by the native macOS package.
+#
+#   sudo @NETDATA_RUNTIME_PREFIX@/usr/libexec/netdata/netdata-uninstaller.sh [--purge] [--yes]
+#
+# Default: remove everything the package owns, keep the user's data.
+# --purge: also delete configuration, the metrics database, and the claim
+# identity. Destructive; asks for confirmation unless --yes is given.
+#
+# Ownership and retention table (decision D13):
+#
+#   /Library/LaunchDaemons/com.github.netdata.plist           remove
+#   /Library/LaunchDaemons/com.github.netdata.updater.plist   remove
+#   PREFIX/usr                  payload                       remove
+#   PREFIX/bin                  bundled bash (payload)        remove
+#   PREFIX/var/log/netdata      logs (transient)              remove
+#   PREFIX/var/run              runtime state (transient)     remove
+#   PREFIX/etc/netdata          user config, claim.conf       retain*
+#   PREFIX/var/lib/netdata      claim identity, registry      retain*
+#   PREFIX/var/cache/netdata    metrics database (dbengine)   retain*
+#   package receipt                                           forget
+#   service account and group   remove only when this package created them
+#
+# Retained paths (*) are re-owned to root:wheel mode 0700 before the
+# service account is deleted: an account deletion leaves files owned by an
+# unassigned uid that macOS may later hand to an unrelated account, and
+# some of these files carry secrets (claim.conf). A later reinstall's
+# postinstall restores ownership to the newly created service account.
+
+set -u
+
+PREFIX="@NETDATA_RUNTIME_PREFIX@"
+NETDATA_USER="@NETDATA_USER@"
+IDENTIFIER="@NETDATA_PKG_IDENTIFIER@"
+LABEL="com.github.netdata"
+UPDATER_LABEL="com.github.netdata.updater"
+ACCOUNT_MARKER="${PREFIX}/var/lib/netdata/.macos-pkg-created-account"
+
+PURGE=0
+ASSUME_YES=0
+
+usage() {
+    echo "usage: $0 [--purge] [--yes]"
+    echo "  --purge  also delete configuration, database and claim identity"
+    echo "  --yes    do not ask for confirmation"
+}
+
+log() {
+    echo "netdata uninstaller: $*"
+}
+
+for arg in "$@"; do
+    case "${arg}" in
+        --purge) PURGE=1 ;;
+        # --force is what kickstart.sh passes the uninstaller it finds; it
+        # means the same thing --yes does here.
+        --yes|--force) ASSUME_YES=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) usage >&2; exit 1 ;;
+    esac
+done
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "netdata uninstaller: must run as root (use sudo)" >&2
+    exit 1
+fi
+
+# The prefix is baked in at build time; refuse to run with a value that
+# would make the removals below reach outside the install tree.
+case "${PREFIX}" in
+    /opt/*|/usr/local/*) ;;
+    *) echo "netdata uninstaller: refusing to operate on prefix '${PREFIX}'" >&2; exit 1 ;;
+esac
+
+if [ "${PURGE}" -eq 1 ] && [ "${ASSUME_YES}" -ne 1 ]; then
+    if [ -t 0 ]; then
+        echo "--purge PERMANENTLY deletes the Netdata configuration, the metrics"
+        echo "database, and this machine's claim identity under ${PREFIX}."
+        printf "Type 'yes' to continue: "
+        read -r answer
+        if [ "${answer}" != "yes" ]; then
+            echo "aborted."
+            exit 1
+        fi
+    else
+        echo "netdata uninstaller: --purge without a terminal requires --yes" >&2
+        exit 1
+    fi
+fi
+
+# Whether this package created the service account is decided before
+# anything is deleted - the marker lives inside a directory --purge removes.
+account_is_ours=0
+[ -f "${ACCOUNT_MARKER}" ] && account_is_ours=1
+
+#
+# Stop and unregister both launchd jobs. bootout is asynchronous - wait
+# for the label to actually disappear so no process outlives the removal.
+#
+for label in "${LABEL}" "${UPDATER_LABEL}"; do
+    if /bin/launchctl print "system/${label}" >/dev/null 2>&1; then
+        log "stopping ${label}"
+        /bin/launchctl bootout "system/${label}" 2>/dev/null || true
+        i=0
+        while [ "${i}" -lt 60 ] && /bin/launchctl print "system/${label}" >/dev/null 2>&1; do
+            sleep 1
+            i=$((i + 1))
+        done
+    fi
+    rm -f "/Library/LaunchDaemons/${label}.plist"
+done
+
+leftover="$(pgrep -x netdata 2>/dev/null || true)"
+if [ -n "${leftover}" ]; then
+    log "WARNING: netdata processes still running after bootout: ${leftover}" >&2
+fi
+
+#
+# Package-owned state.
+#
+log "removing the payload under ${PREFIX}/usr"
+rm -rf "${PREFIX:?}/usr"
+rm -rf "${PREFIX:?}/bin"
+rm -rf "${PREFIX:?}/var/log/netdata"
+rm -rf "${PREFIX:?}/var/run"
+rm -f "${ACCOUNT_MARKER}"
+
+#
+# Retained state - or, with --purge, its deletion.
+#
+if [ "${PURGE}" -eq 1 ]; then
+    log "purging configuration, database and claim identity"
+    rm -rf "${PREFIX:?}/etc/netdata" \
+           "${PREFIX}/var/lib/netdata" \
+           "${PREFIX}/var/cache/netdata"
+else
+    for dir in "${PREFIX}/etc/netdata" \
+               "${PREFIX}/var/lib/netdata" \
+               "${PREFIX}/var/cache/netdata"; do
+        if [ -d "${dir}" ]; then
+            chown -R root:wheel "${dir}"
+            chmod 0700 "${dir}"
+        fi
+    done
+fi
+
+#
+# The service account, only if this package created it. An account that
+# predates the package (a source install's, or anything else) is not ours
+# to delete.
+#
+if [ "${account_is_ours}" -eq 1 ]; then
+    if dscl . -read "/Users/${NETDATA_USER}" UniqueID >/dev/null 2>&1; then
+        log "removing service account ${NETDATA_USER}"
+        dscl . -delete "/Users/${NETDATA_USER}"
+    fi
+    if dscl . -read "/Groups/${NETDATA_USER}" PrimaryGroupID >/dev/null 2>&1; then
+        dscl . -delete "/Groups/${NETDATA_USER}"
+    fi
+else
+    log "service account ${NETDATA_USER} was not created by this package; leaving it in place"
+fi
+
+/usr/sbin/pkgutil --forget "${IDENTIFIER}" >/dev/null 2>&1 || true
+
+# Drop whatever directories are now empty; retained state keeps its chain.
+for dir in "${PREFIX}/var/lib" "${PREFIX}/var/cache" "${PREFIX}/var/log" \
+           "${PREFIX}/var" "${PREFIX}/etc" "${PREFIX}"; do
+    rmdir "${dir}" 2>/dev/null || true
+done
+
+if [ "${PURGE}" -eq 1 ]; then
+    log "done. Nothing was retained."
+else
+    log "done. Retained (owned by root:wheel until a reinstall):"
+    retained=""
+    for dir in "${PREFIX}/etc/netdata" \
+               "${PREFIX}/var/lib/netdata" \
+               "${PREFIX}/var/cache/netdata"; do
+        [ -d "${dir}" ] && { echo "  ${dir}"; retained="${retained} ${dir}"; }
+    done
+    # This script is part of the payload and no longer exists at this point,
+    # so name the exact command instead of suggesting a --purge re-run.
+    [ -n "${retained}" ] && log "to delete them: sudo rm -rf${retained}"
+fi
+
+exit 0

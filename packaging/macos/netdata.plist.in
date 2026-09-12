@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The macOS package's LaunchDaemon. The label matches what macOS source
+     installs have always used, so at most one Agent instance can be
+     registered either way. No UserName on purpose: the daemon starts as
+     root and drops privileges itself (run as user), exactly as on Linux;
+     launchd restarts it on abnormal exit but honours a clean stop. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.github.netdata</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>@NETDATA_RUNTIME_PREFIX@/usr/sbin/netdata</string>
+        <string>-D</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>@NETDATA_RUNTIME_PREFIX@</string>
+    <key>StandardOutPath</key>
+    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/launchd.log</string>
+</dict>
+</plist>

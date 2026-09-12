@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of libYAML
 
+include_guard()
+
 # Handle bundling of libyaml.
 #
 # This pulls it in as a sub-project using FetchContent functionality.
@@ -12,11 +14,14 @@ function(netdata_bundle_libyaml)
         include(FetchContent)
         include(NetdataFetchContentExtra)
 
-        if(ENABLE_BUNDLED_LIBYAML)
+        if(ENABLE_BUNDLED_YAML)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
 
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+        # libyaml 0.2.5 declares a CMake floor below 3.5, which CMake >= 4.0
+        # rejects outright instead of configuring in compatibility mode.
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
         set(repo https://github.com/yaml/libyaml)
         set(tag 2c891fc7a770e8ba2fec34fc6b545c672beb37e6) # v0.2.5
 
@@ -24,14 +29,12 @@ function(netdata_bundle_libyaml)
                 FetchContent_Declare(yaml
                         GIT_REPOSITORY ${repo}
                         GIT_TAG ${tag}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                         EXCLUDE_FROM_ALL
                 )
         else()
                 FetchContent_Declare(yaml
                         GIT_REPOSITORY ${repo}
                         GIT_TAG ${tag}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                 )
         endif()
 
@@ -50,17 +53,23 @@ endfunction()
 macro(netdata_detect_libyaml)
         set(HAVE_LIBYAML True)
 
-        pkg_check_modules(YAML yaml-0.1)
+        if(NOT ENABLE_BUNDLED_YAML)
+                pkg_check_modules(YAML yaml-0.1)
+        endif()
 
-        if(ENABLE_BUNDLED_LIBYAML OR NOT YAML_FOUND)
+        if(NOT YAML_FOUND)
+                set(ENABLE_BUNDLED_YAML True)
                 netdata_bundle_libyaml()
-                set(ENABLE_BUNDLED_LIBYAML True PARENT_SCOPE)
                 set(NETDATA_YAML_LDFLAGS yaml)
                 get_target_property(NETDATA_YAML_TARGET_INCLUDE_DIRS yaml INTERFACE_INCLUDE_DIRECTORIES)
                 # Pinned libyaml exposes yaml.h first and its generated config.h second.
                 # Prepend only the public headers; the yaml target propagates the full interface.
                 list(GET NETDATA_YAML_TARGET_INCLUDE_DIRS 0 NETDATA_YAML_INCLUDE_DIRS)
                 get_target_property(NETDATA_YAML_CFLAGS_OTHER yaml INTERFACE_COMPILE_DEFINITIONS)
+
+                if(NETDATA_YAML_CFLAGS_OTHER STREQUAL NETDATA_YAML_CFLAGS_OTHER-NOTFOUND)
+                        set(NETDATA_YAML_CFLAGS_OTHER "")
+                endif()
         else()
                 set(NETDATA_YAML_LDFLAGS ${YAML_LDFLAGS})
                 set(NETDATA_YAML_CFLAGS_OTHER ${YAML_CFLAGS_OTHER})
@@ -73,7 +82,7 @@ endmacro()
 # The specified target must already exist, and the netdata_detect_libyaml
 # macro must have already been run at least once for this to work correctly.
 function(netdata_add_libyaml_to_target _target)
-        if(ENABLE_BUNDLED_LIBYAML OR NOT YAML_FOUND)
+        if(ENABLE_BUNDLED_YAML)
                 target_include_directories(${_target} BEFORE PUBLIC ${NETDATA_YAML_INCLUDE_DIRS})
                 target_compile_definitions(${_target} PUBLIC ${NETDATA_YAML_CFLAGS_OTHER})
         else()

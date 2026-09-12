@@ -3,7 +3,8 @@
 REPO_ROOT="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
-# shellcheck source=./win-build-dir.sh
+# shellcheck source=packaging/windows/win-build-dir.sh
+# shellcheck disable=SC1091
 . "${REPO_ROOT}/packaging/windows/win-build-dir.sh"
 
 set -eu -o pipefail
@@ -47,6 +48,8 @@ if [ -n "${windows_path_prefix}" ]; then
     windows_path_prefix_arg=("-DNETDATA_WINDOWS_PATH_PREFIX=${windows_path_prefix}")
 fi
 
+# build is assigned by win-build-dir.sh, sourced above.
+# shellcheck disable=SC2154
 if [ -d "${build}" ]; then
 	rm -rf "${build}"
 fi
@@ -74,10 +77,8 @@ CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
     -B "${build}" \
     -G "${generator}" \
     -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
-    -DBUILD_FOR_PACKAGING=On \
+    -DNETDATA_PACKAGE_KIND=msi \
     -DNETDATA_USER="${USER}" \
-    -DENABLE_ACLK=On \
-    -DENABLE_CLOUD=On \
     -DENABLE_ML=On \
     -DENABLE_PLUGIN_GO=On \
     -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \

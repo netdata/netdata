@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of JSON-C
 
+include_guard()
+
 # Handle bundling of json-c.
 #
 # This pulls it in as a sub-project using FetchContent functionality.
@@ -17,8 +19,6 @@ function(netdata_bundle_jsonc)
         if(ENABLE_BUNDLED_JSONC)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
-
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
         # JSON-C supports older versions of CMake than we do, so set
         # the correct values for the few policies we actually need.
@@ -42,14 +42,12 @@ function(netdata_bundle_jsonc)
                 FetchContent_Declare(json-c
                         GIT_REPOSITORY ${repo}
                         GIT_TAG ${tag}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                         EXCLUDE_FROM_ALL
                 )
         else()
                 FetchContent_Declare(json-c
                         GIT_REPOSITORY ${repo}
                         GIT_TAG ${tag}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                 )
         endif()
 

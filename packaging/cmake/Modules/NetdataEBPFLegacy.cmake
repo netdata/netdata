@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Handling for eBPF legacy programs
 
+include_guard()
+
 include(ExternalProject)
 include(NetdataUtil)
 
@@ -41,6 +43,8 @@ endfunction()
 
 function(netdata_install_legacy_ebpf_code)
     install(DIRECTORY ${ebpf-legacy_BUILD_DIR}/ebpf.d
-            DESTINATION usr/libexec/netdata/plugins.d
+            DESTINATION ${PLUGINS_DEST}
             COMPONENT ebpf-code-legacy)
+
+    netdata_add_deb_copyright(ebpf-code-legacy netdata-ebpf-code-legacy)
 endfunction()

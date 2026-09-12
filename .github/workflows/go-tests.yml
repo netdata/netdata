@@ -30,6 +30,7 @@ jobs:
           files: |
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             .github/workflows/go-tests.yml
             packaging/cmake/
             src/go/**

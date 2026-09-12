@@ -4,6 +4,8 @@
 # The high-level logic is (a) use git-describe, (b) fallback to info from
 # packaging/version. This version field is used for cmake's project,
 # cpack's packaging, and the agent's functionality.
+
+include_guard()
 function(netdata_version)
   find_package(Git)
 

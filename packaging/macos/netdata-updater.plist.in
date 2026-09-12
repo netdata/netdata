@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The auto-updater's calendar daemon: netdata-updater.sh once a day. The
+     updater sleeps a random NETDATA_UPDATER_JITTER (default up to an hour)
+     before acting, so a fixed StartCalendarInterval does not stampede the
+     release servers. postinstall bootstraps this label only when auto-updates
+     are not opted out, and never re-registers it while the updater itself is
+     mid-transaction (it would kill its own installer child). -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.github.netdata.updater</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>@NETDATA_RUNTIME_PREFIX@/usr/libexec/netdata/netdata-updater.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>7</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>WorkingDirectory</key>
+    <string>@NETDATA_RUNTIME_PREFIX@</string>
+    <key>StandardOutPath</key>
+    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/updater.log</string>
+    <key>StandardErrorPath</key>
+    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/updater.log</string>
+</dict>
+</plist>
