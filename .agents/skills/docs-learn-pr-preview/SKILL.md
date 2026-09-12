@@ -37,6 +37,7 @@ Set paths and create a fresh private run directory. `LEARN_REPO` must identify t
 
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+SOURCE_REPO="${REPO_ROOT}" # Use the isolated acquisition repository here if the requested object was missing.
 SOURCE_REF="<verified-requested-source-commit-or-ref>"
 LEARN_REPO="${NETDATA_REPOS_DIR:?set the source mirror root}/learn"
 LEARN_REF="HEAD"
@@ -51,21 +52,23 @@ SNAPSHOT="${REPO_ROOT}/.agents/skills/docs-learn-pr-preview/scripts/snapshot-sou
 Export exact committed source blobs (requires Python 3.9 or later):
 
 ```bash
-python3 "${SNAPSHOT}" --repo "${REPO_ROOT}" --output "${SOURCE_COPY}" --ref "${SOURCE_REF}"
+python3 "${SNAPSHOT}" --repo "${SOURCE_REPO}" --output "${SOURCE_COPY}" --ref "${SOURCE_REF}"
 ```
 
 For an intentional working-tree preview, use this **instead** of the committed export. Add one
 `--include-untracked relative/file` for each explicitly selected nonignored untracked file; omit the option if none.
-Tracked working files, staged additions and tracked deletions are included automatically.
+Use the intended working checkout as `SOURCE_REPO`. Tracked working files, staged additions and tracked deletions
+are reflected automatically.
 
 ```bash
-python3 "${SNAPSHOT}" --repo "${REPO_ROOT}" --output "${SOURCE_COPY}" --working-tree \
+python3 "${SNAPSHOT}" --repo "${SOURCE_REPO}" --output "${SOURCE_COPY}" --working-tree \
   --include-untracked "<selected-relative-file>"
 ```
 
 The helper requires a new output and sibling `.manifest.json`. It records source mode, resolved/base commit,
-per-file hashes and modes, selected untracked files, missing tracked files and gitlink pins. Gitlinks are recorded,
-not expanded: if an affected preview input needs submodule content, prepare that pinned content in the isolated copy
+per-file hashes and modes, selected untracked files, indexed paths missing on disk and gitlink pins. Staged deletions
+are absent from the index and snapshot; use the inspected status/diff for the complete deletion report. Gitlinks are
+recorded, not expanded: if an affected preview input needs submodule content, prepare that pinned content in the isolated copy
 and record it before claiming coverage. Unresolved index conflicts and links escaping the snapshot are rejected.
 Keep inputs stable during capture; on failure inspect the new partial output and retry with a fresh run directory.
 The helper never restores or cleans the original checkout.

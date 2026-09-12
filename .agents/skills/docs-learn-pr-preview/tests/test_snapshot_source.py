@@ -131,6 +131,14 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual((self.output / "page.md").read_bytes(), b"tracked edit\n")
         self.assertEqual((self.output / "staged.md").read_bytes(), b"current staged addition\n")
 
+    def test_staged_deletion_is_absent_from_snapshot_and_missing_indexed_list(self):
+        self.git("rm", "deleted.md")
+        self.snapshot("--working-tree")
+        manifest = self.manifest("working-tree", self.base)
+        self.assertFalse((self.output / "deleted.md").exists())
+        self.assertNotIn("deleted.md", manifest["files"])
+        self.assertEqual(manifest["missing_tracked"], [])
+
     def test_exact_blobs_links_modes_and_unusual_names(self):
         name = "folder with spaces/file ; $literal `name`.md"
         self.write(name, b"literal filename\n")
