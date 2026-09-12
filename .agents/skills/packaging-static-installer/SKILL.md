@@ -28,8 +28,9 @@ Timing, size and slowdown figures below are historical observations, not build o
 
 ```bash
 # 1. Pre-flight for an authorized build (inspect first; honor pinned reproduction inputs)
-docker pull netdata/static-builder:v1     # refresh the cached image — see Gotcha #2
-git submodule update --init --recursive   # populate vendored sources — see Gotcha #1
+# Initialize only missing required submodules using Gotcha #1 below.
+# For a normal build, refresh the image; retain the selected image for a pinned reproduction.
+docker pull netdata/static-builder:v1     # see Gotcha #2
 
 # 2. Build (~22-25 min cold, ~10-15 min on cache hit, on a 24-core host)
 ./packaging/makeself/build-static.sh x86_64
@@ -107,11 +108,15 @@ ABORTED  Failed to configure Netdata sources.
 
 A plain fresh clone or linked worktree may have uninitialized submodules. Inspect `git submodule status` and local
 submodule changes first. Initialize missing required sources for the authorized build; do not reset modified or
-divergent submodules merely to make the status clean:
+divergent submodules merely to make the status clean. For each required path listed above whose status begins
+with `-`, set `missing_required_submodule` to that exact path and run this separately:
 
 ```bash
-git submodule update --init --recursive
+git submodule update --init -- "${missing_required_submodule:?set one uninitialized required submodule path}"
 ```
+
+The path argument confines initialization to the selected missing module. Do not use an unscoped or recursive update:
+that can move already initialized modules to recorded commits, including unrelated or deliberately divergent modules.
 
 Verify with `git submodule status`: `-` means uninitialized, `+` differs from the recorded commit, and `U` is
 conflicted.
@@ -210,8 +215,8 @@ slower runtime useful for valgrind/gdb. The `README.md` in `packaging/makeself/`
 
 | Symptom | Job | Cause | Fix |
 |---------|-----|-------|-----|
-| `Cannot find source file: vendored/lib/access.c` | 70 (CMake configure) | Submodules not initialized | `git submodule update --init --recursive` |
-| `sha256sum: unrecognized option: c` then `expected: X, got X` | 11 / 20 / 30 / 40 / 50 | Image checksum utility lacks the required option; stale image is one observed cause | `docker pull netdata/static-builder:v1` |
+| `Cannot find source file: vendored/lib/access.c` | 70 (CMake configure) | Submodules not initialized | Initialize only the missing required path under Gotcha #1 |
+| `sha256sum: unrecognized option: c` then `expected: X, got X` | 11 / 20 / 30 / 40 / 50 | Image checksum utility lacks the required option; stale image is one observed cause | For a normal build, refresh the intended platform image under Gotcha #2; retain pinned reproduction inputs |
 | `No cached copy of build directory for X found, fetching sources instead.` (every run) | any third-party | `artifacts/cache/` removed or arch dir missing | Normal on first build; persists for the next run |
 | `Could not find a usable OCI runtime` | n/a | Neither docker nor podman in `$PATH` | Install one |
 | Runtime check times out waiting for localhost:19999 | 81 | Agent did not become reachable within the bounded wait; cause is not yet established | Inspect the job log and `netdata.log`, then diagnose startup |
