@@ -95,6 +95,20 @@ static bool sqlite_teardown_unsafe = false;
 // life of the process, with a single warning to show for it.
 static bool sqlite_zombie_connection_created = false;
 
+// When, and for which database, the first zombie was noted. Recorded ONLY so the eventual
+// "skipping sqlite3_shutdown()" line can say whether the suppression came from this shutdown or
+// from something that happened hours earlier at startup.
+//
+// KNOWN LIMITATION, deliberate: this latch is sticky for the life of the process even if the
+// deferred close later completes (the owning thread finalizes its statements and the connection
+// really does go away). It cannot be cleared safely - once sqlite3_close_v2() has been called,
+// touching that handle to re-test it is undefined - and the trade is one-sided: skipping
+// sqlite3_shutdown() costs a teardown the exiting process does not need, while clearing it
+// wrongly reinstates the pcache1 crash it exists to prevent. The log line below is how you tell
+// a stale suppression from a live one.
+static usec_t sqlite_zombie_noted_ut = 0;
+static const char *sqlite_zombie_noted_db = NULL;
+
 // Every distinct reason is logged, not just the first: when several conditions fire, the list
 // is what tells a triage pass which one actually drove the decision.
 void sqlite_mark_teardown_unsafe(const char *reason)
@@ -623,7 +637,10 @@ static void sqlite_note_zombie_connection(sqlite3 *database, const char *databas
         // Record WHICH database and WHEN, because this flag can be set at startup (the
         // context-load path closes thread-local handles) and is then reported hours later at
         // exit. Without provenance the exit message looks like a shutdown problem.
-        __atomic_store_n(&sqlite_zombie_connection_created, true, __ATOMIC_RELEASE);
+        if (!__atomic_exchange_n(&sqlite_zombie_connection_created, true, __ATOMIC_RELEASE)) {
+            sqlite_zombie_noted_ut = now_monotonic_usec();
+            sqlite_zombie_noted_db = database_name;
+        }
         nd_log_daemon(
             NDLP_WARNING,
             "SQL: the %s database still has prepared statements attached; closing it leaves a zombie "
@@ -799,6 +816,20 @@ void sqlite_library_shutdown(void)
     //
     // Suppressing the handle close without suppressing this would not fix anything: it would
     // move the fault out of a Vdbe and into pcache1 one line later in the shutdown sequence.
+
+    // Say WHERE the zombie came from. A suppression traced to a close that happened long before
+    // shutdown is a different problem from one caused by this teardown, and without this the two
+    // are indistinguishable in the log.
+    char zombie_note[160];
+    if (__atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE))
+        snprintfz(
+            zombie_note, sizeof(zombie_note) - 1,
+            "a zombie %s connection was noted %llu s ago and cannot be proven closed",
+            sqlite_zombie_noted_db ? sqlite_zombie_noted_db : "sqlite",
+            sqlite_zombie_noted_ut ? (unsigned long long)((now_monotonic_usec() - sqlite_zombie_noted_ut) / USEC_PER_SEC) : 0ULL);
+    else
+        zombie_note[0] = '\0';
+
     if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
         // Fast path only - the authoritative re-check happens under sqlite_spinlock below,
         // because a thread can close a handle (creating a zombie) after this point.
@@ -809,7 +840,7 @@ void sqlite_library_shutdown(void)
             sqlite_teardown_is_unsafe() ? "a SQLite user may still be running" : "",
             (sqlite_teardown_is_unsafe() && __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE))
                 ? " and " : "",
-            __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE) ? "a zombie connection exists" : "");
+            __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE) ? zombie_note : "");
         return;
     }
 
