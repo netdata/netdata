@@ -202,7 +202,7 @@ Keep a record of profile decisions in a project-local doc under
   quality-gate metrics such as `new_duplicated_lines`,
   `new_duplicated_lines_density`, and `new_lines`.
 - Hotspot `ruleKey` filtering is client-side (search only filters by
-  status/project), so the family-mode helper does it in Python.
+  status/project), so the family-mode helper does it with `jq`.
 - An issue may be transitioned only between certain states; if you get
   "Cannot do transition from STATUS X to Y", inspect its current state and available transitions before retrying.
 - `SONAR_DRY_RUN=1` is the right knob when iterating on comments
