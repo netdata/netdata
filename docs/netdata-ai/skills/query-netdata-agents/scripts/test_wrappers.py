@@ -135,6 +135,7 @@ else:
         audit_dir.mkdir(parents=True)
         victim = self.root / "external-cache"
         victim.mkdir(mode=0o755)
+        victim.chmod(0o755)  # Establish the permission fixture independently of the caller umask.
         (audit_dir / "bearers").symlink_to(victim, target_is_directory=True)
         for caller in ("resolver", "query", "function"):
             with self.subTest(caller=caller):

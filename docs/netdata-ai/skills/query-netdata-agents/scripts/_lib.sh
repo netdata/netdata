@@ -255,7 +255,8 @@ _agents_resolve_bearer() {
     local cache_dir cache_file now exp_s
     cache_dir="$(agents_audit_dir)/bearers"
     cache_file="${cache_dir}/${mg}.json"
-    # Existing links must not redirect cache reads, writes, or permissions.
+    # Audit ancestors are trusted configuration; worktrees intentionally share .local via a symlink.
+    # Reject links at the bearer directory/entry so they cannot redirect cache operations.
     # -L also catches dangling links before a mint can create their target.
     if [[ -L "${cache_dir}" || -L "${cache_file}" ]]; then
         echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Bearer cache directory and entry must not be symbolic links." >&2
