@@ -153,7 +153,7 @@ See `query-discipline.md` for the rule and worked examples.
 
 ## Default version filter
 
-Latest stable + latest 2-3 nightlies. The dataset is noisy
+Highest observed stable + up to three observed nightlies. The dataset is noisy
 because many unupdated agents report crashes that have been
 fixed. Filtering to recent versions focuses triage on bugs
 that still matter.

@@ -53,6 +53,7 @@ _agents_resolve_bearer() { printf 'bearer\n' >> "$TEST_BLOCKED"; return 97; }
 agentevents_query_function() {
     jq -nc --arg via "$1" --argjson payload "$2" '{via:$via,payload:$payload}' >> "$TEST_CALLS"
     cat "$TEST_FIXTURE"
+    return "${TEST_TRANSPORT_STATUS:-0}"
 }
 agentevents_audit_dir() { printf '%s\n' "$TEST_AUDIT"; }
 '''
@@ -186,6 +187,38 @@ agentevents_audit_dir() { printf '%s\n' "$TEST_AUDIT"; }
         self.assertEqual(sibling.read_text(), 'preserve sibling')
         self.assertEqual(json.loads(output.read_text())['data'], [['v2.10.0']])
         self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+
+    def test_existing_nonregular_output_and_symlink_are_rejected(self):
+        fifo = self.work / 'existing.fifo'
+        os.mkfifo(fifo)
+        link = self.work / 'fifo-link'
+        link.symlink_to(fifo)
+        for output in (fifo, link):
+            with self.subTest(output=output.name):
+                result = self.cli('--output', str(output), '--versions', 'v2.10.0')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(self.calls.exists(), 'existing output should reject before fetch')
+        self.assertTrue(stat.S_ISFIFO(fifo.stat().st_mode))
+        self.assertTrue(link.is_symlink())
+
+    def test_invalid_regex_preserves_raw_output_and_unrelated_sibling(self):
+        output = self.work / 'regex.json'
+        sibling = self.work / 'regex.json.tmp'
+        sibling.write_text('preserve')
+        result = self.cli('--output', str(output), '--version', '[')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(json.loads(output.read_text()), json.loads(self.fixture.read_text()))
+        self.assertEqual(sibling.read_text(), 'preserve')
+        self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+
+    def test_failed_fetch_keeps_private_partial_output(self):
+        self.env['TEST_TRANSPORT_STATUS'] = '23'
+        output = self.work / 'failed.json'
+        result = self.cli('--output', str(output), '--versions', 'v2.10.0')
+        self.assertEqual(result.returncode, 23)
+        self.assertEqual(output.read_text(), self.fixture.read_text())
+        self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+        self.assertNotIn('wrote', result.stderr)
 
     def test_selftest_is_offline_and_preserves_caller_state(self):
         result = self.run_shell(r'''

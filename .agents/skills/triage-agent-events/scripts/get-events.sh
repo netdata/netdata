@@ -5,7 +5,7 @@
 # auto version filter (highest numeric observed stable plus up to 3 observed nightlies).
 #
 # Output: JSON dump under
-#   <repo>/.local/audits/query-agent-events/<timestamp>.json
+#   <repo>/.local/audits/query-agent-events/<run>.json
 
 set -euo pipefail
 
@@ -256,8 +256,9 @@ if [ -z "$OUTPUT" ]; then
     OUTPUT="$output_reservation.json"
 fi
 # Refuse existing files/symlinks; the capture owns only its newly created output.
-if ! (umask 077; set -C; : > "$OUTPUT"); then
+if [[ -e "$OUTPUT" || -L "$OUTPUT" ]] || ! (umask 077; set -C; : > "$OUTPUT"); then
     echo "[get-events] output must be a new writable path: $OUTPUT" >&2
+    [ -z "$output_reservation" ] || rm -f "$output_reservation"
     exit 2
 fi
 if [ -n "$output_reservation" ]; then

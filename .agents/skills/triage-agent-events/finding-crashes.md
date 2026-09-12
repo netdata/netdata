@@ -15,7 +15,7 @@ Get recent signal crashes on stable + recent nightlies:
 ```
 
 Output is a JSON dump under
-`<repo>/.local/audits/query-agent-events/<timestamp>.json`.
+`<repo>/.local/audits/query-agent-events/<run>.json`.
 
 Then aggregate:
 
