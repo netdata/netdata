@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import tempfile
 import unittest
 
@@ -42,6 +43,23 @@ codacyaudit_load_env() { printf 'unexpected-env-load\\n' >&2; return 98; }
 ''' + script, "test-helpers", str(HELPER)],
                 cwd=directory, env=env, text=True, capture_output=True, timeout=15,
             )
+
+    @unittest.skipUnless(shutil.which("zsh"), "zsh is not installed")
+    def test_documented_selftest_can_be_sourced_in_zsh(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = {"PATH": os.environ.get("PATH", "")}
+            result = subprocess.run(
+                [shutil.which("zsh"), "-f", "-c", '''
+source "$1"
+curl() { return 99; }
+codacyaudit_load_env() { return 98; }
+codacyaudit_selftest_no_token_leak
+''', "test-zsh", str(HELPER)], cwd=directory, env=env,
+                text=True, capture_output=True, timeout=15,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("PASS", result.stdout)
+            self.assertEqual(result.stderr, "")
 
     def test_successful_response_is_forwarded(self):
         for command in (WRAPPERS["codacyaudit_get"], WRAPPERS["codacyaudit_post"]):

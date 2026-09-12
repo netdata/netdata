@@ -92,9 +92,9 @@ codacyaudit_audit_dir() {
 # stderr: minimal status line on error.
 _codacyaudit_run() {
     local method="$1"
-    local path="$2"
+    local request_path="$2"
     local data="${3:-}"
-    local url="${CODACY_HOST}${path}"
+    local url="${CODACY_HOST}${request_path}"
 
     local -a curl_args=(
         --silent --show-error --fail-with-body
@@ -107,28 +107,28 @@ _codacyaudit_run() {
         curl_args+=(--header 'Content-Type: application/json' --data-raw "$data")
     fi
 
-    local body status
+    local body curl_status
     if body="$(curl "${curl_args[@]}" "$url" 2>/dev/null)"; then
         printf '%s' "$body"
     else
-        status=$?
+        curl_status=$?
         # A service/proxy can reflect credentials or request data in errors.
-        printf '[ERROR] Codacy %s request failed (curl status %s)\n' "$method" "$status" >&2
-        return "$status"
+        printf '[ERROR] Codacy %s request failed (curl status %s)\n' "$method" "$curl_status" >&2
+        return "$curl_status"
     fi
 }
 
 # Public GET. Stdout is the successful response body, unchanged.
 codacyaudit_get() {
-    local path="$1"
-    _codacyaudit_run GET "$path"
+    local request_path="$1"
+    _codacyaudit_run GET "$request_path"
 }
 
 # Public POST.
 codacyaudit_post() {
-    local path="$1"
+    local request_path="$1"
     local data="$2"
-    _codacyaudit_run POST "$path" "$data"
+    _codacyaudit_run POST "$request_path" "$data"
 }
 
 # Paginated GET. Walks the v3 cursor protocol and concatenates
@@ -146,13 +146,13 @@ codacyaudit_get_paged() {
 
     while :; do
         if [[ "$path_base" == *'?'* ]]; then sep='&'; else sep='?'; fi
-        local path="${path_base}${sep}limit=${limit}"
+        local request_path="${path_base}${sep}limit=${limit}"
         if [ -n "$cursor" ]; then
-            path="${path}&cursor=${cursor}"
+            request_path="${request_path}&cursor=${cursor}"
         fi
 
         local resp
-        resp="$(_codacyaudit_run GET "$path")" || return 1
+        resp="$(_codacyaudit_run GET "$request_path")" || return 1
 
         # Append data[] to accumulator.
         out="$(printf '%s\n%s' "$out" "$resp" \
@@ -211,7 +211,7 @@ codacyaudit_selftest_no_token_leak() (
         esac
     }
 
-    local wrapper out status
+    local wrapper out selftest_status
     for wrapper in get post paged issues repository; do
         if out="$(
             case "$wrapper" in
@@ -221,8 +221,8 @@ codacyaudit_selftest_no_token_leak() (
                 issues) codacyaudit_pr_issues 1 ;;
                 repository) codacyaudit_repo_info ;;
             esac 2>&1
-        )"; then status=0; else status=$?; fi
-        if [ "$status" -ne 0 ] || [[ "$out" != *'"fixture"'* || "$out" == *"$CODACY_TOKEN"* ]]; then
+        )"; then selftest_status=0; else selftest_status=$?; fi
+        if [ "$selftest_status" -ne 0 ] || [[ "$out" != *'"fixture"'* || "$out" == *"$CODACY_TOKEN"* ]]; then
             printf 'FAIL: Codacy offline wrapper self-test (%s)\n' "$wrapper" >&2
             return 1
         fi
