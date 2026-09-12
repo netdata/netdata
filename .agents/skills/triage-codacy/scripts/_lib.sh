@@ -152,7 +152,7 @@ codacyaudit_get_paged() {
         fi
 
         local resp
-        resp="$(_codacyaudit_run GET "$request_path")" || return 1
+        resp="$(_codacyaudit_run GET "$request_path")" || return $?
 
         # Append data[] to accumulator.
         out="$(printf '%s\n%s' "$out" "$resp" \

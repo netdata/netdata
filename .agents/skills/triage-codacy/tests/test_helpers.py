@@ -72,7 +72,7 @@ curl() { printf '%s' '{"data":"fixture response"}'; }
                 self.assertEqual(result.stderr, "")
 
     def test_failed_transport_preserves_status_without_exposing_output(self):
-        for command in (WRAPPERS["codacyaudit_get"], WRAPPERS["codacyaudit_post"]):
+        for command in WRAPPERS.values():
             with self.subTest(command=command):
                 result = self.run_shell('''
 curl() {
@@ -105,6 +105,19 @@ codacyaudit_get_paged '/fixture?filter=open' 2
         self.assertEqual(json.loads(result.stdout), [{"id": 1}, {"id": 2}])
         self.assertEqual(result.stderr, "")
 
+    def test_later_page_failure_preserves_status_without_partial_results(self):
+        result = self.run_shell('''
+curl() {
+    case "${@: -1}" in
+        *cursor=second) return 23 ;;
+        *) printf '%s' '{"data":[{"id":1}],"pagination":{"cursor":"second"}}' ;;
+    esac
+}
+codacyaudit_get_paged /fixture
+''')
+        self.assertEqual(result.returncode, 23, result.stderr)
+        self.assertEqual(result.stdout, "")
+
     def test_selftest_is_offline_and_preserves_caller_state(self):
         for setup in (
             "unset CODACY_TOKEN CODACY_HOST CODACY_PROVIDER CODACY_ORG CODACY_REPO",
@@ -130,7 +143,7 @@ after="$(declare -p CODACY_TOKEN CODACY_HOST CODACY_PROVIDER CODACY_ORG CODACY_R
             with self.subTest(wrapper=wrapper):
                 result = self.run_shell(wrapper + '''() {
     printf '%s' "$CODACY_TOKEN" >&2
-    printf '%s' '[]'
+    printf '%s' '{"fixture":"leak-test"}'
 }
 codacyaudit_selftest_no_token_leak
 ''')
