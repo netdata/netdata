@@ -161,6 +161,9 @@ steps 3-4, perform only authorized remote actions, and use `AGENTS.md#review` to
 
 ### 1a. Fetch all comments (paranoid)
 
+Run when the selected scope requires fetching GitHub comments. For supplied-comment-only inspection, use the supplied
+evidence directly and skip this step.
+
 ```
 bash .agents/skills/repo-pr-reviews/scripts/fetch-all.sh <PR_NUMBER>
 ```
@@ -169,6 +172,9 @@ Tail-prints a `summary.txt` that shows the per-author count and the list of
 open review threads. Use this as the input to the rest of the cycle.
 
 ### 1b. Fetch SonarCloud PR findings
+
+Run only when Sonar findings belong to the selected scope and need fetching. Supplied Sonar evidence can be inspected
+without this fetch or credential setup; a comment-only scope skips this step.
 
 ```
 bash .agents/skills/repo-pr-reviews/scripts/fetch-sonar-findings.sh <PR_NUMBER>
@@ -256,6 +262,9 @@ not "agent dumped 14 replies, then dumped 14 resolves". Bulk operations
 look mechanical and erode trust in the address pass.
 
 ### 3b. Address each Sonar finding
+
+Skip this step when Sonar findings are outside the selected scope. Use supplied evidence or the selected fetch from
+step 1b; an unrelated cached Sonar file does not add it to scope.
 
 For each issue in `sonar-issues.json` and each hotspot in
 `sonar-hotspots.json`:
@@ -438,7 +447,8 @@ should:
 4. Wait for the user's decision.
 
 Then act per their direction. Do not respond to humans on the user's
-behalf without explicit direction. Existing direction remains valid; do not request it again.
+behalf without explicit direction. Existing explicit direction for the response remains valid; do not request it
+again. A request to review a human comment does not itself authorize a reply.
 
 ## Bot directory
 
