@@ -155,8 +155,9 @@ State for each PR is cached under `<repo-root>/.local/audits/pr-reviews/pr-<N>/`
 
 ## Workflow
 
-For inspection, use the selected sources in steps 1-2, verify the findings, then report under step 8. For complete
-triage, all sources apply. For authorized addressing, apply
+For supplied-comment-only inspection, skip the commands in steps 1-2, verify the supplied findings directly, then
+report under step 8. For other inspections, use the selected sources in steps 1-2, verify the findings, then report
+under step 8. For complete triage, all sources apply. For authorized addressing, apply
 steps 3-4, perform only authorized remote actions, and use `AGENTS.md#review` to decide whether steps 5-7 are needed.
 
 ### 1a. Fetch all comments (paranoid)
@@ -207,6 +208,10 @@ the failures as input alongside review comments and Sonar findings. They
 all get addressed in the same iteration so a single push covers them.
 
 ### 2. List open threads (and Sonar findings)
+
+These commands read a completed `fetch-all.sh` cache and apply only when fetched GitHub threads are selected evidence.
+For supplied-comment-only inspection, assistants MUST skip both commands even if a cache exists and verify the
+supplied evidence directly.
 
 ```
 bash .agents/skills/repo-pr-reviews/scripts/list-open-threads.sh <PR_NUMBER>          # full bodies
