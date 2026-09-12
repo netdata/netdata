@@ -280,7 +280,9 @@ Use `delay:` when notification execution should wait after a state change:
 delay: down 5m multiplier 1.5 max 1h
 ```
 
-- `up` delays escalation notifications; `down` delays recovery/de-escalation notifications.
+- `up` is selected when the new numeric status is greater than the old; `down` otherwise.
+  This includes `UNDEFINED (-1)` → `CLEAR (1)` using `up`, not just warning/critical escalation.
+  Owners: `src/health/health_event_loop.c` (delay selection), `src/health/rrdcalc.h` (status values).
 - `multiplier` grows the delay when the state changes during the delay.
 - `max` caps the accumulated delay.
 
