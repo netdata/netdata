@@ -20,30 +20,20 @@ Sections:
    paraphrased.
 2. **Inputs** -- what the user must supply (space, hostname,
    time range, etc.).
-3. **Steps** -- numbered, each calling exactly one wrapper from
-   `query-netdata-agents/scripts/_lib.sh`.
+3. **Steps** -- numbered, with the commands and local processing needed for the question.
 4. **Output** -- what the assistant returns to the user.
 5. **Notes / gotchas** -- edge cases, follow-ups, related
    how-tos.
 6. **Source guides** -- cross-links to the per-domain guides
    used.
 
-Every code example must use the token-safe wrappers
-(`agents_query_cloud`, `agents_query_agent`,
-`agents_call_function`). No raw curl with `-H "Authorization:
-Bearer $TOKEN"` -- that defeats the no-token-leak guarantee.
+Credential-bearing requests MUST use the shared query wrappers. Ordinary local processing and unauthenticated
+probes MAY use ordinary commands under [Safe Execution](../SKILL.md#safe-execution). Masked request logs do not
+sanitize response bodies or arbitrary body fields; choose private capture or an appropriate output projection.
 
 ## Index
 
-(Populate as how-tos are authored. Stubs below mirror the canonical
-skill-verification harness questions for `verify/questions.md`; replace each
-`(stub -- not yet authored)` with a real link as soon as a how-to is written.)
-
-### Identity / hardware / OS
-
-- `find-node-id-by-hostname.md` (stub -- not yet authored)
-- `find-node-hardware-specs.md` (stub -- not yet authored)
-- `find-node-os.md` (stub -- not yet authored)
+Only existing recipes are listed. Add a link when the recipe is written.
 
 ### Metrics / fleet SLOs
 
@@ -52,44 +42,14 @@ skill-verification harness questions for `verify/questions.md`; replace each
 
 ### Streaming / parents / vnodes
 
-- `is-node-a-parent-and-children.md` (stub -- not yet authored)
-- `is-node-a-child-and-parent-target.md` (stub -- not yet authored)
-- `list-vnodes-on-node.md` (stub -- not yet authored)
 - [`diagnose-no-data-on-zoom-parent-retention-gaps.md`](./diagnose-no-data-on-zoom-parent-retention-gaps.md) -- why a node shows "No data" when zooming in while wider zoom renders fine: identify the serving agent from jsonwrap `.agents`, compare forced-tier queries (tier 0 vs 1 vs 2), reduce all-null rows to gap runs, run the decisive control test (does the PARENT's own local data have the same tier0 hole?), read the parent's daemon log via the `windows-events`/`systemd-journal` Function for `DBENGINE` write errors, and quantify child streaming flapping via `netdata.streaming_outbound` `replicating` buckets.
-
-### Collectors / jobs
-
-- `find-failed-collection-jobs.md` (stub -- not yet authored)
-- `is-collector-monitoring-X-and-frequency.md` (stub -- not yet authored)
-
-### Top processes
-
-- `pid-with-biggest-memory-and-app-group.md` (stub -- not yet authored)
-
-### Alerts
-
-- `currently-firing-alerts-in-room.md` (stub -- not yet authored)
-- `alert-config-by-cfg-hash.md` (stub -- not yet authored)
-- `silenced-alerts.md` (stub -- not yet authored)
-
-### Logs / status file
-
-- `last-netdata-status-file-log.md` (stub -- not yet authored)
-- `recent-error-logs-in-namespace.md` (stub -- not yet authored)
 
 ### Topology / flows
 
-- `local-l2-topology-summary.md` (stub -- not yet authored)
 - [`group-network-topology-by-kubernetes-pod.md`](./group-network-topology-by-kubernetes-pod.md) -- summarize `topology:network-connections` process actors by Kubernetes pod and namespace through Cloud.
 - [`find-containers-for-topology-port.md`](./find-containers-for-topology-port.md) -- find containers or pods exposing a specific TCP port from the Cloud topology Function payload.
-- [`validate-local-netflow-function.md`](./validate-local-netflow-function.md)
-- `top-flow-talkers-last-hour.md` (stub -- not yet authored)
-
-### Members / rooms / feed
-
-- `members-by-role-in-space.md` (stub -- not yet authored)
-- `rooms-with-most-nodes.md` (stub -- not yet authored)
-- `node-state-changes-last-hour.md` (stub -- not yet authored)
+- [Check an installed Cloud-connected flow Function](./validate-local-netflow-function.md) -- operator diagnosis of
+  Function availability and a real query; producer/schema contract validation belongs in the project developer skill.
 
 ## Cross-skill how-tos
 

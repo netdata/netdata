@@ -50,18 +50,18 @@ Always start with `info=true` to confirm the current schema -- the
 Function's parameter set evolves across agent versions.
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 { "info": true }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=systemd-journal" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=systemd-journal" \
+  "$PAYLOAD"
 ```
 
 The `accepted_params` array in the response tells you which keys the
@@ -126,7 +126,8 @@ coverage (retention) — invaluable for picking the right source and
 knowing how far back data exists:
 
 ```bash
-curl ... -d '{"info":true}' \
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=windows-events" '{"info":true}' \
  | jq -r '.. | objects | select(.id=="__logs_sources") | .options[]
           | "\(.id)\t\(.info)"'
 # windows-events example output:
@@ -145,16 +146,16 @@ sources") so you get exactly the union you asked for
 ### Step 2 — query with the source filter
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "after": -3600, "before": 0, "last": 200, "data_only": true,
   "selections": { "__logs_sources": ["Netdata/Daemon"] }
 }
 EOF
-curl -sS -X POST -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=windows-events" \
-  -d "$PAYLOAD"
+)"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=windows-events" \
+  "$PAYLOAD"
 ```
 
 ### Why server-side source filtering matters (cost + robustness)
@@ -323,11 +324,12 @@ with at least one structured `selections` field.
 ### Example 1: most recent 50 entries from a specific namespace
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 NAMESPACE="systemd"   # or "agent-events", "any-namespace-name"
 
-read -r -d '' PAYLOAD <<EOF
+PAYLOAD="$(cat <<EOF
 {
   "after":  -3600,
   "before": 0,
@@ -336,21 +338,21 @@ read -r -d '' PAYLOAD <<EOF
   "selections": { "__logs_sources": ["${NAMESPACE}"] }
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=systemd-journal" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=systemd-journal" \
+  "$PAYLOAD"
 ```
 
 ### Example 2: full-text search with histogram
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "after":  -86400,
   "before": 0,
@@ -361,22 +363,22 @@ read -r -d '' PAYLOAD <<'EOF'
   "selections": { "__logs_sources": ["all-local-system-logs"] }
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=systemd-journal" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=systemd-journal" \
+  "$PAYLOAD"
 ```
 
 ### Example 3: paginate forward from a known anchor
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 ANCHOR=1700000123456789   # cursor from previous response
 
-read -r -d '' PAYLOAD <<EOF
+PAYLOAD="$(cat <<EOF
 {
   "anchor":    ${ANCHOR},
   "direction": "forward",
@@ -384,12 +386,11 @@ read -r -d '' PAYLOAD <<EOF
   "selections": { "__logs_sources": ["all-local-logs"] }
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=systemd-journal" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=systemd-journal" \
+  "$PAYLOAD"
 ```
 
 ---
@@ -411,9 +412,8 @@ curl -sS -X POST \
   source filter the query targets every source, which on a busy host
   can be hundreds of GB (Linux) or dominated by a noisy channel
   (Windows) — slow, and prone to timeouts.
-- **Permission**: the cloud token must have a role that includes
-  log-read access (function tags include `logs`). `scope:all` works;
-  `scope:grafana-plugin` does NOT.
+- **Permission:** check log-read access for the target space (Function tags include `logs`). Historical guidance
+  distinguishes `scope:all` from `scope:grafana-plugin`; the exact Cloud mapping is not revalidated here.
 - **Response can be tens of MB** when `facets` include high-cardinality
   fields (`MESSAGE_ID`, `_BOOT_ID`, `_PID`). Pick facets carefully.
 

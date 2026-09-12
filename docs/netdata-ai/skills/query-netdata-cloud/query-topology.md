@@ -81,7 +81,7 @@ NODE="YOUR_NODE_UUID"
 source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "selections": {
     "mode": ["aggregated"]
@@ -89,6 +89,7 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 60000
 }
 EOF
+)"
 
 agents_call_function \
   --via cloud \

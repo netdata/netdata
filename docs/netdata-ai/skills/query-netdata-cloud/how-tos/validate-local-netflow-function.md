@@ -1,10 +1,16 @@
-# Validate a local Cloud-connected flow Function
+# Check an installed Cloud-connected flow Function
 
 ## Question
 
-How can an assistant validate `flows:netflow` on a local Netdata Agent
+How can an assistant check reachability and query `flows:netflow` on a local Netdata Agent
 that is connected to Netdata Cloud, without exposing Cloud tokens,
 agent bearers, node ids, or raw flow rows?
+
+This checks an installed Function through Cloud. It does not prove producer implementation or schema-contract
+correctness; those checks belong to the collector authoring workflow. Follow
+[Safe Execution](../SKILL.md#safe-execution) when capturing and displaying responses.
+
+Run the steps from the repository root.
 
 ## Inputs
 
@@ -27,10 +33,10 @@ agent bearers, node ids, or raw flow rows?
    }' <<<"$INFO_JSON"
    ```
 
-2. Load the token-safe wrappers:
+2. Load the shared request helpers:
 
    ```bash
-   source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh
+   source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
    agents_load_env
    ```
 
@@ -58,7 +64,7 @@ agent bearers, node ids, or raw flow rows?
 4. Run a real flow query using the documented request shape:
 
    ```bash
-   read -r -d '' BODY <<'JSON'
+   BODY="$(cat <<'JSON'
    {
      "mode": "flows",
      "view": "table-sankey",
@@ -69,6 +75,7 @@ agent bearers, node ids, or raw flow rows?
      "top_n": 100
    }
    JSON
+   )"
 
    agents_call_function \
      --via cloud \
@@ -101,9 +108,9 @@ bearers, raw IP addresses, or raw flow rows into durable artifacts.
 
 ## Notes / gotchas
 
-- Prefer the Cloud transport for validation. It needs only the Cloud
+- Prefer the Cloud transport for these checks. It needs only the Cloud
   token and does not require a direct agent bearer.
-- Direct-agent validation is also possible. Use the sibling
+- Direct-agent diagnosis is also possible. Use the sibling
   direct-agent how-to when the test must prove the bearer mint/cache
   path and the `X-Netdata-Auth` call path.
 - Negative `after` values are relative to `before`; `before: 0` means
