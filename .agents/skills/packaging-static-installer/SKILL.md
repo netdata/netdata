@@ -109,7 +109,8 @@ ABORTED  Failed to configure Netdata sources.
 A plain fresh clone or linked worktree may have uninitialized submodules. Inspect `git submodule status` and local
 submodule changes first. Initialize missing required sources for the authorized build; do not reset modified or
 divergent submodules merely to make the status clean. For each required path listed above whose status begins
-with `-`, set `missing_required_submodule` to that exact path and run this separately:
+with `-`, set `missing_required_submodule` to that exact path in the same shell invocation as the command below.
+Repeat that assignment and command once per selected path; do not assume shell variables persist across separate tool calls:
 
 ```bash
 git submodule update --init -- "${missing_required_submodule:?set one uninitialized required submodule path}"
