@@ -701,8 +701,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `collectors-prometheus-profiles`: creating, reviewing, validating, proving, iterating, or installing Prometheus
     chart profiles; exporter dashboard design, selector/relabel/fallback policy, coverage and cardinality, stock proof
     artifacts, live verification, the authoring scripts
-  - `collectors-snmp-profiles`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format
-    docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
+  - `collectors-snmp-profiles`: authoring/review of SNMP profiles, typed rows, ddsnmp parsing and profile-format docs;
+    requires MIB `MAX-ACCESS`/`ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
   - `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs and their `metrics:`/`charts:` rules, the trap
     `profile-format.md`, the generator `src/go/cmd/snmptrapprofilegen` (shipped as `snmp-trap-profile-gen`), stock
     pack regeneration and compression, category/severity taxonomy changes
