@@ -308,7 +308,7 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 		ck.run.Dirty(errors.New("jobmgr kernel: negative lane ownership"))
 		return
 	}
-	if ck.shutdownPhase != commandShutdownRunning && ck.shutdownBarrierDone &&
+	if ck.shutdownPhase != commandShutdownRunning && ck.barrierWork.done &&
 		lane.shutdownVisited && lane.owners == 0 {
 		if err := ck.enqueueShutdownStop(lane); err != nil {
 			ck.run.Dirty(err)

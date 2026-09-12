@@ -121,7 +121,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		moreFunctionClose := false
 		if ck.shutdownPhase != commandShutdownCleanupDrain {
 			moreFunctionMutation = ck.serviceFunctionMutation(16)
-		} else if ck.shutdownBarrierDone {
+		} else if ck.barrierWork.done {
 			moreFunctionClose = ck.serviceFunctionCatalogClose(MaximumFunctionCloseQuantum)
 		}
 		if !shuttingDown {
@@ -175,7 +175,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				if err := ck.advanceShutdownBarrier(); err != nil {
 					ck.run.Dirty(err)
 				}
-				if ck.shutdownBarrierDone {
+				if ck.barrierWork.done {
 					moreShutdownLanes, shutdownErr = ck.serviceShutdownStops(4)
 					if shutdownErr != nil {
 						ck.run.Dirty(shutdownErr)
@@ -193,7 +193,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				return
 			}
 			census := ck.runCensus()
-			if census.Drained() || ck.runShutdownBarrierFailedTerminal() || ck.runFinalizerFailedTerminal() {
+			if census.Drained() || ck.barrierWork.failedTerminal() || ck.finalizerWork.failedTerminal() {
 				terminal = errors.Join(terminal, ck.run.Terminal(census))
 				return
 			}
