@@ -40,7 +40,8 @@ agents_query_agent \
     --host    "$AGENT_HOST:19999" \
     --machine-guid "$AGENT_MG" \
     GET /api/v3/info \
-  | jq '.agents[0] | {nm, nd, mg, cloud, application: .application.package.version}'
+  | jq '.agents[0] | {nm, nd, mg, claim_id_present: ((.cloud.claim_id // "") | length > 0),
+                         application: .application.package.version}'
 
 # Hardware and OS labels are NOT under /api/v3/info -- that endpoint's
 # agents[0] object has no `labels` key (verified: v2.10.3 returns only
@@ -52,12 +53,17 @@ agents_query_agent \
     --host    "$AGENT_HOST:19999" \
     --machine-guid "$AGENT_MG" \
     GET /api/v3/info \
-  | jq '.agents[0].application, .agents[0].cloud'
+  | jq '.agents[0] | {application, cloud_status: .cloud.status,
+                         claim_id_present: ((.cloud.claim_id // "") | length > 0)}'
 
-# Claim_id specifically (used by the bearer-mint flow).
+# Check claim presence. The bearer resolver consumes the value privately; do not print it.
 agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
-    GET /api/v3/info | jq -r '.agents[0].cloud.claim_id'
+    GET /api/v3/info | jq '{claim_id_present: ((.agents[0].cloud.claim_id // "") | length > 0)}'
 ```
+
+The wrappers forward raw response bodies. These projections omit the claim value; preserve that boundary when
+customizing a query. To use the full identity tuple locally, capture the response without printing it, as in
+[the local flow validation recipe](./how-tos/validate-direct-local-flow-function.md).
 
 ## Top-level response shape (`/api/v3/info`)
 
@@ -152,9 +158,9 @@ agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid
 
 ## Limits and gotchas
 
-- **`/api/v1/info` and `/api/v3/info` are unauthenticated**, but
-  most other paths require the bearer. The wrapper always uses the
-  bearer; that's fine for `/info` too.
+- **`/api/v1/info` and `/api/v3/info` have no API bearer requirement.** Other endpoints depend on access rules and
+  bearer-protection settings. This wrapper always resolves a bearer, including for `/info`; use the entry
+  reachability probe when only unauthenticated access is needed.
 - **Host OS/hardware/cloud facts live only in `/api/v1/info`'s
   `.host_labels`.** Neither `/api/v3/info`'s `agents[0]` nor a v3
   metrics response's `summary.nodes[]` carries a `labels` field
