@@ -41,10 +41,10 @@ short contributor-facing version.
   outputs"). `go generate` also writes through the module's `README.md` symlink into the generated integration page;
   leave that page unstaged (`ibm-d.md`).
 - Validate locally with `gen_integrations.py`, `gen_docs_integrations.py --check`, and the unit tests
-  (`integrations/README.md` lists the commands and where the dependencies live). Do NOT regenerate the tracked pages as
-  a routine step: the regenerated pages add many changed lines to the PR and make review harder, and CI produces them
-  after merge anyway. When you do regenerate (to read a rendered page, or to check that a generator change converges on
-  a second run), undo every change to tracked generated files before committing.
+  (`integrations/README.md` lists commands and dependencies). Use `how-tos/preview-collector-page.md` for rendered
+  prose inspection in a fresh scratch directory. Full regeneration or convergence checks belong in an isolated source
+  copy containing current inputs. Preserve pre-existing modified and untracked generated files; keeping outputs out of
+  the commit does not require discarding them. Never use a blanket restore to clean up validation.
 - `.github/workflows/check-markdown.yml` regenerates the pages on pull requests to validate Learn ingest and links; it
   does NOT assert that regeneration leaves the checkout clean, so an uncommitted regeneration diff never fails a source
   PR. Earlier guidance that described a clean generated diff as a PR gate was wrong.
@@ -74,7 +74,8 @@ are read only by this tooling.
 
 - `gen_integrations.py` validates each `metadata.yaml` against its JSON Schema only (fatal on any warning).
 - `integrations/tests/test_collector_metadata.py` (both integration workflows): a collector named by a service-discovery
-  rule documents its auto-detection; prose fields contain no Markdown that breaks the Learn build.
+  rule has nonempty auto-detection text, with explicit exceptions; selected prose fields pass common Markdown-pattern
+  checks. This is not factual verification or a complete MDX build.
 - `integrations/tests/test_descriptions.py` (both workflows): the generated page meta descriptions
   (`description-authoring.md`) resolve, validate, and are unique.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
