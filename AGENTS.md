@@ -730,7 +730,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `packaging-static-installer`: building or testing the static self-extracting installer
     (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
 - Docs.
-  - `docs-learn-site-structure`: adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`;
+  - `docs-learn-site-structure`: changing, reviewing or troubleshooting docs publication on `learn.netdata.cloud`;
     `docs/.map/map.yaml`, its schema and `validate_map_schema.py`; why a Learn page is missing or wrong; ingest exit
     codes; MDX escape rules; redirects; the PR gate here (`check-markdown.yml`) and what runs after a docs PR merges
     (`trigger-learn-update.yml`, then the learn `ingest.yml`); Netlify deploy
