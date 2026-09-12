@@ -15,9 +15,20 @@ char cmd_prefix_by_status[] = {
 };
 
 // Accessed from the command loop thread, the libuv workers, the signal thread and the shutdown
-// thread, so every read and write goes through __atomic_* - see commands_exit().
+// thread, so every read and write of THIS variable goes through __atomic_* - see commands_exit().
+// The two below have their own rules; do not read this comment as covering them.
 static cmd_init_status_t command_server_initialized = CMD_INIT_STATUS_OFF;
+
+// Written by the command loop thread before it marks the init completion, read by commands_init()
+// after completion_wait_for() returns. The completion supplies the ordering, so plain accesses
+// are correct here and atomics would add nothing.
 static int command_thread_error;
+
+// Written by commands_exit() from ANOTHER thread and read by the command loop's own condition, so
+// it must be atomic: a missed store means the loop calls uv_run() again, never exits, and
+// uv_thread_join() blocks until the shutdown watchdog aborts the process - the exact failure this
+// change exists to remove. (The loop also zeroes it during setup, which is why commands_exit()
+// waits for the init handshake before it may be touched.)
 static int command_thread_shutdown;
 static unsigned clients = 0;
 
@@ -987,11 +998,11 @@ static void command_thread(void *arg) {
     }
 
     command_thread_error = 0;
-    command_thread_shutdown = 0;
+    __atomic_store_n(&command_thread_shutdown, 0, __ATOMIC_RELEASE);
     /* wake up initialization thread */
     completion_mark_complete(&completion);
 
-    while (command_thread_shutdown == 0) {
+    while (__atomic_load_n(&command_thread_shutdown, __ATOMIC_ACQUIRE) == 0) {
         uv_run(loop, UV_RUN_DEFAULT);
     }
     /* cleanup operations of the event loop */
@@ -1191,7 +1202,7 @@ void commands_exit(void)
         return;
     }
 
-    command_thread_shutdown = 1;
+    __atomic_store_n(&command_thread_shutdown, 1, __ATOMIC_RELEASE);
     netdata_log_info("Shutting down command server.");
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&async));
