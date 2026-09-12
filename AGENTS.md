@@ -727,7 +727,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `tests-query-corpus`: running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for
     query-engine bugs, formatter byte-pins, validating a fix branch
 - Packaging.
-  - `packaging-static-installer`: building or testing the static self-extracting installer
+  - `packaging-static-installer`: building, testing, reviewing or troubleshooting the static self-extracting installer
     (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
 - Docs.
   - `docs-learn-site-structure`: changing, reviewing or troubleshooting docs publication on `learn.netdata.cloud`;
