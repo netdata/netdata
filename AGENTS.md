@@ -730,8 +730,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - Also relevant: `repo-pr-reviews` (pulls SonarCloud findings for a PR).
 - Repo.
   - `repo-pr-reviews`: inspecting or addressing PR comments and reviews
-  - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
-    reset-to-default safety; `--repo` scoping
+  - `repo-mirror-sources`: read-only inspection of Netdata-org source checkouts at `${NETDATA_REPOS_DIR}`;
+    authorized mirror setup/sync, `--repo` scoping, and maintenance limits
   - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; the authoring rules (point
     at the owner, one owner per fact, symbols not line numbers, qualified enforcement claims), the change method
     (evidence round, numbered options, row-level preservation map, two-lens review), the rot signals
