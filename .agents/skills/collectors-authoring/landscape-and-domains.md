@@ -128,8 +128,9 @@ historical diff proves today's kernel attachment path. The failure classes below
 - **Taxonomy is dormant.** Current delivery follows
   `.agents/skills/integrations-lifecycle/consistency.md#the-dormant-collector-taxonomy`; do not author new taxonomy
   files or reproduce a retired CI step as part of an ordinary migration. If explicitly working on the prototype,
-  `integrations/check_collector_taxonomy.py` (`check_touched_coverage`) owns directory coverage/optout checks, while
-  `integrations/_common.py` (`TAXONOMY_SOURCES`) owns source registration and its non-recursive glob boundary.
+  `integrations/check_collector_taxonomy.py` (`check_touched_coverage`) checks same-directory file existence;
+  `integrations/gen_taxonomy.py` (`process_taxonomy_file`) and `integrations/schemas/taxonomy_collector.json` own optout
+  handling. `integrations/_common.py` (`TAXONOMY_SOURCES`) owns source registration and its non-recursive glob boundary.
 
 ## Dealing with data types
 
