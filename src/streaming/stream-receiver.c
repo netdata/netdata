@@ -857,6 +857,18 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             *removed = true;
             return -1;
         }
+
+        if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: received %zu bytes without a newline (max %zu). "
+                   "Disconnecting the sender.",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+                   rpt->thread.line_buffer->len, (size_t)PLUGINSD_LINE_MAX);
+
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
+            *removed = true;
+            return -1;
+        }
     }
     else {
         rc = receiver_read_uncompressed(rpt);
@@ -872,6 +884,18 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 
             rpt->thread.line_buffer->len = 0;
             rpt->thread.line_buffer->buffer[0] = '\0';
+        }
+
+        if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: received %zu bytes without a newline (max %zu). "
+                   "Disconnecting the sender.",
+                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+                   rpt->thread.line_buffer->len, (size_t)PLUGINSD_LINE_MAX);
+
+            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
+            *removed = true;
+            return -1;
         }
     }
 
