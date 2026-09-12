@@ -38,7 +38,7 @@ Read the row for the work at hand, not the whole skill.
 
 | Work | Read |
 |---|---|
-| Review a profile or proof change | Affected chart/metric/schema references; stock changes also need ownership/proof contracts and the rule sheet below. Consult existing design and proof evidence, without creating authoring artifacts merely to review. |
+| Review a profile or proof change | Affected sections of `chart-design.md`, `metric-types.md` and `profile-schema.md`; stock changes also need `ownership-proof.md`, `proof-authoring.md` and the rule sheet below. Consult existing design and proof evidence, without creating authoring artifacts merely to review. |
 | Create or redesign a user profile | `chart-design.md`, `metric-types.md`; `profile-schema.md` for where each field is documented |
 | Create or change a stock profile | the above, then `ownership-proof.md`, `proof-authoring.md`, and the rule sheet below |
 | Build stock fixtures | `how-tos/build-synthetic-fixture.md`, `proof-authoring.md` |
