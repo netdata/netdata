@@ -296,6 +296,8 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.39.0 to 1.40.0 in /src/go ([#23839](https://github.com/netdata/netdata/issues/23839))
 - Build(deps): bump golang.org/x/sys from 0.47.0 to 0.48.0 in /src/go ([#23840](https://github.com/netdata/netdata/issues/23840))
 - Build(deps): bump github.com/catonetworks/cato-go-sdk from 0.4.0 to 0.4.1 in /src/go ([#23841](https://github.com/netdata/netdata/issues/23841))
+- Fix(libnetdata): probe KSM support before enabling deduplication ([#23822](https://github.com/netdata/netdata/issues/23822))
+- Add node decommissioning instructions in learn ([#23812](https://github.com/netdata/netdata/issues/23812))
 
 ## [2.11.0] - 2026-08-12
 
