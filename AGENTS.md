@@ -662,7 +662,8 @@ Public skill convention (`docs/netdata-ai/skills/`):
   reads source files, updates schemas, validates fixtures, changes collectors/producers, or coordinates
   frontend/backend/aggregator code is a project developer skill, not a public one.
 - Skill verification harness inputs (seed questions, grader rubrics, runner scripts, transcript-generation prompts)
-  live under `.agents/skill-verification/<skill>/`, never under `docs/netdata-ai/skills/<skill>/`.
+  live under `.agents/skill-verification/<skill>/`, never under `docs/netdata-ai/skills/<skill>/`. Shared cross-skill
+  invocation cases live under `.agents/skill-verification/invocation/`; that directory is not a runtime skill.
 - Each public skill is reachable from `.agents/skills/<skill-name>` via a relative symlink
   (`.agents/skills/<name>` -> `../../docs/netdata-ai/skills/<name>`). From the repository root, create a new link with
   `ln -s ../../docs/netdata-ai/skills/<name> .agents/skills/<name>`. Inspect an existing path instead of overwriting it;
