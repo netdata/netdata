@@ -104,9 +104,8 @@ Structure and routing:
 - The description names discriminative tasks and representative user phrases, with useful near-miss boundaries.
   Put important review and operation triggers early. Keep exhaustive producer, command and field mappings inside the
   task router or references; the root index is a concise pointer, not another full trigger inventory.
-- Select by task operation plus affected contract. A review lens changes which references to expand, not which
-  applicable correctness contracts exist. When relevance is uncertain, inspect the short entry before loading its
-  details. Do not fork duplicate domain rules for performance and maintainability reviewers.
+- Invocation and review reference selection follow `AGENTS.md#skill-selection`; route the relevant contracts without
+  duplicating that policy or forking domain rules by reviewer lens.
 - Recommended skeleton, each element with the skill that shows it: frontmatter trigger (all); an owners block with one
   row per owner and anchors where a section is meant (`topology-authoring` as a table, `collectors-snmp-trap-profiles`
   as anchored bullets); a task router (`collectors-prometheus-profiles`); a rule sheet distinguishing what the code

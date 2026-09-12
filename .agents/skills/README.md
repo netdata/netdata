@@ -62,3 +62,6 @@ The per-skill grouped index is the "Skills index" in the root `AGENTS.md`: skill
 point marked where it has one, and a skill that serves two areas cross-referenced from the other. A skill's frontmatter
 description is its trigger. How to create, edit, slim, split, or review a skill, and the rot signals to watch for:
 `repo-skill-authoring`, which cites sections of this file and of the root `AGENTS.md` by heading anchor.
+
+Selection by operation and affected contract, review applicability, reference depth and action boundaries are owned by
+`AGENTS.md#skill-selection`. The index and descriptions support that selection; they do not authorize execution.

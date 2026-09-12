@@ -272,8 +272,7 @@ Before non-trivial work:
 1. Read the in-flight SOWs under `.agents/sow/q/current/` and `pending/`. Discover other in-flight work through
    open PRs and issues, not through `master`.
 2. Read relevant specs under `.agents/sow/specs/`.
-3. Inspect `.agents/skills/*/SKILL.md` and load every runtime project skill whose trigger matches the work (index
-   under Project Skills).
+3. Select and load applicable runtime skills using "Skill Selection" below (index under Project Skills).
 4. Inspect code, docs, tests, and existing project instructions as ground truth.
 5. For non-trivial work the goal and plan are user-owned: see "Plan Before Non-Trivial Work".
 
@@ -606,13 +605,38 @@ docs, code, and tests, not in specs.
 - Public/operator skill catalogs SHOULD point to their skill-local rule rather than repeat it.
 - Preserve operator/developer audience boundaries.
 
+### Skill Selection
+
+Apply skill selection to implementation, investigation and read-only review, including work exempt from a SOW.
+
+- Select skills by the requested operation and affected contract, using the grouped index and frontmatter
+  descriptions. Read each applicable entry, then expand its routed references for the task. A matching subject word
+  alone does not select every authoring, querying and triage workflow for that subject.
+- For a review, load the domain contracts needed to assess the change even when an entry describes them as authoring
+  guidance. Use them as review criteria; an implementation procedure is not a request to perform it. Review-only
+  work retains the exemptions and action boundaries in "When A SOW Is Required".
+- A reviewer lens changes evidence emphasis and reference depth, not the applicability of correctness contracts.
+  Do not maintain duplicate domain rules for separate lenses. If relevance is uncertain, inspect the candidate entry
+  and decide from the changed behavior and reachable dependencies; do not load every supporting file by default.
+- Load required shared invariants and prerequisites before specialized guidance. Domain task routers determine which
+  contracts apply; a reviewer MAY follow another reference when evidence exposes a relevant dependency. Skill text
+  is a source map, not proof that a claim is current: verify affected claims at their owners.
+- Loading a skill does not authorize its writes, credential setup, deployments, generation, commits or remote
+  operations. For read-only review, consult existing design and validation evidence and report concrete gaps;
+  do not create implementation artifacts merely because the authoring workflow requests them. Existing user
+  authorization for the actual task still applies.
+
+Review assignment scope, complete-change coverage and stop conditions remain in "Review". Provide the assigned
+operation, complete review scope, approved contracts, applicable skill paths/sections and available evidence so a
+specialist can select depth without guessing the task. One reviewer still assesses the complete unit and interactions.
+
 ### Project Skills
 
 Project skills are memory of HOW to work here.
 
 - Runtime input skills MUST live under `.agents/skills/<area>-<topic>/SKILL.md` and follow `.agents/skills/README.md`
   (areas, naming, frontmatter `name`); the public skill symlinks are exempt (Public skill convention below);
-  `.agents/sow/audit.sh` enforces it. Required First Checks loads the matching ones.
+  `.agents/sow/audit.sh` enforces it. Skill Selection defines when to load them.
 - Output/reference skills may also exist under product documentation or generated skill directories. Do not rename,
   shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related
   public/operator workflow changes.
