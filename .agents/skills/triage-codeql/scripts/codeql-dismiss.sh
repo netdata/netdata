@@ -4,7 +4,7 @@
 # Usage:
 #   codeql-dismiss.sh <alert_number> <reason> "<comment>"
 #
-# Reasons (per GitHub API):
+# Reasons supported by this helper (a subset of the GitHub API):
 #   false positive    -- alert is incorrect
 #   won't fix         -- alert is correct but won't be fixed
 #   used in tests     -- alert appears only in test code

@@ -32,12 +32,12 @@ gh_repo_slug() {
     # Uses bash parameter expansion so repo names containing dots
     # (e.g. "my.repo", "kubernetes-sigs/cluster-api-provider-aws.git") parse
     # correctly. The previous regex `[^/.]+` truncated names with dots.
-    # Returns empty for non-github.com remotes (this skill is GitHub-only).
+    # Recognizes the common github.com forms below (this skill is GitHub-only).
     local root url
     root="$(gh_repo_root)"
     url="$(git -C "${root}" config --get remote.upstream.url 2>/dev/null \
          || git -C "${root}" config --get remote.origin.url)"
-    # Strict github.com host match. `*github.com*` substring would
+    # Match common remote forms, not arbitrary URLs. A `*github.com*` substring would
     # accept `notgithub.com` or `github.com.attacker.example.com`.
     # Three accepted forms cover SCP-style ssh, URL-style ssh, anonymous
     # https, and credentialed https (`x-access-token:TOK@github.com/...`).
@@ -73,7 +73,7 @@ gh_audit_dir() {
     echo "${dir}"
 }
 
-# Run gh against the GitHub API. Authentication comes from `gh auth status`.
+# Run gh against the GitHub API using gh-managed credentials or environment auth.
 # No token is required in .env when using the gh CLI directly.
 gh_api() {
     if ! command -v gh >/dev/null; then
