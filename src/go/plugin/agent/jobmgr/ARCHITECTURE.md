@@ -621,6 +621,24 @@ flowchart TD
    - The `job-runtime` identity stays occupied through cleanup, so a same-job successor cannot start before those
      terminal frames complete.
 
+### Activation failure classification
+
+`joboutput/activation_error.go` owns the error classification shared by discovery, synchronous DynCfg activation,
+accepted-job activation, and SecretStore-dependent restarts. Candidate preparation returns that classification with
+the original error. Config-only validation and runtime activation fallbacks use the same classifier.
+
+The classification distinguishes invalid proposals, transient dependencies, busy physical identities, stale Store
+snapshots, superseded attempts, containment deadlines, quarantine, and other operational failures. These are failure
+facts, not a universal retry policy: synchronous UPDATE preserves its incumbent on busy/stale preparation, while an
+already-applied accepted ENABLE retains activation authority and uses timed recovery. Runtime fallback handles busy
+and quarantine only; a stale Store snapshot is rejected during candidate preparation.
+
+Each caller keeps its command-specific response, graph disposition, and recovery policy explicit. Caller cancellation
+and retained ownership take precedence over ordinary recovery. The classifier preserves the original error tree so
+those lifetime decisions remain available; a provider's own canceled operation does not by itself mean its caller
+was canceled. Managed probe failures keep their separate collector-supplied response and retry metadata. Recovery is
+armed only in `AfterApply`, after the corresponding graph mutation commits.
+
 ### Accepted-job activation
 
 An applied graph record in `accepted` is already visible to the daemon but has no installed runtime. ENABLE therefore
@@ -807,8 +825,10 @@ flowchart LR
 
 The Store change remains committed if a later job restart fails, and the graph truthfully shows that job as `Failed`.
 A retained busy/contained restart revalidates the Store dependency, source winner, desired config, resource absence,
-and run generation. A normal probe failure follows the collector's ordinary autodetection-retry policy.
-`secrets/pending.go`.
+and run generation. Transient provider/scope or other transient construction failures schedule the collector's
+ordinary autodetection retry after the Failed mutation applies, as normal probe failures do. A later disable, removal,
+replacement, or run stop revokes that retry. Invalid proposals and quarantine do not gain a timed retry.
+`joboutput/secret_restart.go`, `joboutput/autodetection_retry.go`, `secrets/pending.go`.
 
 Two rules that surprise people:
 

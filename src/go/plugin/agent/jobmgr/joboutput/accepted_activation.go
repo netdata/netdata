@@ -453,11 +453,17 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		return dcjc.noop(scope, current, permit, result)
 	}
 	if attempt.stage == nil {
-		return dcjc.prepareAcceptedActivationError(attempt, current, scope, permit, attempt.err)
+		return dcjc.prepareAcceptedActivationError(
+			attempt,
+			current,
+			scope,
+			permit,
+			classifyActivationError(attempt.err),
+		)
 	}
 	successor, probeFailure, err := dcjc.factory.prepareCandidate(scope.Successor, permit, attempt.stage)
 	if err != nil {
-		return dcjc.prepareAcceptedActivationError(attempt, current, scope, permit, err)
+		return dcjc.prepareAcceptedActivationError(attempt, current, scope, permit, classifyActivationError(err))
 	}
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 	if probeFailure != nil {
@@ -468,11 +474,14 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 			autoDetectionRetryToken{},
 			probeFailure,
 			probeFailurePlan{
-				postimage:        failedPostimage,
-				failedCleanup:    dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
-				removedCleanup:   dcjc.configDeleteCleanup(dcjc.externalID(scope.ID)),
-				result:           func(*autoDetectionFailure) lifecycle.SealedResult { return result },
-				afterApply:       composeProbeFailureAfterApply(dcjc.scheduleRetryAfterApply(config), attempt.markApplied()),
+				postimage:      failedPostimage,
+				failedCleanup:  dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
+				removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(scope.ID)),
+				result:         func(*autoDetectionFailure) lifecycle.SealedResult { return result },
+				afterApply: composeProbeFailureAfterApply(
+					dcjc.scheduleRetryAfterApply(config),
+					attempt.markApplied(),
+				),
 				removePlainStock: config.SourceType() == confgroup.TypeStock,
 			},
 		)
@@ -490,10 +499,13 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		autoDetectionRetryToken{},
 		attempt.markApplied(),
 		activationFallbackPlan{
-			postimage:  &failedPostimage,
-			result:     result,
-			cleanup:    dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
-			afterApply: composeAfterApply(func() { dcjc.scheduleAutoDetectionRetry(config, busyFailure) }, attempt.markApplied()),
+			postimage: &failedPostimage,
+			result:    result,
+			cleanup:   dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
+			afterApply: composeAfterApply(
+				func() { dcjc.scheduleAutoDetectionRetry(config, busyFailure) },
+				attempt.markApplied(),
+			),
 		},
 		activationFallbackPlan{
 			postimage:  &failedPostimage,
@@ -509,8 +521,9 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
-	err error,
+	activation activationFailure,
 ) (lifecycle.PreparedResourceTransaction, error) {
+	err := activation.err
 	if err == nil {
 		return nil, errors.New("job output: accepted activation has no candidate outcome")
 	}
@@ -526,7 +539,8 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 	}
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 	config := attempt.spec.config
-	if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+	switch activation.kind {
+	case activationFailureQuarantined, activationFailureProposal:
 		return dcjc.prepareMutationWithRetryAfterApply(
 			scope,
 			current,
@@ -540,12 +554,8 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			attempt.markApplied(),
 			jobConfigFailure(err, "activation"),
 		)
-	}
-	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) ||
-		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-		errors.Is(err, ErrStaleStoreGeneration) ||
-		classifyConstructionError(err) == constructionErrorTransient {
+	case activationFailureBusy, activationFailureStaleStore, activationFailureSuperseded,
+		activationFailureDeadline, activationFailureTransient:
 		failure := transientActivationFailure(config, err)
 		return dcjc.prepareMutationWithRetryAfterApply(
 			scope,
@@ -560,23 +570,9 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			composeAfterApply(func() { dcjc.scheduleAutoDetectionRetry(config, failure) }, attempt.markApplied()),
 			jobConfigFailure(err, "activation"),
 		)
+	default:
+		return nil, err
 	}
-	if classifyConstructionError(err) == constructionErrorProposal {
-		return dcjc.prepareMutationWithRetryAfterApply(
-			scope,
-			current,
-			nil,
-			permit,
-			resourceRemovalDisposition(current),
-			&failedPostimage,
-			result,
-			dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
-			autoDetectionRetryToken{},
-			attempt.markApplied(),
-			jobConfigFailure(err, "activation"),
-		)
-	}
-	return nil, err
 }
 
 func composeProbeFailureAfterApply(

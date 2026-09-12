@@ -4,10 +4,8 @@ package joboutput
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -37,9 +35,8 @@ func (dcjc *DynCfgJobController) prepareAdd(
 	if _, err := dcjc.runConfigOperation(ctx, config, configOperationValidate, true); err != nil {
 		// The resource lane stays active while validation yields the graph
 		// claim, so same-resource DynCfg work cannot supersede this attempt.
-		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-			errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-			errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+		switch classifyActivationError(err).kind {
+		case activationFailureBusy, activationFailureDeadline, activationFailureQuarantined:
 			return dcjc.noop(
 				scope,
 				current,
@@ -152,9 +149,9 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			}
 			// The resource lane stays active while validation yields the graph
 			// claim, so same-resource DynCfg work cannot supersede this attempt.
-			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+			code := 400
+			switch classifyActivationError(err).kind {
+			case activationFailureBusy, activationFailureDeadline, activationFailureQuarantined:
 				return dcjc.noop(
 					scope,
 					current,
@@ -162,13 +159,12 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 					mustDynCfgMessage(503, "config validation is busy; retry the command."),
 					dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusDisabled),
 				)
-			}
-			if classifyConstructionError(err) == constructionErrorOperational {
-				return nil, err
-			}
-			code := 400
-			if classifyConstructionError(err) == constructionErrorTransient {
+			case activationFailureTransient:
 				code = 503
+			case activationFailureProposal:
+				// Invalid disabled proposals preserve the existing configuration.
+			default:
+				return nil, err
 			}
 			return dcjc.noop(
 				scope,
@@ -190,17 +186,18 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			cleanup,
 		)
 	}
-	successor, probeFailure, err := dcjc.prepareContainedJob(
+	successor, probeFailure, activation := dcjc.prepareContainedJob(
 		ctx,
 		config,
 		scope.Successor,
 		permit,
 	)
-	if err != nil {
+	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+		switch activation.kind {
+		case activationFailureQuarantined:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			return dcjc.prepareMutationWithRetryAfterApply(
@@ -225,9 +222,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 				nil,
 				jobConfigFailure(err, "activation"),
 			)
-		}
-		if candidatePreparationBusy(err) ||
-			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
+		case activationFailureBusy, activationFailureStaleStore, activationFailureSuperseded:
 			return dcjc.noop(
 				scope,
 				current,
@@ -235,8 +230,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 				mustDynCfgMessage(503, "config update is busy; retry the command."),
 				dcjc.configStatusCleanup(target.resourceID, dyncfg.Status(record.Status)),
 			)
-		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+		case activationFailureDeadline:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			return dcjc.prepareTransientConstructionFailure(
@@ -250,9 +244,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 				config,
 				err,
 			)
-		}
-		switch classifyConstructionError(err) {
-		case constructionErrorTransient:
+		case activationFailureTransient:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			return dcjc.prepareTransientConstructionFailure(
@@ -266,7 +258,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 				config,
 				err,
 			)
-		case constructionErrorProposal:
+		case activationFailureProposal:
 			return dcjc.noop(
 				scope,
 				current,
@@ -454,17 +446,18 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 	if err != nil {
 		return nil, err
 	}
-	successor, probeFailure, err := dcjc.prepareContainedJob(
+	successor, probeFailure, activation := dcjc.prepareContainedJob(
 		ctx,
 		config,
 		scope.Successor,
 		permit,
 	)
-	if err != nil {
+	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+		switch activation.kind {
+		case activationFailureQuarantined:
 			failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 			return dcjc.prepareMutationWithRetryAfterApply(
 				scope,
@@ -482,9 +475,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 				nil,
 				jobConfigFailure(err, "activation"),
 			)
-		}
-		if candidatePreparationBusy(err) ||
-			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
+		case activationFailureBusy, activationFailureStaleStore, activationFailureSuperseded:
 			return dcjc.noop(
 				scope,
 				current,
@@ -492,8 +483,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 				mustDynCfgMessage(503, "job activation is busy; retry the command."),
 				dcjc.configStatusCleanup(target.resourceID, dyncfg.Status(record.Status)),
 			)
-		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+		case activationFailureDeadline:
 			failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 			return dcjc.prepareTransientConstructionFailure(
 				scope,
@@ -506,9 +496,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 				config,
 				err,
 			)
-		}
-		switch classifyConstructionError(err) {
-		case constructionErrorTransient:
+		case activationFailureTransient:
 			failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 			failure := transientActivationFailure(config, err)
 			return dcjc.prepareTransientConstructionFailure(
@@ -522,7 +510,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 				config,
 				err,
 			)
-		case constructionErrorProposal:
+		case activationFailureProposal:
 			return onPrepareFailure(err)
 		default:
 			return nil, err
