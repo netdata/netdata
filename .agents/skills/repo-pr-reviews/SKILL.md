@@ -54,9 +54,8 @@ maintainability. Don't dismiss findings because they look minor.
 These are non-negotiable. Skipping any of them will cost the user time.
 
 1. **Pagination paranoia for selected result sets.** Do not stop at round numbers. If a fetch returns
-   exactly 100 / 200 / 300 items, the round count is suspicious -- GitHub
-   pagination defaults to 100, and round-multiples almost always mean there
-   is a next page that the previous client missed. Always re-probe with an
+   exactly 100 / 200 / 300 items, verify completion: these helpers request 100
+   items per page, so a round multiple may hide a missed next page. Always re-probe with an
    explicit `page=N+1` request. `fetch-all.sh` does this automatically.
 2. **Triage every in-scope comment.** Verify it and classify it under `AGENTS.md#review`. Handle non-blocking findings under
    `AGENTS.md#scope-discipline-at-every-step` and `AGENTS.md#followup-discipline`; do not silently discard them or
@@ -379,7 +378,7 @@ What counts as "new activity":
 Iteration and completion follow `AGENTS.md#review`. Re-fetch and assess new findings when another round is warranted;
 do not repeat merely to reach zero open threads, zero optional suggestions, or a particular bot verdict.
 
-- Before concluding, account for findings from every source and report their verified disposition. Required CI,
+- Before concluding, account for findings from every in-scope source and report their verified disposition. Required CI,
   quality gates, human decisions and actual merge requirements remain prerequisites for claiming merge readiness.
 - A silent reviewer or a wait timeout is not approval. Re-check CI and available feedback, then report any remaining
   coverage or validation limitation; do not loop solely to make the bot respond.
@@ -393,7 +392,8 @@ When the inspection or authorized handling ends, summarize for the user:
 - Findings addressed (count by source: review threads, Sonar, CI).
 - Any unrelated CI failures observed but not fixed (with check name + URL).
 - Any human comments that need their attention.
-- Current PR state (mergeable / blocked / awaiting validation or input, decision, head SHA).
+- Current PR state when inspected (mergeable / blocked / awaiting validation or input, decision, head SHA);
+  otherwise state that it is unassessed. Supplied-comment inspection does not require a live metadata lookup.
 - Proposed but unperformed replies or remote actions, remaining optional findings and their dispositions, and any
   review/validation coverage limits.
 
