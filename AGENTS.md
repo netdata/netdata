@@ -719,7 +719,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `health-alert-authoring`: authoring, adapting, or reviewing health alerts and templates in
     `src/health/health.d/*.conf`; lookup/calc/warn/crit, lifecycle, routing, health-config tests
 - Topology.
-  - `topology-authoring`: creating or changing a topology producer (`topology:network-connections`,
+  - `topology-authoring`: creating, changing or reviewing a topology producer (`topology:network-connections`,
     `topology:streaming`, `topology:snmp`, vSphere, `topology:cato_networks`, or a new one) and its
     `netdata.topology.v1` payload: actors, links, evidence, correlation rules, presentation, modals, overlays,
     validation, and the aggregator contract a producer relies on
