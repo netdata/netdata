@@ -672,12 +672,18 @@ Public skill convention (`docs/netdata-ai/skills/`):
   `$'\033[...]'`; `<prefix>_repo_root` via `git rev-parse --show-toplevel`; `<prefix>_load_env` sourcing `<repo>/.env`
   with `: "${VAR:?}"` validation; `<prefix>_audit_dir` creating the skill's `<repo>/.local/audits/<dir>/` (Local-Only
   Working Directory); masked-token `<prefix>_run` / `<prefix>_run_read` wrappers.
-- Scripts that touch credentials (cloud tokens, per-agent bearers, claim ids, session cookies) MUST be token-safe:
-  helpers handling credential bytes are named with a leading underscore (`_skill_*`, internal-only) and return them
-  via bash namerefs into the caller's locals, NEVER to stdout. Public wrappers (no underscore) read credentials from
-  `.env` internally and emit ONLY the response body. Each token-handling lib MUST ship a
-  `<prefix>_selftest_no_token_leak` that drives every public wrapper with a sentinel token and asserts it never
-  reaches captured stdout.
+- Credential setup MUST be explicit in the task workflow: source the library, then call its environment loader when
+  live execution needs it. Sourcing a library or reviewing a recipe MUST NOT itself load `.env` or query a service.
+  Public request wrappers use the configured environment; do not assume every call reloads it.
+- Helpers handling credential bytes MUST use internal names (`_skill_*`) and keep those bytes out of displayed output.
+  Use the owner's supported caller-local assignment mechanism; when an internal helper emits credential JSON, its
+  caller MUST capture it privately. Do not require Bash namerefs on shells that lack them. Public wrappers MUST NOT
+  log authentication material; successful response bodies may contain private service data and require review before
+  sharing. Response forwarding is not a universal redaction guarantee.
+- Token-handling libraries MUST provide offline synthetic verification of their credential handoff and masking paths,
+  including stdout and stderr. A live request with an invalid sentinel is not an offline self-test; a failed or skipped
+  request is not proof that a wrapper works. Use the skill's focused tests and documented supported shell; preserve
+  caller state by invoking mutable self-tests in an isolated shell. Validation does not authorize real credential setup.
 - How-tos catalog: each public skill ships `how-tos/INDEX.md`. Capture timing and authorization follow Knowledge
   Capture. When an authorized change adds or updates a how-to, keep its catalog consistent. Operator recipes stay
   in public skills; developer recipes belong in the matching `.agents/skills/` project skill and its index, if any.

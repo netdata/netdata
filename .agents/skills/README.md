@@ -65,3 +65,10 @@ description is its trigger. How to create, edit, slim, split, or review a skill,
 
 Selection by operation and affected contract, review applicability, reference depth and action boundaries are owned by
 `AGENTS.md#skill-selection`. The index and descriptions support that selection; they do not authorize execution.
+
+## Verification Scenarios
+
+Offline invocation cases and their grading rubric live under `.agents/skill-verification/invocation/`. Use them when
+changing discovery, task routing or shared selection rules. They test selection and action boundaries without running
+the operational procedures they describe. The query-specific question sets beside them are separate operational
+seeds; loading a verification file does not authorize its live queries.
