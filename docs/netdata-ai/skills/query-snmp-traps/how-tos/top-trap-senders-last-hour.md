@@ -75,7 +75,8 @@ inspection; token-safe request logging does not sanitize their contents. Start a
      "$TRAP_QUERY_DIR/top-source-ips.json"
    ```
 
-4. If hostnames are available, inspect the `_HOSTNAME` facet too:
+4. Optionally inspect the `_HOSTNAME` facet. Because `BODY` requests this facet, successful responses include
+   it with `options: []` when no hostname values are available; the ranking is then `[]`:
 
    ```bash
    jq -e '
