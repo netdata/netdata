@@ -15,11 +15,16 @@ the full structured payload when needed?
 
 ## Steps
 
+Run from the repository root in one Bash session. The private run directory retains raw responses for local
+inspection; token-safe request logging does not sanitize their contents. Start a new run for another execution.
+
 1. Load the token-safe wrappers:
 
    ```bash
    source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
    agents_load_env
+   mkdir -p .local/audits/query-snmp-traps
+   TRAP_QUERY_DIR="$(mktemp -d .local/audits/query-snmp-traps/query.XXXXXX)"
    ```
 
 2. Query trap rows using structured selections. Prefer `TRAP_VAR_*`
@@ -48,20 +53,18 @@ the full structured payload when needed?
      facets: ["TRAP_NAME", "TRAP_OID", "TRAP_CATEGORY", "TRAP_SEVERITY", "TRAP_SOURCE_IP", $field]
    }')"
 
-   mkdir -p .local/audits/query-snmp-traps
-
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
      --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
-     > .local/audits/query-snmp-traps/varbind-filter.json
+     > "$TRAP_QUERY_DIR/varbind-filter.json"
    ```
 
-3. Decode matching rows:
+3. Decode matching rows into a private file, then print a bounded count:
 
    ```bash
-   jq '
+   jq --arg field "$TRAP_VAR_FIELD" '
      .columns as $c
      | [ .data[]? as $row
          | $c | to_entries | sort_by(.value.index)
@@ -71,15 +74,18 @@ the full structured payload when needed?
              category: (.TRAP_CATEGORY // ""),
              severity: (.TRAP_SEVERITY // ""),
              source_ip_present: ((.TRAP_SOURCE_IP // "") | length > 0),
-             ifindex: (.TRAP_VAR_IFINDEX // ""),
+             varbind_field: $field,
+             varbind_value: (.[$field] // ""),
              message: (.MESSAGE // "")
            }
        ]
-   ' .local/audits/query-snmp-traps/varbind-filter.json
+   ' "$TRAP_QUERY_DIR/varbind-filter.json" > "$TRAP_QUERY_DIR/decoded-rows.json"
+
+   jq '{returned_rows: length}' "$TRAP_QUERY_DIR/decoded-rows.json"
    ```
 
 4. If local inspection of the structured varbind object is needed,
-   parse it locally:
+   parse it into another private file:
 
    ```bash
    jq '
@@ -91,15 +97,14 @@ the full structured payload when needed?
          trap: (.TRAP_NAME // .TRAP_OID // ""),
          varbinds: ((.TRAP_JSON // "{}") | try fromjson catch {})
        }
-   ' .local/audits/query-snmp-traps/varbind-filter.json
+   ' "$TRAP_QUERY_DIR/varbind-filter.json" > "$TRAP_QUERY_DIR/varbind-audit.json"
    ```
 
 ## Output
 
-Return sanitized trap names, categories, severities, and messages.
-Do not paste full parsed varbind objects into durable artifacts if
-they contain MAC addresses, usernames, packet contents, public IPs,
-or customer identifiers.
+Return the matching returned-row count (at most 200). You MAY inspect the private decoded rows and varbind audit
+locally for trap names, categories, severities, messages and the configured field value. These are identifying raw
+data, not sanitized output. Review and redact details before sharing or copying them into durable artifacts.
 
 ## Notes / gotchas
 
