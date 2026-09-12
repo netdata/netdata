@@ -201,8 +201,8 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		7*time.Second,
 		10*time.Millisecond,
 	)
-	wireAfterRecovery := output.String()[wireBeforeRecovery:]
 	if scenario.disable || scenario.oversized {
+		wireAfterRecovery := output.String()[wireBeforeRecovery:]
 		require.Equal(
 			t,
 			readsBeforeRecovery,
@@ -218,12 +218,17 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		}
 		return
 	}
-	require.True(
+	// Retry dispatch is asynchronous; tick progress does not join activation.
+	require.Eventually(
 		t,
-		strings.Contains(wireAfterRecovery, "CONFIG go.d:collector:module:job status running") ||
-			strings.Contains(wireAfterRecovery, "CONFIG go.d:collector:module:job create running job"),
-		"transient provider failure did not recover after five real scheduler ticks; replacement reads: %d",
-		replacementReads.Load(),
+		func() bool {
+			wireAfterRecovery := output.String()[wireBeforeRecovery:]
+			return strings.Contains(wireAfterRecovery, "CONFIG go.d:collector:module:job status running") ||
+				strings.Contains(wireAfterRecovery, "CONFIG go.d:collector:module:job create running job")
+		},
+		3*time.Second,
+		10*time.Millisecond,
+		"transient provider failure did not publish recovery after retry became due",
 	)
 	waitSecretStart(t, starts, "replacement")
 	require.Greater(t, replacementReads.Load(), readsBeforeRecovery)

@@ -49,6 +49,8 @@ func classifyActivationError(err error) activationFailure {
 	case errors.Is(err, jobmgr.ErrProcessAttemptSuperseded):
 		failure.kind = activationFailureSuperseded
 	case errors.Is(err, jobmgr.ErrProcessAttemptDeadline):
+		// The containment fuse has its own recovery policy. Callers handle context
+		// expiry; provider/scope deadlines keep their transient classification below.
 		failure.kind = activationFailureDeadline
 	case errors.As(err, &transient):
 		failure.kind = activationFailureTransient
