@@ -743,7 +743,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
     `validate`, `summary`, `inspect-device`, `inspect-link`, and `replay`. Not live queries, traps, or
     collector/profile authoring
   - `triage-coverity`: Coverity Scan defect triage
-  - `triage-sonarqube`: SonarCloud findings triage
+  - `triage-sonarqube`: inspect/review SonarCloud findings and helpers, or apply authorized selected-finding decisions;
+    family and project-policy actions require scope covering all affected findings/projects
   - `triage-codeql`: GitHub Code Scanning / CodeQL triage
   - `triage-codacy`: inspect or review Codacy findings/helpers, run local analysis, or fetch PR issues; supplied
     evidence needs no live fetch. Write actions require user authorization and applicable project tracking.
