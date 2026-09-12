@@ -22,10 +22,11 @@ import (
 )
 
 type Controller struct {
-	mu sync.Mutex // guards all fields
+	mu sync.Mutex // guards mutable fields
 
 	epoch       uint64 // run generation this controller belongs to
 	attempts    jobmgr.ProcessAttemptAuthority
+	diagnostics jobmgr.DiagnosticObserver   // immutable operational log sink
 	modules     collectorapi.Registry       // collector module registry
 	catalog     *Catalog                    // the route catalog it mutates
 	mutations   jobmgr.FunctionMutationPort // kernel Function-mutation port
@@ -294,6 +295,7 @@ func NewContainedController(
 	ctx context.Context,
 	epoch uint64,
 	attempts jobmgr.ProcessAttemptAuthority,
+	diagnostics jobmgr.DiagnosticObserver,
 	modules collectorapi.Registry,
 	initial ...InitialRoute,
 ) (*Controller, *Catalog, error) {
@@ -301,7 +303,7 @@ func NewContainedController(
 	if err != nil {
 		return nil, nil, err
 	}
-	controller, catalog, err := newControllerWithPlans(epoch, attempts, modules, plans, initial...)
+	controller, catalog, err := newControllerWithPlans(epoch, attempts, diagnostics, modules, plans, initial...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -311,6 +313,7 @@ func NewContainedController(
 func newControllerWithPlans(
 	epoch uint64,
 	attempts jobmgr.ProcessAttemptAuthority,
+	diagnostics jobmgr.DiagnosticObserver,
 	modules collectorapi.Registry,
 	plans map[string]controllerModulePlan,
 	initial ...InitialRoute,
@@ -324,6 +327,7 @@ func newControllerWithPlans(
 	controller := &Controller{
 		epoch:        epoch,
 		attempts:     attempts,
+		diagnostics:  diagnostics,
 		modules:      make(collectorapi.Registry, len(modules)),
 		plans:        plans,
 		jobs:         make(map[string]map[string]controllerJob),
@@ -669,26 +673,41 @@ func (c *Controller) finishAvailabilityPoll(
 	poll functionAvailabilityPoll,
 ) {
 	if err := poll.attempt.Await(context.Background()); err != nil {
+		if !jobmgr.ContainsOnlyErrorLeaves(err,
+			context.Canceled,
+			jobmgr.ErrProcessAttemptRetired,
+			jobmgr.ErrProcessAttemptStopped,
+			jobmgr.ErrProcessAttemptSuperseded,
+		) {
+			c.observeAvailabilityFailure(DiagnosticAvailabilityAttemptFailed, poll.bundle, err)
+		}
 		return
 	}
 	result := <-poll.workerResult
 	if result.err != nil {
+		c.observeAvailabilityFailure(DiagnosticAvailabilityCallbackFailed, poll.bundle, result.err)
 		return
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.usableLocked() != nil {
+		c.mu.Unlock()
 		return
 	}
 	if !poll.bundle.commitAvailability(result.availability) {
+		c.mu.Unlock()
 		return
 	}
-	_, _ = c.reconcileModuleLocked(context.Background(), module, creator)
+	_, err := c.reconcileModuleLocked(context.Background(), module, creator)
+	c.mu.Unlock()
+	c.observeAvailabilityFailure(DiagnosticAvailabilityReconciliationFailed, poll.bundle, err)
 }
 
-func (c *Controller) Stop(epoch uint64) error {
+func (c *Controller) Stop(ctx context.Context, epoch uint64) error {
 	if c == nil {
 		return nil
+	}
+	if ctx == nil {
+		return errors.New("jobmgr Function controller: nil stop context")
 	}
 	c.mu.Lock()
 	if epoch != c.epoch || !c.draining || c.terminated {
@@ -698,7 +717,7 @@ func (c *Controller) Stop(epoch uint64) error {
 	c.terminated = true
 	dirty := c.dirty
 	c.mu.Unlock()
-	return errors.Join(dirty, c.cleanupModuleBundles(context.Background()))
+	return errors.Join(dirty, c.cleanupModuleBundles(ctx))
 }
 
 // BeginShutdown withdraws external routes before CommandKernel closes the

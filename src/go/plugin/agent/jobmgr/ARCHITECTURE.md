@@ -1040,6 +1040,19 @@ agent-level module) stages one stable process-owned handler bundle outside contr
 `functions/bundle.go`, `functions/module_stage.go`, `functions/controller.go`, `containment/authority.go`,
 `process_attempt.go`.
 
+Availability callback, contained-attempt, and asynchronous reconciliation failures emit separate fixed diagnostic
+categories through the process observer. Events contain the run generation, sanitized bundle identity, and a safe
+failure/panic classification; callback error text and recovered values are omitted. The production logger limits
+each category to one message per hour across all bundles and run generations. Pure cancellation, retirement,
+supersession, and process-stop results remain quiet; mixed failures remain observable. Existing containment events
+and synchronous reconciliation error propagation keep their separate roles.
+
+Run finalization passes its caller's context through `FunctionAssembly.FinalizeRun` and `Controller.Stop` to any
+remaining bundle cleanup waits. Wait expiry does not complete physical cleanup or reopen publication. Agent-module
+owners are released without waiting in the run finalizer; their process attempts keep ownership until the handler
+actually returns. Physical handler cleanup retains its process-owned context. Normal kernel shutdown detaches job
+handles before finalization; the cancelable waits also cover retained job bundles at the assembly boundary.
+
 ### DynCfg is not a published Function
 
 - DynCfg `config` prefix routes are **private catalog routes**, not Function publications. Netdata owns the global
