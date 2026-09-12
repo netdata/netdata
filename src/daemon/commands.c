@@ -741,6 +741,14 @@ static __thread bool this_thread_runs_a_command = false;
 // mutexes twice.
 static bool commands_exit_in_progress = false;
 
+// Has uv_thread_create() actually produced `thread`?
+//
+// This is NOT the same question as the init status. commands_init() sets CMD_INIT_STATUS_INIT
+// BEFORE it creates the thread, so the status cannot tell us whether `thread` is safe to touch,
+// and CMD_INIT_STATUS_FULL is too strict in the other direction: at INIT the loop is already
+// running and serving commands, so a shutdown there still has to drain it.
+static bool command_thread_created = false;
+
 static void after_schedule_command(uv_work_t *req, int status)
 {
     struct command_context *cmd_ctx = req->data;
@@ -1029,6 +1037,16 @@ void commands_init(void)
     int error;
 
     sanity_check();
+
+    // Never (re)start the command server once shutdown has begun. Without this, a SIGTERM during
+    // startup could have commands_exit() stop the loop while main() is still initializing, and
+    // the next commands_init() would bring a fresh loop up - dispatching commands that touch
+    // db_meta while the shutdown sequence is closing it.
+    if (exit_initiated_get()) {
+        netdata_log_info("Not initializing the command server: shutdown has already begun.");
+        return;
+    }
+
     if (__atomic_load_n(&command_server_initialized, __ATOMIC_ACQUIRE) == CMD_INIT_STATUS_FULL)
         return;
 
@@ -1045,10 +1063,23 @@ void commands_init(void)
         return;
     }
 
-    for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        fatal_assert(0 == netdata_mutex_init(&command_lock_array[i]));
+    // Initialize the command locks ONCE per process.
+    //
+    // commands_exit() deliberately does not destroy them (another thread may hold one; see the
+    // note there), so re-running netdata_mutex_init() on an already-initialized mutex would be
+    // undefined behaviour on a second init/exit cycle. Guarding here keeps both halves safe:
+    // nothing is destroyed while it may be held, and nothing is re-initialized while it is live.
+    //
+    // Only ever reached from commands_init(), which main() calls during single-threaded startup,
+    // so a plain flag is sufficient.
+    static bool command_locks_initialized = false;
+    if (!command_locks_initialized) {
+        for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
+            fatal_assert(0 == netdata_mutex_init(&command_lock_array[i]));
+        }
+        fatal_assert(0 == netdata_rwlock_init(&exclusive_rwlock));
+        command_locks_initialized = true;
     }
-    fatal_assert(0 == netdata_rwlock_init(&exclusive_rwlock));
 
     completion_init(&completion);
     error = uv_thread_create(&thread, command_thread, NULL);
@@ -1066,6 +1097,25 @@ void commands_init(void)
             netdata_log_error("uv_thread_create(): %s", uv_strerror(error));
         }
         goto after_error;
+    }
+
+    // Publish ONLY here - after the initialization handshake, never right after
+    // uv_thread_create(). Between those two points the worker has not yet initialized `async`
+    // and `server_pipe`, and it ends its setup with `command_thread_shutdown = 0`. A
+    // commands_exit() that passed the gate in that window would (a) uv_async_send() an
+    // uninitialized handle and (b) have its `command_thread_shutdown = 1` overwritten by the
+    // worker, so the loop would never exit and uv_thread_join() would block until the shutdown
+    // watchdog aborted. Publishing after the handshake makes the gate mean "the loop is up and
+    // can be told to stop", which is what commands_exit() actually needs.
+    __atomic_store_n(&command_thread_created, true, __ATOMIC_RELEASE);
+
+    // Shutdown may have begun while we were completing that handshake (on Windows the service
+    // reports itself running before netdata_main(), so a stop can arrive during startup). The
+    // commands_exit() that ran then saw no thread and returned without stopping anything, so
+    // stop it now rather than leaving a live loop dispatching commands into a teardown.
+    if (exit_initiated_get()) {
+        netdata_log_info("Command server came up during shutdown; stopping it again.");
+        commands_exit();
     }
 
     return;
@@ -1103,11 +1153,12 @@ void commands_exit(void)
     // latching there unconditionally would skip the database close, PRAGMA optimize and WAL
     // checkpoint on ordinary restarts. Latch only when a command handler is actually in flight
     // and may be holding SQLite state - which for the fatal-agent path includes ourselves.
-    // Do not touch `thread` until commands_init() has actually created it: it sets
-    // CMD_INIT_STATUS_INIT before uv_thread_create(), so a fatal() in that window would reach
-    // uv_thread_equal()/uv_thread_join() on an uninitialised uv_thread_t.
-    if (__atomic_load_n(&command_server_initialized, __ATOMIC_ACQUIRE) != CMD_INIT_STATUS_FULL) {
-        netdata_log_info("Command server is not fully initialized; nothing to stop.");
+    // Do not touch `thread` until it exists - but do not demand CMD_INIT_STATUS_FULL either.
+    // At CMD_INIT_STATUS_INIT the loop is already running (only help/ping/version are
+    // dispatchable, none of which touch SQLite, but the loop must still be stopped), so gating
+    // on FULL would leave it running straight through the SQLite teardown.
+    if (!__atomic_load_n(&command_thread_created, __ATOMIC_ACQUIRE)) {
+        netdata_log_info("Command server thread was never created; nothing to stop.");
         return;
     }
 
@@ -1158,5 +1209,6 @@ void commands_exit(void)
     // There is nothing to gain by destroying them: the process exits immediately after, and
     // the OS reclaims everything. Leaking them is the safe half of the trade.
     netdata_log_info("Command server has stopped.");
+    __atomic_store_n(&command_thread_created, false, __ATOMIC_RELEASE);
     __atomic_store_n(&command_server_initialized, CMD_INIT_STATUS_OFF, __ATOMIC_RELEASE);
 }

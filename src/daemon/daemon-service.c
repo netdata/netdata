@@ -82,7 +82,7 @@ bool service_is_running(SERVICE_TYPE service) {
     bool first = true;
     while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
         SERVICE_THREAD *sth = *PValue;
-        if((sth->services & service) && sth->tid != gettid_cached()) {
+        if((__atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service) && sth->tid != gettid_cached()) {
             running = true;
             break;
         }
@@ -99,7 +99,14 @@ bool service_running(SERVICE_TYPE service) {
     if(unlikely(!sth))
         sth = service_register(NULL, NULL, NULL);
 
-    sth->services |= service;
+    // Publish the bit atomically, but only the first time this thread claims a service.
+    // service_running() is called constantly from the collector and health loops, so the common
+    // case stays a plain relaxed read plus a branch; the atomic OR runs once per thread per
+    // service. Readers (service_is_running(), service_signal_exit(), service_wait_exit()) load
+    // this with ACQUIRE, so a plain non-atomic RMW here would be a genuine data race - and
+    // service_is_running() now makes a shutdown DECISION on the result.
+    if(!(__atomic_load_n(&sth->services, __ATOMIC_RELAXED) & service))
+        __atomic_or_fetch(&sth->services, service, __ATOMIC_RELEASE);
 
     return !nd_thread_signaled_to_cancel() && !exit_initiated_get();
 }
@@ -113,7 +120,7 @@ void service_signal_exit(SERVICE_TYPE service) {
     while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
         SERVICE_THREAD *sth = *PValue;
 
-        if((sth->services & service)) {
+        if((__atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service)) {
             nd_thread_signal_cancel(sth->netdata_thread);
             nd_log_daemon(NDLP_DEBUG, "SERVICE: Signal to stop : %s", sth->name);
             request_quit_t request_quit_callback = sth->request_quit_callback;
@@ -175,7 +182,7 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         bool first = true;
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
-            if(sth->services & service && sth->tid != gettid_cached() && !sth->cancelled) {
+            if((__atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service) && sth->tid != gettid_cached() && !sth->cancelled) {
                 sth->cancelled = true;
                 nd_thread_signal_cancel(sth->netdata_thread);
                 if(running)
@@ -184,7 +191,7 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
 
                 running++;
-                running_services |= sth->services & service;
+                running_services |= __atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service;
 
                 force_quit_t force_quit_callback = sth->force_quit_callback;
                 void *force_quit_data = sth->data;
@@ -219,13 +226,13 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         bool first = true;
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
-            if(sth->services & service && sth->tid != gettid_cached()) {
+            if((__atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service) && sth->tid != gettid_cached()) {
                 if(running)
                     buffer_strcat(thread_list, ", ");
 
                 buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
 
-                running_services |= sth->services & service;
+                running_services |= __atomic_load_n(&sth->services, __ATOMIC_ACQUIRE) & service;
                 running++;
             }
         }

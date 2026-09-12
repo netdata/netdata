@@ -769,11 +769,17 @@ int sqlite_library_init(void)
             NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
     }
     __atomic_store_n(&sqlite_databases_closed, false, __ATOMIC_RELEASE);
-    // Re-arm the suppression flags too. Only the -W unittest drivers re-initialize the library
-    // in one process; without this, one test that trips either flag would silently turn every
-    // later sqlite_library_shutdown() into a no-op.
+    // Re-arm the LIVENESS latch only. It is about threads that were still running during a
+    // previous shutdown, and those are gone by the time we re-initialize, so carrying it forward
+    // would silently turn every later sqlite_library_shutdown() into a no-op (only the -W
+    // unittest drivers re-initialize the library in one process).
     __atomic_store_n(&sqlite_teardown_unsafe, false, __ATOMIC_RELEASE);
-    __atomic_store_n(&sqlite_zombie_connection_created, false, __ATOMIC_RELEASE);
+
+    // The ZOMBIE flag is deliberately NOT cleared. It records that a connection was closed with
+    // statements still attached, so its real close is deferred - that is a property of the
+    // process, not of a library lifetime. The connection survives re-initialization, and calling
+    // sqlite3_shutdown() with it outstanding is exactly the pcache1 teardown crash this flag
+    // exists to prevent.
     sqlite_library_initialized = true;
     spinlock_unlock(&sqlite_spinlock);
 
@@ -794,6 +800,8 @@ void sqlite_library_shutdown(void)
     // Suppressing the handle close without suppressing this would not fix anything: it would
     // move the fault out of a Vdbe and into pcache1 one line later in the shutdown sequence.
     if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        // Fast path only - the authoritative re-check happens under sqlite_spinlock below,
+        // because a thread can close a handle (creating a zombie) after this point.
         nd_log_daemon(
             NDLP_WARNING,
             "SQL: skipping sqlite3_shutdown() (%s%s%s). The library stays initialized until the "
@@ -817,6 +825,26 @@ void sqlite_library_shutdown(void)
         spinlock_unlock(&sqlite_spinlock);
         return;
     }
+
+    // Re-check under the lock, and immediately before sqlite3_shutdown(). The check above is
+    // unlocked, so between it and here another thread could have closed a handle with statements
+    // attached, and tearing the library down over a fresh zombie is the crash we are avoiding.
+    //
+    // SCOPE, so this is not read as a stronger guarantee than it is: holding the lock makes this
+    // authoritative against sql_close_thread_db_safe(), which takes this same lock around its
+    // note-and-close. It is NOT authoritative against ml_fini(), whose close runs with no lock
+    // held at all (see sqlite_note_zombie_connection). That is sufficient only because ml_fini()
+    // and this function are strictly ordered on the one shutdown thread - not because the lock
+    // excludes it.
+    if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        spinlock_unlock(&sqlite_spinlock);
+        nd_log_daemon(
+            NDLP_WARNING,
+            "SQL: skipping sqlite3_shutdown() - a SQLite user or a zombie connection appeared while "
+            "we were tearing down. The library stays initialized until the process exits.");
+        return;
+    }
+
     sqlite_library_initialized = false;
     (void) sqlite3_shutdown();
     spinlock_unlock(&sqlite_spinlock);

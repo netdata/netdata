@@ -1244,14 +1244,15 @@ void aclk_synchronization_shutdown(void)
     // on init and still valid
     aclk_mqtt_client_reset();
 
-    // Same two give-up paths as metadata_sync_shutdown(), and the same consequence: if we never
-    // asked the loop to stop, or could not join it, it and its libuv workers may still be using
-    // db_meta when the caller tears SQLite down.
+    // NOTE the asymmetry with metadata_sync_shutdown(), which DOES latch when its command cannot
+    // be queued: that function returns immediately without joining, so nothing else establishes
+    // that its thread is gone. Here we fall through to nd_thread_join() regardless, and a
+    // successful join is proof the thread finished. Latching on the enqueue failure as well
+    // would leave the one-way latch set on a shutdown where no ACLK worker remains, leaking the
+    // metadata and context handles and skipping sqlite3_shutdown() for nothing. The failed-join
+    // branch below is the one that matters.
     if (queue_aclk_sync_cmd(ACLK_SYNC_SHUTDOWN, NULL, NULL))
         completion_wait_for(&aclk_sync_config.start_stop_complete);
-    else
-        sqlite_mark_teardown_unsafe(
-            "the ACLK shutdown command could not be queued, so its sync thread is still running");
 
     completion_destroy(&aclk_sync_config.start_stop_complete);
     int rc = nd_thread_join(aclk_sync_config.thread);

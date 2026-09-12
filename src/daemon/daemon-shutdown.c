@@ -400,10 +400,16 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // unlink the pipe
     // commands_exit() above (or the earlier signal-handler call) has normally stopped the
     // command loop by now, and libuv unlinks the pipe when it closes. Two exceptions, where the
-    // loop is still live and we unlink from under it: the `netdatacli shutdown-agent` path,
-    // where shutdown runs ON the command event-loop thread so it cannot be joined, and any
-    // abnormal exit, where commands_exit() is skipped entirely. Both are safe - the SQLite
-    // teardown is suppressed on both - but the pipe does go away under a live listener.
+    // loop is still live and we unlink from under it:
+    //
+    //  - `netdatacli shutdown-agent`: shutdown runs ON the command event-loop thread, so it
+    //    cannot be joined. The SQLite teardown is NOT suppressed here, and does not need to be:
+    //    CMD_EXIT runs inline in parse_commands() and touches no SQLite, and that thread is
+    //    executing the teardown rather than serving the loop. It is suppressed only if some
+    //    OTHER command is in flight at the time.
+    //  - an abnormal exit, where commands_exit() is skipped entirely. The teardown IS suppressed
+    //    there, by the abnormal latch above.
+    //
     // ENOENT just means libuv beat us to it.
     const char *pipe = daemon_pipename();
     if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
