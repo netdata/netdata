@@ -207,8 +207,9 @@ This skill holds only what the documents below lack. Point at them; do not resta
   review or schema inspection does not require it.
 - **Classifier:** `--classify` sends MIB-derived text to the configured endpoint. Establish the source scope and
   endpoint/model within the task's authorization before running; the default local endpoint is not an offline parser.
-- **Artifacts:** from the repository root, create a fresh private run. For an intentional rerun, select the earlier
-  compatible classification cache explicitly in `--cache` to reuse it; do not silently overwrite another run's evidence.
+- **Artifacts:** from the repository root, create a fresh private run below.
+- **Cache:** select a compatible earlier cache explicitly in `--cache` for an intentional rerun. Reuse can append and
+  compact that file; copy it into the fresh run first when preserving the original matters.
 
 ```bash
 (
