@@ -628,8 +628,8 @@ Project skills are memory of HOW to work here.
 Public skill convention (`docs/netdata-ai/skills/`):
 
 - Shape: `docs/netdata-ai/skills/<skill-name>/SKILL.md`, optional supporting `<topic>.md` files, optional
-  `scripts/`. Frontmatter has `name` and `description`; the description is the trigger text and MUST enumerate
-  the phrases users actually type.
+  `scripts/`. Frontmatter has `name` and `description`; the description is the trigger text and MUST identify
+  discriminative tasks and representative user phrases. Keep exhaustive command and field mappings in references.
 - Audience: operators and end-users. Public skills MAY teach querying Netdata Cloud or Agents, inspecting
   metrics/logs/topology/alerts, and running safe operational commands. They MUST NOT contain developer-contract
   validation, schema migration plans, producer authoring workflows, UI adapter work, aggregator implementation
@@ -732,9 +732,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `repo-pr-reviews`: inspecting or addressing PR comments and reviews
   - `repo-mirror-sources`: read-only inspection of Netdata-org source checkouts at `${NETDATA_REPOS_DIR}`;
     authorized mirror setup/sync, `--repo` scoping, and maintenance limits
-  - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; the authoring rules (point
-    at the owner, one owner per fact, symbols not line numbers, qualified enforcement claims), the change method
-    (evidence round, numbered options, row-level preservation map, two-lens review), the rot signals
+  - `repo-skill-authoring`: creating, amending, restructuring or reviewing skills; selective authoring rules and owner
+    references, bounded amendments, preservation evidence for restructures, read-only review and rot checks
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`, symlinked at `.agents/skills/<name>`):
 
