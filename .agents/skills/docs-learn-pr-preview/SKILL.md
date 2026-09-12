@@ -70,7 +70,8 @@ per-file hashes and modes, selected untracked files, indexed paths missing on di
 are absent from the index and snapshot; use the inspected status/diff for the complete deletion report. Gitlinks are
 recorded, not expanded: if an affected preview input needs submodule content, prepare that pinned content in the isolated copy
 and record it before claiming coverage. Unresolved index conflicts and links escaping the snapshot are rejected.
-Keep inputs stable during capture; on failure inspect the new partial output and retry with a fresh run directory.
+The helper isolates Git subprocesses from inherited repository/index selection; `--repo` selects the source,
+including a linked worktree. Keep inputs stable during capture; on failure inspect the new partial output and retry with a fresh run directory.
 The helper never restores or cleans the original checkout.
 
 Pin an isolated Learn copy to the resolved commit; this exports committed Learn content, not its local edits:

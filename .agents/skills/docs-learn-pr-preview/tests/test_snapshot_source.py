@@ -62,11 +62,11 @@ class SnapshotTests(unittest.TestCase):
                 result[str(path.relative_to(tree))] = (mode, data)
         return result
 
-    def run_helper(self, *args, success=True):
+    def run_helper(self, *args, success=True, env=None):
         before = self.tree_state(self.repo)
         result = subprocess.run(
             [sys.executable, str(HELPER), *map(str, args)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=self.env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=self.env if env is None else env,
         )
         self.assertEqual(self.tree_state(self.repo), before, "helper mutated source")
         if success:
@@ -99,6 +99,70 @@ class SnapshotTests(unittest.TestCase):
             actual[name] = {"sha256": hashlib.sha256(data).hexdigest(), "mode": mode_bits}
         self.assertEqual(manifest["files"], actual)
         return manifest
+
+    def test_caller_git_environment_does_not_select_snapshot_source(self):
+        foreign = self.root / "foreign repo"
+        self.git("clone", "-q", "--no-hardlinks", str(self.repo), str(foreign))
+        empty_index = self.root / "empty-index"
+        subprocess.run(["git", "-C", str(foreign), "read-tree", "--empty"],
+                       check=True, env=dict(self.env, GIT_INDEX_FILE=str(empty_index)))
+        empty_objects = self.root / "empty-objects"
+        empty_objects.mkdir()
+        overrides = [
+            {"GIT_INDEX_FILE": str(empty_index)},
+            {"GIT_DIR": str(foreign / ".git"), "GIT_WORK_TREE": str(foreign),
+             "GIT_COMMON_DIR": str(foreign / ".git")},
+            {"GIT_OBJECT_DIRECTORY": str(empty_objects),
+             "GIT_ALTERNATE_OBJECT_DIRECTORIES": str(empty_objects)},
+            {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "invalid-key", "GIT_CONFIG_VALUE_0": "unused"},
+            {"GIT_CONFIG_PARAMETERS": "'invalid-key=unused'"},
+        ]
+        self.write("page.md", b"selected commit\n")
+        selected_commit = self.commit()
+        self.write("page.md", b"selected working content\n")
+        for index, override in enumerate(overrides):
+            for working in (False, True):
+                with self.subTest(override=override, working=working):
+                    self.output = self.root / f"environment-{index}-{working}"
+                    before = self.tree_state(self.root)
+                    self.run_helper("--repo", self.repo, "--output", self.output,
+                                    *(("--working-tree",) if working else ("--ref", "HEAD")),
+                                    env=dict(self.env, **override))
+                    after = self.tree_state(self.root)
+                    for path, value in before.items():
+                        self.assertEqual(after.get(path), value, path)
+                    manifest = self.manifest("working-tree" if working else "ref", selected_commit)
+                    self.assertEqual(set(manifest["files"]), {"page.md", "deleted.md"})
+                    expected = b"selected working content\n" if working else b"selected commit\n"
+                    self.assertEqual((self.output / "page.md").read_bytes(), expected)
+
+    def test_linked_worktree_uses_its_own_head_index_and_files(self):
+        primary = self.repo
+        linked = self.root / "linked worktree"
+        self.git("worktree", "add", "-q", "--detach", str(linked), self.base)
+        self.repo = linked
+        self.write("page.md", b"linked commit\n")
+        linked_commit = self.commit()
+        self.write("page.md", b"linked working content\n")
+        self.write("staged.md", b"linked staged addition\n")
+        self.git("add", "staged.md")
+        override = dict(self.env, GIT_DIR=str(primary / ".git"), GIT_WORK_TREE=str(primary),
+                        GIT_COMMON_DIR=str(primary / ".git"), GIT_INDEX_FILE=str(primary / ".git/index"),
+                        GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="core.bare", GIT_CONFIG_VALUE_0="true")
+        for working in (False, True):
+            with self.subTest(working=working):
+                self.output = self.root / f"linked-{working}"
+                before = self.tree_state(self.root)
+                self.run_helper("--repo", linked, "--output", self.output,
+                                *(("--working-tree",) if working else ("--ref", "HEAD")), env=override)
+                after = self.tree_state(self.root)
+                for path, value in before.items():
+                    self.assertEqual(after.get(path), value, path)
+                manifest = self.manifest("working-tree" if working else "ref", linked_commit)
+                self.assertEqual(set(manifest["files"]),
+                                 {"page.md", "deleted.md", "staged.md"} if working else {"page.md", "deleted.md"})
+                expected = b"linked working content\n" if working else b"linked commit\n"
+                self.assertEqual((self.output / "page.md").read_bytes(), expected)
 
     def test_requested_commit_ignores_checkout_dirty_and_untracked(self):
         self.write("page.md", b"later commit\n")

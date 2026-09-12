@@ -12,6 +12,19 @@ import subprocess
 import sys
 
 
+# Repository-local variables listed by `git rev-parse --local-env-vars`, plus
+# inline config entries. Keep global/system config controls (including test isolation).
+GIT_LOCAL_ENV = {
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX",
+    "GIT_SHALLOW_FILE", "GIT_COMMON_DIR",
+}
+GIT_ENV = {key: value for key, value in os.environ.items()
+           if key not in GIT_LOCAL_ENV and not key.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))}
+GIT_ENV["GIT_OPTIONAL_LOCKS"] = "0"
+
+
 class SnapshotError(Exception):
     pass
 
@@ -24,7 +37,7 @@ def git_command(repo, *args):
 
 def git_read(repo, *args):
     command = git_command(repo, *args)
-    result = subprocess.run(command, stdout=subprocess.PIPE, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+    result = subprocess.run(command, stdout=subprocess.PIPE, env=GIT_ENV)
     if result.returncode:
         print(f"Git operation failed in {repo}: status {result.returncode}", file=sys.stderr)
         raise subprocess.CalledProcessError(result.returncode, command)
@@ -103,7 +116,7 @@ def write_link(destination, target):
 def committed_files(repo, entries, output):
     records = {}
     process = subprocess.Popen(git_command(repo, "cat-file", "--batch"), stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+                               stdout=subprocess.PIPE, env=GIT_ENV)
     try:
         for path, (mode, oid) in entries.items():
             if mode == "160000":
