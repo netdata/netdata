@@ -710,7 +710,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     `health-alert-authoring` (alerts on a collector's contexts).
   - Also relevant: `triage-snmp-diagnostics` (offline SNMP evidence investigations).
 - Integrations.
-  - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` schemas and validation, `integrations/`
+  - `integrations-lifecycle`: implementation/review of metadata validation and integrations pipeline; `integrations/`
     generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
     `contexts.yaml` and the NPM catalog generator; the collector-consistency rule
   - Also relevant: `collectors-metadata-yaml` (what the fields say) and `docs-learn-site-structure` (where the

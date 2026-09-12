@@ -50,12 +50,17 @@ dormant collector-taxonomy prototype kept for later work; nothing runs them.
 
 ## What to commit
 
-A source pull request commits the authoritative inputs only. Do not regenerate the tracked pages for it: generated
-pages, generated README files, the umbrella pages, and generated metadata (ibm.d, NPM catalog) add hundreds of changed
-lines that make review harder, and the post-merge workflow `.github/workflows/generate-integrations.yml` regenerates
-them and opens the `integrations-regen` pull request. The gitignored catalogs (`integrations.js`, `integrations.json`,
-`taxonomy.json`) and the untracked `src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` report are
-never committed.
+A source pull request includes authoritative inputs and the required generated runtime outputs: ibm.d
+`contexts/zz_generated_contexts.go` and `config_schema.json` accompany the inputs that produced them. Both integration
+workflows verify these runtime outputs after `go generate`.
+
+Generated documentation follows the post-merge `integrations-regen` pull request: integration pages, generated README
+files, umbrella pages, and producer-generated metadata (ibm.d and the NPM catalog). Preserve local generated-file
+changes without staging them. The complete boundary is owned by
+[delivery](../.agents/skills/integrations-lifecycle/consistency.md#delivery-boundary-source-pr-versus-post-merge-pr).
+The gitignored catalogs (`integrations.js`, `integrations.json`, `taxonomy.json`) and the untracked
+`src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` report are never committed; they may remain
+locally for inspection.
 
 Pull requests run `.github/workflows/check-markdown.yml`, which regenerates everything, runs the tests above, and
 validates the generated links through the Learn ingest.

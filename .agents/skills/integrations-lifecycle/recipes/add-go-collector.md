@@ -79,9 +79,10 @@ prove final README ownership; all published outputs arrive through the post-merg
 - From `src/go`, run `timeout 15s go run ./cmd/godplugin -m <name> -d`. Success: the module registers, a job starts, and
   the command runs until the timeout stops it. `unknown module`, `no jobs started`, config-load errors, or an immediate
   exit are failures. Use `-c <config-dir>` for a non-standard config path.
-- `git diff` touches only: the module directory, `init.go`, `go.d.conf`, the stock conf, the go.d README, the health
-  conf, and possibly `integrations/categories.yaml`. No generated page, README symlink, umbrella page, or gitignored
-  catalog (the `git status` check in `../consistency.md` MUST print nothing).
+- Inspect the staged collector change: expected source artifacts include the module directory, `init.go`, `go.d.conf`,
+  the stock conf, the go.d README, the health conf, and possibly `integrations/categories.yaml`. No generated page,
+  README symlink, umbrella page, or gitignored catalog belongs in it; the staged-artifact check in
+  `../consistency.md` MUST print nothing. Preserve unrelated working-tree files.
 
 ## 6. After merge
 

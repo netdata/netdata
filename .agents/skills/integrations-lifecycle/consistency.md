@@ -18,8 +18,9 @@ description MUST enumerate the relevant artifacts and justify each one left unch
 escape hatch the implementation uses MUST be visible in the PR description or design note, not only in a code comment.
 
 Obvious cases: a unit change in code updates `metadata.yaml`; a new option updates the schema, the stock conf, and the
-docs; a new metric updates `metadata.yaml` and the README. Subtle ones: renaming a metric label changes the alert
-definition that refers to it; changing a default changes the stock conf example and the documented default value.
+docs; a new metric updates its authoritative metadata/docs inputs, while generated README content follows the delivery
+boundary below. Subtle ones: renaming a metric label changes the alert definition that refers to it; changing a default
+changes the stock conf example and the documented default value.
 
 ## Delivery boundary: source PR versus post-merge PR
 
@@ -53,12 +54,14 @@ short contributor-facing version.
   committed. Before opening the PR run:
 
   ```bash
-  git status --porcelain |
-    rg '^(\?\?| M|M |MM|A |AM) (integrations/(integrations\.(js|json)|taxonomy\.json)|src/go/plugin/go\.d/collector/snmp/npm-catalog/metrics-metadata-gaps\.txt)$' || true
+  git diff --cached --name-only --diff-filter=ACMRT -- \
+    integrations/integrations.js integrations/integrations.json integrations/taxonomy.json \
+    src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
   ```
 
-  The command MUST print nothing. If it names a catalog or the side report, remove the local artifact from the commit
-  (or delete the untracked report) rather than committing it.
+  The command MUST print nothing. If it names a catalog or the side report, exclude that artifact from the staged
+  change while preserving its local contents under the repository Git rules. Unstaged or untracked reports can remain
+  for inspection; this check is about the proposed commit, not cleanup of the working tree.
 
 ## The dormant collector taxonomy
 
@@ -90,6 +93,10 @@ are read only by this tooling.
   manual sync (`ibm-d.md`).
 
 ## What reviewers should check
+
+These checks describe the resulting artifacts. For producer-generated metadata, inspect authoritative inputs and
+current generated validation evidence; the delivery boundary does not require that metadata in the source commit.
+Review follows `AGENTS.md#skill-selection` and does not itself regenerate or publish outputs.
 
 1. **Code changes have matching `metadata.yaml` changes.** A chart, dimension, label, or unit change in the code appears
    in `metadata.yaml`; a renamed metric changes both files. Row content (rows mirror the code's context, title, unit,

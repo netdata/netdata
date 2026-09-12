@@ -36,6 +36,7 @@ untouched; generated documentation still arrives through the post-merge PR (`../
 
 ## 5. Before opening the PR
 
-Stage the source artifacts only. Run the gitignored-catalog check from `../consistency.md`; it MUST print nothing. Name
+Stage authoritative inputs and any required generated runtime outputs under `../consistency.md`. Its staged-artifact
+check MUST print nothing; unrelated untracked reports do not need cleanup. Name
 the post-merge regeneration PR as the delivery route for the generated pages in the PR description, and enumerate the
 consistency artifacts you left unchanged with the reason.

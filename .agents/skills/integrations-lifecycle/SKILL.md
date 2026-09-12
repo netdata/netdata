@@ -1,6 +1,6 @@
 ---
 name: integrations-lifecycle
-description: Netdata integrations pipeline reference. Use when editing metadata.yaml and needing to validate, regenerate, or deliver it; modifying integrations generators, schemas, templates, generated integration docs, integrations.js, integrations.json, COLLECTORS.md, SECRETS.md, or SERVICE-DISCOVERY.md; changing collector consistency artifacts; working with ibm.d contexts.yaml to metadata.yaml generation or the NPM catalog generator; or asked what the collector taxonomy.yaml files are.
+description: Change or review the Netdata integrations pipeline, collector artifact consistency, metadata validation, generated docs/catalogs and source-versus-runtime delivery. Covers ibm.d and NPM producers, schemas, generators and dormant taxonomy. Metadata field prose uses collectors-metadata-yaml.
 ---
 
 # integrations-lifecycle
@@ -10,7 +10,11 @@ skill owns the mechanics and the delivery rules; what a collector `metadata.yaml
 `.agents/skills/collectors-metadata-yaml/`, and `config_schema.json` is
 `.agents/skills/collectors-go-design/config-schema.md`.
 
-Facts every reader needs:
+Apply `AGENTS.md#skill-selection`. For review, select the affected pipeline or artifact contract below and inspect
+source plus existing validation evidence. Loading recipes does not require regeneration, dependency installation,
+commits or publication. Authorized validation uses current inputs and preserves existing outputs through isolation.
+
+Shared delivery facts:
 
 - `metadata.yaml` is the input. Hand-authored for most integrations; generated for ibm.d modules (from `contexts.yaml`,
   `config.go`, `module.yaml`) and for the NPM catalog (from SNMP profiles by `integrations/gen_npm_catalog.py`). Edit
