@@ -255,6 +255,8 @@ if [ -z "$OUTPUT" ]; then
     output_reservation="$(mktemp "$audit_dir/events.XXXXXX")"
     OUTPUT="$output_reservation.json"
 fi
+# Keep relative names beginning with a hyphen out of jq/mktemp/mv option parsing.
+case "$OUTPUT" in -*) OUTPUT="./$OUTPUT" ;; esac
 # Refuse existing files/symlinks; the capture owns only its newly created output.
 if [[ -e "$OUTPUT" || -L "$OUTPUT" ]] || ! (umask 077; set -C; : > "$OUTPUT"); then
     echo "[get-events] output must be a new writable path: $OUTPUT" >&2

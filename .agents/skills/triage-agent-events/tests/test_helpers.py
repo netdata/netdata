@@ -82,11 +82,12 @@ agentevents_audit_dir() { printf '%s\n' "$TEST_AUDIT"; }
         self.assert_success(result)
         return json.loads(result.stdout)
 
-    def cli(self, *args):
+    def cli(self, *args, relative_output=False):
         # Only the sibling library changes: run a byte-identical copy of the CLI.
         cli = self.work / 'get-events.sh'
         shutil.copyfile(SCRIPTS / 'get-events.sh', cli)
-        (self.work / '_lib.sh').write_text(self.source + self.guards + self.recorder + '\nagentevents_load_env() { :; }\n')
+        change_directory = '\ncd -- ' + shlex.quote(str(self.work)) + '\n' if relative_output else ''
+        (self.work / '_lib.sh').write_text(self.source + self.guards + self.recorder + '\nagentevents_load_env() { :; }\n' + change_directory)
         return subprocess.run([BASH, str(cli), *args], cwd=ROOT, env=self.env,
                               text=True, capture_output=True, timeout=15)
 
@@ -176,6 +177,21 @@ agentevents_audit_dir() { printf '%s\n' "$TEST_AUDIT"; }
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(output.read_text(), 'preserve output')
         self.assertEqual(sibling.read_text(), 'preserve sibling')
+
+    def test_leading_hyphen_output_names_are_paths(self):
+        for index, selection in enumerate((('--version', '^v2[.]10[.]'),
+                                            ('--versions', 'v2.10.0'))):
+            with self.subTest(selection=selection):
+                name = f'-events-{index}.json'
+                result = self.cli('--output', name, *selection, relative_output=True)
+                self.assert_success(result)
+                self.assertEqual(result.stdout.strip(), './' + name)
+                output = self.work / name
+                rows = [['v2.10.0']] if index == 0 else [['v2.10.0'], ['v2.9.0']]
+                self.assertEqual(json.loads(output.read_text())['data'], rows)
+                self.assertIn(f'wrote {len(rows)} row(s)', result.stderr)
+                self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+                self.assertEqual(list(self.work.glob(name + '.filtered.*')), [])
 
     def test_regex_output_does_not_replace_existing_tmp(self):
         output = self.work / 'new.json'
