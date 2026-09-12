@@ -724,7 +724,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     `netdata.topology.v1` payload: actors, links, evidence, correlation rules, presentation, modals, overlays,
     validation, and the aggregator contract a producer relies on
 - Tests.
-  - `tests-query-corpus`: running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for
+  - `tests-query-corpus`: running, extending or reviewing `tests/query-corpus/`; fixtures, oracles, red/green cases for
     query-engine bugs, formatter byte-pins, validating a fix branch
 - Packaging.
   - `packaging-static-installer`: building, testing, reviewing or troubleshooting the static self-extracting installer
