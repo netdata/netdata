@@ -13,22 +13,29 @@ usage() {
     cat <<'EOF'
 analyze-local.sh [options]
 
-Runs Codacy CLI v2 (https://github.com/codacy/codacy-cli-v2) on the current working
-tree and writes a dump under
-<repo>/.local/audits/codacy/. The cli respects the repo's .codacy.yml
-exclude_paths.
+Runs Codacy CLI v2 (https://github.com/codacy/codacy-cli-v2) on the target
+directory and writes a dump under
+<repo>/.local/audits/codacy/.
+
+Analysis is full-tree: every file under <target> is eligible, not only the files
+changed on the branch. The CLI reads <target>/.codacy/codacy.yaml, which must be
+a reviewed file -- this script never generates configuration.
 
 Options:
-  --tool <name>          run a single tool (e.g. shellcheck, markdownlint).
-                         Omit to run all tools applicable to changed files.
+  --tool <name>          run a single local CLI tool (e.g. shellcheck,
+                         markdownlint). These are the CLI's own analyzers, not
+                         Codacy Cloud parity; omit to run every tool configured
+                         for the target tree.
   --directory <path>     analyze a subpath (default: <repo-root>)
   --format json|sarif    output format (default: sarif)
   --output PATH          explicit dump path (default: auto under .local/audits/codacy/)
   --runner local         Codacy CLI v2 executable to use (default: auto)
   -h, --help
 
-Required tool: a local codacy-cli executable. Set CODACY_CLI_V2_VERSION to verify the
-installed executable before analysis; this script does not download or upgrade tools.
+Required tool: a local codacy-cli executable and a reviewed
+<target>/.codacy/codacy.yaml. Set CODACY_CLI_V2_VERSION to verify the installed
+executable before analysis; this script does not download, upgrade, or initialize
+tools or configuration.
 EOF
 }
 
@@ -112,7 +119,9 @@ case "$RUNNER" in
             esac
         fi
         if [ ! -f "$SUBDIR/.codacy/codacy.yaml" ]; then
-            (cd "$SUBDIR" && codacy-cli init) >"$OUTPUT.init.log" 2>&1
+            echo -e "${CA_RED}[ERROR]${CA_NC} no reviewed config at ${SUBDIR}/.codacy/codacy.yaml" >&2
+            echo "Create it once with 'codacy-cli init' (add --api-token/--provider/--organization/--repository for Codacy Cloud parity), review it, and commit or keep it as a reviewed artifact; this script never generates configuration." >&2
+            exit 2
         fi
         (cd "$SUBDIR" && codacy-cli install) >"$OUTPUT.install.log" 2>&1
         local_args=(analyze "$SUBDIR" --format "$FORMAT" --output "$OUTPUT")
@@ -152,7 +161,7 @@ if [ "$FORMAT" = "json" ]; then
     if [ "$rc" -ne 0 ]; then
         echo -e "${CA_YELLOW}[analyze-local] cli exit ${rc} (expected when findings are present)${CA_NC}" >&2
     fi
-    rm -f "$OUTPUT.log" "$OUTPUT.stdout.log" "$OUTPUT.init.log" "$OUTPUT.install.log"
+    rm -f "$OUTPUT.log" "$OUTPUT.stdout.log" "$OUTPUT.install.log"
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT}" >&2
 else
     # SARIF is JSON too; count results across runs so the same failed-versus-clean rule applies.
@@ -169,7 +178,7 @@ else
         echo -e "${CA_RED}[ERROR]${CA_NC} cli exit ${rc} with 0 findings: a failed analysis, not a clean tree" >&2
         exit 4
     fi
-    rm -f "$OUTPUT.log" "$OUTPUT.stdout.log" "$OUTPUT.init.log" "$OUTPUT.install.log"
+    rm -f "$OUTPUT.log" "$OUTPUT.stdout.log" "$OUTPUT.install.log"
     echo -e "${CA_GREEN}[analyze-local]${CA_NC} wrote ${n} finding(s) to ${OUTPUT} (${FORMAT} format)" >&2
 fi
 

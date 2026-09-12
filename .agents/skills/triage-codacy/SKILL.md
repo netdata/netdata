@@ -33,9 +33,9 @@ Each concrete question that requires non-trivial analysis (multiple wrapper call
 
 In scope:
 
-- Local pre-push analysis via Codacy CLI v2 (`codacy-cli`), using repository-local `.codacy/codacy.yaml`.
-- Anonymous mode uses local linter configuration and Codacy defaults; authenticated `init` is required for Cloud configuration parity.
-- CLI v2 does not currently provide every legacy Cloud analyzer used here, including ShellCheck and markdownlint; those findings require maintained direct integrations or a reviewed parity update before claiming equivalent coverage.
+- Local pre-push analysis via Codacy CLI v2 (`codacy-cli`) against a reviewed `.codacy/codacy.yaml`. Analysis is full-tree over `--directory`, not changed-files-only.
+- Configuration is an input: the script never runs `init`, so a reviewed `.codacy/codacy.yaml` must already exist. Create it once with `codacy-cli init` (add `--api-token/--provider/--organization/--repository` for Cloud configuration parity) and review it; an auto-generated config does not inherit this repository's `.codacy.yml` `exclude_paths`.
+- CLI v2 builds its own ShellCheck and markdownlint analyzers, so their findings are advisory and not Codacy Cloud parity. Use the direct linters (ShellCheck with this repository's `.shellcheckrc`, markdownlint with the repository's rules) when Cloud-parity evidence is required.
 - Read-only PR-issue queries against the v3 API.
 - Token-safe wrappers (sentinel-driven no-leak self-test).
 
@@ -64,7 +64,7 @@ each value comes from, sample formats, common mistakes).
 | Script | Purpose |
 |---|---|
 | `_lib.sh` | Helpers (`codacyaudit_*` prefix). Token-safe; ships `codacyaudit_selftest_no_token_leak`. |
-| `analyze-local.sh` | Initialize/install Codacy CLI v2 and run it locally; write SARIF dumps under `.local/audits/codacy/`. |
+| `analyze-local.sh` | Install/run Codacy CLI v2 against a reviewed `.codacy/codacy.yaml`; write SARIF dumps under `.local/audits/codacy/`. |
 | `pr-issues.sh` | Fetch all Codacy issues for a PR via the v3 API; cluster summary on stdout; full JSON dump on disk. |
 
 ## Workflow -- pre-push prevention
@@ -107,7 +107,7 @@ check-run for the current head SHA is green, inspect `.commitIssue.commitInfo.sh
 in the dump. Findings anchored to an older commit are stale cache and should not
 be treated as current-head blockers.
 
-To restrict to a single tool (matches what Codacy reported on a CI run):
+To restrict to a single local CLI tool (its own analyzer, not Codacy Cloud parity):
 
 ```sh
 .agents/skills/triage-codacy/scripts/analyze-local.sh --tool markdownlint
