@@ -252,7 +252,7 @@ For policy thresholds whose signal may hover near the boundary, use a state-depe
 
 ```text
 warn: $this > (($status >= $WARNING) ? (90) : (100))
-crit: $this > (($status == $CRITICAL) ? (95) : (99))
+crit: $this > (($status == $CRITICAL) ? (105) : (110))
 ```
 
 This changes one threshold into two thresholds:
