@@ -107,7 +107,7 @@ itself the first verification (see Q01).
 
 ## Self-test invariants
 
-- **Q23** -- After answering all questions above, confirm that
-  no NETDATA_CLOUD_TOKEN bytes, no agent-bearer UUID values,
-  and no claim_id values appeared in any printed output during
-  this session.
+- **Q23** -- Check that wrapper diagnostics did not expose Cloud tokens, Agent bearers or authentication selectors.
+  Review successful response bodies before sharing: deliberately requested identity fields such as Q05's claim_id
+  are response data, not proof of a logging leak. Project only the fields needed for the authorized answer and redact
+  unrelated private data. A wrapper forwarding a body unchanged does not establish that it was redacted.

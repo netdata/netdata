@@ -24,8 +24,8 @@ Two targets:
   `${AGENT_EVENTS_NODE_ID}` and machine_guid
   `${AGENT_EVENTS_MACHINE_GUID}`.
 
-Both use the bearer-mint flow. The harness verifies the wrapper
-mints / caches / refreshes correctly for both.
+For bearer-protected targets, verify the wrapper's mint/cache/refresh behavior during the authorized operational
+check. An unprotected Agent uses direct access without minting a bearer; record the observed mode.
 
 ## Identity (direct)
 

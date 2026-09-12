@@ -187,17 +187,19 @@
       "id": "INV-11",
       "prompt": "Review a C topology producer payload change that alters actor identity and link evidence tables.",
       "required": [
-        "collectors-authoring",
         "topology-authoring"
       ],
-      "optional": [],
+      "optional": [
+        "collectors-authoring"
+      ],
       "not_selected_by_prompt": [
         "query-netdata-cloud",
         "collectors-go-design"
       ],
       "expect": [
         "Use topology identity, evidence, correlation and validator contracts.",
-        "This is producer review, not an operator query or Go design task."
+        "This is producer review, not an operator query or Go design task.",
+        "Read shared collector contracts if the producer is collector-hosted; C alone does not establish that, since streaming can also produce topology."
       ]
     },
     {
