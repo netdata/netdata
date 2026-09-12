@@ -690,9 +690,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
 - Collectors. START HERE: `collectors-authoring`.
   - `collectors-authoring`: authoring, modifying or reviewing collectors across plugin families; shared identity,
     missing-data, lifecycle, cost and cardinality contracts, then selective framework/domain routes
-  - `collectors-go-design`: designing a new go.d collector or changing a public contract of one (config option, mode,
-    metric meaning, ownership or durable state, Functions, vnodes), or reviewing such a change; the design note,
-    architecture gate, operator surface, `config_schema.json` authoring, and mutating-collector references
+  - `collectors-go-design`: go.d contract design/review and `config_schema.json` forms; selective operator-surface,
+    identity, state/mutation and design-evidence guidance
   - `collectors-go-framework-v2`: creating or migrating a go.d collector to framework V2; `CollectorV2`,
     `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests
   - `collectors-metadata-yaml`: what every collector `metadata.yaml` field says and how it reads: overview,
