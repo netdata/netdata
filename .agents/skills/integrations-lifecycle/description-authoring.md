@@ -128,7 +128,8 @@ metrics_description: |
 
 Before committing `metadata.yaml` changes:
 
-1. Regenerate and validate the integration data (dependencies: `integrations/README.md`):
+1. Regenerate and validate the integration data. In these examples, `python3` means the dependency-equipped
+   interpreter selected under `integrations/README.md`:
 
    ```bash
    python3 integrations/gen_integrations.py
@@ -140,7 +141,8 @@ Before committing `metadata.yaml` changes:
    Both workflows run the same two test modules; `check-markdown.yml` runs `test_descriptions` with `LEARN_INGEST_PATH`
    pointing at the checked-out `netdata/learn` ingest script, so a locally green run can still fail there on Learn-side
    frontmatter parsing.
-2. Read the page in an isolated preview (`how-tos/preview-collector-page.md`); inspect the catalog sentence separately
+2. For collectors, use `how-tos/preview-collector-page.md`; for flows and other integration types, use its
+   [non-collector route](./how-tos/preview-collector-page.md#non-collector-pages). Inspect the catalog sentence separately
    under the contract above. Do not regenerate checkout pages or umbrella files just to read their wording. Full
    umbrella rendering requires an isolated source copy and the complete page corpus (`pipeline.md`).
 3. Read the table row description and generated page frontmatter for the integration. Both must answer "what is this

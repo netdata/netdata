@@ -1,6 +1,7 @@
-# Preview a collector page without replacing checkout files
+# Preview a collector page without replacing checkout pages
 
-Use this for generated prose inspection during authorized metadata changes or an explicitly requested preview.
+Use this for collector prose inspection during authorized metadata changes or an explicitly requested preview.
+For flows and other integration types, use [Non-collector pages](#non-collector-pages) below.
 Read-only review uses the supplied artifacts and source; loading a content skill does not authorize regeneration.
 This recipe refreshes the two ignored catalogs, then runs the actual page generator in a fresh private scratch
 working directory. It never links source directories into scratch or restores checkout files.
@@ -82,6 +83,25 @@ produced by the catalog sentence extractor, using
 `../description-authoring.md`: catalog and page meta descriptions have different precedence. Generated pages and
 README files remain outputs; fix their authoritative inputs and run a fresh preview. Delivery follows
 `../consistency.md`.
+
+## Non-collector pages
+
+The `-c plugin/module` selector matches only `integration_type: collector`; flows and other integration types do
+not match it even when their metadata has plugin and module names. Prepare a fresh regular-file source copy with
+current modified and intentional new inputs, and no symlinks escaping it, as described under
+[Current inputs and dependencies](#current-inputs-and-dependencies). Run applicable producers there first.
+
+From that isolated repository root, use the dependency-equipped Python from `integrations/README.md`:
+
+```bash
+# Run both commands in the prepared isolated source copy.
+python3 integrations/gen_integrations.py
+python3 integrations/gen_docs_integrations.py
+```
+
+This generates the full page corpus in the copy; inspect the relevant page and its catalog sentence there.
+`--check` validates descriptions without rendering pages. Full umbrella rendering also needs the later stages in
+`../pipeline.md`. Generated pages and README symlinks remain local preview outputs under `../consistency.md`.
 
 ## What this validates
 

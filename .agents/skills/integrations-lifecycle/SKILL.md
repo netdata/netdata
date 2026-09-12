@@ -25,7 +25,7 @@ Shared delivery facts:
   generated. Do not edit them.
 - Source PRs carry sources; generated documentation arrives through the post-merge `integrations-regen` PR. Validate
   with `gen_integrations.py` and the tests during authorized changes; preview pages in isolation using
-  `how-tos/preview-collector-page.md`. Preserve existing generated-file edits and keep them out of the source commit.
+  `how-tos/preview-collector-page.md` (selected collectors or its non-collector route). Preserve existing generated-file edits and keep them out of the source commit.
   The one place this boundary is written out, with its ibm.d runtime-output exception, is `consistency.md`.
 - The collector taxonomy (`taxonomy.yaml`, `gen_taxonomy.py`) is a dormant early implementation kept for later work;
   nothing runs it. Do not author, extend, or seed taxonomy content (`consistency.md`, "The dormant collector taxonomy").
@@ -36,7 +36,7 @@ Shared delivery facts:
 |---|---|
 | `consistency.md` | which artifacts move together, the delivery boundary, what CI enforces, the review checklist, the dormant taxonomy |
 | `integrations/README.md` | dependencies and the command list for a local run |
-| `how-tos/preview-collector-page.md` | inspect current generated prose without replacing checkout pages or READMEs |
+| `how-tos/preview-collector-page.md` | selected collector prose; its non-collector route covers flows and other types in an isolated source copy |
 | `description-authoring.md` | the catalog sentence and the generated page meta description (the two cross-type description contracts) |
 | `recipes/add-go-collector.md`, `recipes/update-collector.md` | step-by-step for a new or changed go.d collector |
 | `ibm-d.md` | the ibm.d generation chain |

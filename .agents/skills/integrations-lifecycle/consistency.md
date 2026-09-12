@@ -43,7 +43,7 @@ short contributor-facing version.
   leave that page unstaged (`ibm-d.md`).
 - Validate locally with `gen_integrations.py`, `gen_docs_integrations.py --check`, and the unit tests
   (`integrations/README.md` lists commands and dependencies). Use `how-tos/preview-collector-page.md` for rendered
-  prose inspection in a fresh scratch directory. Full regeneration or convergence checks belong in an isolated source
+  collector prose inspection in scratch, or its non-collector route for other integration types. Full regeneration or convergence checks belong in an isolated source
   copy containing current inputs. Preserve pre-existing modified and untracked generated files; keeping outputs out of
   the commit does not require discarding them. Never use a blanket restore to clean up validation.
 - `.github/workflows/check-markdown.yml` regenerates the pages on pull requests to validate Learn ingest and links; it
