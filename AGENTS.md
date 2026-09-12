@@ -751,7 +751,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
     `AE_*` fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
   - Also relevant: `repo-pr-reviews` (pulls SonarCloud findings for a PR).
 - Repo.
-  - `repo-pr-reviews`: inspecting or addressing PR comments and reviews
+  - `repo-pr-reviews`: focused PR-comment inspection or complete PR triage; addressing findings when authorized
   - `repo-mirror-sources`: read-only inspection of Netdata-org source checkouts at `${NETDATA_REPOS_DIR}`;
     authorized mirror setup/sync, `--repo` scoping, and maintenance limits
   - `repo-skill-authoring`: creating, amending, restructuring or reviewing skills; selective authoring rules and owner
