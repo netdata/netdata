@@ -28,28 +28,22 @@ gh_repo_root() {
 }
 
 gh_repo_slug() {
-    # Owner/repo of the upstream remote (or origin if no upstream).
-    # Uses bash parameter expansion so repo names containing dots
-    # (e.g. "my.repo", "kubernetes-sigs/cluster-api-provider-aws.git") parse
-    # correctly. The previous regex `[^/.]+` truncated names with dots.
-    # Recognizes the common github.com forms below (this skill is GitHub-only).
-    local root url
+    # Parse the authority and exactly two path components; a GitHub-looking
+    # substring in another host's path is not a GitHub remote.
+    local root url slug
     root="$(gh_repo_root)"
     url="$(git -C "${root}" config --get remote.upstream.url 2>/dev/null \
          || git -C "${root}" config --get remote.origin.url)"
-    # Match common remote forms, not arbitrary URLs. A `*github.com*` substring would
-    # accept `notgithub.com` or `github.com.attacker.example.com`.
-    # Three accepted forms cover SCP-style ssh, URL-style ssh, anonymous
-    # https, and credentialed https (`x-access-token:TOK@github.com/...`).
-    if [[ "${url}" != *@github.com:* \
-       && "${url}" != *://github.com/* \
-       && "${url}" != *@github.com/* ]]; then
-        echo ""
-        return
+    if [[ "${url}" =~ ^[^/@:[:space:]]+@github\.com:([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+)$ ]]; then
+        slug="${BASH_REMATCH[1]}"
+    elif [[ "${url}" =~ ^(https?|ssh)://([^/@[:space:]]+@)?github\.com/([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+)$ ]]; then
+        slug="${BASH_REMATCH[3]}"
+    else
+        return 0
     fi
-    url="${url%.git}"               # strip trailing .git, if any
-    url="${url#*github.com[:/]}"    # strip everything up to and including github.com:/
-    echo "${url}"
+    slug="${slug%.git}"
+    case "${slug#*/}" in ''|.|..) return 0 ;; esac
+    printf '%s\n' "${slug}"
 }
 
 # Resolve and validate the repo slug. Returns "owner/repo" on stdout or

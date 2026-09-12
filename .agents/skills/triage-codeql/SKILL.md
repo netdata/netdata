@@ -43,7 +43,8 @@ covering those actions; preserve permission already granted for the current scop
 - Confirm the target: the helpers prefer `upstream`, falling back to `origin` when that remote lookup is absent.
   They are intended for `github.com` remotes; a fork checkout can therefore operate on upstream alerts.
 
-Resolve the same target used by both helpers; this reads Git configuration without displaying the remote URL:
+Resolve the same target used by both helpers; this reads Git configuration without displaying the remote URL.
+Keep Setup and subsequent examples in the same shell session so they share `codeql_repo`:
 
 ```bash
 source .agents/skills/triage-codeql/scripts/_lib.sh
