@@ -28,6 +28,8 @@ gh_repo_root() {
 }
 
 gh_repo_slug() {
+    # Resolve repository identity for gh API calls, not clone transport or SSH login validity.
+    # The configured remote transport and username are not used for the API request.
     # Parse the authority and exactly two path components; a GitHub-looking
     # substring in another host's path is not a GitHub remote.
     local root url slug
