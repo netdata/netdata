@@ -28,7 +28,7 @@ PING_INTERVAL="${PING_INTERVAL:-300}"
 # Outstanding view is ideal — it returns proper JSON when authenticated and
 # HTML (Cloudflare challenge or login redirect) when not.
 if [[ -z "${COVERITY_VIEW_OUTSTANDING:-}" ]]; then
-    echo -e "${COV_RED}[ERROR]${COV_NC} COVERITY_VIEW_OUTSTANDING is not set in .env -- keepalive needs a viewId to ping. See ../operations.md." >&2
+    echo -e "${COV_RED}[ERROR]${COV_NC} COVERITY_VIEW_OUTSTANDING is not set in .env -- keepalive needs a viewId to ping. See $(cov_repo_root)/.agents/skills/triage-coverity/operations.md." >&2
     exit 1
 fi
 if [[ ! "${COVERITY_VIEW_OUTSTANDING}" =~ ^[1-9][0-9]*$ ]]; then

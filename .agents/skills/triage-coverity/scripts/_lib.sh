@@ -44,7 +44,7 @@ cov_load_env() {
     root="$(cov_repo_root)"
     env="${root}/.env"
     if [[ ! -f "${env}" || ! -r "${env}" ]]; then
-        echo -e "${COV_RED}[ERROR]${COV_NC} Missing ${env}. See ../operations.md for the local .env template." >&2
+        echo -e "${COV_RED}[ERROR]${COV_NC} Missing ${env}. See ${root}/.agents/skills/triage-coverity/operations.md for the local .env template." >&2
         return 1
     fi
     set -a
