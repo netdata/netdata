@@ -6,7 +6,7 @@
 #
 # Verdicts:
 #   TRUE_BUG_MEMORY_CORRUPTION, TRUE_BUG_CRASH, TRUE_BUG_RESOURCE_LEAK,
-#   TRUE_BUG_LOGIC, TRUE_BUG_UB              -> Bug + Fix Submitted
+#   TRUE_BUG_LOGIC, TRUE_BUG_UB              -> Bug + Fix Required (Fix Submitted with submitted-fix SHA)
 #   FALSE_POSITIVE_GUARD_EXISTS, FALSE_POSITIVE_UNREACHABLE,
 #   FALSE_POSITIVE_TRUSTED_INPUT,
 #   FALSE_POSITIVE_TOOL_MODEL,
@@ -15,7 +15,7 @@
 #   NEEDS_HUMAN, CODE_GONE                   -> NO-OP (skipped, exit 0)
 #
 # Scope:
-#   "outstanding"  default; applied unconditionally
+#   "outstanding"  required scope argument; no disagreement warning
 #   anything else  ("dismissed", "fixed", "unclassified", ...) -- caller
 #                  asserts the new verdict disagrees with the existing
 #                  Coverity classification; the script will warn but proceed.
@@ -25,8 +25,9 @@
 # .local/audits/coverity/raw/all-in-project-all.json (fallback).
 # If neither file exists, severity defaults to Unspecified.
 #
-# If a commit SHA is given, the script appends "Fix commit: <sha>" to the
-# comment before posting.
+# Supply a commit SHA only when it identifies a submitted fix for this defect.
+# For true bugs it selects Fix Submitted; otherwise action remains unchanged.
+# The script trusts the caller and appends "Fix commit: <sha>" to the comment.
 
 set -euo pipefail
 
@@ -58,7 +59,11 @@ esac
 # Verdict -> (classification, action).
 case "${VERDICT}" in
     TRUE_BUG_MEMORY_CORRUPTION|TRUE_BUG_CRASH|TRUE_BUG_RESOURCE_LEAK|TRUE_BUG_LOGIC|TRUE_BUG_UB)
-        CLASS_ID=24; ACT_ID=3 ;;
+        CLASS_ID=24; ACT_ID=2
+        if [[ -n "${COMMIT_SHA}" ]]; then
+            ACT_ID=3
+        fi
+        ;;
     FALSE_POSITIVE_GUARD_EXISTS|FALSE_POSITIVE_UNREACHABLE|FALSE_POSITIVE_TRUSTED_INPUT|FALSE_POSITIVE_TOOL_MODEL|IMPOSSIBLE_CONDITIONS)
         CLASS_ID=22; ACT_ID=5 ;;
     COSMETIC)

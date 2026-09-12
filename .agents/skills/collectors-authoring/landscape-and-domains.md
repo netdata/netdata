@@ -74,7 +74,8 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
 ## Migrating a C ebpf.plugin module to ebpfgo.plugin
 
 The migrations land one module at a time and each reproduces the same five layers.
-`git show b150ca2712` (dcstat, PR #23451) is the reference diff; fd followed it.
+Inspect the current dcstat/fd implementations and their C consumers for the supported target; do not assume a
+historical diff proves today's kernel attachment path. The failure classes below guide that source check.
 
 - **Layers**: Go collector (`<mod>_{config,plan,global,targets,shared_memory}.go`,
   `<mod>_loader_{libbpf,other}.go`) -> CGO runtime (`libbpfloader/<mod>_libbpf.{c,go}`,
@@ -124,18 +125,12 @@ The migrations land one module at a time and each reproduces the same five layer
   the base flavor.
 - **Generated integration docs are a separate post-merge PR** — do not regenerate
   `integrations/*.md` or `integrations.{js,json}` in the migration PR.
-- **Taxonomy has two separate obligations, and only one of them fails loudly.**
-  - Every collector directory whose `metadata.yaml` taxonomy signature changes must contain a
-    `taxonomy.yaml` in THAT directory — including the C `ebpf.plugin` directory you are removing the
-    module from. `check_collector_taxonomy.py` enforces this (TAX030); a per-module file one level down
-    does not satisfy the parent. For a heterogeneous plugin directory,
-    `taxonomy_optout: {reason: ...}` is the established pattern (`debugfs.plugin`, `macos.plugin`,
-    `ebpfgo.plugin`).
-  - The new `ebpfgo.plugin/<module>/taxonomy.yaml` must ALSO be added to `TAXONOMY_SOURCES` in
-    `integrations/_common.py`. The recursive `src/collectors` entry only globs `<plugin>/taxonomy.yaml`
-    one level deep, so an unregistered per-module file is silently ignored and nothing complains.
-  - Reproduce CI locally before pushing:
-    `python3 integrations/check_collector_taxonomy.py --pr-diff "<base>...HEAD"`.
+- **Taxonomy is dormant.** Current delivery follows
+  `.agents/skills/integrations-lifecycle/consistency.md#the-dormant-collector-taxonomy`; do not author new taxonomy
+  files or reproduce a retired CI step as part of an ordinary migration. If explicitly working on the prototype,
+  `integrations/check_collector_taxonomy.py` (`check_touched_coverage`) checks same-directory file existence;
+  `integrations/gen_taxonomy.py` (`process_taxonomy_file`) and `integrations/schemas/taxonomy_collector.json` own optout
+  handling. `integrations/_common.py` (`TAXONOMY_SOURCES`) owns source registration and its non-recursive glob boundary.
 
 ## Dealing with data types
 
@@ -143,24 +138,26 @@ A collector ingests one or more of these data types. Each has its own pattern.
 
 ### Metrics (time-series numeric data)
 
-The default. Streams as `BEGIN/SET/END` (PLUGINSD) or framework equivalents. Shape via NIDL (`SKILL.md` §3). Storage is
-the dbengine; alerts bind to chart `context`; anomaly detection / ML jobs run continuously. Every metric travels via
-streaming to parents and to Netdata Cloud — cardinality matters everywhere.
+The default. Emitted through `BEGIN/SET/END` (PLUGINSD) or framework equivalents. Shape via
+`./collector-practices.md#3-structuring-dashboards`. Storage, chart-context alerts, enabled ML, streaming and Cloud
+access all contribute to cardinality cost; not every deployment enables every consumer or streams every metric.
 
 ### Logs
 
 Two paths:
 
 - **Structured journaling.** `src/collectors/log2journal/` parses application/access logs (configurable YAML rules in
-  `log2journal.d/`, e.g. `nginx-json.yaml`, `default.yaml`) and writes structured fields into the systemd journal. The
-  `systemd-journal.plugin` then exposes the entries via a Function (the log explorer in the Netdata UI).
+  `log2journal.d/`, e.g. `nginx-json.yaml`, `default.yaml`) into Journal Export Format. A journal transport such as
+  `systemd-cat-native` sends those records to journald; `systemd-journal.plugin` exposes them through the log explorer
+  Function. The pipeline is owned by `src/collectors/log2journal/README.md#processing-pipeline`.
 - **OTEL log signals.** `src/crates/otel-plugin/` ingests OTLP logs into a write-ahead log with indexed segments
   (`src/crates/otel-ingestor/`, `sfsq`), queryable via the `otel-logs` Function in the Logs tab.
 
 Platform-specific events: `windows-events.plugin` (Windows event log).
 
-Logs are **not metrics**. Don't try to derive metrics from logs in the collection loop — emit logs as logs, then build
-metrics separately if needed.
+Log-ingestion plugins preserve event records for exploration. An explicitly designed log-to-metric collector is
+also valid: `src/go/plugin/go.d/collector/weblog/collect.go` parses log lines and emits a metric snapshot, as does
+`squidlog`. Choose the intended product surface; metrics do not preserve the original records or replace log search.
 
 ### Live snapshots (Functions)
 
@@ -252,7 +249,8 @@ Network/SNMP collectors typically pair metrics with **topology Functions** and F
   topology.
 
 Each managed device is normally its own job with a job-level `vnode`; emitting several virtual nodes from one job is the
-product decision described in `SKILL.md` §1.9. FDB/ARP/STP data lands as topology Functions, not metrics — the
+product decision in `./collector-practices.md#19-remote-monitored-systems-and-vnodes`. FDB/ARP/STP data lands as
+topology Functions, not metrics — the
 cardinality is too high for metrics and the use case is interactive lookup.
 
 ### Container / orchestration collectors
@@ -269,13 +267,15 @@ the labels and whether to expose them via netipc.
 
 ### Web servers and reverse proxies
 
-Web server collectors pair metrics (requests, status codes, latency, upstream errors) with **access-log Functions** when
-the access log is structured:
+Web server monitoring can pair metrics (requests, status codes, latency, upstream errors) with **access-log Functions**
+when the log format can be parsed:
 
 - `log2journal` parses NGINX/Apache/HAProxy access logs (rules under `src/collectors/log2journal/log2journal.d/`).
 - The journal explorer Function makes the parsed entries searchable in the dashboard.
 
-If the application's log format is closed or unstructured, only metrics are practical.
+Free-form logs can be parsed with PCRE2 patterns, as documented in
+`src/collectors/log2journal/README.md#processing-pipeline`.
+Assess parsing support and available evidence; unstructured does not mean unparseable.
 
 ### Flow protocols (NetFlow / sFlow / IPFIX)
 

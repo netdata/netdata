@@ -54,7 +54,7 @@ QUERY="$(jq -rn \
 
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET "/api/v3/data?$QUERY" \
   | jq '{view: .view.dimensions.names, points: (.result.data | length)}'
@@ -63,7 +63,7 @@ agents_query_agent \
 ## Discover available contexts on the agent
 
 ```bash
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET '/api/v3/contexts'
 ```
 

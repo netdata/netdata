@@ -1,10 +1,17 @@
 # Mutating And Stateful Collectors
 
-Load this when a collector writes or deletes remote objects, or persists state across cycles or restarts. A collector
-that does neither records "no durable remote ownership, no durable local state" in its design note and stops here; it
-needs no journal, queue, lock, or recovery analysis. A collector with durable local state but no remote mutation (for
-example a receiver that persists its own protocol state) reads §3 and §5 only. Rules use the format When / Do / Don't /
-Evidence / Boundary.
+Use these design/review criteria for collectors that mutate remote objects or persist durable local state.
+Rules use When / Do / Don't / Evidence / Boundary.
+
+- **Transient state:** ordinary in-memory state across cycles does not by itself require journals, queues, locks or
+  crash-recovery machinery.
+- **Neither:** when an implementation design note is required, a collector with neither records "no durable remote
+  ownership, no durable local state" and does not perform unrelated recovery analysis.
+- **Durable local state only:** a receiver persisting protocol state, for example, reads §3 and §5 only for applicable
+  persistence/identity rules; the general V2 test contract still applies.
+- **Remote mutation:** use all applicable sections.
+- **Review:** use existing evidence under `AGENTS.md#skill-selection`, without performing mutations or creating
+  implementation artifacts.
 
 ## 1. Mutation Ownership
 

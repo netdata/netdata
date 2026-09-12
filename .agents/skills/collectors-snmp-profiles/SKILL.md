@@ -1,11 +1,11 @@
 ---
 name: collectors-snmp-profiles
-description: Use when editing Netdata SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, or profile-format documentation. Requires checking source MIB field accessibility, especially MAX-ACCESS not-accessible INDEX objects, before adding or changing profile symbols.
+description: Author or review Netdata SNMP polling profiles, ddsnmp parsing, topology/licensing/BGP rows and profile-format documentation. Check source MIB accessibility and row-index extraction for affected symbols. Trap profiles and topology payload design use their separate skills.
 ---
 
 # SNMP Profile Authoring
 
-Use this skill before editing files under:
+Use this skill when authoring or reviewing the profile contracts in:
 
 - `src/go/plugin/go.d/config/go.d/snmp.profiles/`
 - `src/go/plugin/go.d/collector/snmp/ddsnmp/`
@@ -17,10 +17,25 @@ extracted. What the producer emits from those observations (actors, links, evide
 in `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`; the developer workflow for changing it is
 `.agents/skills/topology-authoring/SKILL.md`.
 
+## Select The Affected Contract
+
+Apply `AGENTS.md#skill-selection`. Review uses the checks below and existing source/validation evidence; it does not
+create an implementation SOW or require a live device capture. Live access remains within the task's authorization.
+Verify every added or changed acquisition symbol against its source MIB. A prose-only change does not require a new
+MIB audit of untouched symbols; parser changes still need the relevant input and consumer contracts.
+
+| Affected behavior | Read/check |
+|---|---|
+| Acquired OIDs, index extraction or a device deviation | Required Checks, Device-Scoped MIB Deviations and Index Rules below; `src/go/plugin/go.d/collector/snmp/profile-format.md#field-accessibility` |
+| Profile syntax, inheritance or parser behavior | Canonical Profile Syntax, full profile-format owner and parser/consumer tests |
+| Topology, licensing or BGP rows | Their Required Checks and Audit Recipe items; follow the typed producer/consumer paths |
+| Emitted topology payload | `topology-authoring`; this skill still covers affected profile acquisition |
+| Received trap profiles or trap logs | `collectors-snmp-trap-profiles` or `query-snmp-traps` |
+
 ## Required Checks
 
 1. Identify the source MIB object for every profile field being added or changed.
-2. Check the object's `MAX-ACCESS`.
+2. Check the object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
 3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID` unless it satisfies every
    device-scoped MIB-deviation requirement below.
 4. If a `not-accessible` object appears in the table `INDEX`, derive it from the row OID index using `index` or `index_transform`.
@@ -223,12 +238,15 @@ materially different setup or assertions.
 
 ## Validation
 
-Run the narrow suites for the changed area:
+Select the suites for the affected behavior and its consumers. Existing relevant results count as review evidence;
+run local checks when needed to verify a claim, without treating review as a request to change profiles. From `src/go`:
 
 ```bash
-cd src/go
+# Profile schema, parsing and validation
 go test ./plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition
+# Acquisition, index decoding and typed row delivery
 go test ./plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector
+# Topology consumption of profile observations
 go test ./plugin/go.d/collector/snmp_topology
 ```
 

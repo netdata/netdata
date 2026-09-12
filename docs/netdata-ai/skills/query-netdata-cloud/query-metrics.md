@@ -2,63 +2,31 @@
 
 ## Mandatory Requirements (READ FIRST)
 
-1. You MUST provide detailed and actionable instructions. You don't execute queries for users. You role is to educate them.
+Follow [Choose The Task](./SKILL.md#choose-the-task) for explain, review and execution requests, and
+[Safe Execution](./SKILL.md#safe-execution) for local setup, credentials and response handling.
 
-2. **Never ask users for credentials.** Do not request API tokens, Space IDs, or Room IDs. Always provide ready-to-use instructions with clear placeholders (`YOUR_API_TOKEN`, `YOUR_SPACE_ID`, `YOUR_ROOM_ID`) so users can substitute their own values locally. Your job is to teach users how to construct queries, not to execute queries on their behalf.
-
-3. **`scope.contexts` MUST always be set.** Without it, the default scope is the entire room — every context, every instance, every dimension, every label across all nodes. This causes a **metadata explosion**: the response will contain megabytes of metadata for thousands of metrics the user didn't ask about. Always set `scope.contexts` to the specific context(s) relevant to the query (e.g., `["system.cpu"]`, `["disk.space"]`).
-
-4. **Every response MUST include a complete, runnable curl command.** Users come here to get a query they can run — not a description of what a query would look like. If your response does not contain a full curl command with the complete JSON request body, you have failed to help the user. Specifically:
-   - Always include the full `curl -X POST` command with headers, URL, and the entire `-d '{...}'` JSON body.
-   - The JSON body must include all required fields: `scope`, `selectors`, `window`, `aggregations`, `format`, `options`, and `timeout`.
-   - Set the 3 credentials as variables at the top: `TOKEN="YOUR_API_TOKEN"`, `SPACE="YOUR_SPACE_ID"`, `ROOM="YOUR_ROOM_ID"`.
-   - Use a heredoc for the JSON payload (`read -r -d '' PAYLOAD <<'EOF' ... EOF`) so no escaping is needed.
-   - The user must be able to copy your command, replace the 3 variables at the top, and run it immediately in their terminal.
-   - A response that describes parameters or explains concepts without providing the actual runnable command is incomplete and unhelpful.
-   - Even for simple questions, always provide the curl command. When in doubt, show the command.
+- **`scope.contexts` MUST always be set** to the relevant contexts (for example, `["system.cpu"]` or `["disk.space"]`).
+  Omitting it scopes the entire room and can return megabytes of unrelated metric metadata.
+- When supplying a runnable query, include the full JSON body: `scope`, `selectors`, `window`, `aggregations`,
+  `format`, `options`, and `timeout`. Use the shared helper and a heredoc as in the examples below.
+- Set `SPACE` and `ROOM` locally. These are target identifiers; the helper loads the Cloud credential separately.
 
 ---
 
 ## Prerequisites
 
-Three things are needed:
-
-### 1. API Token
-
-1. Login to [app.netdata.cloud](https://app.netdata.cloud)
-2. Click user icon (lower-left corner, tooltip shows your name)
-3. Select **User Settings**
-4. In the modal, select the **API Tokens** tab
-5. Click the **[+]** button (top-left)
-6. Select a scope, enter a description, click **Create**
-7. **Copy the token immediately** — it will not be shown again
-
-Relevant scopes: `scope:all` (full access), `scope:grafana-plugin` (data endpoints).
-
-### 2. Space ID
-
-1. In the dashboard left side, at the spaces list, click the **gear icon** below the spaces list (tooltip: "Space Settings")
-2. In the **Info** tab, copy the **Space Id**
-
-### 3. Room ID
-
-1. In the same Space Settings, go to the **Rooms** tab
-2. Find the room, click the **>** icon at the right of the room row (tooltip: "Room Settings")
-3. In the **Room** tab, copy the **Room Id**
+Live room-metrics requests need a configured Cloud credential, space ID and room ID. Explanation and saved-data
+review need no credentials. See [Prerequisites](./SKILL.md#prerequisites) and
+[Access And Discovery](./access-and-discovery.md) for local setup and ID discovery.
 
 ---
 
 ## API Endpoints
 
 Base URL: `https://app.netdata.cloud`
-Swagger online: <https://app.netdata.cloud/api/docs/>
+API documentation location to check: <https://app.netdata.cloud/api/docs/> (current availability is unverified).
 
-All endpoints use **POST** with a JSON body and require:
-
-```
-Authorization: Bearer YOUR_API_TOKEN
-Content-Type: application/json
-```
+The endpoints below use **POST** with a JSON body. `agents_query_cloud` supplies authentication and content headers.
 
 | Endpoint                                           | Purpose                        |
 |----------------------------------------------------|--------------------------------|
@@ -91,15 +59,14 @@ Response fields per node:
 Example:
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" \
-  -d '{}'
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" \
+  '{}'
 ```
 
 ---
@@ -631,10 +598,11 @@ Values combine: e.g., `5` = empty + partial, `6` = reset + partial.
 
 ## Practical Examples
 
-All examples use this pattern — users replace the 3 variables at the top:
+Run these examples in a repository checkout after configuring the helper locally. Set the target space and room:
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 ```
@@ -642,11 +610,12 @@ ROOM="YOUR_ROOM_ID"
 ### Example 1: Total CPU Across All Nodes (Last 10 Minutes)
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["system.cpu"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -660,12 +629,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: Single column `selected` with total CPU % (sum of all dimensions across all nodes) at 5 time points.
@@ -673,11 +641,12 @@ Result: Single column `selected` with total CPU % (sum of all dimensions across 
 ### Example 2: CPU Breakdown by Dimension
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["system.cpu"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -691,12 +660,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: One column per dimension (`user`, `system`, `iowait`, `irq`, `softirq`, `steal`, `guest`, `nice`). Values are summed across all nodes.
@@ -704,11 +672,12 @@ Result: One column per dimension (`user`, `system`, `iowait`, `irq`, `softirq`, 
 ### Example 3: Compare CPU Per Node
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["system.cpu"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -722,12 +691,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: One column per node hostname. Values are total CPU % per node. Column names in `view.dimensions.names`.
@@ -735,11 +703,12 @@ Result: One column per node hostname. Values are total CPU % per node. Column na
 ### Example 4: Peak CPU Per Node Over Last Hour
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["system.cpu"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -753,12 +722,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: 6 points (10-min intervals). Each value is the **peak** CPU for that node in that interval.
@@ -766,11 +734,12 @@ Result: 6 points (10-min intervals). Each value is the **peak** CPU for that nod
 ### Example 5: Disk Space Grouped by Filesystem Type
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["disk.space"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -784,12 +753,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: One column per filesystem type (ext4, btrfs, tmpfs, etc.). Values are total disk space summed across all nodes.
@@ -797,11 +765,12 @@ Result: One column per filesystem type (ext4, btrfs, tmpfs, etc.). Values are to
 ### Example 6: Filter by Specific Nodes (UUIDs)
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["system.cpu"], "nodes": ["NODE_UUID_1", "NODE_UUID_2"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -815,12 +784,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: Data and metadata scoped to only those 2 nodes. First call `/nodes` to get UUIDs (the `nd` field).
@@ -828,11 +796,12 @@ Result: Data and metadata scoped to only those 2 nodes. First call `/nodes` to g
 ### Example 7: Filter by Labels
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["disk.space"], "labels": ["mount_point:/", "filesystem:ext4"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -846,12 +815,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: Only ext4 root mount points. Multiple labels with different keys are AND-combined.
@@ -859,11 +827,12 @@ Result: Only ext4 root mount points. Multiple labels with different keys are AND
 ### Example 8: Filter Specific Dimensions
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["system.cpu"], "dimensions": ["user", "system"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -877,12 +846,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Result: Only `user` and `system` CPU dimensions.
@@ -890,11 +858,12 @@ Result: Only `user` and `system` CPU dimensions.
 ### Example 9: Discover Labels for a Context
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope": {"contexts": ["disk.space"]},
   "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
@@ -908,12 +877,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 30000
 }
 EOF
+)"
 
-curl -s -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  "$PAYLOAD"
 ```
 
 Then inspect `summary.labels` in the response:
@@ -998,8 +966,6 @@ it into multiple time ranges.
 
 ---
 
-> **REMINDER — Credentials**: Do not request or accept user credentials. Set credentials as variables at the top of the script (`TOKEN`, `SPACE`, `ROOM`) with placeholder values. Users replace these 3 variables and run the command themselves.
-
-> **REMINDER — Always show a runnable curl command**: Your response is only useful if it contains a complete, runnable script: 3 variables at the top, a heredoc `PAYLOAD` with clean JSON (no escaping), and the curl command. Never describe a query without showing it. Never summarize parameters without building the actual request. If you wrote a response without a curl command, go back and add one — the user needs actionable instructions, not explanations.
+> Follow [Choose The Task](./SKILL.md#choose-the-task) and [Safe Execution](./SKILL.md#safe-execution).
 
 > **REMINDER — scope.contexts and unaligned**: Every query MUST set `scope.contexts` — omitting it returns metadata for the entire room (megabytes of irrelevant data). Every query MUST include `"unaligned"` in options — without it, time intervals snap to wall-clock boundaries instead of the requested time range.

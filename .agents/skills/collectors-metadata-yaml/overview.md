@@ -22,7 +22,8 @@ field means.
   irreversible behavior; `:::tip` for a recommended shortcut ("need X, do Y"); `:::note` for a non-obvious fact that is
   not a warning. `:::info` is the fleet's catch-all and is discouraged. At most one admonition per field. Prefer an
   admonition over a blockquote. An admonition never replaces the field's own first paragraph.
-- Define a term inline the first time it appears; never ship engine vocabulary. A glossary table is allowed only when
+- Define unfamiliar operator terms inline on first use; omit irrelevant implementation mechanics (see the reading
+  model in `SKILL.md`). A glossary table is allowed only when
   four or more terms recur across the page and the options table, and then it closes `method_description`, after the
   reader knows what the collector does, never before.
 - Links go to user-facing pages only: another integration, a `profile-format.md`, a `docs/guides` page, Learn, vendor
@@ -33,9 +34,9 @@ field means.
 **Question:** what is this and what do I get? This is the general overview, not a list of metrics, and the only text
 most visitors read.
 
-- Sentence one is the catalog row and the meta description (`integrations-lifecycle/description-authoring.md` owns its
-  mechanics). It MUST say what the collector monitors in an action phrase and MUST NOT mention options, defaults,
-  limits, or setup.
+- Sentence one supplies the catalog row; page meta descriptions resolve separately, including explicit overrides
+  (`integrations-lifecycle/description-authoring.md`). It MUST say what the collector monitors in an action phrase
+  and MUST NOT mention options, defaults, limits, or setup.
 - Then, in decreasing importance: what the reader gets (areas or scopes covered, the capabilities that distinguish the
   collector), and for a multi-service or multi-device collector one coverage table (area, services) or one pointer to
   the profile library. Exemplars: `azure_monitor/metadata.yaml` (capability list), `s3check/metadata.yaml` (mode
@@ -146,7 +147,7 @@ metric), cost is the most important content on the page and this field MUST be e
 ## 9. Review Questions For This Family
 
 - Can a reader who stops after `metrics_description` say what the collector is and what they get?
-- Does `method_description` name what the collector talks to and how, without a single internal term?
+- Does `method_description` name what the collector talks to and how, without irrelevant implementation mechanics?
 - Is every permission the code requests in the table, and nothing that it does not?
 - Is the collector covered by a `go.d/sd/*.conf` rule? Then `auto_detection` names the discoverer and the rule file.
 - Are `limits` and `performance_impact` either true-as-placeholder or filled with operator-visible bounds and costs?

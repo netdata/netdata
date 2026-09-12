@@ -15,7 +15,7 @@ Get recent signal crashes on stable + recent nightlies:
 ```
 
 Output is a JSON dump under
-`<repo>/.local/audits/query-agent-events/<timestamp>.json`.
+`<repo>/.local/audits/query-agent-events/<run>.json`.
 
 Then aggregate:
 
@@ -128,8 +128,9 @@ For wider investigations, scope to stable releases only:
 get-events.sh --health crash --version '^v2\.\d+\.\d+$'
 ```
 
-The regex filters the page the server returned (`--last`, default 500); raise `--last` or pass the releases with
-`--versions` when you need every stable-release row.
+The regex filters the returned page (`--last`, default 500). Raising `--last` or using server-side `--versions` can
+reduce truncation but does not prove completeness. Check the response envelope and sampling/returned limits before
+claiming counts or absence; narrow or paginate as required. Facets/totals still describe the pre-regex response.
 
 ## Related recipes
 

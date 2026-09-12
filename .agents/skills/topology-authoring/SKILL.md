@@ -1,13 +1,17 @@
 ---
 name: topology-authoring
-description: Developer workflow for creating or changing Netdata topology producers and their `netdata.topology.v1` Function payloads (`topology:network-connections`, `topology:streaming`, `topology:snmp`, vSphere, `topology:cato_networks`, or a new producer), including actor and link design, evidence and detail tables, correlation rules, graph presentation, modal composition, telemetry overlays, validation, and the Cloud aggregator contract a producer relies on. Not for querying topology as an operator (query-netdata-cloud, query-netdata-agents) or for SNMP profile `topology:` rows (collectors-snmp-profiles).
+description: Design, change or review Netdata topology producers and netdata.topology.v1 payloads, including actors, links, evidence, correlation, presentation, modals, overlays and validators. Operator topology queries use query skills; SNMP profile topology rows use collectors-snmp-profiles.
 ---
 
 # Topology Producers
 
 Developer skill for assistants working in this repository, not an operator skill. It routes to the documents that
 own each fact and keeps only the rules and workflow that have no other owner. When you find a fact here and in an
-owner document, the owner document wins; fix this file.
+owner document, verify the affected contract at its source and correct stale guidance during authorized maintenance.
+
+Apply `AGENTS.md#skill-selection`. Review the affected planes and existing design/validation evidence; authoring steps
+below do not require reviewers to create a SOW, redesign unrelated planes or query a live Agent. Live verification
+recipes apply only when the task includes that operation. A changed validator requires checking the claims it affects.
 
 ## Owners
 
@@ -25,9 +29,9 @@ Read the owner for the plane you touch; do not work from memory of it.
 | `src/plugins.d/FUNCTION_UI_REFERENCE.md`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` | Function transport: envelope, `v: 3`, `selections`, `info` responses. |
 | `docs/npm/topology/` | What operators are told the topology means. Change it when a user-visible meaning changes. |
 
-If you are also changing the collector that hosts the producer, `.agents/skills/collectors-authoring/SKILL.md` routes
-that work. SNMP profile `topology:` rows (which OIDs feed the producer) belong to `collectors-snmp-profiles`; this skill
-starts where those rows have become observations.
+If the task also changes or reviews the collector that hosts the producer,
+`.agents/skills/collectors-authoring/SKILL.md` routes that work. SNMP profile `topology:` rows (which OIDs feed the
+producer) belong to `collectors-snmp-profiles`; this skill starts where those rows have become observations.
 
 ## Producers
 
@@ -46,7 +50,9 @@ Cloud aggregator itself is not in this repository.
 
 ## What The Code Enforces
 
-State these as facts in reviews; do not re-derive them, and do not claim enforcement the code does not have.
+Use this map to locate enforcement and its known limits. Before relying on a claim affected by the task, verify it in
+the current schema, validator and relevant tests. Do not re-audit unrelated behavior or infer enforcement from this
+summary alone; distinguish intended contract from what the checked implementation actually rejects.
 
 - JSON Schema (`FUNCTION_TOPOLOGY_SCHEMA.json`): structure, required fields, closed tokens, unknown properties. A
   violation is an error from any validator that loads the schema. It does not check cross-references or row counts.
@@ -84,7 +90,8 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
 
 ## Workflow
 
-Each step names the owner section that holds the rules; read it before designing. Guide means
+Select the steps for the affected planes; a new producer considers every applicable plane. Implementation reads its
+owners before design, while review checks the resulting contracts and evidence. Guide means
 `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
 
 1. Purpose and scale: name the graph users need, choose which plane carries what, and estimate actor, link, and

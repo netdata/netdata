@@ -1,6 +1,6 @@
 ---
 name: triage-agent-events
-description: Bug-investigation tool for the Netdata agent-events ingestion namespace -- triage crashes, panics, fatals across the fleet by downloading events of interest and clustering locally. Covers the three transports (Cloud API and direct agent API are primary; ssh is operator-only), the verified AE_* field map and enum meanings, the dedup model (23h client-side per agent and event signature), the after-the-fact event timing (POST only on agent restart), and the Netdata systemd-journal plugin multi-value filter syntax (FIELD in A, B, C) AND ... Use when investigating crashes / panics / fatals; when grepping for events touching a specific function or file or version; when looking for regressions across versions; when an agent is reported crashing in a way you want to triage. Ships scripts get-events.sh and analyze-events.sh that fetch events with index-friendly filters and compute group-by stats. Defaults to last 24 hours and to the latest stable plus latest 2-3 nightlies.
+description: Investigate Netdata crashes, panics and fatals from agent-events captures or authorized fleet queries. Use for AE_* fields, restart/dedup timing, structured filters, version comparisons and reviews of these investigation helpers. Ordinary logs use the Agent/Cloud query skills.
 ---
 
 # triage-agent-events
@@ -11,11 +11,23 @@ systemd-journal namespace via the Netdata `systemd-journal`
 Function (Cloud-proxied or direct-agent transport) and ships
 scripts that bake in index-friendly query patterns.
 
+## Choose the task
+
+| Task | Read or use |
+|---|---|
+| Analyze a supplied capture | `AE_FIELDS.md`, relevant crash/fatal/recipe guidance, `analyze-events.sh --input PATH`; no credential setup |
+| Explain fields, timing or query construction | `AE_FIELDS.md`, `update-cadence.md`, `query-discipline.md`; transport reference only as needed |
+| Fetch live evidence | Selected transport and query discipline, then configured environment and `get-events.sh` within existing authorization |
+| Review helper or investigation changes | Affected contracts/source and existing tests; examples do not authorize live queries or bug fixes |
+
+The no-leak self-test uses synthetic transport in a subshell, without environment loading or network access. It checks
+Cloud/direct dispatch success and visible request masking; arbitrary event response contents remain private evidence.
+
 ## Why this skill exists
 
-40k-200k status events arrive on the ingestion server every
-day on stable releases. The total fleet is 1.5M agents, so
-the dataset is large and noisy (many unupdated agents report
+Historical observations found 40k-200k daily status events
+and a fleet around 1.5M agents. These are not current size
+guarantees; the dataset can be large and noisy (many unupdated agents report
 crashes that have been fixed). Naive "grep all" queries are
 slow and wasteful. This skill teaches the maintainer (and any
 AI assistant helping them) how to slice the dataset
@@ -25,7 +37,7 @@ efficiently and how to interpret what comes back.
 
 ```
 +-------------------------+        +---------------------+
-|  get-events.sh          |  -->   |  <timestamp>.json   |
+|  get-events.sh          |  -->   |  <run>.json         |
 |  (cloud or agent API)   |        |  in .local/audits   |
 +-------------------------+        +---------------------+
                                           |
@@ -39,7 +51,7 @@ efficiently and how to interpret what comes back.
                                           v
                               +------------------------+
                               |  cluster + read source |
-                              |  + fix the bug         |
+                              |  + report the finding  |
                               +------------------------+
 ```
 
@@ -52,10 +64,9 @@ index-friendly, what each enum value means for triage).
 
 ## Key concepts (read first)
 
-1. **The dataset**: 40k-200k status events / day on stable
-   releases, spread across 1.5M agents (not all restart
-   daily). Naive full-namespace queries with bare FTS are
-   slow.
+1. **The dataset**: fleet-scale status events, not a complete
+   census of crashes at occurrence time. Naive full-namespace
+   queries with bare FTS are slow.
 
 2. **Index-friendly queries** (HARD RULE): use multi-value
    field filters FIRST. The Netdata `systemd-journal` plugin
@@ -92,9 +103,10 @@ index-friendly, what each enum value means for triage).
    (server does not dedup).
 
 6. **Default time + version filters**: 24h time window;
-   latest stable + latest 2-3 nightlies for version. This
+   highest numeric stable + up to three nightlies observed
+   in the discovery response, not the published release catalog. This
    focuses triage on bugs that still matter. Wide windows
-   (`--since '7d'` or longer) are reserved for rare crashes
+   (`--since '7d ago'` or longer) are reserved for rare crashes
    (1-per-few-days class) and for "when did this start /
    get fixed" investigations.
 
@@ -102,6 +114,12 @@ index-friendly, what each enum value means for triage).
    status document becomes an `AE_`-prefixed journal field
    (per `log2journal --prefix 'AE_'` on the ingestion server).
    See `AE_FIELDS.md` for the verified map and enum meanings.
+
+`get-events.sh` fetches one page (default 500 rows), not a paginated census. Before count or absence claims, inspect
+status, partial/sampling flags and matched/returned limits as in
+`./how-tos/trace-stack-symbol-regression-to-mutator.md#3-prove-that-the-response-is-complete`. Narrow or paginate through
+the transport API when needed. Client-side version regexes change rows only; facets/totals still describe the server
+response. Prefer an explicit `--input` when analyzing a particular run; the default latest-file choice is a convenience.
 
 ## Table of contents
 
@@ -126,7 +144,7 @@ are listed in `./how-tos/INDEX.md`; check the per-domain guides and `recipes/` b
 | Script | Purpose |
 |---|---|
 | `_lib.sh` | Helpers (`agentevents_*` prefix). Sources `query-netdata-agents/scripts/_lib.sh`. Token-safe; ships a no-leak self-test. |
-| `get-events.sh` | Fetch events of interest. Index-friendly defaults. JSON output to `.local/audits/query-agent-events/`. |
+| `get-events.sh` | Fetch events of interest. Index-friendly defaults. Fresh private JSON output to `.local/audits/query-agent-events/`; explicit output paths must be new. |
 | `analyze-events.sh` | Group-by stats over a downloaded dump (signal, version, fatal_function, architecture, etc.). |
 | `redact-events.sh` | Opt-in redaction (machine_guid / claim_id / host_id / ephemeral_id -> placeholders). For sharing only. |
 
@@ -143,11 +161,16 @@ This skill follows
 - Producer ingest URL: NEVER quoted literally. Reference only
   as `src/daemon/status-file.c:988`.
 - Fetched event payloads land under
-  `<repo>/.local/audits/query-agent-events/<timestamp>.json`
+  `<repo>/.local/audits/query-agent-events/<run>.json`
   (gitignored). Do NOT paste raw event JSON into committed
   artifacts.
 
 ## Required env keys
+
+`get-events.sh` requires Bash 4 or later for associative arrays; select a compatible Bash on systems with an older
+default. Only live `get-events.sh` calls load these settings. Its current loader requires all listed values for
+either transport;
+offline analysis/redaction, explanation, source review and the synthetic self-test do not load `.env`.
 
 | Key | Role |
 |---|---|

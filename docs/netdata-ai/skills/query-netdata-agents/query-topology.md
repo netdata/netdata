@@ -21,12 +21,21 @@ Use `labels:<pattern>` to opt in to free-form labels with pipe-separated
 
 `POST /api/v3/function?function=topology:<source>`
 
-Example:
+Example: `AGENT_URL` takes precedence. Otherwise use `AGENT_HOST` with its explicit port, or append
+`AGENT_PORT` (default `19999`) to a hostname. An omitted host defaults to `127.0.0.1`.
 
 ```bash
 source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
-AGENT_URL="${AGENT_URL:-http://${AGENT_HOST:-127.0.0.1}:${AGENT_PORT:-19999}}"
+if [[ -z "${AGENT_URL:-}" ]]; then
+    AGENT_TARGET="${AGENT_HOST:-127.0.0.1}"
+    case "$AGENT_TARGET" in
+        \[*\]) AGENT_TARGET="${AGENT_TARGET}:${AGENT_PORT:-19999}" ;;
+        *:*) : ;; # Preserve an already supplied port.
+        *) AGENT_TARGET="${AGENT_TARGET}:${AGENT_PORT:-19999}" ;;
+    esac
+    AGENT_URL="http://${AGENT_TARGET}"
+fi
 AGENT_TARGET="${AGENT_URL#http://}"
 AGENT_TARGET="${AGENT_TARGET#https://}"
 AGENT_TARGET="${AGENT_TARGET%%/*}"

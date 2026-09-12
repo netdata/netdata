@@ -1,6 +1,6 @@
 ---
 name: collectors-prometheus-profiles
-description: Create, review, validate, prove, iterate, or install Netdata Prometheus collector chart profiles (`go.d/prometheus.profiles/*.yaml`). Use for exporter dashboard design, profile schema/runtime behavior, selector/relabel/fallback policy, chart coverage and cardinality, stock semantic proof artifacts, live profile verification, or the authoring scripts (`validate-profile.py`, `profile-toc.py`, `proof-bundle.py`).
+description: Create, review or validate Netdata Prometheus chart profiles, exporter dashboard design, collection policy and stock semantic proofs. Also use for profile authoring scripts and explicitly requested capture, installation or live verification.
 ---
 
 # Prometheus profile authoring
@@ -11,7 +11,8 @@ validator proves only the contracts code can establish.
 
 ## Authorities
 
-When this skill and the code disagree, these shipped documents win; the skill states nothing they already state:
+Use these owners for format and runtime contracts. Verify affected enforcement claims against the current code and
+tests; the lists below are a source map, not evidence that a changed implementation still behaves that way:
 
 - `src/go/plugin/go.d/collector/prometheus/profile-format.md`: the envelope, the runtime processing order, the stock
   contribution policy for `autogen.selector` and relabeling, chart-template rules, job-side profile selection.
@@ -37,6 +38,7 @@ Read the row for the work at hand, not the whole skill.
 
 | Work | Read |
 |---|---|
+| Review a profile or proof change | Affected sections of `chart-design.md`, `metric-types.md` and `profile-schema.md`; stock changes also need `ownership-proof.md`, `proof-authoring.md` and the rule sheet below. Consult existing design and proof evidence, without creating authoring artifacts merely to review. |
 | Create or redesign a user profile | `chart-design.md`, `metric-types.md`; `profile-schema.md` for where each field is documented |
 | Create or change a stock profile | the above, then `ownership-proof.md`, `proof-authoring.md`, and the rule sheet below |
 | Build stock fixtures | `how-tos/build-synthetic-fixture.md`, `proof-authoring.md` |
@@ -45,6 +47,9 @@ Read the row for the work at hand, not the whole skill.
 | Install or live-test a profile | "Delivery and live verification"; `sqlite-metadata-reset.md` only when a reset is proposed |
 | Relate a stock profile to integration metadata | `.agents/skills/integrations-lifecycle/how-tos/prometheus-profile-metadata.md` |
 | Change the scripts | "Scripts" below |
+
+Loading this skill for review or explanation does not authorize capture, installation, database reset or generation.
+Apply the authoring criteria to the assigned change; execute operational procedures only within the actual request.
 
 ## Authoring workflow
 
@@ -188,12 +193,14 @@ wherever you are; `profile-toc.py` is plain Python and takes the profile path as
 
 - Keep reusable runtime or instrumentation profiles independent; a service profile declares them in
   `PROFILE-DESIGN.composition.supports` and never duplicates their charts.
-- Install a user profile under the configured user profile directory and verify profile selection, advancing values,
+- When installation/live verification is requested, install a user profile under the configured user profile directory
+  and verify profile selection, advancing values,
   chart identity, labels, hierarchy, and cardinality against a live target.
 - Do not reset Netdata's SQLite metadata as routine iteration; identities expire through lifecycle and retention. Read
   `sqlite-metadata-reset.md` and obtain explicit production approval before any destructive reset.
-- When editing `metadata.yaml`, follow `integrations-lifecycle`: validate with the generators, never hand-edit
-  generated files under `integrations/`, and undo any regenerated tracked pages before committing.
+- When editing `metadata.yaml`, follow `integrations-lifecycle`: validate current inputs through isolated generation
+  (`.agents/skills/integrations-lifecycle/how-tos/preview-collector-page.md`). Preserve original generated-page edits
+  and follow the source/runtime delivery boundary; do not restore or discard unrelated work.
 
 ## References
 

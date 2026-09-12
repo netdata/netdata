@@ -19,7 +19,7 @@ Sections:
 
 1. **Question** -- the operator question.
 2. **Inputs** -- placeholders the operator must provide.
-3. **Steps** -- runnable commands using token-safe wrappers.
+3. **Steps** -- runnable commands; credential-bearing requests use the shared wrappers.
 4. **Output** -- what to return or inspect.
 5. **Notes / gotchas** -- privacy, scale, and query caveats.
 6. **Source guides** -- links to the guides used.
@@ -27,6 +27,9 @@ Sections:
 Do not include raw Cloud tokens, agent bearers, SNMP communities, USM
 secrets, public device IPs, raw MAC addresses, customer hostnames, or
 full trap payloads in durable artifacts.
+
+Follow [Choose The Task](../SKILL.md#choose-the-task) and [Safe Execution](../SKILL.md#safe-execution). Explanation
+and review do not execute these recipes. Keep conversion, installation and verification stages scoped to the request.
 
 ## Index
 

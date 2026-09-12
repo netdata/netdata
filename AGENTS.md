@@ -272,8 +272,7 @@ Before non-trivial work:
 1. Read the in-flight SOWs under `.agents/sow/q/current/` and `pending/`. Discover other in-flight work through
    open PRs and issues, not through `master`.
 2. Read relevant specs under `.agents/sow/specs/`.
-3. Inspect `.agents/skills/*/SKILL.md` and load every runtime project skill whose trigger matches the work (index
-   under Project Skills).
+3. Select and load applicable runtime skills using "Skill Selection" below (index under Project Skills).
 4. Inspect code, docs, tests, and existing project instructions as ground truth.
 5. For non-trivial work the goal and plan are user-owned: see "Plan Before Non-Trivial Work".
 
@@ -606,13 +605,38 @@ docs, code, and tests, not in specs.
 - Public/operator skill catalogs SHOULD point to their skill-local rule rather than repeat it.
 - Preserve operator/developer audience boundaries.
 
+### Skill Selection
+
+Apply skill selection to implementation, investigation and read-only review, including work exempt from a SOW.
+
+- Select skills by the requested operation and affected contract, using the grouped index and frontmatter
+  descriptions. Read each applicable entry, then expand its routed references for the task. A matching subject word
+  alone does not select every authoring, querying and triage workflow for that subject.
+- For a review, load the domain contracts needed to assess the change even when an entry describes them as authoring
+  guidance. Use them as review criteria; an implementation procedure is not a request to perform it. Review-only
+  work retains the exemptions and action boundaries in "When A SOW Is Required".
+- A reviewer lens changes evidence emphasis and reference depth, not the applicability of correctness contracts.
+  Do not maintain duplicate domain rules for separate lenses. If relevance is uncertain, inspect the candidate entry
+  and decide from the changed behavior and reachable dependencies; do not load every supporting file by default.
+- Load required shared invariants and prerequisites before specialized guidance. Domain task routers determine which
+  contracts apply; a reviewer MAY follow another reference when evidence exposes a relevant dependency. Skill text
+  is a source map, not proof that a claim is current: verify affected claims at their owners.
+- Loading a skill does not authorize its writes, credential setup, deployments, generation, commits or remote
+  operations. For read-only review, consult existing design and validation evidence and report concrete gaps;
+  do not create implementation artifacts merely because the authoring workflow requests them. Existing user
+  authorization for the actual task still applies.
+
+Review assignment scope, complete-change coverage and stop conditions remain in "Review". Provide the assigned
+operation, complete review scope, approved contracts, applicable skill paths/sections and available evidence so a
+specialist can select depth without guessing the task. One reviewer still assesses the complete unit and interactions.
+
 ### Project Skills
 
 Project skills are memory of HOW to work here.
 
 - Runtime input skills MUST live under `.agents/skills/<area>-<topic>/SKILL.md` and follow `.agents/skills/README.md`
   (areas, naming, frontmatter `name`); the public skill symlinks are exempt (Public skill convention below);
-  `.agents/sow/audit.sh` enforces it. Required First Checks loads the matching ones.
+  `.agents/sow/audit.sh` enforces it. Skill Selection defines when to load them.
 - Output/reference skills may also exist under product documentation or generated skill directories. Do not rename,
   shorten, or change their descriptions only to satisfy runtime discovery. Update them when their related
   public/operator workflow changes.
@@ -628,8 +652,8 @@ Project skills are memory of HOW to work here.
 Public skill convention (`docs/netdata-ai/skills/`):
 
 - Shape: `docs/netdata-ai/skills/<skill-name>/SKILL.md`, optional supporting `<topic>.md` files, optional
-  `scripts/`. Frontmatter has `name` and `description`; the description is the trigger text and MUST enumerate
-  the phrases users actually type.
+  `scripts/`. Frontmatter has `name` and `description`; the description is the trigger text and MUST identify
+  discriminative tasks and representative user phrases. Keep exhaustive command and field mappings in references.
 - Audience: operators and end-users. Public skills MAY teach querying Netdata Cloud or Agents, inspecting
   metrics/logs/topology/alerts, and running safe operational commands. They MUST NOT contain developer-contract
   validation, schema migration plans, producer authoring workflows, UI adapter work, aggregator implementation
@@ -638,7 +662,8 @@ Public skill convention (`docs/netdata-ai/skills/`):
   reads source files, updates schemas, validates fixtures, changes collectors/producers, or coordinates
   frontend/backend/aggregator code is a project developer skill, not a public one.
 - Skill verification harness inputs (seed questions, grader rubrics, runner scripts, transcript-generation prompts)
-  live under `.agents/skill-verification/<skill>/`, never under `docs/netdata-ai/skills/<skill>/`.
+  live under `.agents/skill-verification/<skill>/`, never under `docs/netdata-ai/skills/<skill>/`. Shared cross-skill
+  invocation cases live under `.agents/skill-verification/invocation/`; that directory is not a runtime skill.
 - Each public skill is reachable from `.agents/skills/<skill-name>` via a relative symlink
   (`.agents/skills/<name>` -> `../../docs/netdata-ai/skills/<name>`). From the repository root, create a new link with
   `ln -s ../../docs/netdata-ai/skills/<name> .agents/skills/<name>`. Inspect an existing path instead of overwriting it;
@@ -648,12 +673,18 @@ Public skill convention (`docs/netdata-ai/skills/`):
   `$'\033[...]'`; `<prefix>_repo_root` via `git rev-parse --show-toplevel`; `<prefix>_load_env` sourcing `<repo>/.env`
   with `: "${VAR:?}"` validation; `<prefix>_audit_dir` creating the skill's `<repo>/.local/audits/<dir>/` (Local-Only
   Working Directory); masked-token `<prefix>_run` / `<prefix>_run_read` wrappers.
-- Scripts that touch credentials (cloud tokens, per-agent bearers, claim ids, session cookies) MUST be token-safe:
-  helpers handling credential bytes are named with a leading underscore (`_skill_*`, internal-only) and return them
-  via bash namerefs into the caller's locals, NEVER to stdout. Public wrappers (no underscore) read credentials from
-  `.env` internally and emit ONLY the response body. Each token-handling lib MUST ship a
-  `<prefix>_selftest_no_token_leak` that drives every public wrapper with a sentinel token and asserts it never
-  reaches captured stdout.
+- Credential setup MUST be explicit in the task workflow: source the library, then call its environment loader when
+  live execution needs it. Sourcing a library or reviewing a recipe MUST NOT itself load `.env` or query a service.
+  Public request wrappers use the configured environment; do not assume every call reloads it.
+- Helpers handling credential bytes MUST use internal names (`_skill_*`) and keep those bytes out of displayed output.
+  Use the owner's supported caller-local assignment mechanism; when an internal helper emits credential JSON, its
+  caller MUST capture it privately. Do not require Bash namerefs on shells that lack them. Public wrappers MUST NOT
+  log authentication material; successful response bodies may contain private service data and require review before
+  sharing. Response forwarding is not a universal redaction guarantee.
+- Token-handling libraries MUST provide offline synthetic verification of their credential handoff and masking paths,
+  including stdout and stderr. A live request with an invalid sentinel is not an offline self-test; a failed or skipped
+  request is not proof that a wrapper works. Use the skill's focused tests and documented supported shell; preserve
+  caller state by invoking mutable self-tests in an isolated shell. Validation does not authorize real credential setup.
 - How-tos catalog: each public skill ships `how-tos/INDEX.md`. Capture timing and authorization follow Knowledge
   Capture. When an authorized change adds or updates a how-to, keep its catalog consistent. Operator recipes stay
   in public skills; developer recipes belong in the matching `.agents/skills/` project skill and its index, if any.
@@ -664,13 +695,11 @@ Skills index (runtime input under `.agents/skills/`, grouped by area; `.agents/s
 and the rule for adding one; each skill's frontmatter description is the authoritative trigger, this list is a pointer):
 
 - Collectors. START HERE: `collectors-authoring`.
-  - `collectors-authoring`: authoring or modifying any data-collection plugin or module (go.d, ibm.d, Rust, C,
-    PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions; routes
-    to every skill below
-  - `collectors-go-design`: designing a new go.d collector or changing a public contract of one (config option, mode,
-    metric meaning, ownership or durable state, Functions, vnodes), or reviewing such a change; the design note,
-    architecture gate, operator surface, `config_schema.json` authoring, and mutating-collector references
-  - `collectors-go-framework-v2`: creating or migrating a go.d collector to framework V2; `CollectorV2`,
+  - `collectors-authoring`: authoring, modifying or reviewing collectors across plugin families; shared identity,
+    missing-data, lifecycle, cost and cardinality contracts, then selective framework/domain routes
+  - `collectors-go-design`: go.d contract design/review and `config_schema.json` forms; selective operator-surface,
+    identity, state/mutation and design-evidence guidance
+  - `collectors-go-framework-v2`: implementing, migrating or reviewing a go.d V2 collector; `CollectorV2`,
     `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests
   - `collectors-metadata-yaml`: what every collector `metadata.yaml` field says and how it reads: overview,
     permissions, auto-detection (including service discovery), limits and cost, prerequisites, option rows, examples,
@@ -679,16 +708,16 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `collectors-prometheus-profiles`: creating, reviewing, validating, proving, iterating, or installing Prometheus
     chart profiles; exporter dashboard design, selector/relabel/fallback policy, coverage and cardinality, stock proof
     artifacts, live verification, the authoring scripts
-  - `collectors-snmp-profiles`: SNMP profile YAMLs, topology SNMP profiles, ddsnmp profile parsing, profile-format
-    docs; requires MIB `MAX-ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
-  - `collectors-snmp-trap-profiles`: SNMP trap profile YAMLs and their `metrics:`/`charts:` rules, the trap
+  - `collectors-snmp-profiles`: authoring/review of SNMP profiles, typed rows, ddsnmp parsing and profile-format docs;
+    requires MIB `MAX-ACCESS`/`ACCESS` checks and index-derived extraction for `not-accessible` INDEX objects
+  - `collectors-snmp-trap-profiles`: authoring/review of trap profiles and `metrics:`/`charts:` rules, the trap
     `profile-format.md`, the generator `src/go/cmd/snmptrapprofilegen` (shipped as `snmp-trap-profile-gen`), stock
     pack regeneration and compression, category/severity taxonomy changes
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
     `health-alert-authoring` (alerts on a collector's contexts).
   - Also relevant: `triage-snmp-diagnostics` (offline SNMP evidence investigations).
 - Integrations.
-  - `integrations-lifecycle`: the integrations pipeline: `metadata.yaml` schemas and validation, `integrations/`
+  - `integrations-lifecycle`: implementation/review of metadata validation and integrations pipeline; `integrations/`
     generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
     `contexts.yaml` and the NPM catalog generator; the collector-consistency rule
   - Also relevant: `collectors-metadata-yaml` (what the fields say) and `docs-learn-site-structure` (where the
@@ -697,18 +726,18 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `health-alert-authoring`: authoring, adapting, or reviewing health alerts and templates in
     `src/health/health.d/*.conf`; lookup/calc/warn/crit, lifecycle, routing, health-config tests
 - Topology.
-  - `topology-authoring`: creating or changing a topology producer (`topology:network-connections`,
+  - `topology-authoring`: creating, changing or reviewing a topology producer (`topology:network-connections`,
     `topology:streaming`, `topology:snmp`, vSphere, `topology:cato_networks`, or a new one) and its
     `netdata.topology.v1` payload: actors, links, evidence, correlation rules, presentation, modals, overlays,
     validation, and the aggregator contract a producer relies on
 - Tests.
-  - `tests-query-corpus`: running or extending `tests/query-corpus/`; fixtures, oracles, red/green cases for
+  - `tests-query-corpus`: running, extending or reviewing `tests/query-corpus/`; fixtures, oracles, red/green cases for
     query-engine bugs, formatter byte-pins, validating a fix branch
 - Packaging.
-  - `packaging-static-installer`: building or testing the static self-extracting installer
+  - `packaging-static-installer`: building, testing, reviewing or troubleshooting the static self-extracting installer
     (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
 - Docs.
-  - `docs-learn-site-structure`: adding, moving, renaming, or deleting a docs page for `learn.netdata.cloud`;
+  - `docs-learn-site-structure`: changing, reviewing or troubleshooting docs publication on `learn.netdata.cloud`;
     `docs/.map/map.yaml`, its schema and `validate_map_schema.py`; why a Learn page is missing or wrong; ingest exit
     codes; MDX escape rules; redirects; the PR gate here (`check-markdown.yml`) and what runs after a docs PR merges
     (`trigger-learn-update.yml`, then the learn `ingest.yml`); Netlify deploy
@@ -716,25 +745,26 @@ and the rule for adding one; each skill's frontmatter description is the authori
     locally from a PR or docs branch; loads `docs-learn-site-structure` first
   - Also relevant: `integrations-lifecycle` (generated integration pages are published on Learn).
 - Triage.
-  - `triage-snmp-diagnostics`: offline SNMP support bundles and diagnostic files with `src/go/tools/snmp-diagnostics`;
+  - `triage-snmp-diagnostics`: offline SNMP evidence investigations and diagnostics-tool/interpretation reviews
+    with `src/go/tools/snmp-diagnostics`;
     topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`,
     `validate`, `summary`, `inspect-device`, `inspect-link`, and `replay`. Not live queries, traps, or
     collector/profile authoring
   - `triage-coverity`: Coverity Scan defect triage
-  - `triage-sonarqube`: SonarCloud findings triage
+  - `triage-sonarqube`: inspect/review SonarCloud findings and helpers, or apply authorized selected-finding decisions;
+    family and project-policy actions require scope covering all affected findings/projects
   - `triage-codeql`: GitHub Code Scanning / CodeQL triage
-  - `triage-codacy`: Codacy pre-push local analysis and read-only PR-issue fetching; write actions require a GitHub
-    issue or SOW
+  - `triage-codacy`: inspect or review Codacy findings/helpers, run local analysis, or fetch PR issues; supplied
+    evidence needs no live fetch. Write actions require user authorization and applicable project tracking.
   - `triage-agent-events`: investigating crashes, panics, or fatals across the fleet via the agent-events namespace;
     `AE_*` fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
   - Also relevant: `repo-pr-reviews` (pulls SonarCloud findings for a PR).
 - Repo.
-  - `repo-pr-reviews`: inspecting or addressing PR comments and reviews
-  - `repo-mirror-sources`: setting up or syncing the local mirror of Netdata-org repos at `${NETDATA_REPOS_DIR}`;
-    reset-to-default safety; `--repo` scoping
-  - `repo-skill-authoring`: creating, editing, slimming, splitting, or reviewing a skill; the authoring rules (point
-    at the owner, one owner per fact, symbols not line numbers, qualified enforcement claims), the change method
-    (evidence round, numbered options, row-level preservation map, two-lens review), the rot signals
+  - `repo-pr-reviews`: focused PR-comment inspection or complete PR triage; addressing findings when authorized
+  - `repo-mirror-sources`: read-only inspection of Netdata-org source checkouts at `${NETDATA_REPOS_DIR}`;
+    authorized mirror setup/sync, `--repo` scoping, and maintenance limits
+  - `repo-skill-authoring`: creating, amending, restructuring or reviewing skills; selective authoring rules and owner
+    references, bounded amendments, preservation evidence for restructures, read-only review and rot checks
 
 Public skills (canonical under `docs/netdata-ai/skills/<name>/`, symlinked at `.agents/skills/<name>`):
 
@@ -807,8 +837,10 @@ renames:
 | `triage-codeql` | `graphql/` | Code Scanning fetches and dismissals |
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `triage-snmp-diagnostics` | `snmp-diagnostics/` | private bundle inspections, replay output, and incident reports |
+| `docs-learn-pr-preview` | `learn-pr-preview/` | private isolated source snapshots, manifests, Learn builds and server logs |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
+| `collectors-snmp-trap-profiles` | `snmp-trap-profiles/` | private generator artifacts and selected classification caches |
 | `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |

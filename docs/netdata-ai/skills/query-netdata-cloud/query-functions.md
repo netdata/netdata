@@ -29,16 +29,12 @@ see the sibling skill
 
 ## Mandatory Requirements (READ FIRST)
 
-1. **Provide actionable instructions.** Every recommendation ends
-   in a runnable curl command.
-2. **Never request credentials.** Use `YOUR_API_TOKEN` and
-   `YOUR_NODE_UUID` placeholders.
-3. **Always start with `{"info":true}`** when you don't already
-   know the parameter set of the target Function. The `info`
-   response is authoritative -- this skill's tables can be stale
-   relative to the running agent.
-4. **Function names are case-sensitive** (e.g. `systemd-journal`,
-   `topology:snmp`, `flows:netflow`).
+Follow [Choose The Task](./SKILL.md#choose-the-task) for explain, review and execution requests, and
+[Safe Execution](./SKILL.md#safe-execution) for local setup, credentials and response handling.
+
+- For a known read-only Function that supports `info`, use `{"info":true}` to discover its current parameters.
+  Confirm support and behavior before invoking an unfamiliar Function; `info` is not a universal safety switch.
+- **Function names are case-sensitive** (e.g. `systemd-journal`, `topology:snmp`, `flows:netflow`).
 
 ---
 
@@ -66,7 +62,7 @@ For full protocol semantics (facet pills, histograms, charts
 configuration, anchor/delta/PLAY modes, error handling, edge
 cases), the authoritative source is
 `<repo>/src/plugins.d/FUNCTION_UI_REFERENCE.md`. This skill
-summarizes the surface that matters for a Cloud-side curl client;
+summarizes the surface that matters for a Cloud API client;
 the reference covers everything else.
 
 ---
@@ -106,26 +102,24 @@ plus per-collector wrappers.
 
 ## `info=true` discovery
 
-The single most important call to make before constructing a real
-query: pass `{"info": true}` and read `accepted_params` plus
-`required_params`. The agent itself is the authoritative source --
-if a parameter exists there, the Function accepts it; if it
-doesn't, no other doc matters.
+For a read-only Function that supports discovery, pass `{"info": true}` and inspect `accepted_params` and
+`required_params`. Use the running Function's metadata and implementation contract to construct its request.
+An arbitrary Function may ignore `info` or perform an operation; establish its behavior before calling it.
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 FN="systemd-journal"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 { "info": true }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=$FN" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=$FN" \
+  "$PAYLOAD"
 ```
 
 ### `required_params` widget schema
@@ -177,22 +171,22 @@ schema for a specific node version.
 `POST /api/v3/spaces/{spaceID}/rooms/{roomID}/functions`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope":     { "nodes": [] },
   "selectors": { "nodes": ["*"] }
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/functions" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/functions" \
+  "$PAYLOAD"
 ```
 
 Response top-level: `functions[]` (each entry: `name`, `version`,
@@ -206,23 +200,25 @@ given Function.
 `POST /api/v2/nodes/{nodeId}/function?function={functionName}`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 FN="processes"
 
-read -r -d '' PAYLOAD <<'EOF'
-{
-  "last":    50,
-  "timeout": 30000
-}
+PAYLOAD="$(cat <<'EOF'
+{}
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=$FN" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=$FN" \
+  "$PAYLOAD"
 ```
+
+The `processes` Function returns a current snapshot. Its handler
+(`src/collectors/apps.plugin/apps_functions.c:function_processes`) parses arguments from the Function string and
+ignores the JSON payload; `last` and `timeout` in that body do not limit or sort its rows. Use its Function contract
+for arguments; its info request uses `function=processes%20info` with an empty JSON body.
 
 Optional headers:
 
@@ -270,57 +266,52 @@ The listing endpoint reports them when the collector is enabled.
 For logs / topology / flows examples, see the per-family guides
 linked at the top.
 
-### Example 1: top processes by CPU
+### Example 1: current processes snapshot
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 
-read -r -d '' PAYLOAD <<'EOF'
-{
-  "last":    50,
-  "timeout": 30000
-}
+PAYLOAD="$(cat <<'EOF'
+{}
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=processes" \
-  -d "$PAYLOAD" \
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=processes" \
+  "$PAYLOAD" \
   | jq '.data | length, (.[0:3])'
 ```
 
 ### Example 2: discover a Function's parameter widget set
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 { "info": true }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=network-connections" \
-  -d "$PAYLOAD" \
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=network-connections" \
+  "$PAYLOAD" \
   | jq '.required_params | map({id, type, name, options: (.options | length // 0)})'
 ```
 
 ### Example 3: list the Functions on a single node
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "scope":     { "nodes": ["YOUR_NODE_UUID"] },
   "selectors": { "nodes": ["*"] }
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/functions" \
-  -d "$PAYLOAD" \
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/functions" \
+  "$PAYLOAD" \
   | jq -r '.functions[] | "\(.name)\t\(.tags // "")\t\(.help)"'
 ```
 
@@ -336,15 +327,13 @@ curl -sS -X POST \
   huge results (logs, flows), narrow the time window or use the
   Function's pagination (`last`, `anchor`) rather than relying on
   streaming.
-- **Node must be `reachable`.** A `stale` node returns HTTP 400
-  with `errorMsgKey: "ErrInstanceNotReachable"`. Verify with the
-  discovery endpoints in [SKILL.md](./SKILL.md).
-- **Permission**: the cloud token must include
-  `PermissionFunctionExec` on the target space. `scope:all`
-  works; `scope:grafana-plugin` does NOT.
-- **Function name is case-sensitive** -- wrong casing returns 400.
+- **Reachability:** historical Cloud observations associate stale nodes with HTTP 400 and
+  `errorMsgKey: "ErrInstanceNotReachable"`. Check current node discovery and the actual error response.
+- **Permission:** historical guidance names `PermissionFunctionExec` and distinguishes `scope:all` from
+  `scope:grafana-plugin`. Exact Cloud gates and status mappings are not verified against a current server owner;
+  check target-space role, token scope and endpoint restrictions before changing access.
+- **Function names are case-sensitive.** Wrong casing can cause a request failure.
 - **`info=true` does NOT bypass auth.** ACL is enforced on every
   call regardless of body.
-- **The agent's own `info=true` response is authoritative for
-  parameters.** Tables in this skill can drift relative to the
-  running version. When in doubt, ask the agent.
+- **Use the running Function's supported discovery mechanism and contract.** Tables can drift relative to the
+  running version; follow [the discovery guidance](#infotrue-discovery) for that Function.

@@ -10,8 +10,8 @@
 #   action         (attr 2): 1=Undecided      2=FixRequired  3=FixSubmitted  4=ModelingRequired  5=Ignore
 #   external ref   (attr 4): always sent null here
 #
-# Comment is read from <comment-file>. MUST be ASCII (Cloudflare blocks em-dashes
-# and smart quotes with a 403 Cloudflare challenge — see SKILL.md).
+# Comment is read from <comment-file>. MUST be ASCII (Cloudflare blocked em-dashes
+# and smart quotes in past runs — see ../operations.md).
 
 set -euo pipefail
 
@@ -42,7 +42,7 @@ fi
 # ASCII-only check on the comment body. `tr -d '\000-\177'` is portable across
 # GNU and BSD/macOS (`grep -P` is GNU-only).
 if LC_ALL=C tr -d '\000-\177' < "${COMMENT_FILE}" | grep -q .; then
-    echo -e "${COV_RED}[ERROR]${COV_NC} ${COMMENT_FILE} contains non-ASCII bytes. Cloudflare will block. Replace em-dashes (--) and smart quotes." >&2
+    echo -e "${COV_RED}[ERROR]${COV_NC} ${COMMENT_FILE} contains non-ASCII bytes. The helper requires ASCII. Replace em-dashes (--) and smart quotes." >&2
     exit 1
 fi
 

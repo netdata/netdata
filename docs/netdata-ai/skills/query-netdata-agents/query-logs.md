@@ -44,9 +44,8 @@ agents_query_agent \
     '{"after":-3600,"before":0,"last":50,"direction":"backward","selections":{"__logs_sources":["agent-events"]}}'
 ```
 
-The wrapper minted/cached the bearer internally; stdout is the
-response body only. The bearer never reaches the assistant's
-captured output.
+The wrapper resolves the bearer privately and forwards the log response unchanged. Logs themselves can contain
+sensitive data: capture or project them before display when needed. Request-auth masking does not sanitize log rows.
 
 ## Discover the available log sources
 

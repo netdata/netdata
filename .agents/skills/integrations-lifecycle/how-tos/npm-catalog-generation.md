@@ -6,8 +6,8 @@ generated from something other than ibm.d inputs, so it is easy to hand-edit by 
 `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml` and its 1013 pages under `npm-catalog/integrations/` are
 committed and generated; neither is hand-editable. Every run also writes the untracked
 `npm-catalog/metrics-metadata-gaps.txt` (`write_gap_report`): read it to see which profile metrics lack metadata, then
-delete it. Delivery (source PR versus the post-merge regeneration PR, the gitignored catalogs, the side report) is in
-`../consistency.md`, "Delivery boundary".
+keep it locally if useful, without staging it. Delivery (source PR versus the post-merge regeneration PR, the gitignored
+catalogs and side report) is in `../consistency.md`, "Delivery boundary".
 
 ## The chain
 
@@ -80,10 +80,11 @@ catalog entry as their only public documentation, so check its setup block direc
 
 ## Verify a generator change did not disturb the other entries
 
-```bash
-python3 integrations/gen_npm_catalog.py
-git diff -U0 src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml | grep '^@@'
-```
+For authorized generator validation, use a fresh regular-file source copy containing current modified and new inputs,
+with no symlinks escaping it (`./preview-collector-page.md#current-inputs-and-dependencies`). Before running
+`python3 integrations/gen_npm_catalog.py` there, save the existing NPM metadata to a separate private snapshot. Compare
+that snapshot with the resulting `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml` using `diff -u` or a diff
+viewer; this also works when the isolated copy has no Git metadata. Keep the generated gap report in that run.
 
 Every hunk should fall inside the line range of the entries you meant to change. A hunk in the device or trap ranges
 means a default was altered.
