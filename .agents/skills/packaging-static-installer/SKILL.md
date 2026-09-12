@@ -202,7 +202,9 @@ The script auto-installs QEMU binfmt handlers via `tonistiigi/binfmt:master` if 
 ./packaging/makeself/build-static.sh x86_64 debug
 ```
 
-Sets `NETDATA_BUILD_WITH_DEBUG=1` (`packaging/makeself/build.sh:9-22`), which disables optimization and includes debug symbols. Result: larger archive (~2× size), slower runtime, useful for valgrind/gdb. The `README.md` in `packaging/makeself/` documents valgrind invocation.
+Sets `NETDATA_BUILD_WITH_DEBUG=1` (`packaging/makeself/build.sh:9-22`), which selects reduced C optimization
+(`-O1 -ggdb`) and internal checks in the Netdata build job. Historically the archive was about twice the size, with
+slower runtime useful for valgrind/gdb. The `README.md` in `packaging/makeself/` documents valgrind invocation.
 
 ## Common failures
 
