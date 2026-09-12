@@ -29,9 +29,9 @@ Read the owner for the plane you touch; do not work from memory of it.
 | `src/plugins.d/FUNCTION_UI_REFERENCE.md`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` | Function transport: envelope, `v: 3`, `selections`, `info` responses. |
 | `docs/npm/topology/` | What operators are told the topology means. Change it when a user-visible meaning changes. |
 
-If the task also changes or reviews the collector that hosts the producer, `.agents/skills/collectors-
-authoring/SKILL.md` routes that work. SNMP profile `topology:` rows (which OIDs feed the producer) belong to
-`collectors-snmp-profiles`; this skill starts where those rows have become observations.
+If the task also changes or reviews the collector that hosts the producer,
+`.agents/skills/collectors-authoring/SKILL.md` routes that work. SNMP profile `topology:` rows (which OIDs feed the
+producer) belong to `collectors-snmp-profiles`; this skill starts where those rows have become observations.
 
 ## Producers
 
