@@ -23,7 +23,7 @@ names.
 | `AGENTS.md#git-and-pr-workflow` | staging, and which git actions need explicit approval (deleting a file among them) |
 | `AGENTS.md#open-source-reference-evidence` | the citation form for an owner outside this repository |
 | `.agents/skills/README.md#skills`, `.agents/skills/README.md#naming`, `.agents/skills/README.md#areas` | the no-nesting rule; the name form; the area minting rule with its same-change obligation |
-| `.agents/skills/README.md#owner-section-citations` | the point-rather-than-restate rule and the anchor form (a MUST) with its slug rules; the marker paragraph for a private owner document, none for a Learn-published one |
+| `.agents/skills/README.md#owner-section-citations` | the point-rather-than-restate rule and the anchor form (a MUST) with its slug rules; the recommended marker paragraph for a private owner document, none for a Learn-published one |
 | `.agents/skills/README.md#finding-a-skill` | the index is the map; the frontmatter description is the trigger; the cross-reference for a skill serving two areas |
 
 ## Authoring Rules

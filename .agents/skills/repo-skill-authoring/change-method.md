@@ -88,9 +88,9 @@ The coordinator re-verifies every Tier-1 item before implementation and preserve
   Record an inaccessible store as unsearched, not empty. Looking up an issue does not require a full PR-comment
   triage workflow; use `repo-pr-reviews` when that workflow is actually requested.
 - Search owner candidates and generated-file indicators using `./authoring-rules.md#authoring-rules`. Check Learn
-  publication via `docs/.map/map.yaml` when deciding the private-owner marker required by
-  `.agents/skills/README.md#owner-section-citations`. Repository instruction files and the skills README use the
-  inline citing sentence specified there. Cite the exact section that states the fact, or its script/symbol owner.
+  publication via `docs/.map/map.yaml` when deciding the private-owner marker recommended by
+  `.agents/skills/README.md#owner-section-citations`. Root instructions and the skills README already use inline
+  citing sentences; retain that convention. Cite the exact section that states the fact, or its script/symbol owner.
 - For changed paths, headings or contracts, search incoming references in root and scoped instructions, sibling
   skills, developer docs, code-tree README files, tests, CI filters and audit globs. Record relevant hits and their
   disposition under `AGENTS.md#clean-end-state-over-less-churn`.
