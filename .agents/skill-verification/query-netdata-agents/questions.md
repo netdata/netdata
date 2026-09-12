@@ -24,14 +24,15 @@ Two targets:
   `${AGENT_EVENTS_NODE_ID}` and machine_guid
   `${AGENT_EVENTS_MACHINE_GUID}`.
 
-For bearer-protected targets, verify the wrapper's mint/cache/refresh behavior during the authorized operational
-check. An unprotected Agent uses direct access without minting a bearer; record the observed mode.
+During authorized operational checks, the wrapper always resolves a bearer, even for an unprotected Agent.
+Verify its mint/cache/refresh behavior separately from the raw unauthenticated probe, which does not mint a bearer;
+record which route was exercised.
 
 ## Identity (direct)
 
 - **Q01** -- Read the agent's `/api/v3/info` directly. What is the
-  node UUID, machine_guid, claim_id, agent version, and
-  hostname?
+  node UUID, machine_guid, agent version, hostname, and
+  `claim_id_present` boolean? Validate the claim ID privately; do not display its value.
 - **Q02** -- What is the install prefix detected by
   `agents_netdata_prefix` on the local desktop?
 

@@ -36,7 +36,7 @@ itself the first verification (see Q01).
 - **Q04** -- Which cloud provider, region, and instance type is
   `costa-desktop` running on (if any)?
 - **Q05** -- What is the agent version on `costa-desktop`, and
-  what is its claim_id?
+  is its claim ID present? Report `claim_id_present`, not the value.
 
 ## Streaming / parent / child / vnodes
 
@@ -108,6 +108,6 @@ itself the first verification (see Q01).
 ## Self-test invariants
 
 - **Q23** -- Check that wrapper diagnostics did not expose Cloud tokens, Agent bearers or authentication selectors.
-  Review successful response bodies before sharing: deliberately requested identity fields such as Q05's claim_id
-  are response data, not proof of a logging leak. Project only the fields needed for the authorized answer and redact
-  unrelated private data. A wrapper forwarding a body unchanged does not establish that it was redacted.
+  Review successful response bodies before sharing: claim IDs can occur in response data even when diagnostic
+  masking works. Validate them privately and expose only a presence indicator, including for Q05. Project only the
+  fields needed for the authorized answer and redact private data. Forwarding a body unchanged does not redact it.

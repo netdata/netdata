@@ -26,7 +26,7 @@ Example:
 ```bash
 source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
-AGENT_URL="${AGENT_URL:-http://${AGENT_HOST:-127.0.0.1}:${AGENT_PORT:-19999}}"
+AGENT_URL="${AGENT_URL:-http://${AGENT_HOST:-127.0.0.1:19999}}"
 AGENT_TARGET="${AGENT_URL#http://}"
 AGENT_TARGET="${AGENT_TARGET#https://}"
 AGENT_TARGET="${AGENT_TARGET%%/*}"

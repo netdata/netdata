@@ -37,7 +37,7 @@ agents_load_env
 # is fine and consistent.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET /api/v3/info \
   | jq '.agents[0] | {nm, nd, mg, claim_id_present: ((.cloud.claim_id // "") | length > 0),
@@ -50,14 +50,14 @@ agents_query_agent \
 # / OS query patterns" below for the endpoint that actually has them.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET /api/v3/info \
   | jq '.agents[0] | {application, cloud_status: .cloud.status,
                          claim_id_present: ((.cloud.claim_id // "") | length > 0)}'
 
 # Check claim presence. The bearer resolver consumes the value privately; do not print it.
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET /api/v3/info | jq '{claim_id_present: ((.agents[0].cloud.claim_id // "") | length > 0)}'
 ```
 
@@ -111,7 +111,7 @@ Hardware, OS, and cloud-provider facts live in the agent's
 or a v3 metrics response):
 
 ```bash
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET /api/v1/info \
   | jq '.host_labels'
 ```
@@ -135,7 +135,7 @@ status. See [query-dyncfg.md](./query-dyncfg.md):
 
 ```bash
 # List every go.d.plugin job and its current state.
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET '/api/v3/config?action=tree&path=/collectors/go.d/Jobs' \
   | jq '.tree["/collectors/go.d/Jobs"]'
 ```
@@ -152,7 +152,7 @@ under `/collectors/go.d/Vnodes` and `/collectors/ibm.d/Vnodes` in
 the DynCfg tree. Use the same DynCfg path:
 
 ```bash
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET '/api/v3/config?action=tree&path=/collectors/go.d/Vnodes'
 ```
 

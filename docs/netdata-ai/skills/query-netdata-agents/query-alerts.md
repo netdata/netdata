@@ -35,7 +35,7 @@ agents_load_env
 # Currently-firing alerts on this host with summary + values + instances.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     POST /api/v3/alerts '{"options":["summary","values","instances"]}'
 
@@ -45,7 +45,7 @@ AFTER=$(( $(date +%s) - 3600 ))
 NOW=$(date +%s)
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     POST /api/v3/alert_transitions "{\"after\":$AFTER,\"before\":$NOW}"
 
@@ -53,7 +53,7 @@ agents_query_agent \
 CFG="ALERT_CONFIG_HASH_UUID"   # the cfg field of an alert instance
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET "/api/v3/alert_config?config=$CFG"
 ```

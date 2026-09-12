@@ -246,11 +246,23 @@ _agents_resolve_bearer() {
     local mg="${2:?machine_guid required}"
     local host="${3:?host required}"
 
+    # Validate before creating directories or looking up a cache path.
+    if [[ ! "${mg}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Invalid machine_guid: expected a UUID." >&2
+        return 1
+    fi
+
     local cache_dir cache_file now exp_s
     cache_dir="$(agents_audit_dir)/bearers"
+    cache_file="${cache_dir}/${mg}.json"
+    # Existing links must not redirect cache reads, writes, or permissions.
+    # -L also catches dangling links before a mint can create their target.
+    if [[ -L "${cache_dir}" || -L "${cache_file}" ]]; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Bearer cache directory and entry must not be symbolic links." >&2
+        return 1
+    fi
     mkdir -p "${cache_dir}"
     chmod 0700 "${cache_dir}" 2>/dev/null || true
-    cache_file="${cache_dir}/${mg}.json"
 
     now=$(date +%s)
 

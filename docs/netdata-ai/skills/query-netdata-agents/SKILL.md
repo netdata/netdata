@@ -57,7 +57,7 @@ unauthenticated access. For an unauthenticated reachability check, discard the p
 
 ```bash
 curl -sS --max-time 10 -o /dev/null -w '%{http_code}\n' \
-  "http://${AGENT_HOST:?set the Agent host}:19999/api/v3/info"
+  "http://${AGENT_HOST:?set the Agent host:port}/api/v3/info"
 ```
 
 An HTTP success establishes reachability for that request, not permission to call every API. See
@@ -83,7 +83,7 @@ For example, after choosing the requested target locally:
 source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
 agents_query_agent \
-  --node "${NODE_UUID:?set the node UUID}" --host "${AGENT_HOST:?set the Agent host}:19999" \
+  --node "${NODE_UUID:?set the node UUID}" --host "${AGENT_HOST:?set the Agent host:port}" \
   --machine-guid "${AGENT_MG:?set the machine GUID}" \
   POST '/api/v3/function?function=systemd-journal' '{"info":true}' \
   | jq '{status, type}'

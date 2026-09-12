@@ -38,13 +38,13 @@ that every path needs a bearer. Owners: `src/web/api/web_api_v3.c`, `src/web/api
 `src/web/server/web_client.c` and `src/libnetdata/user-auth/http-access.h`.
 
 For a requested auth probe, choose an available read-only Function, set `NODE_UUID`, `AGENT_HOST` and `AGENT_FUNCTION`,
-and suppress the response body:
+using `AGENT_HOST` as the complete `host:port`, and suppress the response body:
 
 ```bash
 agent_function_path="/host/${NODE_UUID:?set node}/api/v3/function?function=${AGENT_FUNCTION:?set Function}"
 curl -sS --max-time 10 -o /dev/null -w '%{http_code}\n' -X POST \
   -H 'Content-Type: application/json' \
-  "http://${AGENT_HOST:?set host}:19999${agent_function_path}" \
+  "http://${AGENT_HOST:?set host:port}${agent_function_path}" \
   -d '{"info":true}'
 ```
 
@@ -55,6 +55,8 @@ Cloud-token flow in [Safe Execution](./SKILL.md#safe-execution), not manual cred
 Canonical protocol headers are `Authorization: Bearer <CLOUD_TOKEN>` to Cloud and
 `X-Netdata-Auth: Bearer <AGENT_BEARER>` to the Agent. `src/web/api/http_header.c` also accepts `Authorization` as a
 compatibility alias for an **Agent bearer**. That does not make a Cloud REST token an Agent bearer.
+The direct helper uses HTTP: bearer authentication does not encrypt the connection. Transport confidentiality
+depends on the network or tunnel protecting that connection.
 
 ## Mint And Cache Lifecycle
 
@@ -77,7 +79,8 @@ more than two hours left, so a mint response does not promise a new full lifetim
 
 The resolver stores the response plus `_cached_at` under
 `.local/audits/query-netdata-agents/bearers/<machine_guid>.json`, gitignored with file mode 0600; it attempts directory
-mode 0700. It returns the bearer through a validated caller-local output variable, not displayed stdout.
+mode 0700. The machine GUID must be a UUID, and existing cache-directory or cache-entry symlinks are rejected.
+It returns the bearer through a validated caller-local output variable, not displayed stdout.
 
 Current client policy, owned by `_agents_exp_to_seconds` and `_agents_resolve_bearer`:
 

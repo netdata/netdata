@@ -62,6 +62,88 @@ else:
                               '--host agent.invalid:19999 --machine-guid "$TEST_MG" '
                               '--function systemd-journal')
 
+    def resolve(self, caller):
+        if caller == "function":
+            return self.direct()
+        if caller == "query":
+            return self.run_shell('agents_query_agent --node "$TEST_NODE" '
+                                  '--host agent.invalid:19999 --machine-guid "$TEST_MG" '
+                                  'GET /api/v3/data')
+        return self.run_shell('resolve_test() { local bearer; '
+                              '_agents_resolve_bearer bearer "$TEST_NODE" "$TEST_MG" '
+                              'agent.invalid:19999; }; resolve_test')
+
+    def test_invalid_cache_keys_fail_before_cache_creation_or_requests(self):
+        for caller in ("resolver", "query", "function"):
+            for key in ("../victim", "../../victim", "/tmp/victim", "not-a-uuid",
+                        self.mg + "/../victim", self.mg + "\n", self.mg[:-1],
+                        "g" + self.mg[1:]):
+                with self.subTest(caller=caller, key=key):
+                    self.env["TEST_MG"] = key
+                    result = self.resolve(caller)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(result.stdout, "")
+                    self.assertFalse((self.root / ".local").exists())
+                    self.assertFalse(self.capture.exists())
+
+    def test_traversal_cannot_read_overwrite_or_delete_sibling_cache(self):
+        cache_dir = self.root / ".local/audits/query-netdata-agents/bearers"
+        cache_dir.mkdir(parents=True)
+        victim = cache_dir.parent / "victim.json"
+        self.env["TEST_MG"] = "../victim"
+        for caller in ("resolver", "query", "function"):
+            for state in ("fresh", "expired", "mint-failure"):
+                with self.subTest(caller=caller, state=state):
+                    content = json.dumps({"token": "SIBLING_TOKEN",
+                                          "expiration": 9999999999 if state == "fresh" else 1})
+                    victim.write_text(content)
+                    self.env["TEST_MINT_FAILURE"] = "1" if state == "mint-failure" else "0"
+                    result = self.resolve(caller)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(victim.read_text(), content)
+                    self.assertFalse(self.capture.exists())
+                    self.assertNotIn("SIBLING_TOKEN", result.stdout + result.stderr)
+
+    def test_linked_cache_entry_cannot_read_overwrite_or_remove_target(self):
+        cache_dir = self.root / ".local/audits/query-netdata-agents/bearers"
+        cache_dir.mkdir(parents=True)
+        victim = self.root / "victim.json"
+        cache_file = cache_dir / (self.mg + ".json")
+        cache_file.symlink_to(victim)
+        for caller in ("resolver", "query", "function"):
+            for state in ("fresh", "expired", "mint-failure", "missing"):
+                with self.subTest(caller=caller, state=state):
+                    content = json.dumps({"token": "LINKED_TOKEN",
+                                          "expiration": 9999999999 if state == "fresh" else 1})
+                    if state == "missing":
+                        victim.unlink()
+                    else:
+                        victim.write_text(content)
+                    self.env["TEST_MINT_FAILURE"] = "1" if state == "mint-failure" else "0"
+                    result = self.resolve(caller)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertTrue(cache_file.is_symlink())
+                    if state == "missing":
+                        self.assertFalse(victim.exists())
+                    else:
+                        self.assertEqual(victim.read_text(), content)
+                    self.assertFalse(self.capture.exists())
+                    self.assertNotIn("LINKED_TOKEN", result.stdout + result.stderr)
+
+    def test_linked_cache_directory_is_rejected_without_chmod_or_requests(self):
+        audit_dir = self.root / ".local/audits/query-netdata-agents"
+        audit_dir.mkdir(parents=True)
+        victim = self.root / "external-cache"
+        victim.mkdir(mode=0o755)
+        (audit_dir / "bearers").symlink_to(victim, target_is_directory=True)
+        for caller in ("resolver", "query", "function"):
+            with self.subTest(caller=caller):
+                result = self.resolve(caller)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(list(victim.iterdir()), [])
+                self.assertEqual(victim.stat().st_mode & 0o777, 0o755)
+                self.assertFalse(self.capture.exists())
+
     def requests(self):
         return [json.loads(line) for line in self.capture.read_text().splitlines()]
 
@@ -89,6 +171,16 @@ else:
         cache = self.root / ".local/audits/query-netdata-agents/bearers" / (self.mg + ".json")
         self.assertEqual(cache.stat().st_mode & 0o777, 0o600)
         self.assertEqual(cache.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(json.loads(cache.read_text())["token"], self.bearer)
+
+    def test_uppercase_uuid_keeps_its_cache_key(self):
+        self.env["TEST_MG"] = "ABCDEF01-2345-6789-ABCD-EF0123456789"
+        for _ in range(2):
+            result = self.resolve("query")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assert_auth_hidden(result)
+        self.assertEqual(sum("/bearer_get_token?" in r["url"] for r in self.requests()), 1)
+        cache = self.root / ".local/audits/query-netdata-agents/bearers" / (self.env["TEST_MG"] + ".json")
         self.assertEqual(json.loads(cache.read_text())["token"], self.bearer)
 
     def test_mint_failure_does_not_echo_credential_response(self):
