@@ -99,6 +99,13 @@ static bool sqlite_zombie_connection_created = false;
 // "skipping sqlite3_shutdown()" line can say whether the suppression came from this shutdown or
 // from something that happened hours earlier at startup.
 //
+// Both are ATOMIC, and the ORDER matters: they are written BEFORE the flag is published, and
+// read AFTER it is observed. sqlite_note_zombie_connection() cannot take sqlite_spinlock (it
+// runs both with that lock held and without it), and the reader in sqlite_library_shutdown()
+// formats this message outside the lock - so a thread-local close noting the first zombie can
+// run concurrently with that formatting. Publishing the flag first would let the reader see
+// "a zombie exists" and then read an unwritten name and timestamp.
+//
 // KNOWN LIMITATION, deliberate: this latch is sticky for the life of the process even if the
 // deferred close later completes (the owning thread finalizes its statements and the connection
 // really does go away). It cannot be cleared safely - once sqlite3_close_v2() has been called,
@@ -637,10 +644,15 @@ static void sqlite_note_zombie_connection(sqlite3 *database, const char *databas
         // Record WHICH database and WHEN, because this flag can be set at startup (the
         // context-load path closes thread-local handles) and is then reported hours later at
         // exit. Without provenance the exit message looks like a shutdown problem.
-        if (!__atomic_exchange_n(&sqlite_zombie_connection_created, true, __ATOMIC_RELEASE)) {
-            sqlite_zombie_noted_ut = now_monotonic_usec();
-            sqlite_zombie_noted_db = database_name;
+        // Populate BEFORE publishing, and publish with RELEASE - see the note at the
+        // declarations. Two threads racing to record the first zombie may overwrite each
+        // other's values, which is harmless for a diagnostic; what must not happen is the flag
+        // becoming visible ahead of the data.
+        if (!__atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+            __atomic_store_n(&sqlite_zombie_noted_db, database_name, __ATOMIC_RELAXED);
+            __atomic_store_n(&sqlite_zombie_noted_ut, now_monotonic_usec(), __ATOMIC_RELAXED);
         }
+        __atomic_store_n(&sqlite_zombie_connection_created, true, __ATOMIC_RELEASE);
         nd_log_daemon(
             NDLP_WARNING,
             "SQL: the %s database still has prepared statements attached; closing it leaves a zombie "
@@ -821,12 +833,17 @@ void sqlite_library_shutdown(void)
     // shutdown is a different problem from one caused by this teardown, and without this the two
     // are indistinguishable in the log.
     char zombie_note[160];
-    if (__atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE))
+    if (__atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        // The ACQUIRE above pairs with the RELEASE publish in sqlite_note_zombie_connection(),
+        // so these two are guaranteed written by the time we get here.
+        const char *noted_db = __atomic_load_n(&sqlite_zombie_noted_db, __ATOMIC_RELAXED);
+        usec_t noted_ut = __atomic_load_n(&sqlite_zombie_noted_ut, __ATOMIC_RELAXED);
         snprintfz(
             zombie_note, sizeof(zombie_note) - 1,
             "a zombie %s connection was noted %llu s ago and cannot be proven closed",
-            sqlite_zombie_noted_db ? sqlite_zombie_noted_db : "sqlite",
-            sqlite_zombie_noted_ut ? (unsigned long long)((now_monotonic_usec() - sqlite_zombie_noted_ut) / USEC_PER_SEC) : 0ULL);
+            noted_db ? noted_db : "sqlite",
+            noted_ut ? (unsigned long long)((now_monotonic_usec() - noted_ut) / USEC_PER_SEC) : 0ULL);
+    }
     else
         zombie_note[0] = '\0';
 
