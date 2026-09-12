@@ -6,6 +6,7 @@ description: Inspect, review or triage GitHub Code Scanning alerts, including Co
 # GitHub Code Scanning Triage
 
 Use the shipped helpers for GitHub REST alert operations. Run commands below from the repository root.
+Owner references starting with `./` are relative to this skill directory.
 
 ## Pick The Task
 
