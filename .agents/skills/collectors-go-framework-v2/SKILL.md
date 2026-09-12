@@ -169,7 +169,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   changed-contract name after eviction. When the window is `DescriptorRetentionUnbounded`, do not age out cached
   state for that name. This does not forbid reusing instruments for a fixed known metric surface. The source owner is
   `src/go/pkg/metrix/README.md#consumers-that-cache-per-name-state`; the Prometheus writer
-  (`src/go/plugin/go.d/collector/prometheus/writer.go`) demonstrates commit-aware retention.
+  (`src/go/plugin/go.d/collector/prometheus/writer.go`) demonstrates commit-aware retention. If the store lacks this
+  optional accessor, preserve cached handles rather than inventing a finite expiry.
 - To reproduce a V1 chart context in a migration, inject `context_namespace` (the
   fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
   `prefix.<app>.<metric>` without hand-built chart IDs.
