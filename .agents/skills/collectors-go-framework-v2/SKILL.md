@@ -248,7 +248,7 @@ mechanics. Keep it loaded for style; read source files for evidence.
 ## Host Scopes
 
 - Host scopes SHOULD be used only after a product decision says the data belongs on a generated vnode (the decision is
-  described in `collectors-authoring` §1.9).
+  described in `.agents/skills/collectors-authoring/collector-practices.md#19-remote-monitored-systems-and-vnodes`).
 - `ScopeKey` and `GUID` MUST be deterministic.
 - Collector-generated vnodes MUST set `_vnode_type=<source>`.
 - Host-scope cardinality MUST be bounded and documented. Collectors SHOULD NOT

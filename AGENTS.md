@@ -688,9 +688,8 @@ Skills index (runtime input under `.agents/skills/`, grouped by area; `.agents/s
 and the rule for adding one; each skill's frontmatter description is the authoritative trigger, this list is a pointer):
 
 - Collectors. START HERE: `collectors-authoring`.
-  - `collectors-authoring`: authoring or modifying any data-collection plugin or module (go.d, ibm.d, Rust, C,
-    PLUGINSD); logs, topology, NetFlow/sFlow/IPFIX, OTEL, SNMP profiles, statsd, Prometheus scraping, Functions; routes
-    to every skill below
+  - `collectors-authoring`: authoring, modifying or reviewing collectors across plugin families; shared identity,
+    missing-data, lifecycle, cost and cardinality contracts, then selective framework/domain routes
   - `collectors-go-design`: designing a new go.d collector or changing a public contract of one (config option, mode,
     metric meaning, ownership or durable state, Functions, vnodes), or reviewing such a change; the design note,
     architecture gate, operator surface, `config_schema.json` authoring, and mutating-collector references

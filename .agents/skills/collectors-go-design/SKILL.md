@@ -109,8 +109,9 @@ owner identity, record that a renamed job does not adopt old ownership. All of t
 observation, then map states to values, before writing metric names or `charts.yaml`. **Don't:** emit a value that
 looks like a measurement for something not measured; a skipped operation has no duration, a failed attempt is not a lag
 or success sample (its request duration may still be a valid measurement of the request), a waiting state is not a zero
-(`collectors-authoring` §1.4, gaps are data). **Evidence:** the table itself, plus a test that drives each row's
-state through the real path and asserts emitted / omitted / retained. **Boundary:** human-readable configuration does
+(`.agents/skills/collectors-authoring/collector-practices.md#14-gaps-are-data`). **Evidence:** the table itself, plus a
+test that drives each row's state through the real path and asserts emitted / omitted / retained. **Boundary:**
+human-readable configuration does
 not prohibit millisecond latency charts; the table decides units per chart.
 
 | Column | Meaning |
