@@ -11,8 +11,8 @@
 #   resolve-cid-to-diid.sh <cid>
 #
 # Prints the defectInstanceId on stdout if resolved, or "GONE" if Coverity has
-# no current defect instance for this CID (the underlying code was removed or
-# the scan no longer reports it).
+# no extractable instance ID in the reply. Verify response/scan/source evidence
+# before concluding that the underlying code was removed.
 #
 # This call is INDEPENDENT of view state -- it queries the defect by CID
 # directly, so it does not interact with the server-side view pagination.
