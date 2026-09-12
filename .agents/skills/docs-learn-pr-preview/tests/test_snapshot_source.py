@@ -24,7 +24,7 @@ class SnapshotTests(unittest.TestCase):
         self.repo.mkdir()
         self.git("init", "-q")
         self.git("config", "user.name", "Fixture Author")
-        self.git("config", "user.email", "fixture@example.invalid")
+        self.git("config", "user.email", "fixture@example.com")
         self.git("config", "core.autocrlf", "false")
         self.write("page.md", b"base page\n")
         self.write("deleted.md", b"base deletion candidate\n")
