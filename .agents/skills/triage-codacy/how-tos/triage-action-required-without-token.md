@@ -11,16 +11,20 @@ GitHub exposes no annotations and the local checkout has no `.env` with
      --jq '{conclusion:.conclusion, output:.output, details_url:.details_url}'
    ```
 
-2. Fetch public PR issue details from Codacy v3:
+2. If a live lookup is within scope, try the public Codacy v3 endpoint. Anonymous availability is service-dependent;
+   failure is an evidence gap, not an empty result. Use a fresh private capture directory:
 
    ```bash
    mkdir -p .local/audits/codacy
+   codacy_capture="$(mktemp -d .local/audits/codacy/public-issues.XXXXXX)"
+   chmod 700 "$codacy_capture"
    curl -fsS \
      "https://api.codacy.com/api/v3/analysis/organizations/gh/netdata/repositories/netdata/pull-requests/<PR>/issues?limit=100" \
-     -o .local/audits/codacy/pr-<PR>-public-issues.json
+     -o "$codacy_capture/issues.json"
    ```
 
-3. Show only still-blocking issues:
+3. After a successful fetch, inspect added issues. This is one page: follow `pagination.cursor` before claiming
+   complete coverage. Verify each candidate against the current source and current-head gate:
 
    ```bash
    jq -r '
@@ -34,11 +38,11 @@ GitHub exposes no annotations and the local checkout has no `.env` with
          .commitIssue.lineText
        ]
      | @tsv
-   ' .local/audits/codacy/pr-<PR>-public-issues.json
+   ' "$codacy_capture/issues.json"
    ```
 
-4. Ignore `deltaType == "Fixed"` entries for the current blocker. They are
-   historical issue records that Codacy already considers resolved.
+4. `deltaType == "Fixed"` records reflect Codacy's resolved classification. Preserve commit provenance and
+   investigate conflicting current-head evidence; an older anchor alone does not prove resolution.
 
 Safety note: the public response can contain `commitInfo` fields with personal
 metadata. Keep raw dumps under `.local/audits/codacy/`, which is gitignored,

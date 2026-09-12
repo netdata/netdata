@@ -745,8 +745,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `triage-coverity`: Coverity Scan defect triage
   - `triage-sonarqube`: SonarCloud findings triage
   - `triage-codeql`: GitHub Code Scanning / CodeQL triage
-  - `triage-codacy`: Codacy pre-push local analysis and read-only PR-issue fetching; write actions require a GitHub
-    issue or SOW
+  - `triage-codacy`: inspect or review Codacy findings/helpers, run local analysis, or fetch PR issues; supplied
+    evidence needs no live fetch. Write actions require user authorization and applicable project tracking.
   - `triage-agent-events`: investigating crashes, panics, or fatals across the fleet via the agent-events namespace;
     `AE_*` fields; 23h dedup; journal multi-value `selections` filters. Bug-investigation tool, not generic logs
   - Also relevant: `repo-pr-reviews` (pulls SonarCloud findings for a PR).
