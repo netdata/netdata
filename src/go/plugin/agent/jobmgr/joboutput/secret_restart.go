@@ -205,21 +205,25 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 				if cloned.FullName() != id {
 					return nil, errors.New("job output: dependent start identity differs")
 				}
-				successor, probeFailure, prepareErr := dcjc.prepareContainedJob(
+				successor, probeFailure, activation := dcjc.prepareContainedJob(
 					ctx,
 					cloned,
 					scope.Successor,
 					permit,
 				)
-				if prepareErr != nil {
+				if prepareErr := activation.err; prepareErr != nil {
 					if ctx.Err() != nil || lifecycle.OwnershipRetained(prepareErr) {
 						return nil, prepareErr
 					}
 					postimage := graphConfig(record, dyncfg.StatusFailed)
 					var pending func()
-					if candidatePreparationBusy(prepareErr) ||
-						errors.Is(prepareErr, jobmgr.ErrProcessAttemptDeadline) {
+					switch activation.kind {
+					case activationFailureBusy, activationFailureStaleStore, activationFailureDeadline:
 						pending = state.RetainPending
+					case activationFailureTransient:
+						pending = func() {
+							dcjc.scheduleAutoDetectionRetry(cloned, transientActivationFailure(cloned, prepareErr))
+						}
 					}
 					return dcjc.prepareMutationWithRetryAfterApply(
 						scope,
