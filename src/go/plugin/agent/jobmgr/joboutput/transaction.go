@@ -442,10 +442,10 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 }
 
 func activationFallback(spec ResourceTransactionSpec, err error) *ResourceActivationFallback {
-	switch {
-	case errors.Is(err, jobmgr.ErrProcessAttemptQuarantined):
+	switch classifyActivationError(err).kind {
+	case activationFailureQuarantined:
 		return spec.ActivationQuarantinedFallback
-	case errors.Is(err, jobmgr.ErrProcessAttemptBusy):
+	case activationFailureBusy:
 		return spec.ActivationBusyFallback
 	default:
 		return nil

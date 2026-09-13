@@ -2,20 +2,7 @@
 
 package joboutput
 
-import (
-	"errors"
-
-	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-)
-
-type constructionErrorClass uint8
-
-const (
-	constructionErrorOperational constructionErrorClass = iota
-	constructionErrorProposal
-	constructionErrorTransient
-)
+import "github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 type invalidJobConfigurationError struct {
 	cause error
@@ -45,37 +32,18 @@ func invalidJobConfiguration(err error) error {
 	if err == nil {
 		return nil
 	}
-	return &invalidJobConfigurationError{cause: err}
+	return &invalidJobConfigurationError{
+		cause: err,
+	}
 }
 
 func transientJobConstruction(err error) error {
 	if err == nil {
 		return nil
 	}
-	return &transientJobConstructionError{cause: err}
-}
-
-func classifyConstructionError(err error) constructionErrorClass {
-	var transient *transientJobConstructionError
-	if errors.As(err, &transient) {
-		return constructionErrorTransient
+	return &transientJobConstructionError{
+		cause: err,
 	}
-
-	var resolveErr *secretresolver.AtomicResolveError
-	if errors.As(err, &resolveErr) {
-		switch resolveErr.Kind {
-		case secretresolver.AtomicErrorProvider, secretresolver.AtomicErrorScope:
-			return constructionErrorTransient
-		default:
-			return constructionErrorProposal
-		}
-	}
-
-	var invalid *invalidJobConfigurationError
-	if errors.As(err, &invalid) {
-		return constructionErrorProposal
-	}
-	return constructionErrorOperational
 }
 
 func transientActivationFailure(config confgroup.Config, err error) *autoDetectionFailure {
