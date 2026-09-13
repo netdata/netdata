@@ -223,6 +223,7 @@ int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
+int pluginsd_timestamps_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
 void replication_initialize(void);
@@ -496,6 +497,7 @@ int netdata_main(int argc, char **argv) {
                             rrdlabels_aral_init(false);
 
                             if (pluginsd_parser_unittest()) return 1;
+                            if (pluginsd_timestamps_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
