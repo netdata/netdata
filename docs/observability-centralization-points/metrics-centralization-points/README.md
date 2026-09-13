@@ -31,6 +31,12 @@ For full details on high-availability Parent clusters, including failover and ma
 
 A **Netdata Parent** is a regular Netdata Agent configured to receive streaming metrics from Netdata Children (also normal Agents!).
 
+:::note
+
+**Operating system:** Netdata Parent nodes run on **Linux**. Windows Agents can stream metrics to a Linux Parent as **Children**, but cannot serve as Parents or stream receivers. For installing the Agent on Windows, see [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md).
+
+:::
+
 To install a Netdata Parent:
 
 1. Install Netdata on your Parent node.
