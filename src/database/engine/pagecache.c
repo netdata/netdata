@@ -11,7 +11,7 @@ struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
-    pgd_free(entry.data);
+    pgd_free(entry.data, PGD_FREE_SITE_MAIN_CACHE_EVICT);
 }
 
 static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused, Word_t section) {
