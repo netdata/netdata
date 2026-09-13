@@ -264,6 +264,18 @@ Which mechanism each command surface uses:
 - **Process-owned off-loop** — contained attempts own their physical worker, per-identity exclusion, and final cleanup
   across run rotation.
 
+Shutdown barrier, run finalizer, and Function cleanup work share the kernel-local `oneShotTask` handshake
+(`kernel_one_shot.go`). It validates request-to-task starts, the sequence-1 no-value completion, and the expected
+sequence-2 terminate/abandon acknowledgment. A terminal action is recorded only after the supervisor accepts it;
+replayed completion dirties the run without replacing that accepted action. Invalid acknowledgments and failed
+release retain ownership. Task references clear only after `TaskSupervisor.Release` succeeds.
+
+Each caller keeps its domain policy: barrier/finalizer errors dirty the run immediately, and their readiness gates
+preserve shutdown ordering. Function cleanup stores ordinary work errors until physical release, then acknowledges
+the exact catalog cleanup generation and reports errors. Resource stop/finalize and prepare/apply/dispose
+transactions retain their separate multi-phase protocols. The shared record is a value in the existing owner or map;
+it adds no scheduler, worker, per-task heap object, or population scan.
+
 ### Fairness and timeout rules
 
 - **`TaskSupervisor` runs two independent classes** — framework-control work (lifecycle/DynCfg commands) and generic

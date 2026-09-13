@@ -251,17 +251,9 @@ type CommandKernel struct {
 	shutdownRequests         map[lifecycle.TaskRequestRef]*commandLane       // lanes awaiting a shutdown stop, by request ref
 	shutdownTasks            map[lifecycle.TaskRef]*commandLane              // lanes with an in-flight shutdown stop, by task ref
 	shutdownBarrier          RunShutdownBarrier                              // run shutdown barrier (withdraw publications, close catalog)
-	shutdownBarrierRequest   lifecycle.TaskRequestRef                        // shutdown barrier task-request ref
-	shutdownBarrierTask      lifecycle.TaskRef                               // shutdown barrier task ref
-	shutdownBarrierAction    lifecycle.TaskActionKind                        // shutdown barrier task action kind
-	shutdownBarrierDone      bool                                            // barrier completed (or was a noop)
-	shutdownBarrierFailed    bool                                            // barrier failed
+	barrierWork              oneShotTask                                     // shutdown barrier handshake
 	finalizer                RunFinalizer                                    // run finalizer callback
-	finalizerRequest         lifecycle.TaskRequestRef                        // finalizer task-request ref
-	finalizerTask            lifecycle.TaskRef                               // finalizer task ref
-	finalizerAction          lifecycle.TaskActionKind                        // finalizer task action kind
-	finalizerDone            bool                                            // finalizer completed (or was a noop)
-	finalizerFailed          bool                                            // finalizer failed
+	finalizerWork            oneShotTask                                     // run finalizer handshake
 	lanes                    map[commandLaneKey]*commandLane                 // active lanes by key
 	freeLane                 *commandLane                                    // head of the recycled-lane freelist
 	ready                    [2]readyQueue                                   // per-source ready-lane queues
@@ -472,33 +464,15 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		})
 	}
 	if cleanup, ok := ck.functionCleanupTasks[completion.Ref]; ok {
-		if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone {
-			completion.Err = errors.Join(
-				completion.Err,
-				errors.New("jobmgr kernel: invalid Function cleanup completion"),
-			)
-			cleanup.err = completion.Err
-			ck.functionCleanupTasks[completion.Ref] = cleanup
-			ck.abandonTask(completion.Ref, completion.Sequence+1, completion.Err)
-			return
-		}
-		cleanup.err = completion.Err
-		ck.functionCleanupTasks[completion.Ref] = cleanup
-		if err := ck.tasks.SendAction(lifecycle.TaskAction{
-			Ref:      completion.Ref,
-			Sequence: 2,
-			Kind:     lifecycle.TaskActionTerminate,
-		}); err != nil {
-			ck.abandonTask(completion.Ref, 2, err)
-		}
+		ck.completeFunctionCleanup(cleanup, completion)
 		return
 	}
-	if ck.finalizerTask.Valid() && completion.Ref == ck.finalizerTask {
-		ck.completeRunFinalizer(completion)
+	if ck.finalizerWork.ref.Valid() && completion.Ref == ck.finalizerWork.ref {
+		ck.completeShutdownWork(&ck.finalizerWork, completion, "run finalizer")
 		return
 	}
-	if ck.shutdownBarrierTask.Valid() && completion.Ref == ck.shutdownBarrierTask {
-		ck.completeShutdownBarrier(completion)
+	if ck.barrierWork.ref.Valid() && completion.Ref == ck.barrierWork.ref {
+		ck.completeShutdownWork(&ck.barrierWork, completion, "shutdown barrier")
 		return
 	}
 	operation := ck.tasksByRef[completion.Ref]
@@ -1096,32 +1070,15 @@ func (ck *CommandKernel) sendEncodeAction(operation *commandOperation) error {
 
 func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 	if cleanup, ok := ck.functionCleanupTasks[ack.Ref]; ok {
-		if (ack.Kind != lifecycle.TaskActionTerminate && ack.Kind != lifecycle.TaskActionAbandon) ||
-			ack.Sequence != 2 {
-			ck.run.Dirty(errors.New("jobmgr kernel: invalid Function cleanup acknowledgement"))
-			return
-		}
-		if ack.Kind == lifecycle.TaskActionAbandon {
-			ck.recordAbandonment("function-cleanup", ack.Ref, ack.Abandoned)
-		}
-		if err := ck.tasks.Release(ack.Ref); err != nil {
-			ck.run.Dirty(err)
-			return
-		}
-		delete(ck.functionCleanupTasks, ack.Ref)
-		completeErr := errors.Join(cleanup.err, ack.Err)
-		catalogErr := ck.functionCatalog.CompleteCleanup(cleanup.ref)
-		if completeErr != nil || catalogErr != nil {
-			ck.run.Dirty(errors.Join(completeErr, catalogErr))
-		}
+		ck.acknowledgeFunctionCleanup(cleanup, ack)
 		return
 	}
-	if ck.finalizerTask.Valid() && ack.Ref == ck.finalizerTask {
-		ck.acknowledgeRunFinalizer(ack)
+	if ck.finalizerWork.ref.Valid() && ack.Ref == ck.finalizerWork.ref {
+		ck.acknowledgeShutdownWork(&ck.finalizerWork, ack, "run finalizer", "run-finalizer")
 		return
 	}
-	if ck.shutdownBarrierTask.Valid() && ack.Ref == ck.shutdownBarrierTask {
-		ck.acknowledgeShutdownBarrier(ack)
+	if ck.barrierWork.ref.Valid() && ack.Ref == ck.barrierWork.ref {
+		ck.acknowledgeShutdownWork(&ck.barrierWork, ack, "shutdown barrier", "shutdown-barrier")
 		return
 	}
 	operation := ck.tasksByRef[ack.Ref]
@@ -1461,7 +1418,7 @@ func (ck *CommandKernel) abortFunctionMutationForShutdown() error {
 }
 
 func (ck *CommandKernel) serviceShutdownStops(quantum int) (bool, error) {
-	if ck.shutdownPhase != commandShutdownCleanupDrain || !ck.shutdownBarrierDone || quantum <= 0 {
+	if ck.shutdownPhase != commandShutdownCleanupDrain || !ck.barrierWork.done || quantum <= 0 {
 		return false, errors.New("jobmgr kernel: invalid shutdown lane service")
 	}
 	for visited := 0; visited < quantum && ck.shutdownLaneCursor != nil; visited++ {
@@ -1548,10 +1505,7 @@ func (ck *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 func (ck *CommandKernel) advanceShutdownBarrier() error {
 	if ck.shutdownPhase != commandShutdownCleanupDrain ||
 		ck.shutdownBarrier == nil ||
-		ck.shutdownBarrierDone ||
-		ck.shutdownBarrierFailed ||
-		ck.shutdownBarrierRequest.Valid() ||
-		ck.shutdownBarrierTask.Valid() {
+		!ck.barrierWork.ready() {
 		return nil
 	}
 	if ck.shutdownCancelCursor != nil || ck.tasks.InheritedCancellationPending() {
@@ -1576,76 +1530,12 @@ func (ck *CommandKernel) advanceShutdownBarrier() error {
 	if err != nil {
 		return err
 	}
-	ck.shutdownBarrierRequest = request
+	ck.barrierWork.request = request
 	return nil
 }
 
-func (ck *CommandKernel) completeShutdownBarrier(completion lifecycle.TaskCompletion) {
-	if completion.Sequence != 1 ||
-		completion.Kind != lifecycle.TaskOutcomeNone ||
-		ck.shutdownBarrierAction != 0 ||
-		ck.shutdownBarrierDone ||
-		ck.shutdownBarrierFailed {
-		cause := errors.New("jobmgr kernel: invalid shutdown barrier completion")
-		ck.shutdownBarrierFailed = true
-		ck.shutdownBarrierAction = lifecycle.TaskActionAbandon
-		ck.abandonTask(completion.Ref, completion.Sequence+1, cause)
-		return
-	}
-	if completion.Err != nil {
-		ck.shutdownBarrierFailed = true
-		ck.run.Dirty(completion.Err)
-	}
-	ck.shutdownBarrierAction = lifecycle.TaskActionTerminate
-	if err := ck.tasks.SendAction(lifecycle.TaskAction{
-		Ref:      completion.Ref,
-		Sequence: 2,
-		Kind:     lifecycle.TaskActionTerminate,
-	}); err != nil {
-		ck.shutdownBarrierFailed = true
-		ck.shutdownBarrierAction = lifecycle.TaskActionAbandon
-		ck.abandonTask(completion.Ref, 2, err)
-	}
-}
-
-func (ck *CommandKernel) acknowledgeShutdownBarrier(ack lifecycle.TaskAcknowledgement) {
-	if ack.Sequence != 2 ||
-		(ack.Kind != lifecycle.TaskActionTerminate && ack.Kind != lifecycle.TaskActionAbandon) ||
-		ck.shutdownBarrierAction != ack.Kind ||
-		ck.shutdownBarrierDone {
-		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier acknowledgement"))
-		return
-	}
-	if ack.Err != nil {
-		ck.shutdownBarrierFailed = true
-		ck.run.Dirty(ack.Err)
-	}
-	if ack.Kind == lifecycle.TaskActionAbandon {
-		ck.shutdownBarrierFailed = true
-		ck.recordAbandonment("shutdown-barrier", ack.Ref, ack.Abandoned)
-	}
-	if err := ck.tasks.Release(ack.Ref); err != nil {
-		ck.shutdownBarrierFailed = true
-		ck.run.Dirty(err)
-		return
-	}
-	ck.shutdownBarrierTask = lifecycle.TaskRef{}
-	ck.shutdownBarrierAction = 0
-	if !ck.shutdownBarrierFailed {
-		ck.shutdownBarrierDone = true
-	}
-}
-
-func (ck *CommandKernel) runShutdownBarrierFailedTerminal() bool {
-	return ck.shutdownBarrierFailed &&
-		!ck.shutdownBarrierRequest.Valid() &&
-		!ck.shutdownBarrierTask.Valid() &&
-		ck.shutdownBarrierAction == 0
-}
-
 func (ck *CommandKernel) advanceRunFinalizer() error {
-	if ck.finalizer == nil || ck.finalizerDone || ck.finalizerFailed || ck.finalizerRequest.Valid() ||
-		ck.finalizerTask.Valid() {
+	if ck.finalizer == nil || !ck.finalizerWork.ready() {
 		return nil
 	}
 	if !ck.shutdownReadyForFinalizer() {
@@ -1668,7 +1558,7 @@ func (ck *CommandKernel) advanceRunFinalizer() error {
 	if err != nil {
 		return err
 	}
-	ck.finalizerRequest = request
+	ck.finalizerWork.request = request
 	return nil
 }
 
@@ -1678,10 +1568,7 @@ func (ck *CommandKernel) advanceRunFinalizer() error {
 func (ck *CommandKernel) shutdownBarrierSettled() bool {
 	return ck.shutdownPhase == commandShutdownCleanupDrain &&
 		ck.ownershipChains == 0 &&
-		ck.shutdownBarrierDone && !ck.shutdownBarrierFailed &&
-		!ck.shutdownBarrierRequest.Valid() &&
-		!ck.shutdownBarrierTask.Valid() &&
-		ck.shutdownBarrierAction == 0
+		ck.barrierWork.settled()
 }
 
 func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
@@ -1693,66 +1580,6 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 		return false
 	}
 	return true
-}
-
-func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletion) {
-	if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone || ck.finalizerAction != 0 ||
-		ck.finalizerDone ||
-		ck.finalizerFailed {
-		cause := errors.New("jobmgr kernel: invalid run finalizer completion")
-		ck.finalizerFailed = true
-		ck.finalizerAction = lifecycle.TaskActionAbandon
-		ck.abandonTask(completion.Ref, completion.Sequence+1, cause)
-		return
-	}
-	if completion.Err != nil {
-		ck.finalizerFailed = true
-		ck.run.Dirty(completion.Err)
-	}
-	ck.finalizerAction = lifecycle.TaskActionTerminate
-	if err := ck.tasks.SendAction(
-		lifecycle.TaskAction{
-			Ref:      completion.Ref,
-			Sequence: 2,
-			Kind:     lifecycle.TaskActionTerminate,
-		},
-	); err != nil {
-		ck.finalizerFailed = true
-		ck.finalizerAction = lifecycle.TaskActionAbandon
-		ck.abandonTask(completion.Ref, 2, err)
-	}
-}
-
-func (ck *CommandKernel) acknowledgeRunFinalizer(ack lifecycle.TaskAcknowledgement) {
-	if ack.Sequence != 2 ||
-		(ack.Kind != lifecycle.TaskActionTerminate && ack.Kind != lifecycle.TaskActionAbandon) ||
-		ck.finalizerAction != ack.Kind ||
-		ck.finalizerDone {
-		ck.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer acknowledgement"))
-		return
-	}
-	if ack.Err != nil {
-		ck.finalizerFailed = true
-		ck.run.Dirty(ack.Err)
-	}
-	if ack.Kind == lifecycle.TaskActionAbandon {
-		ck.finalizerFailed = true
-		ck.recordAbandonment("run-finalizer", ack.Ref, ack.Abandoned)
-	}
-	if err := ck.tasks.Release(ack.Ref); err != nil {
-		ck.finalizerFailed = true
-		ck.run.Dirty(err)
-		return
-	}
-	ck.finalizerTask = lifecycle.TaskRef{}
-	ck.finalizerAction = 0
-	if !ck.finalizerFailed {
-		ck.finalizerDone = true
-	}
-}
-
-func (ck *CommandKernel) runFinalizerFailedTerminal() bool {
-	return ck.finalizerFailed && !ck.finalizerRequest.Valid() && !ck.finalizerTask.Valid() && ck.finalizerAction == 0
 }
 
 func (ck *CommandKernel) kernelOwnershipDrained() bool {
@@ -1812,7 +1639,7 @@ func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 		LongLived:              ck.tasks.LongLivedCensus(),
 		Frame:                  ck.frames.Census(),
 		Abandoned:              ck.abandoned,
-		RunFinalizerComplete:   ck.finalizerDone && !ck.finalizerFailed,
+		RunFinalizerComplete:   ck.finalizerWork.done && !ck.finalizerWork.failed,
 	}
 }
 
