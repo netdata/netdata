@@ -34,10 +34,9 @@ existing owner pointer.
 2. Record the implementation target and validation under the applicable SOW gate. The existing request or approved
    plan covers a fixed goal; ask only for a genuine user-owned fork.
 3. Make the amendment and its coupled pointer fixes. Record what changed, its evidence, any intentionally retained
-   material, and line counts before and after. A full inventory, two evidence agents and a preservation map are not
-   required for this path.
-4. Check affected commands, links, routing and source claims safely, then use the review coverage required by the
-   user and `AGENTS.md#review`. This path does not automatically require two review lenses.
+   material, and line counts before and after. A full inventory or preservation map is not required for this path.
+4. Check affected commands, links, routing and source claims safely. Choose direct or delegated review and relevant
+   lenses under `AGENTS.md#review`; a bounded amendment does not automatically require an independent reviewer.
 5. Complete `./change-method.md#mechanical-hygiene` and `./change-method.md#close`.
 
 If the change relocates substantial knowledge, removes a workflow, changes audience boundaries, or makes omissions
@@ -47,11 +46,12 @@ skill solely because unrelated rot is visible; handle independent findings under
 ## Restructure Evidence
 
 For a substantial slim, split or rewrite, first identify candidate owners and incoming references using
-`./change-method.md#recorded-findings-and-owners`. Then run two independent read-only evidence passes with fresh
-context, scoped to the skill unit and its coupled surfaces. One owns `inventory.md`, the other `staleness.md` in the
-new run directory. Give both the scope and owner candidates (possibly empty); they MAY extend that list. Each writes its
-assigned file before returning its summary. The coordinator verifies consequential findings; source decides factual
-disagreements, and the finer split wins when inventory clauses differ.
+`./change-method.md#recorded-findings-and-owners`. Record inventory and source-verification evidence in `inventory.md`
+and `staleness.md` in the new run directory, scoped to the skill unit and its coupled surfaces. These are evidence
+requirements, not separate agent assignments. The main agent MAY do both or delegate bounded investigation when
+independence, expertise, context isolation or parallelism adds value under `AGENTS.md#review`. Give delegated work
+its scope, owner candidates and owned output path; candidates MAY be extended from evidence. Verify consequential
+findings, use source to resolve factual disagreements, and preserve the finer split when inventory clauses differ.
 
 The inventory opens with per-file line counts, prose-width observations and provenance from `git log --follow --
 <path>`: first and last change dates and commit count. Keep hashes in local evidence, never in the skill. Distinguish
@@ -79,7 +79,8 @@ The staleness pass checks claims against source, rather than treating old prose 
   Neither an absent mirror nor an unverifiable claim automatically authorizes synchronization, substitutes latest
   upstream for historical evidence, or requires a user decision.
 
-The coordinator re-verifies every Tier-1 item before implementation and preserves material uncertainty in the record.
+Before implementation, the main agent verifies every Tier-1 item at its source and preserves material uncertainty in
+the record. Reuse verification already performed directly; delegation does not require repeating the entire census.
 
 ## Recorded Findings And Owners
 
@@ -141,25 +142,27 @@ Relocated facts follow the receiving document's register and citation rules with
 
 ## Review Round
 
-Review the complete active unit and its interactions, not unrelated accumulated branch changes. Give every reviewer
-its original request, approved decisions, SOW filename when present, exact diff/base or recorded working-tree state,
-owner sources and relevant validation. The old text reveals removed contracts; it is evidence of change, never the
-truth authority. Reviewers are read-only and MUST NOT launch more agents or execute the skill's operational workflow.
+Choose direct assessment or independent review, its scope and relevant lenses under `AGENTS.md#review`. Assess the
+affected unit and its interactions without pulling in unrelated accumulated branch changes; a delegated assignment
+MAY focus on a specific question or fix. Give each reviewer the relevant request, approved decisions, assigned scope,
+SOW filename when present, exact diff/base or recorded working-tree state, owner sources and validation. The old text
+reveals removed contracts; it is evidence of change, never the truth authority. Reviewers are read-only and MUST NOT
+launch more agents or execute the skill's operational workflow.
 When an existing change has no inventory or map, derive the affected obligations from its diff and owners. Report
 concrete missing evidence; do not require the author to repeat an implementation ceremony solely to supply those files.
 
-Use the coverage required by the user and `AGENTS.md#review`. For a restructure, use two independent fresh-context
-lenses, both receiving the complete unit:
+For a restructure, the overall assessment includes both preservation and correctness. These concerns MAY be combined
+in one assessment or split when distinct uncertainty warrants it; they do not mandate separate agents:
 
-- Preservation: checks inventory and keep-list dispositions against reachable new text or cited owner sections,
+- Preservation: check inventory and keep-list dispositions against reachable new text or cited owner sections,
   including permissive halves and any range rows.
-- Correctness: checks changed and retained applicable contracts at their sources, enforcement qualifiers, command
-  prerequisites, anchors, invocation boundaries and unintended effects of removals. Assess the whole unit and its
-  acceptance criteria, not only individual claims. Record unavailable sources as unverifiable.
+- Correctness: check changed and retained applicable contracts at their sources, enforcement qualifiers, command
+  prerequisites, anchors, invocation boundaries and unintended effects of removals. The main agent accounts for the
+  unit's acceptance criteria; a specialist may assess a narrower question. Record unavailable sources as unverifiable.
 
-For changes to this method, include a fresh-context task walkthrough in the correctness assignment: bounded
-amendment, restructure, review-only work, and relevant authorization/evidence edge cases. It is part of the same
-review, not an extra review round.
+For changes to this method, walk through bounded amendment, restructure, review-only work and relevant authorization
+or evidence edge cases. Use direct assessment or include the walkthrough in a justified independent review under
+`AGENTS.md#review`; it is not an automatic extra assignment or review round.
 
 Ask reviewers for a proposed fix per finding. Verify findings before acting and classify blockers versus TODO using
 `AGENTS.md#review`. Validate prose commands
@@ -170,9 +173,9 @@ and confirm the same case afterward.
 
 Incorporate user steering promptly. If the review state changes, tell reviewers the precise changes or let them finish
 against their recorded state; do not hold the user's request until the round ends. Apply useful in-scope suggestions
-and run affected checks. Suggestions alone do not trigger another round. Repeat the complete unit only for a verified
-blocker that materially changes behavior or a review missing necessary context/coverage, following the owner's stop
-and recurrence rules. Git checkpoints require existing Git authorization; a review never supplies it.
+and run affected checks. Suggestions alone do not trigger another round. Select any follow-up scope from the fix's
+impact on earlier evidence under `AGENTS.md#review`; broaden only where needed. Git checkpoints require existing Git
+authorization; a review never supplies it.
 
 ## Mechanical Hygiene
 

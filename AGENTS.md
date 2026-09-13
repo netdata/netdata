@@ -389,7 +389,14 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
 
 ### Review
 
-Review findings are leads until verified against the shipped code and its contracts.
+The main agent owns delegation, review timing, scope and lenses within the user's directions. Assess the actual
+change, unresolved uncertainty and available validation; phase boundaries, commits and SOW steps do not require
+subagents by themselves. Direct work and self-review are appropriate when the affected behavior is well understood.
+Independent challenge is useful for consequential design assumptions, complex interactions or material blind spots.
+Exploration MAY be delegated to keep bulky source investigation out of the main context; return concise evidence and
+owner pointers, and verify consequential findings without routinely repeating the entire exploration.
+
+Review findings are leads until verified against the relevant design or shipped code and its contracts.
 
 - A review request alone is read-only, as defined under "When A SOW Is Required". The fix requirements below apply
   only when implementation is authorized.
@@ -407,22 +414,31 @@ Review findings are leads until verified against the shipped code and its contra
   reproducer and confirm the failure no longer occurs. Record the passing result or non-reproduction evidence;
   if verification is unavailable or incomplete, record the gap instead of claiming success. Speculation alone is
   not reproduction.
-- Multi-round review: when Git operations are authorized under "Git And PR Workflow", checkpoint-commit each
-  validated change (specific files only) before its review and squash at PR time only if history rewriting is
-  explicitly approved. Otherwise review the working-tree diff, preserve a record of the reviewed state, and report
-  that no checkpoint commit or squash was performed. A review requirement never grants Git authorization.
-- Recurrence: if findings keep clustering in one subsystem for ~2-3 rounds, stop patching individual cases, name the
-  missing invariant, and propose one class-level fix as a user decision.
-- Obtaining a review: the coordinating assistant spawns independent, full-scope reviewers with clean context, or runs
-  the external assistants the user names. Delegated reviewers MUST NOT launch other agents; include this restriction
-  in each review assignment. For performance-sensitive code at least one reviewer MUST carry an explicit hot-path
-  performance lens. Record each reviewer and its findings under Validation in the SOW when one exists; otherwise
-  report the findings and review scope directly to the user.
-- One complete review round is the default. Repeat the same full scope only when a verified shipping blocker
-  required a material change to shipped implementation or behavior, or when the prior review could not assess the
-  complete change.
-- Stop when no verified shipping blocker remains. Reviewer unanimity, exact readiness phrases, and zero optional
-  suggestions are NOT required. Nits alone MUST NOT keep a review cycle open.
+- Review coverage: choose a decision, coherent change or specific fix and include the context needed to trace its
+  consequences. The main agent remains responsible for the whole affected deliverable; individual reviewers MAY
+  assess narrower questions. Select correctness, compatibility, performance, security or other lenses when relevant,
+  rather than assigning a fixed roster. Follow explicit user requests for reviewers and scope.
+- Performance sensitivity depends on workload frequency, volume, cardinality, resource budgets and shared state,
+  not merely the language or component name. Consider per-item costs, allocations, contention and unbounded growth
+  where relevant, including infrequent paths with large inputs or shared locks. The main agent decides whether
+  independent performance review or additional measurements would resolve a material uncertainty.
+- Delegated reviewers MUST NOT edit files, perform operational actions or launch other agents; state these boundaries
+  in the assignment. Supply the selected scope, relevant acceptance criteria, owner sources, validation and the SOW
+  filename when present. Record the assessment used, its scope, material findings and limitations under Validation in
+  the SOW when one exists; direct assessment is valid and does not require inventing a reviewer.
+- Review evidence: preserve the reviewed commit or working-tree state and relevant validation. Checkpoint commits
+  MAY be useful when authorized under "Git And PR Workflow"; a review round neither requires nor authorizes a commit,
+  push or history rewrite.
+- Follow-up review: after a fix, retain earlier evidence that still holds. Check a bounded fix and its affected
+  interactions directly or with a focused reviewer. Widen review when changed assumptions, shared behavior, contracts
+  or missing coverage invalidate the earlier assessment beyond that fix. A blocker label or new commit alone does
+  not require a fresh reviewer or another complete review of the original scope.
+- Recurrence: when findings repeatedly cluster in one subsystem, investigate the shared cause or missing invariant
+  rather than accumulating case fixes. Broaden investigation when the evidence warrants it; obtain user approval
+  for remedies that change architecture, scope, public behavior or an approved design.
+- Stop when no verified shipping blocker remains, material risks have been assessed and required validation is
+  complete. Reviewer unanimity, exact readiness phrases and zero optional suggestions are NOT required. Nits alone
+  MUST NOT keep a review cycle open.
 
 ### Followup Discipline
 
@@ -626,9 +642,9 @@ Apply skill selection to implementation, investigation and read-only review, inc
   do not create implementation artifacts merely because the authoring workflow requests them. Existing user
   authorization for the actual task still applies.
 
-Review assignment scope, complete-change coverage and stop conditions remain in "Review". Provide the assigned
-operation, complete review scope, approved contracts, applicable skill paths/sections and available evidence so a
-specialist can select depth without guessing the task. One reviewer still assesses the complete unit and interactions.
+Review strategy and stop conditions remain in "Review". Provide the assigned operation and scope, approved contracts,
+applicable skill paths/sections and available evidence so a specialist can select depth without guessing the task.
+The main agent remains responsible for coverage of the affected deliverable; a specialist need not repeat it all.
 
 ### Project Skills
 
