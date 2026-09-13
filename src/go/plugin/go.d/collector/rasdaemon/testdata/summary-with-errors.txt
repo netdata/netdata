@@ -1,0 +1,43 @@
+Memory controller events summary:
+	Corrected on DIMM Label(s): 'DDR4_A1' location: 0:0:0:0 errors: 2
+	Corrected on DIMM Label(s): 'DDR4_A1' location: 0:1:0:0 errors: 1
+	Corrected on DIMM Label(s): 'DDR4_B1' location: 0:0:1:0 errors: 1
+	Uncorrected on DIMM Label(s): 'DDR4_G1' location: 0:0:4:0 errors: 1
+
+PCIe AER events summary:
+	2 Corrected errors: Receiver Error
+	1 Fatal errors: Uncorrected (Fatal) Completion Timeout
+
+No ARM processor errors.
+
+No CXL AER uncorrectable errors.
+
+No CXL AER correctable errors.
+
+No CXL overflow errors.
+
+No CXL poison errors.
+
+No CXL generic errors.
+
+No CXL general media errors.
+
+No CXL DRAM errors.
+
+No CXL memory module errors.
+
+No Extlog errors.
+
+Devlink records summary:
+	0000:41:00.0 has 1 errors
+Disk errors summary:
+	sdd has 1 errors
+Memory failure events summary:
+	Recovered errors: 1
+
+MCE records summary:
+	1 Corrected error errors
+	1 Uncorrected error errors
+SIGNAL events summary:
+	2 errors: 1
+
