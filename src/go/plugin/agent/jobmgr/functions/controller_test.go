@@ -391,7 +391,7 @@ func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testin
 			break
 		}
 	}
-	require.ErrorIs(t, controller.Stop(1), withdrawErr)
+	require.ErrorIs(t, controller.Stop(context.Background(), 1), withdrawErr)
 	require.Eventually(t, func() bool {
 		return predecessor.cleanupCount() == 1
 	}, time.Second, time.Millisecond)
@@ -846,6 +846,7 @@ func newContainedControllerTest(
 		t.Context(),
 		epoch,
 		attempts,
+		nil,
 		modules,
 		initial...,
 	)
@@ -870,7 +871,7 @@ func newContainedControllerTest(
 						}
 					}
 				}
-				_ = controller.Stop(epoch)
+				_ = controller.Stop(context.Background(), epoch)
 			}
 		}
 		attempts.BeginShutdown()
