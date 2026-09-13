@@ -316,8 +316,9 @@ void finalize_self_prepared_sql_statements()
     spinlock_lock(&sqlite_spinlock);
     spinlock_lock(&JudyL_thread_stmt_lock);
 
-    // Ask the authority, not our TLS cache: our cached pointer may name a pool that
-    // finalize_all_prepared_sql_statements() has already freed.
+    // Ask the authority, not our TLS cache. The JudyL mapping is what decides a pool exists;
+    // the TLS pointer is only a same-thread cache and may be stale. (It is not that someone else
+    // freed the pool - nothing else frees one any more - it is that the cache is not the record.)
     Word_t thread_id = (Word_t)gettid_cached();
     Pvoid_t *Pvalue = JudyLGet(JudyL_thread_stmt_pool, thread_id, PJE0);
     if (Pvalue && *Pvalue) {
@@ -839,7 +840,7 @@ void sqlite_library_shutdown(void)
         const char *noted_db = __atomic_load_n(&sqlite_zombie_noted_db, __ATOMIC_RELAXED);
         usec_t noted_ut = __atomic_load_n(&sqlite_zombie_noted_ut, __ATOMIC_RELAXED);
         snprintfz(
-            zombie_note, sizeof(zombie_note) - 1,
+            zombie_note, sizeof(zombie_note),
             "a zombie %s connection was noted %llu s ago and cannot be proven closed",
             noted_db ? noted_db : "sqlite",
             noted_ut ? (unsigned long long)((now_monotonic_usec() - noted_ut) / USEC_PER_SEC) : 0ULL);
