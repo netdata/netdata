@@ -400,7 +400,10 @@ For exporters with configurable label contracts:
 4. Keep non-additive gauges at their complete emitted identity when no reducer
    preserves meaning.
 5. Do not duplicate a coarser chart solely because Netdata can already obtain
-   that view by grouping the finer chart.
+   that view by grouping the finer chart. Independently admitted rollups are
+   different: when a detailed context exceeds an existing series limit, its
+   data is unavailable for grouping. Such a rollup must aggregate the complete
+   source population, and its own context remains subject to the same limits.
 
 Record every intentional aggregation in the operator model and prove it with a
 fixture containing at least two series that differ only on an omitted label. The

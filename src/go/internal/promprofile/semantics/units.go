@@ -38,8 +38,13 @@ type registeredSourceRate struct {
 var sourceUnitRegistry = map[string]map[string]rationalScale{
 	"count": {"one": newRationalScale(1, 1)},
 	"data": {
-		"byte":    newRationalScale(1, 1),
-		"megabit": newRationalScale(125_000, 1),
+		"byte":     newRationalScale(1, 1),
+		"megabit":  newRationalScale(125_000, 1),
+		"mebibyte": newRationalScale(1<<20, 1),
+		"gibibyte": newRationalScale(1<<30, 1),
+	},
+	"data_rate": {
+		"gibibyte_per_second": newRationalScale(1<<30, 1),
 	},
 	"duration": {
 		"second":      newRationalScale(1, 1),
@@ -254,6 +259,11 @@ func canonicalUnit(quantity, base, object, rate string) (string, error) {
 		unit = strings.ReplaceAll(object, "_", " ")
 	case "data":
 		unit = "bytes"
+	case "data_rate":
+		unit = "bytes/s"
+		if rate == "per_second" {
+			return "bytes/s²", nil
+		}
 	case "duration":
 		unit = "seconds"
 	case "duration_squared":

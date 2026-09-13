@@ -289,11 +289,15 @@ func labelValueMayMatch(label SourceLabel, value string) bool {
 	if label.Presence.Kind == "required" && strings.TrimSpace(value) == "" {
 		return false
 	}
+	if label.Domain.Kind == "unsigned_integer" {
+		_, ok := parseCanonicalUint64(value)
+		return ok
+	}
 	return label.Domain.Kind == "open" || slices.Contains(label.Domain.Values, value)
 }
 
 func labelMayHaveNonblankValue(label SourceLabel) bool {
-	if label.Domain.Kind == "open" {
+	if label.Domain.Kind == "open" || label.Domain.Kind == "unsigned_integer" {
 		return true
 	}
 	return slices.ContainsFunc(label.Domain.Values, func(value string) bool {
