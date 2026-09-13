@@ -10,9 +10,17 @@ This method:
 - Works with static builds only (for now).
 - Does *not* support automatic updates on offline systems.
 
+## Before You Start
+
+Before preparing an offline package, keep these constraints in mind:
+
+- The selected `--release-channel` is written into the package and used again during offline installation.
+- The package usually includes static installers for multiple architectures. To limit the package to specific architectures, use `--offline-architecture`.
+- Offline installation does not support every `kickstart.sh` option. For example, `--install-version` cannot be used with an offline install source.
+
 :::note
 
-Local package tools like `apt-offline` may work for DEB/RPM installs — but we don’t officially support them.
+Local package tools like `apt-offline` may work for DEB/RPM installs — but we don't officially support them.
 
 :::
 
@@ -24,7 +32,7 @@ For offline installation on Windows, see [Install Netdata on Windows](/packaging
 
 ## Step 1: Prepare the Offline Installation Package
 
-On your internet-connected machine, you'll need::
+On your internet-connected machine, you'll need:
 
 | Requirement             | Purpose                    |
 |-------------------------|----------------------------|
@@ -32,23 +40,32 @@ On your internet-connected machine, you'll need::
 | `sha256sum` or `shasum` | Verify script downloads    |
 | POSIX-compliant shell   | Required to run the script |
 
+You also need a writable target directory for the package and a temporary directory where the user running the script can write and execute files.
+
 Run the following command:
 
 - using `wget`
+
   ```bash
   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh
   sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
   ```
+
 - or using `curl`
+
   ```bash
   curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh
   sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
   ```
 
+The `--release-channel` flag controls which pre-built static binaries are downloaded into the offline package:
+
+- `--release-channel stable`: the latest stable release.
+- `--release-channel nightly`: the latest nightly build, for testing new features.
+
 :::note
 
 The folder name `netdata-offline` is just an example — use any name you want.
-To use the nightly channel instead, replace `stable` with `nightly`.
 
 :::
 
@@ -57,12 +74,12 @@ To use the nightly channel instead, replace `stable` with `nightly`.
 The script creates a directory with all necessary files:
 
 ```
-── netdata-offline
-   ├── channel             # Release channel info
-   ├── install.sh          # Installation script
-   ├── kickstart.sh        # Original kickstart script
-   ├── netdata-*.gz.run    # Netdata static packages for different architectures
-   └── sha256sums.txt      # Verification hashes
+./netdata-offline
+├── channel             # Release channel info
+├── install.sh          # Installation script
+├── kickstart.sh        # Original kickstart script
+├── netdata-*.gz.run    # Netdata static packages for different architectures
+└── sha256sums.txt      # Verification hashes
 ```
 
 ## Step 2: Transfer to Offline System
@@ -76,69 +93,55 @@ The installation script expects the exact directory structure and filenames.
 
 :::
 
-:::tip
+## Step 3: Install Netdata on the Target (Offline) System
 
-The folder name `netdata-offline` is just an example — use any name you want.
-
-:::
-
-### Output
-
-This will create a directory like:
-
-```
-./netdata-offline/
-```
-
-It will contain everything required to install Netdata offline.
-
----
-
-## Choose Release Channel (Optional)
-
-To prepare for a specific channel (`nightly` or `stable`), add:
-
-```bash
---release-channel nightly
-```
-
-or
-
-```bash
---release-channel stable
-```
-
-Example:
-
-```bash
-sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
-```
-
----
-
-## Install Netdata on the Target (Offline) System
-
-1. Copy the entire `netdata-offline` directory to your offline system.
-
-:::warning
-
-Don't rename or modify the files.
-
-:::
-
-2. On the offline system, run:
+On the offline system, navigate into the transferred directory and run the installer:
 
 ```bash
 cd netdata-offline
 sudo ./install.sh
 ```
 
-The `install.sh` script accepts the [same parameters](/packaging/installer/methods/kickstart.md#optional-parameters-for-kickstartsh) as `kickstart.sh`, allowing you to customize your installation.
+The `install.sh` script forwards many of the same parameters to `kickstart.sh`, allowing you to customize your installation. See [Before You Start](#before-you-start) for offline-specific limitations.
 
 ## Automatic Updates
 
 :::note
 
-Automatic updates are *disabled* by default for offline installations — since there’s no network connection.
+Automatic updates are *disabled* by default for offline installations — since there's no network connection.
 
 :::
+
+## Troubleshooting
+
+### "This script needs root privileges" (F0201)
+
+If you see the following error when running the preparation command:
+
+```
+ABORTED  This script needs root privileges to install Netdata, but cannot find a way to gain them (we support sudo, doas, and pkexec). Either re-run this script as root, or set $ROOTCMD to a command that can be used to gain root privileges.
+```
+
+This means the script could not find a supported privilege escalation tool (`sudo`, `doas`, or `pkexec`) while running as an unprivileged user.
+
+To resolve this:
+
+1. **Run the command as root:** Open a root shell and run the preparation command directly:
+
+   ```bash
+   sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+   ```
+
+2. **Re-run with a privilege escalation tool:** Prefix the command with `sudo`, `doas`, or `pkexec`:
+
+   ```bash
+   sudo sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+   ```
+
+3. **Set the `ROOTCMD` environment variable:** If your system uses a non-standard privilege escalation tool, set `ROOTCMD` to point to it:
+
+   ```bash
+   ROOTCMD=/usr/bin/doas sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-source ./netdata-offline
+   ```
+
+See the [Environment Variables](/packaging/installer/methods/kickstart.md#environment-variables) section in the kickstart documentation for full details on `ROOTCMD` and other options.
