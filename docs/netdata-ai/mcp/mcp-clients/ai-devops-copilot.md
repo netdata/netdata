@@ -209,6 +209,10 @@ See dedicated configuration guides for each client:
 - Netdata Web Client
 - Claude Code
 - Gemini CLI
+- OpenAI Codex CLI
+- Crush
+- OpenCode
+- Devin
 
 - Train team members on safe AI usage practices
 - Establish clear guidelines for when AI assistance is appropriate
