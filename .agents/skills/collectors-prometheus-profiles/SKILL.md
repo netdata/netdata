@@ -64,8 +64,9 @@ Apply the authoring criteria to the assigned change; execute operational procedu
    category explains it; which resource or dependency is responsible. For each view state one operator question, one
    entity grain, the smallest stable identity, the labels compared as dimensions, the labels kept for filtering, the
    labels omitted with the reducer that keeps the omission truthful, and the exact source signals with units,
-   lifecycle, and inter-dimension relationship. Do not build an aggregate view Netdata derives by grouping the detailed
-   one; choose the finest operator-useful grain whose cardinality and churn stay acceptable.
+   lifecycle, and inter-dimension relationship. Choose the finest operator-useful grain whose cardinality and churn
+   stay acceptable. An independently admitted rollup is useful when existing context limits can omit that detail:
+   grouping cannot reconstruct data that was not collected. Otherwise avoid duplicating a view obtainable by grouping.
 3. **Classify labels and cardinality** (`chart-design.md`, "Assign labels by role"; `docs/NIDL-Framework.md` when
    choosing a monitored component, instance grain, dimension set, or label role). Give every relevant label a role:
    required identity, optional identity, dimension, promoted metadata, routing only, or omitted with a stated lost

@@ -1,0 +1,3983 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Service/model rollups and built-in detail are admitted independently under the existing limits.
+# Scheduler pressure uses extrema because ranks may report replicated observations.
+# Unknown source families remain available to generic fallback.
+
+match: sglang:*
+app: sglang
+relabeling:
+- match: sglang:http_requests_total
+  metric_relabel_configs:
+  - target_label: method_class
+    replacement: other
+  - source_labels:
+    - method
+    regex: (GET|HEAD|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)
+    target_label: method_class
+    replacement: ${1}
+- match: sglang:http_responses_total
+  metric_relabel_configs:
+  - target_label: method_class
+    replacement: other
+  - source_labels:
+    - method
+    regex: (GET|HEAD|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)
+    target_label: method_class
+    replacement: ${1}
+- match: sglang:http_responses_total
+  metric_relabel_configs:
+  - target_label: status_class
+    replacement: unclassified
+  - source_labels:
+    - status_code
+    regex: ([1-5])[0-9]{2}
+    target_label: status_class
+    replacement: ${1}xx
+- match: sglang:http_requests_active
+  metric_relabel_configs:
+  - target_label: method_class
+    replacement: other
+  - source_labels:
+    - method
+    regex: (GET|HEAD|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)
+    target_label: method_class
+    replacement: ${1}
+template:
+  context_namespace: sglang
+  chart_defaults:
+    label_promotion: []
+  groups:
+  - family: Service
+    context_namespace: service
+    chart_defaults:
+      priority: 70000
+    metrics:
+    - sglang:num_requests_total
+    - sglang:prompt_tokens_total
+    - sglang:generation_tokens_total
+    - sglang:e2e_request_latency_seconds_bucket
+    - sglang:e2e_request_latency_seconds_count
+    - sglang:e2e_request_latency_seconds_sum
+    - sglang:time_to_first_token_seconds_bucket
+    - sglang:time_to_first_token_seconds_count
+    - sglang:time_to_first_token_seconds_sum
+    - sglang:inter_token_latency_seconds_bucket
+    - sglang:inter_token_latency_seconds_count
+    - sglang:inter_token_latency_seconds_sum
+    - sglang:failed_session_recoveries_total
+    - sglang:routing_keys_active
+    - sglang:http_requests_total
+    - sglang:http_responses_total
+    - sglang:http_requests_active
+    charts:
+    - title: Finished Inference Requests
+      context: finished_requests
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_requests_total
+        name_from_label: is_streaming
+      aggregation: sum
+    - title: Finished Request Tokens
+      context: tokens
+      units: tokens/s
+      dimensions:
+      - selector: sglang:prompt_tokens_total
+        name: prompt
+      - selector: sglang:generation_tokens_total
+        name: generated
+      aggregation: sum
+    - title: End-to-End Request Latency Distribution (seconds)
+      context: e2e_request_latency_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_bucket
+      aggregation: sum
+    - title: End-to-End Request Latency Observation Rate
+      context: e2e_request_latency_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_count
+        name: observations
+      aggregation: sum
+    - title: End-to-End Request Latency Accumulated Observations
+      context: e2e_request_latency_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_sum
+        name: observation_sum
+      aggregation: sum
+    - title: Time to First Token Distribution (seconds)
+      context: time_to_first_token_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_bucket
+      aggregation: sum
+    - title: Time to First Token Observation Rate
+      context: time_to_first_token_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_count
+        name: observations
+      aggregation: sum
+    - title: Time to First Token Accumulated Observations
+      context: time_to_first_token_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_sum
+        name: observation_sum
+      aggregation: sum
+    - title: Inter-Token Latency Distribution (seconds)
+      context: inter_token_latency_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_bucket
+      aggregation: sum
+    - title: Inter-Token Latency Observation Rate
+      context: inter_token_latency_observations
+      units: tokens/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_count
+        name: observations
+      aggregation: sum
+    - title: Inter-Token Latency Accumulated Observations
+      context: inter_token_latency_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_sum
+        name: observation_sum
+      aggregation: sum
+    - title: Failed Streaming-Session Recoveries
+      context: failed_session_recoveries_total
+      units: sessions/s
+      dimensions:
+      - selector: sglang:failed_session_recoveries_total
+        name: failed_session_recoveries_total
+    - title: Active Routing Keys
+      context: routing_keys_active
+      units: routing keys
+      dimensions:
+      - selector: sglang:routing_keys_active
+        name: routing_keys_active
+    - title: HTTP Request Arrivals
+      context: http_requests_total
+      units: requests/s
+      dimensions:
+      - selector: sglang:http_requests_total
+        name_from_label: method_class
+      aggregation: sum
+    - title: Returned HTTP Responses
+      context: http_responses_total
+      units: requests/s
+      dimensions:
+      - selector: sglang:http_responses_total
+        name_from_label: status_class
+      aggregation: sum
+    - title: Active HTTP Requests
+      context: http_requests_active
+      units: requests
+      dimensions:
+      - selector: sglang:http_requests_active
+        name_from_label: method_class
+      aggregation: sum
+  - family: Models
+    context_namespace: models
+    chart_defaults:
+      priority: 71000
+    metrics:
+    - sglang:num_requests_total
+    - sglang:prompt_tokens_total
+    - sglang:generation_tokens_total
+    - sglang:e2e_request_latency_seconds_bucket
+    - sglang:e2e_request_latency_seconds_count
+    - sglang:e2e_request_latency_seconds_sum
+    - sglang:time_to_first_token_seconds_bucket
+    - sglang:time_to_first_token_seconds_count
+    - sglang:time_to_first_token_seconds_sum
+    - sglang:inter_token_latency_seconds_bucket
+    - sglang:inter_token_latency_seconds_count
+    - sglang:inter_token_latency_seconds_sum
+    - sglang:num_so_requests_total
+    - sglang:num_aborted_requests_total
+    - sglang:cached_tokens_total
+    - sglang:prompt_tokens_histogram_bucket
+    - sglang:prompt_tokens_histogram_count
+    - sglang:prompt_tokens_histogram_sum
+    - sglang:uncached_prompt_tokens_histogram_bucket
+    - sglang:uncached_prompt_tokens_histogram_count
+    - sglang:uncached_prompt_tokens_histogram_sum
+    - sglang:generation_tokens_histogram_bucket
+    - sglang:generation_tokens_histogram_count
+    - sglang:generation_tokens_histogram_sum
+    charts:
+    - title: Finished Inference Requests
+      context: finished_requests
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_requests_total
+        name_from_label: is_streaming
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Finished Request Tokens
+      context: tokens
+      units: tokens/s
+      dimensions:
+      - selector: sglang:prompt_tokens_total
+        name: prompt
+      - selector: sglang:generation_tokens_total
+        name: generated
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: End-to-End Request Latency Distribution (seconds)
+      context: e2e_request_latency_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_bucket
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: End-to-End Request Latency Observation Rate
+      context: e2e_request_latency_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: End-to-End Request Latency Accumulated Observations
+      context: e2e_request_latency_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Time to First Token Distribution (seconds)
+      context: time_to_first_token_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_bucket
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Time to First Token Observation Rate
+      context: time_to_first_token_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Time to First Token Accumulated Observations
+      context: time_to_first_token_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Inter-Token Latency Distribution (seconds)
+      context: inter_token_latency_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_bucket
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Inter-Token Latency Observation Rate
+      context: inter_token_latency_observations
+      units: tokens/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Inter-Token Latency Accumulated Observations
+      context: inter_token_latency_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Finished Structured-Output Requests
+      context: structured_output_requests
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_so_requests_total
+        name: finished
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Request Abort Calls
+      context: abort_calls
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_aborted_requests_total
+        name: aborted
+      instances:
+        by_labels:
+        - model_name
+    - title: Finished Request Cached Tokens
+      context: cached_tokens
+      units: tokens/s
+      dimensions:
+      - selector: sglang:cached_tokens_total
+        name_from_label: cache_source
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Prompt Length Distribution (tokens)
+      context: prompt_tokens_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:prompt_tokens_histogram_bucket
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Prompt Length Observation Rate
+      context: prompt_tokens_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:prompt_tokens_histogram_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Prompt Length Accumulated Observations
+      context: prompt_tokens_observation_sum
+      units: tokens/s
+      dimensions:
+      - selector: sglang:prompt_tokens_histogram_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Uncached Prompt Length Distribution (tokens)
+      context: uncached_prompt_tokens_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:uncached_prompt_tokens_histogram_bucket
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Uncached Prompt Length Observation Rate
+      context: uncached_prompt_tokens_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:uncached_prompt_tokens_histogram_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Uncached Prompt Length Accumulated Observations
+      context: uncached_prompt_tokens_observation_sum
+      units: tokens/s
+      dimensions:
+      - selector: sglang:uncached_prompt_tokens_histogram_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Generated Length Distribution (tokens)
+      context: generation_tokens_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:generation_tokens_histogram_bucket
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Generated Length Observation Rate
+      context: generation_tokens_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:generation_tokens_histogram_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Generated Length Accumulated Observations
+      context: generation_tokens_observation_sum
+      units: tokens/s
+      dimensions:
+      - selector: sglang:generation_tokens_histogram_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+      aggregation: sum
+    - title: Finished Inference Requests
+      context: by_engine_finished_requests
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_requests_total
+        name_from_label: is_streaming
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Finished Request Tokens
+      context: by_engine_tokens
+      units: tokens/s
+      dimensions:
+      - selector: sglang:prompt_tokens_total
+        name: prompt
+      - selector: sglang:generation_tokens_total
+        name: generated
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: End-to-End Request Latency Distribution (seconds)
+      context: by_engine_e2e_request_latency_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_bucket
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: End-to-End Request Latency Observation Rate
+      context: by_engine_e2e_request_latency_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: End-to-End Request Latency Accumulated Observations
+      context: by_engine_e2e_request_latency_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:e2e_request_latency_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Time to First Token Distribution (seconds)
+      context: by_engine_time_to_first_token_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_bucket
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Time to First Token Observation Rate
+      context: by_engine_time_to_first_token_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Time to First Token Accumulated Observations
+      context: by_engine_time_to_first_token_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:time_to_first_token_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Inter-Token Latency Distribution (seconds)
+      context: by_engine_inter_token_latency_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_bucket
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Inter-Token Latency Observation Rate
+      context: by_engine_inter_token_latency_observations
+      units: tokens/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Inter-Token Latency Accumulated Observations
+      context: by_engine_inter_token_latency_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:inter_token_latency_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Finished Structured-Output Requests
+      context: by_engine_structured_output_requests
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_so_requests_total
+        name: finished
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Request Abort Calls
+      context: by_engine_abort_calls
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_aborted_requests_total
+        name: aborted
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+    - title: Finished Request Cached Tokens
+      context: by_engine_cached_tokens
+      units: tokens/s
+      dimensions:
+      - selector: sglang:cached_tokens_total
+        name_from_label: cache_source
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Prompt Length Distribution (tokens)
+      context: by_engine_prompt_tokens_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:prompt_tokens_histogram_bucket
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Prompt Length Observation Rate
+      context: by_engine_prompt_tokens_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:prompt_tokens_histogram_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Prompt Length Accumulated Observations
+      context: by_engine_prompt_tokens_observation_sum
+      units: tokens/s
+      dimensions:
+      - selector: sglang:prompt_tokens_histogram_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Uncached Prompt Length Distribution (tokens)
+      context: by_engine_uncached_prompt_tokens_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:uncached_prompt_tokens_histogram_bucket
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Uncached Prompt Length Observation Rate
+      context: by_engine_uncached_prompt_tokens_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:uncached_prompt_tokens_histogram_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Uncached Prompt Length Accumulated Observations
+      context: by_engine_uncached_prompt_tokens_observation_sum
+      units: tokens/s
+      dimensions:
+      - selector: sglang:uncached_prompt_tokens_histogram_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Generated Length Distribution (tokens)
+      context: by_engine_generation_tokens_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:generation_tokens_histogram_bucket
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Generated Length Observation Rate
+      context: by_engine_generation_tokens_observations
+      units: requests/s
+      dimensions:
+      - selector: sglang:generation_tokens_histogram_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Generated Length Accumulated Observations
+      context: by_engine_generation_tokens_observation_sum
+      units: tokens/s
+      dimensions:
+      - selector: sglang:generation_tokens_histogram_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Finished Inference Requests
+      context: by_priority_finished_requests
+      units: requests/s
+      dimensions:
+      - selector: sglang:num_requests_total{priority=~".+"}
+        name_from_label: is_streaming
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+        - priority
+      aggregation: sum
+    - title: Finished Request Tokens
+      context: by_priority_tokens
+      units: tokens/s
+      dimensions:
+      - selector: sglang:prompt_tokens_total{priority=~".+"}
+        name: prompt
+      - selector: sglang:generation_tokens_total{priority=~".+"}
+        name: generated
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+        - priority
+      aggregation: sum
+    groups:
+    - family: Scheduling
+      context_namespace: scheduling
+      metrics:
+      - sglang:num_running_reqs
+      - sglang:num_queue_reqs
+      - sglang:num_retracted_reqs
+      - sglang:num_paused_reqs
+      - sglang:num_retracted_input_tokens_total
+      - sglang:num_retracted_output_tokens_total
+      - sglang:num_retracted_requests_total
+      - sglang:num_unique_running_routing_keys
+      - sglang:routing_key_running_req_count
+      - sglang:routing_key_all_req_count
+      - sglang:queue_time_seconds_bucket
+      - sglang:queue_time_seconds_count
+      - sglang:queue_time_seconds_sum
+      charts:
+      - title: Worker Request Queues
+        context: worker_requests
+        units: requests
+        dimensions:
+        - selector: sglang:num_running_reqs{priority!~".+"}
+          name: running
+        - selector: sglang:num_queue_reqs{priority!~".+"}
+          name: waiting
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Maximum Worker Request Queues
+        context: maximum_worker_requests
+        units: requests
+        dimensions:
+        - selector: sglang:num_running_reqs{priority!~".+"}
+          name: running
+        - selector: sglang:num_queue_reqs{priority!~".+"}
+          name: waiting
+        instances:
+          by_labels:
+          - model_name
+        aggregation: max
+      - title: Worker Request Queues by Priority
+        context: priority_requests
+        units: requests
+        dimensions:
+        - selector: sglang:num_running_reqs{priority=~".+"}
+          name: running
+        - selector: sglang:num_queue_reqs{priority=~".+"}
+          name: waiting
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - priority
+          optional_by_labels:
+          - dp_rank
+      - title: Requests Retracted or Paused in Last Statistics Interval
+        context: interval_disruptions
+        units: requests
+        dimensions:
+        - selector: sglang:num_retracted_reqs
+          name: retracted
+        - selector: sglang:num_paused_reqs
+          name: paused
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Retracted Tokens
+        context: retracted_tokens
+        units: tokens/s
+        dimensions:
+        - selector: sglang:num_retracted_input_tokens_total
+          name: input
+        - selector: sglang:num_retracted_output_tokens_total
+          name: output
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Retracted Requests
+        context: num_retracted_requests_total
+        units: requests/s
+        dimensions:
+        - selector: sglang:num_retracted_requests_total
+          name: num_retracted_requests_total
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Routing Keys with Running Requests
+        context: num_unique_running_routing_keys
+        units: routing keys
+        dimensions:
+        - selector: sglang:num_unique_running_routing_keys
+          name: num_unique_running_routing_keys
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Current Routing Keys by Running Request Count
+        context: routing_key_running_req_count
+        units: routing keys
+        dimensions:
+        - selector: sglang:routing_key_running_req_count{le="1",gt="0"}
+          name: requests_0_to_1
+        - selector: sglang:routing_key_running_req_count{le="2",gt="1"}
+          name: requests_1_to_2
+        - selector: sglang:routing_key_running_req_count{le="3",gt="2"}
+          name: requests_2_to_3
+        - selector: sglang:routing_key_running_req_count{le="5",gt="3"}
+          name: requests_3_to_5
+        - selector: sglang:routing_key_running_req_count{le="7",gt="5"}
+          name: requests_5_to_7
+        - selector: sglang:routing_key_running_req_count{le="10",gt="7"}
+          name: requests_7_to_10
+        - selector: sglang:routing_key_running_req_count{le="20",gt="10"}
+          name: requests_10_to_20
+        - selector: sglang:routing_key_running_req_count{le="50",gt="20"}
+          name: requests_20_to_50
+        - selector: sglang:routing_key_running_req_count{le="100",gt="50"}
+          name: requests_50_to_100
+        - selector: sglang:routing_key_running_req_count{le="200",gt="100"}
+          name: requests_100_to_200
+        - selector: sglang:routing_key_running_req_count{le="+Inf",gt="200"}
+          name: requests_200_to_infinity
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Current Routing Keys by Total Request Count
+        context: routing_key_all_req_count
+        units: routing keys
+        dimensions:
+        - selector: sglang:routing_key_all_req_count{le="1",gt="0"}
+          name: requests_0_to_1
+        - selector: sglang:routing_key_all_req_count{le="2",gt="1"}
+          name: requests_1_to_2
+        - selector: sglang:routing_key_all_req_count{le="3",gt="2"}
+          name: requests_2_to_3
+        - selector: sglang:routing_key_all_req_count{le="5",gt="3"}
+          name: requests_3_to_5
+        - selector: sglang:routing_key_all_req_count{le="7",gt="5"}
+          name: requests_5_to_7
+        - selector: sglang:routing_key_all_req_count{le="10",gt="7"}
+          name: requests_7_to_10
+        - selector: sglang:routing_key_all_req_count{le="20",gt="10"}
+          name: requests_10_to_20
+        - selector: sglang:routing_key_all_req_count{le="50",gt="20"}
+          name: requests_20_to_50
+        - selector: sglang:routing_key_all_req_count{le="100",gt="50"}
+          name: requests_50_to_100
+        - selector: sglang:routing_key_all_req_count{le="200",gt="100"}
+          name: requests_100_to_200
+        - selector: sglang:routing_key_all_req_count{le="+Inf",gt="200"}
+          name: requests_200_to_infinity
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Request Queue Wait Distribution (seconds)
+        context: queue_time_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:queue_time_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Request Queue Wait Observation Rate
+        context: queue_time_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:queue_time_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Request Queue Wait Accumulated Observations
+        context: queue_time_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:queue_time_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+    - family: Resources
+      context_namespace: resources
+      metrics:
+      - sglang:token_usage
+      - sglang:full_token_usage
+      - sglang:swa_token_usage
+      - sglang:mamba_usage
+      - sglang:kv_available_tokens
+      - sglang:swa_available_tokens
+      - sglang:mamba_available_tokens
+      - sglang:kv_evictable_tokens
+      - sglang:kv_used_tokens
+      - sglang:swa_evictable_tokens
+      - sglang:swa_used_tokens
+      - sglang:mamba_evictable_tokens
+      - sglang:mamba_used_tokens
+      - sglang:lora_pool_slots_used
+      - sglang:lora_pool_slots_total
+      - sglang:hicache_host_used_tokens
+      - sglang:hicache_host_total_tokens
+      - sglang:max_total_num_tokens
+      - sglang:max_total_num_tokens_swa
+      - sglang:num_used_tokens
+      - sglang:lora_pool_utilization
+      - sglang:num_streaming_sessions
+      - sglang:streaming_session_held_tokens
+      - sglang:weight_memory_usage_gb
+      - sglang:kv_cache_memory_usage_gb
+      - sglang:graph_memory_usage_gb
+      - sglang:page_size
+      - sglang:num_pages
+      - sglang:context_len
+      - sglang:startup_available_gpu_memory_gb
+      charts:
+      - title: Maximum Worker Pool Pressure
+        context: maximum_worker_pressure
+        units: ratio
+        dimensions:
+        - selector: sglang:token_usage
+          name: overall
+        - selector: sglang:full_token_usage
+          name: full
+        - selector: sglang:swa_token_usage
+          name: swa
+        - selector: sglang:mamba_usage
+          name: mamba
+        instances:
+          by_labels:
+          - model_name
+        aggregation: max
+      - title: Minimum Worker Free Token Slots
+        context: minimum_worker_free_tokens
+        units: tokens
+        dimensions:
+        - selector: sglang:kv_available_tokens
+          name: full
+        - selector: sglang:swa_available_tokens
+          name: swa
+        instances:
+          by_labels:
+          - model_name
+        aggregation: min
+      - title: Minimum Worker Free Mamba State Slots
+        context: minimum_worker_free_states
+        units: state slots
+        dimensions:
+        - selector: sglang:mamba_available_tokens
+          name: mamba
+        instances:
+          by_labels:
+          - model_name
+        aggregation: min
+      - title: Worker Pool Pressure
+        context: pool_pressure
+        units: ratio
+        dimensions:
+        - selector: sglang:token_usage
+          name: overall
+        - selector: sglang:full_token_usage
+          name: full
+        - selector: sglang:swa_token_usage
+          name: swa
+        - selector: sglang:mamba_usage
+          name: mamba
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker KV Token Slots
+        context: kv_tokens
+        units: tokens
+        dimensions:
+        - selector: sglang:kv_available_tokens
+          name: available
+        - selector: sglang:kv_evictable_tokens
+          name: evictable
+        - selector: sglang:kv_used_tokens
+          name: used
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker SWA Token Slots
+        context: swa_tokens
+        units: tokens
+        dimensions:
+        - selector: sglang:swa_available_tokens
+          name: available
+        - selector: sglang:swa_evictable_tokens
+          name: evictable
+        - selector: sglang:swa_used_tokens
+          name: used
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Mamba State Slots
+        context: mamba_states
+        units: state slots
+        dimensions:
+        - selector: sglang:mamba_available_tokens
+          name: available
+        - selector: sglang:mamba_evictable_tokens
+          name: evictable
+        - selector: sglang:mamba_used_tokens
+          name: used
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker LoRA Slots
+        context: lora_slots
+        units: slots
+        dimensions:
+        - selector: sglang:lora_pool_slots_used
+          name: used
+        - selector: sglang:lora_pool_slots_total
+          name: capacity
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Host Cache Tokens
+        context: host_tokens
+        units: tokens
+        dimensions:
+        - selector: sglang:hicache_host_used_tokens
+          name: used
+        - selector: sglang:hicache_host_total_tokens
+          name: capacity
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Logical Token Capacity
+        context: token_capacity
+        units: tokens
+        dimensions:
+        - selector: sglang:max_total_num_tokens
+          name: full
+        - selector: sglang:max_total_num_tokens_swa
+          name: swa
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Reported Used Token Slots
+        context: num_used_tokens
+        units: tokens
+        dimensions:
+        - selector: sglang:num_used_tokens
+          name: num_used_tokens
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker LoRA Slot Utilization
+        context: lora_pool_utilization
+        units: ratio
+        dimensions:
+        - selector: sglang:lora_pool_utilization
+          name: lora_pool_utilization
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Retained Streaming Sessions
+        context: num_streaming_sessions
+        units: sessions
+        dimensions:
+        - selector: sglang:num_streaming_sessions
+          name: num_streaming_sessions
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Tokens Held by Streaming Sessions
+        context: streaming_session_held_tokens
+        units: tokens
+        dimensions:
+        - selector: sglang:streaming_session_held_tokens
+          name: streaming_session_held_tokens
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Model Weight Memory
+        context: weight_memory_usage_gb
+        units: bytes
+        dimensions:
+        - selector: sglang:weight_memory_usage_gb
+          name: weight_memory_usage_gb
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Allocated KV Cache Memory
+        context: kv_cache_memory_usage_gb
+        units: bytes
+        dimensions:
+        - selector: sglang:kv_cache_memory_usage_gb
+          name: kv_cache_memory_usage_gb
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker CUDA Graph Memory by Phase
+        context: graph_memory_usage_gb
+        units: bytes
+        dimensions:
+        - selector: sglang:graph_memory_usage_gb
+          name_from_label: phase
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Tokens per KV Page
+        context: page_size
+        units: tokens
+        dimensions:
+        - selector: sglang:page_size
+          name: page_size
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker KV Page Capacity
+        context: num_pages
+        units: pages
+        dimensions:
+        - selector: sglang:num_pages
+          name: num_pages
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Configured Context Length
+        context: context_len
+        units: tokens
+        dimensions:
+        - selector: sglang:context_len
+          name: context_len
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Available GPU Memory at Startup
+        context: startup_available_gpu_memory_gb
+        units: bytes
+        dimensions:
+        - selector: sglang:startup_available_gpu_memory_gb
+          name: startup_available_gpu_memory_gb
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+    - family: Execution
+      context_namespace: execution
+      metrics:
+      - sglang:spec_accept_length
+      - sglang:spec_cap_length
+      - sglang:spec_block_accept_length
+      - sglang:spec_num_draft_tokens
+      - sglang:estimated_read_bytes_per_gpu_total
+      - sglang:estimated_write_bytes_per_gpu_total
+      - sglang:gen_throughput
+      - sglang:cache_hit_rate
+      - sglang:decode_sum_seq_lens
+      - sglang:weight_load_duration_seconds
+      - sglang:spec_accept_rate
+      - sglang:spec_num_steps
+      - sglang:utilization
+      - sglang:fwd_occupancy
+      - sglang:new_token_ratio
+      - sglang:is_cuda_graph
+      - sglang:cuda_graph_passes_total
+      - sglang:per_stage_req_latency_seconds_bucket
+      - sglang:per_stage_req_latency_seconds_count
+      - sglang:per_stage_req_latency_seconds_sum
+      - sglang:eplb_balancedness_count
+      - sglang:eplb_balancedness_sum
+      - sglang:realtime_tokens_total
+      - sglang:prefill_effective_tokens_total
+      - sglang:forward_execution_seconds_total
+      - sglang:estimated_flops_per_gpu_total
+      - sglang:dp_cooperation_realtime_tokens_total
+      - sglang:dp_cooperation_forward_execution_seconds_total
+      - sglang:prefill_delayer_wait_forward_passes_bucket
+      - sglang:prefill_delayer_wait_forward_passes_count
+      - sglang:prefill_delayer_wait_forward_passes_sum
+      - sglang:prefill_delayer_wait_seconds_bucket
+      - sglang:prefill_delayer_wait_seconds_count
+      - sglang:prefill_delayer_wait_seconds_sum
+      - sglang:prefill_delayer_outcomes_total
+      - sglang:eplb_gpu_physical_count_bucket
+      - sglang:eplb_gpu_physical_count_count
+      - sglang:eplb_gpu_physical_count_sum
+      charts:
+      - title: Worker Speculative Token Lengths
+        context: speculative_lengths
+        units: tokens
+        dimensions:
+        - selector: sglang:spec_accept_length
+          name: accepted
+        - selector: sglang:spec_cap_length
+          name: cap
+        - selector: sglang:spec_block_accept_length
+          name: block
+        - selector: sglang:spec_num_draft_tokens
+          name: draft
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Estimated Per-GPU Memory Traffic
+        context: estimated_memory_traffic
+        units: bytes/s
+        dimensions:
+        - selector: sglang:estimated_read_bytes_per_gpu_total
+          name: read
+        - selector: sglang:estimated_write_bytes_per_gpu_total
+          name: write
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Reported Generation Throughput
+        context: gen_throughput
+        units: tokens/s
+        dimensions:
+        - selector: sglang:gen_throughput
+          name: gen_throughput
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Reported Prefix-Cache Hit Ratio
+        context: cache_hit_rate
+        units: ratio
+        dimensions:
+        - selector: sglang:cache_hit_rate
+          name: cache_hit_rate
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Total Sequence Length of Running Decode Requests
+        context: decode_sum_seq_lens
+        units: tokens
+        dimensions:
+        - selector: sglang:decode_sum_seq_lens
+          name: decode_sum_seq_lens
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Model Weight Load Duration
+        context: weight_load_duration_seconds
+        units: seconds
+        dimensions:
+        - selector: sglang:weight_load_duration_seconds
+          name_from_label: source
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Speculative Token Acceptance Ratio
+        context: spec_accept_rate
+        units: ratio
+        dimensions:
+        - selector: sglang:spec_accept_rate
+          name: spec_accept_rate
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Reported Speculative Decode Steps
+        context: spec_num_steps
+        units: steps
+        dimensions:
+        - selector: sglang:spec_num_steps
+          name: spec_num_steps
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Reported SLO Utilization Diagnostic
+        context: utilization
+        units: ratio
+        dimensions:
+        - selector: sglang:utilization
+          name: utilization
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Forward-Execution Occupancy
+        context: fwd_occupancy
+        units: ratio
+        dimensions:
+        - selector: sglang:fwd_occupancy
+          name: fwd_occupancy
+          options:
+            divisor: 100
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker New-Token Allocation Ratio
+        context: new_token_ratio
+        units: ratio
+        dimensions:
+        - selector: sglang:new_token_ratio
+          name: new_token_ratio
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker CUDA Graph Execution State
+        context: is_cuda_graph
+        units: '{status}'
+        dimensions:
+        - selector: sglang:is_cuda_graph
+          name: is_cuda_graph
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker CUDA Graph Passes by Mode
+        context: cuda_graph_passes_total
+        units: passes/s
+        dimensions:
+        - selector: sglang:cuda_graph_passes_total
+          name_from_label: mode
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Request Stage Duration Distribution (seconds)
+        context: per_stage_req_latency_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:per_stage_req_latency_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - stage
+          optional_by_labels:
+          - dp_rank
+      - title: Request Stage Duration Observation Rate
+        context: per_stage_req_latency_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:per_stage_req_latency_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - stage
+          optional_by_labels:
+          - dp_rank
+      - title: Request Stage Duration Accumulated Observations
+        context: per_stage_req_latency_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:per_stage_req_latency_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - stage
+          optional_by_labels:
+          - dp_rank
+      - title: Expert Load Balance Observations Observation Rate
+        context: eplb_balancedness_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:eplb_balancedness_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - forward_mode
+          optional_by_labels:
+          - dp_rank
+      - title: Expert Load Balance Observations Accumulated Observations
+        context: eplb_balancedness_observation_sum
+        units: ratio/s
+        dimensions:
+        - selector: sglang:eplb_balancedness_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - forward_mode
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Execution Tokens by Mode
+        context: realtime_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:realtime_tokens_total
+          name_from_label: mode
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Prefill Tokens by Source
+        context: prefill_effective_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:prefill_effective_tokens_total
+          name_from_label: mode
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Forward-Execution Time by Category
+        context: forward_execution_seconds_total
+        units: seconds/s
+        dimensions:
+        - selector: sglang:forward_execution_seconds_total
+          name_from_label: category
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Estimated Floating-Point Work per GPU
+        context: estimated_flops_per_gpu_total
+        units: floating point operations per gpu/s
+        dimensions:
+        - selector: sglang:estimated_flops_per_gpu_total
+          name: estimated_flops_per_gpu_total
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Cooperative Execution Tokens by Mode
+        context: dp_cooperation_realtime_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:dp_cooperation_realtime_tokens_total
+          name_from_label: num_prefill_ranks
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - mode
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Cooperative Forward-Execution Time
+        context: dp_cooperation_forward_execution_seconds_total
+        units: seconds/s
+        dimensions:
+        - selector: sglang:dp_cooperation_forward_execution_seconds_total
+          name_from_label: num_prefill_ranks
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - category
+          optional_by_labels:
+          - dp_rank
+      - title: Prefill Delay in Forward Passes Distribution (steps)
+        context: prefill_delayer_wait_forward_passes_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefill_delayer_wait_forward_passes_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Prefill Delay in Forward Passes Observation Rate
+        context: prefill_delayer_wait_forward_passes_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefill_delayer_wait_forward_passes_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Prefill Delay in Forward Passes Accumulated Observations
+        context: prefill_delayer_wait_forward_passes_observation_sum
+        units: steps/s
+        dimensions:
+        - selector: sglang:prefill_delayer_wait_forward_passes_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Prefill Delay Duration Distribution (seconds)
+        context: prefill_delayer_wait_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefill_delayer_wait_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Prefill Delay Duration Observation Rate
+        context: prefill_delayer_wait_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefill_delayer_wait_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Prefill Delay Duration Accumulated Observations
+        context: prefill_delayer_wait_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:prefill_delayer_wait_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Prefill Delay Outcomes
+        context: prefill_delayer_outcomes_total
+        units: events/s
+        dimensions:
+        - selector: sglang:prefill_delayer_outcomes_total
+          name_from_label: actual_execution
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - input_estimation
+          - output_allow
+          - output_reason
+          optional_by_labels:
+          - dp_rank
+      - title: Selected Physical Experts per GPU Distribution (experts)
+        context: eplb_gpu_physical_count_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:eplb_gpu_physical_count_bucket
+        instances:
+          by_labels:
+          - layer
+      - title: Selected Physical Experts per GPU Observation Rate
+        context: eplb_gpu_physical_count_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:eplb_gpu_physical_count_count
+          name: observations
+        instances:
+          by_labels:
+          - layer
+      - title: Selected Physical Experts per GPU Accumulated Observations
+        context: eplb_gpu_physical_count_observation_sum
+        units: experts/s
+        dimensions:
+        - selector: sglang:eplb_gpu_physical_count_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - layer
+    - family: Structured Output
+      context_namespace: structured_output
+      metrics:
+      - sglang:num_grammar_total
+      - sglang:num_grammar_cache_hit_total
+      - sglang:num_grammar_aborted_total
+      - sglang:num_grammar_timeout_total
+      - sglang:num_grammar_queue_reqs
+      - sglang:grammar_compilation_time_seconds_bucket
+      - sglang:grammar_compilation_time_seconds_count
+      - sglang:grammar_compilation_time_seconds_sum
+      - sglang:grammar_schema_count_bucket
+      - sglang:grammar_schema_count_count
+      - sglang:grammar_schema_count_sum
+      - sglang:grammar_ebnf_size_bucket
+      - sglang:grammar_ebnf_size_count
+      - sglang:grammar_ebnf_size_sum
+      - sglang:grammar_tree_traversal_time_avg_bucket
+      - sglang:grammar_tree_traversal_time_avg_count
+      - sglang:grammar_tree_traversal_time_avg_sum
+      - sglang:grammar_tree_traversal_time_max_bucket
+      - sglang:grammar_tree_traversal_time_max_count
+      - sglang:grammar_tree_traversal_time_max_sum
+      charts:
+      - title: Worker Grammar Processing Events
+        context: grammar_events
+        units: events/s
+        dimensions:
+        - selector: sglang:num_grammar_total
+          name: attempts
+        - selector: sglang:num_grammar_cache_hit_total
+          name: hits
+        - selector: sglang:num_grammar_aborted_total
+          name: aborted
+        - selector: sglang:num_grammar_timeout_total
+          name: timed_out
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Requests Waiting for Grammar Compilation
+        context: num_grammar_queue_reqs
+        units: requests
+        dimensions:
+        - selector: sglang:num_grammar_queue_reqs
+          name: num_grammar_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Grammar Compilation Duration Distribution (seconds)
+        context: grammar_compilation_time_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_compilation_time_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Grammar Compilation Duration Observation Rate
+        context: grammar_compilation_time_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_compilation_time_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Grammar Compilation Duration Accumulated Observations
+        context: grammar_compilation_time_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:grammar_compilation_time_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Grammar Schema Count Distribution (schemas)
+        context: grammar_schema_count_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_schema_count_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Grammar Schema Count Observation Rate
+        context: grammar_schema_count_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_schema_count_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Grammar Schema Count Accumulated Observations
+        context: grammar_schema_count_observation_sum
+        units: schemas/s
+        dimensions:
+        - selector: sglang:grammar_schema_count_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: EBNF Grammar Length Distribution (characters)
+        context: grammar_ebnf_size_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_ebnf_size_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: EBNF Grammar Length Observation Rate
+        context: grammar_ebnf_size_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_ebnf_size_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: EBNF Grammar Length Accumulated Observations
+        context: grammar_ebnf_size_observation_sum
+        units: characters/s
+        dimensions:
+        - selector: sglang:grammar_ebnf_size_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Average Grammar Traversal Duration per Request Distribution (seconds)
+        context: grammar_tree_traversal_time_avg_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_tree_traversal_time_avg_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Average Grammar Traversal Duration per Request Observation Rate
+        context: grammar_tree_traversal_time_avg_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_tree_traversal_time_avg_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Average Grammar Traversal Duration per Request Accumulated Observations
+        context: grammar_tree_traversal_time_avg_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:grammar_tree_traversal_time_avg_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Maximum Grammar Traversal Duration per Request Distribution (seconds)
+        context: grammar_tree_traversal_time_max_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_tree_traversal_time_max_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Maximum Grammar Traversal Duration per Request Observation Rate
+        context: grammar_tree_traversal_time_max_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:grammar_tree_traversal_time_max_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Maximum Grammar Traversal Duration per Request Accumulated Observations
+        context: grammar_tree_traversal_time_max_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:grammar_tree_traversal_time_max_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+  - family: Cache
+    context_namespace: cache
+    chart_defaults:
+      priority: 74000
+    groups:
+    - family: Transfers
+      context_namespace: transfers
+      metrics:
+      - sglang:num_bootstrap_failed_reqs_total
+      - sglang:num_transfer_failed_reqs_total
+      - sglang:num_prefill_retries_total
+      - sglang:num_prefill_bootstrap_queue_reqs
+      - sglang:num_prefill_inflight_queue_reqs
+      - sglang:num_decode_prealloc_queue_reqs
+      - sglang:num_decode_transfer_queue_reqs
+      - sglang:kv_transfer_speed_gb_s_bucket
+      - sglang:kv_transfer_speed_gb_s_count
+      - sglang:kv_transfer_speed_gb_s_sum
+      - sglang:kv_transfer_latency_ms_bucket
+      - sglang:kv_transfer_latency_ms_count
+      - sglang:kv_transfer_latency_ms_sum
+      - sglang:pending_prealloc_token_usage
+      - sglang:kv_transfer_bootstrap_ms_bucket
+      - sglang:kv_transfer_bootstrap_ms_count
+      - sglang:kv_transfer_bootstrap_ms_sum
+      - sglang:kv_transfer_alloc_ms_bucket
+      - sglang:kv_transfer_alloc_ms_count
+      - sglang:kv_transfer_alloc_ms_sum
+      - sglang:kv_transfer_total_mb_bucket
+      - sglang:kv_transfer_total_mb_count
+      - sglang:kv_transfer_total_mb_sum
+      charts:
+      - title: Worker Transfer Failures and Retries
+        context: failures
+        units: requests/s
+        dimensions:
+        - selector: sglang:num_bootstrap_failed_reqs_total
+          name: bootstrap
+        - selector: sglang:num_transfer_failed_reqs_total
+          name: transfer
+        - selector: sglang:num_prefill_retries_total
+          name: retries
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Prefill Requests Waiting for Bootstrap
+        context: num_prefill_bootstrap_queue_reqs
+        units: requests
+        dimensions:
+        - selector: sglang:num_prefill_bootstrap_queue_reqs{priority!~".+"}
+          name: num_prefill_bootstrap_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Prefill Requests Waiting for Bootstrap by Priority
+        context: num_prefill_bootstrap_queue_reqs_by_priority
+        units: requests
+        dimensions:
+        - selector: sglang:num_prefill_bootstrap_queue_reqs{priority=~".+"}
+          name: num_prefill_bootstrap_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - priority
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Prefill Requests in Flight
+        context: num_prefill_inflight_queue_reqs
+        units: requests
+        dimensions:
+        - selector: sglang:num_prefill_inflight_queue_reqs{priority!~".+"}
+          name: num_prefill_inflight_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Prefill Requests in Flight by Priority
+        context: num_prefill_inflight_queue_reqs_by_priority
+        units: requests
+        dimensions:
+        - selector: sglang:num_prefill_inflight_queue_reqs{priority=~".+"}
+          name: num_prefill_inflight_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - priority
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Decode Requests Waiting for Preallocation
+        context: num_decode_prealloc_queue_reqs
+        units: requests
+        dimensions:
+        - selector: sglang:num_decode_prealloc_queue_reqs{priority!~".+"}
+          name: num_decode_prealloc_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Decode Requests Waiting for Preallocation by Priority
+        context: num_decode_prealloc_queue_reqs_by_priority
+        units: requests
+        dimensions:
+        - selector: sglang:num_decode_prealloc_queue_reqs{priority=~".+"}
+          name: num_decode_prealloc_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - priority
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Decode Requests Waiting for KV Transfer
+        context: num_decode_transfer_queue_reqs
+        units: requests
+        dimensions:
+        - selector: sglang:num_decode_transfer_queue_reqs{priority!~".+"}
+          name: num_decode_transfer_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Decode Requests Waiting for KV Transfer by Priority
+        context: num_decode_transfer_queue_reqs_by_priority
+        units: requests
+        dimensions:
+        - selector: sglang:num_decode_transfer_queue_reqs{priority=~".+"}
+          name: num_decode_transfer_queue_reqs
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          - priority
+          optional_by_labels:
+          - dp_rank
+      - title: Observed KV Transfer Speed Distribution (GiB/s)
+        context: kv_transfer_speed_gb_s_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_speed_gb_s_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Observed KV Transfer Speed Observation Rate
+        context: kv_transfer_speed_gb_s_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_speed_gb_s_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Observed KV Transfer Speed Accumulated Observations
+        context: kv_transfer_speed_gb_s_observation_sum
+        units: bytes/s²
+        dimensions:
+        - selector: sglang:kv_transfer_speed_gb_s_sum
+          name: observation_sum
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Duration Distribution (milliseconds)
+        context: kv_transfer_latency_ms_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_latency_ms_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Duration Observation Rate
+        context: kv_transfer_latency_ms_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_latency_ms_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Duration Accumulated Observations
+        context: kv_transfer_latency_ms_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:kv_transfer_latency_ms_sum
+          name: observation_sum
+          options:
+            divisor: 1000
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: Worker Reported Pending Preallocation Token Ratio
+        context: pending_prealloc_token_usage
+        units: ratio
+        dimensions:
+        - selector: sglang:pending_prealloc_token_usage
+          name: pending_prealloc_token_usage
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Bootstrap Duration Distribution (milliseconds)
+        context: kv_transfer_bootstrap_ms_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_bootstrap_ms_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Bootstrap Duration Observation Rate
+        context: kv_transfer_bootstrap_ms_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_bootstrap_ms_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Bootstrap Duration Accumulated Observations
+        context: kv_transfer_bootstrap_ms_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:kv_transfer_bootstrap_ms_sum
+          name: observation_sum
+          options:
+            divisor: 1000
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Allocation Duration Distribution (milliseconds)
+        context: kv_transfer_alloc_ms_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_alloc_ms_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Allocation Duration Observation Rate
+        context: kv_transfer_alloc_ms_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_alloc_ms_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Allocation Duration Accumulated Observations
+        context: kv_transfer_alloc_ms_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:kv_transfer_alloc_ms_sum
+          name: observation_sum
+          options:
+            divisor: 1000
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Size Distribution (MiB)
+        context: kv_transfer_total_mb_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_total_mb_bucket
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Size Observation Rate
+        context: kv_transfer_total_mb_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:kv_transfer_total_mb_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+      - title: KV Transfer Size Accumulated Observations
+        context: kv_transfer_total_mb_observation_sum
+        units: bytes/s
+        dimensions:
+        - selector: sglang:kv_transfer_total_mb_sum
+          name: observation_sum
+          options:
+            multiplier: 1048576
+        instances:
+          by_labels:
+          - model_name
+          - engine_type
+          - tp_rank
+          - pp_rank
+          - moe_ep_rank
+          optional_by_labels:
+          - dp_rank
+    - family: Storage
+      context_namespace: storage
+      metrics:
+      - sglang:prefetched_tokens_total
+      - sglang:backuped_tokens_total
+      - sglang:prefetch_pgs_bucket
+      - sglang:prefetch_pgs_count
+      - sglang:prefetch_pgs_sum
+      - sglang:backup_pgs_bucket
+      - sglang:backup_pgs_count
+      - sglang:backup_pgs_sum
+      - sglang:prefetch_bandwidth_bucket
+      - sglang:prefetch_bandwidth_count
+      - sglang:prefetch_bandwidth_sum
+      - sglang:backup_bandwidth_bucket
+      - sglang:backup_bandwidth_count
+      - sglang:backup_bandwidth_sum
+      charts:
+      - title: Tokens Prefetched from Storage
+        context: backend_prefetched_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:prefetched_tokens_total
+          name: prefetched_tokens_total
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Tokens Prefetched from Storage
+        context: worker_prefetched_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:prefetched_tokens_total
+          name: prefetched_tokens_total
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Tokens Backed Up to Storage
+        context: backend_backuped_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:backuped_tokens_total
+          name: backuped_tokens_total
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Tokens Backed Up to Storage
+        context: worker_backuped_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:backuped_tokens_total
+          name: backuped_tokens_total
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Storage Prefetch Batch Size Distribution (pages)
+        context: backend_prefetch_pgs_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_pgs_bucket
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Storage Prefetch Batch Size Observation Rate
+        context: backend_prefetch_pgs_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_pgs_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Storage Prefetch Batch Size Accumulated Observations
+        context: backend_prefetch_pgs_observation_sum
+        units: pages/s
+        dimensions:
+        - selector: sglang:prefetch_pgs_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Storage Prefetch Batch Size Distribution (pages)
+        context: worker_prefetch_pgs_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_pgs_bucket
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Storage Prefetch Batch Size Observation Rate
+        context: worker_prefetch_pgs_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_pgs_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Storage Prefetch Batch Size Accumulated Observations
+        context: worker_prefetch_pgs_observation_sum
+        units: pages/s
+        dimensions:
+        - selector: sglang:prefetch_pgs_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Storage Backup Batch Size Distribution (pages)
+        context: backend_backup_pgs_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_pgs_bucket
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Storage Backup Batch Size Observation Rate
+        context: backend_backup_pgs_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_pgs_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Storage Backup Batch Size Accumulated Observations
+        context: backend_backup_pgs_observation_sum
+        units: pages/s
+        dimensions:
+        - selector: sglang:backup_pgs_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Storage Backup Batch Size Distribution (pages)
+        context: worker_backup_pgs_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_pgs_bucket
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Storage Backup Batch Size Observation Rate
+        context: worker_backup_pgs_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_pgs_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Storage Backup Batch Size Accumulated Observations
+        context: worker_backup_pgs_observation_sum
+        units: pages/s
+        dimensions:
+        - selector: sglang:backup_pgs_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Observed Storage Prefetch Speed Distribution (GiB/s)
+        context: backend_prefetch_bandwidth_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_bandwidth_bucket
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Observed Storage Prefetch Speed Observation Rate
+        context: backend_prefetch_bandwidth_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_bandwidth_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Observed Storage Prefetch Speed Accumulated Observations
+        context: backend_prefetch_bandwidth_observation_sum
+        units: bytes/s²
+        dimensions:
+        - selector: sglang:prefetch_bandwidth_sum
+          name: observation_sum
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Observed Storage Prefetch Speed Distribution (GiB/s)
+        context: worker_prefetch_bandwidth_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_bandwidth_bucket
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Observed Storage Prefetch Speed Observation Rate
+        context: worker_prefetch_bandwidth_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:prefetch_bandwidth_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Observed Storage Prefetch Speed Accumulated Observations
+        context: worker_prefetch_bandwidth_observation_sum
+        units: bytes/s²
+        dimensions:
+        - selector: sglang:prefetch_bandwidth_sum
+          name: observation_sum
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Observed Storage Backup Speed Distribution (GiB/s)
+        context: backend_backup_bandwidth_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_bandwidth_bucket
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Observed Storage Backup Speed Observation Rate
+        context: backend_backup_bandwidth_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_bandwidth_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Observed Storage Backup Speed Accumulated Observations
+        context: backend_backup_bandwidth_observation_sum
+        units: bytes/s²
+        dimensions:
+        - selector: sglang:backup_bandwidth_sum
+          name: observation_sum
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - storage_backend
+        aggregation: sum
+      - title: Observed Storage Backup Speed Distribution (GiB/s)
+        context: worker_backup_bandwidth_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_bandwidth_bucket
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Observed Storage Backup Speed Observation Rate
+        context: worker_backup_bandwidth_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:backup_bandwidth_count
+          name: observations
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+      - title: Observed Storage Backup Speed Accumulated Observations
+        context: worker_backup_bandwidth_observation_sum
+        units: bytes/s²
+        dimensions:
+        - selector: sglang:backup_bandwidth_sum
+          name: observation_sum
+          options:
+            multiplier: 1073741824
+        instances:
+          by_labels:
+          - storage_backend
+          - tp_rank
+          - dp_rank
+          - pp_rank
+          - pp_size
+          - attn_cp_rank
+          - attn_cp_size
+    - family: Host
+      context_namespace: host
+      metrics:
+      - sglang:eviction_duration_seconds_bucket
+      - sglang:eviction_duration_seconds_count
+      - sglang:eviction_duration_seconds_sum
+      - sglang:evicted_tokens_total
+      - sglang:load_back_duration_seconds_bucket
+      - sglang:load_back_duration_seconds_count
+      - sglang:load_back_duration_seconds_sum
+      - sglang:load_back_tokens_total
+      - sglang:hicache_backup_duration_seconds_bucket
+      - sglang:hicache_backup_duration_seconds_count
+      - sglang:hicache_backup_duration_seconds_sum
+      - sglang:hicache_backup_bytes_total
+      - sglang:load_back_bytes_total
+      - sglang:hicache_backup_tokens_total
+      - sglang:hicache_dropped_tokens_total
+      charts:
+      - title: Device Cache Eviction Duration Distribution (seconds)
+        context: eviction_duration_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:eviction_duration_seconds_bucket
+        instances:
+          by_labels:
+          - cache_type
+      - title: Device Cache Eviction Duration Observation Rate
+        context: eviction_duration_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:eviction_duration_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - cache_type
+      - title: Device Cache Eviction Duration Accumulated Observations
+        context: eviction_duration_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:eviction_duration_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - cache_type
+      - title: Device Cache Token Evictions
+        context: evicted_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:evicted_tokens_total
+          name: evicted_tokens_total
+        instances:
+          by_labels:
+          - cache_type
+      - title: Host-to-Device Load Duration Distribution (seconds)
+        context: load_back_duration_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:load_back_duration_seconds_bucket
+        instances:
+          by_labels:
+          - cache_type
+      - title: Host-to-Device Load Duration Observation Rate
+        context: load_back_duration_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:load_back_duration_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - cache_type
+      - title: Host-to-Device Load Duration Accumulated Observations
+        context: load_back_duration_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:load_back_duration_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - cache_type
+      - title: Tokens Loaded from Host to Device
+        context: load_back_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:load_back_tokens_total
+          name_from_label: pool
+        instances:
+          by_labels:
+          - cache_type
+      - title: Device-to-Host Backup Duration Distribution (seconds)
+        context: hicache_backup_duration_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:hicache_backup_duration_seconds_bucket
+        instances:
+          by_labels:
+          - cache_type
+      - title: Device-to-Host Backup Duration Observation Rate
+        context: hicache_backup_duration_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:hicache_backup_duration_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - cache_type
+      - title: Device-to-Host Backup Duration Accumulated Observations
+        context: hicache_backup_duration_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:hicache_backup_duration_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - cache_type
+      - title: Bytes Backed Up from Device to Host
+        context: hicache_backup_bytes_total
+        units: bytes/s
+        dimensions:
+        - selector: sglang:hicache_backup_bytes_total
+          name: hicache_backup_bytes_total
+        instances:
+          by_labels:
+          - cache_type
+      - title: Bytes Loaded from Host to Device
+        context: load_back_bytes_total
+        units: bytes/s
+        dimensions:
+        - selector: sglang:load_back_bytes_total
+          name: load_back_bytes_total
+        instances:
+          by_labels:
+          - cache_type
+      - title: Tokens Backed Up from Device to Host
+        context: hicache_backup_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:hicache_backup_tokens_total
+          name_from_label: pool
+        instances:
+          by_labels:
+          - cache_type
+      - title: Device Cache Tokens Dropped Under Host Pressure
+        context: hicache_dropped_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:hicache_dropped_tokens_total
+          name_from_label: reason
+        instances:
+          by_labels:
+          - cache_type
+          - pool
+  - family: Multimodal
+    context_namespace: multimodal
+    chart_defaults:
+      priority: 75000
+    groups:
+    - family: Encoder
+      context_namespace: encoder
+      metrics:
+      - sglang:encoder_dp_pending_requests
+      - sglang:encoder_cache_evictions_total
+      - sglang:encoder_cache_size_mb
+      - sglang:encoder_cache_entries
+      - sglang:encoder_cache_hit_tokens_total
+      - sglang:encoder_cache_total_tokens_total
+      - sglang:encoder_cache_hit_files_total
+      - sglang:encoder_cache_total_files_total
+      - sglang:encoder_requests_total
+      - sglang:encoder_requests_received_total
+      - sglang:encoder_mm_items_per_batch_bucket
+      - sglang:encoder_mm_items_per_batch_count
+      - sglang:encoder_mm_items_per_batch_sum
+      - sglang:encoder_mm_items_per_request_bucket
+      - sglang:encoder_mm_items_per_request_count
+      - sglang:encoder_mm_items_per_request_sum
+      - sglang:encoder_request_e2e_latency_seconds_bucket
+      - sglang:encoder_request_e2e_latency_seconds_count
+      - sglang:encoder_request_e2e_latency_seconds_sum
+      - sglang:encoder_queue_wait_seconds_bucket
+      - sglang:encoder_queue_wait_seconds_count
+      - sglang:encoder_queue_wait_seconds_sum
+      - sglang:encoder_preprocess_seconds_bucket
+      - sglang:encoder_preprocess_seconds_count
+      - sglang:encoder_preprocess_seconds_sum
+      - sglang:encoder_model_forward_seconds_bucket
+      - sglang:encoder_model_forward_seconds_count
+      - sglang:encoder_model_forward_seconds_sum
+      - sglang:encoder_transfer_seconds_bucket
+      - sglang:encoder_transfer_seconds_count
+      - sglang:encoder_transfer_seconds_sum
+      charts:
+      - title: Pending Encoder Requests
+        context: model_encoder_dp_pending_requests
+        units: requests
+        dimensions:
+        - selector: sglang:encoder_dp_pending_requests
+          name: encoder_dp_pending_requests
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Pending Encoder Requests
+        context: worker_encoder_dp_pending_requests
+        units: requests
+        dimensions:
+        - selector: sglang:encoder_dp_pending_requests
+          name: encoder_dp_pending_requests
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Encoder Cache Evictions
+        context: model_encoder_cache_evictions_total
+        units: events/s
+        dimensions:
+        - selector: sglang:encoder_cache_evictions_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Encoder Cache Evictions
+        context: worker_encoder_cache_evictions_total
+        units: events/s
+        dimensions:
+        - selector: sglang:encoder_cache_evictions_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Encoder Cache Memory
+        context: model_encoder_cache_size_mb
+        units: bytes
+        dimensions:
+        - selector: sglang:encoder_cache_size_mb
+          name: encoder_cache_size_mb
+          options:
+            multiplier: 1048576
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Encoder Cache Memory
+        context: worker_encoder_cache_size_mb
+        units: bytes
+        dimensions:
+        - selector: sglang:encoder_cache_size_mb
+          name: encoder_cache_size_mb
+          options:
+            multiplier: 1048576
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Encoder Cache Entries
+        context: model_encoder_cache_entries
+        units: entries
+        dimensions:
+        - selector: sglang:encoder_cache_entries
+          name: encoder_cache_entries
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Encoder Cache Entries
+        context: worker_encoder_cache_entries
+        units: entries
+        dimensions:
+        - selector: sglang:encoder_cache_entries
+          name: encoder_cache_entries
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Encoder Token Cache Hits
+        context: model_encoder_cache_hit_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:encoder_cache_hit_tokens_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Encoder Token Cache Hits
+        context: worker_encoder_cache_hit_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:encoder_cache_hit_tokens_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Encoder Token Cache Lookups
+        context: model_encoder_cache_total_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:encoder_cache_total_tokens_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Encoder Token Cache Lookups
+        context: worker_encoder_cache_total_tokens_total
+        units: tokens/s
+        dimensions:
+        - selector: sglang:encoder_cache_total_tokens_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Encoder File Cache Hits
+        context: model_encoder_cache_hit_files_total
+        units: files/s
+        dimensions:
+        - selector: sglang:encoder_cache_hit_files_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Encoder File Cache Hits
+        context: worker_encoder_cache_hit_files_total
+        units: files/s
+        dimensions:
+        - selector: sglang:encoder_cache_hit_files_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Encoder File Cache Lookups
+        context: model_encoder_cache_total_files_total
+        units: files/s
+        dimensions:
+        - selector: sglang:encoder_cache_total_files_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Encoder File Cache Lookups
+        context: worker_encoder_cache_total_files_total
+        units: files/s
+        dimensions:
+        - selector: sglang:encoder_cache_total_files_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Completed Encoder Requests by Outcome
+        context: model_encoder_requests_total
+        units: requests/s
+        dimensions:
+        - selector: sglang:encoder_requests_total
+          name_from_label: status
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Completed Encoder Requests by Outcome
+        context: worker_encoder_requests_total
+        units: requests/s
+        dimensions:
+        - selector: sglang:encoder_requests_total
+          name_from_label: status
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Received Encoder Requests
+        context: model_encoder_requests_received_total
+        units: requests/s
+        dimensions:
+        - selector: sglang:encoder_requests_received_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+        aggregation: sum
+      - title: Received Encoder Requests
+        context: worker_encoder_requests_received_total
+        units: requests/s
+        dimensions:
+        - selector: sglang:encoder_requests_received_total
+          name_from_label: modality
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+      - title: Multimodal Items per Encoder Batch Distribution (items)
+        context: model_encoder_mm_items_per_batch_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_batch_bucket
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Multimodal Items per Encoder Batch Observation Rate
+        context: model_encoder_mm_items_per_batch_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_batch_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Multimodal Items per Encoder Batch Accumulated Observations
+        context: model_encoder_mm_items_per_batch_observation_sum
+        units: items/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_batch_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Multimodal Items per Encoder Batch Distribution (items)
+        context: worker_encoder_mm_items_per_batch_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_batch_bucket
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Multimodal Items per Encoder Batch Observation Rate
+        context: worker_encoder_mm_items_per_batch_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_batch_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Multimodal Items per Encoder Batch Accumulated Observations
+        context: worker_encoder_mm_items_per_batch_observation_sum
+        units: items/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_batch_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Multimodal Items per Encoder Request Distribution (items)
+        context: model_encoder_mm_items_per_request_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_request_bucket
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Multimodal Items per Encoder Request Observation Rate
+        context: model_encoder_mm_items_per_request_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_request_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Multimodal Items per Encoder Request Accumulated Observations
+        context: model_encoder_mm_items_per_request_observation_sum
+        units: items/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_request_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Multimodal Items per Encoder Request Distribution (items)
+        context: worker_encoder_mm_items_per_request_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_request_bucket
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Multimodal Items per Encoder Request Observation Rate
+        context: worker_encoder_mm_items_per_request_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_request_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Multimodal Items per Encoder Request Accumulated Observations
+        context: worker_encoder_mm_items_per_request_observation_sum
+        units: items/s
+        dimensions:
+        - selector: sglang:encoder_mm_items_per_request_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: End-to-End Encoder Request Duration Distribution (seconds)
+        context: model_encoder_request_e2e_latency_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_request_e2e_latency_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: End-to-End Encoder Request Duration Observation Rate
+        context: model_encoder_request_e2e_latency_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_request_e2e_latency_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: End-to-End Encoder Request Duration Accumulated Observations
+        context: model_encoder_request_e2e_latency_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_request_e2e_latency_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: End-to-End Encoder Request Duration Distribution (seconds)
+        context: worker_encoder_request_e2e_latency_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_request_e2e_latency_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: End-to-End Encoder Request Duration Observation Rate
+        context: worker_encoder_request_e2e_latency_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_request_e2e_latency_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: End-to-End Encoder Request Duration Accumulated Observations
+        context: worker_encoder_request_e2e_latency_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_request_e2e_latency_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Queue Wait Distribution (seconds)
+        context: model_encoder_queue_wait_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_queue_wait_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Queue Wait Observation Rate
+        context: model_encoder_queue_wait_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_queue_wait_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Queue Wait Accumulated Observations
+        context: model_encoder_queue_wait_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_queue_wait_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Queue Wait Distribution (seconds)
+        context: worker_encoder_queue_wait_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_queue_wait_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Queue Wait Observation Rate
+        context: worker_encoder_queue_wait_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_queue_wait_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Queue Wait Accumulated Observations
+        context: worker_encoder_queue_wait_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_queue_wait_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Preprocessing Duration Distribution (seconds)
+        context: model_encoder_preprocess_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_preprocess_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Preprocessing Duration Observation Rate
+        context: model_encoder_preprocess_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_preprocess_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Preprocessing Duration Accumulated Observations
+        context: model_encoder_preprocess_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_preprocess_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Preprocessing Duration Distribution (seconds)
+        context: worker_encoder_preprocess_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_preprocess_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Preprocessing Duration Observation Rate
+        context: worker_encoder_preprocess_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_preprocess_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Preprocessing Duration Accumulated Observations
+        context: worker_encoder_preprocess_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_preprocess_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Model Execution Duration Distribution (seconds)
+        context: model_encoder_model_forward_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_model_forward_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Model Execution Duration Observation Rate
+        context: model_encoder_model_forward_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_model_forward_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Model Execution Duration Accumulated Observations
+        context: model_encoder_model_forward_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_model_forward_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - modality
+        aggregation: sum
+      - title: Encoder Model Execution Duration Distribution (seconds)
+        context: worker_encoder_model_forward_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_model_forward_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Model Execution Duration Observation Rate
+        context: worker_encoder_model_forward_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_model_forward_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Model Execution Duration Accumulated Observations
+        context: worker_encoder_model_forward_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_model_forward_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - modality
+      - title: Encoder Transfer Duration Distribution (seconds)
+        context: model_encoder_transfer_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_transfer_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - backend
+        aggregation: sum
+      - title: Encoder Transfer Duration Observation Rate
+        context: model_encoder_transfer_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_transfer_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - backend
+        aggregation: sum
+      - title: Encoder Transfer Duration Accumulated Observations
+        context: model_encoder_transfer_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_transfer_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - backend
+        aggregation: sum
+      - title: Encoder Transfer Duration Distribution (seconds)
+        context: worker_encoder_transfer_seconds_distribution
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_transfer_seconds_bucket
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - backend
+      - title: Encoder Transfer Duration Observation Rate
+        context: worker_encoder_transfer_seconds_observations
+        units: observations/s
+        dimensions:
+        - selector: sglang:encoder_transfer_seconds_count
+          name: observations
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - backend
+      - title: Encoder Transfer Duration Accumulated Observations
+        context: worker_encoder_transfer_seconds_observation_sum
+        units: seconds/s
+        dimensions:
+        - selector: sglang:encoder_transfer_seconds_sum
+          name: observation_sum
+        instances:
+          by_labels:
+          - model_name
+          - dp_rank
+          - backend
+  - family: Runtime
+    context_namespace: runtime
+    chart_defaults:
+      priority: 77000
+    metrics:
+    - sglang:process_cpu_seconds_total
+    - sglang:func_latency_seconds_bucket
+    - sglang:func_latency_seconds_count
+    - sglang:func_latency_seconds_sum
+    - sglang:startup_time_seconds
+    - sglang:startup_cuda_graph_time_seconds
+    - sglang:spec_verify_calls_total
+    - sglang:get_loads_duration_seconds_bucket
+    - sglang:get_loads_duration_seconds_count
+    - sglang:get_loads_duration_seconds_sum
+    - sglang:startup_latency_breakdown_seconds_max
+    charts:
+    - title: Component CPU Time
+      context: process_cpu_seconds_total
+      units: seconds/s
+      dimensions:
+      - selector: sglang:process_cpu_seconds_total
+        name: process_cpu_seconds_total
+      instances:
+        by_labels:
+        - component
+    - title: Instrumented Function Duration Distribution (seconds)
+      context: func_latency_seconds_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:func_latency_seconds_bucket
+      instances:
+        by_labels:
+        - name
+    - title: Instrumented Function Duration Observation Rate
+      context: func_latency_seconds_observations
+      units: observations/s
+      dimensions:
+      - selector: sglang:func_latency_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - name
+    - title: Instrumented Function Duration Accumulated Observations
+      context: func_latency_seconds_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:func_latency_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - name
+    - title: Serving Startup Phase Duration
+      context: startup_time_seconds
+      units: seconds
+      dimensions:
+      - selector: sglang:startup_time_seconds
+        name: startup_time_seconds
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+        - phase
+    - title: CUDA Graph Startup Phase Duration
+      context: startup_cuda_graph_time_seconds
+      units: seconds
+      dimensions:
+      - selector: sglang:startup_cuda_graph_time_seconds
+        name: startup_cuda_graph_time_seconds
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+        - phase
+    - title: Speculative Verification Calls
+      context: spec_verify_calls_total
+      units: passes/s
+      dimensions:
+      - selector: sglang:spec_verify_calls_total
+        name: spec_verify_calls_total
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+      aggregation: sum
+    - title: Load-Query Duration Distribution (seconds)
+      context: get_loads_duration_seconds_distribution
+      units: observations/s
+      dimensions:
+      - selector: sglang:get_loads_duration_seconds_bucket
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+    - title: Load-Query Duration Observation Rate
+      context: get_loads_duration_seconds_observations
+      units: observations/s
+      dimensions:
+      - selector: sglang:get_loads_duration_seconds_count
+        name: observations
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+    - title: Load-Query Duration Accumulated Observations
+      context: get_loads_duration_seconds_observation_sum
+      units: seconds/s
+      dimensions:
+      - selector: sglang:get_loads_duration_seconds_sum
+        name: observation_sum
+      instances:
+        by_labels:
+        - model_name
+        - engine_type
+    - title: Maximum Startup Step Duration
+      context: startup_latency_breakdown_seconds_max
+      units: seconds
+      dimensions:
+      - selector: sglang:startup_latency_breakdown_seconds_max
+        name: startup_latency_breakdown_seconds_max
+      instances:
+        by_labels:
+        - context
+  - family: HTTP Routes
+    context_namespace: http_routes
+    chart_defaults:
+      priority: 76000
+    metrics:
+    - sglang:http_requests_total
+    - sglang:http_responses_total
+    - sglang:http_requests_active
+    charts:
+    - title: HTTP Request Arrivals
+      context: route_http_requests_total
+      units: requests/s
+      dimensions:
+      - selector: sglang:http_requests_total
+        name_from_label: method_class
+      instances:
+        by_labels:
+        - endpoint
+      aggregation: sum
+    - title: HTTP Request Arrivals
+      context: method_http_requests_total
+      units: requests/s
+      dimensions:
+      - selector: sglang:http_requests_total
+        name: http_requests_total
+      instances:
+        by_labels:
+        - endpoint
+        - method
+    - title: Returned HTTP Responses
+      context: route_http_responses_total
+      units: requests/s
+      dimensions:
+      - selector: sglang:http_responses_total
+        name_from_label: status_class
+      instances:
+        by_labels:
+        - endpoint
+      aggregation: sum
+    - title: Returned HTTP Responses
+      context: method_http_responses_total
+      units: requests/s
+      dimensions:
+      - selector: sglang:http_responses_total
+        name_from_label: status_code
+      instances:
+        by_labels:
+        - endpoint
+        - method
+    - title: Active HTTP Requests
+      context: route_http_requests_active
+      units: requests
+      dimensions:
+      - selector: sglang:http_requests_active
+        name_from_label: method_class
+      instances:
+        by_labels:
+        - endpoint
+      aggregation: sum
+    - title: Active HTTP Requests
+      context: method_http_requests_active
+      units: requests
+      dimensions:
+      - selector: sglang:http_requests_active
+        name: http_requests_active
+      instances:
+        by_labels:
+        - endpoint
+        - method

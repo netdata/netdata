@@ -39,6 +39,13 @@ func validateViewReduction(contextID string, view *compiledView) error {
 }
 
 func viewFanInCauses(view *compiledView) []fanInCause {
+	projection := view.entity
+	projection.Identity.Required = slices.Clone(projection.Identity.Required)
+	for label, rendering := range view.labels.Dimensions {
+		if rendering.Render == "label_value" {
+			projection.Identity.Required = append(projection.Identity.Required, label)
+		}
+	}
 	causes := make(map[string]fanInCause)
 	add := func(input *compiledViewInput, source compiledViewOccurrence, label string) {
 		key := input.id + "#" + source.sourceProfile + "#" + source.occurrence.key + "#" + label
@@ -48,12 +55,12 @@ func viewFanInCauses(view *compiledView) []fanInCause {
 		input := view.inputs[inputID]
 		for _, source := range input.occurrences {
 			for label := range view.labels.Omit {
-				if labelCanVaryWithinProjection(source, input, label, view.entity) {
+				if labelCanVaryWithinProjection(source, input, label, projection) {
 					add(input, source, label)
 				}
 			}
 			for label, rendering := range view.labels.Dimensions {
-				if rendering.Render == "input_role" && labelCanVaryWithinProjection(source, input, label, view.entity) {
+				if rendering.Render == "input_role" && labelCanVaryWithinProjection(source, input, label, projection) {
 					add(input, source, label)
 				}
 			}
@@ -101,7 +108,8 @@ func labelCanVaryWithinProjection(
 	entity EntityDefinition,
 ) bool {
 	schema, ok := source.occurrence.labels[label]
-	if !ok || labelDeterminedByEntity(source, label, entity) || conditionFixesOneValue(input.definition.Where, label) {
+	if !ok || labelDeterminedByEntity(source, label, entity) || conditionFixesOneValue(input.definition.Where, label) ||
+		conditionGuaranteesAbsentLabel(input.definition.Where, label) {
 		return false
 	}
 	if schema.EndpointCardinality.Kind == "singleton" {
