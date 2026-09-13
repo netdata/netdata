@@ -13,6 +13,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestKernelOneShotInvalidCompletionSequenceAbandons(t *testing.T) {
+	for _, kind := range []string{"barrier", "finalizer", "function-cleanup"} {
+		t.Run(kind, func(t *testing.T) {
+			for name, sequence := range map[string]uint8{"zero": 0, "unexpected phase": 2, "overflow": 255} {
+				t.Run(name, func(t *testing.T) {
+					fixture := startOneShotProtocolFixture(t, kind)
+					t.Cleanup(func() {
+						// Join the child if the regression prevents abandonment, before
+						// the fixture's cleanup releases its supervisor slot.
+						if !fixture.ackReceived {
+							require.NoError(t, fixture.kernel.tasks.Abandon(fixture.completion.Ref, 2))
+							fixture.receiveAcknowledgment(t)
+						}
+					})
+					malformed := fixture.completion
+					malformed.Sequence = sequence
+					fixture.kernel.completeTask(malformed)
+					require.Error(t, fixture.kernel.run.DirtyCause())
+					require.Equal(t, 1, fixture.kernel.tasks.Active())
+					fixture.assertCatalogCompletions(t, 0)
+
+					ack := fixture.receiveAcknowledgment(t)
+					require.Equal(t, lifecycle.TaskAcknowledgement{
+						Ref:      fixture.completion.Ref,
+						Sequence: 2,
+						Kind:     lifecycle.TaskActionAbandon,
+						Abandoned: lifecycle.TaskAbandonment{
+							Outcome: lifecycle.TaskOutcomeNone,
+						},
+					}, ack)
+					fixture.kernel.acknowledgeTask(ack)
+					require.Zero(t, fixture.kernel.tasks.Active())
+					fixture.assertCatalogCompletions(t, 1)
+				})
+			}
+		})
+	}
+}
+
 func TestKernelOneShotRejectsWrongAcknowledgmentAction(t *testing.T) {
 	for _, kind := range []string{"barrier", "finalizer", "function-cleanup"} {
 		t.Run(kind, func(t *testing.T) {

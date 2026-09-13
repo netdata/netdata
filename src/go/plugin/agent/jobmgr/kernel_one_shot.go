@@ -57,7 +57,7 @@ func (ck *CommandKernel) completeOneShotTask(
 		cause := errors.Join(completion.Err, fmt.Errorf("jobmgr kernel: invalid %s completion", name))
 		task.failed = true
 		if task.action == 0 && task.ref.Valid() && completion.Ref == task.ref {
-			ck.abandonOneShotTask(task, completion.Sequence+1, cause)
+			ck.abandonOneShotTask(task, cause)
 		} else {
 			// A replay cannot replace an action already accepted by the child.
 			ck.run.Dirty(cause)
@@ -72,17 +72,18 @@ func (ck *CommandKernel) completeOneShotTask(
 		Sequence: 2,
 		Kind:     lifecycle.TaskActionTerminate,
 	}); err != nil {
-		ck.abandonOneShotTask(task, 2, err)
+		ck.abandonOneShotTask(task, err)
 	} else {
 		task.action = lifecycle.TaskActionTerminate
 	}
 	return completion.Err
 }
 
-func (ck *CommandKernel) abandonOneShotTask(task *oneShotTask, sequence uint8, cause error) {
+func (ck *CommandKernel) abandonOneShotTask(task *oneShotTask, cause error) {
 	task.failed = true
 	ck.run.Dirty(cause)
-	if err := ck.tasks.Abandon(task.ref, sequence); err != nil {
+	// The child awaits action 2 even when the reported completion is malformed.
+	if err := ck.tasks.Abandon(task.ref, 2); err != nil {
 		ck.run.Dirty(errors.Join(cause, err))
 		return
 	}
