@@ -57,7 +57,29 @@ Netdata Agent metrics storage is limited to 3 GiB by default (configurable), usi
 
 Data is deleted when retention enforcement detects that **either** the size limit or the time limit has been reached, whichever comes first. Actual disk usage may temporarily exceed the configured size limit because retention size is a soft target, not a hard cap. For the detailed enforcement behavior, see [Retention Size Enforcement](/src/database/README.md#retention-size-enforcement).
 
-In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+In practice, with default settings and an ingestion rate of about 1,500 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, about 3 months of medium resolution (per-minute) data, and about 2 years of low resolution (per-hour) data.
+
+:::note
+
+At higher ingestion rates the per-tier size limit is reached before the time limit, so actual retention depends on both the number of metrics collected and the configured size limit. You can increase the size limit per tier to extend retention.
+
+:::
+
+### Calculating Disk Requirements
+
+Use the following formula to estimate the disk space needed for a given retention period:
+
+`Disk (bytes) = metrics_per_second × seconds_in_retention_period × bytes_per_sample`
+
+For example, to estimate tier0 disk usage for 4,000 metrics per second over 14 days:
+
+4,000 × 86,400 × 14 = 4,838,400,000 samples × 0.6 bytes ≈ **2.7 GiB**
+
+:::note
+
+Real-world compression varies depending on data patterns. Use these estimates for planning, but monitor actual disk usage to fine-tune your configuration.
+
+:::
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
