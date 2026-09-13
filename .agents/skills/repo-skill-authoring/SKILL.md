@@ -35,7 +35,7 @@ unrelated material. Validation and review establish acceptance; shorter text alo
 ## Maintaining This Skill
 
 Capture applicable lessons under `AGENTS.md#knowledge-capture` and the active task's artifact gate. Updating one
-lesson uses the bounded amendment path unless it changes the method structurally. When the method changes, include a
-fresh-context walkthrough from this skill, root `AGENTS.md` and the skills README in the required review: exercise a
-representative amendment, restructure and read-only review, including their action boundaries. This can be part of the
-correctness review, not an automatic additional review round.
+lesson uses the bounded amendment path unless it changes the method structurally. When the method changes, walk
+through a representative amendment, restructure and read-only review, including their action boundaries, using this
+skill, root `AGENTS.md` and the skills README. Choose direct assessment or a justified independent walkthrough under
+`AGENTS.md#review`; this does not automatically add a reviewer or another round.

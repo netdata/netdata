@@ -6,6 +6,9 @@ positive, near-miss, review-lens, uncertain-dependency and authorization cases.
 
 ## Run A Walkthrough
 
+Choose a direct walkthrough or independent assessment under `AGENTS.md#review`. Direct assessment can use the rubric
+but is not a blind selection check. For an independent walkthrough:
+
 1. Give a fresh-context reviewer the case IDs and prompts, root `AGENTS.md#skill-selection`, the actual checkout's
    runtime names/descriptions, and access to relevant entries/owner references. Do not give expected fields before
    the reviewer records its selections. A host's cached skill catalog may differ from the branch being tested.
@@ -30,9 +33,9 @@ positive, near-miss, review-lens, uncertain-dependency and authorization cases.
 - Existing user authorization persists. An implementation or live-query scenario may authorize its ordinary steps in
   a real task; merely reading that same scenario during this walkthrough authorizes none of them.
 
-Record each case as supported, material miss, or unresolved, with evidence. Apply the project's bounded review rule:
-verify and fix material defects, apply useful suggestions once, and do not add rounds for nits or exact verdict words.
-One reviewer still covers the complete assigned unit and its interactions; additional lenses change emphasis.
+Record each case as supported, material miss, or unresolved, with evidence. Apply `AGENTS.md#review` for review scope
+and stopping: verify findings, fix material defects when authorized, and do not add rounds for nits or exact verdict
+words. The main agent owns overall coverage; specialist assignments may address selected cases or dependencies.
 
 ## Limits
 

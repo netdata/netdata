@@ -98,13 +98,10 @@ These are non-negotiable. Skipping any of them will cost the user time.
 9. **Don't loop forever on silent bots.** Some assistants stop responding.
    That's fine. Use `wait-for-activity.sh` with the 30-min timeout and
    move on if nothing changes.
-10. **When a bot finds a legit issue, search the WHOLE PR for similar
-    issues.** This is the most expensive rule to ignore. AI reviewers
-    surface their top 3-7 findings, not the full set. If you fix only the
-    ones they pointed at, you'll spend dozens of round-trips discovering
-    the rest one at a time. Every round-trip is 30+ minutes of bot
-    review latency. **The fix for one issue means a full re-audit of the
-    PR for the same class of issue.** Do that before pushing.
+10. **Check for the same root cause in related code.** Trace where the defective pattern can recur within the
+    selected scope and relevant dependencies. Broaden the search across the PR when the cause is shared; a local
+    finding does not automatically require a full-PR re-audit. Reuse a completed same-cause search unless new evidence
+    invalidates it. Review strategy and follow-up scope follow `AGENTS.md#review`.
 11. **Don't trust linters alone -- smoke-test every fix.** Static
     analyzers (shellcheck, etc.) verify a property of the code; they
     don't verify behavior. A "correct per the linter" fix can change
@@ -114,7 +111,7 @@ These are non-negotiable. Skipping any of them will cost the user time.
     affected script (or the smallest invocation that exercises the
     change) and verify the output looks right. "Linter green" is not
     the same as "still works."
-12. **Check full-scope review coverage before pushing.** Step 4a applies `AGENTS.md#review`; a push alone does not
+12. **Check review and validation coverage before pushing.** Step 4a applies `AGENTS.md#review`; a push alone does not
     require another review when the current change already has adequate coverage.
 13. **Before every authorized push, refresh the selected finding sources.** Step 4-pre verifies and dispositions newly arrived
     feedback against the current HEAD; do not leave findings unassessed or assume the fetch prevents later arrivals.
@@ -232,10 +229,8 @@ For thread N:
 1. **Read the comment carefully.** What is the bot/dev claiming?
 2. **Open the file at the line and verify.** Does the claim hold against
    the current code? Is it valid in context?
-3. **Search the whole PR diff (and adjacent code) for the same class of
-   issue.** Rule #10 -- this is mandatory. (You only do this sweep once,
-   on the first thread of a class -- subsequent threads in the same
-   class share the same fix.)
+3. **Check related code for the same root cause** under rule #10. Reuse a completed search for subsequent findings
+   of that cause; broaden it when new evidence changes the affected scope.
 4. **Decide**:
    - If valid -> classify under `AGENTS.md#review`; fix blockers and approved improvements, including similar
      in-scope instances. Record dispositions for non-blocking items under the root scope and follow-up rules.
@@ -277,10 +272,8 @@ For each issue in `sonar-issues.json` and each hotspot in
 1. **Read the rule and the message.** What is Sonar claiming?
 2. **Open the file at the line and verify.** Does the claim hold against
    the current code?
-3. **Search the whole PR diff (and adjacent code) for the same class of
-   issue.** Same rule #10 as for review comments. If Sonar flagged one
-   instance of S131 (case without default), sweep all case statements.
-   If Sonar flagged S2245 (insecure RNG), sweep all `random()` callsites.
+3. **Check related code for the same root cause** under rule #10. A shared rule ID alone does not prove every
+   matching construct is defective; use the actual trigger and contract to choose the search and review scope.
 4. **Decide**:
    - If valid -> classify under `AGENTS.md#review`; fix blockers and approved improvements, including similar
      in-scope instances. Disposition other findings under the root scope and follow-up rules.
@@ -326,17 +319,18 @@ at the end, but not fixed here.
 If the fresh snapshot contains an unassessed finding, verify and disposition it before pushing. Additional fixes
 require relevant validation; repeat review only under `AGENTS.md#review`, not merely because another comment arrived.
 
-### 4a. Before pushing -- verify full-scope review coverage
+### 4a. Before pushing -- verify review and validation coverage
 
-Ensure the complete current PR diff has independent review coverage under `AGENTS.md#review`. Reuse a completed
-review when no condition requiring another round applies; do not launch a reviewer merely because a push is next.
-The coordinator owns delegation, validates findings and decides whether a repeat is warranted under the root rule.
+Assess whether the current change has adequate review and validation under `AGENTS.md#review`. The main agent owns
+that assessment; independent review of the entire PR is not a prerequisite for every push. Reuse earlier evidence
+that still holds, assess new fixes and their interactions, and widen coverage when changes invalidate earlier
+assumptions. Do not launch a reviewer merely because a push is next or claim readiness for unassessed work.
 
-A full-scope prompt template:
+When independent review is useful, adapt the scope and lenses to the unresolved question:
 
-> Review PR <N> end-to-end on branch <X>, against base <base>. Read AGENTS.md and the active SOW <filename, if any>.
-> Check correctness, tests, side effects, security, operations, and similar defects throughout the complete diff.
-> For performance-sensitive code, also audit hot-path complexity, allocations, contention and unbounded growth.
+> Review <decision/change/fix and affected interactions> on branch <X>, against <base or reviewed state>.
+> Read AGENTS.md and the active SOW <filename, if any>. Assess <relevant risks/questions> using <owner/validation
+> evidence>. Trace dependencies needed for this scope and report material gaps beyond it.
 > Classify each finding under AGENTS.md Review, with file/line evidence, trigger, consequence and a suggested fix.
 > This is read-only: do not edit files, mutate remote or Git state, stop processes, or launch other agents.
 
