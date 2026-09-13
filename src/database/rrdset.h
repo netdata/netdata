@@ -84,6 +84,47 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 #define rrdset_is_discoverable(st) (rrdset_is_replicating(st) || !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
 
 // --------------------------------------------------------------------------------------------------------------------
+// Receiver replication ownership.
+//
+// The SINGLE implementation of the receiver-replication claim and release. Every lifecycle site uses
+// these - the parser's CHART_DEFINITION_END, both REPLAY_END branches, the connect/disconnect reset,
+// and chart teardown. Do NOT open-code the flag CAS plus the counter movement anywhere else: the
+// ownership invariant is only enforceable while it lives in one place. Every decrement must be either
+// a release that cleared IN_PROGRESS in its own CAS old value, or the speculative-increment rollback
+// in claim() for a duplicate CHART_DEFINITION_END. The rollback does not clear the flag because the
+// chart still holds its contribution; a child resends CHART_DEFINITION_END when it adds dimensions.
+//
+// claim():   true when THIS call caused the not-replicating -> replicating transition, i.e. the chart's
+//            contribution is now held. False means the chart already held one and this call's
+//            speculative increment has been withdrawn.
+// release(): returns the OLD flags; releases the contribution only if this call cleared IN_PROGRESS.
+//            `also_clear` carries extra flags to clear in the same atomic transition.
+bool rrdhost_receiver_replication_claim(RRDSET *st);
+// The macro captures the CALLING function, so the refusal log names the release site that
+// over-released (replay completion, its forced branch, the reset, or chart teardown) rather than
+// this one shared implementation.
+RRDSET_FLAGS rrdhost_receiver_replication_release_with_caller(RRDSET *st, RRDSET_FLAGS also_clear, const char *function, bool pulse);
+#define rrdhost_receiver_replication_release(st, also_clear) \
+    rrdhost_receiver_replication_release_with_caller(st, also_clear, __FUNCTION__, true)
+// For the connect/disconnect reset ONLY: it drains the whole generation and its caller has already
+// published the receiver state, so the 1->0 edge here must not republish RCV_RUNNING over it.
+#define rrdhost_receiver_replication_release_no_pulse(st, also_clear) \
+    rrdhost_receiver_replication_release_with_caller(st, also_clear, __FUNCTION__, false)
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Refused (would-be-underflow) releases, so a test can detect an over-release that the refusal itself
+// hides from the counter.
+extern size_t rrdhost_receiver_replication_refusals;
+
+// Test-only: pause one claiming thread between its accounting increment and its flag publish, so a unit test
+// can drive that interleaving deterministically instead of hoping for it.
+void rrdhost_receiver_replication_race_hook_arm(RRDSET *st);
+bool rrdhost_receiver_replication_race_hook_is_waiting(void);
+void rrdhost_receiver_replication_race_hook_release(void);
+void rrdhost_receiver_replication_race_hook_disarm(void);
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
 
 struct rrdset {
     nd_uuid_t chart_uuid;                             // the global UUID for this chart
