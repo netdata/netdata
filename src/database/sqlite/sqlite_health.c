@@ -3,6 +3,7 @@
 #include "sqlite_health.h"
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
+#include "sqlite_metadata.h"
 #include "health/health_internals.h"
 #include "health/health-alert-entry.h"
 
@@ -353,35 +354,106 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
  *
  */
 
-#define SQL_CLEANUP_HEALTH_LOG_DETAIL                                                                                  \
-    "DELETE FROM health_log_detail WHERE health_log_id IN "                                                            \
-    " (SELECT health_log_id FROM health_log WHERE host_id = @host_id) AND when_key < UNIXEPOCH() - @history "          \
-    " AND updated_by_id <> 0 AND transition_id NOT IN "                                                                \
-    " (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"
+// Rows are deleted in bounded batches. The eligible set is extremely bimodal: on a large
+// parent most hourly runs have a few dozen rows to delete, but roughly three times a day a
+// run finds ~800k rows that crossed the retention boundary together. Deleting those in one
+// transaction rewrites the table plus every index on it, and the resulting fsync storm
+// saturates the database disk long enough to starve dbengine queries - which stalls health
+// evaluation itself, since health is the biggest query consumer on a parent.
+//
+// The rowid-IN form is used rather than "DELETE ... LIMIT": both produce an identical query
+// plan, but DELETE-with-LIMIT needs SQLITE_ENABLE_UPDATE_DELETE_LIMIT, which is not enabled
+// in every SQLite build netdata may link against.
+#define HEALTH_LOG_CLEANUP_BATCH_SIZE (2000)
 
-void sql_health_alarm_log_cleanup(RRDHOST *host)
+#define SQL_CLEANUP_HEALTH_LOG_DETAIL                                                                                  \
+    "DELETE FROM health_log_detail WHERE rowid IN ("                                                                   \
+    "  SELECT d.rowid FROM health_log_detail d WHERE d.health_log_id IN "                                              \
+    "   (SELECT health_log_id FROM health_log WHERE host_id = @host_id) AND d.when_key < UNIXEPOCH() - @history "      \
+    "   AND d.updated_by_id <> 0 AND d.transition_id NOT IN "                                                          \
+    "   (SELECT last_transition_id FROM health_log hl WHERE hl.host_id = @host_id)"                                    \
+    "  LIMIT @batch) RETURNING 1"
+
+// Returns true when this host still has eligible rows and the caller should come back sooner
+// than its normal interval. Only the two throttles set it - an oversized WAL and the runtime
+// budget - because only they stop with work that is known to be drainable. A failed statement
+// is reported and left for the next normal pass: retrying it once a minute for every host
+// would only repeat a permanent failure.
+//
+// "started" is the caller's pass start, so the runtime budget bounds the whole pass rather
+// than each host.
+bool sql_health_alarm_log_cleanup(RRDHOST *host, time_t started)
 {
     sqlite3_stmt *res = NULL;
     int rc;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res))
-        return;
-
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_retention_s));
+    bool retry_soon = false;
 
-    param = 0;
-    rc = sqlite3_step_monitored(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to cleanup health log detail table, rc = %d", rc);
+    if (!PREPARE_STATEMENT(db_meta, SQL_CLEANUP_HEALTH_LOG_DETAIL, &res)) {
+        health_alarm_log_cleanup(host);
+        return false;
+    }
+
+    // Each iteration is its own transaction, so the WAL can be checkpointed and other writers
+    // can make progress between batches. We stop early on the same two conditions the other
+    // cleanups in run_metadata_cleanup() respect - an oversized WAL and a runtime budget - and
+    // whatever is left is picked up by the next cleanup cycle.
+    while (true) {
+        param = 0;
+        SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_retention_s));
+        SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)HEALTH_LOG_CLEANUP_BATCH_SIZE));
+
+        param = 0;
+
+        // The statement RETURNs one row per deleted row: counting them is statement local.
+        // sqlite3_changes() cannot be used here - it reports the last statement completed on
+        // the connection, and db_meta is shared with the health and ACLK threads, which makes
+        // its value unpredictable rather than merely stale.
+        //
+        // Never leave this drain on a SQLITE_ROW: finalizing or resetting a half drained
+        // RETURNING statement commits the rows it already deleted instead of rolling them
+        // back, so we would lose exactly the count we came here for.
+        //
+        // The delete itself completes inside the first step and the rows are replayed from an
+        // ephemeral table, so the implicit commit lands on the step that returns SQLITE_DONE.
+        // A busy there makes sqlite3_step() reset, and the retry inside sqlite3_step_monitored()
+        // restarts the delete rather than resuming it, counting the same rows twice. That can
+        // only inflate the count, so it costs one extra batch and can never fake an exhausted
+        // set.
+        int deleted = 0;
+        while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW)
+            deleted++;
+
+        if (unlikely(rc != SQLITE_DONE)) {
+            error_report("Failed to cleanup health log detail table, rc = %d", rc);
+            break;
+        }
+
+        // a short batch means the eligible set for this host is exhausted
+        if (deleted < HEALTH_LOG_CLEANUP_BATCH_SIZE)
+            break;
+
+        // Both throttles are checked after a batch, never before the first one: the caller
+        // gates on the WAL immediately before calling us, so checking it here again would only
+        // repeat that stat once per host.
+        if (!sql_metadata_wal_size_acceptable() ||
+            now_monotonic_sec() - started >= METADATA_RUNTIME_THRESHOLD) {
+            retry_soon = true;
+            break;
+        }
+
+        SQLITE_RESET(res);
+    }
 
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-    
+
     // After cleaning up SQLite entries, also clean up in-memory entries
     health_alarm_log_cleanup(host);
+
+    return retry_soon;
 }
 
 #define SQL_UPDATE_TRANSITION_IN_HEALTH_LOG                                                                            \
