@@ -122,13 +122,13 @@ modules:
                 ```
 
             - name: max_time_series
-              description: Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed.
+              description: With a selected profile, limits rendered time series independently in each context after aggregation; an over-limit context is skipped whole. Without a profile, limits total time series after relabeling at startup. Set to 0 for no limit.
               default_value: 2000
               required: false
               group: Limits
 
             - name: max_time_series_per_metric
-              description: Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped.
+              description: With a selected profile, limits each metric family's rendered time series independently in each context; an over-limit context is skipped whole. Without a profile, skips final metric families exceeding this limit. Set to 0 for no limit.
               default_value: 200
               required: false
               group: Limits

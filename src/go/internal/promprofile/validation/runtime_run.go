@@ -49,9 +49,9 @@ type routePlanError struct {
 func (e *routePlanError) Error() string { return fmt.Sprintf("%s: %v", e.stage, e.err) }
 func (e *routePlanError) Unwrap() error { return e.err }
 
-func prepareRoutePlan(reader metrix.Reader, templateYAML, emitTypeID string) (routePlanResult, error) {
+func prepareRoutePlan(reader metrix.Reader, templateYAML, emitTypeID string, opts ...chartengine.Option) (routePlanResult, error) {
 	routes := newPlanRouteSummary()
-	engine, err := newRouteEngine(templateYAML, emitTypeID, routes.observe)
+	engine, err := newRouteEngine(templateYAML, emitTypeID, routes.observe, opts...)
 	if err != nil {
 		return routePlanResult{}, err
 	}
@@ -61,12 +61,14 @@ func prepareRoutePlan(reader metrix.Reader, templateYAML, emitTypeID string) (ro
 func newRouteEngine(
 	templateYAML, emitTypeID string,
 	observe func(chartengine.PlanRouteDiagnostic),
+	opts ...chartengine.Option,
 ) (*chartengine.Engine, error) {
-	engine, err := chartengine.New(
+	engineOpts := []chartengine.Option{
 		chartengine.WithEmitTypeIDBudgetPrefix(emitTypeID),
 		chartengine.WithRuntimeStore(nil),
 		chartengine.WithPlanRouteDiagnosticObserver(observe),
-	)
+	}
+	engine, err := chartengine.New(append(engineOpts, opts...)...)
 	if err != nil {
 		return nil, &routePlanError{stage: "init", err: err}
 	}

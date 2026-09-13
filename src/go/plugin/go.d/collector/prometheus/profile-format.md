@@ -445,6 +445,14 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   lowers emitted chart cardinality; `aggregation` only selects the value for resulting collisions. Every scraped series is
   still processed and retained in the collector's metric store. This chart reduction is separate from Prometheus
   relabeling: it does not remove or rewrite stored series labels.
+- **Existing limits apply independently to each context after aggregation.** When a profile is selected,
+  `max_time_series` limits the distinct output chart/dimension values in each resolved context, and
+  `max_time_series_per_metric` limits each source family's output values within that context. Charts sharing a context
+  share its limits. Histogram buckets, counts, and sums count as output values from the same source family.
+  An over-limit context is skipped whole and retried each scrape; other contexts continue to use their complete inputs.
+  A rollup can therefore remain visible while detail is skipped. Names, defaults, and zero-to-disable behavior of the
+  settings are unchanged. These are output limits: scraping and retained source data still scale with input size.
+  Jobs with no selected profile retain their startup total and per-family source limits.
 - **Only collected series can be charted.** Gauge families named `*_info` are skipped. Untyped scalar families are
   collected only when the selected profile or job `fallback_type` maps them to a gauge or counter, or when the name ends
   in `_total` (the last-resort implicit counter rule). Declared type wins; job policy wins over profile policy; and an

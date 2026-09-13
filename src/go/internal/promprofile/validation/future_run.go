@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 )
 
@@ -97,7 +98,7 @@ func addFutureOpennessChecks(
 	if strings.TrimSpace(templateYAML) == "" {
 		return fmt.Errorf("future collector returned an empty chart template")
 	}
-	planned, err := prepareRoutePlan(futureReader, templateYAML, collectorJobFullName(jobName))
+	planned, err := prepareRoutePlan(futureReader, templateYAML, collectorJobFullName(jobName), chartengine.WithEnginePolicy(coll.EnginePolicy()))
 	if err != nil {
 		return fmt.Errorf("future chart plan: %w", err)
 	}

@@ -31,6 +31,8 @@ type engineConfig struct {
 	log                     *logger.Logger
 	seriesSelection         seriesSelectionMode
 	runtimePlanner          bool
+	maxTimeSeries           int
+	maxTimeSeriesPerMetric  int
 }
 
 type policyOverride[T any] struct {
@@ -67,6 +69,11 @@ type EnginePolicy struct {
 
 	// Autogen controls unmatched-series fallback behavior.
 	Autogen *AutogenPolicy
+
+	// These carry the collector's existing limits to post-aggregation admission.
+	// Each context is checked independently; non-positive values disable a limit.
+	MaxTimeSeries          int
+	MaxTimeSeriesPerMetric int
 }
 
 func defaultAutogenPolicy() AutogenPolicy {
@@ -131,6 +138,8 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 		if selectorErr != nil {
 			return fmt.Errorf("invalid engine selector: %w", selectorErr)
 		}
+		cfg.maxTimeSeries = policy.MaxTimeSeries
+		cfg.maxTimeSeriesPerMetric = policy.MaxTimeSeriesPerMetric
 		if policy.Autogen != nil {
 			cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: cloneAutogenPolicy(autogen)}
 			cfg.autogenRulesOverride = policyOverride[[]charttpl.ValidatedAutogenRule]{

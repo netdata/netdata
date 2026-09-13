@@ -174,6 +174,8 @@ type chartState struct {
 	entries         map[string]*dimBuildEntry
 	observedCount   int
 	currentBuildSeq uint64
+
+	sourceDimensions map[sourceDimension]struct{}
 }
 
 type planBuildContext struct {
@@ -196,6 +198,8 @@ type planBuildContext struct {
 	materializedByID map[string]*materializedChartState
 
 	planRouteStats
+
+	maxSeriesPerMetric int
 }
 
 type flattenedReadChecker interface {
@@ -282,6 +286,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		return Plan{}, materializedState{}, 0, 0, 0, false, err
 	}
 	sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
+	e.enforceContextLimits(ctx)
 
 	// Route-cache lifecycle follows metrix snapshot membership. Diagnostic plans
 	// bypass it completely so repeated attempts retain complete route facts.
@@ -444,6 +449,8 @@ func (e *Engine) preparePlanBuildContext(
 		dimCapHints:       dimCapHints,
 		materialized:      materialized,
 		materializedByID:  materialized.charts,
+
+		maxSeriesPerMetric: e.state.cfg.maxTimeSeriesPerMetric,
 	}, nil
 }
 
@@ -712,6 +719,12 @@ func (ctx *planBuildContext) accumulateRoute(
 	}
 	if isHistogramBucketSeries(seriesMeta) {
 		cs.meta.Type = program.ChartTypeHeatmap
+	}
+	if ctx.maxSeriesPerMetric > 0 {
+		if cs.sourceDimensions == nil {
+			cs.sourceDimensions = make(map[sourceDimension]struct{})
+		}
+		cs.sourceDimensions[sourceDimension{diagnosticMetricFamilyName(metricName, labels, seriesMeta), route.DimensionName}] = struct{}{}
 	}
 	sortKey := histogramBucketDimensionSortKey(route, seriesMeta, labels)
 
