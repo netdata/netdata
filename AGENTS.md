@@ -294,7 +294,7 @@ Before non-trivial work:
     implementation can start.
   - `in-progress`: implementation underway. Set it with the first implementation-file change.
   - `paused`: intentionally stopped; may resume on the branch.
-  - `completed`: validated and durable memory transferred. The successful terminal status.
+  - `completed`: required review and validation complete, durable memory transferred. The successful terminal status.
 - Content hygiene: an active SOW is a current-state handoff, not an append-only transcript.
   - When a plan, assumption, or decision is superseded, replace it with the current truth. Keep prior history only
     when it explains a current constraint, approval, or rejected alternative.
@@ -312,7 +312,8 @@ Before non-trivial work:
   superseded by newer user instructions.
 - Completion of a standalone or step SOW, when the authorized deliverable is complete and any changes are ready to
   merge (umbrellas: see "Umbrella And Step SOWs"):
-  1. Finish authorized implementation, documentation capture under Knowledge Capture, validation, and follow-up mapping.
+  1. Finish authorized implementation, documentation capture under Knowledge Capture, required review and validation,
+     and follow-up mapping. Record the evidence required by "Review" under the SOW's Validation section.
   2. Transfer durable knowledge needed for the approved deliverable into project skills, docs, code, and tests (and
      specs once re-introduced). Document reusable discoveries from implementation under Knowledge Capture. Discoveries
      from tracked answer-only work MAY remain sanitized local notes without authorizing guide edits. The SOW MUST NOT
@@ -371,9 +372,10 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
   NOT be committed.
 - Never `git checkout <file>`, `git reset`, delete files, or rewrite history without explicit user approval. Undo a
   change by editing it out, not by checking the file out.
-- Commit and push only when the user asks or explicitly approves those operations in the plan. Approval to implement
-  a fixed goal is not implicit approval of Git operations subsequently added to the plan. Checkpoint commits and
-  squashing under "Review" remain subject to these authorization rules.
+- Local commits: authorization to implement includes local commits unless the user asks to leave changes uncommitted.
+  Commit coherent, validated implementation before its independent review, and completed, validated review fixes as
+  follow-up commits. Keep unfinished or unvalidated work uncommitted.
+- Pushes, squashing and other history rewrites still require explicit user authorization.
 - Commit messages and PR bodies describe the change. A PR body links the follow-up issues tracked from its SOW.
 
 ### Local SOW Parking
@@ -389,12 +391,20 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
 
 ### Review
 
-The main agent owns delegation, review timing, scope and lenses within the user's directions. Assess the actual
-change, unresolved uncertainty and available validation; phase boundaries, commits and SOW steps do not require
-subagents by themselves. Direct work and self-review are appropriate when the affected behavior is well understood.
-Independent challenge is useful for consequential design assumptions, complex interactions or material blind spots.
-Exploration MAY be delegated to keep bulky source investigation out of the main context; return concise evidence and
-owner pointers, and verify consequential findings without routinely repeating the entire exploration.
+The main agent owns delegation, review timing, scope, lenses, depth and reviewer count within the user's directions
+and the readiness requirement below. During development, assess the actual change, unresolved uncertainty and available
+validation; phase boundaries, commits and SOW steps do not require subagents by themselves. Direct work and self-review
+are appropriate when the affected behavior is well understood. Independent challenge is useful for consequential
+design assumptions, complex interactions or material blind spots. Exploration MAY be delegated to keep bulky source
+investigation out of the main context; return concise evidence and owner pointers, and verify consequential findings
+without routinely repeating the entire exploration.
+
+- Readiness: before declaring an implementation branch ready for merge, its final changes MUST have received
+  independent review. If adequate review has not already occurred, the main agent MUST assign a reviewer who did not
+  implement the reviewed changes.
+- Earlier review MAY satisfy readiness where its scope and assumptions remain valid for the final deliverable. The
+  main agent MUST obtain review of subsequent material changes and uncovered interactions; an automatic repeat of
+  the entire review is not required.
 
 Review findings are leads until verified against the relevant design or shipped code and its contracts.
 
@@ -424,11 +434,13 @@ Review findings are leads until verified against the relevant design or shipped 
   independent performance review or additional measurements would resolve a material uncertainty.
 - Delegated reviewers MUST NOT edit files, perform operational actions or launch other agents; state these boundaries
   in the assignment. Supply the selected scope, relevant acceptance criteria, owner sources, validation and the SOW
-  filename when present. Record the assessment used, its scope, material findings and limitations under Validation in
-  the SOW when one exists; direct assessment is valid and does not require inventing a reviewer.
-- Review evidence: preserve the reviewed commit or working-tree state and relevant validation. Checkpoint commits
-  MAY be useful when authorized under "Git And PR Workflow"; a review round neither requires nor authorizes a commit,
-  push or history rewrite.
+  filename when present.
+- Review evidence: the SOW's Validation section MUST record the reviewer, reviewed commit or identified working-tree
+  state, covered scope and interactions, findings and their dispositions (or no findings), and remaining limitations.
+  When relying on earlier review, explain why its coverage remains valid for the final state. Preserve relevant
+  validation evidence alongside the review; for work without a SOW, include the review summary in the final report.
+- Review checkpoints follow "Git And PR Workflow". Focused review MAY compare commits; it does not require uncommitted
+  changes. Choose review scope from the changed behavior and remaining uncertainty, not the working tree's status.
 - Follow-up review: after a fix, retain earlier evidence that still holds. Check a bounded fix and its affected
   interactions directly or with a focused reviewer. Widen review when changed assumptions, shared behavior, contracts
   or missing coverage invalidate the earlier assessment beyond that fix. A blocker label or new commit alone does
@@ -436,8 +448,8 @@ Review findings are leads until verified against the relevant design or shipped 
 - Recurrence: when findings repeatedly cluster in one subsystem, investigate the shared cause or missing invariant
   rather than accumulating case fixes. Broaden investigation when the evidence warrants it; obtain user approval
   for remedies that change architecture, scope, public behavior or an approved design.
-- Stop when no verified shipping blocker remains, material risks have been assessed and required validation is
-  complete. Reviewer unanimity, exact readiness phrases and zero optional suggestions are NOT required. Nits alone
+- Stop when no verified shipping blocker remains, material risks have been assessed and required review and validation
+  are complete. Reviewer unanimity, exact readiness phrases and zero optional suggestions are NOT required. Nits alone
   MUST NOT keep a review cycle open.
 
 ### Followup Discipline
@@ -613,8 +625,8 @@ docs, code, and tests, not in specs.
 - Documentation work arising from answer-only questions requires separate authorization. Documentation capture
   records observed behavior; it does not authorize additional implementation or new product contracts.
 - Local notes are private evidence, not shared project contracts or automatic follow-up commitments. Accepted
-  deferred work follows Followup Discipline. Commit, push, and publication requirements never grant authorization
-  to perform those actions.
+  deferred work follows Followup Discipline. Git authorization follows "Git And PR Workflow"; these capture
+  requirements do not authorize implementation or publication.
 - Developer skills that give capture instructions MUST point to this section for timing and authorization.
 - Public/operator skills MUST carry a self-contained operator-facing version because they can be used outside this
   checkout.

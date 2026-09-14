@@ -16,9 +16,9 @@ One value only: `planning`, `ready`, `in-progress`, `paused`, or `completed`.
 `planning` means analysis or decisions are incomplete. `ready` means the
 Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
 Before Non-Trivial Work") applies, the user has approved the goal and plan.
-`completed` means work is validated and required memory transfer under `AGENTS.md#sow-lifecycle` is complete. SOW files
-are local-only working memory under `.agents/sow/q/` (gitignored) and are never
-committed.
+`completed` means required review, validation and memory transfer under `AGENTS.md#sow-lifecycle` are complete.
+Review evidence belongs under Validation, following `AGENTS.md#review`. SOW files are local-only working memory under
+`.agents/sow/q/` (gitignored) and are never committed.
 
 Sub-state: <short current truth>
 
@@ -207,8 +207,9 @@ Real-use evidence:
 
 Reviewer findings:
 
-- <reviewer; scope and reviewed checkpoint commit or working-tree state; each finding and how it was handled:
-  verified and fixed, rejected with evidence, or tracked; note Git operations not performed because unauthorized.>
+- <Review evidence required by AGENTS.md#review: reviewer, reviewed commit or identified working-tree state, covered
+  scope and interactions, findings and dispositions (or none), and remaining limitations. Explain why any reused
+  earlier review still covers the final state. Note Git operations not performed because unauthorized.>
 
 Same-failure scan:
 
