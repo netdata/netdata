@@ -56,19 +56,23 @@ func TestRunDelivery(t *testing.T) {
 			}
 			requests := make(chan request, 2)
 			var calls atomic.Int32
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				calls.Add(1)
-				var event Event
-				err := json.NewDecoder(r.Body).Decode(&event)
-				requests <- request{r.Method, r.URL.RequestURI(), r.Header.Get("Authorization"), r.Header.Get("Content-Type"), r.UserAgent(), event, err}
-				w.Header().Set("Location", "/unexpected-redirect-target")
-				w.WriteHeader(test.httpStatus)
-				_, _ = io.WriteString(w, "synthetic-private-value response body")
-			}))
+			server := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					calls.Add(1)
+					var event Event
+					err := json.NewDecoder(r.Body).Decode(&event)
+					requests <- request{r.Method, r.URL.RequestURI(), r.Header.Get("Authorization"), r.Header.Get("Content-Type"), r.UserAgent(), event, err}
+					w.Header().Set("Location", "/unexpected-redirect-target")
+					w.WriteHeader(test.httpStatus)
+					_, _ = io.WriteString(w, "synthetic-private-value response body")
+				}),
+			)
 			defer server.Close()
 			t.Setenv("NOTIFIER_TEST_URL", server.URL+"/notify?key=synthetic-private-value")
 			t.Setenv("NOTIFIER_TEST_TOKEN", "synthetic-private-value")
-			cfg := configForURL("${env:NOTIFIER_TEST_URL}") + "    bearer_token: '${env:NOTIFIER_TEST_TOKEN}'\n"
+			cfg := configForURL(
+				"${env:NOTIFIER_TEST_URL}",
+			) + "    bearer_token: '${env:NOTIFIER_TEST_TOKEN}'\n"
 			var stdout, stderr bytes.Buffer
 			input := strings.Replace(validEvent, "WARNING", test.status, 1)
 			code := Run(
@@ -126,7 +130,50 @@ func TestRunValidationAndErrors(t *testing.T) {
 			code:   1,
 			err:    "not configured",
 		},
-		"missing destination": {args: []string{"send"}, config: validConfig, code: 1, err: "provide --config"},
+		"missing destination": {
+			args:   []string{"send"},
+			config: validConfig,
+			code:   1,
+			err:    "provide --config",
+		},
+		"mixed selectors": {
+			args:   []string{"send", "--destination", "dev", "--role", "sysadmin"},
+			config: validConfig,
+			code:   1,
+			err:    "either --destination or --role",
+		},
+		"blank role": {
+			args:   []string{"send", "--role", " "},
+			config: validConfig,
+			code:   1,
+			err:    "invalid command options",
+		},
+		"empty explicit destination with role": {
+			args:   []string{"send", "--destination", "", "--role", "sysadmin"},
+			config: validConfig,
+			code:   1,
+			err:    "invalid command options",
+		},
+		"validate rejects role selector": {
+			args:   []string{"validate", "--role", "sysadmin"},
+			config: validConfig,
+			code:   1,
+			err:    "invalid command options",
+		},
+		"validate routing without resolving": {
+			args: []string{"validate"},
+			config: configForURL(
+				"${env:NOTIFIER_TEST_MISSING}",
+			) + "routing:\n  roles:\n    sysadmin: [dev]\n",
+			stdout: "configuration is valid\n",
+		},
+		"invalid event with no targets": {
+			args:   []string{"send", "--role", "silent"},
+			config: validConfig,
+			input:  "synthetic-private-value",
+			code:   1,
+			err:    "invalid JSON",
+		},
 		"invalid event": {
 			args:   []string{"send", "--destination", "dev"},
 			config: validConfig,
@@ -176,7 +223,11 @@ func TestRunValidationAndErrors(t *testing.T) {
 	require.NoError(t, os.Unsetenv("NOTIFIER_TEST_MISSING"))
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			args := append(append([]string(nil), test.args...), "--config", writeConfig(t, test.config))
+			args := append(
+				append([]string(nil), test.args...),
+				"--config",
+				writeConfig(t, test.config),
+			)
 			var stdout, stderr bytes.Buffer
 			got := Run(context.Background(), args, strings.NewReader(test.input), &stdout, &stderr)
 			assert.Equal(t, test.code, got)
@@ -203,12 +254,19 @@ func TestRunUsage(t *testing.T) {
 		"missing command": {code: 1},
 		"unknown command": {args: []string{"synthetic-private-value"}, code: 1},
 		"missing config":  {args: []string{"validate"}, code: 1},
-		"missing file":    {args: []string{"validate", "--config", filepath.Join(t.TempDir(), "missing")}, code: 1},
+		"missing file": {
+			args: []string{"validate", "--config", filepath.Join(t.TempDir(), "missing")},
+			code: 1,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			assert.Equal(t, test.code, Run(context.Background(), test.args, strings.NewReader(""), &stdout, &stderr))
+			assert.Equal(
+				t,
+				test.code,
+				Run(context.Background(), test.args, strings.NewReader(""), &stdout, &stderr),
+			)
 			if test.help {
 				assert.Equal(t, usage, stdout.String())
 			} else {
@@ -233,7 +291,15 @@ func TestRunCancellationDuringInput(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			code := Run(
 				ctx,
-				[]string{"send", "--config", writeConfig(t, validConfig), "--destination", "dev", "--timeout", "20ms"},
+				[]string{
+					"send",
+					"--config",
+					writeConfig(t, validConfig),
+					"--destination",
+					"dev",
+					"--timeout",
+					"20ms",
+				},
 				reader,
 				&stdout,
 				&stderr,
@@ -264,18 +330,20 @@ func TestRunNetworkFailures(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			stop := make(chan struct{})
 			canceled := make(chan struct{})
-			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if test.hang {
-					_, _ = io.Copy(io.Discard, r.Body)
-					select {
-					case <-r.Context().Done():
-						close(canceled)
-					case <-stop:
+			server := httptest.NewUnstartedServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if test.hang {
+						_, _ = io.Copy(io.Discard, r.Body)
+						select {
+						case <-r.Context().Done():
+							close(canceled)
+						case <-stop:
+						}
+						return
 					}
-					return
-				}
-				w.WriteHeader(http.StatusNoContent)
-			}))
+					w.WriteHeader(http.StatusNoContent)
+				}),
+			)
 			server.Config.ErrorLog = log.New(io.Discard, "", 0)
 			if test.tls {
 				server.StartTLS()
@@ -294,7 +362,15 @@ func TestRunNetworkFailures(t *testing.T) {
 				1,
 				Run(
 					context.Background(),
-					[]string{"send", "--config", path, "--destination", "dev", "--timeout", "200ms"},
+					[]string{
+						"send",
+						"--config",
+						path,
+						"--destination",
+						"dev",
+						"--timeout",
+						"200ms",
+					},
 					strings.NewReader(validEvent),
 					&stdout,
 					&stderr,

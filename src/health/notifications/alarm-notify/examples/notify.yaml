@@ -3,7 +3,16 @@ destinations:
   local:
     type: webhook
     url: http://127.0.0.1:18080/notify
+  audit:
+    type: webhook
+    url: http://127.0.0.1:18080/audit
   authenticated:
     type: webhook
     url: ${env:NOTIFY_WEBHOOK_URL}
     bearer_token: ${env:NOTIFY_WEBHOOK_TOKEN}
+routing:
+  default: [local]
+  roles:
+    sysadmin: [local, audit]
+    dba: [audit]
+    muted: []

@@ -5,10 +5,12 @@ implementation; it does not change the active Bash notifier. Existing functional
 and questionable behavior requires an explicit decision before being changed or dropped. No Bash feature has been
 approved for removal by this increment.
 
-## Working increment
+## Working increments
 
 - Standalone developer build, explicit YAML configuration, JSON input, and one selected generic webhook delivery.
 - Configuration validation, literal/environment/file secrets, request timeout/cancellation, and safe diagnostics.
+- Central role-to-destination routing, defaults for unmapped roles, explicit suppression, reserved roles, and
+  deduplication by destination name. Sequential fan-out records individual results and preserves any-success exits.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -55,16 +57,16 @@ remote services remain available.
 
 | Area | Functional baseline | Go migration |
 |---|---|---|
-| Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Pending; next routing increment |
+| Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
 | Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Pending |
 | Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Pending except initial webhook settings |
-| Results | Per-target failures and Bash's any-success invocation result | Pending for fan-out; one webhook reports its own result |
+| Results | Per-target failures and Bash's any-success invocation result | Implemented for webhook fan-out; provider subtarget details pending with providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first three proposed increments cover this foundation, routing/fan-out, and one named provider. More small PRs
-follow until the functional baseline and explicitly approved exceptions are complete. Final architecture and broad
-refactoring are discussed after that working baseline exists.
+The foundation and routing/fan-out increments are implemented. The next proposed increment adds one named provider.
+More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final architecture
+and broad refactoring are discussed after that working baseline exists.
