@@ -33,6 +33,7 @@ func init() {
 type CachestatConfig struct {
 	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
+	// DynCfg fields (from config_schema.json)
 	Enabled        bool   `yaml:"enabled" json:"enabled"`
 	AppsEnabled    bool   `yaml:"apps" json:"apps"`
 	CgroupsEnabled bool   `yaml:"cgroups" json:"cgroups"`
@@ -68,17 +69,20 @@ func (c *CachestatCollector) Configuration() any {
 }
 
 func (c *CachestatCollector) Init(ctx context.Context) error {
-	// Load legacy config as fallback
-	legacyCfg, err := resolveCachestatLegacyConfig()
-	if err == nil && legacyCfg.Enabled {
-		c.Config.Enabled = true
-		c.Config.AppsEnabled = legacyCfg.AppsEnabled
-		c.Config.CgroupsEnabled = legacyCfg.CgroupsEnabled
+	// Agent provides config from YAML. Fall back to legacy config if not set.
+	if !c.Config.Enabled {
+		// Try legacy config as fallback
+		legacyCfg, err := resolveCachestatLegacyConfig()
+		if err == nil && legacyCfg.Enabled {
+			c.Config.Enabled = true
+			c.Config.AppsEnabled = legacyCfg.AppsEnabled
+			c.Config.CgroupsEnabled = legacyCfg.CgroupsEnabled
+		} else {
+			return errors.New("cachestat disabled in configuration")
+		}
 	}
 
-	if !c.Config.Enabled {
-		return errors.New("cachestat disabled in configuration")
-	}
+	c.Debugf("initializing cachestat: apps=%v cgroups=%v", c.Config.AppsEnabled, c.Config.CgroupsEnabled)
 
 	// Load eBPF program
 	handle, err := LoadCachestatLegacy(CachestatLegacyConfig{

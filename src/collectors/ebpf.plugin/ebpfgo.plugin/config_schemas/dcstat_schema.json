@@ -2,10 +2,44 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "title": "DCstat eBPF Collector",
+  "description": "Collects directory cache statistics using eBPF probes",
   "properties": {
-    "enabled": {"type": "boolean", "default": true},
-    "update_every": {"type": "integer", "default": 1, "minimum": 1},
-    "apps": {"type": "boolean", "default": false},
-    "cgroups": {"type": "boolean", "default": false}
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable collector",
+      "description": "Enable or disable the dcstat eBPF collector",
+      "default": true
+    },
+    "update_every": {
+      "type": "integer",
+      "title": "Update interval",
+      "description": "Data collection interval in seconds",
+      "default": 1,
+      "minimum": 1
+    },
+    "apps": {
+      "type": "boolean",
+      "title": "Per-application metrics",
+      "description": "Enable per-application process metrics collection",
+      "default": false
+    },
+    "cgroups": {
+      "type": "boolean",
+      "title": "Per-cgroup metrics",
+      "description": "Enable per-control-group metrics collection",
+      "default": false
+    }
+  },
+  "ui": {
+    "sections": [
+      {
+        "name": "Basic Settings",
+        "fields": ["enabled", "update_every"]
+      },
+      {
+        "name": "Advanced",
+        "fields": ["apps", "cgroups"]
+      }
+    ]
   }
 }

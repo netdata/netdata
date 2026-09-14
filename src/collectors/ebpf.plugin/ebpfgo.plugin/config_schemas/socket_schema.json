@@ -2,8 +2,28 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "title": "Socket eBPF Collector",
+  "description": "Collects network socket statistics using eBPF probes",
   "properties": {
-    "enabled": {"type": "boolean", "default": true},
-    "update_every": {"type": "integer", "default": 1, "minimum": 1}
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable collector",
+      "description": "Enable or disable the socket eBPF collector",
+      "default": true
+    },
+    "update_every": {
+      "type": "integer",
+      "title": "Update interval",
+      "description": "Data collection interval in seconds",
+      "default": 1,
+      "minimum": 1
+    }
+  },
+  "ui": {
+    "sections": [
+      {
+        "name": "Basic Settings",
+        "fields": ["enabled", "update_every"]
+      }
+    ]
   }
 }
