@@ -188,3 +188,27 @@ The time-ranges of the queries running control the amount of shared memory requi
 ## Metrics Registry
 
 DBENGINE uses 150 bytes of memory for every metric for which retention is maintained but is not currently being collected.
+
+## Boundary with the rest of Netdata
+
+The engine is a component of the `netdata` binary, but its sources under `src/database/engine/` do not include or call
+anything of the daemon. Everything flows through the engine's own headers:
+
+- **Configuration** (`dbengine-config.h`): the embedder fills one `struct dbengine_config` and hands it to
+  `dbengine_init()` once, before the first tier; each tier gets a `struct rrdeng_tier_config` through `rrdeng_init()`.
+  The same struct carries the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest
+  datafile) and `preload_metrics` (the list of metric uuids the embedder already knows, fed into the metrics registry
+  before the journals load).
+- **Published statistics** (`rrdengineapi.h`): the engine keeps its own counters and exposes snapshot getters, such as
+  `rrdeng_get_cache_efficiency_stats()`, `rrdeng_get_gorilla_stats()` and `rrdeng_pulse_memory_sizes()` with
+  `rrdeng_mem_name()`; the daemon's pulse subsystem reads them each cycle. The engine never pushes into daemon charts.
+- **Work** (`rrdengineapi.h`): the embedder can run a function on the engine's worker pool with `rrdeng_enq_work()`.
+- **Worker job ids** (`dbengine-workers.h`): the engine's jobs occupy the first block of the shared libuv pool's job
+  id space; an embedder numbers its own jobs from `RRDENG_WORKER_JOB_MAX`. Pool-thread setup is
+  `libuv_worker_thread_init()` in libnetdata.
+- **Tests**: `mrg-unittest.c` and `page_test.cc` live here and use engine headers only; the daemon-side tests
+  (`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through `RRDHOST`,
+  `RRDSET` and `RRDDIM`.
+
+The daemon depends on the engine, not the other way round: it includes the engine's headers, reads
+`struct rrdengine_instance` where it needs to, and owns `netdata.conf` parsing, sqlite, streaming and the charts.
