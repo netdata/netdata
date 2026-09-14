@@ -1,32 +1,37 @@
 ---
 name: collectors-go-framework-v2
-description: Use when creating or migrating a Go go.d collector to framework V2, touching CollectorV2, metrix.CollectorStore, ChartTemplateYAML/charts.yaml, charttpl/chartengine, V2 host scopes/vnodes, or V2 collector tests. Focuses on concise maintainer-preferred V2 collector patterns.
+description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml/charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
 ---
 
 # Writing Go go.d Modules With Framework V2
 
-Use with `collectors-authoring`. Design decisions (product boundary, ownership, options, metric semantics)
-are made first with `.agents/skills/collectors-go-design/SKILL.md`; this skill owns the implementation
-mechanics. Keep it loaded for style; read source files for evidence.
+Use with `collectors-authoring` and apply `AGENTS.md#skill-selection`. This skill owns V2 implementation patterns;
+source files and their tests establish the affected framework contract. Use `collectors-go-design` when product,
+ownership, option or metric-semantics decisions are involved, including their review.
+
+For review, assess applicable requirements and existing evidence. The implementation gates, migration manifests and
+pre-PR actions below are review criteria, not instructions to create artifacts or perform live operations. Verify
+claims affected by the change at source; a narrow lens does not exempt a relevant contract.
 
 ## Read First
 
-- Contract: `src/go/plugin/framework/collectorapi/collector.go`
-- Framework-change workflow:
-  `src/go/plugin/framework/docs/changing-framework-code.md`
-- Canonical new-collector guide:
-  `src/go/plugin/go.d/docs/how-to-write-a-collector.md`
-- Helper-package guide:
-  `src/go/plugin/go.d/docs/helper-packages.md`
-- V1-to-V2 migration guide:
-  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`
-- Runtime/chart lifecycle: `src/go/plugin/framework/chartengine/README.md`
-- Template format: `src/go/plugin/framework/charttpl/README.md`
-- Host scopes/vnodes: `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md`
-- Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`.
-  Use focused pieces from it, not the whole collector shape.
-- Older V2 collectors can still be useful for local patterns, but review them
-  for stale style before treating them as examples.
+Select references by the changed behavior. New collectors need the lifecycle contract and authoring guide; a migration
+also needs its compatibility guide. Follow dependencies when a change reaches additional contracts.
+
+| Task or affected contract | Read |
+|---|---|
+| Collector lifecycle, registration or optional interfaces | `src/go/plugin/framework/collectorapi/collector.go` and applicable Core Style below |
+| New collector or lifecycle implementation patterns | `src/go/plugin/go.d/docs/how-to-write-a-collector.md` |
+| Existing plumbing or helper choice | `src/go/plugin/go.d/docs/helper-packages.md` |
+| V1-to-V2 migration, including review | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` and Compatibility Rules below |
+| Shared framework behavior or a missing general capability | `src/go/plugin/framework/docs/changing-framework-code.md`; its implementation approval tiers still apply |
+| Metric-store cycles, descriptors or caching | `src/go/pkg/metrix/README.md` and Metrics And Charts below |
+| Runtime chart output or lifecycle | `src/go/plugin/framework/chartengine/README.md` |
+| Template format, identity or reducers | `src/go/plugin/framework/charttpl/README.md` and Chart Label Identity below |
+| Host scopes or vnodes | `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md` and Host Scopes below |
+
+Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`. Use focused pieces, not the whole collector
+shape. Older V2 collectors can supply local patterns, but check for stale style before treating them as examples.
 
 ## Decision Discipline
 
@@ -150,21 +155,22 @@ mechanics. Keep it loaded for style; read source files for evidence.
   quantiles are not globally mergeable with these reducers. Non-sum reduction
   of cumulative counters happens before Netdata calculates rates and can be
   misleading when source membership changes.
-- `metrix` keeps ONE descriptor per metric NAME, resolved atomically at commit and
-  BOUNDED: a name idle past its retention window (`expireAfterSuccessCycles +
+- `metrix` keeps ONE descriptor per metric NAME, resolved atomically at commit. With finite age expiry,
+  a name idle past its retention window (`expireAfterSuccessCycles +
   descriptorGraceCycles`, both configurable on `NewCollectorStore(...)`) is evicted
   and can then re-register with a changed contract. Within that window the
   descriptor is authoritative — re-registering a TRULY-LIVE name with a changed
   kind / summary quantiles / histogram bounds fails the commit (loud), an idle name
   is superseded, and Init-time (out-of-cycle) registration still panics
   synchronously on conflict.
-- If a collector caches per-name handles ACROSS cycles, it MUST NOT keep them for
-  the job lifetime: couple their lifetime to the descriptor window via the optional
-  `metrix.DescriptorRetention` accessor (`DescriptorRetentionWindow()`,
-  `SuccessfulCommits()`), or a stale handle drift-skips a changed-contract name
-  forever after `metrix` evicts the descriptor. The prometheus writer
-  (`collector/prometheus/writer.go`) is the reference; see
-  `src/go/pkg/metrix/README.md` ("Descriptor Lifecycle and Retention").
+- Dynamic per-name handle caches MUST follow the store's descriptor lifetime through the optional
+  `metrix.DescriptorRetention` accessor (`DescriptorRetentionWindow()`, `SuccessfulCommits()`). Age finite-window
+  caches on successful commits in step with descriptor retention; keeping obsolete handles forever can drift-skip a
+  changed-contract name after eviction. When the window is `DescriptorRetentionUnbounded`, do not age out cached
+  state for that name. This does not forbid reusing instruments for a fixed known metric surface. The source owner is
+  `src/go/pkg/metrix/README.md#consumers-that-cache-per-name-state`; the Prometheus writer
+  (`src/go/plugin/go.d/collector/prometheus/writer.go`) demonstrates commit-aware retention. If the store lacks this
+  optional accessor, preserve cached handles rather than inventing a finite expiry.
 - To reproduce a V1 chart context in a migration, inject `context_namespace` (the
   fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
   `prefix.<app>.<metric>` without hand-built chart IDs.
@@ -248,7 +254,7 @@ mechanics. Keep it loaded for style; read source files for evidence.
 ## Host Scopes
 
 - Host scopes SHOULD be used only after a product decision says the data belongs on a generated vnode (the decision is
-  described in `collectors-authoring` §1.9).
+  described in `.agents/skills/collectors-authoring/collector-practices.md#19-remote-monitored-systems-and-vnodes`).
 - `ScopeKey` and `GUID` MUST be deterministic.
 - Collector-generated vnodes MUST set `_vnode_type=<source>`.
 - Host-scope cardinality MUST be bounded and documented. Collectors SHOULD NOT
@@ -258,8 +264,9 @@ mechanics. Keep it loaded for style; read source files for evidence.
 
 ## Tests
 
-At minimum, V2 work MUST include these tests, or the PR/SOW MUST justify why a
-specific item does not apply:
+For implementation, V2 work MUST include evidence from these tests, or the PR/SOW MUST justify why a specific item
+does not apply. Relevant existing tests count; do not add duplicate tests merely to satisfy this list. Review checks
+applicable coverage and required validation evidence without creating a new PR/SOW:
 
 - config YAML/JSON serialization compatibility;
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;

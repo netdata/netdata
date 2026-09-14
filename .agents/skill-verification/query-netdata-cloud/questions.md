@@ -1,10 +1,14 @@
 # query-netdata-cloud -- verification questions (seed list)
 
-This file is the **seed input** consumed by the verification
-harness introduced by PR #22423. The harness spawns a Sonnet-class assistant
-with `../SKILL.md` + `../how-tos/INDEX.md` + the canonical
-reference docs as context, asks each question below, captures the
-transcript, and grades it against the verification harness rubric.
+This is an operational verification seed list. Supply the runtime entry
+`docs/netdata-ai/skills/query-netdata-cloud/SKILL.md`, its `how-tos/INDEX.md` and relevant canonical references to the
+reviewer. Choose the model and execution scope for that task; this file does not establish that an automated harness
+is installed or that these live checks have run. Offline invocation-only checks live in
+`.agents/skill-verification/invocation/README.md`.
+
+Live questions require a separately authorized query task and configured targets. Read-only review of these questions
+uses their contracts without executing them or reading credentials. A requested live query may supply that authorization;
+do not request it again merely because the question appears in this seed list.
 
 Verification questions do not authorize guide edits. Record unanswered questions and reusable discoveries as
 sanitized local evidence under `AGENTS.md#knowledge-capture`; documentation implementation is separately authorized.
@@ -32,7 +36,7 @@ itself the first verification (see Q01).
 - **Q04** -- Which cloud provider, region, and instance type is
   `costa-desktop` running on (if any)?
 - **Q05** -- What is the agent version on `costa-desktop`, and
-  what is its claim_id?
+  is its claim ID present? Report `claim_id_present`, not the value.
 
 ## Streaming / parent / child / vnodes
 
@@ -103,7 +107,7 @@ itself the first verification (see Q01).
 
 ## Self-test invariants
 
-- **Q23** -- After answering all questions above, confirm that
-  no NETDATA_CLOUD_TOKEN bytes, no agent-bearer UUID values,
-  and no claim_id values appeared in any printed output during
-  this session.
+- **Q23** -- Check that wrapper diagnostics did not expose Cloud tokens, Agent bearers or authentication selectors.
+  Review successful response bodies before sharing: claim IDs can occur in response data even when diagnostic
+  masking works. Validate them privately and expose only a presence indicator, including for Q05. Project only the
+  fields needed for the authorized answer and redact private data. Forwarding a body unchanged does not redact it.

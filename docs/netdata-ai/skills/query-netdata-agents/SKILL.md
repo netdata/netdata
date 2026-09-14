@@ -1,50 +1,102 @@
 ---
 name: query-netdata-agents
-description: Query Netdata Agents (parents and children) directly via their HTTP API on port 19999. Includes a bearer-token helper that mints, caches, and transparently refreshes a per-agent bearer from a long-lived Netdata Cloud token, and auto-detects bearer-protected agents. Use when the user asks how to call an agent's REST API or Function directly, query an agent's logs/metrics/alerts directly, mint a bearer token from a cloud token, or work around bearer protection.
+description: Query or explain direct Netdata Agent APIs and Functions; review direct-query recipes or helpers; troubleshoot bearer authentication. Use query-netdata-cloud for Cloud-proxied calls.
 ---
 
-# Query Netdata Agents directly
+# Query Netdata Agents Directly
 
-This skill teaches end-users (and AI assistants helping them) how to
-talk to a Netdata Agent's HTTP API directly, including
-bearer-protected agents that require an SSO-issued bearer token.
+Use this skill for direct HTTP access to an Agent, parent or child, usually on port 19999. It serves operators and
+assistants helping them. The sibling [Cloud skill](../query-netdata-cloud/SKILL.md) covers Cloud transport; matching
+Function payloads use the same underlying Agent schemas.
 
-It is the sibling of [`query-netdata-cloud`](../query-netdata-cloud/SKILL.md).
-The two skills cover different transports for the same underlying
-agent API.
+## Choose The Task
 
-## Index of guides
+- **Explain or review:** read the relevant guide and helper as reference material. Do not source helpers, load
+  credentials, mint bearers or run live requests just because the skill was loaded.
+- **Run a requested query:** use [Prerequisites](#prerequisites), [Safe Execution](#safe-execution) and the relevant
+  domain guide. A query request does not authorize DynCfg updates or other state-changing Functions.
+- **Diagnose authentication or maintain the helper:** read [authentication.md](./authentication.md) and the relevant
+  symbol in [scripts/_lib.sh](./scripts/_lib.sh). Preserve authorization already given for the current task.
 
-| Domain | Guide |
+For Cloud team members, Cloud transport is the default when no direct route was requested. Direct access avoids the
+Cloud request round trip, but this skill's bearer wrapper still needs a reusable cache or Cloud access to mint.
+`agents_call_function` defaults to `--via cloud`; `--via agent` is explicit and has no automatic Cloud fallback.
+
+## Domain Guides
+
+| Domain | Read |
 |---|---|
-| Generic Function invocation | [query-functions.md](./query-functions.md) |
-| Logs (`systemd-journal`, `windows-events`, `macos-logs`, `otel-logs`) | [query-logs.md](./query-logs.md) |
-| Topology (`topology:snmp`) | [query-topology.md](./query-topology.md) |
-| Flows (`flows:netflow`) | [query-flows.md](./query-flows.md) |
-| Alerts (v3 paths) | [query-alerts.md](./query-alerts.md) |
-| DynCfg (`/api/v3/config`) | [query-dyncfg.md](./query-dyncfg.md) |
-| Time-series metrics (`/api/v3/data`) | [query-metrics.md](./query-metrics.md) |
-| Node identity, hardware, vnodes | [query-nodes.md](./query-nodes.md) |
-| Streaming (parent / child / replication) -- agent-only | [query-streaming.md](./query-streaming.md) |
-| **Operational how-tos (live catalog)** | [how-tos/INDEX.md](./how-tos/INDEX.md) |
+| Generic Functions and discovery | [query-functions.md](./query-functions.md) |
+| Logs: systemd-journal, windows-events, macos-logs, otel-logs | [query-logs.md](./query-logs.md) |
+| Topology, including topology:snmp | [query-topology.md](./query-topology.md) |
+| Network flows: flows:netflow | [query-flows.md](./query-flows.md) |
+| Alerts through v3 paths | [query-alerts.md](./query-alerts.md) |
+| DynCfg: /api/v3/config | [query-dyncfg.md](./query-dyncfg.md) |
+| Time-series metrics: /api/v3/data | [query-metrics.md](./query-metrics.md) |
+| Node identity, hardware and vnodes | [query-nodes.md](./query-nodes.md) |
+| Streaming, parent/child and replication | [query-streaming.md](./query-streaming.md) |
+| Operational recipes | [how-tos/INDEX.md](./how-tos/INDEX.md) |
 
+Read the matching guide for body schemas rather than loading every domain. End users MAY use the helpers as a black
+box or read their source as a reference implementation.
 
-| Transport | Auth | When to use |
-|---|---|---|
-| Cloud-proxied (sibling skill) | Cloud token | Default. Works for any team member with cloud access. No agent-side bearer needed. |
-| Direct-agent (this skill) | Per-agent bearer (UUID, ~24h TTL) | Power users; lower-latency batch fetches; bypasses the Cloud round-trip; required when Cloud is unavailable. |
+## Prerequisites
 
-For **what** to query (function payloads, body schemas), see the
-sibling skill -- the agent and the Cloud proxy expose the same
-Function payload shape.
+Explanation and saved-data review need no live credentials. The shipped executable recipes require Bash, Git, curl,
+jq and a repository checkout containing the helper. Direct calls require network access to the selected Agent.
 
-This skill ships shell scripts at
-[`scripts/_lib.sh`](./scripts/_lib.sh) that automate the bearer mint
-/ cache / refresh / call-function flow. End-users can either use the
-scripts as a black box, or read the script source as a reference
-implementation.
+For the managed bearer flow, configure `NETDATA_CLOUD_TOKEN` and `NETDATA_CLOUD_HOSTNAME` locally, then load the
+helper and call `agents_load_env`. It sources the checkout's trusted `.env`; query wrappers themselves do not load
+that file. Supply the target node UUID, machine GUID and `host:port` to direct wrappers. Space/room IDs are needed
+only by endpoints that use them. Do not require them for every direct call.
 
----
+Never request credential values in conversation. Use env-key placeholders; the user configures `.env` locally.
+[Configuration](./authentication.md#configuration) documents existing key roles and identity lookup.
+The direct wrapper always resolves a bearer, including for open endpoints; it does not detect protection or switch to
+unauthenticated access. For an unauthenticated reachability check, discard the potentially sensitive info body:
+
+```bash
+curl -sS --max-time 10 -o /dev/null -w '%{http_code}\n' \
+  "http://${AGENT_HOST:?set the Agent host:port}/api/v3/info"
+```
+
+An HTTP success establishes reachability for that request, not permission to call every API. See
+[Protection And Headers](./authentication.md#protection-and-headers) for status interpretation.
+
+## Safe Execution
+
+Use `agents_query_cloud`, `agents_query_agent` or `agents_call_function` for credential-bearing requests. Do not write
+raw curl commands containing live auth headers or invoke internal mint helpers directly. Header notation in the auth
+reference describes the protocol, not a request to expose credentials. Unauthenticated probes and local processing
+MAY use ordinary commands when they capture or suppress sensitive response fields.
+
+The wrappers mask request-auth values in their command log and keep internal mint/claim discovery private. They
+**forward endpoint responses unchanged**: logs, config and identity responses can contain secrets or identifiers.
+Cloud tokens, Agent bearers and claim IDs MUST NOT reach assistant-visible output. Capture sensitive responses in a
+shell variable or private local artifact, or pipe directly to an appropriate field projection before display. Do not
+use a general query wrapper to display a credential-issuing endpoint's response. Masked request logging is not response
+sanitization; do not enable shell tracing around credentials.
+
+For example, after choosing the requested target locally:
+
+```bash
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
+agents_query_agent \
+  --node "${NODE_UUID:?set the node UUID}" --host "${AGENT_HOST:?set the Agent host:port}" \
+  --machine-guid "${AGENT_MG:?set the machine GUID}" \
+  POST '/api/v3/function?function=systemd-journal' '{"info":true}' \
+  | jq '{status, type}'
+```
+
+For an execution recipe, provide a complete runnable invocation and the response fields needed for the question.
+Explanations and reviews do not need an unrelated live command appended. Function-specific parameters and output
+projections belong in the domain guide. [Helper Interfaces](./authentication.md#helper-interfaces)
+records all public interfaces, credential/cache handling and safe test commands.
+
+Bearers stay in local configuration/cache or private in-memory variables. Never commit credential values, claim IDs,
+node UUIDs or machine GUIDs. Repository users follow `.agents/sensitive-data-discipline.md`; outside a checkout,
+apply the same redaction to shared artifacts. A private cache is not an artifact to display or publish.
 
 ## Knowledge Capture
 
@@ -64,242 +116,3 @@ implementation.
 - Prefer updating an existing guide over duplicating it. Keep recipes operator-facing: fetching or using Agent
   data. Developer contract validation for topology producers, schemas, fixtures, UI adapters, or aggregator
   handoffs belongs in the relevant project developer skill, not in this public skill.
-
-## Mandatory Requirements (READ FIRST)
-
-1. **Preserve reusable discoveries** under [Knowledge Capture](#knowledge-capture).
-2. **Use the token-safe wrappers.** `agents_query_cloud`,
-   `agents_query_agent`, `agents_call_function` from
-   [`scripts/_lib.sh`](./scripts/_lib.sh) handle auth internally
-   and emit only the response body to stdout. Never write raw
-   curl with a literal `Authorization: Bearer $TOKEN` or
-   `X-Netdata-Auth: Bearer <uuid>`. Bearers / cloud tokens /
-   claim_ids must NEVER reach assistant-captured stdout.
-3. **Provide actionable instructions.** End every recommendation
-   with a runnable wrapper invocation.
-4. **Never request credentials.** Use env-key placeholders
-   (`NETDATA_CLOUD_TOKEN`, `AGENT_EVENTS_HOSTNAME`,
-   `AGENT_EVENTS_NODE_ID`, etc.) -- the user fills `.env` locally.
-5. **Bearer values stay in `.env` and `.local/`.** The bearer
-   cache file at `<repo>/.local/audits/query-netdata-agents/
-   bearers/<machine_guid>.json` is mode 0600 and gitignored. The
-   internal helper `_agents_resolve_bearer` returns it through a
-   validated caller-local output variable, never to stdout.
-6. **For bearer-protected agents, default to the Cloud-token
-   flow** in this skill (it auto-mints + caches the bearer).
-
----
-
-## Prerequisites
-
-- All [SKILL.md prereqs from `query-netdata-cloud`](../query-netdata-cloud/SKILL.md#prerequisites):
-  cloud token, space ID, room ID, node UUID.
-- Network access to the agent on port 19999 (or whatever it binds).
-  Test with: `curl -sS http://AGENT_HOST:19999/api/v3/info` -- a 200
-  with JSON confirms reachability.
-- The agent's `claim_id` if you intend to mint a bearer. It's at
-  `/api/v3/info` -> `.agents[0].cloud.claim_id`, or with shell
-  access at `<netdata-prefix>/var/lib/netdata/cloud.d/claimed_id`.
-  For the install-prefix detection rule, see
-  [`scripts/_lib.sh`](./scripts/_lib.sh).
-
-`.env` keys consumed (none are added by this skill -- the four
-existing `AGENT_EVENTS_*` keys cover the maintainer-facing
-agent-events workflow):
-
-| Key | Role |
-|---|---|
-| `NETDATA_CLOUD_TOKEN` | Cloud REST token used to mint per-agent bearers |
-| `NETDATA_CLOUD_HOSTNAME` | Cloud REST host |
-| `AGENT_EVENTS_HOSTNAME` | When working with the agent-events node specifically -- ssh + direct-HTTP host (IP or DNS name). NOT the journal namespace (hardcoded `agent-events`). |
-| `AGENT_EVENTS_NODE_ID` | Target node UUID for direct calls |
-| `AGENT_EVENTS_MACHINE_GUID` | Bearer cache key (one bearer per machine_guid) |
-
----
-
-## Detect bearer protection
-
-The signal is HTTP `412 Precondition Failed` from the agent for any
-authenticated path (e.g. `/host/<uuid>/api/v3/function?...`). The
-response body is `You need to be authorized to access this resource`.
-
-```bash
-# Probe -- 412 means bearer required, 200 means open access
-HOST="agent.example.invalid:19999"
-NODE="YOUR_NODE_UUID"
-
-curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  -H 'Content-Type: application/json' \
-  "http://$HOST/host/$NODE/api/v3/function?function=systemd-journal" \
-  -d '{"info":true}'
-```
-
-The unauthenticated `/api/v3/info` endpoint is always reachable
-(returns 200 with the agent's identity). Use it to confirm the host
-is up before checking auth.
-
----
-
-## Mint a per-agent bearer
-
-**Endpoint:** `GET /api/v2/bearer_get_token` on Netdata Cloud.
-
-Required query parameters: `node_id`, `machine_guid`, `claim_id`.
-Auth: Cloud token in `Authorization: Bearer ...`.
-
-```bash
-TOKEN="YOUR_API_TOKEN"
-NODE_ID="YOUR_NODE_UUID"
-MACHINE_GUID="YOUR_MACHINE_GUID"
-CLAIM_ID="YOUR_CLAIM_ID"
-
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/bearer_get_token?node_id=$NODE_ID&machine_guid=$MACHINE_GUID&claim_id=$CLAIM_ID"
-```
-
-Response body:
-
-| Field | Description |
-|---|---|
-| `token` | The 36-char UUID bearer; pass to the agent in `X-Netdata-Auth: Bearer <token>` |
-| `expiration` | Numeric. Format may be Unix ms or seconds; treat values > 10^12 as ms |
-| `bearer_protection` | `true` if the agent IS bearer-protected; the token still works either way |
-| `mg` | Echoed `machine_guid` |
-| `status` | Status code |
-
-Permission gate (Cloud-side): `PermissionSpaceRead` on the target
-space; node must be `reachable`. If the agent is `stale`, the call
-returns 400.
-
----
-
-## Use the bearer to call an agent
-
-```bash
-HOST="agent.example.invalid:19999"   # the agent's bind address
-NODE="YOUR_NODE_UUID"                # the node UUID (== nd field)
-BEARER="MINTED_BEARER_UUID"
-
-curl -sS -X POST \
-  -H "X-Netdata-Auth: Bearer $BEARER" \
-  -H 'Content-Type: application/json' \
-  "http://$HOST/host/$NODE/api/v3/function?function=systemd-journal" \
-  -d '{"info":true,"timeout":30000}'
-```
-
-Notes:
-
-- The header is **`X-Netdata-Auth: Bearer ...`**, NOT
-  `Authorization: Bearer ...`. The agent rejects the latter for
-  per-agent bearer auth.
-- The agent's HTTP API path mirrors the Cloud-proxied path. For the
-  Function payload shape (e.g. `systemd-journal` query body), see
-  the matching guide in
-  [`query-netdata-cloud`](../query-netdata-cloud/SKILL.md).
-
----
-
-## Bearer cache and refresh
-
-The shipped scripts cache bearers per `machine_guid` under
-`<repo>/.local/audits/query-netdata-agents/bearers/<machine_guid>.json`
-(gitignored, mode 0600). Each cache entry stores the raw mint
-response.
-
-Refresh policy: the cache is considered expired when
-`expiration - now < 3600` (one-hour buffer before actual TTL).
-Mirror of the Cloud frontend's policy
-(`cloud-frontend/src/domains/nodes/useAgentBearer.js`).
-
-A failed mint clears the cache entry so the next call re-mints from
-scratch.
-
----
-
-## Scripts
-
-The reference implementation lives in
-[`scripts/_lib.sh`](./scripts/_lib.sh). It exposes **token-safe
-public wrappers** (the assistant never sees the cloud token,
-agent bearer, or claim_id on stdout) and a **self-test** that
-asserts no token bytes leak.
-
-```bash
-# In your script:
-source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
-agents_load_env
-
-# Cloud-side call. NETDATA_CLOUD_TOKEN is read from .env
-# internally; stdout is the response body only.
-agents_query_cloud GET /api/v2/spaces
-
-# Direct-agent call. The bearer is minted/cached/refreshed
-# internally. stdout is the response body only; stderr shows the
-# curl invocation with `<CLOUD_TOKEN>` and `<AGENT_BEARER>`
-# masked.
-agents_query_agent \
-    --node "$AGENT_EVENTS_NODE_ID" \
-    --host "$AGENT_EVENTS_HOSTNAME:19999" \
-    --machine-guid "$AGENT_EVENTS_MACHINE_GUID" \
-    POST '/api/v3/function?function=systemd-journal' '{"info":true}'
-
-# Convenience: pick transport with --via cloud|agent.
-agents_call_function \
-    --via cloud \
-    --node "$AGENT_EVENTS_NODE_ID" \
-    --function systemd-journal
-```
-
-### Public API (assistant-facing)
-
-| Function | Purpose |
-|---|---|
-| `agents_load_env` | Source `<repo>/.env`; validate required keys |
-| `agents_repo_root` | Locate this repo's checkout root |
-| `agents_audit_dir` | Create + return `<repo>/.local/audits/query-netdata-agents/` |
-| `agents_netdata_prefix` | Autodetect Netdata install prefix (system / `/opt/netdata` / `/usr/local/netdata`) |
-| `agents_query_cloud METHOD PATH [BODY]` | Call any Cloud REST endpoint. Auth is added internally. **Stdout = response body only.** |
-| `agents_query_agent --node N --host H --machine-guid M METHOD PATH [BODY]` | Call any direct-agent path. Bearer resolved internally. **Stdout = response body only.** |
-| `agents_call_function --via cloud\|agent --node N --function F [--body J]` | Convenience wrapper around the two above |
-| `agents_run` / `agents_run_read` | Run curl with masked-token argv echo on stderr (used by the wrappers; rarely needed directly) |
-| `agents_selftest_no_token_leak` | Self-test: drives the wrappers with a sentinel token and asserts the sentinel never reaches captured stdout |
-
-### Internal helpers (do NOT call directly)
-
-These start with `_` and operate on token bytes inside their own
-scope. They return token data through validated caller-local output
-variables (so the assistant never sees them on stdout). Don't
-shell-out to them.
-
-| Internal | Purpose |
-|---|---|
-| `_agents_resolve_bearer OUTVAR <node> <mg> <host>` | Cache-aware bearer resolution; writes the bearer into `$OUTVAR` |
-| `_agents_get_claim_id OUTVAR <host>` | Resolve `claim_id` from `/api/v3/info`; writes to `$OUTVAR` |
-| `_agents_mint_bearer_json <node> <mg> <claim>` | One-shot Cloud bearer mint; the caller MUST capture into a local |
-| `_agents_log_masked` | Token / bearer redaction for stderr argv echoes |
-| `_agents_exp_to_seconds` | Normalize Cloud `expiration` (sec or ms) to seconds |
-
----
-
-## Direct-agent vs Cloud-proxied: how `agents_call_function` chooses
-
-Default is `--via cloud` -- the safe choice for any team member.
-
-`--via agent` requires:
-1. The agent host is reachable from the workstation on port 19999.
-2. A bearer (auto-minted internally via `_agents_resolve_bearer`).
-
-Falls back to `--via cloud` if the direct call fails.
-
----
-
-## Sensitive data
-
-- Bearer values appear in script stderr only when masked.
-- The cache file at `.local/audits/.../bearers/<machine_guid>.json`
-  contains the raw bearer; mode 0600.
-- Never paste bearer values, claim ids, machine GUIDs, or node UUIDs
-  into committed files. See
-  `<repo>/.agents/sensitive-data-discipline.md` for the
-  full rule.

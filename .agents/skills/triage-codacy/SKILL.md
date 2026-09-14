@@ -1,14 +1,21 @@
 ---
 name: triage-codacy
-description: Codacy Cloud workflow for this repository -- run Codacy's analyzers locally before `git push` (mirrors what Codacy CI runs), and fetch/cluster Codacy issues for any PR via the v3 API. Use when the user mentions Codacy, "codacy analysis", `codacy-analysis-cli`, "codacy issues on PR", "fix codacy CI", "codacy markdownlint findings", or any Codacy gate failing on a netdata-org PR. Ships scripts analyze-local.sh (docker/binary runner for codacy-analysis-cli) and pr-issues.sh (paginated v3 issue fetch + group-by tool/pattern/severity/file). Token-safe -- CODACY_TOKEN never reaches assistant-visible stdout. Read-only by design; write actions (mark FP, mark fixed) require a GitHub issue or branch-local SOW.
+description: Inspect, analyze, troubleshoot, or review Codacy findings and local analyzer/API helpers. Use for Codacy CI failures, codacy-analysis-cli, PR issue queries, and markdownlint findings. Supplied evidence and source review need no credentials; live queries and local analysis are separate routes. Writes require user authorization.
 ---
 
 # Codacy audit skill
 
-Drives Codacy Cloud for `netdata/netdata`:
+Use the operation and available evidence to choose a route:
 
-1. **Pre-push prevention** -- run the same analyzers Codacy CI runs, locally, before `git push`. Collapses the "push -> wait minutes -> see findings -> fix -> push again" loop into one push.
-2. **Read-only PR triage** -- list Codacy issues for any PR, cluster by tool / pattern / severity / file, drop the JSON dump under `<repo>/.local/audits/codacy/`.
+| Task | Route |
+|---|---|
+| Review supplied findings or helper changes | Inspect that evidence and affected helper contracts; no credentials, API fetch or analyzer run solely because this skill loaded |
+| Run local analysis | `scripts/analyze-local.sh`; no token or `.env` needed; select the relevant tool/scope |
+| Fetch current PR issues | `scripts/pr-issues.sh`; configured token required by this script; preserve the response and its commit provenance |
+| Diagnose a known CLI/API problem | Select the relevant recipe from `./how-tos/INDEX.md` |
+| Validate wrapper changes | Run the offline self-test and `python3 -B .agents/skills/triage-codacy/tests/test_helpers.py` |
+
+Loading this skill does not authorize fixes, pushes, remote issue transitions or analysis-policy changes.
 
 This skill is the fourth in the static-analysis triage family in this repo:
 `triage-coverity/`, `triage-sonarqube/`, `triage-codeql/`, `triage-codacy/` share one shape and one set of conventions;
@@ -38,10 +45,11 @@ In scope:
 - Read-only PR-issue queries against the v3 API.
 - Token-safe wrappers (sentinel-driven no-leak self-test).
 
-Out of scope until a real use case creates a GitHub issue or branch-local SOW:
+The following need a user-authorized task and applicable project tracking. A GitHub issue or SOW alone is not
+permission to perform them:
 
 - Write actions (mark issue as false-positive, mark as fixed, modify ignore-patterns).
-- Master-backlog triage on the 31,425+ open issues.
+- Repository-wide backlog triage beyond the selected PR or findings.
 - Cross-repo aggregation across the netdata org.
 
 ## Required env keys
@@ -74,7 +82,9 @@ $ .agents/skills/triage-codacy/scripts/analyze-local.sh
 [analyze-local] wrote 0 finding(s) to <repo>/.local/audits/codacy/local-<ts>.json
 ```
 
-Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR will be green (modulo Codacy server-side patterns the local CLI doesn't bundle). If it returns findings, fix them locally first.
+For an authorized push, use local analysis to catch relevant findings early. Zero findings establishes only the
+completed local run's result: CLI versions, selected tools/files and server-side configuration can differ. Check the
+remote gate for the current head before claiming it is green. Verify findings before applying authorized fixes.
 
 Failed analyses are not clean trees: when the dump is not JSON, is JSON of the
 wrong shape (not a findings array, an `{issues: [...]}` object, or a SARIF `runs`
@@ -88,26 +98,26 @@ One common local cause is gitignored generated output with restrictive file
 permissions. For example, if local scratch output under `.local/` contains files
 not readable by the Docker container, Codacy logs `Could not read file` messages
 and the saved `.json` dump is plain text. Fix or move the local generated output
-before trusting local analyzer output.
+before trusting local analyzer output. Preserve unrelated files and permissions when correcting the local cause.
 
-Operational gotcha: the public Codacy v3 analysis endpoint can expose PR issue
-details even when GitHub check-run annotations are empty and no `CODACY_TOKEN`
-is available:
+A public Codacy v3 endpoint has exposed PR details without a token when GitHub annotations were empty. Availability
+is service-dependent; an authorization failure or unavailable response is an evidence gap, not an empty issue list:
+
 
 ```
 curl -fsS \
   "https://api.codacy.com/api/v3/analysis/organizations/gh/netdata/repositories/netdata/pull-requests/<PR>/issues?limit=100"
 ```
 
-Filter for `.data[] | select(.deltaType == "Added")` to identify the issues
-that still block the PR. Treat `commitInfo` fields as sensitive operational
+Filter for `.data[] | select(.deltaType == "Added")` to inspect added issues, then verify relevance against the
+current head and gate; this filter alone does not establish which findings block it. Treat `commitInfo` fields as sensitive operational
 metadata; do not copy names or email addresses into committed artifacts.
 
 Operational gotcha: Codacy's PR issue API can lag behind the GitHub check-run
 after a new push. If `pr-issues.sh` still reports findings but the Codacy
 check-run for the current head SHA is green, inspect `.commitIssue.commitInfo.sha`
-in the dump. Findings anchored to an older commit are stale cache and should not
-be treated as current-head blockers.
+in the dump. Reverify older findings against the current source and current-head gate. An older anchor alone does
+not prove a finding is stale or resolved; the same defect may still exist.
 
 To restrict to a single tool (matches what Codacy reported on a CI run):
 
@@ -148,13 +158,15 @@ This skill follows `<repo>/.agents/sensitive-data-discipline.md`:
 
 ## Token-safe self-test
 
-Before trusting wrappers in a long-running session, run the self-test:
+After changing wrappers, run the offline self-test (no `.env` or token setup):
 
 ```console
 $ source .agents/skills/triage-codacy/scripts/_lib.sh
-$ codacyaudit_load_env
 $ codacyaudit_selftest_no_token_leak
 PASS: codacyaudit_selftest_no_token_leak
 ```
 
-The self-test sets `CODACY_TOKEN` to a sentinel UUID, drives every public wrapper, captures stdout, and asserts the sentinel never appears. Run after editing `_lib.sh` or any wrapper.
+The self-test uses synthetic configuration and an in-process transport in a subshell. It drives every public HTTP
+wrapper, checks success and both output streams, and preserves caller state. The focused tests also cover failure
+status and reflected-secret suppression. This checks local wrapper behavior, not live authentication or service
+compatibility. Successful API bodies are forwarded unchanged and may contain private data; review before sharing.

@@ -1,12 +1,12 @@
 ---
 name: collectors-go-design
-description: Early design decisions for Go go.d collectors, made before code. Use when designing a new go.d collector; when adding, renaming, removing, or changing the default of a config option or mode; when adding or changing a Function; when changing what a metric means or which entities become charts or vnodes; when a collector will write or delete remote objects, persist state across restarts, or coordinate with other jobs; when asking "should this be a config option", "who owns this state", "what does this sample mean", "should this be a vnode"; and when reviewing such a change. Not for V1-to-V2 migrations without approved enrichment, mechanical fixes, or docs-only work.
+description: Design or review go.d collector contracts, including options, metric meaning and identity, vnodes, Functions, ownership, remote writes and durable state. Also author or review DynCfg config_schema.json forms. Contract-preserving fixes and migrations use framework guidance; integration prose uses the metadata skill.
 ---
 
 # Go Collector Design
 
-This skill decides the shape of a collector before code exists: what it promises, who owns what, what an operator
-decides, what a sample means, and what proves it. Implementation mechanics live in
+Use this skill to design or review what a collector promises, who owns its state, what an operator decides, what a
+sample means, and what proves it. Resolve applicable implementation design questions before code. Mechanics live in
 `.agents/skills/collectors-go-framework-v2/SKILL.md` and
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; artifact delivery lives in
 `.agents/skills/integrations-lifecycle/`. Do not restate those here.
@@ -14,26 +14,40 @@ decides, what a sample means, and what proves it. Implementation mechanics live 
 Every rule below is written as: **When** it applies, **Do / Don't**, what counts as **Evidence**, and its **Boundary**
 (the legitimate exception). A checked box or an approval phrase is never evidence.
 
+## Review And Implementation
+
+Apply `AGENTS.md#skill-selection`. During review, use the applicable items as questions about the changed contract,
+source and existing design/validation evidence. Report concrete missing or inconsistent evidence; do not create a SOW,
+design note, truth-table artifact or mutation test merely because this authoring workflow describes it. Required
+acceptance evidence still matters. Loading a reference does not authorize its UI changes, remote operations or setup.
+
+During authorized implementation, record the applicable design before code and retain the project's approval gates.
+A pure form presentation edit uses the schema reference without a collector design note; an option/default/meaning
+change remains design work even when implemented through the schema. An ordinary transient cache does not by itself
+require durable-state machinery; ownership, lifecycle and cost changes still need their applicable design review.
+
 ## When This Skill Applies
 
 | Task | Load | Design note depth |
 |---|---|---|
 | New go.d collector | this skill, then the V2 skill and the how-to guide | full note; one line per item for a small read-only collector |
 | New public config option, mode, or default change | `operator-surface.md` (the option's decision record) | the affected item only |
-| Writing or changing `config_schema.json` (the DynCfg form) | `config-schema.md` | none; it is authoring, not design |
+| Form presentation in `config_schema.json`, with option/default semantics unchanged | `config-schema.md` | none; a changed operator contract uses the relevant design row |
 | New or changed metric meaning, new entity axis, vnodes | the Metric Semantics and Identity items | the affected item only |
-| Collector that writes or deletes remotely, or persists state | this skill plus `mutating-collectors.md` | full note plus the mutating items |
-| Reviewing any of the above | the same items as review questions | — |
-| V1-to-V2 migration without approved enrichment, mechanical fix, docs-only change | not this skill (`migrate-v1-to-v2.md`, V2 skill, `integrations-lifecycle`) | none |
+| Collector that writes or deletes remotely, or persists durable local state | this skill plus applicable `mutating-collectors.md` sections | full note plus applicable state/mutation items |
+| Reviewing any of the above | affected items as review questions and existing evidence | no new implementation artifact |
+| Contract-preserving migration/fix or integration prose only | migration/V2 or metadata/integration guidance as applicable | none; schema forms remain routed above |
 
 ## The Collector Design Note
 
-**When:** any task in the table above. **Do:** fill the applicable items below as a `Collector design:` block under
+**When:** authorized design or implementation of a new collector or an affected public, ownership or lifecycle
+contract. **Do:** fill the applicable items below as a `Collector design:` block under
 "Affected contracts and surfaces" in the SOW's Pre-Implementation Gate, before implementation. **Don't:** create
 separate documents, or answer items the collector does not have; write "none" with the reason instead. **Evidence:**
 each item cites its source (provider doc, existing code, framework contract, user decision). **Boundary:** a small
-read-only collector answers every item in one line each; only a collector that writes, deletes, or persists state
-loads `mutating-collectors.md`.
+collector that only reads its source answers applicable items in one line each. Pure form edits and review-only
+requests follow the exceptions above. Remote mutation or durable local state selects the applicable sections of
+`mutating-collectors.md`; it does not make every item apply to every collector.
 
 1. **Product boundary.** State the operational question the collector answers, the supported providers, versions,
    and configurations, the explicit non-goals, and whether each measurement is client-observed or a backend
@@ -41,11 +55,11 @@ loads `mutating-collectors.md`.
    discoverability fix (the contract was hidden), and an expansion (a new capability, which needs the user's
    approval). An explicitly excluded capability is not a defect.
 2. **Provider contract.** For every operation the design depends on, name the permissions, consistency assumptions,
-   retries, and error meanings, with a link to the current provider documentation. When more than one provider or
-   mode is involved, fill a capability matrix: one row per operation, one column per provider, cells say supported /
-   semantics / evidence. An S3-compatible request API does not imply interchangeable replication, versioning, or
-   deletion semantics. Similar charts may share observations while provider operations differ; decide sharing from
-   the matrix, not from vendor count or API naming.
+   retries, and error meanings, with a link to the applicable provider/version documentation. When more than one
+   provider or mode is involved, fill a capability matrix: one row per operation, one column per provider, cells say
+   supported / semantics / evidence. An S3-compatible request API does not imply interchangeable replication,
+   versioning, or deletion semantics. Similar charts may share observations while provider operations differ; decide
+   sharing from the matrix, not from vendor count or API naming.
 3. **Architecture and ownership.** Name what owns config, client transport, normalization, durable state, and
    presentation; which existing helpers fit (`src/go/plugin/go.d/docs/helper-packages.md`); what needs a boundary and
    what stays direct code. Any coupling across jobs or owners, any durable state, any scheduler or queue goes through
@@ -109,8 +123,9 @@ owner identity, record that a renamed job does not adopt old ownership. All of t
 observation, then map states to values, before writing metric names or `charts.yaml`. **Don't:** emit a value that
 looks like a measurement for something not measured; a skipped operation has no duration, a failed attempt is not a lag
 or success sample (its request duration may still be a valid measurement of the request), a waiting state is not a zero
-(`collectors-authoring` §1.4, gaps are data). **Evidence:** the table itself, plus a test that drives each row's
-state through the real path and asserts emitted / omitted / retained. **Boundary:** human-readable configuration does
+(`.agents/skills/collectors-authoring/collector-practices.md#14-gaps-are-data`). **Evidence:** the table itself, plus a
+test that drives each row's state through the real path and asserts emitted / omitted / retained. **Boundary:**
+human-readable configuration does
 not prohibit millisecond latency charts; the table decides units per chart.
 
 | Column | Meaning |
@@ -150,9 +165,11 @@ length is a signal, not a limit; splitting one function into arbitrarily named h
 
 ## Reading Sequence
 
-1. This skill: fill the design note in the SOW gate.
-2. `operator-surface.md` for any option, mode, or form work; `config-schema.md` when writing the schema file itself;
-   `mutating-collectors.md` only for side-effecting or persistent collectors.
-3. `src/go/plugin/go.d/docs/how-to-write-a-collector.md` and the V2 skill for implementation.
-4. `.agents/skills/collectors-metadata-yaml/SKILL.md` for the integration page (`metadata.yaml`), then
-   `.agents/skills/integrations-lifecycle/consistency.md` for artifact delivery.
+1. Select affected items from the task table. Implementation records its applicable note; review checks existing
+   contracts and evidence under `./SKILL.md#review-and-implementation`.
+2. Read `operator-surface.md` for option/mode decisions and `config-schema.md` for form authoring or review.
+   Read `mutating-collectors.md` for remote mutation or durable local state, using its scoped routes.
+3. For implementation mechanics or their review, use `src/go/plugin/go.d/docs/how-to-write-a-collector.md` and the V2
+   skill when that framework applies; contract-preserving migrations use the migration guide.
+4. When metadata or delivery is affected, use `.agents/skills/collectors-metadata-yaml/SKILL.md` and
+   `.agents/skills/integrations-lifecycle/consistency.md`. Reading delivery guidance does not request regeneration.

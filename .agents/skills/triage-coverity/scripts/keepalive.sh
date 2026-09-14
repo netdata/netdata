@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
 # Keep the Coverity Scan session warm during a triage run.
 #
-# DESIGN — the script EXITS NON-ZERO the moment a ping fails. That fires the
-# orchestrator's background-task completion notification, so the agent learns
-# *immediately* that the cookie went bad and can ask the user to recapture it.
-# DO NOT silently retry — silent retries hide the failure and waste a triage
-# session's worth of work.
+# Exits nonzero on the first failed ping; it does not silently retry.
+# Run for sustained live work using the host's actual task/session controls.
+# Track the owned job, inspect failures and stop it when the live work ends.
+# Notification timing depends on the host, not this helper.
 #
-# The Coverity session cookie expires after a few minutes of inactivity AND
-# requires the user's browser tab on https://scan.coverity.com to be open.
-# Closing the browser tab kills the session immediately; pings stop working.
+# Inactivity and browser-tab closure have caused session failures in past runs;
+# exact expiry timing is not guaranteed. See ../operations.md for diagnosis.
 #
-# Usage (from an orchestrator agent):
-#   Bash tool with run_in_background=true,
-#   command="bash .agents/skills/triage-coverity/scripts/keepalive.sh"
-#
-# Stop the background task at the end of the triage session.
+# Usage:
+#   bash .agents/skills/triage-coverity/scripts/keepalive.sh
 #
 # Environment overrides:
 #   PING_INTERVAL   seconds between pings (default 300 = 5 min)
@@ -33,7 +28,7 @@ PING_INTERVAL="${PING_INTERVAL:-300}"
 # Outstanding view is ideal — it returns proper JSON when authenticated and
 # HTML (Cloudflare challenge or login redirect) when not.
 if [[ -z "${COVERITY_VIEW_OUTSTANDING:-}" ]]; then
-    echo -e "${COV_RED}[ERROR]${COV_NC} COVERITY_VIEW_OUTSTANDING is not set in .env -- keepalive needs a viewId to ping. See SKILL.md." >&2
+    echo -e "${COV_RED}[ERROR]${COV_NC} COVERITY_VIEW_OUTSTANDING is not set in .env -- keepalive needs a viewId to ping. See $(cov_repo_root)/.agents/skills/triage-coverity/operations.md." >&2
     exit 1
 fi
 if [[ ! "${COVERITY_VIEW_OUTSTANDING}" =~ ^[1-9][0-9]*$ ]]; then
@@ -45,7 +40,7 @@ PING_URL="${COVERITY_HOST}/reports/table.json?projectId=${COVERITY_PROJECT_ID}&v
 
 ping_once() {
     local body rc
-    # Capture both body and HTTP code in one go.
+    # Capture the body; curl failures are reported separately.
     body="$(curl -sS --max-time 30 \
         -H "accept: application/json, text/plain, */*" \
         -H "user-agent: ${COVERITY_USER_AGENT}" \

@@ -217,6 +217,7 @@ func newRunGeneration(
 		ctx,
 		config.Generation,
 		config.Attempts,
+		config.Diagnostics,
 		config.Modules,
 		config.Frames,
 		initialRoutes...,

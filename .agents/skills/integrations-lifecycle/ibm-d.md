@@ -46,11 +46,12 @@ file that registers those contexts with the ibm.d framework. The directive is in
 
 ### `docgen`: `contexts.yaml` + `config.go` + `module.yaml` to `metadata.yaml` + `README.md` + `config_schema.json`
 
-`src/go/plugin/ibm.d/docgen/main.go`. Inputs per module:
+`src/go/plugin/ibm.d/docgen/main.go`. `metadataTemplate` derives keywords from the module name, not a `module.yaml`
+keywords field. Inputs per module:
 
 - `contexts/contexts.yaml`, the same structure `metricgen` reads;
 - `config.go`, parsed via Go AST (`docgen/config_parser.go`) into config field records;
-- `module.yaml`: name, display name, overview `description`, frontmatter `page_description`, icon, categories, keywords,
+- `module.yaml`: name, display name, overview `description`, frontmatter `page_description`, icon, categories, and
   link. `page_description` becomes `meta.monitored_instance.description`, the explicit page meta description
   (`description-authoring.md`).
 
@@ -80,11 +81,18 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
 
 1. Edit one of `contexts/contexts.yaml` (metric class, context, dimension), `config.go` (config field), or `module.yaml`
    (display name, descriptions, categories, icon).
-2. From the Go module root (there is no `go.mod` at the repository root, so the repo-root form fails with "does not
-   contain main module"):
+2. Start from the isolated repository root described below. The command enters `src/go` in a subshell because
+   `go generate` needs that module root; there is no `go.mod` at the repository root.
+
+   Before generation, inspect all affected outputs. To preserve existing edits and avoid README symlink writes, run
+   the producer chain in a fresh regular-file source copy containing the current modified and new inputs; symlinks
+   MUST NOT escape that copy. Run the following validation and preview in the same copy, and bring back only the
+   intended runtime outputs. A HEAD-only archive can omit the change being validated. `docgen -output` can isolate its
+   own outputs, but the checkout catalog generator will not consume that scratch metadata automatically.
 
    ```bash
-   cd src/go && go generate ./plugin/ibm.d/modules/<module-dir>/...
+   # Run from the prepared isolated repository root.
+   (cd src/go && go generate ./plugin/ibm.d/modules/<module-dir>/...)
    ```
 
    This runs BOTH `metricgen` and `docgen`. `./plugin/ibm.d/modules/websphere/...` hits all three WebSphere sub-modules;
@@ -96,14 +104,15 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
 4. `go generate` does not run the integrations pipeline. Validate the derived metadata locally:
 
    ```bash
+   # Stay in that isolated root; use the dependency-equipped interpreter from integrations/README.md.
    python3 integrations/gen_integrations.py
    python3 integrations/gen_docs_integrations.py --check
    ```
 
-   Regenerating the page (`python3 integrations/gen_docs_integrations.py -c ibm.d.plugin/<module-name>`) is optional; it
-   also repairs the page `go generate` overwrote through the README symlink.
-5. Confirm the diff contains only the expected changes, then undo every change to `metadata.yaml`, `README.md`, and
-   `integrations/<slug>.md` before committing; they arrive through the post-merge PR.
+   For rendered prose inspection, use `how-tos/preview-collector-page.md` with the current producer outputs. A catalog
+   generated from stale `metadata.yaml` does not validate changes in `module.yaml` or `contexts.yaml`.
+5. Inspect and stage only the expected source and runtime outputs. Keep generated metadata, README, and integration
+   pages unstaged; they arrive through the post-merge PR. Preserve existing edits; do not blanket-restore these files.
 
 ## What generation does and does not cover
 

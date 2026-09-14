@@ -2,10 +2,10 @@
 # get-events.sh -- fetch events of interest from agent-events.
 #
 # Index-friendly defaults: 24h time, multi-value selections,
-# auto version filter (latest stable + latest 3 nightlies).
+# auto version filter (highest numeric observed stable plus up to 3 observed nightlies).
 #
 # Output: JSON dump under
-#   <repo>/.local/audits/query-agent-events/<timestamp>.json
+#   <repo>/.local/audits/query-agent-events/<run>.json
 
 set -euo pipefail
 
@@ -34,7 +34,7 @@ Filters (all are AND'd; values within a flag are OR'd):
                              example: SIGSEGV/SEGV_MAPERR,SIGBUS/BUS_OBJERR
   --function <names>         comma-separated AE_FATAL_FUNCTION values
   --version <spec>           "auto" (default), "all", or a regex
-                             auto -> latest stable + latest 3 nightlies (computed)
+                             auto -> highest numeric stable + up to 3 nightlies observed in discovery
                              all  -> no version filter
                              else -> regex applied client-side after fetch
                                      (multi-value selections require explicit values;
@@ -51,7 +51,7 @@ Response control:
   --histogram FIELD          add a histogram bucket on FIELD
 
 Output:
-  --output PATH              path to write the JSON dump (default: auto under .local/audits/...)
+  --output PATH              new path for the JSON dump (default: unique private file under .local/audits/...)
 
 Other:
   -h, --help                 this message
@@ -185,14 +185,15 @@ esac
 if [ -n "$VERSIONS_EXPLICIT" ]; then
     set_selection AE_AGENT_VERSION "$VERSIONS_EXPLICIT"
 elif [ "$VERSION" = "auto" ]; then
-    echo "[get-events] computing default version filter (latest stable + latest 3 nightlies)..." >&2
-    versions_json="$(agentevents_compute_default_versions "$VIA" "${AFTER#-}")"
+    echo "[get-events] computing numeric version filter from observed stable/nightly facets..." >&2
+    versions_json="$(agentevents_compute_default_versions "$VIA" "$AFTER" "$BEFORE_PARSED")"
     if [ "$(echo "$versions_json" | jq 'length')" -gt 0 ]; then
         versions_csv="$(echo "$versions_json" | jq -r 'join(",")')"
         echo "[get-events] auto versions: $versions_csv" >&2
         set_selection AE_AGENT_VERSION "$versions_csv"
     else
-        echo "[get-events] auto version detection found no versions; proceeding without version filter" >&2
+        echo "[get-events] no versions observed; select --versions explicitly or request --version all" >&2
+        exit 2
     fi
 elif [ "$VERSION" = "all" ]; then
     : # no filter
@@ -247,9 +248,23 @@ fi
 # ---------------------------------------------------------------
 # Output path.
 
+output_reservation=
 if [ -z "$OUTPUT" ]; then
     audit_dir="$(agentevents_audit_dir)"
-    OUTPUT="$audit_dir/$(date -u +%Y%m%dT%H%M%SZ).json"
+    # BSD mktemp requires terminal Xs. Reserve a unique stem, then create its JSON sibling exclusively.
+    output_reservation="$(mktemp "$audit_dir/events.XXXXXX")"
+    OUTPUT="$output_reservation.json"
+fi
+# Keep relative names beginning with a hyphen out of jq/mktemp/mv option parsing.
+case "$OUTPUT" in -*) OUTPUT="./$OUTPUT" ;; esac
+# Refuse existing files/symlinks; the capture owns only its newly created output.
+if [[ -e "$OUTPUT" || -L "$OUTPUT" ]] || ! (umask 077; set -C; : > "$OUTPUT"); then
+    echo "[get-events] output must be a new writable path: $OUTPUT" >&2
+    [ -z "$output_reservation" ] || rm -f "$output_reservation"
+    exit 2
+fi
+if [ -n "$output_reservation" ]; then
+    rm -f "$output_reservation"
 fi
 
 # ---------------------------------------------------------------
@@ -269,16 +284,17 @@ if [ -n "$VERSION_REGEX" ]; then
         exit 2
     else
         pre_rows="$(jq '(.data // []) | length' "$OUTPUT")"
-        trap 'rm -f "$OUTPUT.tmp"' EXIT
+        FILTERED_OUTPUT="$(mktemp "$OUTPUT.filtered.XXXXXX")"
+        trap 'rm -f "$FILTERED_OUTPUT"' EXIT
         if ! jq --arg re "$VERSION_REGEX" '
             (.columns.AE_AGENT_VERSION.index) as $i
             | .data = [ (.data // [])[] | select(((.[$i] // "") | tostring) | test($re)) ]
-        ' "$OUTPUT" > "$OUTPUT.tmp"; then
-            rm -f "$OUTPUT.tmp"
+        ' "$OUTPUT" > "$FILTERED_OUTPUT"; then
+            rm -f "$FILTERED_OUTPUT"
             echo "[get-events] --version regex '$VERSION_REGEX' failed; the dump at $OUTPUT is NOT filtered" >&2
             exit 2
         fi
-        mv "$OUTPUT.tmp" "$OUTPUT"
+        mv "$FILTERED_OUTPUT" "$OUTPUT"
         echo "[get-events] applied client-side --version regex: $VERSION_REGEX" >&2
         if [ "$pre_rows" -ge "$LAST" ]; then
             echo "[get-events] the fetched page was full ($pre_rows rows, --last $LAST): the regex narrowed that page only; raise --last or use --versions for a server-side filter" >&2

@@ -264,6 +264,18 @@ Which mechanism each command surface uses:
 - **Process-owned off-loop** — contained attempts own their physical worker, per-identity exclusion, and final cleanup
   across run rotation.
 
+Shutdown barrier, run finalizer, and Function cleanup work share the kernel-local `oneShotTask` handshake
+(`kernel_one_shot.go`). It validates request-to-task starts, the sequence-1 no-value completion, and the expected
+sequence-2 terminate/abandon acknowledgment. A terminal action is recorded only after the supervisor accepts it;
+replayed completion dirties the run without replacing that accepted action. Invalid acknowledgments and failed
+release retain ownership. Task references clear only after `TaskSupervisor.Release` succeeds.
+
+Each caller keeps its domain policy: barrier/finalizer errors dirty the run immediately, and their readiness gates
+preserve shutdown ordering. Function cleanup stores ordinary work errors until physical release, then acknowledges
+the exact catalog cleanup generation and reports errors. Resource stop/finalize and prepare/apply/dispose
+transactions retain their separate multi-phase protocols. The shared record is a value in the existing owner or map;
+it adds no scheduler, worker, per-task heap object, or population scan.
+
 ### Fairness and timeout rules
 
 - **`TaskSupervisor` runs two independent classes** — framework-control work (lifecycle/DynCfg commands) and generic
@@ -621,6 +633,24 @@ flowchart TD
    - The `job-runtime` identity stays occupied through cleanup, so a same-job successor cannot start before those
      terminal frames complete.
 
+### Activation failure classification
+
+`joboutput/activation_error.go` owns the error classification shared by discovery, synchronous DynCfg activation,
+accepted-job activation, and SecretStore-dependent restarts. Candidate preparation returns that classification with
+the original error. Config-only validation and runtime activation fallbacks use the same classifier.
+
+The classification distinguishes invalid proposals, transient dependencies, busy physical identities, stale Store
+snapshots, superseded attempts, containment deadlines, quarantine, and other operational failures. These are failure
+facts, not a universal retry policy: synchronous UPDATE preserves its incumbent on busy/stale preparation, while an
+already-applied accepted ENABLE retains activation authority and uses timed recovery. Runtime fallback handles busy
+and quarantine only; a stale Store snapshot is rejected during candidate preparation.
+
+Each caller keeps its command-specific response, graph disposition, and recovery policy explicit. Caller cancellation
+and retained ownership take precedence over ordinary recovery. The classifier preserves the original error tree so
+those lifetime decisions remain available; a provider's own canceled operation does not by itself mean its caller
+was canceled. Managed probe failures keep their separate collector-supplied response and retry metadata. Recovery is
+armed only in `AfterApply`, after the corresponding graph mutation commits.
+
 ### Accepted-job activation
 
 An applied graph record in `accepted` is already visible to the daemon but has no installed runtime. ENABLE therefore
@@ -807,8 +837,10 @@ flowchart LR
 
 The Store change remains committed if a later job restart fails, and the graph truthfully shows that job as `Failed`.
 A retained busy/contained restart revalidates the Store dependency, source winner, desired config, resource absence,
-and run generation. A normal probe failure follows the collector's ordinary autodetection-retry policy.
-`secrets/pending.go`.
+and run generation. Transient provider/scope or other transient construction failures schedule the collector's
+ordinary autodetection retry after the Failed mutation applies, as normal probe failures do. A later disable, removal,
+replacement, or run stop revokes that retry. Invalid proposals and quarantine do not gain a timed retry.
+`joboutput/secret_restart.go`, `joboutput/autodetection_retry.go`, `secrets/pending.go`.
 
 Two rules that surprise people:
 
@@ -1019,6 +1051,19 @@ agent-level module) stages one stable process-owned handler bundle outside contr
 
 `functions/bundle.go`, `functions/module_stage.go`, `functions/controller.go`, `containment/authority.go`,
 `process_attempt.go`.
+
+Availability callback, contained-attempt, and asynchronous reconciliation failures emit separate fixed diagnostic
+categories through the process observer. Events contain the run generation, sanitized bundle identity, and a safe
+failure/panic classification; callback error text and recovered values are omitted. The production logger limits
+each category to one message per hour across all bundles and run generations. Pure cancellation, retirement,
+supersession, and process-stop results remain quiet; mixed failures remain observable. Existing containment events
+and synchronous reconciliation error propagation keep their separate roles.
+
+Run finalization passes its caller's context through `FunctionAssembly.FinalizeRun` and `Controller.Stop` to any
+remaining bundle cleanup waits. Wait expiry does not complete physical cleanup or reopen publication. Agent-module
+owners are released without waiting in the run finalizer; their process attempts keep ownership until the handler
+actually returns. Physical handler cleanup retains its process-owned context. Normal kernel shutdown detaches job
+handles before finalization; the cancelable waits also cover retained job bundles at the assembly boundary.
 
 ### DynCfg is not a published Function
 

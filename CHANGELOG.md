@@ -296,6 +296,19 @@
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.39.0 to 1.40.0 in /src/go ([#23839](https://github.com/netdata/netdata/issues/23839))
 - Build(deps): bump golang.org/x/sys from 0.47.0 to 0.48.0 in /src/go ([#23840](https://github.com/netdata/netdata/issues/23840))
 - Build(deps): bump github.com/catonetworks/cato-go-sdk from 0.4.0 to 0.4.1 in /src/go ([#23841](https://github.com/netdata/netdata/issues/23841))
+- Fix(libnetdata): probe KSM support before enabling deduplication ([#23822](https://github.com/netdata/netdata/issues/23822))
+- Add node decommissioning instructions in learn ([#23812](https://github.com/netdata/netdata/issues/23812))
+- Fix(skills): clarify invocation and correct unsafe guidance ([#23845](https://github.com/netdata/netdata/issues/23845))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.33.3 to 1.33.4 in /src/go ([#23850](https://github.com/netdata/netdata/issues/23850))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.111.0 to 1.113.0 in /src/go ([#23852](https://github.com/netdata/netdata/issues/23852))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.71.0 to 1.72.0 in /src/go ([#23853](https://github.com/netdata/netdata/issues/23853))
+- Build(deps): bump golang.org/x/net from 0.58.0 to 0.59.0 in /src/go ([#23857](https://github.com/netdata/netdata/issues/23857))
+- Build(deps): bump github.com/jackc/pgx/v5 from 5.10.0 to 5.11.0 in /src/go ([#23856](https://github.com/netdata/netdata/issues/23856))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.40.0 to 1.41.0 in /src/go ([#23854](https://github.com/netdata/netdata/issues/23854))
+- Fix(go.d): unify activation outcomes and restore secret retries ([#23847](https://github.com/netdata/netdata/issues/23847))
+- Fix(go.d): report Function failures and honor finalizer context ([#23858](https://github.com/netdata/netdata/issues/23858))
+- Refactor(go.d): centralize one-shot task handshakes ([#23859](https://github.com/netdata/netdata/issues/23859))
+- Docs(agents): make delegation and review proportional to risk ([#23860](https://github.com/netdata/netdata/issues/23860))
 
 ## [2.11.0] - 2026-08-12
 

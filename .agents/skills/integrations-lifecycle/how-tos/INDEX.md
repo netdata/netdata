@@ -5,6 +5,7 @@ Analysis-derived answers to concrete pipeline questions. Capture timing and auth
 
 | Question | How-to | Audience |
 |---|---|---|
+| Preview a collector page without disturbing existing changes | [preview-collector-page](preview-collector-page.md) | authors and reviewers |
 | A collector is being retired: what is its whole ownership surface? | [retiring-collector-integration](retiring-collector-integration.md) | authors |
 | A section exists in `metadata.yaml` but Website or Learn does not show it | [tracing-missing-published-sections](tracing-missing-published-sections.md) | authors |
 | A generated page links to a Learn URL that may have drifted | [auditing-metadata-learn-links](auditing-metadata-learn-links.md) | authors |

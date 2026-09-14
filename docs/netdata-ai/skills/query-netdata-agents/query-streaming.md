@@ -37,7 +37,7 @@ agents_load_env
 # Discover the parameters first.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     POST '/api/v3/function?function=netdata-streaming' '{"info":true}' \
   | jq '{accepted_params, required_params}'
@@ -45,7 +45,7 @@ agents_query_agent \
 # Real query: top-level streaming state.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     POST '/api/v3/function?function=netdata-streaming' '{"timeout":30000}'
 ```

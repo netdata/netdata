@@ -29,14 +29,14 @@ http://<agent>:19999/host/<node-uuid>/api/v3/function?function=<name>
 
 ## Discover Functions on a single agent
 
-Most agents expose a function-listing surface through the same
-generic Function call with `function=info`-like discovery. To
-enumerate by name, query each Function with `{"info":true}`. For
-a top-level list, use the Cloud-side functions endpoint via
+Use `GET /api/v3/functions` for direct listing (`/api/v1/functions` is the older host catalog). These are listing
+endpoints, not a generic Function named `info`. The v3 route is owned by `src/web/api/web_api_v3.c` and
+`src/web/api/v2/api_v2_functions.c`. Inspect the chosen Function's advertised parameters; `{"info":true}` is a
+Function-specific parameter convention, not universal discovery for arbitrary Functions.
+
+For Cloud-side discovery across nodes, see
 [List Functions on the nodes in a
-room](../query-netdata-cloud/query-functions.md#list-functions-on-the-nodes-in-a-room)
-(the Cloud listing is authoritative even when you ultimately call
-the agent directly).
+room](../query-netdata-cloud/query-functions.md#list-functions-on-the-nodes-in-a-room).
 
 ## Invoke a Function via the wrapper
 
@@ -44,32 +44,29 @@ the agent directly).
 source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
 
-# Discover the parameter set (info=true is the safe first call).
+# processes uses command words for info mode, not a JSON info field.
 agents_query_agent \
     --node "$AGENT_EVENTS_NODE_ID" \
     --host "$AGENT_EVENTS_HOSTNAME:19999" \
     --machine-guid "$AGENT_EVENTS_MACHINE_GUID" \
-    POST '/api/v3/function?function=processes' '{"info":true}'
-
-# Real query (after `info` told you the parameters).
-agents_query_agent \
-    --node "$AGENT_EVENTS_NODE_ID" \
-    --host "$AGENT_EVENTS_HOSTNAME:19999" \
-    --machine-guid "$AGENT_EVENTS_MACHINE_GUID" \
-    POST '/api/v3/function?function=processes' '{"last":50,"timeout":30000}'
+    POST '/api/v3/function?function=processes%20info' \
+  | jq '{status, type, update_every, has_history, help}'
 ```
 
+The `processes` handler in `src/collectors/apps.plugin/apps_functions.c` ignores JSON payload fields. For process
+rows, use the `processes` command and its supported command-word filters; JSON `last` and `timeout` do not limit it.
+
 The wrapper writes the response JSON to stdout; stderr shows the
-curl invocation with `<AGENT_BEARER>` masked (the bearer is
-minted/cached/refreshed internally and never reaches stdout).
+curl invocation with `<AGENT_BEARER>` masked. Internal authentication is captured privately; endpoint responses are
+not sanitized. Capture or project sensitive response fields before assistant-visible output, as the entry describes.
 
 ## When to prefer agent-direct over Cloud-proxied
 
 - **Lower latency.** Direct skips the Cloud round-trip entirely.
-- **Cloud unavailable.** The agent answers as long as port 19999
-  is reachable from your workstation.
-- **High-frequency batch fetches.** The Cloud may rate-limit
-  function calls; the agent does not.
+- **Cloud unavailable.** This bearer wrapper needs a reusable cached token as well as Agent reachability. If it
+  needs to mint or refresh, Cloud access is still required. It has no automatic transport fallback.
+- **Batch fetches.** Direct calls avoid the Cloud proxy round trip; size concurrency and query windows for the
+  Agent and Function. Direct transport does not imply unlimited capacity.
 
 When the user only has Cloud access (the typical team-member case
 on a remote agent), use the Cloud-proxied path documented in
@@ -78,11 +75,11 @@ instead.
 
 ## Limits and gotchas
 
-- **Bearer protection**: a 412 response from the agent means the
-  agent is bearer-protected. The `agents_query_agent` wrapper
-  handles this transparently (mint via Cloud, cache, refresh).
-  Direct curl fails until you mint a bearer.
-- **Function name is case-sensitive.** Wrong casing returns 400.
+- **Bearer protection:** a 412 indicates missing required authorization for that request. The wrapper always
+  resolves a bearer before calling; it does not detect protection or retry on 412. See the
+  [authentication reference](./authentication.md#protection-and-headers).
+- **Function names:** after access checks, an unknown registered name returns 404. A missing or empty `function`
+  parameter returns 400 (`src/nrpc/nrpc-registry.c`, `src/web/api/v1/api_v1_function.c`). Use the catalog spelling.
 - **Response is not streamed.** Even on the agent, the Function
   response is buffered into a single JSON document.
 - **The `cfg` field of an alert instance**, `claim_id`, `node_id`,

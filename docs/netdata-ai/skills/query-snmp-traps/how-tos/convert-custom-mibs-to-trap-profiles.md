@@ -16,9 +16,16 @@ Netdata SNMP trap profile YAMLs?
 
 ## Steps
 
+Run from the repository root in one Bash session. Conversion and review are separate from installation, job
+recreation and Agent restart: perform those changes only when requested. Optional `--classify` sends data to an
+OpenAI-compatible endpoint and also requires that operation to be requested.
+
 1. Verify the installed helper exists:
 
    ```bash
+   mkdir -p .local/audits/query-snmp-traps
+   TRAP_QUERY_DIR="$(mktemp -d .local/audits/query-snmp-traps/query.XXXXXX)"
+
    SNMP_TRAP_PROFILE_GEN="${SNMP_TRAP_PROFILE_GEN:-/usr/libexec/netdata/plugins.d/snmp-trap-profile-gen}"
 
    if ! test -x "$SNMP_TRAP_PROFILE_GEN"; then
@@ -33,7 +40,7 @@ Netdata SNMP trap profile YAMLs?
    ```bash
    MIB_DIR="/path/to/vendor-mibs"
    MIB_MODULE="NAGIOS-NOTIFY-MIB"
-   OUT_DIR="$(mktemp -d -t snmp-trap-profile-gen.XXXXXX)"
+   OUT_DIR="$(mktemp -d "$TRAP_QUERY_DIR/profiles.XXXXXX")"
 
    "$SNMP_TRAP_PROFILE_GEN" generate \
      --source-dir "$MIB_DIR" \
@@ -52,7 +59,7 @@ Netdata SNMP trap profile YAMLs?
 4. Convert the full MIB directory after the single-module test works:
 
    ```bash
-   OUT_DIR="$(mktemp -d -t snmp-trap-profile-gen.XXXXXX)"
+   OUT_DIR="$(mktemp -d "$TRAP_QUERY_DIR/profiles.XXXXXX")"
 
    "$SNMP_TRAP_PROFILE_GEN" generate \
      --source-dir "$MIB_DIR" \
@@ -60,16 +67,17 @@ Netdata SNMP trap profile YAMLs?
      --out-dir "$OUT_DIR"
    ```
 
-5. Install the generated YAML profiles:
+5. When installation is requested, select the reviewed YAML files to install:
 
    ```bash
+   PROFILE_FILES=("$OUT_DIR/profiles/SELECTED_PROFILE.yaml")
    sudo install -d -o netdata -g netdata -m 0755 /etc/netdata/go.d/snmp.trap-profiles
    sudo install -o netdata -g netdata -m 0644 \
-     "$OUT_DIR"/profiles/*.yaml \
+     "${PROFILE_FILES[@]}" \
      /etc/netdata/go.d/snmp.trap-profiles/
    ```
 
-6. Restart the Netdata Agent or recreate all active SNMP trap jobs.
+6. When requested, restart the Netdata Agent or recreate all active SNMP trap jobs.
 
    Profiles are immutable while the shared catalog epoch has active job leases.
    The final lease release unloads the epoch; the next job creation loads and
@@ -77,9 +85,14 @@ Netdata SNMP trap profile YAMLs?
    review artifact for the conversion output; install the selected YAML files,
    not that generated manifest, in the operator profile directory.
 
-7. Verify that unknown OIDs resolve:
+7. When a verification query is requested, load the wrappers and environment, then check unknown OIDs:
 
    ```bash
+   source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+   agents_load_env
+   mkdir -p .local/audits/query-snmp-traps
+   TRAP_QUERY_DIR="$(mktemp -d .local/audits/query-snmp-traps/query.XXXXXX)"
+
    NODE_UUID="YOUR_NODE_UUID"
    SNMP_TRAPS_JOB="local"
    SNMP_TRAPS_FUNCTION="snmp:traps"
@@ -98,27 +111,27 @@ Netdata SNMP trap profile YAMLs?
      facets: ["TRAP_NAME", "TRAP_CATEGORY", "TRAP_SEVERITY"]
    }')"
 
-   mkdir -p .local/audits/query-snmp-traps
-
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
      --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
-     > .local/audits/query-snmp-traps/custom-profile-verify.json
+     > "$TRAP_QUERY_DIR/custom-profile-verify.json"
 
    jq '.facets[]?
        | select((.id // .name) == "TRAP_NAME")
        | .options[]?' \
-     .local/audits/query-snmp-traps/custom-profile-verify.json
+     "$TRAP_QUERY_DIR/custom-profile-verify.json" > "$TRAP_QUERY_DIR/verified-trap-names.json"
+
+   jq '{returned_rows: ((.data // []) | length)}' "$TRAP_QUERY_DIR/custom-profile-verify.json"
    ```
 
 ## Output
 
-Return whether the helper produced profile YAML, which YAML files were
-installed, and whether fresh trap rows now show `TRAP_NAME`,
-`TRAP_CATEGORY`, and `TRAP_SEVERITY` from the custom profile. Do not
-paste raw MIB text, trap payloads, device IPs, or SNMP credentials into
+Report only the stages actually performed: generated YAML, selected installed files, and verification results.
+You MAY inspect the private verification response and name facets locally to check `TRAP_NAME`, `TRAP_CATEGORY`,
+and `TRAP_SEVERITY` on fresh rows. Conversion outputs and responses can contain identifying details; review and
+redact them before sharing. Do not paste raw MIB text, trap payloads, device IPs, or SNMP credentials into
 durable artifacts.
 
 ## Notes / gotchas
@@ -135,9 +148,10 @@ durable artifacts.
   does not test the edits. Restart the Agent or recreate every trap job; after
   the final old lease is released, the next job initialization reloads the
   files and rejects malformed generated YAML instead of silently accepting it.
-- A validation run with `NAGIOS-NOTIFY-MIB` produced `nagios.yaml`
-  containing four traps: `nHostEvent`, `nHostNotify`, `nSvcEvent`, and
-  `nSvcNotify`.
+
+- Historical conversion example, not revalidated here: `NAGIOS-NOTIFY-MIB` produced `nagios.yaml` with `nHostEvent`,
+  `nHostNotify`, `nSvcEvent` and `nSvcNotify`. Check actual generated output rather than assuming this example is a
+  current generator guarantee.
 
 ## Source guides
 

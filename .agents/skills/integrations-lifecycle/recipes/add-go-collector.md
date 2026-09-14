@@ -62,15 +62,16 @@ python3 integrations/gen_docs_integrations.py --check
 python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata
 ```
 
-Do not regenerate the pages for the PR; CI does it after merge, and the extra changed lines make review harder. To read
-the rendered page once, run `python3 integrations/gen_docs_integrations.py -c go.d.plugin/<name>` and `python3
-integrations/gen_doc_collector_page.py`, then undo the changes to tracked files before committing.
+Preview rendered prose with `../how-tos/preview-collector-page.md`. It keeps checkout pages and README files
+untouched; generated documentation still arrives through the post-merge PR (`../consistency.md`).
 
 Expected: `gen_integrations.py` exits 0 (a non-zero exit names the file and the schema violation) and rewrites the
-gitignored `integrations/integrations.js` and `integrations.json`; `--check` counts your collector. A rendered page, if
-you generated one, is `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md` with the `<!--startmeta` banner, your
-`sidebar_label`, and a `learn_rel_path` under `Collecting Metrics/Collectors/<category>`, plus a `README.md` symlink and
-a row in `src/collectors/COLLECTORS.md`; all of these arrive through the post-merge PR.
+gitignored `integrations/integrations.js` and `integrations.json`; `--check` counts your collector. In the isolated
+preview, a rendered page is `src/go/plugin/go.d/collector/<name>/integrations/<slug>.md` with the
+`<!--startmeta` banner, `sidebar_label`, and a `learn_rel_path` under `Collecting Metrics/Collectors/<category>`,
+plus a `README.md` symlink and
+a catalog row in the full published corpus. Scoped previews do not generate `src/collectors/COLLECTORS.md` or
+prove final README ownership; all published outputs arrive through the post-merge PR.
 
 ## 5. Verify
 
@@ -78,9 +79,10 @@ a row in `src/collectors/COLLECTORS.md`; all of these arrive through the post-me
 - From `src/go`, run `timeout 15s go run ./cmd/godplugin -m <name> -d`. Success: the module registers, a job starts, and
   the command runs until the timeout stops it. `unknown module`, `no jobs started`, config-load errors, or an immediate
   exit are failures. Use `-c <config-dir>` for a non-standard config path.
-- `git diff` touches only: the module directory, `init.go`, `go.d.conf`, the stock conf, the go.d README, the health
-  conf, and possibly `integrations/categories.yaml`. No generated page, README symlink, umbrella page, or gitignored
-  catalog (the `git status` check in `../consistency.md` MUST print nothing).
+- Inspect the staged collector change: expected source artifacts include the module directory, `init.go`, `go.d.conf`,
+  the stock conf, the go.d README, the health conf, and possibly `integrations/categories.yaml`. No generated page,
+  README symlink, umbrella page, or gitignored catalog belongs in it; the staged-artifact check in
+  `../consistency.md` MUST print nothing. Preserve unrelated working-tree files.
 
 ## 6. After merge
 

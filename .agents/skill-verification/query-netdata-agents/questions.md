@@ -1,11 +1,14 @@
 # query-netdata-agents -- verification questions (seed list)
 
-This file is the **seed input** consumed by the verification
-harness introduced by PR #22423 for direct-agent queries. The harness spawns
-a Sonnet-class assistant with `../SKILL.md` + `../how-tos/INDEX.md`
-+ the canonical reference docs as context, asks each question
-below, captures the transcript, and grades it against the
-verification harness rubric.
+This is an operational verification seed list. Supply the runtime entry
+`docs/netdata-ai/skills/query-netdata-agents/SKILL.md`, its `how-tos/INDEX.md` and relevant canonical references to the
+reviewer. Choose the model and execution scope for that task; this file does not establish that an automated harness
+is installed or that these live checks have run. Offline invocation-only checks live in
+`.agents/skill-verification/invocation/README.md`.
+
+Live questions require a separately authorized query task and configured targets. Read-only review of these questions
+uses their contracts without executing them or reading credentials. A requested live query may supply that authorization;
+do not request it again merely because the question appears in this seed list.
 
 Verification questions do not authorize guide edits. Record unanswered questions and reusable discoveries as
 sanitized local evidence under `AGENTS.md#knowledge-capture`; documentation implementation is separately authorized.
@@ -21,14 +24,15 @@ Two targets:
   `${AGENT_EVENTS_NODE_ID}` and machine_guid
   `${AGENT_EVENTS_MACHINE_GUID}`.
 
-Both use the bearer-mint flow. The harness verifies the wrapper
-mints / caches / refreshes correctly for both.
+During authorized operational checks, the wrapper always resolves a bearer, even for an unprotected Agent.
+Verify its mint/cache/refresh behavior separately from the raw unauthenticated probe, which does not mint a bearer;
+record which route was exercised.
 
 ## Identity (direct)
 
 - **Q01** -- Read the agent's `/api/v3/info` directly. What is the
-  node UUID, machine_guid, claim_id, agent version, and
-  hostname?
+  node UUID, machine_guid, agent version, hostname, and
+  `claim_id_present` boolean? Validate the claim ID privately; do not display its value.
 - **Q02** -- What is the install prefix detected by
   `agents_netdata_prefix` on the local desktop?
 

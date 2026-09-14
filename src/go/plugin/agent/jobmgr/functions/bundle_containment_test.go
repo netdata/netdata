@@ -820,6 +820,7 @@ func TestContainedFunctionControllerPublishesSuccessfulAvailabilityTransition(t 
 		context.Background(),
 		1,
 		attempts,
+		nil,
 		collectorapi.Registry{
 			"module": {
 				AgentFunctions: func() []funcapi.FunctionConfig {
@@ -865,7 +866,7 @@ func TestContainedFunctionControllerPublishesSuccessfulAvailabilityTransition(t 
 			break
 		}
 	}
-	require.NoError(t, controller.Stop(1))
+	require.NoError(t, controller.Stop(context.Background(), 1))
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	require.NoError(t, attempts.Shutdown(shutdownCtx))

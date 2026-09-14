@@ -52,7 +52,7 @@ JSON
 
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     POST '/api/v3/function?function=flows:netflow' "$BODY" \
   | jq '.data | {view, group_by, flows_count: (.flows|length), stats}'
@@ -61,7 +61,7 @@ agents_query_agent \
 ## Discover supported parameters
 
 ```bash
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     POST '/api/v3/function?function=flows:netflow' '{"info":true}' \
   | jq '.required_params'
 ```

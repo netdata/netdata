@@ -1,15 +1,29 @@
 ---
 name: collectors-snmp-trap-profiles
-description: Use when editing Netdata SNMP trap profile YAMLs under snmp.trap-profiles/, trap profile metric rules (metrics:/charts:), the trap profile-format documentation, the trap profile generator (src/go/cmd/snmptrapprofilegen, shipped as snmp-trap-profile-gen), regenerating or compressing the stock trap profile pack and its catalogue.json, or changing the trap category or severity sets. Enforces the closed 8-category / 8-severity taxonomy, MIB-qualified trap names, the file-scoped varbinds table, label cardinality discipline, stock/operator separation, and the generator's validation and determinism contracts.
+description: Author or review Netdata SNMP trap profiles, metrics/charts rules, loader schema, snmp-trap-profile-gen, stock catalogue/compression and category/severity changes. Preserve MIB, varbind, taxonomy and cardinality contracts. Trap-log queries and SNMP polling profiles use separate skills.
 ---
 
 # SNMP Trap Profile Authoring
 
-Use this skill before editing files under:
+Use this skill for authoring or reviewing the affected contracts under:
 
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/` (stock pack `default/`, `catalogue.json`, `profile-format.md`)
 - `src/go/cmd/snmptrapprofilegen/` (the generator; installed as `snmp-trap-profile-gen`)
 - `src/go/plugin/go.d/collector/snmp_traps/internal/catalog/` when the change is about what a profile may contain
+
+## Select The Task
+
+Apply `AGENTS.md#skill-selection`. Review checks affected rules against source and existing validation evidence;
+implementation procedures below do not require a reviewer to create artifacts, regenerate the pack, call a classifier
+or install profiles. Select additional sections when the changed behavior reaches them.
+
+| Task | Read |
+|---|---|
+| Profile contents, templates or metric rules | Profile checks and the profile-format owner |
+| Generator or loader behavior | Applicable generator/profile checks and their source owners; follow emitted-schema effects |
+| Stock pack regeneration or compression | Regeneration, file-size/compression and catalogue contracts; inspect affected generator changes |
+| Category or severity set changes | Taxonomy section and every coupled surface it lists |
+| Trap log investigation or polling profiles | `query-snmp-traps` or `collectors-snmp-profiles` |
 
 ## Authoritative sources
 
@@ -189,7 +203,21 @@ This skill holds only what the documents below lack. Point at them; do not resta
 
 ## Regenerating the stock pack
 
+- **Operation:** this command overwrites stock profiles and the catalogue. Run it only for authorized pack regeneration;
+  review or schema inspection does not require it.
+- **Classifier:** `--classify` sends MIB-derived text to the configured endpoint. Establish the source scope and
+  endpoint/model within the task's authorization before running; the default local endpoint is not an offline parser.
+- **Artifacts:** from the repository root, create a fresh private run below.
+- **Cache:** select a compatible earlier cache explicitly in `--cache` for an intentional rerun. Reuse can append and
+  compact that file; copy it into the fresh run first when preserving the original matters.
+
 ```bash
+(
+set -e
+umask 077
+PROFILE_AUDIT_DIR="$PWD/.local/audits/snmp-trap-profiles"
+mkdir -p "$PROFILE_AUDIT_DIR"
+PROFILE_RUN_DIR="$(mktemp -d "$PROFILE_AUDIT_DIR/generate.XXXXXX")"
 cd src/go
 go run ./cmd/snmptrapprofilegen generate \
   --source-dir /path/to/mibs \
@@ -197,10 +225,11 @@ go run ./cmd/snmptrapprofilegen generate \
   --classify \
   --require-llm \
   --concurrency 20 \
-  --out-dir /tmp/snmp-trap-profile-gen-output \
-  --cache /tmp/snmp-trap-profile-gen-output/classification-cache.jsonl \
+  --out-dir "$PROFILE_RUN_DIR" \
+  --cache "$PROFILE_RUN_DIR/classification-cache.jsonl" \
   --profiles-out-dir ./plugin/go.d/config/go.d/snmp.trap-profiles/default \
   --catalogue ./plugin/go.d/config/go.d/snmp.trap-profiles/catalogue.json
+)
 ```
 
 - Classification talks to an OpenAI-compatible endpoint (`--base-url`, default a local server; `--model`); without
@@ -253,6 +282,9 @@ Add tests that pin the generator's and the loader's sets when you touch them.
   behind compression.
 
 ## Validation
+
+Use the suites for the affected generator/profile contract, including consumers when their behavior changes. Review
+checks relevant existing results and can run isolated local tests; it does not execute the stock-regeneration recipe.
 
 ```bash
 cd src/go

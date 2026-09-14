@@ -18,8 +18,9 @@ description MUST enumerate the relevant artifacts and justify each one left unch
 escape hatch the implementation uses MUST be visible in the PR description or design note, not only in a code comment.
 
 Obvious cases: a unit change in code updates `metadata.yaml`; a new option updates the schema, the stock conf, and the
-docs; a new metric updates `metadata.yaml` and the README. Subtle ones: renaming a metric label changes the alert
-definition that refers to it; changing a default changes the stock conf example and the documented default value.
+docs; a new metric updates its authoritative metadata/docs inputs, while generated README content follows the delivery
+boundary below. Subtle ones: renaming a metric label changes the alert definition that refers to it; changing a default
+changes the stock conf example and the documented default value.
 
 ## Delivery boundary: source PR versus post-merge PR
 
@@ -41,10 +42,10 @@ short contributor-facing version.
   outputs"). `go generate` also writes through the module's `README.md` symlink into the generated integration page;
   leave that page unstaged (`ibm-d.md`).
 - Validate locally with `gen_integrations.py`, `gen_docs_integrations.py --check`, and the unit tests
-  (`integrations/README.md` lists the commands and where the dependencies live). Do NOT regenerate the tracked pages as
-  a routine step: the regenerated pages add many changed lines to the PR and make review harder, and CI produces them
-  after merge anyway. When you do regenerate (to read a rendered page, or to check that a generator change converges on
-  a second run), undo every change to tracked generated files before committing.
+  (`integrations/README.md` lists commands and dependencies). Use `how-tos/preview-collector-page.md` for rendered
+  collector prose inspection in scratch, or its non-collector route for other integration types. Full regeneration or convergence checks belong in an isolated source
+  copy containing current inputs. Preserve pre-existing modified and untracked generated files; keeping outputs out of
+  the commit does not require discarding them. Never use a blanket restore to clean up validation.
 - `.github/workflows/check-markdown.yml` regenerates the pages on pull requests to validate Learn ingest and links; it
   does NOT assert that regeneration leaves the checkout clean, so an uncommitted regeneration diff never fails a source
   PR. Earlier guidance that described a clean generated diff as a PR gate was wrong.
@@ -53,12 +54,14 @@ short contributor-facing version.
   committed. Before opening the PR run:
 
   ```bash
-  git status --porcelain |
-    rg '^(\?\?| M|M |MM|A |AM) (integrations/(integrations\.(js|json)|taxonomy\.json)|src/go/plugin/go\.d/collector/snmp/npm-catalog/metrics-metadata-gaps\.txt)$' || true
+  git diff --cached --name-only --diff-filter=ACMRT -- \
+    integrations/integrations.js integrations/integrations.json integrations/taxonomy.json \
+    src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
   ```
 
-  The command MUST print nothing. If it names a catalog or the side report, remove the local artifact from the commit
-  (or delete the untracked report) rather than committing it.
+  The command MUST print nothing. If it names a catalog or the side report, exclude that artifact from the staged
+  change while preserving its local contents under the repository Git rules. Unstaged or untracked reports can remain
+  for inspection; this check is about the proposed commit, not cleanup of the working tree.
 
 ## The dormant collector taxonomy
 
@@ -74,7 +77,8 @@ are read only by this tooling.
 
 - `gen_integrations.py` validates each `metadata.yaml` against its JSON Schema only (fatal on any warning).
 - `integrations/tests/test_collector_metadata.py` (both integration workflows): a collector named by a service-discovery
-  rule documents its auto-detection; prose fields contain no Markdown that breaks the Learn build.
+  rule has nonempty auto-detection text, with explicit exceptions; selected prose fields pass common Markdown-pattern
+  checks. This is not factual verification or a complete MDX build.
 - `integrations/tests/test_descriptions.py` (both workflows): the generated page meta descriptions
   (`description-authoring.md`) resolve, validate, and are unique.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
@@ -89,6 +93,10 @@ are read only by this tooling.
   manual sync (`ibm-d.md`).
 
 ## What reviewers should check
+
+These checks describe the resulting artifacts. For producer-generated metadata, inspect authoritative inputs and
+current generated validation evidence; the delivery boundary does not require that metadata in the source commit.
+Review follows `AGENTS.md#skill-selection` and does not itself regenerate or publish outputs.
 
 1. **Code changes have matching `metadata.yaml` changes.** A chart, dimension, label, or unit change in the code appears
    in `metadata.yaml`; a renamed metric changes both files. Row content (rows mirror the code's context, title, unit,

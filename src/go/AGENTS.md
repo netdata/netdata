@@ -9,6 +9,16 @@ them from there.
 
 ## Task Routing
 
+Use this table for implementation and for review of the affected contracts. Apply the root
+`AGENTS.md#skill-selection` action and evidence boundaries; reading a design or delivery workflow during review does
+not require creating its implementation artifacts.
+
+For collector review, start with the collector entry and relevant framework/version contracts. For go.d, expand Go
+design when config, metric meaning, identity, Functions, ownership, persistent state or coordination is affected. A
+performance lens still needs that design guidance when ownership or lifecycle creates the costs; an isolated parser
+change preserving those contracts does not require the full design workflow. Follow the table's domain-specific
+references when their surfaces are affected, including the IBM.d exception.
+
 | Work area | Start here | Notes |
 |---|---|---|
 | New go.d collector, or a public-contract change (option, mode, metric meaning, ownership, Functions, vnodes) | `.agents/skills/collectors-go-design/SKILL.md`, then `src/go/plugin/go.d/docs/how-to-write-a-collector.md` | Design note in the SOW gate first; new go.d collectors use framework V2. |

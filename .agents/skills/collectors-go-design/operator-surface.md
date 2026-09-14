@@ -5,6 +5,10 @@ The operator surface is a public contract: easy to add, hard to remove. This ref
 `.agents/skills/integrations-lifecycle/consistency.md` owns which artifacts change together. Rules use the format
 When / Do / Don't / Evidence / Boundary.
 
+For review, use the affected sections as contract questions and inspect existing evidence under
+`AGENTS.md#skill-selection`. Record creation and UI exercises below belong to authorized implementation; reading this
+reference does not authorize changing a live configuration or require a new design artifact.
+
 ## 1. Config Decision Record
 
 **When:** every proposed public option, including ones inherited from a shared config type. **Do:** answer two
