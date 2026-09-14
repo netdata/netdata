@@ -181,19 +181,54 @@ void init_cmd_pool(CmdPool *pool, int size) {
     pool->tail = 0;
     pool->count = 0;
     pool->closed = false;
+    pool->producers = 0;
 
     fatal_assert(0 == netdata_mutex_init(&pool->lock));
     fatal_assert(0 == netdata_cond_init(&pool->not_full));
+    fatal_assert(0 == netdata_cond_init(&pool->no_producers));
+}
+
+// Drops one producer reference. Caller holds pool->lock.
+static inline void cmd_pool_producer_left___while_locked(CmdPool *pool)
+{
+    if (pool->producers > 0 && --pool->producers == 0)
+        netdata_cond_broadcast(&pool->no_producers);
+}
+
+bool cmd_pool_producer_enter(CmdPool *pool)
+{
+    netdata_mutex_lock(&pool->lock);
+
+    if (pool->closed) {
+        netdata_mutex_unlock(&pool->lock);
+        return false;
+    }
+
+    pool->producers++;
+    netdata_mutex_unlock(&pool->lock);
+    return true;
+}
+
+void cmd_pool_producer_leave(CmdPool *pool)
+{
+    netdata_mutex_lock(&pool->lock);
+    cmd_pool_producer_left___while_locked(pool);
+    netdata_mutex_unlock(&pool->lock);
 }
 
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
 {
     netdata_mutex_lock(&pool->lock);
 
+    // counted for the whole call, so close_cmd_pool() cannot return - and the owner cannot go on to
+    // release the pool - while this producer is still inside, including while it is parked below
+    pool->producers++;
+
     while (!pool->closed && pool->count == pool->size) {
         if (wait_on_full)
             netdata_cond_wait(&pool->not_full, &pool->lock);
         else {
+            cmd_pool_producer_left___while_locked(pool);
             netdata_mutex_unlock(&pool->lock); // No space, return
             return false;
         }
@@ -203,6 +238,7 @@ bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
     // producer that pushes cannot both believe they won: the command is either queued before the
     // close, and the consumer drains it, or refused here and the caller knows not to wait for it.
     if (pool->closed) {
+        cmd_pool_producer_left___while_locked(pool);
         netdata_mutex_unlock(&pool->lock);
         return false;
     }
@@ -211,6 +247,7 @@ bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
     pool->tail = (pool->tail + 1) % pool->size;
     pool->count++;
 
+    cmd_pool_producer_left___while_locked(pool);
     netdata_mutex_unlock(&pool->lock);
     return true;
 }
@@ -233,8 +270,18 @@ bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd) {
 void close_cmd_pool(CmdPool *pool) {
     netdata_mutex_lock(&pool->lock);
     pool->closed = true;
+
     // wake every producer parked on a full pool so it re-checks and gives up
     netdata_cond_broadcast(&pool->not_full);
+
+    // Then wait for them to actually leave. Waking a producer is not the same as it being gone: it
+    // still has to reacquire this mutex and return through it. release_cmd_pool() destroys the mutex
+    // and the conditions, so returning from here while one is mid-wakeup would destroy the very
+    // objects it is about to touch. After this loop the pool is closed for good and empty of
+    // producers, so no later push can arrive either.
+    while (pool->producers > 0)
+        netdata_cond_wait(&pool->no_producers, &pool->lock);
+
     netdata_mutex_unlock(&pool->lock);
 }
 
@@ -245,6 +292,7 @@ void release_cmd_pool(CmdPool *pool) {
     }
     netdata_mutex_destroy(&pool->lock);
     netdata_cond_destroy(&pool->not_full);
+    netdata_cond_destroy(&pool->no_producers);
 }
 
 /// Test
