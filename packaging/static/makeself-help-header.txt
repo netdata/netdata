@@ -1,0 +1,48 @@
+
+  ^
+  |.-.   .-.   .-.   .-.   .  Netdata
+  |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
+
+  Copyright 2018-2025 Netdata Inc.
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  You are about to install netdata to this system.
+  netdata will be installed at:
+
+                    /opt/netdata
+
+  The following changes will be made to your system:
+
+  # USERS / GROUPS
+  User 'netdata' and group 'netdata' will be added, if not present.
+
+  # LOGROTATE
+  This file will be installed if logrotate is present.
+
+   - /etc/logrotate.d/netdata
+
+  # SYSTEM INIT
+  This file will be installed if this system runs with systemd:
+
+   - /lib/systemd/system/netdata.service
+
+   or, for older CentOS, Debian/Ubuntu or OpenRC Gentoo:
+
+   - /etc/init.d/netdata         will be created
+
+
+  This package can also update a netdata installation that has been
+  created with another version of it.
+
+  Your netdata configuration will be retained.
+  After installation, netdata will be (re-)started.
+
+  netdata re-distributes a lot of open source software components.
+  Check its full license at:
+  https://github.com/netdata/netdata/blob/master/LICENSE.md
+
+  Anonymous stat collection and reporting to Netdata is enabled
+  by default. To disable, pass --disable-telemetry option to the installer
+  or export the environment variable DISABLE_TELEMETRY to a non-zero or non-empty
+  value (e.g export DISABLE_TELEMETRY=1).
