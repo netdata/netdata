@@ -836,7 +836,7 @@ ALWAYS_INLINE void rrdeng_prep_wait(PDC *pdc) {
 
 ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_QUERY);
+        worker_is_busy(RRDENG_WORKER_JOB_QUERY);
 
     pdc->page_list_JudyL = get_page_list(pdc->ctx, pdc->metric,
                                                  pdc->start_time_s * USEC_PER_SEC,

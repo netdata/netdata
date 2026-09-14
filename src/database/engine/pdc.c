@@ -1133,7 +1133,7 @@ static bool epdl_populate_pages_from_extent_data(
     }
 
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_DECOMPRESSION);
+        worker_is_busy(RRDENG_WORKER_JOB_EXTENT_DECOMPRESSION);
 
     if (likely(!have_read_error && RRDENG_COMPRESSION_NONE != header->compression_algorithm)) {
         // find the uncompressed extent size
@@ -1172,7 +1172,7 @@ static bool epdl_populate_pages_from_extent_data(
     }
 
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP);
+        worker_is_busy(RRDENG_WORKER_JOB_EXTENT_PAGE_LOOKUP);
 
     size_t stats_data_from_main_cache = 0;
     size_t stats_data_from_extent = 0;
@@ -1214,7 +1214,7 @@ static bool epdl_populate_pages_from_extent_data(
                 have_read_error);
 
         if(worker)
-            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_ALLOCATION);
+            worker_is_busy(RRDENG_WORKER_JOB_EXTENT_PAGE_ALLOCATION);
 
         PGD *pgd;
 
@@ -1264,7 +1264,7 @@ static bool epdl_populate_pages_from_extent_data(
         }
 
         if(worker)
-            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION);
+            worker_is_busy(RRDENG_WORKER_JOB_EXTENT_PAGE_POPULATION);
 
         PGC_ENTRY page_entry = {
                 .hot = false,
@@ -1332,7 +1332,7 @@ static bool epdl_populate_pages_from_extent_data(
         }
 
         if(worker)
-            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP);
+            worker_is_busy(RRDENG_WORKER_JOB_EXTENT_PAGE_LOOKUP);
     }
 
     if(stats_data_from_main_cache)
@@ -1406,7 +1406,7 @@ static inline void datafile_extent_read_free(void *buffer) {
 // see epdl_pending_add() for the rules of traversing it.
 NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
+        worker_is_busy(RRDENG_WORKER_JOB_EXTENT_CACHE_LOOKUP);
 
     size_t *statistics_counter = NULL;
     PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
@@ -1436,7 +1436,7 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instanc
     }
     else {
         if(worker)
-            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_MMAP);
+            worker_is_busy(RRDENG_WORKER_JOB_EXTENT_MMAP);
 
         void *extent_data = datafile_extent_read(ctx, epdl->datafile->file, epdl->extent_block, epdl->extent_size);
         if(extent_data != NULL) {
@@ -1447,7 +1447,7 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instanc
             extent_data = tmp;
 
             if(worker)
-                worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
+                worker_is_busy(RRDENG_WORKER_JOB_EXTENT_CACHE_LOOKUP);
 
             bool added = false;
             extent_cache_page = pgc_page_add_and_acquire(extent_cache, (PGC_ENTRY) {

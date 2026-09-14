@@ -16,8 +16,10 @@
 //   PDC, the page details control     the plan of one query: which pages, from cache or disk, in what order (pdc.h)
 //   the event loop (rrdeng_main)      the single libuv thread that owns datafile I/O, flushing and rotation
 //
-// The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable; the daemon
-// symbols the engine still depends on are listed, one by one, in rrdengine-daemon.h.
+// The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable, hands it its
+// configuration and optional services through dbengine-config.h, and reads what the engine publishes
+// (statistics, worker job ids) through the engine's own headers. The engine includes nothing of the
+// daemon.
 
 #include <fcntl.h>
 #include <lz4.h>
@@ -25,8 +27,8 @@
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include "../storage-engine-types.h"
-#include "rrdengine-daemon.h"
 #include "dbengine-config.h"
+#include "dbengine-workers.h"
 
 // the process-wide configuration, copied once by dbengine_init() and read-only afterwards
 extern struct dbengine_config dbengine_cfg;

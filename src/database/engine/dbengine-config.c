@@ -24,6 +24,7 @@ static bool dbengine_config_equal(const struct dbengine_config *a, const struct 
            a->journal_v2_unmount_time_s == b->journal_v2_unmount_time_s &&
            a->default_update_every_s == b->default_update_every_s &&
            a->libuv_worker_threads == b->libuv_worker_threads &&
+           a->reserved_libuv_worker_threads == b->reserved_libuv_worker_threads &&
            a->on_db_rotation == b->on_db_rotation &&
            a->preload_metrics == b->preload_metrics;
 }
@@ -39,12 +40,12 @@ static void dbengine_config_resolve(struct dbengine_config *cfg) {
         cfg->default_update_every_s = 1;
 
     if(!cfg->libuv_worker_threads)
-        cfg->libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+        cfg->libuv_worker_threads = DBENGINE_CONFIG_DEFAULT_WORKER_THREADS;
 
-    // the dispatcher keeps RESERVED_LIBUV_WORKER_THREADS free for others; a pool that small cannot host the engine
-    if(cfg->libuv_worker_threads <= RESERVED_LIBUV_WORKER_THREADS)
+    // the dispatcher keeps the reserved threads free for the embedder; a pool that small cannot host the engine
+    if(cfg->reserved_libuv_worker_threads < 0 || cfg->libuv_worker_threads <= cfg->reserved_libuv_worker_threads)
         fatal("DBENGINE: a libuv worker pool of %d threads is too small (%d are reserved)",
-              cfg->libuv_worker_threads, RESERVED_LIBUV_WORKER_THREADS);
+              cfg->libuv_worker_threads, cfg->reserved_libuv_worker_threads);
 }
 
 void dbengine_init(const struct dbengine_config *cfg) {
