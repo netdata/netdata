@@ -18,8 +18,4 @@
 #include "daemon/libuv_workers.h"                 // UV_EVENT_* job ids, register_libuv_worker_jobs(),
                                                   // RESERVED_LIBUV_WORKER_THREADS                     -> hooks
 
-// work the engine hands to the rest of the daemon                                                    -> hooks
-size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid));
-                                                                                // database/sqlite/sqlite_metadata.h
-
 #endif // NETDATA_RRDENGINE_DAEMON_H

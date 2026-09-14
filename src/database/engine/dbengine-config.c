@@ -24,7 +24,8 @@ static bool dbengine_config_equal(const struct dbengine_config *a, const struct 
            a->journal_v2_unmount_time_s == b->journal_v2_unmount_time_s &&
            a->default_update_every_s == b->default_update_every_s &&
            a->libuv_worker_threads == b->libuv_worker_threads &&
-           a->on_db_rotation == b->on_db_rotation;
+           a->on_db_rotation == b->on_db_rotation &&
+           a->preload_metrics == b->preload_metrics;
 }
 
 // the 0-means-default fields become concrete values here, so the engine never has to re-check them

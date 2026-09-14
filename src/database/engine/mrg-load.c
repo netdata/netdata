@@ -42,8 +42,11 @@ void mrg_metric_prepopulate_cleanup(MRG *mrg) {
     acquired_metrics_counter = 0;
 }
 
-// Main function to load metrics from the database
+// Pre-populate the registry from the embedder's list of known metrics, if it provides one
 bool mrg_load(MRG *mrg) {
-    size_t processed_metrics = populate_metrics_from_database(mrg, (void (*)(void *, Word_t, nd_uuid_t *))mrg_metric_prepopulate);
+    if(!dbengine_cfg.preload_metrics)
+        return false;
+
+    size_t processed_metrics = dbengine_cfg.preload_metrics(mrg, (void (*)(void *, Word_t, nd_uuid_t *))mrg_metric_prepopulate);
     return processed_metrics > 0;
 }
