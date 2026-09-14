@@ -1086,7 +1086,7 @@ update_build() {
     archive_name=""
 
     if [ -n "${zstd}" ]; then
-      if download "${NETDATA_TARBALL_BASE_URL}.zst" "${ndtmpdir}/${archive_base_name}.zst"; then
+      if _safe_download "${NETDATA_TARBALL_BASE_URL}.zst" "${ndtmpdir}/${archive_base_name}.zst"; then
         archive_name="${archive_base_name}.zst"
         decompress="${zstd} -dc"
       else

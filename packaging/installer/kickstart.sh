@@ -2166,7 +2166,7 @@ set_source_archive_urls() {
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
       latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-v${latest}.tar"
+      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${latest}.tar"
       export NETDATA_SOURCE_ARCHIVE_BASEURL="https://github.com/netdata/netdata/releases/download/${latest}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
     fi
@@ -2305,7 +2305,7 @@ try_build_install() {
     fi
   fi
 
-  run ${decompress} | tar -xf - -C "${tmpdir}"
+  run ${decompress} "${archive_name}" | tar -xf - -C "${tmpdir}"
   rm -rf "${archive_name}" > /dev/null 2>&1
 
   if [ "${DRY_RUN}" -ne 1 ]; then
