@@ -33,6 +33,8 @@ func dispatch(
 			err = sendWebhook(ctx, dst, event, timeout)
 		case "slack":
 			err = sendSlack(ctx, dst, event, timeout)
+		case "discord":
+			err = sendDiscord(ctx, dst, event, timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}

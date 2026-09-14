@@ -169,7 +169,16 @@ func TestSlackLinkText(t *testing.T) {
 	}
 }
 
-func TestSlackConfiguration(t *testing.T) {
+func TestURLProviderConfiguration(t *testing.T) {
+	for _, provider := range []string{"slack", "discord"} {
+		t.Run(provider, func(t *testing.T) {
+			testURLProviderConfiguration(t, provider)
+		})
+	}
+}
+
+func testURLProviderConfiguration(t *testing.T, provider string) {
+	t.Helper()
 	tests := map[string]struct {
 		url   string
 		extra string
@@ -202,7 +211,7 @@ func TestSlackConfiguration(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			config := strings.Replace(configForURL(test.url), "type: webhook", "type: slack", 1) + test.extra
+			config := strings.Replace(configForURL(test.url), "type: webhook", "type: "+provider, 1) + test.extra
 			got, err := readConfig(strings.NewReader(config))
 			if test.err != "" {
 				require.ErrorContains(t, err, test.err)
@@ -213,7 +222,7 @@ func TestSlackConfiguration(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(
 				t,
-				Config{Version: 1, Destinations: map[string]Destination{"dev": {Type: "slack", URL: test.url}}},
+				Config{Version: 1, Destinations: map[string]Destination{"dev": {Type: provider, URL: test.url}}},
 				got,
 			)
 		})

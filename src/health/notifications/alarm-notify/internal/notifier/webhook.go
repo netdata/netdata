@@ -27,6 +27,12 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 	if err := validateURL(endpoint); err != nil {
 		return err
 	}
+	if dst.Type == "discord" {
+		endpoint, err = discordEndpoint(endpoint)
+		if err != nil {
+			return err
+		}
+	}
 	var token string
 	if dst.BearerToken != "" {
 		token, err = resolveSecret(ctx, dst.BearerToken)
@@ -73,7 +79,7 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 	// Close without buffering or draining an arbitrary remote body.
 	defer response.Body.Close()
 	accepted := response.StatusCode >= 200 && response.StatusCode < 300
-	if dst.Type == "slack" {
+	if dst.Type == "slack" || dst.Type == "discord" {
 		accepted = response.StatusCode == http.StatusOK
 	}
 	if !accepted {
