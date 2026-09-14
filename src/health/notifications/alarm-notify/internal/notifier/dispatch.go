@@ -26,7 +26,16 @@ func dispatch(
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		err := sendWebhook(ctx, cfg.Destinations[name], event, timeout)
+		dst := cfg.Destinations[name]
+		var err error
+		switch dst.Type {
+		case "webhook":
+			err = sendWebhook(ctx, dst, event, timeout)
+		case "slack":
+			err = sendSlack(ctx, dst, event, timeout)
+		default:
+			err = errors.New("destination provider is not implemented")
+		}
 		report(deliveryResult{destination: name, err: err})
 		if err == nil {
 			succeeded++

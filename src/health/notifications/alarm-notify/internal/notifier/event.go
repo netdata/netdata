@@ -26,6 +26,7 @@ type Event struct {
 	Value          *float64  `json:"value"`
 	PreviousValue  *float64  `json:"previous_value"`
 	Units          string    `json:"units,omitempty"`
+	URL            string    `json:"url,omitempty"`
 }
 
 func readEvent(r io.Reader) (Event, error) {
@@ -41,6 +42,9 @@ func readEvent(r io.Reader) (Event, error) {
 	}
 	if event.Version != 1 {
 		return Event{}, errors.New("event version must be 1")
+	}
+	if event.URL != "" && !validHTTPURL(event.URL, true) {
+		return Event{}, errors.New("event url must be an absolute HTTP(S) URL without user information")
 	}
 	if strings.TrimSpace(event.IncidentID) == "" || strings.TrimSpace(event.Node) == "" ||
 		strings.TrimSpace(event.Alert) == "" || strings.TrimSpace(event.Summary) == "" || event.Timestamp.IsZero() {

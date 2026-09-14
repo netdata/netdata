@@ -11,6 +11,7 @@ approved for removal by this increment.
 - Configuration validation, literal/environment/file secrets, request timeout/cancellation, and safe diagnostics.
 - Central role-to-destination routing, defaults for unmapped roles, explicit suppression, reserved roles, and
   deduplication by destination name. Sequential fan-out records individual results and preserves any-success exits.
+- Modern Slack app webhooks with status colors, plain-text alert content and an optional navigation link.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -33,7 +34,7 @@ remote services remain available.
 | Kavenegar | `send_kavenegar` | Pending |
 | Telegram | `send_telegram` | Pending |
 | Microsoft Teams | `send_msteams` | Pending |
-| Slack | `send_slack` | Pending |
+| Slack | `send_slack` | Modern app webhooks implemented; legacy channel/user/username/icon overrides pending by explicit staged-delivery decision |
 | Rocket.Chat | `send_rocketchat` | Pending |
 | Alerta | `send_alerta` | Pending |
 | Flock | `send_flock` | Pending |
@@ -60,13 +61,14 @@ remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Pending except initial webhook settings |
-| Results | Per-target failures and Bash's any-success invocation result | Implemented for webhook fan-out; provider subtarget details pending with providers |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Modern Slack content/link/status formatting implemented; other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook and modern Slack URL settings implemented; remaining provider configuration pending |
+| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook and modern Slack fan-out; provider subtarget details pending with providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The foundation and routing/fan-out increments are implemented. The next proposed increment adds one named provider.
-More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final architecture
-and broad refactoring are discussed after that working baseline exists.
+The first three increments cover the foundation, routing/fan-out, and modern Slack app webhooks. Legacy Slack
+override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
+More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final
+architecture and broad refactoring are discussed after that working baseline exists.
