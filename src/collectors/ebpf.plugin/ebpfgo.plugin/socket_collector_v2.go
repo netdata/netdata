@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -40,6 +41,9 @@ type SocketCollector struct {
 	Config SocketConfig
 	handle *SocketLegacyHandle
 	store  metrix.CollectorStore
+
+	// Function support (network-protocols)
+	fnStore *socketFunctionStore
 }
 
 func NewSocketCollector() *SocketCollector {
@@ -79,6 +83,10 @@ func (c *SocketCollector) Init(ctx context.Context) error {
 	}
 
 	c.handle = handle
+
+	// Initialize function store for network-protocols function
+	c.fnStore = newSocketFunctionStore(c.Config.UpdateEvery)
+
 	return nil
 }
 
@@ -107,6 +115,16 @@ func (c *SocketCollector) Collect(ctx context.Context) error {
 	meter.Counter("ipv6_send").ObserveTotal(float64(snapshot.Ipv6Send))
 	meter.Counter("ipv6_recv").ObserveTotal(float64(snapshot.Ipv6Recv))
 
+	// Update function store with latest metrics for network-protocols function
+	if c.fnStore != nil {
+		c.fnStore.update(socketGlobalPublish{
+			Ipv4Send: int64(snapshot.Ipv4Send),
+			Ipv4Recv: int64(snapshot.Ipv4Recv),
+			Ipv6Send: int64(snapshot.Ipv6Send),
+			Ipv6Recv: int64(snapshot.Ipv6Recv),
+		})
+	}
+
 	return nil
 }
 
@@ -122,4 +140,36 @@ func (c *SocketCollector) ChartTemplateYAML() string {
 
 func (c *SocketCollector) MetricStore() metrix.CollectorStore {
 	return c.store
+}
+
+// Function support: network-protocols
+// These methods enable the socket collector to serve network-protocols function calls
+// through the agent's function routing system.
+
+// handleNetworkProtocolsFunction serves the network-protocols function request
+// by returning the latest socket metrics collected.
+func (c *SocketCollector) handleNetworkProtocolsFunction() (string, error) {
+	if c.fnStore == nil {
+		return "", fmt.Errorf("function store not initialized")
+	}
+
+	publish, hasData := c.fnStore.snapshot()
+	if !hasData {
+		return "", fmt.Errorf("no data available yet")
+	}
+
+	// Format response as JSON
+	result := map[string]interface{}{
+		"ipv4_send": publish.Ipv4Send,
+		"ipv4_recv": publish.Ipv4Recv,
+		"ipv6_send": publish.Ipv6Send,
+		"ipv6_recv": publish.Ipv6Recv,
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal response: %v", err)
+	}
+
+	return string(data), nil
 }
