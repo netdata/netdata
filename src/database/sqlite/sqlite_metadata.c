@@ -3027,6 +3027,19 @@ static void metadata_event_loop(void *arg)
 
     (void)uv_loop_close(loop);
 
+    // Did we give up on outstanding libuv work? Key this on the flags themselves rather than
+    // on loop_count: the loop above also exits when uv_run() reports no pending callbacks,
+    // and what matters is not "did we time out" but "is a worker still using the databases".
+    //
+    // Such a worker runs on a libuv threadpool thread, which nd_thread_join_threads() does not
+    // know about and cannot wait for. It is still binding and stepping statements against
+    // db_meta - and, via metadata_scan_host() -> ml_dimension_load_models(), against ml_db.
+    // Suppress the whole SQLite teardown so its handles and statements stay valid until the
+    // process exits.
+    if (config->metadata_running || config->ctx_load_running)
+        sqlite_mark_teardown_unsafe(
+            "a metadata worker outlived the shutdown wait and may still be using the databases");
+
     store_alert_transitions(pending_alert_list, false, true);
     store_sql_statements(pending_sql_statement, false, true);
 
@@ -3061,6 +3074,13 @@ void metadata_sync_shutdown(void)
     // and shutdown will timeout
     if (!metadata_enq_cmd(&cmd, true)) {
         nd_log_daemon(NDLP_WARNING, "METADATA: Failed to send a shutdown command");
+
+        // We never asked the metadata thread to stop, so we are returning with it - and its
+        // libuv workers - still running against db_meta and ml_db. This is a worse position
+        // than the watchdog timeout below: there we at least drained for 15s first. Suppress
+        // the SQLite teardown, including ml_fini()'s close, before the caller walks into it.
+        sqlite_mark_teardown_unsafe(
+            "the metadata shutdown command could not be queued, so the metadata thread is still running");
         return;
     }
     nd_log_daemon(NDLP_INFO, "METADATA: Submitted shutdown command, waiting for ACK");
@@ -3069,8 +3089,13 @@ void metadata_sync_shutdown(void)
     completion_destroy(&meta_config.start_stop_complete);
 
     int rc = nd_thread_join(meta_config.thread);
-    if (rc)
+    if (rc) {
         nd_log_daemon(NDLP_ERR, "METADATA: Failed to join synchronization thread");
+
+        // Same reasoning as the enqueue failure above: an unjoined metadata thread may still
+        // be inside SQLite when the caller tears it down.
+        sqlite_mark_teardown_unsafe("the metadata synchronization thread could not be joined");
+    }
     else
         nd_log_daemon(NDLP_INFO, "METADATA: synchronization thread shutdown completed");
 }

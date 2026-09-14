@@ -7,13 +7,60 @@
 static SPINLOCK JudyL_thread_stmt_lock = SPINLOCK_INITIALIZER;
 static Pvoid_t JudyL_thread_stmt_pool = NULL;
 
+// Per-thread cache of prepared statements, and the contract that governs its lifetime.
+//
+// THE RULES (all four are load-bearing; breaking any one reintroduces a shutdown crash):
+//
+//  1. NO DECISION ABOUT POOL OWNERSHIP is made on an unlocked read of
+//     sqlite_databases_closed. An unlocked pre-check in
+//     finalize_self_prepared_sql_statements() was the double-free: the reader could be told
+//     "not closed", block on the lock, and free a pool that the teardown thread had already
+//     freed. (#20731 added such a pre-check after #20536 had removed the sibling one from that
+//     same function. Do not add it back.)
+//     Note this rule is about POOL OWNERSHIP only. The flag is deliberately read unlocked
+//     elsewhere, where a stale answer is harmless: REQUIRE_HEALTH_DB_OPEN() uses it as a hint,
+//     and sqlite_close_databases() stores it before taking the lock so that new work is
+//     refused as early as possible.
+//  2. Every find, mutate and free of a JudyL_thread_stmt_pool entry happens under
+//     JudyL_thread_stmt_lock.
+//  3. THE JUDYL ARRAY IS THE AUTHORITY for pool lifetime, not thread_stmt_pool. Self cleanup
+//     frees only the entry the array maps for gettid_cached() and deletes that key. Nothing
+//     else frees a pool at all: finalize_all_prepared_sql_statements() only REPORTS the pools
+//     it finds and suppresses the teardown (see rule 4), so a pool is only ever released by
+//     its own owner. thread_stmt_pool is a same-thread cache for prepare_statement(); the
+//     lookup, not the cache, decides what exists.
+//  4. NO TEARDOWN PATH WRITES ANOTHER THREAD'S THREAD-LOCAL STORAGE - not the pool
+//     pointer, not the caller's cached sqlite3_stmt * slot. It is tempting to have the
+//     finalizer NULL the owner's slots so they cannot be reused after finalization, but
+//     finalize_all_prepared_sql_statements() exists precisely for pools whose owner did
+//     NOT clean up, and such an owner's TLS block may no longer have a valid lifetime.
+//     Holding the locks does not prolong it.
+//
+// WHAT PROTECTS A STATEMENT THAT IS STILL IN USE is not this struct - it is
+// sqlite_teardown_unsafe (see below). When any pooled-statement owner might still be
+// running, teardown is suppressed entirely and nothing is finalized out from under it.
+//
+// THE OWNER SET IS AN ENUMERATED INVARIANT, NOT ONE THIS CODE ENFORCES. Today the only threads
+// that register here are HEALTH (the PREPARE_COMPILED_STATEMENT sites in sqlite_health.c and
+// sqlite_aclk_alert.c are all gated on is_health_thread) and the ML threads - both the TRAIN[N]
+// workers and the detection thread reach the direct prepare_statement() sites in ml.cc, which
+// is why both call finalize_self_prepared_sql_statements() at the end of their loops. Every ML
+// thread is joined by ml_stop_threads() before teardown; health cleans up from a
+// CLEANUP_FUNCTION handler.
+// So in a correct shutdown finalize_all_prepared_sql_statements() finds NOTHING and is a
+// pure diagnostic. IF YOU ADD A PREPARE_COMPILED_STATEMENT CALLER ON A THREAD THAT IS
+// NEITHER JOINED BEFORE TEARDOWN NOR GUARANTEED TO RUN
+// finalize_self_prepared_sql_statements(), you MUST extend the liveness check that sets
+// sqlite_teardown_unsafe, or you reintroduce the use-after-free.
 struct stmt_pool_s {
     int count;
+    bool overflow_reported;
     pid_t thread_id;
     char *name;
     void *stmt[MAX_PREPARED_THREAD_STATEMENTS];
 };
 
+// Same-thread cache only. Rule 3: the JudyL array, not this pointer, decides what exists.
 __thread struct stmt_pool_s *thread_stmt_pool = NULL;
 
 long long def_journal_size_limit = 16777216;
@@ -22,6 +69,71 @@ SPINLOCK sqlite_spinlock = SPINLOCK_INITIALIZER;
 
 bool sqlite_library_initialized;
 bool sqlite_databases_closed;
+
+// One-way latch: "someone may still be using SQLite, so tearing it down would be a
+// use-after-free". Set on every shutdown path that gives up waiting for a SQLite user
+// instead of proving it finished, and checked by every teardown entry point -
+// ml_fini(), sqlite_close_databases() and sqlite_library_shutdown().
+//
+// When it is set we deliberately leak: the METADATA, CONTEXT and ML handles stay open,
+// statements stay unfinalized and the library stays initialized until the process exits and the
+// OS reclaims everything. (Thread-local handles are the exception: sql_close_thread_db_safe()
+// still closes those, which is safe because they are private to a single thread.)
+// That is strictly safer than crashing inside pcache1 - the same reasoning that already
+// governs sql_close_thread_db_safe() below. sqlite_databases_closed is still set in that
+// case, so no NEW work is admitted; only the destruction is skipped.
+static bool sqlite_teardown_unsafe = false;
+
+// A SEPARATE, narrower signal: a connection was closed with statements still attached, so it
+// became a zombie. That makes sqlite3_shutdown() unsafe - it would dismantle pcache1 while the
+// zombie still references pages - but it says nothing about whether anyone is still USING
+// db_meta, so it must not suppress the database closes.
+//
+// Keeping the two apart matters because this one is reachable at STARTUP:
+// sql_close_thread_db_safe() runs on the context-load path during boot. Folding it into the
+// liveness latch would let one leaked statement there suppress every teardown for the entire
+// life of the process, with a single warning to show for it.
+static bool sqlite_zombie_connection_created = false;
+
+// When, and for which database, the first zombie was noted. Recorded ONLY so the eventual
+// "skipping sqlite3_shutdown()" line can say whether the suppression came from this shutdown or
+// from something that happened hours earlier at startup.
+//
+// Both are ATOMIC, and the ORDER matters: they are written BEFORE the flag is published, and
+// read AFTER it is observed. sqlite_note_zombie_connection() cannot take sqlite_spinlock (it
+// runs both with that lock held and without it), and the reader in sqlite_library_shutdown()
+// formats this message outside the lock - so a thread-local close noting the first zombie can
+// run concurrently with that formatting. Publishing the flag first would let the reader see
+// "a zombie exists" and then read an unwritten name and timestamp.
+//
+// KNOWN LIMITATION, deliberate: this latch is sticky for the life of the process even if the
+// deferred close later completes (the owning thread finalizes its statements and the connection
+// really does go away). It cannot be cleared safely - once sqlite3_close_v2() has been called,
+// touching that handle to re-test it is undefined - and the trade is one-sided: skipping
+// sqlite3_shutdown() costs a teardown the exiting process does not need, while clearing it
+// wrongly reinstates the pcache1 crash it exists to prevent. The log line below is how you tell
+// a stale suppression from a live one.
+static usec_t sqlite_zombie_noted_ut = 0;
+static const char *sqlite_zombie_noted_db = NULL;
+
+// Every distinct reason is logged, not just the first: when several conditions fire, the list
+// is what tells a triage pass which one actually drove the decision.
+void sqlite_mark_teardown_unsafe(const char *reason)
+{
+    bool was_set = __atomic_exchange_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
+
+    nd_log_daemon(
+        NDLP_WARNING,
+        "SQL: %s SQLite teardown: %s. Databases, statements and library state are leaked "
+        "deliberately; the process is exiting.",
+        was_set ? "also suppressing" : "suppressing",
+        reason ? reason : "a SQLite user may still be running");
+}
+
+bool sqlite_teardown_is_unsafe(void)
+{
+    return __atomic_load_n(&sqlite_teardown_unsafe, __ATOMIC_ACQUIRE);
+}
 
 SQLITE_API int sqlite3_exec_monitored(
     sqlite3 *db,                               /* An open database */
@@ -174,8 +286,9 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
     if (!stmt_list)
         return;
 
-    int max_keys = MIN(stmt_list->count, MAX_PREPARED_THREAD_STATEMENTS);
-    for (int i = 0; i < max_keys; i++) {
+    // count is bounded by prepare_statement(), which refuses to register past
+    // MAX_PREPARED_THREAD_STATEMENTS instead of incrementing and dropping silently.
+    for (int i = 0; i < stmt_list->count; i++) {
         if (!stmt_list->stmt[i])
             continue;
         int rc = sqlite3_finalize((sqlite3_stmt *)stmt_list->stmt[i]);
@@ -187,26 +300,54 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
     freez(stmt_list);
 }
 
-// This must be called when the thread terminates
+// This must be called when the thread terminates.
+//
+// There is deliberately NO sqlite_databases_closed check here, neither before the lock nor under
+// it - see rule 1 at the top of this file. The unlocked one used to be at the head of this
+// function and was the double free: this thread read "not closed", waited for the lock, and then
+// freed a pool that the teardown thread had already freed and removed.
+//
+// That teardown-side free no longer exists - finalize_all_prepared_sql_statements() now only
+// reports and latches - so today nothing else frees a pool and the double free is structurally
+// impossible. The lookup below is still the guard, and it is what keeps that true regardless of
+// who might free one in future: the JudyL mapping, never the TLS pointer, decides what exists.
 void finalize_self_prepared_sql_statements()
 {
-    if (__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE))
-        return;
-
     spinlock_lock(&sqlite_spinlock);
-
     spinlock_lock(&JudyL_thread_stmt_lock);
-    if (thread_stmt_pool) {
-        Word_t thread_id = thread_stmt_pool->thread_id;
-        finalize_and_free_stmt_list(thread_stmt_pool);
-        thread_stmt_pool = NULL;
+
+    // Ask the authority, not our TLS cache. The JudyL mapping is what decides a pool exists;
+    // the TLS pointer is only a same-thread cache and may be stale. (It is not that someone else
+    // freed the pool - nothing else frees one any more - it is that the cache is not the record.)
+    Word_t thread_id = (Word_t)gettid_cached();
+    Pvoid_t *Pvalue = JudyLGet(JudyL_thread_stmt_pool, thread_id, PJE0);
+    if (Pvalue && *Pvalue) {
+        finalize_and_free_stmt_list((struct stmt_pool_s *)*Pvalue);
         (void)JudyLDel(&JudyL_thread_stmt_pool, thread_id, PJE0);
     }
-    spinlock_unlock(&JudyL_thread_stmt_lock);
+    thread_stmt_pool = NULL;
 
+    spinlock_unlock(&JudyL_thread_stmt_lock);
     spinlock_unlock(&sqlite_spinlock);
 }
 
+// Report any statement pool whose owner did not clean up, and suppress the teardown if there
+// is one.
+//
+// In a correct shutdown this finds NOTHING: every pool owner either was joined before we got
+// here (the ML TRAIN workers, via ml_stop_threads()) or ran
+// finalize_self_prepared_sql_statements() from its own cleanup handler (HEALTH, and the main
+// thread just above). So the normal path walks an empty array and changes nothing.
+//
+// If it DOES find a pool, we cannot safely finalize it. We would be finalizing statements
+// that a thread may still hold cached, and rule 4 forbids clearing that thread's slot, so
+// there would be no way to stop it reusing freed memory. We cannot tell from here whether
+// that owner is alive or merely sloppy, so we take the safe reading: warn, latch, and leak.
+//
+// That check is deliberately structural rather than a list of known owners. The liveness test
+// in daemon-shutdown.c knows about HEALTH specifically; this one catches ANY future pool owner
+// that is neither joined before teardown nor runs its own cleanup, without needing to be told
+// about it.
 void finalize_all_prepared_sql_statements()
 {
     spinlock_lock(&JudyL_thread_stmt_lock);
@@ -223,9 +364,12 @@ void finalize_all_prepared_sql_statements()
                 "SQL: Pending SQL statements for thread %lu (%s), make sure thread does a proper cleanup",
                 thread_id,
                 local_stmt_pool->name);
-            finalize_and_free_stmt_list(local_stmt_pool);
+
+            // Do NOT finalize or free it: see the note above. The pool and its statements are
+            // leaked on purpose and the whole teardown is suppressed.
+            sqlite_mark_teardown_unsafe(
+                "a thread left cached SQL statements registered, so it may still be using them");
         }
-        (void)JudyLFreeArray(&JudyL_thread_stmt_pool, PJE0);
     }
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
@@ -236,6 +380,7 @@ static void init_thread_stmt_pool(void) {
         fatal("Failed to allocate memory for statement pool");
 
     thread_stmt_pool->count = 0;
+    thread_stmt_pool->overflow_reported = false;
     thread_stmt_pool->thread_id = gettid_cached();
     thread_stmt_pool->name = strdupz(nd_thread_tag());
     memset(thread_stmt_pool->stmt, 0, sizeof(void *) * MAX_PREPARED_THREAD_STATEMENTS);
@@ -276,9 +421,28 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
     if (rc == SQLITE_OK) {
         if (!thread_stmt_pool)
             init_thread_stmt_pool();
-        int stmt_key = __atomic_fetch_add(&thread_stmt_pool->count, 1, __ATOMIC_RELAXED);
-        if (stmt_key < MAX_PREPARED_THREAD_STATEMENTS)
-            thread_stmt_pool->stmt[stmt_key] = *statement;
+
+        // Register the statement so shutdown can account for it. count is only ever
+        // touched under sqlite_spinlock, so no atomic is needed.
+        //
+        // Do NOT increment past the limit: the old code incremented unconditionally and
+        // dropped the statement silently once the array was full, so those statements were
+        // never finalized and were exactly what left a zombie connection behind at
+        // sqlite3_close_v2(). Refuse loudly instead - it is a real limit being hit, and the
+        // caller keeps a usable statement either way.
+        if (thread_stmt_pool->count < MAX_PREPARED_THREAD_STATEMENTS)
+            thread_stmt_pool->stmt[thread_stmt_pool->count++] = *statement;
+        else if (!thread_stmt_pool->overflow_reported) {
+            // Report ONCE per thread, not per call: this runs under sqlite_spinlock, which also
+            // serializes simple_prepare_statement() for every web, API and metadata thread, so an
+            // unconditional log here would turn a full pool into a global throughput problem.
+            thread_stmt_pool->overflow_reported = true;
+            error_report(
+                "SQL: thread %s exhausted its %d cached statement slots; further statements on this "
+                "thread will not be finalized at shutdown",
+                thread_stmt_pool->name,
+                MAX_PREPARED_THREAD_STATEMENTS);
+        }
     }
     spinlock_unlock(&sqlite_spinlock);
     return rc;
@@ -424,6 +588,81 @@ uint64_t sqlite_get_db_space(sqlite3 *db)
  * Close the sqlite database
  */
 
+// Called immediately before every sqlite3_close_v2() in this file.
+//
+// sqlite3_close_v2() does not fail when statements are still attached: it marks the
+// connection a ZOMBIE and defers the real close until whatever later finalize or close makes
+// it non-busy. If sqlite3_shutdown() runs in between it dismantles pcache1 while the zombie
+// still references pages, and the deferred close then faults inside pcache1RemoveFromHash -
+// after main() has returned, which is why these crashes have no netdata frames.
+//
+// sqlite3_next_stmt() measures the condition directly rather than inferring it from whether
+// some thread failed to clean up: it sees untracked statements (PREPARE_STATEMENT /
+// simple_prepare_statement) as well as the pooled ones, and untracked statements are the ones
+// most likely to still be attached here.
+//
+// NOTE, because this reads like a contradiction otherwise: we detect the zombie and then close
+// ANYWAY. That is deliberate, and it is safe for reasons that are worth spelling out, because
+// the obvious justification is WRONG. It is NOT true that everyone is provably finished by the
+// time we get here: the pooled-statement owners are (that is what the liveness latch
+// establishes), but UNTRACKED users - the PREPARE_STATEMENT / simple_prepare_statement callers
+// on web and API threads - are only bounded by service_wait_exit(~0, 20s), which proceeds
+// whether or not they finished, and they set no latch.
+//
+// Closing over such a user is nevertheless safe, and this is the actual argument:
+//  - sqlite3_close_v2() on a BUSY connection frees nothing. It marks the connection a zombie
+//    and defers the real close until the last statement is finalized, so a thread mid-step
+//    keeps operating on live memory.
+//  - The handles reaching this function from sqlite_close_databases() and ml_fini() come from
+//    plain sqlite3_open(), and nothing in this tree overrides SQLITE_THREADSAFE or calls
+//    sqlite3_config(), so they are fully serialized - the deferred close cannot race a step.
+//  - Nobody can START new work afterwards: prepare_statement() and simple_prepare_statement()
+//    both re-check sqlite_databases_closed under sqlite_spinlock and return SQLITE_MISUSE.
+//  - The caller NULLs db_meta / db_context_meta after this returns, so a late user gets
+//    SQLITE_MISUSE from a NULL handle rather than a dangling one.
+//  - What genuinely is unsafe afterwards is sqlite3_shutdown(), which would dismantle pcache1
+//    while that deferred connection still references pages. That single thing is what this flag
+//    suppresses.
+// Known gap, pre-existing and not introduced here: db_execute() / sqlite3_exec_monitored() do
+// not check the closed flag, so they are not covered by the third bullet.
+//
+// MUST NOT take sqlite_spinlock: it is non-recursive and this runs both WITH the lock held
+// (from sqlite_close_databases() via sql_close_database(), and from sql_close_thread_db_safe(),
+// which takes it itself) and WITHOUT it (from ml_fini(), which holds nothing).
+//
+// Thread-safety of sqlite3_next_stmt() here rests on the same assumption the sqlite3_close_v2()
+// one line later already makes: the caller is the sole owner of this handle at this point. That
+// matters because the handles passed from sql_close_thread_db_safe() are opened
+// SQLITE_OPEN_NOMUTEX, so the call is not internally serialized for them.
+static void sqlite_note_zombie_connection(sqlite3 *database, const char *database_name)
+{
+    if (unlikely(!database))
+        return;
+
+    if (sqlite3_next_stmt(database, NULL)) {
+        // Only sqlite3_shutdown() is unsafe from here - see sqlite_zombie_connection_created.
+        // Do NOT set the liveness latch: this runs at startup too.
+        // Record WHICH database and WHEN, because this flag can be set at startup (the
+        // context-load path closes thread-local handles) and is then reported hours later at
+        // exit. Without provenance the exit message looks like a shutdown problem.
+        // Populate BEFORE publishing, and publish with RELEASE - see the note at the
+        // declarations. Two threads racing to record the first zombie may overwrite each
+        // other's values, which is harmless for a diagnostic; what must not happen is the flag
+        // becoming visible ahead of the data.
+        if (!__atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+            __atomic_store_n(&sqlite_zombie_noted_db, database_name, __ATOMIC_RELAXED);
+            __atomic_store_n(&sqlite_zombie_noted_ut, now_monotonic_usec(), __ATOMIC_RELAXED);
+        }
+        __atomic_store_n(&sqlite_zombie_connection_created, true, __ATOMIC_RELEASE);
+        nd_log_daemon(
+            NDLP_WARNING,
+            "SQL: the %s database still has prepared statements attached; closing it leaves a zombie "
+            "connection, so sqlite3_shutdown() will be skipped at exit (recorded %s)",
+            database_name ? database_name : "sqlite",
+            __atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE) ? "during shutdown" : "before shutdown began");
+    }
+}
+
 void sql_close_database(sqlite3 *database, const char *database_name)
 {
     int rc;
@@ -447,10 +686,15 @@ void sql_close_database(sqlite3 *database, const char *database_name)
     (void) sqlite3_db_release_memory(database);
 #endif
 
+    sqlite_note_zombie_connection(database, database_name);
+
     rc = sqlite3_close_v2(database);
     if (unlikely(rc != SQLITE_OK))
         error_report("%s: Error while closing the sqlite database: rc %d, error \"%s\"", database_name, rc, sqlite3_errstr(rc));
-    database = NULL;
+
+    // NOTE: the caller's handle is NOT cleared here - this parameter is by value. Callers
+    // that keep a global (db_meta, db_context_meta, ml_db) must NULL it themselves, and they
+    // do; see sqlite_close_databases() and ml_fini().
 }
 
 extern sqlite3 *db_context_meta;
@@ -464,8 +708,10 @@ void sql_close_thread_db_safe(sqlite3 **database)
         return;
 
     spinlock_lock(&sqlite_spinlock);
-    if (sqlite_library_initialized)
+    if (sqlite_library_initialized) {
+        sqlite_note_zombie_connection(*database, "thread-local");
         (void) sqlite3_close_v2(*database);
+    }
     spinlock_unlock(&sqlite_spinlock);
 
     *database = NULL;
@@ -473,19 +719,41 @@ void sql_close_thread_db_safe(sqlite3 **database)
 
 void sqlite_close_databases(void)
 {
-    // In case we have statements in the main thread (we should not)
+    // In case we have statements in the main thread (we should not).
+    // This is the main thread's own pool, so it is safe regardless of the latch below.
     finalize_self_prepared_sql_statements();
 
+    // Refuse new work from this point, whether or not we go on to destroy anything.
     __atomic_store_n(&sqlite_databases_closed, true, __ATOMIC_RELEASE);
 
     spinlock_lock(&sqlite_spinlock);
 
-    // Finalize pending statements and report any thread that failed
-    // to do it properly
+    // Always run the diagnostic walk, even when teardown is already suppressed. It is the only
+    // thing that NAMES the thread that failed to clean up, and it is precisely when the
+    // teardown is being suppressed that a triage pass needs that name. It frees nothing, so it
+    // is safe to run on any path; it latches if it finds a pool.
     finalize_all_prepared_sql_statements();
 
+    if (sqlite_teardown_is_unsafe()) {
+        spinlock_unlock(&sqlite_spinlock);
+
+        // Someone may still be inside SQLite with these handles. Finalizing their statements or
+        // closing the connections underneath them is a use-after-free; leaking is not.
+        //
+        // The databases keep an un-checkpointed WAL, which SQLite replays on the next open. The
+        // process is exiting, so nothing in it observes the difference. PRAGMA optimize is also
+        // skipped, since it lives in sql_close_database().
+        nd_log_daemon(
+            NDLP_WARNING,
+            "SQL: skipping statement finalization and the METADATA/CONTEXT database closes - "
+            "SQLite teardown is not safe on this shutdown path");
+        return;
+    }
+
     sql_close_database(db_context_meta, "CONTEXT");
+    db_context_meta = NULL;
     sql_close_database(db_meta, "METADATA");
+    db_meta = NULL;
     spinlock_unlock(&sqlite_spinlock);
 }
 
@@ -531,6 +799,17 @@ int sqlite_library_init(void)
             NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
     }
     __atomic_store_n(&sqlite_databases_closed, false, __ATOMIC_RELEASE);
+    // Re-arm the LIVENESS latch only. It is about threads that were still running during a
+    // previous shutdown, and those are gone by the time we re-initialize, so carrying it forward
+    // would silently turn every later sqlite_library_shutdown() into a no-op (only the -W
+    // unittest drivers re-initialize the library in one process).
+    __atomic_store_n(&sqlite_teardown_unsafe, false, __ATOMIC_RELEASE);
+
+    // The ZOMBIE flag is deliberately NOT cleared. It records that a connection was closed with
+    // statements still attached, so its real close is deferred - that is a property of the
+    // process, not of a library lifetime. The connection survives re-initialization, and calling
+    // sqlite3_shutdown() with it outstanding is exactly the pcache1 teardown crash this flag
+    // exists to prevent.
     sqlite_library_initialized = true;
     spinlock_unlock(&sqlite_spinlock);
 
@@ -544,6 +823,45 @@ int sqlite_release_memory(int bytes)
 
 void sqlite_library_shutdown(void)
 {
+    // The check lives here rather than at the call sites so that every caller is covered by
+    // construction, and it comes BEFORE the release-memory drain below - that drain mutates
+    // the same global allocator state sqlite3_shutdown() tears down.
+    //
+    // Suppressing the handle close without suppressing this would not fix anything: it would
+    // move the fault out of a Vdbe and into pcache1 one line later in the shutdown sequence.
+
+    // Say WHERE the zombie came from. A suppression traced to a close that happened long before
+    // shutdown is a different problem from one caused by this teardown, and without this the two
+    // are indistinguishable in the log.
+    char zombie_note[160];
+    if (__atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        // The ACQUIRE above pairs with the RELEASE publish in sqlite_note_zombie_connection(),
+        // so these two are guaranteed written by the time we get here.
+        const char *noted_db = __atomic_load_n(&sqlite_zombie_noted_db, __ATOMIC_RELAXED);
+        usec_t noted_ut = __atomic_load_n(&sqlite_zombie_noted_ut, __ATOMIC_RELAXED);
+        snprintfz(
+            zombie_note, sizeof(zombie_note),
+            "a zombie %s connection was noted %llu s ago and cannot be proven closed",
+            noted_db ? noted_db : "sqlite",
+            noted_ut ? (unsigned long long)((now_monotonic_usec() - noted_ut) / USEC_PER_SEC) : 0ULL);
+    }
+    else
+        zombie_note[0] = '\0';
+
+    if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        // Fast path only - the authoritative re-check happens under sqlite_spinlock below,
+        // because a thread can close a handle (creating a zombie) after this point.
+        nd_log_daemon(
+            NDLP_WARNING,
+            "SQL: skipping sqlite3_shutdown() (%s%s%s). The library stays initialized until the "
+            "process exits.",
+            sqlite_teardown_is_unsafe() ? "a SQLite user may still be running" : "",
+            (sqlite_teardown_is_unsafe() && __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE))
+                ? " and " : "",
+            __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE) ? zombie_note : "");
+        return;
+    }
+
 #ifdef NETDATA_INTERNAL_CHECKS
     int bytes;
     do {
@@ -556,6 +874,26 @@ void sqlite_library_shutdown(void)
         spinlock_unlock(&sqlite_spinlock);
         return;
     }
+
+    // Re-check under the lock, and immediately before sqlite3_shutdown(). The check above is
+    // unlocked, so between it and here another thread could have closed a handle with statements
+    // attached, and tearing the library down over a fresh zombie is the crash we are avoiding.
+    //
+    // SCOPE, so this is not read as a stronger guarantee than it is: holding the lock makes this
+    // authoritative against sql_close_thread_db_safe(), which takes this same lock around its
+    // note-and-close. It is NOT authoritative against ml_fini(), whose close runs with no lock
+    // held at all (see sqlite_note_zombie_connection). That is sufficient only because ml_fini()
+    // and this function are strictly ordered on the one shutdown thread - not because the lock
+    // excludes it.
+    if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        spinlock_unlock(&sqlite_spinlock);
+        nd_log_daemon(
+            NDLP_WARNING,
+            "SQL: skipping sqlite3_shutdown() - a SQLite user or a zombie connection appeared while "
+            "we were tearing down. The library stays initialized until the process exits.");
+        return;
+    }
+
     sqlite_library_initialized = false;
     (void) sqlite3_shutdown();
     spinlock_unlock(&sqlite_spinlock);
