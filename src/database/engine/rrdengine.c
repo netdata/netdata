@@ -195,7 +195,7 @@ static inline enum LIBUV_WORKERS_STATUS work_request_full(void) {
     if(dispatched >= (size_t)(dbengine_cfg.libuv_worker_threads))
         return LIBUV_WORKERS_CRITICAL;
 
-    else if(dispatched >= (size_t)(dbengine_cfg.libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS))
+    else if(dispatched >= (size_t)(dbengine_cfg.libuv_worker_threads - dbengine_cfg.reserved_libuv_worker_threads))
         return LIBUV_WORKERS_STRESSED;
 
     return LIBUV_WORKERS_RELAXED;
@@ -224,6 +224,51 @@ static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx
     }
 }
 
+void rrdeng_worker_jobs_register(void) {
+    static __thread bool registered = false;
+    if(likely(registered))
+        return;
+    registered = true;
+
+    libuv_worker_thread_init();
+
+    worker_register_job_name(RRDENG_WORKER_JOB_INIT, "worker init");
+
+    // query related
+    worker_register_job_name(RRDENG_WORKER_JOB_QUERY, "query");
+    worker_register_job_name(RRDENG_WORKER_JOB_EXTENT_CACHE_LOOKUP, "extent cache");
+    worker_register_job_name(RRDENG_WORKER_JOB_EXTENT_MMAP, "extent mmap");
+    worker_register_job_name(RRDENG_WORKER_JOB_EXTENT_DECOMPRESSION, "extent decompression");
+    worker_register_job_name(RRDENG_WORKER_JOB_EXTENT_PAGE_LOOKUP, "page lookup");
+    worker_register_job_name(RRDENG_WORKER_JOB_EXTENT_PAGE_POPULATION, "page populate");
+    worker_register_job_name(RRDENG_WORKER_JOB_EXTENT_PAGE_ALLOCATION, "page allocate");
+
+    // flushing related
+    worker_register_job_name(RRDENG_WORKER_JOB_FLUSH_MAIN_CACHE, "flush main");
+    worker_register_job_name(RRDENG_WORKER_JOB_EXTENT_WRITE, "extent write");
+    worker_register_job_name(RRDENG_WORKER_JOB_FLUSHED_TO_OPEN, "flushed to open");
+
+    // datafile full
+    worker_register_job_name(RRDENG_WORKER_JOB_JOURNAL_INDEX, "jv2 indexing");
+
+    // db rotation related
+    worker_register_job_name(RRDENG_WORKER_JOB_DATAFILE_DELETE_WAIT, "datafile delete wait");
+    worker_register_job_name(RRDENG_WORKER_JOB_DATAFILE_DELETE, "datafile deletion");
+    worker_register_job_name(RRDENG_WORKER_JOB_FIND_ROTATED_METRICS, "find rotated metrics");
+    worker_register_job_name(RRDENG_WORKER_JOB_FIND_REMAINING_RETENTION, "find remaining retention");
+    worker_register_job_name(RRDENG_WORKER_JOB_POPULATE_MRG, "update retention");
+
+    // other
+    worker_register_job_name(RRDENG_WORKER_JOB_EVICT_MAIN_CACHE, "evict main");
+    worker_register_job_name(RRDENG_WORKER_JOB_EVICT_OPEN_CACHE, "evict open");
+    worker_register_job_name(RRDENG_WORKER_JOB_EVICT_EXTENT_CACHE, "evict extent");
+    worker_register_job_name(RRDENG_WORKER_JOB_BUFFERS_CLEANUP, "dbengine buffers cleanup");
+    worker_register_job_name(RRDENG_WORKER_JOB_FLUSH_DIRTY, "dbengine flush dirty");
+    worker_register_job_name(RRDENG_WORKER_JOB_QUIESCE, "dbengine quiesce");
+    worker_register_job_name(RRDENG_WORKER_JOB_SHUTDOWN, "dbengine shutdown");
+    worker_register_job_name(RRDENG_WORKER_JOB_MRG_LOAD, "jv2 mrg load");
+}
+
 static inline void work_done(struct rrdeng_work *work_request) {
     aral_freez(rrdeng_main.work_cmd.ar, work_request);
 }
@@ -231,8 +276,8 @@ static inline void work_done(struct rrdeng_work *work_request) {
 static void work_standard_worker(uv_work_t *req) {
     __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 
-    register_libuv_worker_jobs();
-    worker_is_busy(UV_EVENT_WORKER_INIT);
+    rrdeng_worker_jobs_register();
+    worker_is_busy(RRDENG_WORKER_JOB_INIT);
 
     struct rrdeng_work *work_request = req->data;
 
@@ -247,7 +292,7 @@ static void work_standard_worker(uv_work_t *req) {
             if (cmd.opcode == RRDENG_OPCODE_NOOP)
                 break;
 
-            worker_is_busy(UV_EVENT_WORKER_INIT);
+            worker_is_busy(RRDENG_WORKER_JOB_INIT);
             switch (cmd.opcode) {
                 case RRDENG_OPCODE_EXTENT_READ:
                     worker_dispatch_extent_read(cmd, true);
@@ -676,7 +721,7 @@ static void journalfile_extent_build(struct rrdengine_instance *ctx, struct exte
 static void
 extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr, bool have_error)
 {
-    worker_is_busy(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN);
+    worker_is_busy(RRDENG_WORKER_JOB_FLUSHED_TO_OPEN);
 
     struct page_descr_with_data *descr;
     struct rrdengine_datafile *datafile;
@@ -1135,7 +1180,7 @@ static void *extent_write_tp_worker(
     struct completion *completion __maybe_unused,
     uv_work_t *req __maybe_unused)
 {
-    worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
+    worker_is_busy(RRDENG_WORKER_JOB_EXTENT_WRITE);
     uv_buf_t iov;
     struct page_descr_with_data *base = data;
     struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base, &iov);
@@ -1145,7 +1190,7 @@ static void *extent_write_tp_worker(
 
     int ret = -1;
     for (size_t attempt = 0; attempt < 2 ; attempt++) {
-        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
+        worker_is_busy(RRDENG_WORKER_JOB_EXTENT_WRITE);
         struct rrdengine_datafile *datafile = xt_io_descr->datafile;
 
         ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos);
@@ -1465,7 +1510,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     time_t global_first_time_s = LONG_MAX;
 
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
+        worker_is_busy(RRDENG_WORKER_JOB_FIND_ROTATED_METRICS);
 
     struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
@@ -1590,7 +1635,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     // Update the first time / last time for all metrics we plan to delete
 
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION);
+        worker_is_busy(RRDENG_WORKER_JOB_FIND_REMAINING_RETENTION);
 
     global_first_time_s = find_uuid_first_time(ctx, first_datafile_remaining, uuid_first_entry_list, added);
 
@@ -1603,7 +1648,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     }
 
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
+        worker_is_busy(RRDENG_WORKER_JOB_POPULATE_MRG);
 
     netdata_log_info("DBENGINE: tier %d: updating metrics registry retention for %zu metrics", ctx->config.tier, added);
 
@@ -1706,14 +1751,14 @@ void datafile_delete(
     unsigned fileno = datafile->fileno;
 
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
+        worker_is_busy(RRDENG_WORKER_JOB_DATAFILE_DELETE_WAIT);
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
     size_t attempts = 0;
 
     while (!datafile_got_for_deletion) {
         if(worker)
-            worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
+            worker_is_busy(RRDENG_WORKER_JOB_DATAFILE_DELETE_WAIT);
 
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
@@ -1757,7 +1802,7 @@ void datafile_delete(
                      tier, datafile->tier, fileno, disk_time ? "disk quota" : "time retention");
 
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
+        worker_is_busy(RRDENG_WORKER_JOB_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
     size_t deleted_bytes, journal_file_bytes, datafile_bytes;
@@ -1863,7 +1908,7 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_inst
 }
 
 static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_DBENGINE_QUIESCE);
+    worker_is_busy(RRDENG_WORKER_JOB_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
     for(size_t i = 0; i < pgc_max_flushers() ; i++)
@@ -1877,7 +1922,7 @@ static void after_flush_dirty_pages_of_section(struct rrdengine_instance *ctx __
 }
 
 static void *flush_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_DBENGINE_FLUSH_DIRTY);
+    worker_is_busy(RRDENG_WORKER_JOB_FLUSH_DIRTY);
     pgc_flush_dirty_pages(main_cache, (Word_t)ctx);
 
     for(size_t i = 0; i < pgc_max_flushers() ; i++)
@@ -1909,7 +1954,7 @@ static void *tier_mrg_load(
     struct completion *completion __maybe_unused,
     uv_work_t *req __maybe_unused)
 {
-    worker_is_busy(UV_EVENT_DBENGINE_MRG_LOAD);
+    worker_is_busy(RRDENG_WORKER_JOB_MRG_LOAD);
     struct mrg_load_thread *mlt = data;
     journalfile_v2_populate_retention_to_mrg_worker(mlt);
     mlt->datafile->populate_mrg.populated = true;
@@ -1934,7 +1979,7 @@ static void *populate_mrg_tp_worker(
     struct completion *completion __maybe_unused,
     uv_work_t *uv_work_req __maybe_unused)
 {
-    worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
+    worker_is_busy(RRDENG_WORKER_JOB_POPULATE_MRG);
 
     struct mrg_load_thread *mlt = data;
     int tier = ctx->config.tier;
@@ -2031,7 +2076,7 @@ static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_DBENGINE_SHUTDOWN);
+    worker_is_busy(RRDENG_WORKER_JOB_SHUTDOWN);
 
     bool logged = false;
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED) ||
@@ -2053,7 +2098,7 @@ static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     if (!main_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE);
+    worker_is_busy(RRDENG_WORKER_JOB_FLUSH_MAIN_CACHE);
     while (pgc_flush_pages(main_cache))
         yield_the_processor();
 
@@ -2064,7 +2109,7 @@ static void *cache_evict_main_tp_worker(struct rrdengine_instance *ctx __maybe_u
     if (!main_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_DBENGINE_EVICT_MAIN_CACHE);
+    worker_is_busy(RRDENG_WORKER_JOB_EVICT_MAIN_CACHE);
     while (pgc_evict_pages(main_cache, 0, 0))
         yield_the_processor();
 
@@ -2075,7 +2120,7 @@ static void *cache_evict_open_tp_worker(struct rrdengine_instance *ctx __maybe_u
     if (!open_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_DBENGINE_EVICT_OPEN_CACHE);
+    worker_is_busy(RRDENG_WORKER_JOB_EVICT_OPEN_CACHE);
     while (pgc_evict_pages(open_cache, 0, 0))
         yield_the_processor();
 
@@ -2086,7 +2131,7 @@ static void *cache_evict_extent_tp_worker(struct rrdengine_instance *ctx __maybe
     if (!extent_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE);
+    worker_is_busy(RRDENG_WORKER_JOB_EVICT_EXTENT_CACHE);
     while (pgc_evict_pages(extent_cache, 0, 0))
         yield_the_processor();
 
@@ -2217,7 +2262,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
     if (unlikely(!ctx_is_available_for_queries(ctx)))
         return data;
 
-    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
+    worker_is_busy(RRDENG_WORKER_JOB_JOURNAL_INDEX);
     struct rrdengine_datafile *datafile = NULL;
 
     bool index_once = false;
@@ -2346,7 +2391,7 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 }
 
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
+    worker_is_busy(RRDENG_WORKER_JOB_BUFFERS_CLEANUP);
 
     wal_cleanup1();
     extent_buffer_cleanup1();

@@ -3,47 +3,20 @@
 #ifndef NETDATA_EVENT_LOOP_H
 #define NETDATA_EVENT_LOOP_H
 
+// job ids are indices into per-thread worker utilization tables that every user of the libuv threadpool
+// shares; the storage engine owns the first block, the daemon's own jobs follow it
+#ifdef ENABLE_DBENGINE
+#include "database/engine/dbengine-workers.h"
+#define UV_EVENT_JOB_FIRST RRDENG_WORKER_JOB_MAX
+#else
+#define UV_EVENT_JOB_FIRST 1
+#endif
+
 enum event_loop_job {
     UV_EVENT_JOB_NONE = 0,
 
-    // generic
-    UV_EVENT_WORKER_INIT,
-
-    // query related
-    UV_EVENT_DBENGINE_QUERY,
-    UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP,
-    UV_EVENT_DBENGINE_EXTENT_MMAP,
-    UV_EVENT_DBENGINE_EXTENT_DECOMPRESSION,
-    UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP,
-    UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION,
-    UV_EVENT_DBENGINE_EXTENT_PAGE_ALLOCATION,
     // Metrics calculation
-    UV_EVENT_WEIGHTS_CALCULATION,
-
-    // flushing related
-    UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE,
-    UV_EVENT_DBENGINE_EXTENT_WRITE,
-    UV_EVENT_DBENGINE_FLUSHED_TO_OPEN,
-
-    // datafile full
-    UV_EVENT_DBENGINE_JOURNAL_INDEX,
-
-    // db rotation related
-    UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT,
-    UV_EVENT_DBENGINE_DATAFILE_DELETE,
-    UV_EVENT_DBENGINE_FIND_ROTATED_METRICS, // find the metrics that are rotated
-    UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION, // find their remaining retention
-    UV_EVENT_DBENGINE_POPULATE_MRG, // update mrg
-
-    // other dbengine events
-    UV_EVENT_DBENGINE_EVICT_MAIN_CACHE,
-    UV_EVENT_DBENGINE_EVICT_OPEN_CACHE,
-    UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE,
-    UV_EVENT_DBENGINE_BUFFERS_CLEANUP,
-    UV_EVENT_DBENGINE_FLUSH_DIRTY,
-    UV_EVENT_DBENGINE_QUIESCE,
-    UV_EVENT_DBENGINE_MRG_LOAD,
-    UV_EVENT_DBENGINE_SHUTDOWN,
+    UV_EVENT_WEIGHTS_CALCULATION = UV_EVENT_JOB_FIRST,
 
     // metadata
     UV_EVENT_HOST_CONTEXT_LOAD,

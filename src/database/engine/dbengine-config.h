@@ -33,7 +33,8 @@ struct dbengine_config {
     // runtime
     time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1
     int libuv_worker_threads;                   // size of the libuv thread pool the engine dispatches work into;
-                                                // 0 = the daemon's minimum pool
+                                                // 0 = DBENGINE_CONFIG_DEFAULT_WORKER_THREADS
+    int reserved_libuv_worker_threads;          // pool threads the engine must leave free for the embedder's own work
 
     // services the embedder may provide; NULL = not provided
     void (*on_db_rotation)(void);               // a tier deleted its oldest datafile: retention just shrank
@@ -45,6 +46,13 @@ struct dbengine_config {
 };
 
 #define DEFAULT_PAGES_PER_EXTENT (109)
+
+// the smallest libuv pool the engine assumes when the embedder does not say
+#if defined(ENV32BIT)
+#define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (8)
+#else
+#define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (16)
+#endif
 
 #if defined(ENV32BIT)
 #define DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB (16)
@@ -68,6 +76,7 @@ struct dbengine_config {
     .journal_v2_unmount_time_s = 120,                           \
     .default_update_every_s = 1,                                \
     .libuv_worker_threads = 0,                                  \
+    .reserved_libuv_worker_threads = 0,                         \
     .on_db_rotation = NULL,                                     \
     .preload_metrics = NULL,                                    \
 }
