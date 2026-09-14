@@ -372,9 +372,10 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
   NOT be committed.
 - Never `git checkout <file>`, `git reset`, delete files, or rewrite history without explicit user approval. Undo a
   change by editing it out, not by checking the file out.
-- Commit and push only when the user asks or explicitly approves those operations in the plan. Approval to implement
-  a fixed goal is not implicit approval of Git operations subsequently added to the plan. Checkpoint commits and
-  squashing under "Review" remain subject to these authorization rules.
+- Local commits: authorization to implement includes local commits unless the user asks to leave changes uncommitted.
+  Commit coherent, validated implementation before its independent review, and completed, validated review fixes as
+  follow-up commits. Keep unfinished or unvalidated work uncommitted.
+- Pushes, squashing and other history rewrites still require explicit user authorization.
 - Commit messages and PR bodies describe the change. A PR body links the follow-up issues tracked from its SOW.
 
 ### Local SOW Parking
@@ -438,8 +439,8 @@ Review findings are leads until verified against the relevant design or shipped 
   state, covered scope and interactions, findings and their dispositions (or no findings), and remaining limitations.
   When relying on earlier review, explain why its coverage remains valid for the final state. Preserve relevant
   validation evidence alongside the review; for work without a SOW, include the review summary in the final report.
-- Checkpoint commits MAY be useful when authorized under "Git And PR Workflow"; a review round neither requires nor
-  authorizes a commit, push or history rewrite.
+- Review checkpoints follow "Git And PR Workflow". Focused review MAY compare commits; it does not require uncommitted
+  changes. Choose review scope from the changed behavior and remaining uncertainty, not the working tree's status.
 - Follow-up review: after a fix, retain earlier evidence that still holds. Check a bounded fix and its affected
   interactions directly or with a focused reviewer. Widen review when changed assumptions, shared behavior, contracts
   or missing coverage invalidate the earlier assessment beyond that fix. A blocker label or new commit alone does
@@ -624,8 +625,8 @@ docs, code, and tests, not in specs.
 - Documentation work arising from answer-only questions requires separate authorization. Documentation capture
   records observed behavior; it does not authorize additional implementation or new product contracts.
 - Local notes are private evidence, not shared project contracts or automatic follow-up commitments. Accepted
-  deferred work follows Followup Discipline. Commit, push, and publication requirements never grant authorization
-  to perform those actions.
+  deferred work follows Followup Discipline. Git authorization follows "Git And PR Workflow"; these capture
+  requirements do not authorize implementation or publication.
 - Developer skills that give capture instructions MUST point to this section for timing and authorization.
 - Public/operator skills MUST carry a self-contained operator-facing version because they can be used outside this
   checkout.
