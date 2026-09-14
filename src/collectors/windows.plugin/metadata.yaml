@@ -2783,8 +2783,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: contentions
-        - name: CLR Memory processes
-          description: "These metrics refer to NET CLR Memory instances."
+        - name: .NET Framework CLR Memory processes
+          description: "These metrics refer to .NET Framework CLR Memory instances."
           labels:
             - name: process
               description: The process name.
