@@ -1945,6 +1945,7 @@ if(ENABLE_DBENGINE)
             src/database/engine/dbengine-config.c
             src/database/engine/dbengine-config.h
             src/database/engine/dbengine-workers.h
+            src/database/engine/dbengine-stats.h
     )
 endif()
 
