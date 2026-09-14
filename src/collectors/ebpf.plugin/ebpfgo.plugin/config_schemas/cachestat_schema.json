@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Cachestat eBPF Collector",
+  "properties": {
+    "enabled": {"type": "boolean", "default": true},
+    "update_every": {"type": "integer", "default": 1, "minimum": 1},
+    "apps": {"type": "boolean", "default": false},
+    "cgroups": {"type": "boolean", "default": false},
+    "per_core_stats": {"type": "boolean", "default": false},
+    "kernel_debugfs": {"type": "string", "default": "/sys/kernel/debug"}
+  }
+}

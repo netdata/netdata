@@ -1,0 +1,33 @@
+version: v1
+context_namespace: fd
+groups:
+  - family: fd
+    metrics:
+      - open
+      - close
+      - open_error
+    charts:
+      - id: fd_open
+        title: File descriptor open calls
+        context: disk.fd_open
+        units: "ops/s"
+        type: area
+        dimensions:
+          - selector: open
+            name: open
+      - id: fd_close
+        title: File descriptor close calls
+        context: disk.fd_close
+        units: "ops/s"
+        type: area
+        dimensions:
+          - selector: close
+            name: close
+      - id: fd_open_error
+        title: File descriptor open errors
+        context: disk.fd_open_error
+        units: "ops/s"
+        type: area
+        dimensions:
+          - selector: open_error
+            name: errors

@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "FD eBPF Collector",
+  "properties": {
+    "enabled": {"type": "boolean", "default": true},
+    "update_every": {"type": "integer", "default": 1, "minimum": 1},
+    "apps": {"type": "boolean", "default": false},
+    "cgroups": {"type": "boolean", "default": false}
+  }
+}

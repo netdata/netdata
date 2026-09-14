@@ -1,0 +1,36 @@
+version: v1
+context_namespace: dcstat
+groups:
+  - family: dcstat
+    metrics:
+      - ratio
+      - getpage_vect
+      - getpage_nonvect
+      - cache_insertion
+    charts:
+      - id: dcstat_ratio
+        title: Directory cache ratio
+        context: disk.dcstat_ratio
+        units: "%"
+        type: area
+        dimensions:
+          - selector: ratio
+            name: ratio
+      - id: dcstat_getpage
+        title: Dcstat getpage calls
+        context: disk.dcstat_getpage
+        units: "ops/s"
+        type: area
+        dimensions:
+          - selector: getpage_vect
+            name: vect
+          - selector: getpage_nonvect
+            name: nonvect
+      - id: dcstat_cache_insertion
+        title: Dcstat cache insertions
+        context: disk.dcstat_cache_insertion
+        units: "ops/s"
+        type: area
+        dimensions:
+          - selector: cache_insertion
+            name: insertions
