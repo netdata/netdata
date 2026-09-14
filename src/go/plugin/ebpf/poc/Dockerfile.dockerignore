@@ -1,0 +1,8 @@
+**
+!src
+!src/go
+!src/go/**
+!src/collectors
+!src/collectors/ebpf.plugin
+!src/collectors/ebpf.plugin/ebpfgo.plugin
+!src/collectors/ebpf.plugin/ebpfgo.plugin/**

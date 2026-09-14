@@ -2,6 +2,11 @@ module github.com/netdata/netdata/go/plugins
 
 go 1.27.0
 
+// The experimental eBPF executable reuses the existing native backend in this checkout.
+replace github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin => ../collectors/ebpf.plugin/ebpfgo.plugin
+
+require github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin v0.0.0
+
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e

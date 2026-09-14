@@ -60,11 +60,11 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
     the legacy kprobe path is compiled.
   - `.github/workflows/go-tests.yml` states outright that it leaves `NETDATA_*_HAS_SKELETON` absent, so the
     libbpf-tagged CI job exercises the **legacy path only** — generating skeletons needs a BPF toolchain CI
-    does not have. The CMake packaging build, by contrast, passes `-I <build>/ebpf-co-re`. So CO-RE-only code
-    reaches release builds having never been compiled by the Go job.
+    does not have. Inspect the CMake include flags and the archive layout before assuming a packaged build
+    enables CO-RE: the bundle pinned by `packaging/cmake/Modules/NetdataEBPFCORE.cmake` stores skeletons in `includes/`.
   - Legacy path (what CI runs):
     `CGO_CFLAGS="-I<repo>/externaldeps/libbpf/include" go test -tags netdata_ebpf_libbpf -race -count=1 ./...`
-  - CO-RE path: add `-I<repo>/build/ebpf-co-re` to `CGO_CFLAGS` and repeat. Confirm the path actually
+  - CO-RE path: add `-I<repo>/build/ebpf-co-re/includes` to `CGO_CFLAGS` for that bundle and repeat. Confirm the path actually
     switched rather than silently repeating the legacy build — `__has_include("dc.skel.h")` must be true, or
     `gcc -E` must show the CO-RE-only call sites surviving preprocessing.
   - Failure mode this catches: a runtime field declared inside the CO-RE guard but referenced outside it.

@@ -3425,6 +3425,53 @@ if(ENABLE_PLUGIN_EBPF)
                 PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE SETUID
                 COMPONENT plugin-ebpf
                 DESTINATION usr/libexec/netdata/plugins.d)
+
+        if(NOT BUILD_FOR_PACKAGING AND NOT STATIC_BUILD)
+            # Source-install POC only; exclude native packages and static installers.
+            file(GLOB_RECURSE EBPF_POC_PLUGIN_FILES CONFIGURE_DEPENDS
+                    "${CMAKE_SOURCE_DIR}/src/go/*.go"
+                    "${CMAKE_SOURCE_DIR}/src/go/plugin/ebpf/*.yaml"
+                    "${CMAKE_SOURCE_DIR}/src/go/plugin/ebpf/*.json"
+                    "${CMAKE_SOURCE_DIR}/src/go/plugin/framework/*.json"
+                    "${CMAKE_SOURCE_DIR}/src/go/plugin/agent/*.json")
+            list(APPEND EBPF_POC_PLUGIN_FILES ${EBPF_GO_PLUGIN_FILES})
+
+            # The CO-RE release archive stores skeleton headers under includes/.
+            set(EBPF_POC_CGO_CFLAGS "${EBPF_GO_CGO_CFLAGS} -I${ebpf-co-re_SOURCE_DIR}/includes")
+            add_custom_command(
+                    OUTPUT "${CMAKE_BINARY_DIR}/ebpf-poc.plugin"
+                    COMMAND "${CMAKE_COMMAND}" -E env
+                            GOROOT=${GO_ROOT}
+                            CGO_ENABLED=1
+                            CGO_CFLAGS=${EBPF_POC_CGO_CFLAGS}
+                            CGO_LDFLAGS=${EBPF_GO_CGO_LDFLAGS}
+                            GOPROXY=https://proxy.golang.org,direct
+                            "${GO_EXECUTABLE}" build -buildvcs=false
+                            -ldflags "${GO_LDFLAGS}"
+                            -tags netdata_ebpf_libbpf
+                            -o "${CMAKE_BINARY_DIR}/ebpf-poc.plugin"
+                            "./cmd/ebpfpocplugin"
+                    DEPENDS ${EBPF_POC_PLUGIN_FILES}
+                    COMMENT "Building experimental eBPF shared-framework plugin ebpf-poc.plugin"
+                    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/go"
+                    VERBATIM)
+
+            add_custom_target(ebpf-poc-plugin ALL
+                    DEPENDS "${CMAKE_BINARY_DIR}/ebpf-poc.plugin")
+            add_dependencies(ebpf-poc-plugin libbpf ebpf-co-re)
+
+            install(FILES "${CMAKE_BINARY_DIR}/ebpf-poc.plugin"
+                    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE SETUID
+                    COMPONENT plugin-ebpf-poc
+                    DESTINATION usr/libexec/netdata/plugins.d)
+            install(FILES src/go/plugin/ebpf/config/ebpf-poc.conf
+                    COMPONENT plugin-ebpf-poc
+                    DESTINATION usr/lib/netdata/conf.d)
+            install(DIRECTORY src/go/plugin/ebpf/config/ebpf-poc
+                    COMPONENT plugin-ebpf-poc
+                    DESTINATION usr/lib/netdata/conf.d
+                    FILES_MATCHING PATTERN "*.conf")
+        endif()
     endif()
 
     install(FILES
