@@ -22,8 +22,5 @@ agentevents_load_env
 
 ## Live how-to rule
 
-If you investigate a question that isn't covered by the
-existing per-domain guides or these recipes AND your work
-involved non-trivial analysis, AUTHOR a how-to under
-`../how-tos/<slug>.md` and add a row to `../how-tos/INDEX.md`.
-See SKILL.md for the rule.
+Capture timing and authorization follow `AGENTS.md#knowledge-capture`. Additional authorized how-tos belong under
+`../how-tos/` and are listed in `../how-tos/INDEX.md`.

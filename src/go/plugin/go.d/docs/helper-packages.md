@@ -38,6 +38,7 @@ already owns the behavior.
 | Profile-catalog loading (YAML profiles, stock/user dirs) | `src/go/plugin/go.d/pkg/profilecatalog` |
 | Ping probing | `src/go/plugin/go.d/pkg/pinger` |
 | SNMP utilities | `src/go/plugin/go.d/pkg/snmputils` |
+| SNMP device identity and profile metadata | `src/go/plugin/go.d/collector/snmp/ddsnmp` |
 | Kubernetes client helpers | `src/go/plugin/go.d/pkg/k8sclient` |
 | Docker host helpers | `src/go/plugin/go.d/pkg/dockerhost` |
 | Test helpers for collectors | `src/go/plugin/go.d/pkg/collecttest` |
@@ -342,6 +343,41 @@ Create the resolver at the composition root and inject the same pointer into its
 MUST NOT close, sweep, or replace it during per-job lifecycle. Keep collector-specific address eligibility, candidate
 selection, display precedence, and audit mapping in collector-owned adapters rather than adding those policies to the
 generic package.
+
+## SNMP Device Identity
+
+Use `ddsnmp.AcquireDeviceIdentity` in `src/go/plugin/go.d/collector/snmp/ddsnmp` to obtain a device's GUID,
+hostname, and labels independently of an SNMP metrics job. The result does not publish a vnode or register a device.
+
+The caller composes the existing acquisition steps:
+
+1. Obtain system information with `snmputils.GetSysInfo` using a connected `gosnmp.Handler`.
+2. Resolve profiles with `ddsnmp.Catalog.Resolve`. Choose the appropriate profile projection and no-profile policy
+   for the consumer; those decisions do not belong to identity assembly.
+3. Construct `ddsnmpcollector.New` with the selected profiles, system object ID, client, and logger, or reuse the
+   caller's existing engine. Pass it to `AcquireDeviceIdentity` together with the system information and options.
+   A nil metadata source obtains identity from system information alone.
+
+`ddsnmpcollector` is a library engine. Construction creates its metric and metadata helpers, but does not start a
+metrics job or background work. Identity acquisition calls only `CollectDeviceMetadata`, once per invocation. It
+returns acquisition errors unchanged and does not return a partial identity on error. The caller owns connection
+lifetime, timeout/retry settings, attempt diagnostics, and any subsequent refresh or publication. Engine state is
+mutable; the caller must serialize its use.
+
+Identity defaults preserve the SNMP collector's existing behavior:
+
+- GUID is the SHA1 UUID in the DNS namespace derived from the raw configured address, unless overridden. Address
+  normalization, DNS resolution, port, credentials, and descriptive metadata do not participate in that calculation.
+- Hostname uses the configured override, then system name, then `snmp-device`.
+- System labels include the SNMP vnode marker, address, and system information. Policy defaults supplied through
+  `BaseLabels` precede system labels. Profile metadata fills empty labels or replaces them on an exact match;
+  configured `Labels` override all previous values, including with empty values.
+- Input maps and system information remain unchanged; the returned labels belong to the caller.
+
+The SNMP metrics collector keeps its availability timeout calculation and device publication locally. It passes its
+existing engine so acquisition retains missing-OID and diagnostic state. Initial identity acquisition does not seed
+the engine's metric preparation cache: the first metrics collection still reads metadata again. Keep that behavior
+when extracting or changing callers unless a separate change explicitly revises the request/cache contract.
 
 ## Legacy V1 Helpers
 

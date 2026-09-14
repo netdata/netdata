@@ -8,7 +8,9 @@ correlation rule wiring, without exposing Cloud tokens, agent bearers, node ids,
 machine GUIDs, claim ids, cookies, or raw endpoint rows?
 
 This is a producer-contract validation recipe. It belongs to the developer
-topology skill, not to the public/operator query skills.
+topology skill, not to the public/operator query skills. Use it when the task requests live producer verification.
+For code review or an existing offline payload, inspect the affected contracts and saved evidence without loading
+credentials or contacting an Agent merely because this recipe is linked (`AGENTS.md#skill-selection`).
 
 ## Inputs
 
@@ -61,7 +63,12 @@ topology skill, not to the public/operator query skills.
    FUNCTION_NAME="topology:network-connections"
    FUNCTION_ENCODED="$(printf '%s' "$FUNCTION_NAME" | jq -sRr @uri)"
    REQUEST_BODY='{"selections":{"group_by":["process_name"],"__topology_mode":["aggregated"],"sockets":["inbound","outbound","listening"],"protocols":["ipv4_tcp","ipv6_tcp","ipv4_udp","ipv6_udp"],"endpoints":["by_ip"]}}'
-   OUT="$(agents_audit_dir)/network-connections-aggregated-live.json"
+   umask 077
+   CAPTURE_DIR="$(mktemp -d "$(agents_audit_dir)/network-connections.XXXXXX")" || {
+     echo "could not create a private capture directory" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   OUT="$CAPTURE_DIR/network-connections-aggregated-live.json"
 
    agents_query_agent \
      --node "$NODE_UUID" \

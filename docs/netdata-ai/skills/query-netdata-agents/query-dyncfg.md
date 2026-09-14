@@ -32,7 +32,7 @@ agents_load_env
 # List all configuration objects.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET '/api/v3/config?action=tree&path=/'
 
@@ -40,7 +40,7 @@ agents_query_agent \
 ID='health:alert:prototype:ram_usage'
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET "/api/v3/config?action=schema&id=$(printf %s "$ID" | jq -sRr @uri)"
 
@@ -48,7 +48,7 @@ agents_query_agent \
 TPL='go.d:nginx'; JOB='local_server'
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     POST "/api/v3/config?action=add&id=$(printf %s "$TPL" | jq -sRr @uri)&name=$JOB" \
     '{"url":"http://127.0.0.1/stub_status","update_every":5}'

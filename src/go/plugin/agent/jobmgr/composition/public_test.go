@@ -21,88 +21,88 @@ import (
 
 func TestProductionProcessRejectsInvalidInitialVnodes(t *testing.T) {
 	tests := map[string]struct {
-		vnodes map[string]*vnodes.VirtualNode
+		vnodes map[string]*vnodes.Config
 	}{
-		"nil vnode": {vnodes: map[string]*vnodes.VirtualNode{"missing": nil}},
+		"nil vnode": {vnodes: map[string]*vnodes.Config{"missing": nil}},
 		"source type with separator": {
-			vnodes: map[string]*vnodes.VirtualNode{
-				"node": {
+			vnodes: map[string]*vnodes.Config{
+				"node": {VirtualNode: vnodes.VirtualNode{
 					Name:       "node",
 					Hostname:   "node",
 					GUID:       "11111111-1111-1111-1111-111111111111",
 					SourceType: "user type",
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
+				}},
 			},
 		},
 		"hostname unsafe for host emission": {
-			vnodes: map[string]*vnodes.VirtualNode{
-				"node": {
+			vnodes: map[string]*vnodes.Config{
+				"node": {VirtualNode: vnodes.VirtualNode{
 					Name:       "node",
 					Hostname:   "operator's-node",
 					GUID:       "11111111-1111-1111-1111-111111111111",
 					SourceType: confgroup.TypeUser,
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
+				}},
 			},
 		},
 		"unsupported GUID spelling": {
-			vnodes: map[string]*vnodes.VirtualNode{
-				"node": {
+			vnodes: map[string]*vnodes.Config{
+				"node": {VirtualNode: vnodes.VirtualNode{
 					Name:       "node",
 					Hostname:   "node",
 					GUID:       "urn:uuid:11111111-1111-1111-1111-111111111111",
 					SourceType: confgroup.TypeUser,
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
+				}},
 			},
 		},
 		"semantically duplicate GUID": {
-			vnodes: map[string]*vnodes.VirtualNode{
-				"first": {
+			vnodes: map[string]*vnodes.Config{
+				"first": {VirtualNode: vnodes.VirtualNode{
 					Name:       "first",
 					Hostname:   "first",
 					GUID:       "11111111-1111-1111-1111-111111111111",
 					SourceType: confgroup.TypeUser,
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
-				"second": {
+				}},
+				"second": {VirtualNode: vnodes.VirtualNode{
 					Name:       "second",
 					Hostname:   "second",
 					GUID:       "11111111111111111111111111111111",
 					SourceType: confgroup.TypeUser,
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
+				}},
 			},
 		},
 		"host label with trailing escape": {
-			vnodes: map[string]*vnodes.VirtualNode{
-				"node": {
+			vnodes: map[string]*vnodes.Config{
+				"node": {VirtualNode: vnodes.VirtualNode{
 					Name:       "node",
 					Hostname:   "node",
 					GUID:       "11111111-1111-1111-1111-111111111111",
 					Labels:     map[string]string{"site": `value\`},
 					SourceType: confgroup.TypeUser,
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
+				}},
 			},
 		},
 		"hostnames collide after host emission preparation": {
-			vnodes: map[string]*vnodes.VirtualNode{
-				"first": {
+			vnodes: map[string]*vnodes.Config{
+				"first": {VirtualNode: vnodes.VirtualNode{
 					Name:       "first",
 					Hostname:   "host",
 					GUID:       "11111111-1111-1111-1111-111111111111",
 					SourceType: confgroup.TypeUser,
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
-				"second": {
+				}},
+				"second": {VirtualNode: vnodes.VirtualNode{
 					Name:       "second",
 					Hostname:   " host ",
 					GUID:       "22222222-2222-2222-2222-222222222222",
 					SourceType: confgroup.TypeUser,
 					Source:     "file=/etc/netdata/vnodes.conf",
-				},
+				}},
 			},
 		},
 	}
@@ -127,7 +127,7 @@ func TestProductionProcessAcceptsIndividuallyValidatedVNodeLoad(t *testing.T) {
   guid: 22222222-2222-2222-2222-222222222222
 `), 0o644))
 
-	initial := vnodes.Load(dir)
+	initial := vnodes.Load(dir, false)
 	require.Len(t, initial, 1)
 	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
 	config.InitialVnodes = initial
@@ -138,14 +138,14 @@ func TestProductionProcessAcceptsIndividuallyValidatedVNodeLoad(t *testing.T) {
 
 func TestProductionProcessAcceptsCompactInitialVNodeGUID(t *testing.T) {
 	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
-	config.InitialVnodes = map[string]*vnodes.VirtualNode{
-		"node": {
+	config.InitialVnodes = map[string]*vnodes.Config{
+		"node": {VirtualNode: vnodes.VirtualNode{
 			Name:       "node",
 			Hostname:   "node",
 			GUID:       "11111111111111111111111111111111",
 			SourceType: confgroup.TypeUser,
 			Source:     "file=/etc/netdata/vnodes.conf",
-		},
+		}},
 	}
 
 	_, err := NewProcess(config)
@@ -154,14 +154,14 @@ func TestProductionProcessAcceptsCompactInitialVNodeGUID(t *testing.T) {
 
 func TestProductionProcessAcceptsWindowsInitialVNodeSource(t *testing.T) {
 	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
-	config.InitialVnodes = map[string]*vnodes.VirtualNode{
-		"node": {
+	config.InitialVnodes = map[string]*vnodes.Config{
+		"node": {VirtualNode: vnodes.VirtualNode{
 			Name:       "node",
 			Hostname:   "node",
 			GUID:       "11111111-1111-1111-1111-111111111111",
 			SourceType: confgroup.TypeUser,
 			Source:     `file=C:\Program Files\Netdata\vnodes.conf`,
-		},
+		}},
 	}
 
 	_, err := NewProcess(config)

@@ -35,10 +35,11 @@ Standard Cloud Function-call endpoint:
 `POST /api/v2/nodes/{nodeId}/function?function=flows:netflow`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "mode":     "flows",
   "view":     "table-sankey",
@@ -49,12 +50,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "top_n":    100
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=flows:netflow" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=flows:netflow" \
+  "$PAYLOAD"
 ```
 
 ### Modes
@@ -146,10 +146,11 @@ totals) suitable for map rendering.
 ### Example 1: top-100 talker pairs by bytes, last hour
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "mode":     "flows",
   "view":     "table-sankey",
@@ -160,19 +161,18 @@ read -r -d '' PAYLOAD <<'EOF'
   "top_n":    100
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=flows:netflow" \
-  -d "$PAYLOAD" \
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=flows:netflow" \
+  "$PAYLOAD" \
   | jq '.data.flows[:5]'
 ```
 
 ### Example 2: breakdown of TCP traffic by AS name, with histogram
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "mode":       "flows",
   "view":       "timeseries",
@@ -184,12 +184,13 @@ read -r -d '' PAYLOAD <<'EOF'
   "top_n":      25
 }
 EOF
+)"
 ```
 
 ### Example 3: country-map of egress bytes
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "mode":     "flows",
   "view":     "country-map",
@@ -200,18 +201,20 @@ read -r -d '' PAYLOAD <<'EOF'
   "top_n":    500
 }
 EOF
+)"
 ```
 
 ### Example 4: autocomplete for a destination IP filter
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "mode":  "autocomplete",
   "field": "DST_ADDR",
   "term":  "10.0.0."
 }
 EOF
+)"
 ```
 
 For CIDR autocomplete, loose address and prefix-length fragments are accepted.
@@ -250,15 +253,14 @@ canonical values in `selections`:
 ### Example 5: discover the live parameter set first
 
 ```bash
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 { "info": true }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/function?function=flows:netflow" \
-  -d "$PAYLOAD" \
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/function?function=flows:netflow" \
+  "$PAYLOAD" \
   | jq '{accepted_params, required_params}'
 ```
 

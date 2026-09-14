@@ -95,7 +95,10 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if err := emitHostSelection(api, env); err != nil {
 		return err
 	}
-	visitor := emissionDefinitionVisitor{api: api, env: env}
+	visitor := emissionDefinitionVisitor{
+		api: api,
+		env: env,
+	}
 	visitCreatePhase(visitor, normalized)
 	visitLabelUpdatePhase(visitor, normalized.updateLabels)
 	emitUpdatePhase(api, env, normalized.updateCharts)
@@ -132,16 +135,7 @@ func emitHostSelection(api *netdataapi.API, env EmitEnv) error {
 	if sanitizeWireID(guid) != guid {
 		return fmt.Errorf("chartemit: emit env host scope guid contains unsupported characters")
 	}
-	if env.HostScope.Define != nil {
-		define, err := PrepareHostInfo(*env.HostScope.Define)
-		if err != nil {
-			return err
-		}
-		if define.GUID != guid {
-			return fmt.Errorf("chartemit: host define guid %q does not match host scope guid %q", env.HostScope.Define.GUID, env.HostScope.GUID)
-		}
-		api.HOSTINFO(define)
-	}
+
 	api.HOST(guid)
 	return nil
 }

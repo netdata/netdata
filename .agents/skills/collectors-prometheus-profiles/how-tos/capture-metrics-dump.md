@@ -7,13 +7,17 @@ surface.
 
 ## Capture
 
-For a local unprotected endpoint:
+For an authorized capture from a local unprotected endpoint:
 
 ```bash
-DUMP="$(git rev-parse --show-toplevel)/.local/audits/prometheus-profiles/APP-$(date -u +%Y%m%dT%H%M%SZ).prom"
-mkdir -p "$(dirname "$DUMP")"
+set -e
+CAPTURE_PARENT="$(git rev-parse --show-toplevel)/.local/audits/prometheus-profiles"
+mkdir -p "$CAPTURE_PARENT"
+CAPTURE_DIR="$(mktemp -d "$CAPTURE_PARENT/capture.XXXXXX")"
+DUMP="$CAPTURE_DIR/metrics.prom"
+(umask 077; : > "$DUMP")
 curl -fsS "http://127.0.0.1:PORT/metrics" -o "$DUMP"
-echo "$DUMP"   # keep this path; the checks below read it
+echo "$DUMP"   # use this path only after curl succeeds; a failed capture may leave partial data
 ```
 
 For an authenticated endpoint, use the operator's existing secret-safe curl or

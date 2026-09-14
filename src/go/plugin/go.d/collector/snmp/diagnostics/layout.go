@@ -5,6 +5,7 @@ package diagnostics
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -37,7 +38,12 @@ func checkpointFilename(sequence uint64) string { return fmt.Sprintf("checkpoint
 // ListCheckpoints reads filenames only. Evidence is decoded when selected, not
 // during rotation; temporary files and unrelated entries never enter retention.
 func ListCheckpoints(directory string) ([]CheckpointFile, error) {
-	files, err := os.ReadDir(filepath.Join(directory, TopologyDirectory))
+	return ListCheckpointsFS(os.DirFS(directory))
+}
+
+// ListCheckpointsFS lists completed checkpoint filenames in a diagnostic filesystem.
+func ListCheckpointsFS(root fs.FS) ([]CheckpointFile, error) {
+	files, err := fs.ReadDir(root, TopologyDirectory)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

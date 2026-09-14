@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/docker/go-units"
@@ -48,6 +47,7 @@ type archiveOpener func(io.Reader, snmpdiag.ReadLimits) (openedArchive, error)
 
 type commandOptions struct {
 	inputPath         string
+	lifecycle         bool
 	normal            bool
 	previousRun       bool
 	checkpoint        uint64
@@ -95,45 +95,34 @@ func runWithOpener(arguments []string, stdout, stderr io.Writer, openArchive arc
 		return 2
 	}
 
+	if err := validateSelection(operation, options); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	input, err := openInput(options.inputPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: open input: %v\n", err)
+		return 1
+	}
+	defer input.Close()
 	if operation == "list" {
-		if options.normal || options.previousRun || options.registrationID != 0 {
-			fmt.Fprintln(stderr, "error: list does not support --normal, --previous-run, or --registration-id")
+		if input.root == nil {
+			fmt.Fprintln(stderr, "error: list requires a diagnostics directory or support bundle")
 			return 1
 		}
-		info, err := os.Stat(options.inputPath)
-		if err != nil || !info.IsDir() || options.checkpoint != 0 {
-			fmt.Fprintln(stderr, "error: list requires a directory and does not select a checkpoint")
-			return 1
-		}
-		entries, err := snmpdiag.ListCheckpoints(options.inputPath)
-		if err != nil {
-			fmt.Fprintf(stderr, "error: list checkpoints: %v\n", err)
-			return 1
-		}
-		normal, err := snmpdiag.ListNormalFiles(options.inputPath)
-		if err != nil {
-			fmt.Fprintf(stderr, "error: list normal devices: %v\n", err)
-			return 1
-		}
-		listing := struct {
-			Topology []snmpdiag.CheckpointFile `json:"topology_checkpoints"`
-			Normal   []snmpdiag.NormalFile     `json:"normal_devices"`
-		}{entries, normal}
-		if err := jsonv2.MarshalWrite(stdout, listing, outputJSONOptions); err != nil {
+		if err := jsonv2.MarshalWrite(stdout, input.list(), outputJSONOptions); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
-		fmt.Fprintln(stdout)
+		if _, err := fmt.Fprintln(stdout); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
 		return 0
 	}
-	path, err := resolveCommandInput(options)
+	file, err := input.selectDocument(options)
 	if err != nil {
 		fmt.Fprintf(stderr, "error: select input: %v\n", err)
-		return 1
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Fprintf(stderr, "error: open archive: %v\n", err)
 		return 1
 	}
 	defer file.Close()
@@ -172,22 +161,23 @@ func parseCommandOptions(operation string, arguments []string, stderr io.Writer)
 		operationUsage(stderr, operation)
 		flags.PrintDefaults()
 	}
-	flags.StringVar(&options.inputPath, "input", "", "new-format diagnostic file or directory (latest topology checkpoint)")
-	flags.BoolVar(&options.normal, "normal", false, "select normal device evidence from a directory")
+	flags.StringVar(&options.inputPath, "input", "", "diagnostic file/directory, extracted support-bundle root, or .tar.zst/.tar.gz/.zip bundle")
+	flags.BoolVar(&options.lifecycle, "lifecycle", false, "select lifecycle evidence from a directory or bundle")
+	flags.BoolVar(&options.normal, "normal", false, "select normal device evidence from a directory or bundle")
 	flags.BoolVar(&options.previousRun, "previous-run", false, "select the previous evidence-bearing normal run")
 	flags.Uint64Var(&options.registrationID, "registration-id", 0, "device registration ID")
-	flags.Uint64Var(&options.checkpoint, "checkpoint", 0, "checkpoint sequence to select from a directory")
+	flags.Uint64Var(&options.checkpoint, "checkpoint", 0, "checkpoint sequence to select from a directory or bundle")
 	flags.StringVar(
 		&options.maxCompressedSize,
 		"max-compressed-size",
 		options.maxCompressedSize,
-		"maximum compressed archive size",
+		"maximum compressed size of the selected diagnostic document (not the bundle)",
 	)
 	flags.StringVar(
 		&options.maxDecodedSize,
 		"max-decoded-size",
 		options.maxDecodedSize,
-		"maximum decoded archive size",
+		"maximum decoded JSON size of the selected diagnostic document (not the bundle)",
 	)
 	if operation == "replay" || operation == "inspect-device" || operation == "inspect-link" {
 		addQueryFlags(flags, &options.query)
@@ -358,31 +348,18 @@ func openDiagnosticArchive(r io.Reader, limits snmpdiag.ReadLimits) (openedArchi
 	return openedArchive{topology: archive}, err
 }
 
-func resolveInput(input string, sequence uint64) (string, error) {
-	info, err := os.Stat(input)
-	if err != nil {
-		return "", err
+func validateSelection(operation string, options commandOptions) error {
+	if operation == "list" && (options.normal || options.previousRun || options.registrationID != 0 || options.lifecycle || options.checkpoint != 0) {
+		return errors.New("list does not support evidence selectors")
 	}
-	if !info.IsDir() {
-		if sequence != 0 {
-			return "", errors.New("--checkpoint requires a directory")
-		}
-		return input, nil
+	if options.previousRun && !options.normal {
+		return errors.New("--previous-run requires --normal")
 	}
-	entries, err := snmpdiag.ListCheckpoints(input)
-	if err != nil {
-		return "", err
+	if options.lifecycle && (options.normal || options.checkpoint != 0) {
+		return errors.New("--lifecycle cannot be combined with --normal or --checkpoint")
 	}
-	if len(entries) == 0 {
-		return "", errors.New("directory has no topology checkpoints; select lifecycle.zst for lifecycle inspection")
+	if options.normal && (options.registrationID == 0 || options.checkpoint != 0) {
+		return errors.New("--normal requires --registration-id and cannot select a topology checkpoint")
 	}
-	if sequence == 0 {
-		sequence = entries[len(entries)-1].Sequence
-	}
-	for _, entry := range entries {
-		if entry.Sequence == sequence {
-			return filepath.Join(input, snmpdiag.TopologyDirectory, entry.Filename), nil
-		}
-	}
-	return "", fmt.Errorf("checkpoint %d is not retained", sequence)
+	return nil
 }

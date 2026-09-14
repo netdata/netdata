@@ -3,7 +3,7 @@
 #
 # Sources query-netdata-agents/scripts/_lib.sh and adds
 # agentevents_* helpers. Token-safe: bearers and the cloud
-# token never appear on the assistant-visible stdout.
+# token are masked in request logs; event response bodies remain private evidence.
 #
 # Usage:
 #   source "$(git rev-parse --show-toplevel)/.agents/skills/triage-agent-events/scripts/_lib.sh"
@@ -60,7 +60,7 @@ agentevents_namespace() {
 #
 # VIA is "cloud" or "agent". PAYLOAD is the systemd-journal
 # Function POST body (JSON string).
-# stdout: response body (JSON). No tokens leak.
+# stdout: response body (JSON), forwarded without content redaction.
 
 agentevents_query_function() {
     local via="$1"
@@ -92,17 +92,18 @@ agentevents_query_function() {
 # ---------------------------------------------------------------
 # Default version-filter computation.
 #
-# agentevents_compute_default_versions VIA SINCE_RELATIVE_SECONDS
+# agentevents_compute_default_versions VIA AFTER BEFORE
 #
 # Queries the journal for the AE_AGENT_VERSION facet and picks:
-#   - the latest stable (matches ^v\d+\.\d+\.\d+$, sorted desc)
-#   - up to 3 latest nightlies (matches ^v\d+\.\d+\.\d+-\d+-nightly$, sorted desc by commit count)
+#   - the highest observed stable numeric release tuple
+#   - up to 3 observed nightlies, ordered by numeric release tuple then count
 #
 # Outputs a JSON array of version strings to stdout.
 
 agentevents_compute_default_versions() {
     local via="${1:-cloud}"
-    local since_secs="${2:-86400}"
+    local after="${2:--86400}"
+    local before="${3:-0}"
 
     local namespace
     namespace="$(agentevents_namespace)"
@@ -110,10 +111,11 @@ agentevents_compute_default_versions() {
     local payload
     payload=$(jq -nc \
         --arg ns "$namespace" \
-        --argjson after "-${since_secs}" \
+        --argjson after "$after" \
+        --argjson before "$before" \
         '{
             "after": $after,
-            "before": 0,
+            "before": $before,
             "last": 1,
             "__logs_sources": $ns,
             "facets": ["AE_AGENT_VERSION"]
@@ -130,9 +132,10 @@ agentevents_compute_default_versions() {
         ([.facets[]? | select(.id=="AE_AGENT_VERSION") | .options[]?.id] // [])
         as $all
         | (
-            ($all | map(select(test("^v\\d+\\.\\d+\\.\\d+$"))) | sort | reverse | .[0:1])
+            ($all | map(select(test("^v\\d+\\.\\d+\\.\\d+$"))) | sort_by(ltrimstr("v") | split(".") | map(tonumber)) | reverse | .[0:1])
             + ($all | map(select(test("^v\\d+\\.\\d+\\.\\d+-\\d+-nightly$")))
-                    | sort_by(. | capture("-(?<n>\\d+)-nightly").n | tonumber)
+                    | sort_by(capture("^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-(?<n>\\d+)-nightly$")
+                              | [.major, .minor, .patch, .n] | map(tonumber))
                     | reverse | .[0:3])
         )'
 }
@@ -140,35 +143,43 @@ agentevents_compute_default_versions() {
 # ---------------------------------------------------------------
 # No-token-leak self-test.
 
-agentevents_selftest_no_token_leak() {
-    # Drive the public wrappers with sentinel values; assert no
-    # sentinel ever appears on captured stdout.
+agentevents_selftest_no_token_leak() (
+    # Subshell preserves caller functions/settings. No .env, cache, or live transport.
     local sentinel="deadbeef-1234-5678-9abc-def012345678"
-
-    # Set sentinels in the environment that COULD leak if a
-    # wrapper logged its inputs.
-    local saved_token="${NETDATA_CLOUD_TOKEN:-}"
-    local saved_node="${AGENT_EVENTS_NODE_ID:-}"
-
+    local test_bearer="11111111-2222-3333-4444-555555555555"
+    local via out
     NETDATA_CLOUD_TOKEN="$sentinel"
-    AGENT_EVENTS_NODE_ID="$sentinel"
-    export NETDATA_CLOUD_TOKEN AGENT_EVENTS_NODE_ID
+    NETDATA_CLOUD_HOSTNAME=cloud.example.com
+    AGENT_EVENTS_HOSTNAME=agent.example.com
+    AGENT_EVENTS_NODE_ID=22222222-3333-4444-5555-666666666666
+    AGENT_EVENTS_MACHINE_GUID=33333333-4444-5555-6666-777777777777
+    AGENTS_DRY_RUN=0
 
-    # Run a no-op-ish payload through the helpers; capture stdout.
-    local out
-    out="$( {
-        agentevents_query_function cloud '{"info":true}' 2>/dev/null || true
-    } )"
+    _agents_resolve_bearer() { _agents_set_outvar "$1" "$test_bearer"; }
+    curl() {
+        local arg
+        for arg in "$@"; do
+            case "$arg" in
+                https://cloud.example.com/api/v2/nodes/*/function?function=systemd-journal)
+                    printf '%s' '{"fixture":"cloud"}'; return 0 ;;
+                http://agent.example.com:19999/host/*/api/v3/function?function=systemd-journal)
+                    printf '%s' '{"fixture":"agent"}'; return 0 ;;
+            esac
+        done
+        return 97
+    }
 
-    # Restore.
-    NETDATA_CLOUD_TOKEN="$saved_token"
-    AGENT_EVENTS_NODE_ID="$saved_node"
-
-    if printf '%s' "$out" | grep -q "$sentinel"; then
-        echo "FAIL: sentinel $sentinel appeared on captured stdout" >&2
-        return 1
-    fi
-
-    echo "PASS: agentevents_selftest_no_token_leak"
-    return 0
-}
+    for via in cloud agent; do
+        if out="$(agentevents_query_function "$via" '{"info":true}' 2>&1)"; then
+            if [[ "$out" == *"$sentinel"* || "$out" == *"$test_bearer"* ||
+                  "$out" != *"\"fixture\":\"$via\""* ]]; then
+                printf 'FAIL: %s dispatch output or masking check\n' "$via" >&2
+                return 1
+            fi
+        else
+            printf 'FAIL: %s dispatch did not complete\n' "$via" >&2
+            return 1
+        fi
+    done
+    printf '%s\n' 'PASS: agentevents_selftest_no_token_leak'
+)

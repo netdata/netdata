@@ -5,6 +5,8 @@ package jobruntime
 import (
 	"errors"
 	"io"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 )
 
 type outputPoisoner interface {
@@ -14,9 +16,26 @@ type outputPoisoner interface {
 // OutputStateTransaction is the in-memory half of one output frame. Commit is
 // called only after the complete frame is written; Abort settles every other
 // path.
-type OutputStateTransaction interface {
-	Commit() error
-	Abort() error
+type OutputStateTransaction = hostoutput.Transaction
+
+type outputBuilder interface {
+	CommitBuiltJobOutput(func() ([]byte, error), OutputStateTransaction) error
+}
+
+func commitHostOutput(
+	writer io.Writer,
+	request hostoutput.Request,
+	state OutputStateTransaction,
+) (*hostoutput.Publication, error) {
+	publication := hostoutput.Prepare(request, state)
+	if writer, ok := writer.(outputBuilder); ok {
+		return publication, writer.CommitBuiltJobOutput(publication.Build, publication)
+	}
+	payload, err := publication.Build()
+	if err != nil {
+		return publication, errors.Join(err, publication.Abort())
+	}
+	return publication, commitJobOutputTransaction(writer, payload, publication)
 }
 
 type outputTransaction interface {

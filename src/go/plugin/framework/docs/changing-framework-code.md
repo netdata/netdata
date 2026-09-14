@@ -17,7 +17,7 @@ This guide applies when changing or extending any of these areas:
 - `src/go/plugin/framework/chartemit`
 - `src/go/plugin/framework/functions`
 - `src/go/plugin/framework/vnodes`
-- `src/go/plugin/framework/vnoderegistry`
+- `src/go/plugin/framework/hostoutput`
 - `src/go/plugin/framework/dyncfg`
 - `src/go/plugin/framework/confgroup`
 - `src/go/plugin/framework/runtimecomp`
@@ -305,7 +305,7 @@ Examples:
 - Runtime wiring and dyncfg lifecycle:
   - `go test -race -count=1 ./plugin/agent/jobmgr/...`
   - REQUIRED when changing `collectorapi`, `jobruntime`, `dyncfg`,
-    `confgroup`, `vnoderegistry`, or runtime wiring behavior.
+    `confgroup`, `hostoutput`, or runtime wiring behavior.
   - Representative files include `manager_v2_test.go`, `job_factory_test.go`,
     `sim_test.go`, `dyncfg_collector_test.go`, and `dyncfg_vnode_test.go`.
 - Function/topology payloads:

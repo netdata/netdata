@@ -24,47 +24,21 @@
       },
       "create_vnode": {
         "title": "Create",
-        "description": "If set, the collector will create a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes) for this SNMP device, which will appear as a separate Node in Netdata.",
+        "description": "Create a Virtual Node for this SNMP device when no named vnode reference is set. A named reference takes precedence, including when this option is true.",
         "type": "boolean",
         "default": true
       },
       "vnode_device_down_threshold": {
         "title": "Device Down Threshold",
-        "description": "Number of consecutive failed data collections before marking the device as down.",
+        "description": "Number of consecutive failed data collections before marking a collector-generated vnode as down. Named vnodes use their own stale_after setting.",
         "type": "integer",
         "minimum": 1,
         "default": 3
       },
       "vnode": {
         "title": "Virtual node",
-        "description": "Identity of the Virtual Node created for this device when `create_vnode` is enabled.",
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "guid": {
-            "title": "GUID",
-            "description": "A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.",
-            "type": "string"
-          },
-          "hostname": {
-            "title": "Hostname",
-            "description": "The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.",
-            "type": "string"
-          },
-          "labels": {
-            "title": "Labels",
-            "description": "Additional key-value pairs to associate with the Virtual Node.",
-            "type": [
-              "object",
-              "null"
-            ],
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        }
+        "description": "Name of a centrally configured Virtual Node to attach this job to. Takes precedence over local vnode creation.",
+        "type": "string"
       },
       "options": {
         "title": "Options",
@@ -273,6 +247,37 @@
             "default": 0.1
           }
         }
+      },
+      "local_vnode": {
+        "title": "Local virtual node",
+        "description": "Configuration for the Virtual Node created by this job when create_vnode is enabled and no named vnode reference is set.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "guid": {
+            "title": "GUID",
+            "description": "A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address.",
+            "type": "string"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "description": "The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used.",
+            "type": "string"
+          },
+          "labels": {
+            "title": "Labels",
+            "description": "Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
       }
     },
     "required": [
@@ -360,11 +365,12 @@
           ]
         },
         {
-          "title": "Vnode",
+          "title": "Virtual node",
           "fields": [
+            "vnode",
             "create_vnode",
-            "vnode_device_down_threshold",
-            "vnode"
+            "local_vnode",
+            "vnode_device_down_threshold"
           ]
         },
         {
@@ -380,6 +386,13 @@
           ]
         }
       ]
+    },
+    "vnode": {
+      "ui:placeholder": "office-router",
+      "ui:help": "Define the vnode in the Vnodes configuration first. This reference supplies host identity and labels; the job keeps its own SNMP connection settings."
+    },
+    "local_vnode": {
+      "ui:help": "Use these fields for a vnode created by this job. Legacy vnode objects remain accepted and appear here when opened in the form."
     }
   }
 }

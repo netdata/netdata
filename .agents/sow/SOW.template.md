@@ -16,7 +16,7 @@ One value only: `planning`, `ready`, `in-progress`, `paused`, or `completed`.
 `planning` means analysis or decisions are incomplete. `ready` means the
 Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
 Before Non-Trivial Work") applies, the user has approved the goal and plan.
-`completed` means work is validated and durable memory transferred. SOW files
+`completed` means work is validated and required memory transfer under `AGENTS.md#sow-lifecycle` is complete. SOW files
 are local-only working memory under `.agents/sow/q/` (gitignored) and are never
 committed.
 
@@ -94,10 +94,12 @@ Affected contracts and surfaces:
 Clean-end-state target:
 
 - <The structure the codebase should have once the approved scope is fully delivered.>
-- Removed as redundant (i): <code/config/docs/tests this change makes redundant.>
-- Excluded coupled items (ii): <coupled items NOT part of this clean end state, each with reason + scope source.>
-- Reference search (when a path/contract is replaced): <command(s) run + result; every surviving reference mapped to
-  (i)/(ii), or the target is incomplete.>
+- Removed or migrated (i): <redundant code/config/docs/tests and replacement where applicable.>
+- Intentionally retained (ii): <valid retained items and references, with rationale; not unfinished migration work.>
+- Deferred or excluded (iii): <coupled items omitted from delivery, each with reason, scope source, required user
+  approval, and follow-up tracking under AGENTS.md#followup-discipline.>
+- Reference search (when a path/contract is replaced): <command(s) run + result; every relevant hit mapped to
+  (i)/(ii)/(iii), and unrelated matches explained, or the target is incomplete.>
 
 Existing patterns to reuse:
 
@@ -184,8 +186,9 @@ Acceptance criteria evidence:
 
 Clean-end-state evidence:
 
-- <Delivered state vs the recorded target: (i) removed as redundant, (ii) excluded coupled items, and the recorded
-  reference search where a path or contract was replaced; or a link to the user approval for a non-clean state.>
+- <Delivered state vs the recorded target: (i) removed/migrated, (ii) intentionally retained, (iii) deferred/excluded,
+  and the recorded reference search where a path or contract was replaced; include required user approval for any
+  non-clean state.>
 
 Deferred clean-end-state remainder:
 
@@ -194,7 +197,9 @@ Deferred clean-end-state remainder:
 
 Tests or equivalent validation:
 
-- <command/output summary>
+- <command/output summary; for reviewer-reported bugs, the failing regression test or the reason automation is
+  impractical plus observable reproduction evidence; record the post-fix passing result or non-reproduction evidence
+  from rerunning the same test/reproducer, and explicitly state any remaining validation gap.>
 
 Real-use evidence:
 
@@ -202,7 +207,8 @@ Real-use evidence:
 
 Reviewer findings:
 
-- <reviewer; each finding and how it was handled: verified and fixed, rejected with evidence, or tracked>
+- <reviewer; scope and reviewed checkpoint commit or working-tree state; each finding and how it was handled:
+  verified and fixed, rejected with evidence, or tracked; note Git operations not performed because unauthorized.>
 
 Same-failure scan:
 
@@ -225,9 +231,10 @@ Sensitive data gate:
 - Specs: <updated .agents/sow/specs/ path or evidence-backed reason no update was needed>
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>
-- SOW lifecycle: <durable knowledge transferred to skills/docs/code/tests; follow-ups moved to GitHub issues or
-  rejected; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never committed;
-  regression-as-new-SOW handling recorded>
+- SOW lifecycle: <deliverable knowledge transferred to skills/docs/code/tests under AGENTS.md#sow-lifecycle; other
+  discoveries captured under AGENTS.md#knowledge-capture; follow-ups implemented, rejected, or tracked under
+  AGENTS.md#followup-discipline; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never
+  committed; regression-as-new-SOW handling recorded>
 - Workflow friction triaged: <each `Workflow Friction & Rule Gaps` entry resolved to a rule update (file + change), an
   evidence-backed rejection, or a tracked follow-up; "no workflow friction arose" if the section is empty>
 
@@ -237,7 +244,9 @@ Lessons:
 
 Follow-up mapping:
 
-- <implemented/rejected/GitHub issue link>
+- <implemented/rejected/GitHub issue link; for eligible independent personal work, the parked SOW path and explicit
+  user acceptance of private tracking under AGENTS.md#followup-discipline. Local discovery notes alone are not
+  accepted deferrals.>
 
 ## Outcome <!-- sow:optional -->
 

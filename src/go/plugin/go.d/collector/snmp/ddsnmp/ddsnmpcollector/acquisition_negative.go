@@ -9,6 +9,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // AcquisitionNegativeCause explains a permanent missing-OID entry without
@@ -27,7 +28,7 @@ type negativeEvidence struct {
 
 // Only production suppression reads establish eligibility. Dynamic instance
 // GETs bypass this map, so their churn cannot grow retained diagnostic history.
-func isMissingOID(client gosnmp.Handler, missing map[string]bool, oid string) bool {
+func isMissingOID(client snmputils.ScalarClient, missing map[string]bool, oid string) bool {
 	if observer, ok := client.(*diagnosticClient); ok && observer.negative != nil && observer.SourceRecorder() != nil {
 		if observer.negative.eligible == nil {
 			observer.negative.eligible = make(map[string]bool)

@@ -52,19 +52,19 @@ func TestSelectDCStatKallsymsPrefixFromReader(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := selectDCStatKallsymsPrefixFromReader(tc.prefix, strings.NewReader(tc.kallsyms))
+			got, err := selectKallsymsPrefix(tc.prefix, strings.NewReader(tc.kallsyms))
 			if err != nil {
-				t.Fatalf("selectDCStatKallsymsPrefixFromReader: %v", err)
+				t.Fatalf("selectKallsymsPrefix: %v", err)
 			}
 			if got != tc.want {
-				t.Fatalf("selectDCStatKallsymsPrefixFromReader() = %q, want %q", got, tc.want)
+				t.Fatalf("selectKallsymsPrefix() = %q, want %q", got, tc.want)
 			}
 		})
 	}
 }
 
 func TestSelectDCStatKallsymsPrefixRejectsEmptyPrefix(t *testing.T) {
-	if _, err := selectDCStatKallsymsPrefixFromReader("", strings.NewReader("")); err == nil {
+	if _, err := selectKallsymsPrefix("", strings.NewReader("")); err == nil {
 		t.Fatal("expected an error for an empty prefix")
 	}
 }

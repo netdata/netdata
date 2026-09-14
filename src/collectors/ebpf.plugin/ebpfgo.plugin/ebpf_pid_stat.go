@@ -48,6 +48,9 @@ type netdataPublishFDStat struct {
 	CloseCall uint32
 	OpenErr   uint32
 	CloseErr  uint32
+	// UpdateEverySec belongs in the row rather than the segment header because
+	// another module may own publishing while fd collects on a different cadence.
+	UpdateEverySec uint32
 }
 
 type ebpfProcessStat struct {

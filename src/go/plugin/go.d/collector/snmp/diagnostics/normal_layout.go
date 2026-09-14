@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -42,7 +44,12 @@ func parseNormalFilename(name string) (registration uint64, ok bool) {
 }
 
 func ReadNormalRuns(directory string) (NormalRuns, error) {
-	file, err := os.Open(filepath.Join(directory, NormalDirectory, normalRunsFilename))
+	return ReadNormalRunsFS(os.DirFS(directory))
+}
+
+// ReadNormalRunsFS reads the committed run identities from a diagnostic filesystem.
+func ReadNormalRunsFS(root fs.FS) (NormalRuns, error) {
+	file, err := root.Open(path.Join(NormalDirectory, normalRunsFilename))
 	if errors.Is(err, os.ErrNotExist) {
 		return NormalRuns{}, nil
 	}
@@ -72,7 +79,12 @@ func validNormalRun(id string) bool {
 // ListNormalFiles reads only the committed run index and filenames. Temporary
 // or unactivated files never become previous-run evidence by accident.
 func ListNormalFiles(directory string) ([]NormalFile, error) {
-	runs, err := ReadNormalRuns(directory)
+	return ListNormalFilesFS(os.DirFS(directory))
+}
+
+// ListNormalFilesFS lists completed device files from committed runs only.
+func ListNormalFilesFS(root fs.FS) ([]NormalFile, error) {
+	runs, err := ReadNormalRunsFS(root)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +93,7 @@ func ListNormalFiles(directory string) ([]NormalFile, error) {
 		if run == "" {
 			continue
 		}
-		files, err := os.ReadDir(filepath.Join(directory, NormalDirectory, run))
+		files, err := fs.ReadDir(root, path.Join(NormalDirectory, run))
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}

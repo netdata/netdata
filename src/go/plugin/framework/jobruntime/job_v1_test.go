@@ -156,7 +156,9 @@ func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
 	job.autoDetectEvery = 1
 	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
-			return retryableTestError{error: errors.New("init error")}
+			return retryableTestError{
+				error: errors.New("init error"),
+			}
 		},
 	}
 	job.module = m
@@ -173,7 +175,9 @@ func TestJob_AutoDetection_ForeignRetryableFailInitDisablesRetry(t *testing.T) {
 	job.autoDetectEvery = 1
 	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
-			return foreignRetryableTestError{error: errors.New("init error")}
+			return foreignRetryableTestError{
+				error: errors.New("init error"),
+			}
 		},
 	}
 	job.module = m
@@ -419,8 +423,12 @@ func TestJobSteadyStateCollectorPanicIsSanitizedBeforeLogging(t *testing.T) {
 		},
 	}
 	job := NewJob(JobConfig{
-		PluginName: pluginName, Name: jobName, ModuleName: modName,
-		FullName: modName + "_" + jobName, Module: mod, Out: io.Discard,
+		PluginName: pluginName,
+		Name:       jobName,
+		ModuleName: modName,
+		FullName:   modName + "_" + jobName,
+		Module:     mod,
+		Out:        io.Discard,
 		LifecycleErrorSanitizer: func(error) error {
 			return errors.New("sanitized collector failure")
 		},
@@ -442,14 +450,20 @@ func TestJobPostCheckFailureIsSanitizedBeforeEveryLog(t *testing.T) {
 		ChartsFunc: func() *collectorapi.Charts {
 			return &collectorapi.Charts{
 				&collectorapi.Chart{
-					ID: marker + " invalid", Title: "title", Units: "units",
+					ID:    marker + " invalid",
+					Title: "title",
+					Units: "units",
 				},
 			}
 		},
 	}
 	job := NewJob(JobConfig{
-		PluginName: pluginName, Name: jobName, ModuleName: modName,
-		FullName: modName + "_" + jobName, Module: mod, Out: io.Discard,
+		PluginName: pluginName,
+		Name:       jobName,
+		ModuleName: modName,
+		FullName:   modName + "_" + jobName,
+		Module:     mod,
+		Out:        io.Discard,
 		LifecycleErrorSanitizer: func(error) error {
 			return errors.New("sanitized chart failure")
 		},
@@ -469,8 +483,12 @@ func TestJob_OutputFailureDoesNotReportCollectorPanic(t *testing.T) {
 		ChartsFunc: func() *collectorapi.Charts {
 			return &collectorapi.Charts{
 				&collectorapi.Chart{
-					ID: "id", Title: "title", Units: "units",
-					Dims: collectorapi.Dims{&collectorapi.Dim{ID: "value"}},
+					ID:    "id",
+					Title: "title",
+					Units: "units",
+					Dims: collectorapi.Dims{&collectorapi.Dim{
+						ID: "value",
+					}},
 				},
 			}
 		},
@@ -479,8 +497,11 @@ func TestJob_OutputFailureDoesNotReportCollectorPanic(t *testing.T) {
 		},
 	}
 	job := NewJob(JobConfig{
-		PluginName: pluginName, Name: jobName, ModuleName: modName,
-		FullName: modName + "_" + jobName, Module: mod,
+		PluginName: pluginName,
+		Name:       jobName,
+		ModuleName: modName,
+		FullName:   modName + "_" + jobName,
+		Module:     mod,
 		Out: writeFunc(func([]byte) (int, error) {
 			return 0, errors.New("write failed")
 		}),
@@ -500,23 +521,38 @@ func TestJob_Tick(t *testing.T) {
 	}
 }
 
-func TestJob_PullVnodeUpdateDuringCollectAppliesBeforeSameCycleEmission(t *testing.T) {
+func TestJob_PullVnodeUpdateDuringCollectRetainsTargetUntilNextCycle(t *testing.T) {
 	var out bytes.Buffer
 	current := newSnapshotHolder(VnodeSnapshot{
-		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-one", GUID: "node-guid"},
+		Vnode: &vnodes.VirtualNode{
+			Name:     "db",
+			Hostname: "host-one",
+			GUID:     "node-guid",
+		},
 		Revision:         1,
 		MetadataRevision: 1,
 	})
 	collectStarted := make(chan struct{})
 	collectRelease := make(chan struct{})
+	firstCollect := true
 
 	mod := &collectorapi.MockCollectorV1{
 		ChartsFunc: func() *collectorapi.Charts {
-			return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+			return &collectorapi.Charts{
+				&collectorapi.Chart{
+					ID:    "id",
+					Title: "t",
+					Units: "u",
+					Dims:  collectorapi.Dims{{ID: "d1"}},
+				},
+			}
 		},
 		CollectFunc: func(context.Context) map[string]int64 {
-			close(collectStarted)
-			<-collectRelease
+			if firstCollect {
+				firstCollect = false
+				close(collectStarted)
+				<-collectRelease
+			}
 			return map[string]int64{"d1": 1}
 		},
 	}
@@ -542,27 +578,48 @@ func TestJob_PullVnodeUpdateDuringCollectAppliesBeforeSameCycleEmission(t *testi
 	}()
 	<-collectStarted
 	current.set(VnodeSnapshot{
-		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-two", GUID: "node-guid"},
+		Vnode: &vnodes.VirtualNode{
+			Name:     "db",
+			Hostname: "host-two",
+			GUID:     "next-guid",
+		},
 		Revision:         2,
 		MetadataRevision: 2,
 	})
 	close(collectRelease)
 	<-done
 
-	assert.Contains(t, out.String(), "HOST_DEFINE 'node-guid' 'host-two'")
-	assert.NotContains(t, out.String(), "HOST_DEFINE 'node-guid' 'host-one'")
+	assert.Contains(t, out.String(), "HOST_DEFINE 'node-guid' 'host-one'")
+	assert.NotContains(t, out.String(), "next-guid")
+
+	out.Reset()
+	job.runOnce()
+	assert.Contains(t, out.String(), "HOST_DEFINE 'next-guid' 'host-two'")
+	assert.NotContains(t, out.String(), "node-guid")
 }
 
 func TestJob_PullSourceOnlyUpdateDoesNotResendHostInfo(t *testing.T) {
 	var out bytes.Buffer
 	current := newSnapshotHolder(VnodeSnapshot{
-		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-one", GUID: "node-guid", SourceType: "user"},
+		Vnode: &vnodes.VirtualNode{
+			Name:       "db",
+			Hostname:   "host-one",
+			GUID:       "node-guid",
+			SourceType: "user",
+		},
 		Revision:         1,
 		MetadataRevision: 1,
 	})
 	mod := &collectorapi.MockCollectorV1{
 		ChartsFunc: func() *collectorapi.Charts {
-			return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+			return &collectorapi.Charts{
+				&collectorapi.Chart{
+					ID:    "id",
+					Title: "t",
+					Units: "u",
+					Dims:  collectorapi.Dims{{ID: "d1"}},
+				},
+			}
 		},
 		CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"d1": 1} },
 	}
@@ -584,7 +641,12 @@ func TestJob_PullSourceOnlyUpdateDoesNotResendHostInfo(t *testing.T) {
 
 	out.Reset()
 	current.set(VnodeSnapshot{
-		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-one", GUID: "node-guid", SourceType: "dyncfg"},
+		Vnode: &vnodes.VirtualNode{
+			Name:       "db",
+			Hostname:   "host-one",
+			GUID:       "node-guid",
+			SourceType: "dyncfg",
+		},
 		Revision:         2,
 		MetadataRevision: 1,
 	})
@@ -598,25 +660,44 @@ func TestJob_ModuleOwnedVnodeDoesNotOverrideConfiguredJobVnode(t *testing.T) {
 	mod := &v1ModuleOwnedVnodeCollector{
 		MockCollectorV1: collectorapi.MockCollectorV1{
 			ChartsFunc: func() *collectorapi.Charts {
-				return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+				return &collectorapi.Charts{
+					&collectorapi.Chart{
+						ID:    "id",
+						Title: "t",
+						Units: "u",
+						Dims:  collectorapi.Dims{{ID: "d1"}},
+					},
+				}
 			},
 			CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"d1": 1} },
 		},
-		vnode: &vnodes.VirtualNode{Name: "module", Hostname: "module-host", GUID: "module-guid"},
+		vnode: &vnodes.VirtualNode{
+			Name:     "module",
+			Hostname: "module-host",
+			GUID:     "module-guid",
+		},
 	}
 	current := newSnapshotHolder(VnodeSnapshot{
-		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "pulled-host", GUID: "pulled-guid"},
+		Vnode: &vnodes.VirtualNode{
+			Name:     "db",
+			Hostname: "pulled-host",
+			GUID:     "pulled-guid",
+		},
 		Revision:         2,
 		MetadataRevision: 2,
 	})
 	job := NewJob(JobConfig{
-		PluginName:            pluginName,
-		Name:                  jobName,
-		ModuleName:            modName,
-		FullName:              modName + "_" + jobName,
-		Module:                mod,
-		Out:                   &out,
-		Vnode:                 vnodes.VirtualNode{Name: "db", Hostname: "job-host", GUID: "job-guid"},
+		PluginName: pluginName,
+		Name:       jobName,
+		ModuleName: modName,
+		FullName:   modName + "_" + jobName,
+		Module:     mod,
+		Out:        &out,
+		Vnode: vnodes.VirtualNode{
+			Name:     "db",
+			Hostname: "job-host",
+			GUID:     "job-guid",
+		},
 		VnodeName:             "db",
 		VnodeRevision:         1,
 		VnodeMetadataRevision: 1,
@@ -626,9 +707,9 @@ func TestJob_ModuleOwnedVnodeDoesNotOverrideConfiguredJobVnode(t *testing.T) {
 
 	job.runOnce()
 
-	assert.Contains(t, out.String(), "HOST_DEFINE 'job-guid' 'job-host'")
+	assert.Contains(t, out.String(), "HOST_DEFINE 'pulled-guid' 'pulled-host'")
 	assert.NotContains(t, out.String(), "module-host")
-	assert.NotContains(t, out.String(), "pulled-host")
+	assert.NotContains(t, out.String(), "job-host")
 }
 
 type v1ModuleOwnedVnodeCollector struct {
@@ -646,7 +727,9 @@ type vnodeSnapshotHolder struct {
 }
 
 func newSnapshotHolder(snapshot VnodeSnapshot) *vnodeSnapshotHolder {
-	return &vnodeSnapshotHolder{current: snapshot.Copy()}
+	return &vnodeSnapshotHolder{
+		current: snapshot.Copy(),
+	}
 }
 
 func (h *vnodeSnapshotHolder) set(snapshot VnodeSnapshot) {

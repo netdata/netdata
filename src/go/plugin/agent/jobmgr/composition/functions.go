@@ -27,6 +27,7 @@ func NewContainedFunctionAssembly(
 	ctx context.Context,
 	epoch uint64,
 	attempts jobmgr.ProcessAttemptAuthority,
+	diagnostics jobmgr.DiagnosticObserver,
 	modules collectorapi.Registry,
 	frames *lifecycle.FrameOwner,
 	initial ...functionadapter.InitialRoute,
@@ -38,6 +39,7 @@ func NewContainedFunctionAssembly(
 		ctx,
 		epoch,
 		attempts,
+		diagnostics,
 		modules,
 		initial...,
 	)
@@ -139,11 +141,11 @@ func (fa *FunctionAssembly) BeforeFunctionCatalogClose(_ context.Context, genera
 
 // FinalizeRun terminalizes controller-owned Function state after the kernel has
 // drained the catalog and every job handle.
-func (fa *FunctionAssembly) FinalizeRun(_ context.Context, generation uint64) error {
+func (fa *FunctionAssembly) FinalizeRun(ctx context.Context, generation uint64) error {
 	if fa == nil {
 		return nil
 	}
-	return fa.controller.Stop(generation)
+	return fa.controller.Stop(ctx, generation)
 }
 
 type functionJobLifecycle struct {

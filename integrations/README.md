@@ -24,7 +24,9 @@ maintainers in `.agents/skills/integrations-lifecycle/`; this file is the local-
 
 Validation is what a source change needs before its PR; regeneration of the tracked pages is optional and its output is
 never committed (see "What to commit"). Run from the repository root. The producers (first two lines) matter only when
-their inputs or generators changed.
+their inputs or generators changed; run that producer chain and its validation in an isolated source copy containing
+current modified and new inputs, as described below. With current producer outputs, catalog validation alone writes
+only the ignored catalogs in the checkout.
 
 ```bash
 python3 integrations/gen_npm_catalog.py                       # SNMP profiles -> npm-catalog/metadata.yaml
@@ -33,13 +35,14 @@ python3 integrations/gen_integrations.py                      # validation: ever
 python3 integrations/gen_docs_integrations.py --check         # validation: page descriptions, writes nothing
 python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_prometheus_profile_docs \
     integrations.tests.test_collector_metadata                 # what CI runs; test_collector_page_navigation is manual
-# Optional, to look at a rendered page; undo the changes to tracked files before committing:
-python3 integrations/gen_docs_integrations.py -c <plugin>/<module>   # one collector's page
-python3 integrations/gen_docs_integrations.py                 # every page
-python3 integrations/gen_doc_collector_page.py                # -> src/collectors/COLLECTORS.md
-python3 integrations/gen_doc_secrets_page.py                  # -> src/collectors/SECRETS.md
-python3 integrations/gen_doc_service_discovery_page.py        # -> src/collectors/SERVICE-DISCOVERY.md
 ```
+
+For a selected collector page, use the isolated recipe in
+[preview-collector-page](../.agents/skills/integrations-lifecycle/how-tos/preview-collector-page.md). It uses the current
+catalog and writes pages under a fresh scratch directory, preserving checkout pages and READMEs. Full page/umbrella
+regeneration and producer chains should run in an isolated source copy containing current modified and new inputs;
+see `.agents/skills/integrations-lifecycle/pipeline.md` and `.agents/skills/integrations-lifecycle/ibm-d.md`.
+Keep unrelated generated-file changes intact and unstaged; validation is not a reason to restore or delete them.
 
 `integrations/check_collector_metadata.py` is a legacy script that no longer runs. `gen_taxonomy.py`,
 `gen_taxonomy_seed.py`, `check_collector_taxonomy.py`, the `taxonomy.yaml` files, and `integrations/taxonomy/` are a
@@ -47,12 +50,17 @@ dormant collector-taxonomy prototype kept for later work; nothing runs them.
 
 ## What to commit
 
-A source pull request commits the authoritative inputs only. Do not regenerate the tracked pages for it: generated
-pages, generated README files, the umbrella pages, and generated metadata (ibm.d, NPM catalog) add hundreds of changed
-lines that make review harder, and the post-merge workflow `.github/workflows/generate-integrations.yml` regenerates
-them and opens the `integrations-regen` pull request. The gitignored catalogs (`integrations.js`, `integrations.json`,
-`taxonomy.json`) and the untracked `src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` report are
-never committed.
+A source pull request includes authoritative inputs and the required generated runtime outputs: ibm.d
+`contexts/zz_generated_contexts.go` and `config_schema.json` accompany the inputs that produced them. Both integration
+workflows verify these runtime outputs after `go generate`.
+
+Generated documentation follows the post-merge `integrations-regen` pull request: integration pages, generated README
+files, umbrella pages, and producer-generated metadata (ibm.d and the NPM catalog). Preserve local generated-file
+changes without staging them. The complete boundary is owned by
+[delivery](../.agents/skills/integrations-lifecycle/consistency.md#delivery-boundary-source-pr-versus-post-merge-pr).
+The gitignored catalogs (`integrations.js`, `integrations.json`, `taxonomy.json`) and the untracked
+`src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt` report are never committed; they may remain
+locally for inspection.
 
 Pull requests run `.github/workflows/check-markdown.yml`, which regenerates everything, runs the tests above, and
 validates the generated links through the Learn ingest.

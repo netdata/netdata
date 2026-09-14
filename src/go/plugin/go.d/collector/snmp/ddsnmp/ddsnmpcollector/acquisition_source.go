@@ -37,7 +37,7 @@ func (r *SourceRecorder) Wrap(client gosnmp.Handler) gosnmp.Handler {
 
 func (c *sourceClient) SourceRecorder() *SourceRecorder { return c.recorder }
 
-func sourceRecorder(client gosnmp.Handler) *SourceRecorder {
+func sourceRecorder(client any) *SourceRecorder {
 	if c, ok := client.(interface{ SourceRecorder() *SourceRecorder }); ok {
 		return c.SourceRecorder()
 	}

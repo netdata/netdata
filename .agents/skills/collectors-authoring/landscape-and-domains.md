@@ -71,30 +71,93 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
     It compiles wherever CO-RE is on and fails everywhere else with `has no member named '<field>'`, which
     surfaces as a distro build break (EL8 ships libbpf 0.x) long after the Go job went green.
 
+## Migrating a C ebpf.plugin module to ebpfgo.plugin
+
+The migrations land one module at a time and each reproduces the same five layers.
+Inspect the current dcstat/fd implementations and their C consumers for the supported target; do not assume a
+historical diff proves today's kernel attachment path. The failure classes below guide that source check.
+
+- **Layers**: Go collector (`<mod>_{config,plan,global,targets,shared_memory}.go`,
+  `<mod>_loader_{libbpf,other}.go`) -> CGO runtime (`libbpfloader/<mod>_libbpf.{c,go}`,
+  `<mod>_types.go`) -> shared-memory producer (a new `EBPFGO_SHM_FLAG_*` bit plus per-module maps in
+  `ebpf_shared_memory_store.go`) -> C consumers (`apps.plugin`, `cgroups.plugin/cgroup_ebpfgo_<mod>.c`)
+  -> removal of the C module and everything it alone kept alive.
+- **Do not trust the C module's attach-target list.** It is a plain symbol list resolved against
+  `/proc/kallsyms` (`ebpf_load_addresses`, exact `strcmp` + `T/t/W/w` filter), and it goes stale silently:
+  when the kernel moves a syscall onto a different inner function, the old symbol usually still EXISTS,
+  so the probe attaches, the module loads, and the counter sits at zero forever. fd hit exactly this —
+  `close(2)` stopped calling `close_fd()` once `file_close_fd()` appeared, and both the C module and its
+  first Go port reported zero closes on every affected kernel. Before porting a target list, read the
+  current `SYSCALL_DEFINE*` in the kernel source and confirm the symbol is still on the path.
+- **Prefer the syscall wrapper for syscall-shaped metrics.** `__x64_sys_<name>` / `__arm64_sys_<name>` /
+  ... and the unprefixed `sys_<name>` on architectures without `CONFIG_ARCH_HAS_SYSCALL_WRAPPER` (32-bit
+  arm, powerpc) return exactly what userspace sees, so both the call count and the `PT_REGS_RC < 0` error
+  test are correct on every kernel version. Inner helpers are a fallback for kernels predating the
+  wrappers. Watch the return TYPE: a helper returning `struct file *` makes the shipped program's
+  `(int)ret < 0` error test meaningless. Known trade-off: the wrapper is per-ABI, so on x86_64 it misses
+  32-bit processes.
+- **Object prefix is not the run mode.** Legacy objects come in `p`/`r` pairs
+  (`BuildObjectPathWithFlavor`'s `isReturn`). The prefix selects which BPF *programs* the object
+  contains, not what the operator asked for: a module whose upstream buffer/arena programs read
+  `PT_REGS_RC` (fd) MUST load the `r` family in every mode, because those are the only programs that
+  exist. Decide this from the upstream `*_buffer.bpf.c`, never from `ebpf load mode`.
+- **`ebpf load mode` gates charts, not attachment.** The C modules attached both entry and return
+  probes unconditionally and only branched on `em->mode` when creating charts. Reproduce that split.
+- **A producer-side option needs a header flag to reach out-of-process consumers.** `apps.plugin` and
+  `cgroups.plugin` cannot see the collector's config, so anything that changes which charts they may
+  create has to travel as an `EBPFGO_SHM_FLAG_*` bit — see `EBPFGO_SHM_FLAG_FD_ERRORS`. A new bit in the
+  existing header `flags` word is not a layout change and needs no `_vN` segment rename.
+- **Match the chart algorithm, not the previous module you ported.** The row's `ct` gate makes both
+  shapes possible, so pick per module: dcstat's C charts were `absolute`, so its Go port publishes
+  interval totals; cachestat's and fd's are `incremental`, so their ports publish per-interval deltas
+  and the *consumer* accumulates them into monotonic totals
+  (`apps_ebpf_accumulate_cachestat` / `apps_ebpf_accumulate_fd`). Getting this backwards silently
+  rescales every existing chart.
+- **Retain the `enum ebpf_pids_index` slot.** It indexes the legacy ebpf.plugin SHM `threads` bitmask,
+  so renumbering changes what every surviving module's bit means. Delete the struct field, keep the slot.
+- **Resolve attach targets in candidate order**, using `ebpf_kallsyms.go` (`selectKallsymsPrefix` for a
+  compiler-suffixed static symbol, `selectKallsymsCandidateSets` for ordered exact names, one pass for
+  several targets). Candidate order encodes a kernel-version preference; symbol-table order is address
+  order and picks arbitrarily when two candidates coexist.
+- **Cap the base-flavor selector.** Base objects stop earlier than buffer/arena
+  (`<mod>MaxBaseSelector`), and some modules skip a rung entirely — fd ships no `.5.10.` base object.
+  Use the wide `(1 << 12) - 1` kernels mask so buffer/arena can reach selector 11 and let the cap bound
+  the base flavor.
+- **Generated integration docs are a separate post-merge PR** — do not regenerate
+  `integrations/*.md` or `integrations.{js,json}` in the migration PR.
+- **Taxonomy is dormant.** Current delivery follows
+  `.agents/skills/integrations-lifecycle/consistency.md#the-dormant-collector-taxonomy`; do not author new taxonomy
+  files or reproduce a retired CI step as part of an ordinary migration. If explicitly working on the prototype,
+  `integrations/check_collector_taxonomy.py` (`check_touched_coverage`) checks same-directory file existence;
+  `integrations/gen_taxonomy.py` (`process_taxonomy_file`) and `integrations/schemas/taxonomy_collector.json` own optout
+  handling. `integrations/_common.py` (`TAXONOMY_SOURCES`) owns source registration and its non-recursive glob boundary.
+
 ## Dealing with data types
 
 A collector ingests one or more of these data types. Each has its own pattern.
 
 ### Metrics (time-series numeric data)
 
-The default. Streams as `BEGIN/SET/END` (PLUGINSD) or framework equivalents. Shape via NIDL (`SKILL.md` §3). Storage is
-the dbengine; alerts bind to chart `context`; anomaly detection / ML jobs run continuously. Every metric travels via
-streaming to parents and to Netdata Cloud — cardinality matters everywhere.
+The default. Emitted through `BEGIN/SET/END` (PLUGINSD) or framework equivalents. Shape via
+`./collector-practices.md#3-structuring-dashboards`. Storage, chart-context alerts, enabled ML, streaming and Cloud
+access all contribute to cardinality cost; not every deployment enables every consumer or streams every metric.
 
 ### Logs
 
 Two paths:
 
 - **Structured journaling.** `src/collectors/log2journal/` parses application/access logs (configurable YAML rules in
-  `log2journal.d/`, e.g. `nginx-json.yaml`, `default.yaml`) and writes structured fields into the systemd journal. The
-  `systemd-journal.plugin` then exposes the entries via a Function (the log explorer in the Netdata UI).
+  `log2journal.d/`, e.g. `nginx-json.yaml`, `default.yaml`) into Journal Export Format. A journal transport such as
+  `systemd-cat-native` sends those records to journald; `systemd-journal.plugin` exposes them through the log explorer
+  Function. The pipeline is owned by `src/collectors/log2journal/README.md#processing-pipeline`.
 - **OTEL log signals.** `src/crates/otel-plugin/` ingests OTLP logs into a write-ahead log with indexed segments
   (`src/crates/otel-ingestor/`, `sfsq`), queryable via the `otel-logs` Function in the Logs tab.
 
 Platform-specific events: `windows-events.plugin` (Windows event log).
 
-Logs are **not metrics**. Don't try to derive metrics from logs in the collection loop — emit logs as logs, then build
-metrics separately if needed.
+Log-ingestion plugins preserve event records for exploration. An explicitly designed log-to-metric collector is
+also valid: `src/go/plugin/go.d/collector/weblog/collect.go` parses log lines and emits a metric snapshot, as does
+`squidlog`. Choose the intended product surface; metrics do not preserve the original records or replace log search.
 
 ### Live snapshots (Functions)
 
@@ -186,7 +249,8 @@ Network/SNMP collectors typically pair metrics with **topology Functions** and F
   topology.
 
 Each managed device is normally its own job with a job-level `vnode`; emitting several virtual nodes from one job is the
-product decision described in `SKILL.md` §1.9. FDB/ARP/STP data lands as topology Functions, not metrics — the
+product decision in `./collector-practices.md#19-remote-monitored-systems-and-vnodes`. FDB/ARP/STP data lands as
+topology Functions, not metrics — the
 cardinality is too high for metrics and the use case is interactive lookup.
 
 ### Container / orchestration collectors
@@ -203,13 +267,15 @@ the labels and whether to expose them via netipc.
 
 ### Web servers and reverse proxies
 
-Web server collectors pair metrics (requests, status codes, latency, upstream errors) with **access-log Functions** when
-the access log is structured:
+Web server monitoring can pair metrics (requests, status codes, latency, upstream errors) with **access-log Functions**
+when the log format can be parsed:
 
 - `log2journal` parses NGINX/Apache/HAProxy access logs (rules under `src/collectors/log2journal/log2journal.d/`).
 - The journal explorer Function makes the parsed entries searchable in the dashboard.
 
-If the application's log format is closed or unstructured, only metrics are practical.
+Free-form logs can be parsed with PCRE2 patterns, as documented in
+`src/collectors/log2journal/README.md#processing-pipeline`.
+Assess parsing support and available evidence; unstructured does not mean unparseable.
 
 ### Flow protocols (NetFlow / sFlow / IPFIX)
 

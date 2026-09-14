@@ -441,6 +441,161 @@ modules:
       scopes: []
   - meta:
       plugin_name: ebpf-go.plugin
+      module_name: fd
+      monitored_instance:
+        name: eBPF Filedescriptor
+        link: "https://kernel.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "ebpf.jpg"
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - file
+        - eBPF
+        - file descriptor
+        - open
+        - close
+    overview:
+      data_collection:
+        metrics_description: "Monitor calls for functions responsible to open or close a file. Setting `fd = yes` enables collection and the host-wide charts only; the per-application and per-cgroup charts additionally require `apps = yes` and/or `cgroups = yes` in the `[global]` section. The error charts require `ebpf load mode = return`; the counters behind them are always collected, but they are only charted in that mode, as in the C implementation of this collector."
+        method_description: "Attach a return probe to the kernel's open and close entry points, using the object flavor selected for the running kernel."
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: "The plugin needs setuid because it loads data inside kernel. Netdata sets necessary permission during installation time."
+      default_behavior:
+        auto_detection:
+          description: "The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached. The attach symbols differ by kernel version and architecture, so the collector resolves them from `/proc/kallsyms` before attaching. Open uses `do_sys_openat2`, then `do_sys_open`: both are inner functions that `open`, `openat` and `openat2` all funnel through. Close uses the architecture's close(2) syscall symbol (`__x64_sys_close`, `__arm64_sys_close`, ..., or the unprefixed `sys_close` on architectures without syscall wrappers), falling back to the inner helpers `close_fd` and `__close_fd` on kernels that predate the wrappers. The inner helper is not used on newer kernels because the close(2) syscall no longer calls it, which made the close counters read zero."
+        limits:
+          description: ""
+        performance_impact:
+          description: "This thread will add overhead every time that an internal kernel function monitored by this thread is called."
+    setup:
+      prerequisites:
+        list:
+          - title: Compile kernel
+            description: |
+              Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+              When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
+              with different names.
+
+              Now follow steps:
+              1. Copy the configuration file to /usr/src/linux/.config.
+              2. Select the necessary options: make oldconfig
+              3. Compile your kernel image: make bzImage
+              4. Compile your modules: make modules
+              5. Copy your new kernel image for boot loader directory
+              6. Install the new modules: make modules_install
+              7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+              8. Update your boot loader
+      configuration:
+        file:
+          name: "ebpf.d.conf"
+          description: "Primary configuration file for ebpf-go.plugin. Enable the fd module in the `[ebpf programs]` section. The collector also accepts the legacy `ebpf.d/fd.conf` overlay for backward compatibility."
+        options:
+          description: |
+            The `fd` option in section `[ebpf programs]` controls whether the module is loaded.
+            The options listed below are `[global]` overrides.
+          folding:
+            title: "Config options"
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency. This configuration value takes precedence over the runtime interval passed by pluginsd.
+              default_value: 10
+              required: false
+            - name: ebpf load mode
+              description: "Selects whether the error charts are published. `entry` collects and charts only the call counts; `return` and its legacy alias `dev` additionally publish `filesystem.file_error` and the per-application and per-cgroup error charts. Attachment is unaffected: the probes always read the syscall return value, so switching modes costs nothing at collection time."
+              default_value: entry
+              required: false
+            - name: apps
+              description: Enable or disable integration with apps.plugin
+              default_value: no
+              required: false
+            - name: cgroups
+              description: Enable or disable integration with cgroup.plugin
+              default_value: no
+              required: false
+            - name: pid table size
+              description: Number of elements stored inside hash tables used to monitor calls per PID.
+              default_value: 32768
+              required: false
+            - name: ebpf object flavor
+              description: "Select the fd object flavor to load. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The default is `buffer`, and the collector falls back when the requested flavor is not available on the system."
+              default_value: buffer
+              required: false
+            - name: ebpf type format
+              description: "Legacy key from the C ebpf.plugin, kept so migrated configurations still parse. It maps onto `ebpf object flavor`: `legacy` forces the kprobe-based tracing objects, while `co-re` and `auto` are accepted no-ops that leave the flavor to auto-detection. Prefer `ebpf object flavor` in new configurations."
+              default_value: auto
+              required: false
+            - name: ebpf co-re tracing
+              description: "Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code)."
+              default_value: trampoline
+              required: false
+            - name: maps per core
+              description: Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information.
+              default_value: yes
+              required: false
+            - name: btf path
+              description: Override the default BTF source directory. The collector checks this path for a vmlinux BTF file used by CO-RE loading.
+              default_value: /sys/kernel/btf
+              required: false
+            - name: collect pid
+              description: "Controls which PIDs are stored in the BPF hash tables. `real parent` stores only the real parent PID (lowest overhead); `parent` stores the immediate parent PID; `all` stores every PID used by the process (highest overhead)."
+              default_value: real parent
+              required: false
+            - name: lifetime
+              description: Set default lifetime for thread when enabled by cloud.
+              default_value: 300
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics show the host-wide rate of file open and close calls, and of the ones that failed."
+          labels: []
+          metrics:
+            - name: filesystem.file_descriptor
+              description: "Open and close calls. Published as cumulative kernel counters with the `incremental` algorithm, preserving the legacy filedescriptor metric contract."
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: close
+            - name: filesystem.file_error
+              description: "Open and close calls that returned an error. Published only in the non-entry load modes, `ebpf load mode = return` and its legacy alias `dev`."
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: close
+  - meta:
+      plugin_name: ebpf-go.plugin
       module_name: socket
       monitored_instance:
         name: eBPF Socket

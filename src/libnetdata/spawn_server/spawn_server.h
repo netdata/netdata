@@ -48,8 +48,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
 
 typedef enum __attribute__((packed)) {
-    SPAWN_TIMEDWAIT_EXITED = 0,     // the child exited; *status holds its status and si has been freed
-    SPAWN_TIMEDWAIT_RUNNING = 1,    // the timeout expired; the child is still running and si remains valid
+    SPAWN_TIMEDWAIT_EXITED = 0,     // si has been freed and must not be touched again; *status holds
+                                    // the child's status, or -1 if it could not be determined
+    SPAWN_TIMEDWAIT_RUNNING = 1,    // the wait observed no exit within the timeout; si remains valid.
+                                    // NOT proof the child is alive - see the note below
     SPAWN_TIMEDWAIT_ERROR = 2,      // the wait could not be completed (broken status channel / unusable
                                     // handle); the child's state is unknown, si remains valid, and the
                                     // caller must reclaim it (e.g. via spawn_server_exec_kill())
@@ -59,11 +61,23 @@ typedef enum __attribute__((packed)) {
 // bounded poll (the nofork backend uses a ~1ms slice because its wait primitive treats 0 as
 // "wait forever"; the others poll once); the wait is always bounded, never infinite.
 // On SPAWN_TIMEDWAIT_EXITED the instance has been freed, exactly like spawn_server_exec_wait().
+// EXITED is a statement about ownership, not about a successful report: a backend that consumes the
+// instance while reading the child's status (nofork does, as soon as the report is readable) must
+// still return EXITED if that report turns out to be truncated or malformed, with *status == -1.
+// Reporting ERROR there would be worse than useless - ERROR obliges the caller to reclaim an
+// instance that no longer exists.
 // On SPAWN_TIMEDWAIT_RUNNING or SPAWN_TIMEDWAIT_ERROR the caller keeps ownership and must eventually
 // call spawn_server_exec_timedwait(), spawn_server_exec_wait() or spawn_server_exec_kill().
 // ERROR is distinct from RUNNING on purpose: the wait could not progress (it is not merely "not yet"),
 // so callers must NOT loop on it (that would spin forever when timeout_ms == 0) - they must reclaim
 // the instance, typically by killing it.
+// RUNNING means "this wait saw no exit", not "the child is alive" - only EXITED is authoritative
+// about the child's fate. Every backend observes the exit indirectly (a report from the spawn server
+// process, a semaphore posted from an exit callback, waitpid(), a waitable handle), and in most of
+// them the observation can lag the reap, so RUNNING is also what you get for a child that is already
+// gone and whose pid the kernel may have released. Callers MUST therefore treat si's pid as
+// last-known-only: reclaim the instance through spawn_server_exec_kill() (which owns whatever
+// pid-safety the backend can offer) instead of signalling that pid themselves.
 // status is optional (may be NULL): on EXITED the wait/cleanup still happens, the status is just not stored.
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status);
 

@@ -1,6 +1,6 @@
 ---
 name: docs-learn-site-structure
-description: How documentation in this repository (and the other Netdata-org source repositories) becomes pages on learn.netdata.cloud, and how to change it safely. Use when adding, moving, renaming, or deleting a docs page; when asked "how do I publish this on Learn", "why is this page missing or wrong on Learn", "where does this URL come from", "should I edit this here or in the learn repo", "why did the sidebar order change", "why did the Learn build or ingest fail" (MDX errors, exit codes 2 or 3, broken anchors), "how do redirects work on Learn", or "what runs when a docs PR merges"; when editing `docs/.map/map.yaml`, `docs/.map/map.schema.json`, `docs/.map/validate_map_schema.py`, `.github/workflows/trigger-learn-update.yml`, or `.github/workflows/check-markdown.yml`; when reading `ingest/ingest.py`, `ingest/autogenerateRedirects.py`, `static.toml`, `netlify.toml`, `LegacyLearnCorrelateLinksWithGHURLs.json`, or the `ingest.yml` workflow in netdata/learn. Not for building or previewing Learn locally from a PR (docs-learn-pr-preview), not for the content of generated integration pages or the metadata.yaml pipeline (integrations-lifecycle, collectors-metadata-yaml), and not for the Learn page layout of a specific docs directory (docs/.map/README.md).
+description: Change, review or troubleshoot Learn publication, docs/.map mapping, page URLs, redirects, sidebars, MDX and ingest/CI behavior. Local site builds require docs-learn-pr-preview; generated integration content uses metadata/integrations skills.
 ---
 
 # Learn site structure
@@ -8,6 +8,14 @@ description: How documentation in this repository (and the other Netdata-org sou
 A page on `learn.netdata.cloud` is a node in this repository's `docs/.map/map.yaml`, rendered by the ingest of the
 `netdata/learn` repository into a Docusaurus site that Netlify deploys. This skill states what an author or reviewer
 here relies on; the how-to-publish procedure is `docs/.map/README.md`, and the mechanics live in the learn repository.
+
+Apply `AGENTS.md#skill-selection`. Review the affected publication contract and existing evidence; recipe instructions
+do not require a new SOW or authorize deletion, publication, ingest or a local preview. Use the task and symptom routes
+below, including their dependencies when a change reaches another surface.
+
+Learn-side facts carry the revision at which they were checked. Before relying on a claim affected by the task, inspect
+that contract at the relevant available Learn revision and report any evidence gap. `repo-mirror-sources` supplies the
+read-only checkout/revision workflow; loading this skill does not request a mirror refresh.
 
 ## Owners
 
@@ -30,6 +38,7 @@ builds the site locally from a PR and loads this skill first; `repo-mirror-sourc
 
 | Task | Read |
 |---|---|
+| review a page, mapping or pipeline change | the affected task/symptom references below and current owner evidence; no recipe execution solely for review |
 | add a page | `./recipes/add-doc-page.md`, then `./mapping.md` |
 | move a page to another section | `./recipes/move-doc-page.md`, `./redirects.md` |
 | rename a page (label or URL) | `./recipes/rename-doc-page.md`, `./mapping.md#file-path-and-slug` |

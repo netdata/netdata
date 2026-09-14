@@ -163,8 +163,8 @@ func (c *Collector) normalDeviceInput() diagnostics.DeviceInput {
 		result.SysObjectID, result.SysName, result.SysDescr = si.SysObjectID, si.Name, si.Descr
 		result.SysContact, result.SysLocation, result.Vendor, result.Model = si.Contact, si.Location, si.Vendor, si.Model
 	}
-	if c.vnode != nil {
-		result.VnodeGUID, result.VnodeLabels = c.vnode.GUID, maps.Clone(c.vnode.Labels)
+	if vnode := c.deviceVnode(); vnode != nil {
+		result.VnodeGUID, result.VnodeLabels = vnode.GUID, maps.Clone(vnode.Labels)
 	}
 	return result
 }

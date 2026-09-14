@@ -41,5 +41,5 @@ For every stock profile:
 - `python3 -m unittest integrations.tests.test_prometheus_profile_docs` enforces stock-profile reachability, view/chart/
   family parity, support projection, the public chart-field allowlist, absence of internal questions, inherited-YAML
   isolation, complete metric mappings, and grouped table output. Both integration workflows run it.
-- Review the catalog sentence and operator-model brief as public product copy; if you regenerate the page or
-  `src/collectors/COLLECTORS.md` to read them, undo those tracked changes before committing.
+- Review the catalog sentence and operator-model brief as public product copy; use `preview-collector-page.md`
+  for isolated page rendering and retain the source-only delivery boundary in `../consistency.md`.

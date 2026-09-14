@@ -55,7 +55,14 @@ type SysInfoProbe struct {
 	SeenSysLocation bool
 }
 
-func GetSysInfo(client gosnmp.Handler) (*SysInfo, error) {
+// ScalarClient is sufficient for system and device metadata acquisition.
+type ScalarClient interface {
+	Get([]string) (*gosnmp.SnmpPacket, error)
+	MaxOids() int
+	Version() gosnmp.SnmpVersion
+}
+
+func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 	pdus, err := getSysInfoPDUs(client)
 	if err != nil {
 		return nil, err
@@ -123,7 +130,7 @@ func sysInfoOIDs() []string {
 	}
 }
 
-func getSysInfoPDUs(client gosnmp.Handler) ([]gosnmp.SnmpPDU, error) {
+func getSysInfoPDUs(client ScalarClient) ([]gosnmp.SnmpPDU, error) {
 	maxOids := client.MaxOids()
 	if maxOids < 1 {
 		return nil, WithFailure(
@@ -146,7 +153,7 @@ func getSysInfoPDUs(client gosnmp.Handler) ([]gosnmp.SnmpPDU, error) {
 	return pdus, nil
 }
 
-func getSysInfoChunkPDUs(client gosnmp.Handler, version gosnmp.SnmpVersion, oids []string) ([]gosnmp.SnmpPDU, error) {
+func getSysInfoChunkPDUs(client ScalarClient, version gosnmp.SnmpVersion, oids []string) ([]gosnmp.SnmpPDU, error) {
 	for len(oids) > 0 {
 		packet, err := client.Get(oids)
 		if err != nil {

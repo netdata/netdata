@@ -25,7 +25,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -411,7 +410,9 @@ func TestRunGenerationAcceptedEnableDoesNotBlockDisableBehindNonCooperativeCheck
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() {}}
+				return &runTestHandler{
+					cleanup: func() {},
+				}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
@@ -815,7 +816,6 @@ func testRunJobServices(t testing.TB) runJobServices {
 		Defaults:      confgroup.Registry{},
 		Resolver:      resolver,
 		StoreCreators: creators,
-		Vnodes:        vnoderegistry.New(),
 	}
 }
 

@@ -84,7 +84,9 @@ The archive is organized into numbered directories so a person or an automated r
 - `05-logs/`, recent agent logs and relevant kernel messages, bounded by `--since`.
 - `06-state/`, persistent state such as the daemon status file used for crash analysis, database disk usage, and cloud claim state.
 - `07-runtime/`, live agent state read from the local API, collected only when the agent responds.
-- `08-network/`, local connectivity relevant to the agent.
+- `08-network/`, local connectivity relevant to the agent, including
+  `netdata-sockets.txt`: visible, platform-supported sockets owned by the
+  Netdata process tree and their native states.
 - `09-permissions/`, file modes, ownership, plugin capabilities, extended attributes, security contexts, and ACLs for the agent's directories and plugins.
 
 ## Include SNMP diagnostics

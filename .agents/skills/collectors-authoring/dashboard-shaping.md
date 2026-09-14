@@ -1,13 +1,13 @@
 # Dashboard-shaping mechanisms
 
-Reference for `collectors-authoring` §3. Each mechanism feeds the NIDL model described in the skill. Open
-the subsection that matches the ingestion path you are working on.
+Mechanisms for `collectors-authoring`; the NIDL owner is
+`./collector-practices.md#3-structuring-dashboards`. Open the subsection for the affected ingestion path.
 
 ## SNMP profiles — declarative spec → NIDL
 
 SNMP collection is profile-driven. A profile is a YAML document declaring OIDs, metric definitions, table indexing,
 units, chart families, and selectors. Stock profiles ship from `src/go/plugin/go.d/config/go.d/snmp.profiles/default/`;
-spec at `src/go/plugin/go.d/collector/snmp/profile-format.md` (~2000 lines).
+spec at `src/go/plugin/go.d/collector/snmp/profile-format.md`.
 
 Adding or extending SNMP coverage means writing or extending a profile, not adding code. The SNMP topology collector
 (`snmp_topology`) builds on top of profiles — extending profiles is usually the right starting point for topology work
@@ -29,7 +29,8 @@ The statsd plugin lets the operator group raw statsd metrics into curated charts
 Wildcard patterns extract dimension names from the matched portion: `dimension = pattern 'myapp.api.*.200' '' last 1 1`
 creates dimensions named after the wildcard match. Three-layer dimension lookup (dimension name in dictionary → metric
 name in dictionary → fallback to original). Stock examples: `src/collectors/statsd.plugin/k6.conf`,
-`src/collectors/statsd.plugin/asterisk.conf`. Full spec: `src/collectors/statsd.plugin/README.md` lines 397-639.
+`src/collectors/statsd.plugin/asterisk.conf`. Full spec:
+`src/collectors/statsd.plugin/README.md#synthetic-statsd-charts`.
 
 This is the most operator-controllable shaping mechanism — the dashboard is whatever the operator declares.
 

@@ -1,6 +1,6 @@
 ---
 name: tests-query-corpus
-description: Developer contract for the query contract corpus (tests/query-corpus) — the black-box correctness suite for the Netdata query engine. Use when running the corpus, adding or extending corpus cases, authoring fixtures, changing an oracle or a byte-pin, adding a case for a query-engine bug, recording the fixing PR after it merges, or validating a query-engine fix branch against the corpus.
+description: Run, extend or review the Netdata query contract corpus (tests/query-corpus), its fixtures, independent oracles, byte pins and harness. Use for query-engine regression cases, fix-branch validation and recording merged fixes.
 ---
 
 # Query Contract Corpus — developer contract
@@ -16,6 +16,21 @@ plus cross-cutting API, options, and weights surfaces.
 The suite is a self-contained Go module
 (`github.com/netdata/netdata/tests/query-corpus`). Always run `go` commands
 from inside `tests/query-corpus/`.
+
+## Choose the task
+
+| Task | Read |
+|---|---|
+| Review a corpus change | Correctness model, affected architecture/manifest/fixture/oracle sections and existing validation evidence |
+| Run or interpret results | Running and The manifest; README for suite coverage |
+| Add or change a fixture/case | Correctness model, Authoring fixtures, Adding a case and manifest registration |
+| Reproduce a query-engine bug | Adding a case for a bug and the relevant independent oracle contract |
+| Change an oracle, byte pin or harness | Correctness model and Changing oracles, pins, and the harness; verify affected parser/source contracts |
+
+For review, assess the complete assigned change without creating authoring artifacts or starting a daemon merely
+because the running workflow appears below. Execution and Git steps apply only within existing task authorization;
+recording a merged fix does not itself authorize a rebase or push. Preserve the full-suite gate when corpus delivery
+and its push are authorized.
 
 ## Correctness model — why this suite means something
 
@@ -87,7 +102,9 @@ different rules:
     (a PR that deliberately changes the output format), never "the test
     started failing".
 
-**Falsifiability discipline:** when an expectation and the engine disagree,
+**Falsifiability discipline:** first rule out an independently demonstrated fixture, harness or oracle defect.
+Correct such a defect from fixture math or the cited source contract, with evidence explaining the error; observing
+the engine result alone is never justification. Once the expectation is established and the engine disagrees,
 there are exactly two exits — the engine is wrong (the case stays as written
 and joins the broken list until it is fixed) or a recorded ruling says the
 behavior is intended (the case is rewritten to assert the ruled behavior,
@@ -198,7 +215,8 @@ its test as the regression guard and records `FixedBy: "#PR"`.
 
 ## Authoring fixtures
 
-- **Epoch**: all points anchor at `fixture.T0`. For `update_every > 1`,
+- **Epoch**: deterministic fixtures anchor at `fixture.T0`; necessary wall-clock cases use the bounded envelopes
+  required below. For `update_every > 1`,
   pre-align the series: `base := fixture.T0 - fixture.T0%int64(ue)` —
   storage keeps pushed timestamps exactly, but views re-grid onto absolute
   `update_every` multiples, so unaligned fixtures make expectations

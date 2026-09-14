@@ -3,34 +3,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"path/filepath"
 
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 )
-
-func resolveCommandInput(options commandOptions) (string, error) {
-	if !options.normal {
-		if options.previousRun {
-			return "", errors.New("--previous-run requires --normal")
-		}
-		return resolveInput(options.inputPath, options.checkpoint)
-	}
-	if options.registrationID == 0 || options.checkpoint != 0 {
-		return "", errors.New("--normal requires --registration-id and cannot select a topology checkpoint")
-	}
-	files, err := snmpdiag.ListNormalFiles(options.inputPath)
-	if err != nil {
-		return "", err
-	}
-	for _, file := range files {
-		if file.Previous == options.previousRun && file.RegistrationID == options.registrationID {
-			return filepath.Join(options.inputPath, snmpdiag.NormalDirectory, file.RunID, file.Filename), nil
-		}
-	}
-	return "", fmt.Errorf("normal device %d is not retained in the selected run", options.registrationID)
-}
 
 func executeNormalOperation(operation string, archive openedArchive, options commandOptions) (any, error) {
 	device := archive.normal

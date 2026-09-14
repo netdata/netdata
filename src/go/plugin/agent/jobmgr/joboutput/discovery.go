@@ -292,17 +292,18 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			cleanup,
 		)
 	}
-	successor, probeFailure, err := dcjc.prepareContainedJob(
+	successor, probeFailure, activation := dcjc.prepareContainedJob(
 		ctx,
 		change.Config,
 		scope.Successor,
 		permit,
 	)
-	if err != nil {
+	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+		switch activation.kind {
+		case activationFailureQuarantined:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			return dcjc.prepareMutationWithRetryAfterApply(
@@ -323,8 +324,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				pendingSettlement,
 				jobConfigFailure(err, "activation"),
 			)
-		}
-		if candidatePreparationBusy(err) {
+		case activationFailureBusy, activationFailureStaleStore:
 			baselineUID := ""
 			if exists {
 				baselineUID = incumbent.UID()
@@ -343,11 +343,9 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 					),
 				),
 			)
-		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
+		case activationFailureSuperseded:
 			return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
-		}
-		if errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+		case activationFailureDeadline:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			return dcjc.prepareMutationWithRetryAfterApply(
@@ -375,9 +373,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				),
 				jobConfigFailure(err, "activation"),
 			)
-		}
-		switch classifyConstructionError(err) {
-		case constructionErrorTransient:
+		case activationFailureTransient:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			failure := transientActivationFailure(change.Config, err)
@@ -404,7 +400,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				),
 				jobConfigFailure(err, "activation"),
 			)
-		case constructionErrorProposal:
+		case activationFailureProposal:
 			return nil, jobmgr.RejectProposal(err)
 		default:
 			return nil, err

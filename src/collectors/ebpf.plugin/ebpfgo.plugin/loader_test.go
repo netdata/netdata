@@ -339,6 +339,11 @@ func TestBuildLoadPlan(t *testing.T) {
 			})
 
 			tc.want.ObjectPath = filepath.Join(defaultPluginsDir(), "ebpf.d", tc.want.ObjectPath)
+			// The plan must carry the requested family, not just bake it into the
+			// path: buildFallbackPlans reads primary.IsReturn to keep the fallback
+			// chain in the same 'p'/'r' family.  Asserted for every case here so a
+			// regression cannot hide in whichever case sets it.
+			tc.want.IsReturn = tc.isReturn
 
 			if got != tc.want {
 				t.Fatalf("BuildLoadPlan() = %#v, want %#v", got, tc.want)

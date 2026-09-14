@@ -1,10 +1,11 @@
 # How-tos
 
-Analysis-derived answers to concrete pipeline questions. The rule that keeps this catalog live is in `../SKILL.md`
-("Live how-to rule").
+Analysis-derived answers to concrete pipeline questions. Capture timing and authorization are in
+`AGENTS.md#knowledge-capture`.
 
 | Question | How-to | Audience |
 |---|---|---|
+| Preview a collector page without disturbing existing changes | [preview-collector-page](preview-collector-page.md) | authors and reviewers |
 | A collector is being retired: what is its whole ownership surface? | [retiring-collector-integration](retiring-collector-integration.md) | authors |
 | A section exists in `metadata.yaml` but Website or Learn does not show it | [tracing-missing-published-sections](tracing-missing-published-sections.md) | authors |
 | A generated page links to a Learn URL that may have drifted | [auditing-metadata-learn-links](auditing-metadata-learn-links.md) | authors |
@@ -17,7 +18,7 @@ Analysis-derived answers to concrete pipeline questions. The rule that keeps thi
 1. Create `how-tos/<slug>.md`: the question in one line, the answer citing files and symbols (never line numbers), and,
    when the work read other repositories, a "How I figured this out" footer naming files and commands so the next reader
    can verify.
-2. Add a row above and commit it with the work that prompted the analysis.
+2. Add a row above with the authorized documentation change. Git operations follow `AGENTS.md#git-and-pr-workflow`.
 
 Do not add one when an existing guide already covers the question (update that guide), when the answer is a lookup that
 needs no analysis, or when it is speculative or tied to a release that will change.

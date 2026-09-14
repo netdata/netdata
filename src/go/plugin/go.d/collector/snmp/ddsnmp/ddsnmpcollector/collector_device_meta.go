@@ -17,13 +17,14 @@ import (
 
 // deviceMetadataCollector handles collection of device metadata
 type deviceMetadataCollector struct {
-	snmpClient  gosnmp.Handler
+	snmpClient  snmputils.ScalarClient
 	missingOIDs map[string]bool
 	log         *logger.Logger
 	sysobjectid string
+	strict      bool
 }
 
-func newDeviceMetadataCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger, sysobjectid string) *deviceMetadataCollector {
+func newDeviceMetadataCollector(snmpClient snmputils.ScalarClient, missingOIDs map[string]bool, log *logger.Logger, sysobjectid string) *deviceMetadataCollector {
 	return &deviceMetadataCollector{
 		snmpClient:  snmpClient,
 		missingOIDs: missingOIDs,
@@ -61,6 +62,9 @@ func (dc *deviceMetadataCollector) collectObserved(
 					acquisition.metadataObserver(entry.Metadata),
 				)
 				if err != nil {
+					if dc.strict {
+						return nil, err
+					}
 					dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
 						i, entry.SysobjectID, err)
 				}
@@ -188,6 +192,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 			}
 		case len(field.Symbols) > 0:
 			// Multiple symbols - try each until one succeeds
+			fieldErrStart := len(errs)
 			for i, sym := range field.Symbols {
 				v, err := dc.processSymbolValueObserved(name, sym, pdus, i == len(field.Symbols)-1, observer.processing(name))
 				if err != nil {
@@ -198,6 +203,8 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 					continue
 				}
 				if v != "" {
+					// A usable fallback resolves only this field's earlier failures.
+					errs = errs[:fieldErrStart]
 					ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
 					observer.value(name)
 					break // Use first successful value
@@ -207,7 +214,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 		}
 	}
 
-	if len(errs) > 0 && len(metadata) == 0 {
+	if len(errs) > 0 && (dc.strict || len(metadata) == 0) {
 		return snmputils.WithFailure(fmt.Errorf("failed to process any metadata fields: %w", errors.Join(errs...)), "metadata", "processing")
 	}
 
