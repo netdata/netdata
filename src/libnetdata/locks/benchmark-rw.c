@@ -5,7 +5,145 @@
 #define MAX_THREADS 64
 #define TEST_DURATION_SEC 1
 #define STOP_SIGNAL UINT64_MAX
-#define MAX_CONFIGS 10
+#define MAX_CONFIGS 20
+
+// ----------------------------------------------------------------------------
+// Runtime knobs, read from the environment so the benchmark stays reachable
+// through the plain `netdata -W rwlockstest` entrypoint (no CLI plumbing).
+//
+//   RWBENCH_SECS            seconds per configuration          (default 1)
+//   RWBENCH_CS_WORK         work units inside the critical section (default 0)
+//   RWBENCH_PROBE_SECS      seconds per writer-latency probe    (default 5)
+//   RWBENCH_WRITER_GAP_US   probe writer idle gap between acquisitions (default 1000)
+//   RWBENCH_SKIP_MATRIX     set to 1 to run only the latency probe
+//   RWBENCH_SKIP_PROBE      set to 1 to run only the throughput/latency matrix
+
+static unsigned long env_ulong(const char *name, unsigned long def) {
+    const char *v = getenv(name);
+    if(!v || !*v) return def;
+
+    char *end = NULL;
+    errno_clear();
+    unsigned long r = strtoul(v, &end, 10);
+    if(errno || !end || *end) {
+        fprintf(stderr, "RWBENCH: ignoring invalid %s='%s', using %lu\n", name, v, def);
+        return def;
+    }
+
+    return r;
+}
+
+// ----------------------------------------------------------------------------
+// Nanosecond clock.
+//
+// libnetdata's clocks API exposes microseconds only (clocks.h), which cannot
+// resolve an uncontended read-lock acquisition (tens of nanoseconds). This is
+// kept file-local instead of added to libnetdata/clocks because the benchmark is
+// its only consumer; promote it if a second one appears.
+
+static ALWAYS_INLINE nsec_t bench_now_nsec(void) {
+    struct timespec ts;
+    if(unlikely(clock_gettime(CLOCK_MONOTONIC, &ts) == -1))
+        return 0;
+
+    return (nsec_t)ts.tv_sec * NSEC_PER_SEC + (nsec_t)ts.tv_nsec;
+}
+
+// ----------------------------------------------------------------------------
+// Latency histogram.
+//
+// Power-of-two buckets over nanoseconds: bucket i counts samples in
+// [2^i, 2^(i+1)) ns. The question this benchmark answers is whether a lock
+// acquisition costs tens of nanoseconds, ~50us (one nanosleep of timer slack) or
+// ~512us (the top of the back-off ramp) - those are orders of magnitude apart,
+// so power-of-two resolution is enough and needs no per-sample storage.
+// Exact max and sum are kept alongside.
+
+#define LAT_BUCKETS 48  // up to 2^48 ns ~ 78 hours
+
+typedef struct {
+    uint64_t count;
+    uint64_t sum_ns;
+    uint64_t max_ns;
+    uint64_t buckets[LAT_BUCKETS];
+} latency_hist_t;
+
+static ALWAYS_INLINE void lat_record(latency_hist_t *h, nsec_t ns) {
+    h->count++;
+    h->sum_ns += ns;
+    if(ns > h->max_ns) h->max_ns = ns;
+
+    // bucket = floor(log2(ns)); 0 and 1 both land in bucket 0
+    size_t b = 0;
+    if(ns > 1) {
+        b = (size_t)(63 - __builtin_clzll((unsigned long long)ns));
+        if(b >= LAT_BUCKETS) b = LAT_BUCKETS - 1;
+    }
+    h->buckets[b]++;
+}
+
+static void lat_merge(latency_hist_t *dst, const latency_hist_t *src) {
+    dst->count += src->count;
+    dst->sum_ns += src->sum_ns;
+    if(src->max_ns > dst->max_ns) dst->max_ns = src->max_ns;
+    for(size_t i = 0; i < LAT_BUCKETS; i++)
+        dst->buckets[i] += src->buckets[i];
+}
+
+// Upper bound (in ns) of the bucket holding the requested percentile.
+static uint64_t lat_percentile_ns(const latency_hist_t *h, double p) {
+    if(!h->count) return 0;
+
+    uint64_t target = (uint64_t)((double)h->count * p);
+    if(target < 1) target = 1;
+
+    uint64_t seen = 0;
+    for(size_t i = 0; i < LAT_BUCKETS; i++) {
+        seen += h->buckets[i];
+        if(seen >= target)
+            return 2ULL << i;   // upper bound of [2^i, 2^(i+1))
+    }
+
+    return h->max_ns;
+}
+
+static double lat_mean_us(const latency_hist_t *h) {
+    if(!h->count) return 0.0;
+    return (double)h->sum_ns / (double)h->count / 1000.0;
+}
+
+static void lat_print_line(const char *label, const latency_hist_t *h) {
+    fprintf(stderr, "%-26s %10"PRIu64" %10.3f %10.3f %10.3f %10.3f %12.3f\n",
+            label,
+            h->count,
+            lat_mean_us(h),
+            (double)lat_percentile_ns(h, 0.50) / 1000.0,
+            (double)lat_percentile_ns(h, 0.99) / 1000.0,
+            (double)lat_percentile_ns(h, 0.999) / 1000.0,
+            (double)h->max_ns / 1000.0);
+}
+
+static void lat_print_header(const char *what) {
+    fprintf(stderr, "\n%s (microseconds; percentiles are power-of-two bucket upper bounds)\n", what);
+    fprintf(stderr, "%-26s %10s %10s %10s %10s %10s %12s\n",
+            "SERIES", "SAMPLES", "MEAN", "P50<=", "P99<=", "P99.9<=", "MAX");
+    fprintf(stderr, "-------------------------------------------------------------------------------------------------\n");
+}
+
+// Distribution dump - the bimodality of writer acquisition is the point, and a
+// mean hides it completely.
+static void lat_print_distribution(const latency_hist_t *h) {
+    if(!h->count) return;
+
+    fprintf(stderr, "    distribution: ");
+    for(size_t i = 0; i < LAT_BUCKETS; i++) {
+        if(!h->buckets[i]) continue;
+        fprintf(stderr, "[<%.3gus]=%.1f%% ",
+                (double)(2ULL << i) / 1000.0,
+                (double)h->buckets[i] * 100.0 / (double)h->count);
+    }
+    fprintf(stderr, "\n");
+}
 
 // Structure to store summary statistics
 typedef struct {
@@ -31,7 +169,13 @@ typedef struct {
         uint64_t operations;        // Number of read/write operations
         usec_t test_time;          // Time spent in test
         volatile int ready;         // Thread completed flag
+        latency_hist_t lat;         // Lock-acquisition latency (when measured)
+        uint64_t sink;              // Per-thread accumulator for critical-section work
     } stats[MAX_THREADS];
+
+    // Per-run knobs, set by run_test() before the threads are released
+    uint32_t cs_work;               // work units executed inside the critical section
+    bool measure_latency;           // time every lock acquisition
 
     // Per-thread control
     struct {
@@ -106,6 +250,21 @@ static void wait_for_start(netdata_cond_t *cond, netdata_mutex_t *mutex, uint64_
     netdata_mutex_unlock(mutex);
 }
 
+// Work performed inside the critical section.
+//
+// Writers do the shared counter increment the original benchmark did - it is
+// exclusive, so it is a legitimate write. Readers only read: the original code
+// had every reader do control->counter++ under a READ lock, which is a genuine
+// data race between concurrent readers and made the shared cacheline bounce for
+// reasons unrelated to the lock being measured.
+static ALWAYS_INLINE void do_critical_section_work(rwlock_control_t *control, thread_context_t *ctx) {
+    if(ctx->type == THREAD_WRITER)
+        control->counter++;
+
+    for(uint32_t i = 0; i < control->cs_work; i++)
+        control->stats[ctx->thread_id].sink += __atomic_load_n(&control->counter, __ATOMIC_RELAXED);
+}
+
 static void benchmark_thread(void *arg) {
     thread_context_t *ctx = (thread_context_t *)arg;
     rwlock_control_t *control = ctx->control;
@@ -122,20 +281,31 @@ static void benchmark_thread(void *arg) {
         usec_t start = now_monotonic_high_precision_usec();
         uint64_t operations = 0;
 
+        // The latency pass reads the clock twice per acquisition, which costs
+        // more than an uncontended acquisition itself. That is why it is a
+        // separate pass: the throughput pass below stays clock-free so its
+        // numbers remain comparable.
+        const bool measure = control->measure_latency;
+        latency_hist_t *lat = &control->stats[ctx->thread_id].lat;
+
         while (control->thread_controls[ctx->thread_id].run_flag) {
+            nsec_t t0 = measure ? bench_now_nsec() : 0;
+
             if(ctx->is_spinlock) {
                 RW_SPINLOCK *spinlock = ctx->lock;
                 if(ctx->type == THREAD_READER) {
                     rw_spinlock_read_lock(spinlock);
+                    if(measure) lat_record(lat, bench_now_nsec() - t0);
                     check_access_safety(control, THREAD_READER);
-                    control->counter++;  // Just to do some work
+                    do_critical_section_work(control, ctx);
                     release_access(control, THREAD_READER);
                     rw_spinlock_read_unlock(spinlock);
                 }
                 else {
                     rw_spinlock_write_lock(spinlock);
+                    if(measure) lat_record(lat, bench_now_nsec() - t0);
                     check_access_safety(control, THREAD_WRITER);
-                    control->counter++;
+                    do_critical_section_work(control, ctx);
                     release_access(control, THREAD_WRITER);
                     rw_spinlock_write_unlock(spinlock);
                 }
@@ -144,17 +314,22 @@ static void benchmark_thread(void *arg) {
                 netdata_rwlock_t *rwlock = ctx->lock;
                 if(ctx->type == THREAD_READER) {
                     netdata_rwlock_rdlock(rwlock);
+                    if(measure) lat_record(lat, bench_now_nsec() - t0);
                     check_access_safety(control, THREAD_READER);
-                    control->counter++;
+                    do_critical_section_work(control, ctx);
                     release_access(control, THREAD_READER);
                     netdata_rwlock_rdunlock(rwlock);
                 }
                 else {
                     netdata_rwlock_wrlock(rwlock);
+                    if(measure) lat_record(lat, bench_now_nsec() - t0);
                     check_access_safety(control, THREAD_WRITER);
-                    control->counter++;
+                    do_critical_section_work(control, ctx);
                     release_access(control, THREAD_WRITER);
-                    netdata_rwlock_rdunlock(rwlock);
+                    // was rdunlock(): a write lock must be released with
+                    // wrunlock(), they are different libuv calls, so the
+                    // netdata_rwlock writer column was invalid before this.
+                    netdata_rwlock_wrunlock(rwlock);
                 }
             }
             operations++;
@@ -237,6 +412,23 @@ static void print_thread_stats(const char *test_name, int readers, int writers,
     fprintf(stderr, "%4s %8s %12"PRIu64" %12.0f\n",
             "TOT", "", total_ops, total_ops_per_sec);
 
+    if(control->measure_latency) {
+        latency_hist_t rd = {0}, wr = {0};
+        for(int i = 0; i < readers + writers; i++) {
+            if(contexts[i].type == THREAD_READER)
+                lat_merge(&rd, &control->stats[i].lat);
+            else
+                lat_merge(&wr, &control->stats[i].lat);
+        }
+
+        lat_print_header("  acquisition latency");
+        if(rd.count) lat_print_line("  readers", &rd);
+        if(wr.count) {
+            lat_print_line("  writers", &wr);
+            lat_print_distribution(&wr);
+        }
+    }
+
     // Store in summary
     summary->ops_per_sec[lock_type][config_idx] = total_ops_per_sec;
     summary->reader_ops_per_sec[lock_type][config_idx] = reader_ops_per_sec;
@@ -254,7 +446,7 @@ static void run_test(const char *name, int readers, int writers,
     fprintf(stderr, "\nRunning test: %s with %d readers and %d writers...\n",
             name, readers, writers);
 
-    // Reset all stats and control
+    // Reset all stats and control (clears the per-thread latency histograms too)
     memset(&control->stats, 0, sizeof(control->stats));
     control->counter = 0;
     control->readers = 0;
@@ -272,7 +464,7 @@ static void run_test(const char *name, int readers, int writers,
     }
 
     // Wait for test duration
-    sleep_usec(TEST_DURATION_SEC * USEC_PER_SEC);
+    sleep_usec(env_ulong("RWBENCH_SECS", TEST_DURATION_SEC) * USEC_PER_SEC);
 
     // Signal threads to stop
     for(int i = 0; i < total_threads; i++) {
@@ -286,6 +478,188 @@ static void run_test(const char *name, int readers, int writers,
     }
 
     print_thread_stats(name, readers, writers, contexts, control, summary, config_idx, lock_type);
+}
+
+
+// ====================================================================================================================
+// Layer 2 probe: writer acquisition latency under continuous reader churn.
+//
+// This is the scenario the writer-priority change targets: one writer arrives
+// periodically into a stream of readers that never stops. It answers two
+// questions the throughput matrix cannot:
+//
+//   1. how long does a writer wait to acquire, at the tail, not the mean; and
+//   2. what does the blocking reader path cost while a writer is pending.
+//
+// The readers use the BLOCKING rw_spinlock_read_lock() deliberately. The
+// rw-spinlock unittest churns with rw_spinlock_tryread_lock(), which returns
+// immediately and therefore never exercises the reader back-off ramp
+// (microsleep 1us -> 512us) that a pending writer forces readers onto.
+
+#define PROBE_MAX_READERS 32
+
+typedef struct {
+    void *lock;
+    bool is_spinlock;
+    uint32_t stop;
+    uint32_t gap_us;        // writer only: idle time between acquisitions
+    uint32_t finished;      // writer only: set when the thread has exited its loop
+    uint64_t ops;
+    latency_hist_t lat;
+} probe_ctx_t;
+
+static void probe_reader_thread(void *arg) {
+    probe_ctx_t *ctx = (probe_ctx_t *)arg;
+
+    while(!__atomic_load_n(&ctx->stop, __ATOMIC_ACQUIRE)) {
+        nsec_t t0 = bench_now_nsec();
+
+        if(ctx->is_spinlock) {
+            rw_spinlock_read_lock((RW_SPINLOCK *)ctx->lock);
+            lat_record(&ctx->lat, bench_now_nsec() - t0);
+            rw_spinlock_read_unlock((RW_SPINLOCK *)ctx->lock);
+        }
+        else {
+            netdata_rwlock_rdlock((netdata_rwlock_t *)ctx->lock);
+            lat_record(&ctx->lat, bench_now_nsec() - t0);
+            netdata_rwlock_rdunlock((netdata_rwlock_t *)ctx->lock);
+        }
+
+        ctx->ops++;
+    }
+}
+
+static void probe_writer_thread(void *arg) {
+    probe_ctx_t *ctx = (probe_ctx_t *)arg;
+
+    while(!__atomic_load_n(&ctx->stop, __ATOMIC_ACQUIRE)) {
+        // Stay out of the lock between acquisitions, so every sample measures a
+        // writer ARRIVING into an established reader stream. Back-to-back
+        // acquisitions would keep the lock writer-held and measure nothing.
+        microsleep(ctx->gap_us);
+
+        nsec_t t0 = bench_now_nsec();
+
+        if(ctx->is_spinlock) {
+            rw_spinlock_write_lock((RW_SPINLOCK *)ctx->lock);
+            lat_record(&ctx->lat, bench_now_nsec() - t0);
+            rw_spinlock_write_unlock((RW_SPINLOCK *)ctx->lock);
+        }
+        else {
+            netdata_rwlock_wrlock((netdata_rwlock_t *)ctx->lock);
+            lat_record(&ctx->lat, bench_now_nsec() - t0);
+            netdata_rwlock_wrunlock((netdata_rwlock_t *)ctx->lock);
+        }
+
+        ctx->ops++;
+    }
+
+    __atomic_store_n(&ctx->finished, 1, __ATOMIC_RELEASE);
+}
+
+static void run_writer_latency_probe(const char *lock_name, void *lock, bool is_spinlock,
+                                     int nreaders, unsigned long secs, unsigned long gap_us) {
+    probe_ctx_t readers[PROBE_MAX_READERS];
+    probe_ctx_t writer = { .lock = lock, .is_spinlock = is_spinlock, .gap_us = (uint32_t)gap_us };
+    ND_THREAD *reader_threads[PROBE_MAX_READERS];
+    char thr_name[32];
+
+    fprintf(stderr, "\n%s: 1 writer (every %luus) vs %d churning readers, %lus\n",
+            lock_name, gap_us, nreaders, secs);
+
+    usec_t readers_started_ut = now_monotonic_usec();
+    for(int i = 0; i < nreaders; i++) {
+        readers[i] = (probe_ctx_t){ .lock = lock, .is_spinlock = is_spinlock };
+        snprintf(thr_name, sizeof(thr_name), "probe_rd%d", i);
+        reader_threads[i] = nd_thread_create(thr_name, NETDATA_THREAD_OPTION_DONT_LOG,
+                                             probe_reader_thread, &readers[i]);
+    }
+
+    // Let the reader stream establish itself before the writer arrives, so the
+    // first samples are not measuring an empty lock.
+    sleep_usec(100 * USEC_PER_MS);
+
+    ND_THREAD *writer_thread = nd_thread_create("probe_wr", NETDATA_THREAD_OPTION_DONT_LOG,
+                                                probe_writer_thread, &writer);
+
+    sleep_usec(secs * USEC_PER_SEC);
+
+    // Stop the writer first: readers must outlive it, otherwise the last writer
+    // acquisition is measured against a draining reader set instead of a full one.
+    __atomic_store_n(&writer.stop, 1, __ATOMIC_RELEASE);
+
+    // The writer can be parked inside write_lock. On an implementation that
+    // starves writers it never returns while the readers churn, so joining it
+    // here would hang the benchmark forever - which IS the finding, but it has
+    // to be reported rather than hung on. Give it a bounded grace period, then
+    // release the readers so it can always complete.
+    usec_t grace_deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
+    while(!__atomic_load_n(&writer.finished, __ATOMIC_ACQUIRE) &&
+          now_monotonic_usec() < grace_deadline)
+        yield_the_processor();
+
+    bool writer_starved = !__atomic_load_n(&writer.finished, __ATOMIC_ACQUIRE);
+
+    for(int i = 0; i < nreaders; i++)
+        __atomic_store_n(&readers[i].stop, 1, __ATOMIC_RELEASE);
+
+    nd_thread_join(writer_thread);
+    for(int i = 0; i < nreaders; i++)
+        nd_thread_join(reader_threads[i]);
+
+    // Measured, not nominal: when the writer starves, the readers keep running
+    // through the whole grace period, and dividing by `secs` would understate
+    // their throughput by exactly that much - in the one case we care about.
+    usec_t readers_ran_ut = now_monotonic_usec() - readers_started_ut;
+
+    latency_hist_t rd = {0};
+    uint64_t reader_ops = 0;
+    for(int i = 0; i < nreaders; i++) {
+        lat_merge(&rd, &readers[i].lat);
+        reader_ops += readers[i].ops;
+    }
+
+    if(writer_starved)
+        fprintf(stderr, "    *** WRITER STARVED: still parked in the lock 5s after stop;"
+                        " its last sample only completed once the readers were stopped ***\n");
+
+    lat_print_header("  latency");
+    lat_print_line("  writer acquire", &writer.lat);
+    lat_print_distribution(&writer.lat);
+    lat_print_line("  reader acquire", &rd);
+    fprintf(stderr, "    reader throughput: %.3f M ops/sec across %d readers (over %.2fs measured)\n",
+            (double)reader_ops * USEC_PER_SEC / (double)readers_ran_ut / 1000000.0,
+            nreaders,
+            (double)readers_ran_ut / (double)USEC_PER_SEC);
+
+    if(is_spinlock) {
+        RW_SPINLOCK *sp = (RW_SPINLOCK *)lock;
+        if(sp->counter != 0 || sp->writer != 0)
+            fprintf(stderr, "    FATAL: lock not free after probe (counter=%u writer=%d)\n",
+                    sp->counter, sp->writer);
+    }
+}
+
+static void writer_latency_probe(void) {
+    unsigned long secs = env_ulong("RWBENCH_PROBE_SECS", 5);
+    unsigned long gap_us = env_ulong("RWBENCH_WRITER_GAP_US", 1000);
+    int reader_counts[] = { 1, 4, 8, 16, 32 };
+
+    fprintf(stderr, "\n\n====================================================================\n");
+    fprintf(stderr, "WRITER ACQUISITION LATENCY UNDER READER CHURN\n");
+    fprintf(stderr, "====================================================================\n");
+
+    for(size_t i = 0; i < sizeof(reader_counts) / sizeof(reader_counts[0]); i++) {
+        int nreaders = reader_counts[i];
+
+        RW_SPINLOCK rw_spinlock = RW_SPINLOCK_INITIALIZER;
+        run_writer_latency_probe("rw_spinlock", &rw_spinlock, true, nreaders, secs, gap_us);
+
+        netdata_rwlock_t rwlock;
+        netdata_rwlock_init(&rwlock);
+        run_writer_latency_probe("netdata_rwlock", &rwlock, false, nreaders, secs, gap_us);
+        netdata_rwlock_destroy(&rwlock);
+    }
 }
 
 int rwlocks_stress_test(void) {
@@ -319,19 +693,25 @@ int rwlocks_stress_test(void) {
 
     // Test configurations: [readers, writers]
     int configs[][2] = {
-        {1, 0},   // Single reader
-        {0, 1},   // Single writer
+        {1, 0},   // Single reader                  - uncontended reader guard
+        {0, 1},   // Single writer                  - uncontended writer guard
         {1, 1},   // One reader + one writer
         {2, 1},   // Two readers + one writer
         {1, 2},   // One reader + two writers
         {2, 2},   // Two readers + two writers
         {4, 1},   // Four readers + one writer
-        {1, 4},   // One reader + four writers
+        {1, 4},   // One reader + four writers      - writer->writer handoff
         {4, 4},   // Four readers + four writers
+        {8, 1},   // Eight readers + one writer     - reader pressure on one writer
+        {16, 1},  // 16 readers + one writer
+        {32, 1},  // 32 readers + one writer        - oversubscribed below 33 cores
+        {16, 4},  // 16 readers + four writers      - reader pressure + handoff
     };
 
     const int num_configs = sizeof(configs) / sizeof(configs[0]);
     summary.config_count = num_configs;
+    const bool skip_matrix = env_ulong("RWBENCH_SKIP_MATRIX", 0) != 0;
+    const bool skip_probe  = env_ulong("RWBENCH_SKIP_PROBE", 0) != 0;
 
     // Create all threads
     for(int i = 0; i < MAX_THREADS; i++) {
@@ -363,6 +743,25 @@ int rwlocks_stress_test(void) {
         spinlock_contexts[i].thread =
             nd_thread_create(thr_name, NETDATA_THREAD_OPTION_DONT_LOG, benchmark_thread, &spinlock_contexts[i]);
     }
+
+    // Two passes over the matrix. Pass 0 is clock-free and measures throughput.
+    // Pass 1 times every acquisition: two clock reads per operation cost more
+    // than an uncontended acquisition, so its throughput is NOT comparable with
+    // pass 0 - only its latency distribution is meaningful.
+    for(int pass = 0; pass < 2 && !skip_matrix; pass++) {
+    bool measure_latency = (pass == 1);
+    uint32_t cs_work = (uint32_t)env_ulong("RWBENCH_CS_WORK", 0);
+
+    netdata_control.measure_latency = spinlock_control.measure_latency = measure_latency;
+    netdata_control.cs_work = spinlock_control.cs_work = cs_work;
+    memset(&summary, 0, sizeof(summary));
+    summary.config_count = num_configs;
+
+    fprintf(stderr, "\n\n====================================================================\n");
+    fprintf(stderr, "PASS %d: %s (cs_work=%u)\n", pass,
+            measure_latency ? "LATENCY (clock-instrumented, throughput not comparable)"
+                            : "THROUGHPUT (clock-free)", cs_work);
+    fprintf(stderr, "====================================================================\n");
 
     // Run all configurations
     for(int i = 0; i < num_configs; i++) {
@@ -396,6 +795,7 @@ int rwlocks_stress_test(void) {
 
     // Print the summary table
     print_summary(&summary);
+    } // pass
 
     // Stop all threads
     fprintf(stderr, "\nStopping threads...\n");
@@ -429,6 +829,9 @@ int rwlocks_stress_test(void) {
     }
 
     netdata_rwlock_destroy(&netdata_rwlock);
+
+    if(!skip_probe)
+        writer_latency_probe();
 
     return 0;
 }
