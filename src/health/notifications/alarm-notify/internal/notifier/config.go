@@ -16,6 +16,12 @@ import (
 type Config struct {
 	Version      int                    `yaml:"version"`
 	Destinations map[string]Destination `yaml:"destinations"`
+	Routing      Routing                `yaml:"routing,omitempty"`
+}
+
+type Routing struct {
+	Roles   map[string][]string `yaml:"roles,omitempty"`
+	Default []string            `yaml:"default,omitempty"`
 }
 
 type Destination struct {
@@ -49,6 +55,9 @@ func readConfig(r io.Reader) (Config, error) {
 		if err := dst.validate(); err != nil {
 			return Config{}, err
 		}
+	}
+	if err := cfg.validateRouting(); err != nil {
+		return Config{}, err
 	}
 	return cfg, nil
 }

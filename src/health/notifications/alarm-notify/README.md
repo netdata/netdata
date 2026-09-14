@@ -1,12 +1,12 @@
 # Experimental Go notifier
 
-This standalone Go module sends a JSON notification to one explicitly selected webhook. It has no imports from
+This standalone Go module routes a JSON notification to named webhook destinations. It has no imports from
 the existing `src/go` module. It is for local development and is not installed, packaged, or invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
-The first increment establishes a working delivery path. [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash
-functionality. Configuration and code may change substantially before production adoption; final redesign follows
-the working functional baseline.
+The current increments provide explicit delivery and role-based routing. [CAPABILITIES.md](CAPABILITIES.md) tracks
+the remaining Bash functionality. Configuration and code may change substantially before production adoption;
+final redesign follows the working functional baseline.
 
 ## Build and run
 
@@ -16,6 +16,7 @@ From this directory, using the Go version in `go.mod`:
 go build -o /tmp/alarm-notify .
 /tmp/alarm-notify validate --config examples/notify.yaml
 /tmp/alarm-notify send --config examples/notify.yaml --destination local < examples/event.json
+/tmp/alarm-notify send --config examples/notify.yaml --role sysadmin --role dba < examples/event.json
 ```
 
 The send command needs a receiver. For a local demonstration, run this in a separate terminal and stop it with Ctrl-C:
@@ -52,10 +53,14 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
   invalid literal settings fail. It does not resolve secrets, read event input, or make network requests.
 - `send --config FILE --destination NAME` reads exactly one JSON event from stdin and delivers it to that named
   destination. Unknown destinations fail. Other configured destinations are validated but not resolved or contacted.
+- `send --config FILE --role ROLE [--role ROLE ...]` uses YAML routing to select destinations. Choose either an explicit
+  destination or roles; mixing the selectors fails. Roles are exact, case-sensitive names, without comma splitting,
+  wildcards, or implicit role selection. They do not become fields in the webhook payload.
 - Both commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
   Deadline expiration, Ctrl-C, or SIGTERM stops the invocation. Run this developer tool as an ordinary user.
-- Exit status is `0` for success/help and `1` for invalid options, configuration, input, cancellation, or delivery
-  failure. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
+- Exit status is `0` when at least one delivery succeeds, no destinations are selected, validation succeeds, or help
+  is requested. Invalid options/configuration/input, all selected deliveries failing, or command cancellation/timeout
+  return `1`. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
 
 Configuration has `version: 1` and a `destinations` mapping. Each destination requires `type: webhook` and `url`;
 `bearer_token` is optional. Destination names are nonsecret identifiers. The URL must be an absolute HTTP or HTTPS
@@ -68,7 +73,39 @@ identity. Resolved values have surrounding whitespace trimmed and must be nonemp
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
 `validate` checks reference syntax only; `send` resolves and validates the selected destination before sending.
 
-Delivery sends one POST with `Content-Type: application/json` and, when configured, `Authorization: Bearer ...`.
+## Routing and delivery results
+
+The optional `routing` section maps roles to destination names:
+
+```yaml
+routing:
+  default: [local]
+  roles:
+    sysadmin: [local, audit]
+    dba: [audit]
+    muted: []
+```
+
+Each name must exist in `destinations`. A missing role uses `default`; an explicit empty list suppresses delivery for
+that role. Null role entries are rejected so an accidental missing value does not suppress notifications. The
+reserved roles `silent` and `disabled` select nothing and cannot have configured routes. They do not suppress other
+roles in the same invocation. With neither a matching role nor defaults, sending is a successful no-op.
+
+The selected destinations are the union across roles, preserving input-role and configured-list order. Each
+destination name is sent once. Different names remain distinct destinations even if they use the same URL. In the
+example, `--role sysadmin --role dba` sends to `local` and `audit` once each; an unknown role selects `local`.
+
+All configuration and event structure is validated before delivery. Selected destinations are then attempted
+sequentially; a secret-resolution, HTTP, or transport error does not stop the next destination. The total timeout
+still covers the whole invocation, so a slow destination can exhaust the remaining time. Cancellation stops the
+invocation even after earlier successful deliveries; no further destinations are started once it is observed.
+
+Each completed delivery reports its quoted destination name and outcome to stderr, followed by a success/failure
+count. Partial failure returns `0` when another delivery succeeded, matching Bash's any-success behavior; inspect
+the individual results to see failures. On interruption, counts cover results reported before cancellation and do
+not claim an outcome for interrupted or unstarted deliveries.
+
+Each delivery sends one POST with `Content-Type: application/json` and, when configured, `Authorization: Bearer ...`.
 HTTP 200–299 acknowledges delivery. Redirects and other status codes fail; there are no application retries.
 Response bodies are closed without being buffered, logged, or interpreted. Errors do not echo config/input values,
 secret contents, or endpoint URLs.
@@ -84,9 +121,9 @@ Optional fields are `chart`, `context`, `previous_status`, `info`, `value`, `pre
 Values are finite JSON numbers or null; missing values are sent as null and zero remains zero. Unknown fields and
 trailing documents are rejected. Strings are encoded as JSON, including quotes, newlines, and Unicode.
 
-This increment delivers explicitly selected events. It does not infer initial-CLEAR eligibility, role matches, or
-critical-history policy. Those capabilities remain pending in the inventory. Add future internal-only event facts
-separately from this public webhook document.
+This increment does not infer initial-CLEAR eligibility or apply severity filters or critical-history policy. Those
+capabilities remain pending in the inventory. Add future internal-only event facts separately from this public
+webhook document.
 
 ## Validation
 

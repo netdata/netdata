@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -18,12 +19,20 @@ const usage = `Experimental Netdata notifier (not installed or used by the Agent
 Usage:
   alarm-notify validate --config FILE [--timeout 10s]
   alarm-notify send --config FILE --destination NAME [--timeout 10s] < event.json
+  alarm-notify send --config FILE --role ROLE [--role ROLE ...] [--timeout 10s] < event.json
 
-send reads one JSON event and posts it to one configured webhook.
+send reads one JSON event and posts it to the selected webhook destinations.
+Use either one explicit destination or roles resolved through YAML routing.
 validate checks configuration without resolving secrets or sending requests.
 The positive timeout covers the whole invocation, including input reads.
-Exit status: 0 on success/help; 1 on input, configuration, or delivery failure.
+Exit status: 0 on any successful delivery, no selected destinations, validation, or help;
+1 on input/configuration errors, all deliveries failing, or command cancellation/timeout.
 `
+
+type commandUpdate struct {
+	delivery *deliveryResult
+	err      error
+}
 
 // Run implements the command boundary. On cancellation the process may exit while
 // an input read is blocked; callers that reuse Run must close their input afterward.
@@ -42,8 +51,22 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	configPath := flags.String("config", "", "YAML configuration path")
 	timeout := flags.Duration("timeout", 10*time.Second, "total invocation timeout")
 	var destination string
+	var roles []string
 	if args[0] == "send" {
-		flags.StringVar(&destination, "destination", "", "named webhook destination")
+		flags.Func("destination", "named webhook destination", func(value string) error {
+			if strings.TrimSpace(value) == "" {
+				return errors.New("destination must not be empty")
+			}
+			destination = value
+			return nil
+		})
+		flags.Func("role", "role to notify (repeat for multiple roles)", func(value string) error {
+			if strings.TrimSpace(value) == "" {
+				return errors.New("role must not be empty")
+			}
+			roles = append(roles, value)
+			return nil
+		})
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -53,27 +76,65 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		logger.Print("invalid command options; use --help for usage")
 		return 1
 	}
-	if flags.NArg() != 0 || *configPath == "" || *timeout <= 0 || (args[0] == "send" && destination == "") {
+	if flags.NArg() != 0 || *configPath == "" || *timeout <= 0 ||
+		(args[0] == "send" && (destination == "") == (len(roles) == 0)) {
 		logger.Print(
-			"provide --config, a positive --timeout, and --destination for send; positional arguments are not accepted",
+			"provide --config, a positive --timeout, and either --destination or --role for send; positional arguments are not accepted",
 		)
 		return 1
 	}
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
 	// Keep output on this goroutine so cancellation cannot race with a caller's writer.
-	result := make(chan error, 1)
+	updates := make(chan commandUpdate)
+	publish := func(update commandUpdate) {
+		select {
+		case updates <- update:
+		case <-ctx.Done():
+		}
+	}
 	go func() {
-		result <- execute(ctx, *configPath, destination, stdin, *timeout)
+		err := execute(
+			ctx,
+			*configPath,
+			args[0] == "validate",
+			destination,
+			roles,
+			stdin,
+			*timeout,
+			func(result deliveryResult) {
+				publish(commandUpdate{delivery: &result})
+			},
+		)
+		publish(commandUpdate{err: err})
 	}()
 	var err error
-	select {
-	case err = <-result:
-		if ctx.Err() != nil {
+	succeeded, failed := 0, 0
+receive:
+	for {
+		select {
+		case update := <-updates:
+			if update.delivery == nil {
+				err = update.err
+				break receive
+			}
+			if update.delivery.err != nil {
+				failed++
+				logger.Printf("destination %q failed: %s", update.delivery.destination, update.delivery.err)
+			} else {
+				succeeded++
+				logger.Printf("destination %q sent", update.delivery.destination)
+			}
+		case <-ctx.Done():
 			err = ctx.Err()
+			break receive
 		}
-	case <-ctx.Done():
+	}
+	if ctx.Err() != nil {
 		err = ctx.Err()
+	}
+	if args[0] == "send" {
+		logger.Printf("delivery summary: %d succeeded, %d failed", succeeded, failed)
 	}
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -86,13 +147,20 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	}
 	if args[0] == "validate" {
 		fmt.Fprintln(stdout, "configuration is valid")
-	} else {
-		logger.Print("notification sent")
 	}
 	return 0
 }
 
-func execute(ctx context.Context, configPath, destination string, stdin io.Reader, timeout time.Duration) error {
+func execute(
+	ctx context.Context,
+	configPath string,
+	validateOnly bool,
+	destination string,
+	roles []string,
+	stdin io.Reader,
+	timeout time.Duration,
+	report func(deliveryResult),
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -105,12 +173,12 @@ func execute(ctx context.Context, configPath, destination string, stdin io.Reade
 	if err != nil {
 		return err
 	}
-	if destination == "" {
+	if validateOnly {
 		return nil
 	}
-	dst, ok := cfg.Destinations[destination]
-	if !ok {
-		return errors.New("selected destination is not configured")
+	destinations, err := selectDestinations(cfg, destination, roles)
+	if err != nil {
+		return err
 	}
 	event, err := readEvent(stdin)
 	if err != nil {
@@ -119,5 +187,5 @@ func execute(ctx context.Context, configPath, destination string, stdin io.Reade
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return sendWebhook(ctx, dst, event, timeout)
+	return dispatch(ctx, cfg, destinations, event, timeout, report)
 }
