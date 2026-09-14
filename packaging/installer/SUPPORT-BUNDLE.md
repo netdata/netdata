@@ -179,7 +179,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | claim state (`claimed_id` only) | claim id is the identifier support needs to find the node in Cloud; a non-persisted `cloud.d` across restarts is a known Freshdesk root cause |
 | db disk usage per tier + sqlite sizes | retention questions ("why do I only have N days") are answered by tier sizes vs configured limits |
 | dyncfg files (sanitized) | jobs created via UI live here, not in `/etc/netdata` — invisible in classic config collection |
-| go.d job statuses, health silencers | which collector jobs exist/fail; why alerts are silent |
+| python.d job statuses, health silencers | which python.d jobs exist/fail; why alerts are silent. **go.d job state is NOT here** — go.d moved it into dyncfg, so it is captured live in `07-runtime/dyncfg-tree.json` and is unavailable when the agent's API is down |
 
 ### `07-runtime/` — live agent state (only when API responds)
 
@@ -190,6 +190,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | `/api/v3/stream_info`, `/api/v1/aclk` | streaming and cloud-connection diagnostics |
 | active alerts + alert instances | alert tickets are the single biggest Freshdesk theme |
 | `/api/v1/functions`, `/api/v1/ml_info` | which plugins expose what; ML state |
+| **`/api/v3/config?action=tree`** (dyncfg tree) | the authoritative collector job state: every go.d and scripts.d job with its status (`running`/`failed`/`accepted`), plus service discovery, vnodes, secret stores and alert prototypes. go.d stopped writing job state to disk when its job manager moved to a single-owner command kernel, so this endpoint is the only place a bundle can capture it — which also means it is missing when the agent's API is down. Large installs can exceed the 2 MiB API cap; the capture then holds the standard withheld-body marker rather than a truncated tree |
 | `netdata -W buildinfo` + `buildinfojson` | required by the bug template; the paths section proves which config dirs the binary uses; works with the daemon **down** |
 | `netdata -W cmakecache` | authoritative record of how the agent was built (compiler flags, enabled/disabled plugins, configured paths) — a superset of buildinfo; pinpoints build-time causes (a disabled plugin, a custom flag) that buildinfo alone can miss |
 | `netdata -W perflibdump -perflibfile` (Windows) | performance-library counter/instance metadata — the most common Windows support class is perflib-related (e.g. PerflibSMB); collected as a file so a large dump is not truncated, and sanitized like any other file. Reads `HKEY_PERFORMANCE_DATA`, so it needs an elevated session and can be slower than other commands: the collector pre-checks elevation, uses a 30s timeout floor, and never drops it silently — when it cannot run, `perflib.json` holds a JSON marker stating why (not elevated, timed out, or an access error) so support sees the reason instead of a missing file |

@@ -1476,9 +1476,9 @@ collect_state() {
       cat '"$LIBDIR"'/cloud.d/claimed_id 2>/dev/null || echo "(no claimed_id file - agent not claimed)"; echo;
       echo "(token and private.pem intentionally NOT collected)"; true'
     collect_file 06-state/health-silencers.json "Persisted alert silencers" "$LIBDIR/health.silencers.json"
-    for gjs in "$LIBDIR"/god-jobs-statuses.json "$LIBDIR"/*jobs-statuses*.json; do
-      [ -f "$gjs" ] && { collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$gjs"; break; }
-    done
+    # python.d is the only plugin still dumping job state to disk; go.d moved its
+    # job state into dyncfg, captured live in 07-runtime/dyncfg-tree.json
+    collect_file 06-state/pythond-job-statuses.json "python.d collector job states (go.d job state is in 07-runtime/dyncfg-tree.json)" "$LIBDIR/pythond-jobs-statuses.json"
     if [ -d "$LIBDIR/config" ]; then
       for dc in "$LIBDIR/config"/*.dyncfg; do
         [ -f "$dc" ] || continue
@@ -1510,6 +1510,7 @@ collect_runtime() {
     collect_api 07-runtime/alerts-active.json "Currently raised alerts" "/api/v3/alerts?options=active"
     collect_api 07-runtime/alerts-all.json "All alert instances (summary)" "/api/v1/alarms?all"
     collect_api 07-runtime/functions.json "Registered functions (which plugins expose what)" /api/v1/functions
+    collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (running/failed), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
     collect_api 07-runtime/ml-info.json "Machine learning status" /api/v1/ml_info
     # netdata's own resource usage, bounded windows (perf triage without screenshots)
     collect_api 07-runtime/self-cpu.csv "Netdata CPU last 10min (csv)" "/api/v1/data?chart=netdata.server_cpu&after=-600&points=60&format=csv"
@@ -1791,7 +1792,7 @@ write_summary() {
     echo "READ ORDER FOR TRIAGE:"
     echo "  SNMP issues         -> 06-state/snmp-diagnostics-status.txt, 06-state/snmp-diagnostics/"
     echo "  crashes/won't start -> 06-state/status-file.json, 05-logs/, 01-system/kernel-messages.txt"
-    echo "  collector issues    -> 04-config/go.d*, 05-logs/collector.log, 09-permissions/plugins-d.txt"
+    echo "  collector issues    -> 07-runtime/dyncfg-tree.json (job states), 05-logs/collector.log, 04-config/go.d*, 09-permissions/plugins-d.txt"
     echo "  streaming issues    -> 04-config/stream.conf, 07-runtime/node-instances.json, 01-system/clock-timesync.txt"
     echo "  cloud/claiming      -> 06-state/cloud-state.txt, 07-runtime/aclk-state.json, 08-network/"
     echo "  performance         -> 03-process/threads-cpu.txt, 06-state/db-disk-usage.txt, 07-runtime/node-instances.json"
