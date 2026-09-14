@@ -285,6 +285,12 @@ void close_cmd_pool(CmdPool *pool) {
     netdata_mutex_unlock(&pool->lock);
 }
 
+void destroy_cmd_pool(CmdPool *pool) {
+    netdata_mutex_destroy(&pool->lock);
+    netdata_cond_destroy(&pool->not_full);
+    netdata_cond_destroy(&pool->no_producers);
+}
+
 void release_cmd_pool(CmdPool *pool) {
     netdata_mutex_lock(&pool->lock);
 
@@ -319,7 +325,9 @@ void release_cmd_pool(CmdPool *pool) {
     // (aclk_sync_config, meta_config), so these are embedded objects, not allocations. Keeping them
     // valid is what lets the late producer above lock, see `closed`, and be turned away safely.
     //
-    // The pool is not reusable afterwards: re-initializing one at the same address is invalid.
+    // A caller that CAN prove no producer remains - one that joined every producer thread - may
+    // follow this with destroy_cmd_pool(). Without that, the pool is not reusable: re-initializing
+    // one at the same address leaves the previous lock and conditions undestroyed.
 }
 
 /// Test
@@ -365,12 +373,11 @@ void pop_thread(void *arg) {
 
 int test_cmd_pool_fifo()
 {
+    CmdPool pool;
+
     int pool_sizes[] = {32, 64, 128, 256};
 
     for (size_t i = 0; i < sizeof(pool_sizes) / sizeof(pool_sizes[0]); ++i) {
-        // fresh storage per round: release_cmd_pool() leaves the lock and conditions initialized,
-        // so reusing one CmdPool here would re-initialize them in place
-        CmdPool pool;
         int pool_size = pool_sizes[i];
         init_cmd_pool(&pool, pool_size);
 
@@ -385,6 +392,11 @@ int test_cmd_pool_fifo()
         uv_thread_join(&consumer);
 
         release_cmd_pool(&pool);
+        // both threads are joined above, so nothing can still reach the pool: this is the one
+        // caller that may destroy the synchronization objects, and it MUST, because the next
+        // iteration initializes a pool at this same address
+        destroy_cmd_pool(&pool);
+
         if (args.failed) {
             fprintf(stderr, "Multithreaded FIFO test failed with %d errors.\n", args.failed);
             return 1;

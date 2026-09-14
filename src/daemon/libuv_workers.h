@@ -170,6 +170,11 @@ void cmd_pool_producer_leave(CmdPool *pool);
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full);
 bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd);
 void release_cmd_pool(CmdPool *pool);
+
+// Destroys the pool's lock and conditions. release_cmd_pool() deliberately does not, because it
+// cannot rule out a producer that is still blocked acquiring the lock. Call this ONLY when that is
+// provable - every producer thread joined - and only if the pool's storage is to be reused.
+void destroy_cmd_pool(CmdPool *pool);
 int test_cmd_pool_fifo();
 
 #endif //NETDATA_EVENT_LOOP_H
