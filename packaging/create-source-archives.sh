@@ -41,7 +41,7 @@ ${tar} --create \
        --exclude=./artifacts \
        --exclude=.git \
        --exclude=.gitignore \
-       --exclude=.gitatributes \
+       --exclude=.gitattributes \
        --exclude=.gitmodules \
        --transform "s/^\\.\\//${archive_name}\\//" \
        --verbose \
