@@ -20,7 +20,6 @@
 
 // work the engine hands to the rest of the daemon                                                    -> hooks
 void query_weights_worker_thread(void *arg);                                    // web/api/queries/weights.h
-void rrdcontext_db_rotation(void);                                              // database/contexts/rrdcontext.h
 size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid));
                                                                                 // database/sqlite/sqlite_metadata.h
 

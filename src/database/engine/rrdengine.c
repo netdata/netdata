@@ -1848,7 +1848,8 @@ static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_un
     struct rrdengine_datafile *datafile = get_first_ctx_datafile(ctx, false);
     datafile_delete(ctx, datafile, ctx_is_available_for_queries(ctx), true, true);
 
-    rrdcontext_db_rotation();
+    if(dbengine_cfg.on_db_rotation)
+        dbengine_cfg.on_db_rotation();
 
     return data;
 }
