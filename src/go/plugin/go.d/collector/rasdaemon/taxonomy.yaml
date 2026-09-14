@@ -1,0 +1,15 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: rasdaemon
+placements:
+  - id: rasdaemon
+    section_id: system.hardware
+    title: RAS Daemon
+    items:
+      - rasdaemon.memory_errors
+      - rasdaemon.pcie_aer_errors
+      - rasdaemon.mce_records
+      - rasdaemon.memory_failure_events
+      - rasdaemon.other_errors
+      - rasdaemon.dimm_errors
+    icon: hardware

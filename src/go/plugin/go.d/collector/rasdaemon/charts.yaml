@@ -1,0 +1,100 @@
+version: v1
+context_namespace: rasdaemon
+groups:
+  # ── Always-present summary charts ───────────────────────────────────────────
+  # These are emitted on every cycle, including as zeros on a healthy machine, so that
+  # "no RAS errors" is an observable state rather than an absent chart, and so health
+  # alerts have a context to attach to before the first error ever occurs.
+  - family: memory
+    metrics:
+      - memory_errors
+    charts:
+      - id: memory_errors
+        title: Memory errors by severity
+        context: memory_errors
+        units: errors/s
+        algorithm: incremental
+        type: stacked
+        dimensions:
+          - selector: memory_errors
+            name_from_label: severity
+
+  - family: pci
+    metrics:
+      - aer_events
+    charts:
+      - id: pcie_aer_errors
+        title: PCIe Advanced Error Reporting events by severity
+        context: pcie_aer_errors
+        units: errors/s
+        algorithm: incremental
+        type: stacked
+        dimensions:
+          - selector: aer_events
+            name_from_label: severity
+
+  - family: cpu
+    metrics:
+      - mce_records
+    charts:
+      - id: mce_records
+        title: Machine Check Exception records
+        context: mce_records
+        units: events/s
+        algorithm: incremental
+        type: line
+        dimensions:
+          - selector: mce_records
+            name: records
+
+  - family: memory
+    metrics:
+      - memory_failure_events
+    charts:
+      - id: memory_failure_events
+        title: Kernel memory failure events
+        context: memory_failure_events
+        units: events/s
+        algorithm: incremental
+        type: line
+        dimensions:
+          - selector: memory_failure_events
+            name: events
+
+  # extlog, devlink, disk, cxl, arm and signal are reported as one total each. The set is
+  # fixed at six, so cardinality is bounded and the dimension list is stable.
+  - family: other
+    metrics:
+      - class_events
+    charts:
+      - id: other_errors
+        title: Other RAS events by class
+        context: other_errors
+        units: events/s
+        algorithm: incremental
+        type: stacked
+        dimensions:
+          - selector: class_events
+            name_from_label: class
+
+  # ── Per-DIMM detail ─────────────────────────────────────────────────────────
+  # One chart per physical DIMM, keyed by the silkscreen label (DDR4_A1, ...) rather than by
+  # EDAC's rankN directory, so a chart corresponds to a stick a technician can actually pull.
+  # Instances appear when a DIMM first records an error; healthy sticks are covered by the
+  # always-present memory_errors chart above.
+  - family: memory
+    metrics:
+      - mc_events
+    charts:
+      - id: dimm_errors
+        title: Memory errors per DIMM
+        context: dimm_errors
+        units: errors/s
+        algorithm: incremental
+        type: line
+        instances:
+          by_labels: [dimm]
+        dimensions:
+          - selector: mc_events
+            name_from_label: severity
+
