@@ -2572,7 +2572,6 @@ uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx)
 void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np("DBENGINE");
-    service_register(NULL, NULL, NULL);
 
     worker_register("DBENGINE");
 

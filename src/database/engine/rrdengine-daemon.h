@@ -17,7 +17,6 @@
 // leaf daemon headers (they include nothing of the daemon themselves)
 #include "daemon/libuv_workers.h"                 // UV_EVENT_* job ids, register_libuv_worker_jobs(),
                                                   // RESERVED_LIBUV_WORKER_THREADS                     -> hooks
-#include "daemon/daemon-service.h"                // service_register()                                -> hooks
 
 // work the engine hands to the rest of the daemon                                                    -> hooks
 void query_weights_worker_thread(void *arg);                                    // web/api/queries/weights.h
