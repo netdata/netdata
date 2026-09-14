@@ -286,13 +286,40 @@ void close_cmd_pool(CmdPool *pool) {
 }
 
 void release_cmd_pool(CmdPool *pool) {
+    netdata_mutex_lock(&pool->lock);
+
+    // Close before freeing, under the lock, even if the owner already called close_cmd_pool().
+    // This is what makes the buffer free safe: a producer that passed its owner's own "are we still
+    // running" check and was then descheduled arrives here afterwards, and it MUST find the pool
+    // refusing rather than a NULL buffer to write into. Owners that never call close_cmd_pool() at
+    // all (the metadata sync loop) depend entirely on this.
+    pool->closed = true;
+    netdata_cond_broadcast(&pool->not_full);
+
     if (pool->buffer) {
         free(pool->buffer);
         pool->buffer = NULL;
     }
-    netdata_mutex_destroy(&pool->lock);
-    netdata_cond_destroy(&pool->not_full);
-    netdata_cond_destroy(&pool->no_producers);
+
+    // pop_cmd() indexes the buffer whenever count is non-zero, so the count has to go with it
+    pool->count = 0;
+    pool->head = 0;
+    pool->tail = 0;
+
+    netdata_mutex_unlock(&pool->lock);
+
+    // The lock and the conditions are deliberately NOT destroyed.
+    //
+    // close_cmd_pool() can account for producers that are inside the pool, but not for one that has
+    // decided to push and is still blocked acquiring pool->lock: it is not counted yet, so the close
+    // sees zero producers and returns, and destroying the mutex here would pull it out from under a
+    // thread that is about to lock it. Counting cannot fix that - taking the count needs the lock.
+    //
+    // Not destroying them costs nothing: both pools live inside process-lifetime statics
+    // (aclk_sync_config, meta_config), so these are embedded objects, not allocations. Keeping them
+    // valid is what lets the late producer above lock, see `closed`, and be turned away safely.
+    //
+    // The pool is not reusable afterwards: re-initializing one at the same address is invalid.
 }
 
 /// Test
@@ -338,11 +365,12 @@ void pop_thread(void *arg) {
 
 int test_cmd_pool_fifo()
 {
-    CmdPool pool;
-
     int pool_sizes[] = {32, 64, 128, 256};
 
     for (size_t i = 0; i < sizeof(pool_sizes) / sizeof(pool_sizes[0]); ++i) {
+        // fresh storage per round: release_cmd_pool() leaves the lock and conditions initialized,
+        // so reusing one CmdPool here would re-initialize them in place
+        CmdPool pool;
         int pool_size = pool_sizes[i];
         init_cmd_pool(&pool, pool_size);
 

@@ -674,7 +674,7 @@ static void timer_cb(uv_timer_t *handle)
 #define CMD_POOL_SIZE (2048)
 
 // uv_close() completes in the loop pass after it is requested, so this only ever needs a couple of
-// iterations; the cap is there so a handle that refuses to close cannot spin the shutdown forever.
+// iterations. The cap only bounds an impossible state - see the fatal() at its only use.
 #define ACLK_HANDLE_CLOSE_MAX_PASSES (100)
 
 static void aclk_count_open_handle(uv_handle_t *handle __maybe_unused, void *data)
@@ -1096,12 +1096,20 @@ static void aclk_synchronization_event_loop(void *arg)
     // parked in destroy_aclk_config() may be holding rrd_wrlock(), and worker jobs - which are what
     // that wait is for - do not own host timers, so making the barrier wait for them would stall the
     // whole agent behind a query for up to the watchdog timeout for no lifetime benefit.
+    //
+    // The wait for the walk to empty MUST NOT give up early and publish the barrier anyway: the
+    // waiters it releases free configs with an embedded uv_timer_t, so releasing them while libuv
+    // still owns a handle is exactly the corruption this barrier exists to prevent - a timeout would
+    // trade a hang for a use-after-free. The cap therefore ends the process rather than the wait, and
+    // is not reachable in practice: uv_walk() above requested a close on every handle, work requests
+    // are not handles, and one uv_run() pass drains the whole closing queue.
     size_t handle_close_passes = 0;
-    while (aclk_loop_has_open_handles(loop) && handle_close_passes++ < ACLK_HANDLE_CLOSE_MAX_PASSES)
-        (void)uv_run(loop, UV_RUN_NOWAIT);
+    while (aclk_loop_has_open_handles(loop)) {
+        if (unlikely(++handle_close_passes > ACLK_HANDLE_CLOSE_MAX_PASSES))
+            fatal("ACLK: libuv handles still open after %zu close passes", handle_close_passes - 1);
 
-    if (unlikely(aclk_loop_has_open_handles(loop)))
-        nd_log_daemon(NDLP_ERR, "ACLK: libuv handles still open after %zu close passes", handle_close_passes);
+        (void)uv_run(loop, UV_RUN_NOWAIT);
+    }
 
     __atomic_store_n(&config->phase, ACLK_SYNC_HANDLES_CLOSED, __ATOMIC_RELEASE);
     completion_mark_complete(&config->handles_closed);
