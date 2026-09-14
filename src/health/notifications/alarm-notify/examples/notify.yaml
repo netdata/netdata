@@ -1,0 +1,9 @@
+version: 1
+destinations:
+  local:
+    type: webhook
+    url: http://127.0.0.1:18080/notify
+  authenticated:
+    type: webhook
+    url: ${env:NOTIFY_WEBHOOK_URL}
+    bearer_token: ${env:NOTIFY_WEBHOOK_TOKEN}

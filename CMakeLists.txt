@@ -204,6 +204,9 @@ set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
+# Developer-only parallel notifier. No install rule until the production migration.
+option(ENABLE_ALARM_NOTIFY_GO "Build the experimental Go notifier for local development" OFF)
+
 # High-level features
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 
@@ -3831,6 +3834,22 @@ target_link_libraries(netdatacli libnetdata)
 install(TARGETS netdatacli
         COMPONENT netdata
         DESTINATION "${BINDIR}")
+
+#
+# Build the developer-only Go notifier
+#
+
+if(ENABLE_ALARM_NOTIFY_GO)
+    include(NetdataGoTools)
+    find_min_go_version("${CMAKE_SOURCE_DIR}/src/health/notifications/alarm-notify")
+    find_package(Go "${MIN_GO_VERSION}" REQUIRED)
+    if(OS_WINDOWS)
+        set(ALARM_NOTIFY_GO_BIN alarm-notify.exe)
+    else()
+        set(ALARM_NOTIFY_GO_BIN alarm-notify)
+    endif()
+    add_go_target(alarm-notify-go ${ALARM_NOTIFY_GO_BIN} src/health/notifications/alarm-notify .)
+endif()
 
 #
 # Build go.d.plugin

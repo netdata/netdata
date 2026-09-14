@@ -1,0 +1,70 @@
+# Notification migration inventory
+
+The functional baseline is `../alarm-notify.sh.in` and `../health_alarm_notify.conf`. This inventory tracks a parallel
+implementation; it does not change the active Bash notifier. Existing functionality is implemented incrementally,
+and questionable behavior requires an explicit decision before being changed or dropped. No Bash feature has been
+approved for removal by this increment.
+
+## Working increment
+
+- Standalone developer build, explicit YAML configuration, JSON input, and one selected generic webhook delivery.
+- Configuration validation, literal/environment/file secrets, request timeout/cancellation, and safe diagnostics.
+- The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
+
+## Bash providers
+
+All 31 `send_*` functions enter the baseline, including providers absent from integration metadata. Each provider's
+current API and Bash behavior must be checked when its implementation is scoped. This is not a claim that all legacy
+remote services remain available.
+
+| Provider | Bash function | Go migration |
+|---|---|---|
+| Email | `send_email` | Pending |
+| Pushover | `send_pushover` | Pending |
+| Pushbullet | `send_pushbullet` | Pending |
+| Kafka HTTP bridge | `send_kafka` | Pending |
+| PagerDuty | `send_pd` | Pending |
+| Twilio | `send_twilio` | Pending |
+| HipChat | `send_hipchat` | Pending |
+| MessageBird | `send_messagebird` | Pending |
+| SMSEagle | `send_smseagle` | Pending |
+| Kavenegar | `send_kavenegar` | Pending |
+| Telegram | `send_telegram` | Pending |
+| Microsoft Teams | `send_msteams` | Pending |
+| Slack | `send_slack` | Pending |
+| Rocket.Chat | `send_rocketchat` | Pending |
+| Alerta | `send_alerta` | Pending |
+| Flock | `send_flock` | Pending |
+| Discord | `send_discord` | Pending |
+| Fleep | `send_fleep` | Pending |
+| Prowl | `send_prowl` | Pending |
+| IRC | `send_irc` | Pending |
+| AWS SNS | `send_awssns` | Pending |
+| Matrix | `send_matrix` | Pending |
+| Syslog | `send_syslog` | Pending |
+| SMS Server Tools 3 | `send_sms` | Pending |
+| Dynatrace | `send_dynatrace` | Pending |
+| Opsgenie | `send_opsgenie` | Pending |
+| Gotify | `send_gotify` | Pending |
+| ntfy | `send_ntfy` | Pending |
+| ilert | `send_ilert` | Pending |
+| SIGNL4 | `send_signl4` | Pending |
+| Custom | `send_custom` / `custom_sender` | Pending |
+
+## Other functionality
+
+| Area | Functional baseline | Go migration |
+|---|---|---|
+| Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Pending; next routing increment |
+| Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
+| Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Pending except initial webhook settings |
+| Results | Per-target failures and Bash's any-success invocation result | Pending for fan-out; one webhook reports its own result |
+| Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
+| Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
+| Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
+
+The first three proposed increments cover this foundation, routing/fan-out, and one named provider. More small PRs
+follow until the functional baseline and explicitly approved exceptions are complete. Final architecture and broad
+refactoring are discussed after that working baseline exists.
