@@ -10,7 +10,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -167,4 +169,62 @@ func TestFileOverflowStopsReader(t *testing.T) {
 	value, err := resolveFile(ctx, "/dev/zero", "file reference")
 	require.ErrorIs(t, err, errResolvedValueTooLarge)
 	assert.Empty(t, value)
+}
+
+func TestFileTimeoutStopsAndReapsReader(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		deadline time.Duration
+		maxWait  time.Duration
+	}{
+		{
+			name:    "default timeout",
+			maxWait: 5 * time.Second,
+		},
+		{
+			name:     "earlier caller deadline",
+			deadline: time.Second,
+			maxWait:  3 * time.Second,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "secret.fifo")
+			require.NoError(t, syscall.Mkfifo(path, 0o600))
+			helper := filepath.Join(dir, "nd-run")
+			require.NoError(t, os.WriteFile(helper, []byte(
+				"#!/bin/sh\nprintf '%s\\n' \"$$\" > \"$2.pid\"\nexec \"$@\"\n"), 0o700))
+			t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
+			resolver, err := NewDefaultAtomicResolver()
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			// Bound a failing test without giving the default-timeout case a caller deadline.
+			safety := time.AfterFunc(6*time.Second, cancel)
+			defer safety.Stop()
+			if tc.deadline != 0 {
+				var deadlineCancel context.CancelFunc
+				ctx, deadlineCancel = context.WithTimeout(ctx, tc.deadline)
+				defer deadlineCancel()
+			}
+			start := time.Now()
+			value, err := resolver.Resolve(ctx, "${file:"+path+"}", nil)
+			assert.Less(t, time.Since(start), tc.maxWait, "blocking file read must be bounded")
+			assert.Nil(t, value)
+			assert.ErrorIs(t, err, context.DeadlineExceeded)
+			var providerErr *AtomicResolveError
+			require.ErrorAs(t, err, &providerErr)
+			assert.Equal(t, AtomicErrorProvider, providerErr.Kind)
+
+			data, err := os.ReadFile(path + ".pid")
+			require.NoError(t, err, "reader must have started")
+			pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+			require.NoError(t, err)
+			require.Positive(t, pid)
+			var status syscall.WaitStatus
+			_, err = syscall.Wait4(pid, &status, syscall.WNOHANG, nil)
+			assert.ErrorIs(t, err, syscall.ECHILD, "reader must already be reaped")
+		})
+	}
 }

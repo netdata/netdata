@@ -97,6 +97,7 @@ jobs:
                 "Netdata trims leading and trailing whitespace from the file contents.",
                 "The file must exist on the Netdata host and be readable by the `netdata` user.",
                 "On Unix, Netdata reads the file through `nd-run`, without the collector plugin's elevated privileges. Files that were readable only because of those privileges no longer resolve.",
+                "On Unix, file reads time out after 3 seconds, or sooner if the caller's deadline expires or the request is cancelled.",
                 "**Docker Secrets**: Docker mounts secrets as files under `/run/secrets/` inside the container. Use `${file:/run/secrets/<secret-name>}` to read them.",
                 "**Kubernetes Secrets**: If you mount Kubernetes Secrets as volume files in the Netdata pod, reference them with `${file:/path/to/mounted/secret}`.",
             ],
