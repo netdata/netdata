@@ -665,8 +665,6 @@ static void pgc_section_pages_static_aral_init(void) {
         pgc_sections_aral = aral_create(
             "pgc-sections", sizeof(struct section_pages), 0, 0, &pgc_aral_statistics,
             NULL, NULL, false, false, false);
-
-        pulse_aral_register_statistics(&pgc_aral_statistics, "pgc");
     }
 
     spinlock_unlock(&spinlock);
