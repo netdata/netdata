@@ -955,7 +955,70 @@ static void aclk_synchronization_event_loop(void *arg)
 
         } while (opcode != ACLK_DATABASE_NOOP);
     }
-    config->initialized = false;
+
+    // Stop accepting commands, then answer what is still queued. A waiter that got its command in
+    // before the close is entitled to its completion - abandoning the queue here is what used to
+    // leave a host teardown blocked forever in destroy_aclk_config(). close_cmd_pool() makes the
+    // refusal and the insertion mutually exclusive, so after this point a producer either has a
+    // command we are about to drain, or was told no and is not waiting.
+    close_cmd_pool(&config->cmd_pool);
+    __atomic_store_n(&config->initialized, false, __ATOMIC_RELAXED);
+
+    {
+        cmd_data_t cmd;
+        size_t abandoned = 0;
+        while (pop_cmd(&config->cmd_pool, &cmd)) {
+            abandoned++;
+            // Every command whose producer waits on us MUST be completed here, or that producer
+            // blocks forever. Note the completion is in a different parameter for each.
+            switch (cmd.opcode) {
+                case ACLK_CANCEL_NODE_UPDATE_TIMER: {
+                    // destroy_aclk_config() is waiting, and it frees the host's config the moment
+                    // we complete it. So do the same work the live handler does: completing inline
+                    // while the config's uv_timer_t is still registered on this loop would leave
+                    // that handle open inside memory the waiter then frees, and the uv_walk() below
+                    // would read and unlink through it.
+                    RRDHOST *dying = cmd.param[0];
+                    struct completion *compl = cmd.param[1];
+                    struct aclk_sync_cfg_t *cfg =
+                        dying ? __atomic_load_n(&dying->aclk_host_config, __ATOMIC_ACQUIRE) : NULL;
+
+                    if (!cfg || !cfg->timer_initialized) {
+                        // nothing registered on the loop: the waiter can go
+                        if (compl)
+                            completion_mark_complete(compl);
+                        break;
+                    }
+
+                    if (uv_is_active((uv_handle_t *)&cfg->timer))
+                        uv_timer_stop(&cfg->timer);
+
+                    cfg->timer_initialized = false;
+
+                    // the completion is marked from the close callback, during the uv_run() below,
+                    // so the waiter only proceeds once the handle is off the loop
+                    struct notify_timer_cb_data *drain_cb_data = mallocz(sizeof(*drain_cb_data));
+                    drain_cb_data->payload = dying;
+                    drain_cb_data->completion = compl;
+                    cfg->timer.data = drain_cb_data;
+                    uv_close((uv_handle_t *)&cfg->timer, notify_timer_close_callback);
+                    break;
+                }
+
+                case ACLK_MQTT_WSS_CLIENT_RESET:
+                    // aclk_mqtt_client_reset(): the client is going away with us anyway
+                    if (cmd.param[0])
+                        completion_mark_complete((struct completion *)cmd.param[0]);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        if (abandoned)
+            nd_log_daemon(NDLP_INFO, "ACLK: sync event loop stopped with %zu queued commands", abandoned);
+    }
 
     if (!uv_timer_stop(&config->timer_req))
         uv_close((uv_handle_t *)&config->timer_req, NULL);
@@ -1340,23 +1403,45 @@ void unregister_node(const char *machine_guid)
     }
 }
 
+// Waited for before the caller frees the host. The command pool is FIFO, so once the event loop
+// has run this cancel, every command queued earlier for this host has already been consumed - and
+// those commands carry a raw RRDHOST * (schedule_node_state_update(), aclk_queue_node_info()).
+// Without this barrier the loop would dereference the host after it was freed.
 void destroy_aclk_config(RRDHOST *host)
 {
     if (!host)
         return;
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-    if (!aclk_host_config)
-        return;
-
-    if(likely(__atomic_load_n(&aclk_sync_config.initialized, __ATOMIC_RELAXED))) {
+    // The drain is NOT conditional on this host having a config: a node-state command queued for a
+    // host whose config has not been created yet is exactly the case that used to skip it, and it
+    // is the command most likely to still be in the queue - the handler creates the config, so a
+    // NULL config means the loop has not consumed it.
+    //
+    // Never from the event loop itself: we would be waiting on the thread that has to run the
+    // command. No caller does this today - rrdhost_free_unlinked() and the nrpc unittest, where
+    // the loop is not running - so this is an invariant made explicit rather than a case to handle.
+    if(likely(__atomic_load_n(&aclk_sync_config.initialized, __ATOMIC_RELAXED)) &&
+       !aclk_sync_on_event_loop_thread()) {
         struct completion compl;
         completion_init(&compl);
 
+        // The wait MUST NOT be bounded. `compl` lives on this stack and the queued command holds a
+        // pointer to it, so returning early would let the loop complete a destroyed completion and
+        // dereference a host this caller is about to free - the very lifetime bug this barrier
+        // exists to prevent, and reachable whenever the loop is merely slow rather than gone.
+        //
+        // Waiting forever is safe because the loop answers everything it accepts: on the way out it
+        // closes the pool - making refusal and insertion mutually exclusive - and then completes
+        // any cancel still queued. So this either gets its completion from the running loop, from
+        // the loop's shutdown drain, or the push is refused and we never wait at all.
         if (queue_aclk_sync_cmd(ACLK_CANCEL_NODE_UPDATE_TIMER, (void *)host, (void *)&compl))
             completion_wait_for(&compl);
         completion_destroy(&compl);
     }
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
 
     struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_ACQUIRE);
     if (!old_aclk_host_config)

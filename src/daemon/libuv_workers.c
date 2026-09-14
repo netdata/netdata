@@ -180,6 +180,7 @@ void init_cmd_pool(CmdPool *pool, int size) {
     pool->head = 0;
     pool->tail = 0;
     pool->count = 0;
+    pool->closed = false;
 
     fatal_assert(0 == netdata_mutex_init(&pool->lock));
     fatal_assert(0 == netdata_cond_init(&pool->not_full));
@@ -189,13 +190,21 @@ bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
 {
     netdata_mutex_lock(&pool->lock);
 
-    while (pool->count == pool->size) {
+    while (!pool->closed && pool->count == pool->size) {
         if (wait_on_full)
             netdata_cond_wait(&pool->not_full, &pool->lock);
         else {
             netdata_mutex_unlock(&pool->lock); // No space, return
             return false;
         }
+    }
+
+    // Checked under the same lock as the insertion below, so a consumer that closes the pool and a
+    // producer that pushes cannot both believe they won: the command is either queued before the
+    // close, and the consumer drains it, or refused here and the caller knows not to wait for it.
+    if (pool->closed) {
+        netdata_mutex_unlock(&pool->lock);
+        return false;
     }
 
     pool->buffer[pool->tail] = *cmd;
@@ -219,6 +228,14 @@ bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd) {
     netdata_cond_signal(&pool->not_full);
     netdata_mutex_unlock(&pool->lock);
     return true;
+}
+
+void close_cmd_pool(CmdPool *pool) {
+    netdata_mutex_lock(&pool->lock);
+    pool->closed = true;
+    // wake every producer parked on a full pool so it re-checks and gives up
+    netdata_cond_broadcast(&pool->not_full);
+    netdata_mutex_unlock(&pool->lock);
 }
 
 void release_cmd_pool(CmdPool *pool) {

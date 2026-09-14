@@ -1051,13 +1051,20 @@ static void rrdhost_free_unlinked(RRDHOST *host) {
     pulse_host_status(host, PULSE_HOST_STATUS_DELETED, 0);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
+    // BEFORE any of this host's storage is freed. destroy_aclk_config() drains the ACLK command
+    // queue, and the commands still in it hold a raw RRDHOST * they dereference: a pending
+    // node-state timer builds this host's status, which reads system_info, labels and contexts.
+    // Draining after freeing them - the previous order - left that timer reading freed memory.
+    // The nrpc registry is disarmed earlier still, in rrdhost_cleanup_data_collection_and_health()
+    // above, which is the ordering constraint documented there and is unaffected by this.
+    destroy_aclk_config(host);
+
     freez(host->cache_dir);
     simple_pattern_free(host->stream.snd.charts_matching);
     rrdhost_system_info_free(host->system_info);
 
     rrdhost_destroy_rrdcontexts(host);
     rrdlabels_destroy(host->rrdlabels);
-    destroy_aclk_config(host);
 
     string_freez(host->hostname);
     string_freez(host->os);

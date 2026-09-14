@@ -132,6 +132,7 @@ typedef struct {
 } cmd_data_t;
 
 typedef struct {
+    bool closed;                // set by close_cmd_pool(): refuse pushes, wake anyone waiting
     cmd_data_t *buffer;
     int size;
     int head;
@@ -151,6 +152,12 @@ worker_data_t *get_worker(WorkerPool *pool);
 void return_worker(WorkerPool *pool, worker_data_t *worker);
 
 void init_cmd_pool(CmdPool *pool, int size);
+
+// Stops the pool accepting commands, atomically with respect to push_cmd(): after this returns, no
+// push can succeed and none is still waiting for space. A consumer that is shutting down calls this
+// before draining, so a producer either got its command in - and the consumer will see it - or was
+// refused and knows not to wait for it.
+void close_cmd_pool(CmdPool *pool);
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full);
 bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd);
 void release_cmd_pool(CmdPool *pool);
