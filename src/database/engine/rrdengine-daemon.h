@@ -19,10 +19,6 @@
                                                   // RESERVED_LIBUV_WORKER_THREADS                     -> hooks
 #include "daemon/daemon-service.h"                // service_register()                                -> hooks
 
-// telemetry the engine pushes into daemon/pulse                                                      -> published stats
-void pulse_gorilla_hot_buffer_added(void);                                      // daemon/pulse/pulse-gorilla.h
-void pulse_gorilla_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t original);
-
 // work the engine hands to the rest of the daemon                                                    -> hooks
 void query_weights_worker_thread(void *arg);                                    // web/api/queries/weights.h
 void rrdcontext_db_rotation(void);                                              // database/contexts/rrdcontext.h
