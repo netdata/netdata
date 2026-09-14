@@ -7,6 +7,7 @@ package secretresolver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -22,8 +23,12 @@ func readSecretFile(ctx context.Context, path string) ([]byte, error) {
 	defer cancel()
 
 	// Pass the absolute path as one argument: no shell and no privileged file open.
-	out, err := runSecretCommand(ndexec.UnprivilegedCommandContext(ctx, "/bin/cat", path))
+	cmd := ndexec.UnprivilegedCommandContext(ctx, "/bin/cat", path)
+	out, err := runSecretCommand(cmd)
 	if err != nil {
+		if cmd.Process != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("file read timed out: %w", ctx.Err())
+		}
 		return nil, errors.Join(ctx.Err(), err)
 	}
 	return out, nil

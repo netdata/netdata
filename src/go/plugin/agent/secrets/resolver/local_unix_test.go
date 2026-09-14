@@ -171,6 +171,16 @@ func TestFileOverflowStopsReader(t *testing.T) {
 	assert.Empty(t, value)
 }
 
+func TestFileDeadlineBeforeStart(t *testing.T) {
+	useTestFileHelper(t)
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	value, err := resolveFile(ctx, "/unused", "file reference")
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.NotContains(t, err.Error(), "file read timed out")
+	assert.Empty(t, value)
+}
+
 func TestFileTimeoutStopsAndReapsReader(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -213,6 +223,9 @@ func TestFileTimeoutStopsAndReapsReader(t *testing.T) {
 			assert.Less(t, time.Since(start), tc.maxWait, "blocking file read must be bounded")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, context.DeadlineExceeded)
+			require.ErrorContains(t, err, "file read timed out: context deadline exceeded")
+			assert.NotContains(t, err.Error(), "signal: killed")
+			assert.NotContains(t, err.Error(), "\n")
 			var providerErr *AtomicResolveError
 			require.ErrorAs(t, err, &providerErr)
 			assert.Equal(t, AtomicErrorProvider, providerErr.Kind)
