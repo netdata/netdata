@@ -15,6 +15,68 @@ size_t nd_mmap_size = 0;
 
 #if defined(MADV_MERGEABLE)
 int enable_ksm = CONFIG_BOOLEAN_AUTO;
+
+// Probe the kernel once for KSM support, by doing the real operation on a
+// throw-away private anonymous page. This covers a kernel without CONFIG_KSM,
+// a seccomp or LSM denial and a container without a usable /sys, all of which a
+// /sys/kernel/mm/ksm/ existence check would miss.
+// It uses mmap()/munmap() directly, not nd_mmap()/nd_munmap(): the probe's page
+// is not agent memory, so it should not be attributed by workers_memory_call()
+// nor briefly counted in nd_mmap_count / nd_mmap_size.
+static bool ksm_supported_by_kernel(void) {
+    static bool probed = false, supported = false;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+
+    if(likely(__atomic_load_n(&probed, __ATOMIC_ACQUIRE)))
+        return supported;
+
+    bool report = false;
+    int report_errno = 0;
+
+    spinlock_lock(&spinlock);
+    if(!__atomic_load_n(&probed, __ATOMIC_RELAXED)) {
+        size_t len = os_get_system_page_size();
+        void *mem = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+        if(mem == MAP_FAILED) {
+            // the probe could not run at all, which says nothing about KSM.
+            // don't cache this: the next allocation will probe again.
+            spinlock_unlock(&spinlock);
+            return false;
+        }
+
+        bool rc = (madvise(mem, len, MADV_MERGEABLE) == 0);
+        int err = rc ? 0 : errno;
+        munmap(mem, len);
+
+        if(!rc && (err == ENOMEM || err == EAGAIN || err == EINTR)) {
+            // the attempt was inconclusive: resource pressure or an
+            // interruption, not an answer about KSM support. don't cache it.
+            spinlock_unlock(&spinlock);
+            return false;
+        }
+
+        // we have a real answer - cache it
+        supported = rc;
+        __atomic_store_n(&probed, true, __ATOMIC_RELEASE);
+
+        report = !rc;
+        report_errno = err;
+    }
+    spinlock_unlock(&spinlock);
+
+    // report outside the lock: nd_log() allocates, and this spinlock is not
+    // recursive, so logging under it would make any future KSM-eligible
+    // allocation inside the logger deadlock
+    if(report) {
+        errno = report_errno;
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "KSM (kernel same-page merging) is not available or not permitted on this system. "
+               "Memory deduplication is disabled. "
+               "Set '[db] memory deduplication (ksm) = no' in netdata.conf to stop checking.");
+    }
+
+    return supported;
+}
 #else
 int enable_ksm = 0;
 #endif
@@ -51,7 +113,7 @@ inline int madvise_sequential(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
     if (ret != 0 && madvise_log_first_failure(&logger))
-        netdata_log_error("madvise(MADV_SEQUENTIAL) of size %zu, failed.", len);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "madvise(MADV_SEQUENTIAL) of size %zu, failed.", len);
     return ret;
 }
 
@@ -60,7 +122,7 @@ inline int madvise_random(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_RANDOM);
 
     if (ret != 0 && madvise_log_first_failure(&logger))
-        netdata_log_error("madvise(MADV_RANDOM) of size %zu, failed.", len);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "madvise(MADV_RANDOM) of size %zu, failed.", len);
     return ret;
 }
 
@@ -69,7 +131,7 @@ inline int madvise_dontfork(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_DONTFORK);
 
     if (ret != 0 && madvise_log_first_failure(&logger))
-        netdata_log_error("madvise(MADV_DONTFORK) of size %zu, failed.", len);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "madvise(MADV_DONTFORK) of size %zu, failed.", len);
     return ret;
 }
 
@@ -78,7 +140,7 @@ inline int madvise_willneed(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_WILLNEED);
 
     if (ret != 0 && madvise_log_first_failure(&logger))
-        netdata_log_error("madvise(MADV_WILLNEED) of size %zu, failed.", len);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "madvise(MADV_WILLNEED) of size %zu, failed.", len);
     return ret;
 }
 
@@ -87,7 +149,7 @@ inline int madvise_dontneed(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_DONTNEED);
 
     if (ret != 0 && madvise_log_first_failure(&logger))
-        netdata_log_error("madvise(MADV_DONTNEED) of size %zu, failed.", len);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "madvise(MADV_DONTNEED) of size %zu, failed.", len);
     return ret;
 }
 
@@ -97,7 +159,7 @@ inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused)
     int ret = madvise(mem, len, MADV_DONTDUMP);
 
     if (ret != 0 && madvise_log_first_failure(&logger))
-        netdata_log_error("madvise(MADV_DONTDUMP) of size %zu, failed.", len);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "madvise(MADV_DONTDUMP) of size %zu, failed.", len);
     return ret;
 #else
     return 0;
@@ -110,7 +172,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
     int ret = madvise(mem, len, MADV_MERGEABLE);
 
     if (ret != 0 && madvise_log_first_failure(&logger))
-        netdata_log_error("madvise(MADV_MERGEABLE) of size %zu, failed.", len);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "madvise(MADV_MERGEABLE) of size %zu, failed.", len);
     return ret;
 #else
     return 0;
@@ -178,8 +240,29 @@ void *nd_mmap_advanced(const char *filename, size_t size, int flags, int ksm, bo
     if(unlikely((flags & MAP_SHARED) && (!filename || !*filename)))
         fatal("MAP_SHARED requested, without a filename to nd_mmap_advanced()");
 
-    // don't enable ksm is the global setting is disabled
-    if(unlikely(!enable_ksm)) ksm = 0;
+    // resolve the 3 states of the global ksm setting:
+    // no   - never offer memory to ksm
+    // auto - offer it only when the kernel supports it (default)
+    // yes  - always offer it, even if the probe says it is unsupported
+    // on platforms without MADV_MERGEABLE there is nothing to resolve:
+    // enable_ksm is a compile-time CONFIG_BOOLEAN_NO and the option is not
+    // parsed, so the first case always wins and the probe does not exist.
+    if(ksm) {
+        switch(enable_ksm) {
+            case CONFIG_BOOLEAN_NO:
+                ksm = 0;
+                break;
+
+#if defined(MADV_MERGEABLE)
+            case CONFIG_BOOLEAN_AUTO:
+                ksm = ksm_supported_by_kernel() ? 1 : 0;
+                break;
+#endif
+
+            default:
+                break;
+        }
+    }
 
     // KSM only merges anonymous (private) pages, never pagecache (file) pages
     // but MAP_PRIVATE without MAP_ANONYMOUS it fails too, so we need it always
