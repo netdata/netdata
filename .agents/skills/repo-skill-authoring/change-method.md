@@ -35,8 +35,8 @@ existing owner pointer.
    plan covers a fixed goal; ask only for a genuine user-owned fork.
 3. Make the amendment and its coupled pointer fixes. Record what changed, its evidence, any intentionally retained
    material, and line counts before and after. A full inventory or preservation map is not required for this path.
-4. Check affected commands, links, routing and source claims safely. Choose direct or delegated review and relevant
-   lenses under `AGENTS.md#review`; a bounded amendment does not automatically require an independent reviewer.
+4. Check affected commands, links, routing and source claims safely. Choose development-time assessment and review
+   coverage under `AGENTS.md#review`, including its final readiness requirement.
 5. Complete `./change-method.md#mechanical-hygiene` and `./change-method.md#close`.
 
 If the change relocates substantial knowledge, removes a workflow, changes audience boundaries, or makes omissions
@@ -142,8 +142,8 @@ Relocated facts follow the receiving document's register and citation rules with
 
 ## Review Round
 
-Choose direct assessment or independent review, its scope and relevant lenses under `AGENTS.md#review`. Assess the
-affected unit and its interactions without pulling in unrelated accumulated branch changes; a delegated assignment
+Use `AGENTS.md#review` for development-time assessment, independent readiness review and reuse of earlier coverage.
+Assess the affected unit and its interactions without pulling in unrelated accumulated branch changes; an assignment
 MAY focus on a specific question or fix. Give each reviewer the relevant request, approved decisions, assigned scope,
 SOW filename when present, exact diff/base or recorded working-tree state, owner sources and validation. The old text
 reveals removed contracts; it is evidence of change, never the truth authority. Reviewers are read-only and MUST NOT
