@@ -22,6 +22,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   native:
+    timeout-minutes: 20
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -43,3 +44,4 @@ jobs:
           sudo apt-get install -y libcap-dev
           sudo useradd --system --user-group nd-run-test
           sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test --capabilities -v
+          sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test --capabilities --no-setres -v
