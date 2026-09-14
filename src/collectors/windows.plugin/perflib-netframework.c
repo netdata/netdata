@@ -169,9 +169,6 @@ struct net_framework_instances {
     RRDSET *st_clrlocksandthreads_current_recognized_threads;
     RRDDIM *rd_locksandthreads_current_recognized_threads;
 
-    RRDSET *st_clrlocksandthreads_queue_length_peak;
-    RRDDIM *rd_locksandthreads_queue_length_peak;
-
     RRDSET *st_clrlocksandthreads_contentions;
     RRDDIM *rd_locksandthreads_contentions;
 
@@ -201,6 +198,7 @@ struct net_framework_instances {
     COUNTER_DATA NETFrameworkCLRLoadingClassLoadFailure;
 
     COUNTER_DATA NETFrameworkCLRMemoryAllocatedBytesPerSec;
+    COUNTER_DATA NETFrameworkCLRMemoryProcessId;
     COUNTER_DATA NETFrameworkCLRMemoryFinalizationSurvivors;
     COUNTER_DATA NETFrameworkCLRMemoryGen0HeapSize;
     COUNTER_DATA NETFrameworkCLRMemoryGen0PromotedBytesPerSec;
@@ -238,7 +236,6 @@ struct net_framework_instances {
     COUNTER_DATA NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads;
     COUNTER_DATA NETFrameworkCLRLocksAndThreadsRecognizedThreads;
     COUNTER_DATA NETFrameworkCLRLocksAndThreadsCurrentRecognizedThreads;
-    COUNTER_DATA NETFrameworkCLRLocksAndThreadsQueueLengthPeak;
     COUNTER_DATA NETFrameworkCLRLocksAndThreadsContentions;
 };
 
@@ -273,6 +270,7 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRLoadingClassLoadFailure.key = "Total # of Load Failures";
 
     p->NETFrameworkCLRMemoryAllocatedBytesPerSec.key = "Allocated Bytes/sec";
+    p->NETFrameworkCLRMemoryProcessId.key = "ID Process";
     p->NETFrameworkCLRMemoryFinalizationSurvivors.key = "Finalization Survivors";
     p->NETFrameworkCLRMemoryGen0HeapSize.key = "Gen 0 heap size";
     p->NETFrameworkCLRMemoryGen0PromotedBytesPerSec.key = "Gen 0 Promoted Bytes/Sec";
@@ -310,7 +308,6 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads.key = "# of current physical Threads";
     p->NETFrameworkCLRLocksAndThreadsRecognizedThreads.key = "# of total recognized threads";
     p->NETFrameworkCLRLocksAndThreadsCurrentRecognizedThreads.key = "# of current recognized threads";
-    p->NETFrameworkCLRLocksAndThreadsQueueLengthPeak.key = "Queue Length Peak";
     p->NETFrameworkCLRLocksAndThreadsContentions.key = "Total # of Contentions";
 }
 
@@ -381,8 +378,38 @@ static void netframework_process_cleanup(struct net_framework_instances *p)
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_current_physical_threads);
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_recognized_threads);
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_current_recognized_threads);
-    netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_queue_length_peak);
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_contentions);
+}
+
+static void netframework_update_memory_process_id_labels(struct net_framework_instances *p, bool has_process_id)
+{
+    if (!has_process_id)
+        return;
+
+    char process_id[UINT64_MAX_LENGTH];
+    snprintfz(process_id, sizeof(process_id), "%llu",
+              (unsigned long long)p->NETFrameworkCLRMemoryProcessId.current.Data);
+
+#define UPDATE_PROCESS_ID_LABEL(st) \
+    do { \
+        if ((st)) \
+            rrdlabels_add((st)->rrdlabels, "process_id", process_id, RRDLABEL_SRC_AUTO); \
+    } while (0)
+
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_allocated_bytes);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_finalization_survivors);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_heap_size);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_promoted_bytes);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_gc_handles);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_collections);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_induced_gc);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_pinned_objects);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_sink_blocks_in_use);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_committed_bytes);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_reserved_bytes);
+    UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_gc_time);
+
+#undef UPDATE_PROCESS_ID_LABEL
 }
 
 static void dict_net_framework_processes_delete_cb(
@@ -589,7 +616,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     "interop",
                     "netframework.clrinterop_com_callable_wrappers",
                     "COM callable wrappers (CCW)",
-                    "ccw/s",
+                    "ccw",
                     PLUGIN_WINDOWS_NAME,
                     "PerflibNetFramework",
                     PRIO_NETFRAMEWORK_CLR_INTEROP_CCW,
@@ -602,7 +629,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     NULL,
                     1,
                     1,
-                    RRD_ALGORITHM_INCREMENTAL);
+                    RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrinterop_com_callable_wrappers->rrdlabels,
@@ -661,7 +688,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     "interop",
                     "netframework.clrinterop_interop_stubs_created",
                     "Created stubs",
-                    "stubs/s",
+                    "stubs",
                     PLUGIN_WINDOWS_NAME,
                     "PerflibNetFramework",
                     PRIO_NETFRAMEWORK_CLR_INTEROP_STUBS_CREATED,
@@ -669,7 +696,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     RRDSET_TYPE_LINE);
 
                 p->rd_clrinterop_interop_stubs_created = rrddim_add(
-                    p->st_clrinterop_interop_stubs_created, "created", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    p->st_clrinterop_interop_stubs_created, "created", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrinterop_interop_stubs_created->rrdlabels,
@@ -777,7 +804,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
                     "jit",
                     "netframework.clrjit_standard_failures",
                     "JIT compiler failures",
-                    "failures/s",
+                    "failures",
                     PLUGIN_WINDOWS_NAME,
                     "PerflibNetFramework",
                     PRIO_NETFRAMEWORK_CLR_JIT_STANDARD_FAILURES,
@@ -785,7 +812,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
                     RRDSET_TYPE_LINE);
 
                 p->rd_clrjit_standard_failures =
-                    rrddim_add(p->st_clrjit_standard_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(p->st_clrjit_standard_failures, "failures", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrjit_standard_failures->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1127,7 +1154,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     "loading",
                     "netframework.clrloading_class_load_failures",
                     "Class load failures",
-                    "failures/s",
+                    "failures",
                     PLUGIN_WINDOWS_NAME,
                     "PerflibNetFramework",
                     PRIO_NETFRAMEWORK_CLR_LOADING_CLASS_LOAD_FAILURE,
@@ -1135,7 +1162,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     RRDSET_TYPE_LINE);
 
                 p->rd_clrloading_class_load_failure = rrddim_add(
-                    p->st_clrloading_class_load_failure, "class_load", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    p->st_clrloading_class_load_failure, "class_load", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrloading_class_load_failure->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1170,6 +1197,8 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
 
         bool has_allocated_bytes =
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryAllocatedBytesPerSec);
+        bool has_process_id =
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryProcessId);
         bool has_finalization_survivors =
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryFinalizationSurvivors);
         bool has_gen0_heap =
@@ -1636,6 +1665,8 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time, (collected_number)value);
             rrdset_done(p->st_clrmemory_gc_time);
         }
+
+        netframework_update_memory_process_id_labels(p, has_process_id);
     }
 }
 
@@ -2246,41 +2277,6 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->rd_locksandthreads_recognized_threads,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsRecognizedThreads.current.Data);
             rrdset_done(p->st_clrlocksandthreads_recognized_threads);
-        }
-
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsQueueLengthPeak)) {
-            if (!p->st_clrlocksandthreads_queue_length_peak) {
-                snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_queue_length_peak", windows_shared_buffer);
-                netdata_fix_chart_name(id);
-                p->st_clrlocksandthreads_queue_length_peak = rrdset_create_localhost(
-                    "netframework",
-                    id,
-                    NULL,
-                    "locks threads",
-                    "netframework.clrlocksandthreads_queue_length_peak",
-                    "Threads waited to acquire a managed lock",
-                    "threads/s",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibNetFramework",
-                    PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_QUEUE_LENGTH_PEAK,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-                p->rd_locksandthreads_queue_length_peak = rrddim_add(
-                    p->st_clrlocksandthreads_queue_length_peak, "threads", "threads", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-                rrdlabels_add(
-                    p->st_clrlocksandthreads_queue_length_peak->rrdlabels,
-                    "process",
-                    windows_shared_buffer,
-                    RRDLABEL_SRC_AUTO);
-            }
-
-            rrddim_set_by_pointer(
-                p->st_clrlocksandthreads_queue_length_peak,
-                p->rd_locksandthreads_queue_length_peak,
-                (collected_number)p->NETFrameworkCLRLocksAndThreadsQueueLengthPeak.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_queue_length_peak);
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsContentions)) {

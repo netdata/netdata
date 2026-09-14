@@ -2587,7 +2587,7 @@ modules:
                 - name: traversed
             - name: netframework.clrinterop_com_callable_wrappers
               description: COM callable wrappers (CCW)
-              unit: ccw/s
+              unit: ccw
               chart_type: line
               dimensions:
                 - name: com_callable_wrappers
@@ -2599,7 +2599,7 @@ modules:
                 - name: marshallings
             - name: netframework.clrinterop_interop_stubs_created
               description: Created stubs
-              unit: stubs/s
+              unit: stubs
               chart_type: line
               dimensions:
                 - name: created
@@ -2617,7 +2617,7 @@ modules:
                 - name: time
             - name: netframework.clrjit_standard_failures
               description: JIT compiler failures
-              unit: failures/s
+              unit: failures
               chart_type: line
               dimensions:
                 - name: failures
@@ -2677,88 +2677,10 @@ modules:
                 - name: loaded
             - name: netframework.clrloading_class_load_failures
               description: Class load failures
-              unit: failures/s
+              unit: failures
               chart_type: line
               dimensions:
                 - name: class_load
-            - name: netframework.clrmemory_allocated_bytes
-              description: Allocated bytes on the GC heap
-              unit: bytes/s
-              chart_type: line
-              dimensions:
-                - name: allocated
-            - name: netframework.clrmemory_finalization_survivors
-              description: Finalization survivors
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: survivors
-            - name: netframework.clrmemory_heap_size
-              description: Heap size by generation
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: gen0
-                - name: gen1
-                - name: gen2
-                - name: loh
-            - name: netframework.clrmemory_promoted_bytes
-              description: Promoted bytes by generation
-              unit: bytes/s
-              chart_type: line
-              dimensions:
-                - name: gen0
-                - name: gen1
-            - name: netframework.clrmemory_gc_handles
-              description: GC handles in use
-              unit: handles
-              chart_type: line
-              dimensions:
-                - name: handles
-            - name: netframework.clrmemory_collections
-              description: Garbage collections by generation rate
-              unit: collections/s
-              chart_type: line
-              dimensions:
-                - name: gen0
-                - name: gen1
-                - name: gen2
-            - name: netframework.clrmemory_induced_gc
-              description: Induced garbage collections rate
-              unit: collections/s
-              chart_type: line
-              dimensions:
-                - name: induced
-            - name: netframework.clrmemory_pinned_objects
-              description: Pinned objects
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: pinned
-            - name: netframework.clrmemory_sink_blocks_in_use
-              description: Sink blocks in use
-              unit: blocks
-              chart_type: line
-              dimensions:
-                - name: in_use
-            - name: netframework.clrmemory_committed_bytes
-              description: Committed GC virtual memory
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: committed
-            - name: netframework.clrmemory_reserved_bytes
-              description: Reserved GC virtual memory
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: reserved
-            - name: netframework.clrmemory_gc_time
-              description: Time spent in garbage collection
-              unit: percentage
-              chart_type: line
-              dimensions:
-                - name: time
             - name: netframework.clrremoting_channels
               description: Registered channels
               unit: channels/s
@@ -2855,18 +2777,98 @@ modules:
               chart_type: line
               dimensions:
                 - name: threads
-            - name: netframework.clrlocksandthreads_queue_length_peak
-              description: Threads waited to acquire a managed lock
-              unit: threads/s
-              chart_type: line
-              dimensions:
-                - name: threads
             - name: netframework.clrlocksandthreads_contentions
               description: Fails to acquire a managed lock
               unit: contentions/s
               chart_type: line
               dimensions:
                 - name: contentions
+        - name: CLR Memory processes
+          description: "These metrics refer to NET CLR Memory instances."
+          labels:
+            - name: process
+              description: The process name.
+            - name: process_id
+              description: The process ID.
+          metrics:
+            - name: netframework.clrmemory_allocated_bytes
+              description: Allocated bytes on the GC heap
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: allocated
+            - name: netframework.clrmemory_finalization_survivors
+              description: Finalization survivors
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: survivors
+            - name: netframework.clrmemory_heap_size
+              description: Heap size by generation
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+                - name: gen2
+                - name: loh
+            - name: netframework.clrmemory_promoted_bytes
+              description: Promoted bytes by generation
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+            - name: netframework.clrmemory_gc_handles
+              description: GC handles in use
+              unit: handles
+              chart_type: line
+              dimensions:
+                - name: handles
+            - name: netframework.clrmemory_collections
+              description: Garbage collections by generation rate
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+                - name: gen2
+            - name: netframework.clrmemory_induced_gc
+              description: Induced garbage collections rate
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: induced
+            - name: netframework.clrmemory_pinned_objects
+              description: Pinned objects
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: pinned
+            - name: netframework.clrmemory_sink_blocks_in_use
+              description: Sink blocks in use
+              unit: blocks
+              chart_type: line
+              dimensions:
+                - name: in_use
+            - name: netframework.clrmemory_committed_bytes
+              description: Committed GC virtual memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: netframework.clrmemory_reserved_bytes
+              description: Reserved GC virtual memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: reserved
+            - name: netframework.clrmemory_gc_time
+              description: Time spent in garbage collection
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: time
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibAD
