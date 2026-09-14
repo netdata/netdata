@@ -305,6 +305,10 @@
 - Build(deps): bump golang.org/x/net from 0.58.0 to 0.59.0 in /src/go ([#23857](https://github.com/netdata/netdata/issues/23857))
 - Build(deps): bump github.com/jackc/pgx/v5 from 5.10.0 to 5.11.0 in /src/go ([#23856](https://github.com/netdata/netdata/issues/23856))
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.40.0 to 1.41.0 in /src/go ([#23854](https://github.com/netdata/netdata/issues/23854))
+- Fix(go.d): unify activation outcomes and restore secret retries ([#23847](https://github.com/netdata/netdata/issues/23847))
+- Fix(go.d): report Function failures and honor finalizer context ([#23858](https://github.com/netdata/netdata/issues/23858))
+- Refactor(go.d): centralize one-shot task handshakes ([#23859](https://github.com/netdata/netdata/issues/23859))
+- Docs(agents): make delegation and review proportional to risk ([#23860](https://github.com/netdata/netdata/issues/23860))
 
 ## [2.11.0] - 2026-08-12
 
