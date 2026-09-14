@@ -20,8 +20,8 @@ func TestProcessSharedMemoryStorePublishesRowsAndDeltas(t *testing.T) {
 	if len(rows) != 1 || rows[0].pid != 42 {
 		t.Fatalf("rows = %+v, want one process row for PID 42", rows)
 	}
-	if rows[0].process.CreateProcess != 7 || rows[0].process.TaskErr != 2 {
-		t.Fatalf("process row = %+v, want current counters", rows[0].process)
+	if rows[0].process.CreateProcess != 3 || rows[0].process.TaskErr != 2 {
+		t.Fatalf("process row = %+v, want interval deltas", rows[0].process)
 	}
 	if rows[0].process.Name[0] != 'w' {
 		t.Fatalf("process name = %q, want worker", rows[0].process.Name)

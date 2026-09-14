@@ -415,9 +415,9 @@ func (s *ebpfSharedMemoryStore) buildRowLocked(pid uint32) ebpfPidStat {
 		copy(name[:], ident.comm[:])
 		row.process = ebpfProcessStat{
 			Ct: process.Ct, Name: name, Tgid: pid, Pid: pid,
-			ExitCall: process.Current.Exits, ReleaseCall: process.Current.TaskClose,
-			CreateProcess: process.Current.Forks, CreateThread: process.Current.Clones,
-			TaskErr: process.Current.Errors,
+			ExitCall: uint32(process.Exits), ReleaseCall: uint32(process.TaskClose),
+			CreateProcess: uint32(process.Forks), CreateThread: uint32(process.Clones),
+			TaskErr: uint32(process.Errors),
 		}
 	}
 	row.socket = s.socketData[pid]
