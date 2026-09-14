@@ -72,56 +72,17 @@ ALWAYS_INLINE int64_t JudyAllocThreadPulseGetAndReset(void) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// Judy dedicated jemalloc arena
-
-static unsigned jemalloc_arena_index __maybe_unused = 0;
-static bool jemalloc_initialized __maybe_unused = false;
-
-#ifdef HAVE_JEMALLOC_ARENA_API
-#include <jemalloc/jemalloc.h>
-static void jemalloc_init(void) {
-    // Create shared arena
-    size_t sz = sizeof(unsigned);
-    if (mallctl("arenas.create", &jemalloc_arena_index, &sz, NULL, 0) != 0)
-        return;
-
-    // Disable thread cache for direct arena access
-    int cache_enabled = 0;
-    if (mallctl("thread.tcache.enabled", NULL, NULL, &cache_enabled, sizeof(bool)) != 0)
-        return;
-
-    jemalloc_initialized = true;
-}
-
-static void *jemalloc_malloc(Word_t Words) {
-    return mallocx(Words * sizeof(Word_t), MALLOCX_ARENA(jemalloc_arena_index));
-}
-
-static void jemalloc_free(void * PWord, Word_t Words __maybe_unused) {
-    if(PWord)
-        dallocx(PWord, MALLOCX_ARENA(jemalloc_arena_index));
-}
-#endif
-
-// --------------------------------------------------------------------------------------------------------------------
 // Judy API
 
 inline Word_t JudyMalloc(Word_t Words)
 {
     Word_t Addr;
 
-#ifdef HAVE_JEMALLOC_ARENA_API
-    if(jemalloc_initialized)
-        Addr = (Word_t)jemalloc_malloc(Words);
+    ARAL *ar = judy_size_aral(Words);
+    if (ar)
+        Addr = (Word_t)aral_mallocz(ar);
     else
-#endif
-    {
-        ARAL *ar = judy_size_aral(Words);
-        if (ar)
-            Addr = (Word_t)aral_mallocz(ar);
-        else
-            Addr = (Word_t)mallocz(Words * sizeof(Word_t));
-    }
+        Addr = (Word_t)mallocz(Words * sizeof(Word_t));
 
     judy_allocated += Words * sizeof(Word_t);
 
@@ -129,18 +90,11 @@ inline Word_t JudyMalloc(Word_t Words)
 }
 
 inline void JudyFree(void * PWord, Word_t Words) {
-#ifdef HAVE_JEMALLOC_ARENA_API
-    if(jemalloc_initialized)
-        jemalloc_free(PWord, Words);
+    ARAL *ar = judy_size_aral(Words);
+    if (ar)
+        aral_freez(ar, PWord);
     else
-#endif
-    {
-        ARAL *ar = judy_size_aral(Words);
-        if (ar)
-            aral_freez(ar, PWord);
-        else
-            freez(PWord);
-    }
+        freez(PWord);
 
     judy_allocated -= Words * sizeof(Word_t);
 }
@@ -160,13 +114,6 @@ void libjudy_malloc_init(void) {
     // IMPORTANT: this is not called on external plugins
     // the allocator should run even if this is not called
 
-    (void)jemalloc_initialized;
-    (void)jemalloc_arena_index;
-
-#ifdef HAVE_JEMALLOC_ARENA_API
-    jemalloc_init();
-    if(!jemalloc_initialized)
-#endif
-        aral_judy_init();
+    aral_judy_init();
 }
 

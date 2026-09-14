@@ -1,0 +1,113 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# macOS package preinstall: refuse to install over a foreign Netdata
+# (source, Homebrew, unknown port holder), then stop a running Agent
+# before the payload is replaced. Runs as root under installer(8); must
+# be strictly non-interactive. Refusal messages land in
+# /var/log/install.log.
+
+LABEL="com.github.netdata"
+IDENTIFIER="@NETDATA_PKG_IDENTIFIER@"
+NETDATA_USER="@NETDATA_USER@"
+PORT=19999
+
+#
+# Conflict detection. An existing receipt means this is an upgrade of our
+# own package, which is not a conflict. Every check runs to completion
+# and every finding is reported before anything is stopped or modified.
+#
+if ! /usr/sbin/pkgutil --pkg-info "${IDENTIFIER}" >/dev/null 2>&1; then
+    findings=""
+
+    add_finding() {
+        findings="${findings}
+  * $1
+    to resolve: $2"
+    }
+
+    # A daemon registered under our label without our receipt belongs to a
+    # source install - they have shipped this label at every prefix.
+    if [ -f "/Library/LaunchDaemons/${LABEL}.plist" ]; then
+        add_finding "a Netdata source install owns /Library/LaunchDaemons/${LABEL}.plist" \
+            "remove that install with its own uninstaller (netdata-uninstaller.sh), then retry"
+    fi
+
+    # The documented source-install prefix, in case its launchd job is gone.
+    if [ -d "/usr/local/netdata/etc/netdata" ]; then
+        add_finding "a Netdata source install exists at /usr/local/netdata" \
+            "remove that install with its own uninstaller (netdata-uninstaller.sh), then retry"
+    fi
+
+    # A Homebrew service registration, root or user domain. The mere
+    # presence of Homebrew is not a conflict; a registered service is.
+    for plist in /Library/LaunchDaemons/homebrew.mxcl.netdata.plist \
+                 /Library/LaunchAgents/homebrew.mxcl.netdata.plist \
+                 /Users/*/Library/LaunchAgents/homebrew.mxcl.netdata.plist; do
+        if [ -f "${plist}" ]; then
+            add_finding "a Homebrew Netdata service is registered at ${plist}" \
+                "run 'brew services stop netdata' and 'brew uninstall netdata', then retry"
+        fi
+    done
+
+    # A running netdata process at any prefix (a stopped install with no
+    # plist and no known prefix is caught here when it is actually running).
+    for pid in $(pgrep -x netdata 2>/dev/null); do
+        exe="$(ps -o comm= -p "${pid}" 2>/dev/null)"
+        add_finding "a netdata process is already running (pid ${pid}, ${exe:-unknown path})" \
+            "stop it and remove the install that owns it, then retry"
+    done
+
+    # An account named after the service account that does not look like
+    # one: a login-range uid or a real shell means a person or another
+    # product owns the name, and the Agent must not run as it or grant it
+    # group access to its files. A service-shaped account (system-range
+    # uid, no login shell) is reused untouched.
+    if dscl . -read "/Users/${NETDATA_USER}" UniqueID >/dev/null 2>&1; then
+        uid="$(dscl . -read "/Users/${NETDATA_USER}" UniqueID 2>/dev/null | awk '{print $2}')"
+        shell="$(dscl . -read "/Users/${NETDATA_USER}" UserShell 2>/dev/null | awk '{print $2}')"
+        if [ "${uid:-0}" -ge 500 ] || { [ "${shell}" != "/usr/bin/false" ] && [ "${shell}" != "/sbin/nologin" ]; }; then
+            add_finding "an unrelated account named '${NETDATA_USER}' exists (uid ${uid:-?}, shell ${shell:-?})" \
+                "rename or remove that account, then retry"
+        fi
+    fi
+
+    # Something else holding the Agent's port. Running netdata binaries are
+    # reported above; this catches everything else squatting on ${PORT}.
+    listeners="$(/usr/sbin/lsof -nP "-iTCP:${PORT}" -sTCP:LISTEN 2>/dev/null \
+                 | awk 'NR>1 && $1 != "netdata" {print $1, $2}' | sort -u)"
+    if [ -n "${listeners}" ]; then
+        old_ifs="${IFS}"
+        IFS='
+'
+        for line in ${listeners}; do
+            add_finding "an unknown process is listening on port ${PORT} (${line% *}, pid ${line##* })" \
+                "stop it or reconfigure it off port ${PORT}, then retry"
+        done
+        IFS="${old_ifs}"
+    fi
+
+    if [ -n "${findings}" ]; then
+        echo "netdata preinstall: refusing to install over an existing Netdata:" >&2
+        echo "${findings}" >&2
+        echo "netdata preinstall: no process was stopped and no file was modified." >&2
+        exit 1
+    fi
+fi
+
+#
+# Stop a running Agent (the upgrade path). bootout is asynchronous: it
+# starts the teardown and returns. Wait for the label to actually
+# disappear, or the payload gets replaced under a running daemon and
+# postinstall's bootstrap fails with EIO.
+#
+if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
+    /bin/launchctl bootout "system/${LABEL}" 2>/dev/null || true
+    i=0
+    while [ "${i}" -lt 60 ] && /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; do
+        sleep 1
+        i=$((i + 1))
+    done
+fi
+
+exit 0

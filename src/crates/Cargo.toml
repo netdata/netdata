@@ -169,7 +169,6 @@ lru = "0.16"
 parking_lot = "0.12"
 allocative = "0.3.4"
 bumpalo = { version = "3", features = ["std"] }
-tikv-jemallocator = "0.6"
 rayon = "1.11.0"
 itoa = "1.0"
 

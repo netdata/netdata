@@ -1,18 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of dlib
 
+include_guard()
+
 function(netdata_bundle_dlib)
   include(FetchContent)
   include(NetdataFetchContentExtra)
 
   message(STATUS "Preparing vendored copy of dlib")
 
-  if(NETDATA_DLIB_SOURCE_PATH)
-    set(FETCHCONTENT_SOURCE_DIR_DLIB "${NETDATA_DLIB_SOURCE_PATH}")
+  if(NETDATA_DLIB_SOURCE_DIR)
+    set(FETCHCONTENT_SOURCE_DIR_DLIB "${NETDATA_DLIB_SOURCE_DIR}")
     message(STATUS "Using local dlib source: ${NETDATA_DLIB_SOURCE_DIR}")
   endif()
 
-  set(FETCHCONTENT_FULLY_DISCONNECTED Off)
   set(repo https://github.com/davisking/dlib.git)
   set(tag 636c0bcd1e4f428d167699891bc12b404d2d1b41) # v19.24.8
 
@@ -34,20 +35,18 @@ function(netdata_bundle_dlib)
     FetchContent_Declare(dlib
       GIT_REPOSITORY ${repo}
       GIT_TAG ${tag}
-      CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
       EXCLUDE_FROM_ALL
     )
   else()
     FetchContent_Declare(dlib
       GIT_REPOSITORY ${repo}
       GIT_TAG ${tag}
-      CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
     )
   endif()
 
   FetchContent_MakeAvailable_NoInstall(dlib)
 
-  message(STATUS "Finished preparing vendored copy of JSON-C")
+  message(STATUS "Finished preparing vendored copy of dlib")
 endfunction()
 
 function(netdata_add_dlib_to_target _target)

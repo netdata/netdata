@@ -5,22 +5,27 @@ include_guard()
 
 # Fix up CMAKE_SYSTEM_PROCESSOR to actually match the build target
 function(netdata_fixup_system_processor)
-  if(OS_WINDOWS)
-    return()
-  endif()
-
   if(CMAKE_TOOLCHAIN_FILE)
     return()
   endif()
 
+  # CMAKE_C_FLAGS is a single space-separated string; passed unquoted it would
+  # reach the compiler as one argument ("-O2 -g") and fail the invocation, so
+  # any build with user flags silently kept CMake's default processor.
+  separate_arguments(c_flags NATIVE_COMMAND "${CMAKE_C_FLAGS}")
+
   execute_process(
-    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} -dumpmachine
-    COMMAND cut -f 1 -d -
+    COMMAND ${CMAKE_C_COMPILER} ${c_flags} -dumpmachine
     RESULT_VARIABLE return_code
     OUTPUT_VARIABLE output_data
+    OUTPUT_STRIP_TRAILING_WHITESPACE
   )
 
   if(return_code EQUAL 0)
+    # Keep only the machine part of the triple. Stripping the trailing newline
+    # matters: consumers that interpolate CMAKE_SYSTEM_PROCESSOR into a
+    # delimiter-anchored regex (dlib does) never match a value that ends in one.
+    string(REGEX REPLACE "-.*$" "" output_data "${output_data}")
     set(CMAKE_SYSTEM_PROCESSOR "${output_data}" PARENT_SCOPE)
   else()
     message(WARNING "Failed to detect target processor architecture, using CMake default")
@@ -137,7 +142,7 @@ function(netdata_identify_libc _libc_name)
                      NO_CMAKE_INSTALL_PREFIX
                      NO_CMAKE_FIND_ROOT_PATH)
 
-        if(NOT "${LIBC_PATH}" EQUAL "LIBC_PATH-NOTFOUND")
+        if(NOT "${LIBC_PATH}" STREQUAL "LIBC_PATH-NOTFOUND")
             message(CHECK_PASS "found")
             message(CHECK_START "Detecting libc implementation using libc.so.6")
 
@@ -225,7 +230,7 @@ endfunction()
 function(precompile_python dir component)
   find_package(Python3)
 
-  if(NOT ${Python3_Interpreter_FOUND})
+  if(NOT Python3_Interpreter_FOUND)
     message(STATUS "Could not find Python3, skipping precompilation of Python code.")
     return()
   endif()
@@ -237,7 +242,7 @@ function(precompile_python dir component)
     COMPONENT ${component}
   )
   install(
-    CODE "execute_process(COMMAND ${Python3_Interpreter} -O -m compileall -j0 -o2 ${prefix}/${dir} WORKING_DIRECTORY ${prefix}/${dir})"
+    CODE "execute_process(COMMAND ${Python3_EXECUTABLE} -O -m compileall -j0 -o2 ${prefix}/${dir} WORKING_DIRECTORY ${prefix}/${dir})"
     COMPONENT ${component}
   )
 endfunction()
@@ -283,4 +288,45 @@ function(get_vendored_url_and_hash component prefix)
 
   set("${prefix}_URL" "${url}" PARENT_SCOPE)
   set("${prefix}_HASH" "${hash}" PARENT_SCOPE)
+endfunction()
+
+function(netdata_windows_path_to_runtime_path output_var input_path)
+  set(_converted_path "")
+  set(_cygpath_result 1)
+
+  find_program(_cygpath_executable NAMES cygpath)
+  if(_cygpath_executable)
+    execute_process(
+      COMMAND ${_cygpath_executable} -u "${input_path}"
+      RESULT_VARIABLE _cygpath_result
+      OUTPUT_VARIABLE _converted_path
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+
+  if(NOT _converted_path OR NOT _cygpath_result EQUAL 0)
+    string(REPLACE "\\" "/" _converted_path "${input_path}")
+
+    if(_converted_path MATCHES "^([A-Za-z]):(.*)$")
+      string(TOLOWER "${CMAKE_MATCH_1}" _drive_letter)
+      set(_converted_path "/${_drive_letter}${CMAKE_MATCH_2}")
+    endif()
+  endif()
+
+  if(NOT _converted_path STREQUAL "")
+    string(REGEX REPLACE "/$" "" _converted_path "${_converted_path}")
+  endif()
+
+  set(${output_var} "${_converted_path}" PARENT_SCOPE)
+endfunction()
+
+# DEB policy requires a copyright file in every binary package; RPMs
+# deliberately do not ship one.
+function(netdata_add_deb_copyright component package_name)
+        if(NETDATA_STAGE_HOST_FILES AND NOT NETDATA_PACKAGE_KIND STREQUAL "rpm")
+                install(FILES
+                        "${PKG_FILES_PATH}/copyright"
+                        COMPONENT "${component}"
+                        DESTINATION "${PKG_DOC_DEST}/${package_name}")
+        endif()
 endfunction()

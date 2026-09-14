@@ -52,7 +52,6 @@ jobs:
             src/aclk/aclk-schemas/
             src/ml/dlib/
           files_ignore: |
-            netdata.spec.in
             src/go/otel-collector/release-config.yaml.in
             **/*.md
       - name: Check build files
@@ -63,6 +62,7 @@ jobs:
           files: |
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             netdata-installer.sh
             .github/data/distros.yml
             .github/workflows/build.yml
@@ -1247,6 +1247,99 @@ jobs:
             && github.repository == 'netdata/netdata'
             && needs.file-check.outputs.run == 'true'
           }}
+
+  macos-pkg: # Build the native macOS package and store it as an artifact.
+    name: Build macOS Package
+    runs-on: macos-14
+    if: github.event_name != 'workflow_dispatch'
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - uses: actions/checkout@v7
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Fix tags
+        id: fix-tags
+        if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
+        run: |
+          git fetch --tags --force
+      - name: Install latest bash
+        id: install-bash
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          brew install bash
+      - name: Install Go
+        id: install-go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+      - name: Install netdata dependencies
+        id: install-deps
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+      - name: Build package
+        id: build-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          ./packaging/build-package.sh PKG "${PWD}/build-pkg"
+      - name: Store package
+        id: store
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: netdata-macos-pkg
+          path: build-pkg/packages/*.pkg
+          retention-days: 30
+      - name: Install package
+        id: install-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo installer -pkg build-pkg/packages/netdata-*.pkg -target /
+      - name: Smoke test
+        id: smoke
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:19999/api/v1/info && break
+            sleep 2
+          done
+          curl -sf -o /dev/null http://localhost:19999/api/v1/info
+          sudo launchctl print system/com.github.netdata | grep -q 'state = running'
+          pkgutil --pkg-info cloud.netdata.agent
+          sudo grep -q "INSTALL_TYPE='macos-pkg'" /opt/netdata/etc/netdata/.install-type
+      - name: Reinstall over the existing install
+        id: reinstall-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          echo "ci-marker" | sudo tee /opt/netdata/etc/netdata/user-marker.conf > /dev/null
+          sudo installer -pkg build-pkg/packages/netdata-*.pkg -target /
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:19999/api/v1/info && break
+            sleep 2
+          done
+          curl -sf -o /dev/null http://localhost:19999/api/v1/info
+          test "$(sudo cat /opt/netdata/etc/netdata/user-marker.conf)" = "ci-marker"
+      - name: Uninstall
+        id: uninstall-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo /opt/netdata/usr/libexec/netdata/netdata-uninstaller.sh --purge --yes
+          # `! cmd` is exempt from errexit, so failed assertions would pass
+          # silently; assert with explicit exits instead.
+          if pgrep -x netdata; then echo "netdata still running"; exit 1; fi
+          if pkgutil --pkg-info cloud.netdata.agent 2> /dev/null; then echo "receipt still present"; exit 1; fi
+          if sudo launchctl print system/com.github.netdata > /dev/null 2>&1; then echo "agent job still registered"; exit 1; fi
+          if sudo launchctl print system/com.github.netdata.updater > /dev/null 2>&1; then echo "updater job still registered"; exit 1; fi
+          if [ -e /opt/netdata ]; then echo "/opt/netdata still present"; exit 1; fi
 
   macos-build: # Test building on macOS
     name: Test building on macOS

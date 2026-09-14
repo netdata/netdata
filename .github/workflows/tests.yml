@@ -7,11 +7,15 @@ on:
       - master
     paths:
       - 'CMakeLists.txt'
+      - 'src/**/CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.h'
   pull_request:
     paths:
       - 'CMakeLists.txt'
+      - 'src/**/CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.h'
 env:

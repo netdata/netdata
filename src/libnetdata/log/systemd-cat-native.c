@@ -126,7 +126,6 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
 // ----------------------------------------------------------------------------
 // log to a systemd-journal-remote
 
-#ifdef HAVE_LIBCURL
 #include <curl/curl.h>
 
 #ifndef HOST_NAME_MAX
@@ -432,8 +431,6 @@ cleanup:
     return ret;
 }
 
-#endif
-
 static int help(void) {
     fprintf(stderr,
             "\n"
@@ -461,9 +458,7 @@ static int help(void) {
             "          [--newline=STRING]\n"
             "          [--log-as-netdata|-N]\n"
             "          [--namespace=NAMESPACE] [--socket=PATH]\n"
-#ifdef HAVE_LIBCURL
             "          [--url=URL [--key=FILENAME] [--cert=FILENAME] [--trust=FILENAME|all]]\n"
-#endif
             "\n"
             "The program has the following modes of logging:\n"
             "\n"
@@ -490,7 +485,6 @@ static int help(void) {
             "    the log destination. Only log fields defined by Netdata are accepted.\n"
             "    If the environment variables expected by Netdata are not found, it\n"
             "    falls back to stderr logging in logfmt format.\n"
-#ifdef HAVE_LIBCURL
             "\n"
             "  * Log to a systemd-journal-remote TCP socket, enabled with --url=URL\n"
             "\n"
@@ -528,7 +522,6 @@ static int help(void) {
             "\n"
             "      --keep-trying\n"
             "        Keep trying to send the message, if the remote journal is not there.\n"
-#endif
             "\n"
             "    NEWLINES PROCESSING\n"
             "    systemd-journal logs entries may have newlines in them. However the\n"
@@ -742,13 +735,11 @@ int main(int argc, char *argv[]) {
     const char *newline = "\\n";
     const char *namespace = NULL;
     const char *socket = getenv("NETDATA_SYSTEMD_JOURNAL_PATH");
-#ifdef HAVE_LIBCURL
     const char *url = NULL;
     const char *key = NULL;
     const char *cert = NULL;
     const char *trust = NULL;
     bool keep_trying = false;
-#endif
 
     for(int i = 1; i < argc ;i++) {
         const char *k = argv[i];
@@ -771,7 +762,6 @@ int main(int argc, char *argv[]) {
         else if(strncmp(k, "--newline=", 10) == 0)
             newline = &k[10];
 
-#ifdef HAVE_LIBCURL
         else if (strncmp(k, "--url=", 6) == 0)
             url = &k[6];
 
@@ -786,14 +776,12 @@ int main(int argc, char *argv[]) {
 
         else if (strcmp(k, "--keep-trying") == 0)
             keep_trying = true;
-#endif
         else {
             fprintf(stderr, "Unknown parameter '%s'\n", k);
             return 1;
         }
     }
 
-#ifdef HAVE_LIBCURL
     if(log_as_netdata && url) {
         fprintf(stderr, "Cannot log to a systemd-journal-remote URL as Netdata. "
                         "Please either give --url or --log-as-netdata, not both.\n");
@@ -806,8 +794,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-#endif
-
     if(log_as_netdata && namespace) {
         fprintf(stderr, "Cannot log as netdata using a namespace. "
                         "Please either give --log-as-netdata or --namespace, not both.\n");
@@ -817,7 +803,6 @@ int main(int argc, char *argv[]) {
     if(log_as_netdata)
         return log_input_as_netdata(newline, timeout_ms);
 
-#ifdef HAVE_LIBCURL
     if(url) {
         if(url && namespace && *namespace)
             snprintfz(global_namespace, sizeof(global_namespace), "_NAMESPACE=%s\n", namespace);
@@ -827,7 +812,6 @@ int main(int argc, char *argv[]) {
             rc = log_input_to_journal_remote(url, key, cert, trust, newline, timeout_ms);
         } while(keep_trying && rc == LOG_TO_JOURNAL_REMOTE_CANNOT_SEND);
     }
-#endif
 
     return log_input_to_journal(socket, namespace, newline, timeout_ms);
 }

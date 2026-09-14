@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Handling for libbpf (used by the eBPF plugin)
 
+include_guard()
+
 include(ExternalProject)
 include(NetdataUtil)
 
@@ -52,9 +54,6 @@ function(netdata_bundle_libbpf)
         message(FATAL_ERROR "GNU Make is required when building the eBPF plugin, but could not be found.")
     endif()
 
-    pkg_check_modules(ELF REQUIRED libelf)
-    pkg_check_modules(ZLIB REQUIRED zlib)
-
     set(_libbpf_lib_dir lib)
 
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(amd64)")
@@ -85,7 +84,7 @@ function(netdata_bundle_libbpf)
         TARGET libbpf_library
         PROPERTY INTERFACE_LINK_LIBRARIES "${ELF_LIBRARIES};${ZLIB_LIBRARIES}"
     )
-    set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRECTORIES};${ZLIB_INCLUDE_DIRECTORIES}" PARENT_SCOPE)
+    set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRS};${ZLIB_INCLUDE_DIRS}" PARENT_SCOPE)
     set(NETDATA_LIBBPF_COMPILE_OPTIONS "${ELF_CFLAGS_OTHER};${ZLIB_CFLAGS_OTHER}" PARENT_SCOPE)
 endfunction()
 

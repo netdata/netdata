@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Executed by cmake --install for macOS package builds (configured by
+# NetdataMacOSPackage.cmake). Static linking carries the bundled libraries'
+# licence obligations into the shipped package, so every bundled component's
+# licence text is staged into the payload together with an inventory file.
+#
+# A missing licence file is a hard error: the bundle set is fixed for pkg
+# builds, so a gap means either the manifest or the bundling changed without
+# the notices following - fail closed rather than ship without a notice.
+
+set(build_dir "@CMAKE_BINARY_DIR@")
+set(dest "$ENV{DESTDIR}@CMAKE_INSTALL_PREFIX@/usr/share/netdata/licenses")
+
+# component=path-inside-the-build-tree
+set(manifest
+    "bash=bundled-bash-prefix/src/bundled-bash/COPYING"
+    "openssl=bundled-openssl-prefix/src/bundled-openssl/LICENSE.txt"
+    "abseil=_deps/absl-src/LICENSE"
+    "brotli=_deps/brotli-src/LICENSE"
+    "dlib=_deps/dlib-src/LICENSE.txt"
+    "json-c=_deps/json-c-src/COPYING"
+    "libuv=_deps/libuv-src/LICENSE"
+    "lz4=_deps/lz4-src/LICENSE"
+    "protobuf=_deps/protobuf-src/LICENSE"
+    "snappy=_deps/snappy-src/COPYING"
+    "libyaml=_deps/yaml-src/License"
+    "zstd=_deps/zstd-src/COPYING")
+
+file(MAKE_DIRECTORY "${dest}")
+
+set(inventory "Third-party components distributed inside this package.\n")
+string(APPEND inventory "Each component's licence text is in this directory, named <component>.txt.\n")
+string(APPEND inventory "Upstream sources and pinned versions are recorded in the Netdata source tree\n")
+string(APPEND inventory "under packaging/cmake/Modules/ (the module that bundles each component).\n\n")
+
+foreach(entry IN LISTS manifest)
+    string(REPLACE "=" ";" pair "${entry}")
+    list(GET pair 0 component)
+    list(GET pair 1 relpath)
+
+    if(NOT EXISTS "${build_dir}/${relpath}")
+        message(FATAL_ERROR "licence file for bundled component '${component}' not found at ${build_dir}/${relpath}; refusing to stage a package without its notices")
+    endif()
+
+    file(COPY_FILE "${build_dir}/${relpath}" "${dest}/${component}.txt")
+    string(APPEND inventory "${component}\n")
+endforeach()
+
+file(WRITE "${dest}/inventory.txt" "${inventory}")
+message(STATUS "Staged third-party licence notices to ${dest}")
