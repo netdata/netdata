@@ -3,6 +3,7 @@
 package secretresolver
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveCmd(t *testing.T) {
+func TestDefaultAtomicResolverCommand(t *testing.T) {
 	tests := map[string]struct {
 		onWindowsSkip   bool
 		buildCfg        func(t *testing.T) map[string]any
@@ -81,18 +82,21 @@ func TestResolveCmd(t *testing.T) {
 				t.Skip("skipping on windows")
 			}
 
-			resolver := New()
+			resolver, err := NewDefaultAtomicResolver()
+			require.NoError(t, err)
 			cfg := tc.buildCfg(t)
-			err := resolver.Resolve(cfg)
+			resolved, err := resolver.Resolve(context.Background(), cfg, nil)
 
 			if tc.wantErrContains != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErrContains)
+				assert.Nil(t, resolved)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantValue, cfg[tc.field])
+			result := resolved.(map[string]any)
+			assert.Equal(t, tc.wantValue, result[tc.field])
 		})
 	}
 }

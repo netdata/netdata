@@ -6,6 +6,7 @@ modules:
       module_name: dnsmasq
       monitored_instance:
         name: Dnsmasq
+        description: "Monitor Dnsmasq forwarded queries, cache operations, cache performance, and cache size."
         link: https://thekelleys.org.uk/dnsmasq/doc.html
         icon_filename: dnsmasq.svg
         categories:
@@ -102,13 +103,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     address: 127.0.0.1:53
-                
+
                   - name: remote
                     address: 203.0.113.0:53
     troubleshooting:

@@ -3,6 +3,12 @@
 #include "dyncfg-internals.h"
 #include "dyncfg.h"
 
+// Upper bound for a dyncfg payload loaded from disk. Payloads are configuration
+// documents (normally a few KB); anything beyond this is treated as a corrupt or
+// oversized file. Mirrors MAX_SETTINGS_SIZE_BYTES used for settings payloads, so
+// a bad file cannot force an unbounded heap allocation (mallocz fatals on OOM).
+#define DYNCFG_MAX_PAYLOAD_SIZE (20 * 1024 * 1024)
+
 void dyncfg_file_delete(const char *id) {
     CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
     char filename[FILENAME_MAX];
@@ -59,6 +65,17 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
     }
 
     fclose(fp);
+}
+
+bool dyncfg_file_read_payload(FILE *fp, BUFFER *payload, size_t expected_size) {
+    buffer_flush(payload);
+    buffer_need_bytes(payload, expected_size);
+
+    size_t read_size = fread(payload->buffer, 1, expected_size, fp);
+    payload->len = read_size;
+    payload->buffer[read_size] = '\0';
+
+    return read_size == expected_size && !ferror(fp);
 }
 
 void dyncfg_file_load(const char *d_name) {
@@ -140,6 +157,14 @@ void dyncfg_file_load(const char *d_name) {
         }
     }
 
+    if(ferror(fp)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "DYNCFG: failed while reading metadata from file '%s'. Ignoring it.", filename);
+        fclose(fp);
+        dyncfg_cleanup(&tmp);
+        return;
+    }
+
     if (read_payload) {
         // Determine the actual size of the remaining file content
         int rc = 0;
@@ -151,7 +176,6 @@ void dyncfg_file_load(const char *d_name) {
             rc = fseek(fp, 0, SEEK_END);
             if (!rc) {
                 total_size = ftell(fp);                      // Total size of the file
-                actual_size = total_size - saved_position;   // Calculate remaining content size
                 rc = fseek(fp, saved_position, SEEK_SET);    // Reset file pointer to the beginning of the payload
             }
         }
@@ -164,17 +188,45 @@ void dyncfg_file_load(const char *d_name) {
             dyncfg_cleanup(&tmp);
             return;
         }
+
+        if (total_size < saved_position) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DYNCFG: payload position %ld is beyond file size %ld for file '%s'. Ignoring it.",
+                   saved_position, total_size, filename);
+            fclose(fp);
+            dyncfg_cleanup(&tmp);
+            return;
+        }
+
+        actual_size = (size_t)(total_size - saved_position); // Calculate remaining content size
+
+        if (actual_size > DYNCFG_MAX_PAYLOAD_SIZE) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DYNCFG: payload size %zu exceeds the maximum allowed %d for file '%s'. Ignoring it.",
+                   actual_size, DYNCFG_MAX_PAYLOAD_SIZE, filename);
+            fclose(fp);
+            dyncfg_cleanup(&tmp);
+            return;
+        }
+
         // Use actual_size instead of content_length to handle the whole remaining file
         tmp.dyncfg.payload = buffer_create(actual_size, NULL);
         tmp.dyncfg.payload->content_type = content_type;
 
-        buffer_need_bytes(tmp.dyncfg.payload, actual_size);
-        tmp.dyncfg.payload->len = fread(tmp.dyncfg.payload->buffer, 1, actual_size, fp);
+        if(!dyncfg_file_read_payload(fp, tmp.dyncfg.payload, actual_size)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DYNCFG: failed to read the complete payload from file '%s': expected %zu bytes, read %zu, stream error: %s. Ignoring it.",
+                   filename, actual_size, (size_t)tmp.dyncfg.payload->len, ferror(fp) ? "yes" : "no");
+
+            fclose(fp);
+            dyncfg_cleanup(&tmp);
+            return;
+        }
 
         if (content_length != tmp.dyncfg.payload->len) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "DYNCFG: content_length %zu does not match actual payload size %zu for file '%s'",
-                   content_length, actual_size, filename);
+                   content_length, (size_t)tmp.dyncfg.payload->len, filename);
         }
     }
 
@@ -194,7 +246,21 @@ void dyncfg_file_load(const char *d_name) {
 
     dyncfg_set_current_from_dyncfg(&tmp);
 
-    dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
+    // Heal cmds on load: files written by older binaries can carry a stale
+    // mask (e.g. an overridden stock job persisted without REMOVE pre-fix).
+    // The invariant elsewhere is cmds := f(type, source_type, cmds); enforce
+    // it here too so the conflict_cb SWAP cannot reintroduce a stale mask.
+    tmp.cmds = dyncfg_sanitize_cmds(tmp.type, tmp.current.source_type, tmp.cmds);
+
+    if(!dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp))) {
+        // dyncfg_globals.nodes is being destroyed (dyncfg_shutdown_low_level()):
+        // the insert callback never ran, so we still own everything we
+        // allocated above - free it exactly as dyncfg_add_internal() does.
+        // NULL is unambiguous here only because value_len > 0 and the id is
+        // valid - see the set-family contract in dictionary.h
+        dyncfg_cleanup(&tmp);
+        return;
+    }
 
     // check if we need to rename the file
     CLEAN_CHAR_P *fixed_id = dyncfg_escape_id_for_filename(id);
@@ -229,25 +295,50 @@ void dyncfg_load_all(void) {
 // schemas loading
 
 static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
-    int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
+    struct stat st = { 0 };
+    if(stat(filename, &st) != 0 || !S_ISREG(st.st_mode))
+        return false;
+
+    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK, 0666);
     if(unlikely(fd == -1))
         return false;
 
-    struct stat st = { 0 };
-    if(fstat(fd, &st) != 0) {
+    if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
         close(fd);
         return false;
     }
+
+    if(unlikely(st.st_size < 0 || (uintmax_t)st.st_size > UINT32_MAX - 2)) {
+        close(fd);
+        return false;
+    }
+
+    size_t file_size = (size_t)st.st_size;
 
     buffer_flush(dst);
-    buffer_need_bytes(dst, st.st_size + 1); // +1 for the terminating zero
+    buffer_need_bytes(dst, file_size + 1); // +1 for the terminating zero
 
-    ssize_t r = read(fd, (char*)dst->buffer, st.st_size);
-    if(unlikely(r == -1)) {
+    size_t bytes_read = 0;
+    while(bytes_read < file_size) {
+        size_t bytes_to_read = file_size - bytes_read;
+        if(bytes_to_read > (size_t)SSIZE_MAX)
+            bytes_to_read = (size_t)SSIZE_MAX;
+
+        ssize_t r = read(fd, &dst->buffer[bytes_read], bytes_to_read);
+        if(likely(r > 0)) {
+            bytes_read += (size_t)r;
+            continue;
+        }
+
+        if(unlikely(r == -1 && errno == EINTR))
+            continue;
+
+        buffer_flush(dst);
         close(fd);
         return false;
     }
-    dst->len = r;
+
+    dst->len = bytes_read;
     dst->buffer[dst->len] = '\0';
 
     close(fd);

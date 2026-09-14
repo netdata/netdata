@@ -24,7 +24,7 @@ inline size_t pluginsd_initialize_plugin_directories()
     // Get the configuration entry
     if (likely(!plugins_dir_list)) {
         snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
-        plugins_dir_list = strdupz(inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
+        plugins_dir_list = strdupz(inicfg_get_quoted_path_list(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
 
     // Parse it and store it to plugin directories
@@ -159,10 +159,11 @@ static void pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
+        bool retry = false;
         count = pluginsd_process(cd->host, cd,
                                  spawn_popen_read_fd(cd->unsafe.pi),
                                  spawn_popen_write_fd(cd->unsafe.pi),
-                                 0);
+                                 0, &retry);
 
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
@@ -171,7 +172,9 @@ static void pluginsd_worker_thread(void *arg) {
         int worker_ret_code = spawn_popen_kill(cd->unsafe.pi, 3 * MSEC_PER_SEC);
         cd->unsafe.pi = NULL;
 
-        if(likely(worker_ret_code == 0))
+        if (retry && worker_ret_code != -1)
+            pluginsd_sleep(cd->update_every);
+        else if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else
             pluginsd_worker_thread_handle_error(cd, worker_ret_code);
@@ -274,6 +277,22 @@ static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
     return false;
 }
 
+// Plugins that were removed from the agent but may linger on disk after an
+// upgrade.
+static bool is_obsolete_plugin(const char *pluginname) {
+    static const char *obsolete[] = {
+        "otel-signal-viewer",
+        NULL,
+    };
+
+    for (size_t i = 0; obsolete[i]; i++) {
+        if (strcmp(pluginname, obsolete[i]) == 0)
+            return true;
+    }
+
+    return false;
+}
+
 void *pluginsd_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(pluginsd_main_cleanup) cleanup_ptr = ptr;
 
@@ -325,6 +344,20 @@ void *pluginsd_main(void *ptr) {
                 char pluginname[CONFIG_MAX_NAME + 1];
                 if(!is_plugin(pluginname, sizeof(pluginname), file->d_name)) {
                     netdata_log_debug(D_PLUGINSD, "file '%s' does not look like a plugin", file->d_name);
+                    continue;
+                }
+
+                // Skip any obsolete plugins.
+                if(is_obsolete_plugin(pluginname)) {
+                    // log info level first time, debug level afterwards.
+                    static bool logged_obsolete = false;
+                    if(!logged_obsolete) {
+                        logged_obsolete = true;
+                        netdata_log_info("skipping obsolete plugin '%s'; the current agent already provides its function", file->d_name);
+                    }
+                    else {
+                        netdata_log_debug(D_PLUGINSD, "skipping obsolete plugin '%s'", file->d_name);
+                    }
                     continue;
                 }
 

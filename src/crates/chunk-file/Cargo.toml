@@ -1,0 +1,13 @@
+[package]
+name = "chunk-file"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zerocopy = { workspace = true, features = ["derive"] }
+crc32fast = { workspace = true }
+thiserror = { workspace = true }

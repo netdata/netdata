@@ -5,6 +5,7 @@
 }
 
 %token_type {YYSTYPE}
+%token_destructor {freez($$.strval);}
 %token_prefix TOK_
 
 %type expr {EVAL_NODE*}

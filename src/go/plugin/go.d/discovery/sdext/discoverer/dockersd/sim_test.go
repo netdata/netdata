@@ -3,22 +3,28 @@
 package dockersd
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"sort"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
-	"github.com/docker/docker/api/types"
-	typesContainer "github.com/docker/docker/api/types/container"
+	typesContainer "github.com/moby/moby/api/types/container"
+	docker "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+var _ dyncfg.Testable = (*Discoverer)(nil)
+
 type dockerCli interface {
-	addContainer(cntr types.Container)
+	addContainer(cntr typesContainer.Summary)
 	removeContainer(id string)
 }
 
@@ -97,24 +103,122 @@ func (sim *discoverySim) run(t *testing.T) {
 	assert.Equalf(t, wantLen, gotLen, "different len (want %d got %d)", wantLen, gotLen)
 	assert.Equal(t, sim.wantGroups, tggs)
 
-	assert.True(t, mock.negApiVerCalled, "NegotiateAPIVersion called")
 	assert.True(t, mock.closeCalled, "Close called")
+}
+
+func TestDiscoverer_Test(t *testing.T) {
+	t.Run("sanitizes client construction failure", func(t *testing.T) {
+		clientErr := errors.New("invalid endpoint [REDACTED_SECRET]")
+		d, err := NewDiscoverer(Config{})
+		require.NoError(t, err)
+		d.newDockerClient = func(string) (dockerClient, error) {
+			return nil, clientErr
+		}
+
+		err = d.Test(t.Context())
+
+		require.ErrorIs(t, err, clientErr)
+		require.Equal(t, "the configured Docker endpoint is invalid", err.Error())
+		require.NotContains(t, err.Error(), "[REDACTED_SECRET]")
+	})
+
+	t.Run("lists one container and closes the temporary client", func(t *testing.T) {
+		d, err := NewDiscoverer(Config{
+			Address: "unix:///tmp/test-docker.sock",
+		})
+		require.NoError(t, err)
+		client := &testDockerClient{}
+		d.newDockerClient = func(addr string) (dockerClient, error) {
+			require.Equal(t, "unix:///tmp/test-docker.sock", addr)
+			return client, nil
+		}
+
+		require.NoError(t, d.Test(t.Context()))
+
+		require.Equal(t, 1, client.options.Limit)
+		require.True(t, client.closed)
+		require.Nil(t, d.dockerClient)
+	})
+
+	t.Run("returns an unreachable endpoint failure", func(t *testing.T) {
+		listErr := errors.New("endpoint [REDACTED_SECRET] unavailable")
+		d, err := NewDiscoverer(Config{})
+		require.NoError(t, err)
+		client := &testDockerClient{listErr: listErr}
+		d.newDockerClient = func(string) (dockerClient, error) {
+			return client, nil
+		}
+
+		err = d.Test(t.Context())
+
+		require.ErrorIs(t, err, listErr)
+		require.Equal(t, "cannot query containers from the configured Docker endpoint", err.Error())
+		require.NotContains(t, err.Error(), "[REDACTED_SECRET]")
+		require.True(t, client.closed)
+	})
+
+	t.Run("applies the configured timeout", func(t *testing.T) {
+		d, err := NewDiscoverer(Config{})
+		require.NoError(t, err)
+		d.timeout = 10 * time.Millisecond
+		client := &testDockerClient{waitForContext: true}
+		d.newDockerClient = func(string) (dockerClient, error) {
+			return client, nil
+		}
+
+		err = d.Test(t.Context())
+
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Equal(t, "the configured Docker endpoint did not respond before the timeout", err.Error())
+		require.True(t, client.closed)
+	})
+}
+
+func TestNewDiscovererSanitizesDockerHostDiagnostic(t *testing.T) {
+	const dockerHost = "tcp://user:[REDACTED_SECRET]@[PRIVATE_ENDPOINT]:2375"
+	t.Run("selected environment host is not rendered", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", dockerHost)
+		var buf bytes.Buffer
+
+		d, err := newDiscoverer(Config{}, logger.NewWithWriter(&buf))
+
+		require.NoError(t, err)
+		require.Equal(t, dockerHost, d.addr)
+		require.Contains(t, buf.String(), "using docker host from environment")
+		require.NotContains(t, buf.String(), "[REDACTED_SECRET]")
+		require.NotContains(t, buf.String(), "[PRIVATE_ENDPOINT]")
+	})
+
+	t.Run("explicit address does not announce unused environment host", func(t *testing.T) {
+		t.Setenv("DOCKER_HOST", dockerHost)
+		var buf bytes.Buffer
+
+		d, err := newDiscoverer(
+			Config{Address: "unix:///tmp/configured.sock"},
+			logger.NewWithWriter(&buf),
+		)
+
+		require.NoError(t, err)
+		require.Equal(t, "unix:///tmp/configured.sock", d.addr)
+		require.NotContains(t, buf.String(), "using docker host from environment")
+		require.NotContains(t, buf.String(), "[REDACTED_SECRET]")
+		require.NotContains(t, buf.String(), "[PRIVATE_ENDPOINT]")
+	})
 }
 
 func newMockDockerd() *mockDockerd {
 	return &mockDockerd{
-		containers: make(map[string]types.Container),
+		containers: make(map[string]typesContainer.Summary),
 	}
 }
 
 type mockDockerd struct {
-	negApiVerCalled bool
-	closeCalled     bool
-	mux             sync.Mutex
-	containers      map[string]types.Container
+	closeCalled bool
+	mux         sync.Mutex
+	containers  map[string]typesContainer.Summary
 }
 
-func (m *mockDockerd) addContainer(cntr types.Container) {
+func (m *mockDockerd) addContainer(cntr typesContainer.Summary) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
@@ -128,24 +232,44 @@ func (m *mockDockerd) removeContainer(id string) {
 	delete(m.containers, id)
 }
 
-func (m *mockDockerd) ContainerList(_ context.Context, _ typesContainer.ListOptions) ([]types.Container, error) {
+func (m *mockDockerd) ContainerList(_ context.Context, _ docker.ContainerListOptions) (docker.ContainerListResult, error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	var cntrs []types.Container
+	var cntrs []typesContainer.Summary
 	for _, cntr := range m.containers {
 		cntrs = append(cntrs, cntr)
 	}
 
-	return cntrs, nil
-}
-
-func (m *mockDockerd) NegotiateAPIVersion(_ context.Context) {
-	m.negApiVerCalled = true
+	return docker.ContainerListResult{Items: cntrs}, nil
 }
 
 func (m *mockDockerd) Close() error {
 	m.closeCalled = true
+	return nil
+}
+
+type testDockerClient struct {
+	options        docker.ContainerListOptions
+	listErr        error
+	waitForContext bool
+	closed         bool
+}
+
+func (c *testDockerClient) ContainerList(
+	ctx context.Context,
+	options docker.ContainerListOptions,
+) (docker.ContainerListResult, error) {
+	c.options = options
+	if c.waitForContext {
+		<-ctx.Done()
+		return docker.ContainerListResult{}, ctx.Err()
+	}
+	return docker.ContainerListResult{}, c.listErr
+}
+
+func (c *testDockerClient) Close() error {
+	c.closed = true
 	return nil
 }
 

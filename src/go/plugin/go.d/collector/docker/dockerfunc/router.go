@@ -48,9 +48,9 @@ func (r *router) Cleanup(ctx context.Context) {
 	}
 }
 
-func Methods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		containersMethodConfig(),
+func Methods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		containersFunctionConfig(),
 	}
 }
 

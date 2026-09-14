@@ -1,3 +1,12 @@
+metadata:
+  device:
+    fields:
+      ospf_router_id:
+        symbol:
+          OID: 1.3.6.1.2.1.14.1.1.0
+          name: ospfRouterId
+        consumers: [topology]
+
 metrics:
   - MIB: OSPF-MIB
     table:
@@ -147,3 +156,41 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.14.11.1.2
           name: ospfVirtNbrRtrId
+
+topology:
+  - kind: ospf_neighbor
+    MIB: OSPF-MIB
+    table:
+      OID: 1.3.6.1.2.1.14.10
+      name: ospfNbrTable
+    symbols:
+      # Use neighbor state as the required row anchor while keeping the public
+      # topology fact in metric tags below.
+      - OID: 1.3.6.1.2.1.14.10.1.6
+        name: ospf_neighbor
+    metric_tags:
+      - tag: ospf_neighbor_ip
+        symbol:
+          OID: 1.3.6.1.2.1.14.10.1.1
+          name: ospfNbrIpAddr
+      - tag: ospf_neighbor_addressless_index
+        symbol:
+          OID: 1.3.6.1.2.1.14.10.1.2
+          name: ospfNbrAddressLessIndex
+      - tag: ospf_neighbor_router_id
+        symbol:
+          OID: 1.3.6.1.2.1.14.10.1.3
+          name: ospfNbrRtrId
+      - tag: ospf_neighbor_state
+        symbol:
+          OID: 1.3.6.1.2.1.14.10.1.6
+          name: ospfNbrState
+        mapping:
+          1: down
+          2: attempt
+          3: init
+          4: twoWay
+          5: exchangeStart
+          6: exchange
+          7: loading
+          8: full

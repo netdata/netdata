@@ -60,7 +60,8 @@ static const char *stream_parent_effective_service(const char *definition, int d
 
 struct blocked_parent {
     STRING *destination;
-    usec_t until;
+    usec_t since_ut;
+    usec_t duration_ut;
 };
 
 DEFINE_JUDYL_TYPED(BLOCKED_PARENTS, struct blocked_parent *);
@@ -76,7 +77,8 @@ static void block_parent_for_all_nodes(STREAM_PARENT *d, time_t duration_s) {
         p->destination = string_dup(d->destination);
         BLOCKED_PARENTS_SET(&blocked_parents_set, (Word_t)p->destination, p);
     }
-    p->until = now_monotonic_usec() + duration_s * USEC_PER_SEC;
+    p->since_ut = now_monotonic_usec();
+    p->duration_ut = (usec_t)duration_s * USEC_PER_SEC;
 
     rw_spinlock_write_unlock(&blocked_parents_spinlock);
 }
@@ -85,7 +87,7 @@ static bool is_a_blocked_parent(STREAM_PARENT *d) {
     rw_spinlock_read_lock(&blocked_parents_spinlock);
 
     struct blocked_parent *p = BLOCKED_PARENTS_GET(&blocked_parents_set, (Word_t)d->destination);
-    bool ret = p && p->until > now_monotonic_usec();
+    bool ret = p && clocks_usec_delta_or_zero(now_monotonic_usec(), p->since_ut) < p->duration_ut;
 
     rw_spinlock_read_unlock(&blocked_parents_spinlock);
     return ret;
@@ -542,11 +544,11 @@ static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_po
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "STREAM PARENTS '%s': received stream_info data from '%s': "
-           "status: %d, nodes: %zu, receivers: %zu, first_time_s: %ld, last_time_s: %ld, "
+           "status: %d, nodes: %zu, receivers: %zu, first_time_s: %" PRId64 ", last_time_s: %" PRId64 ", "
            "db status: %s, db liveness: %s, ingest type: %s, ingest status: %s",
            hostname, string2str(d->destination),
            d->remote.status, d->remote.nodes, d->remote.receivers,
-           d->remote.db_first_time_s, d->remote.db_last_time_s,
+           (int64_t)d->remote.db_first_time_s, (int64_t)d->remote.db_last_time_s,
            RRDHOST_DB_STATUS_2str(d->remote.db_status),
            RRDHOST_DB_LIVENESS_2str(d->remote.db_liveness),
            RRDHOST_INGEST_TYPE_2str(d->remote.ingest_type),
@@ -602,15 +604,16 @@ bool stream_parent_connect_to_one_unsafe(
         return false;
     }
 
-    STREAM_PARENT *array[size];
+    STREAM_PARENT **array = callocz(size, sizeof(*array));
     usec_t now_ut = now_realtime_usec();
+    bool rc = false;
 
     // fetch stream info for all of them and put them in the array
     size_t count = 0, skipped_but_useful = 0, skipped_not_useful = 0, potential = 0;
     for (STREAM_PARENT *d = host->stream.snd.parents.all; d && count < size ; d = d->next) {
         if (nd_thread_signaled_to_cancel()) {
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
-            return false;
+            goto cleanup;
         }
 
         // make sure they all have a random number
@@ -633,10 +636,10 @@ bool stream_parent_connect_to_one_unsafe(
             potential++;
             host->stream.snd.status.reason = d->reason;
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "STREAM PARENTS '%s': skipping useful parent '%s': POSTPONED FOR %ld SECS MORE: %s",
+                   "STREAM PARENTS '%s': skipping useful parent '%s': POSTPONED FOR %" PRId64 " SECS MORE: %s",
                    rrdhost_hostname(host),
                    string2str(d->destination),
-                   (time_t)((d->postpone_until_ut - now_ut) / USEC_PER_SEC),
+                   (int64_t)((d->postpone_until_ut - now_ut) / USEC_PER_SEC),
                    stream_handshake_error_to_string(d->reason));
             continue;
         }
@@ -740,7 +743,7 @@ bool stream_parent_connect_to_one_unsafe(
             pulse_host_status(host, PULSE_HOST_STATUS_SND_NO_DST, 0);
         }
 
-        return false;
+        goto cleanup;
     }
 
     // order the parents in the array the way we want to connect
@@ -831,7 +834,7 @@ bool stream_parent_connect_to_one_unsafe(
             sender_sock->error = ND_SOCK_ERR_THREAD_CANCELLED;
             host->stream.snd.status.reason = STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP;
             pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, host->stream.snd.status.reason);
-            return false;
+            goto cleanup;
         }
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -873,7 +876,8 @@ bool stream_parent_connect_to_one_unsafe(
             sender_sock->error = ND_SOCK_ERR_NONE;
             host->stream.snd.status.reason = STREAM_HANDSHAKE_SP_CONNECTED;
             pulse_host_status(host, PULSE_HOST_STATUS_SND_CONNECTING, host->stream.snd.status.reason);
-            return true;
+            rc = true;
+            goto cleanup;
         }
         else {
             stream_parent_nd_sock_error_to_reason(d, sender_sock);
@@ -889,7 +893,10 @@ bool stream_parent_connect_to_one_unsafe(
     }
 
     pulse_host_status(host, PULSE_HOST_STATUS_SND_OFFLINE, 0);
-    return false;
+
+cleanup:
+    freez(array);
+    return rc;
 }
 
 bool stream_parent_connect_to_one(

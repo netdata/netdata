@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 use crate::HttpAccess;
 
 /// A function declaration message for Netdata's external plugin protocol
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionDeclaration {
     /// True if the function is global
     pub global: bool,
@@ -37,7 +39,7 @@ impl FunctionDeclaration {
 }
 
 /// A function call message for invoking functions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionCall {
     /// Transaction ID for this function call
     pub transaction: String,
@@ -56,7 +58,7 @@ pub struct FunctionCall {
 }
 
 /// A function result message containing the response payload
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionResult {
     /// Transaction ID or unique identifier for this function call
     pub transaction: String,
@@ -71,21 +73,21 @@ pub struct FunctionResult {
 }
 
 /// A function cancel message for terminating function execution
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionCancel {
     /// Transaction ID of the function call to cancel
     pub transaction: String,
 }
 
 /// A request from the agent for a progress report on a running function call
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionProgressRequest {
     /// Transaction ID of the function call to report progress for
     pub transaction: String,
 }
 
 /// A progress report sent from the plugin to the agent
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionProgressResponse {
     /// Transaction ID of the function call reporting progress
     pub transaction: String,

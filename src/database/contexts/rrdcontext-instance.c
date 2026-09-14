@@ -53,10 +53,9 @@ inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
     return rrdinstance_labels(ri);
 }
 
-inline DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria) {
+inline RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    if(!ri->rrdset) return NULL;
-    return ri->rrdset->functions_view;
+    return ri->rrdset;
 }
 
 inline RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria) {
@@ -263,7 +262,7 @@ void rrdinstances_destroy_from_rrdcontext(RRDCONTEXT *rc) {
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
     RRDSET *st = ri->rrdset;
 
-    if(likely(st)) {
+    if(st != NULL) {
         if(unlikely((unsigned int) st->priority != ri->priority)) {
             ri->priority = st->priority;
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
@@ -282,7 +281,7 @@ void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
 
     if(rrd_flag_is_updated(ri) || !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(ri->rc, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(ri->rc, function, ri->flags);
+        rrdcontext_queue_for_post_processing(ri->rc, function, rrd_flags_get(ri));
     }
 }
 
@@ -302,6 +301,16 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
     };
 
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item(st->rrdhost->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc));
+    if(unlikely(!rca)) {
+        // the contexts dictionary is being destroyed (host shutdown); the insert
+        // callback never ran, so we still own what we duplicated above
+        string_freez(trc.id);
+        string_freez(trc.title);
+        string_freez(trc.units);
+        string_freez(trc.family);
+        return;
+    }
+
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
 
     RRDINSTANCE tri = {
@@ -319,6 +328,18 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
     };
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, string2str(tri.id), &tri, sizeof(tri));
+    if(unlikely(!ria)) {
+        // the instances dictionary is being destroyed; free what we duplicated
+        // above (mirrors rrdinstance_free()) and drop the context reference
+        string_freez(tri.id);
+        string_freez(tri.name);
+        string_freez(tri.units);
+        string_freez(tri.family);
+        string_freez(tri.title);
+        uuidmap_free(tri.uuid);
+        rrdcontext_release(rca);
+        return;
+    }
 
     RRDCONTEXT_ACQUIRED *rca_old = st->rrdcontexts.rrdcontext;
     RRDINSTANCE_ACQUIRED *ria_old = st->rrdcontexts.rrdinstance;

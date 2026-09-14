@@ -4,7 +4,6 @@ package metrix
 
 import (
 	"fmt"
-	"hash/fnv"
 	"math"
 	"sort"
 	"strconv"
@@ -12,12 +11,12 @@ import (
 
 const SummaryQuantileLabel = "quantile"
 const defaultSummaryReservoirSize = 1024
-const initialSummaryReservoirCapacity = 64
 
 // snapshotSummaryInstrument writes sampled full summary points.
 type snapshotSummaryInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
@@ -25,16 +24,20 @@ type snapshotSummaryInstrument struct {
 type statefulSummaryInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
+	scope   HostScope
 	base    []LabelSet
 }
 
 // stagedSummary holds one in-cycle summary sample for a single series identity.
 type stagedSummary struct {
-	key            string
-	name           string
-	labels         []Label
-	labelsKey      string
-	desc           *instrumentDescriptor
+	key          string
+	name         string
+	hostScopeKey string
+	hostScope    HostScope
+	labels       []Label
+	labelsKey    string
+	desc         *instrumentDescriptor
+
 	count          SampleValue
 	sum            SampleValue
 	quantileValues []SampleValue
@@ -50,6 +53,7 @@ func (m *snapshotMeter) Summary(name string, opts ...InstrumentOption) SnapshotS
 	return &snapshotSummaryInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
@@ -63,22 +67,23 @@ func (m *statefulMeter) Summary(name string, opts ...InstrumentOption) StatefulS
 	return &statefulSummaryInstrument{
 		backend: m.backend,
 		desc:    desc,
+		scope:   m.scope,
 		base:    appendLabelSets(m.sets, nil),
 	}
 }
 
 // ObservePoint writes one full summary point for this collect cycle.
 func (s *snapshotSummaryInstrument) ObservePoint(p SummaryPoint, labels ...LabelSet) {
-	s.backend.recordSummaryObservePoint(s.desc, p, appendLabelSets(s.base, labels))
+	s.backend.recordSummaryObservePoint(s.desc, s.scope, p, appendLabelSets(s.base, labels))
 }
 
 // Observe adds one sample to a stateful summary for this collect cycle.
 func (s *statefulSummaryInstrument) Observe(v SampleValue, labels ...LabelSet) {
-	s.backend.recordSummaryObserve(s.desc, v, appendLabelSets(s.base, labels))
+	s.backend.recordSummaryObserve(s.desc, s.scope, v, appendLabelSets(s.base, labels))
 }
 
 // recordSummaryObservePoint writes one full summary point into the active frame.
-func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point SummaryPoint, sets []LabelSet) {
+func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, scope HostScope, point SummaryPoint, sets []LabelSet) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -93,18 +98,31 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point 
 	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
 	count, sum, quantiles := normalizeSummaryPoint(point, desc.summary)
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.summaries[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedSummary{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		c.active.summaries[key] = entry
 	}
@@ -116,7 +134,7 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point 
 }
 
 // recordSummaryObserve adds one sample to a stateful summary in the active frame.
-func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, scope HostScope, value SampleValue, sets []LabelSet) {
 	mustFiniteSample(value)
 
 	c.mu.Lock()
@@ -133,19 +151,32 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value Sampl
 	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
+	scope, ok := c.prepareHostScopeForWriteLocked(scope)
+	if !ok {
+		return
+	}
 
-	key := makeSeriesKey(desc.name, labelsKey)
+	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.summaries[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedSummary{
-			key:       key,
-			name:      desc.name,
-			labels:    labels,
-			labelsKey: labelsKey,
-			desc:      desc,
+			key:          key,
+			name:         desc.name,
+			hostScopeKey: scope.ScopeKey,
+			hostScope:    scope,
+			labels:       labels,
+			labelsKey:    labelsKey,
+			desc:         desc,
 		}
 		if desc.window == WindowCumulative {
-			if existing := c.snapshot.Load().series[key]; existing != nil && existing.desc != nil && existing.desc.kind == kindSummary {
+			if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 				entry.count = existing.summaryCount
 				entry.sum = existing.summarySum
 				if len(desc.summaryQuantiles()) > 0 && existing.summarySketch != nil {
@@ -200,7 +231,11 @@ func normalizeSummaryPoint(point SummaryPoint, schema *summarySchema) (SampleVal
 		if idx == -1 {
 			panic(fmt.Errorf("%w: quantile %v is not declared", errSummaryPoint, q.Quantile))
 		}
-		mustFiniteSample(q.Value)
+		// A summary may report a NaN quantile value (e.g. an empty observation window). Store it;
+		// chartengine renders a non-finite dimension value as a gap (SETEMPTY). Reject only Inf.
+		if math.IsInf(float64(q.Value), 0) {
+			panic(fmt.Errorf("%w: infinite quantile value %v", errSummaryPoint, q.Value))
+		}
 		values[idx] = q.Value
 	}
 
@@ -246,121 +281,4 @@ func (d *instrumentDescriptor) summaryReservoirSize() int {
 		return defaultSummaryReservoirSize
 	}
 	return d.summary.reservoirSize
-}
-
-// summaryQuantileSketch keeps bounded-memory approximate quantiles.
-// It uses reservoir sampling, which is deterministic per series key seed.
-type summaryQuantileSketch struct {
-	capacity int
-	count    uint64
-	rng      uint64
-	values   []SampleValue
-	scratch  []SampleValue
-}
-
-func newSummaryQuantileSketch(capacity int, seed uint64) *summaryQuantileSketch {
-	if capacity <= 0 {
-		capacity = defaultSummaryReservoirSize
-	}
-	if seed == 0 {
-		seed = 1
-	}
-	initCap := min(capacity, initialSummaryReservoirCapacity)
-	return &summaryQuantileSketch{
-		capacity: capacity,
-		rng:      seed,
-		values:   make([]SampleValue, 0, initCap),
-	}
-}
-
-func (s *summaryQuantileSketch) clone() *summaryQuantileSketch {
-	if s == nil {
-		return nil
-	}
-	cp := *s
-	cp.values = append([]SampleValue(nil), s.values...)
-	cp.scratch = nil
-	return &cp
-}
-
-func (s *summaryQuantileSketch) observe(v SampleValue) {
-	// Not safe for concurrent use. Callers must hold the owning store mutex.
-	s.count++
-	if len(s.values) < s.capacity {
-		s.values = append(s.values, v)
-		return
-	}
-
-	j := s.next() % s.count
-	if j < uint64(s.capacity) {
-		s.values[j] = v
-	}
-}
-
-func (s *summaryQuantileSketch) quantiles(targets []float64) []SampleValue {
-	if len(targets) == 0 {
-		return nil
-	}
-
-	out := make([]SampleValue, len(targets))
-	if len(s.values) == 0 {
-		for i := range out {
-			out[i] = math.NaN()
-		}
-		return out
-	}
-
-	s.scratch = growCopy(s.scratch, s.values)
-	sort.Float64s(s.scratch)
-	for i, q := range targets {
-		out[i] = sampleQuantileLinear(s.scratch, q)
-	}
-	return out
-}
-
-func (s *summaryQuantileSketch) next() uint64 {
-	x := s.rng
-	x ^= x << 13
-	x ^= x >> 7
-	x ^= x << 17
-	s.rng = x
-	return x
-}
-
-func growCopy(dst, src []SampleValue) []SampleValue {
-	if cap(dst) < len(src) {
-		dst = make([]SampleValue, len(src))
-	} else {
-		dst = dst[:len(src)]
-	}
-	copy(dst, src)
-	return dst
-}
-
-func sampleQuantileLinear(sorted []SampleValue, q float64) SampleValue {
-	last := len(sorted) - 1
-	if q <= 0 {
-		return sorted[0]
-	}
-	if q >= 1 {
-		return sorted[last]
-	}
-	pos := q * float64(last)
-	low := int(math.Floor(pos))
-	high := int(math.Ceil(pos))
-	if low == high {
-		return sorted[low]
-	}
-	w := pos - float64(low)
-	return sorted[low]*(1-w) + sorted[high]*w
-}
-
-func summarySketchSeed(key string) uint64 {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(key))
-	seed := h.Sum64()
-	if seed == 0 {
-		return 1
-	}
-	return seed
 }

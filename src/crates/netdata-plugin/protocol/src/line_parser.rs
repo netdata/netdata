@@ -115,6 +115,9 @@ pub enum Command<'a> {
     FunctionResultPayload { data: &'a [u8] },
     FunctionPayloadData { data: &'a [u8] },
 
+    // Shutdown
+    Quit,
+
     // Unknown command (fallback)
     Unknown,
 
@@ -172,6 +175,7 @@ impl core::fmt::Debug for Command<'_> {
                 .debug_struct("FunctionPayloadData")
                 .field("data", &ByteStr(data))
                 .finish(),
+            Command::Quit => f.write_str("Quit"),
             Command::Unknown => f.debug_struct("Unknown").finish(),
             Command::EmptyLine => f.write_str("EmptyLine"),
             Command::FunctionResultBegin { args } => f
@@ -315,6 +319,7 @@ impl LineParser {
                 Command::Json { args }
             }
 
+            Some(Token::Quit) => Command::Quit,
             Some(token) => {
                 panic!("Unhandled line parser token: {:#?}", token)
             }

@@ -101,16 +101,7 @@ func (c Config) UID() string {
 }
 
 func (c Config) SourceTypePriority() int {
-	switch c.SourceType() {
-	case confgroup.TypeDyncfg:
-		return 16
-	case confgroup.TypeUser:
-		return 8
-	case confgroup.TypeStock:
-		return 2
-	default:
-		return 0
-	}
+	return confgroup.SourceTypePriority(c.SourceType())
 }
 
 func (c Config) HashIncludeMap(_ string, k, _ any) (bool, error) {

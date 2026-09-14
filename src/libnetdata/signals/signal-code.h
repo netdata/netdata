@@ -3,7 +3,7 @@
 #ifndef NETDATA_SIGNAL_CODE_H
 #define NETDATA_SIGNAL_CODE_H
 
-#include "libnetdata/common.h"
+#include "libnetdata/libnetdata-base.h"
 #include "../template-enum.h"
 
 // SIGNAL_CODE combines signal number and signal code into a single 64-bit identifier

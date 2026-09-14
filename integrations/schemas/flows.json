@@ -1,0 +1,6 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Netdata Flows integrations metadata.",
+    "description": "Flows integrations share the same shape as collector integrations: identity, overview, setup, troubleshooting. Every entry under integration_type=flows validates against this schema, which currently delegates to collector.json. Forking the schema is acceptable when flow-specific fields diverge.",
+    "$ref": "./collector.json"
+}

@@ -1,0 +1,427 @@
+version: v1
+context_namespace: ceph
+groups:
+  - family: Internal
+    metrics:
+      - component_collection_status
+    chart_defaults:
+      instances:
+        by_labels: [component]
+      label_promotion: [fsid]
+    charts:
+      - id: component_collection_status
+        title: Ceph Component Collection Status
+        context: component_collection_status
+        units: status
+        dimensions:
+          - selector: 'component_collection_status{component_collection_status="success"}'
+            name: success
+          - selector: 'component_collection_status{component_collection_status="failed"}'
+            name: failed
+
+  - family: Cluster
+    chart_defaults:
+      label_promotion: [fsid]
+    groups:
+      - family: Status
+        metrics:
+          - cluster_health_status
+          - cluster_hosts
+          - cluster_monitors
+          - cluster_osds
+          - cluster_osds_by_status
+          - cluster_managers
+          - cluster_object_gateways
+          - cluster_iscsi_gateways
+          - cluster_iscsi_gateways_by_status
+        charts:
+          - id: cluster_status
+            title: Ceph Cluster Status
+            context: cluster_status
+            units: status
+            dimensions:
+              - selector: 'cluster_health_status{cluster_health_status="ok"}'
+                name: ok
+              - selector: 'cluster_health_status{cluster_health_status="err"}'
+                name: err
+              - selector: 'cluster_health_status{cluster_health_status="warn"}'
+                name: warn
+          - id: cluster_hosts_count
+            title: Ceph Cluster Hosts
+            context: cluster_hosts_count
+            units: hosts
+            dimensions:
+              - selector: cluster_hosts
+                name: hosts
+          - id: cluster_monitors_count
+            title: Ceph Cluster Monitors
+            context: cluster_monitors_count
+            units: monitors
+            dimensions:
+              - selector: cluster_monitors
+                name: monitors
+          - id: cluster_osds_count
+            title: Ceph Cluster OSDs
+            context: cluster_osds_count
+            units: osds
+            dimensions:
+              - selector: cluster_osds
+                name: osds
+          - id: cluster_osds_by_status_count
+            title: Ceph Cluster OSDs by Status
+            context: cluster_osds_by_status_count
+            units: osds
+            dimensions:
+              - selector: 'cluster_osds_by_status{status="up"}'
+                name: up
+              - selector: 'cluster_osds_by_status{status="down"}'
+                name: down
+              - selector: 'cluster_osds_by_status{status="in"}'
+                name: in
+              - selector: 'cluster_osds_by_status{status="out"}'
+                name: out
+          - id: cluster_managers_count
+            title: Ceph Cluster Managers
+            context: cluster_managers_count
+            units: managers
+            dimensions:
+              - selector: 'cluster_managers{status="active"}'
+                name: active
+              - selector: 'cluster_managers{status="standby"}'
+                name: standby
+          - id: cluster_object_gateways_count
+            title: Ceph Cluster Object Gateways (RGW)
+            context: cluster_object_gateways_count
+            units: gateways
+            dimensions:
+              - selector: cluster_object_gateways
+                name: object
+          - id: cluster_iscsi_gateways_count
+            title: Ceph Cluster iSCSI Gateways
+            context: cluster_iscsi_gateways_count
+            units: gateways
+            dimensions:
+              - selector: cluster_iscsi_gateways
+                name: iscsi
+          - id: cluster_iscsi_gateways_by_status_count
+            title: Ceph Cluster iSCSI Gateways by Status
+            context: cluster_iscsi_gateways_by_status_count
+            units: gateways
+            dimensions:
+              - selector: 'cluster_iscsi_gateways_by_status{status="up"}'
+                name: up
+              - selector: 'cluster_iscsi_gateways_by_status{status="down"}'
+                name: down
+      - family: Capacity
+        metrics:
+          - cluster_physical_capacity_utilization_percent
+          - cluster_physical_capacity_bytes
+          - cluster_objects
+          - cluster_object_copies_health_percent
+          - cluster_objects_unfound_percent
+          - cluster_pools
+          - cluster_pgs
+          - cluster_pgs_by_status
+          - cluster_pgs_per_osd
+        charts:
+          - id: cluster_physical_capacity_utilization
+            title: Ceph Cluster Physical Capacity Utilization
+            context: cluster_physical_capacity_utilization
+            units: percent
+            type: area
+            dimensions:
+              - selector: cluster_physical_capacity_utilization_percent
+                name: utilization
+                options:
+                  float: true
+          - id: cluster_physical_capacity_usage
+            title: Ceph Cluster Physical Capacity Usage
+            context: cluster_physical_capacity_usage
+            units: bytes
+            type: stacked
+            dimensions:
+              - selector: 'cluster_physical_capacity_bytes{state="avail"}'
+                name: avail
+              - selector: 'cluster_physical_capacity_bytes{state="used"}'
+                name: used
+          - id: cluster_objects_count
+            title: Ceph Cluster Objects
+            context: cluster_objects_count
+            units: objects
+            dimensions:
+              - selector: cluster_objects
+                name: objects
+          - id: cluster_object_copies_health
+            title: Ceph Cluster Object Copy Health
+            context: cluster_object_copies_health
+            units: percent
+            dimensions:
+              - selector: 'cluster_object_copies_health_percent{state="degraded"}'
+                name: degraded
+                options:
+                  float: true
+              - selector: 'cluster_object_copies_health_percent{state="misplaced"}'
+                name: misplaced
+                options:
+                  float: true
+          - id: cluster_objects_unfound
+            title: Ceph Cluster Unfound Objects
+            context: cluster_objects_unfound
+            units: percent
+            dimensions:
+              - selector: cluster_objects_unfound_percent
+                name: unfound
+                options:
+                  float: true
+          - id: cluster_pools_count
+            title: Ceph Cluster Pools
+            context: cluster_pools_count
+            units: pools
+            dimensions:
+              - selector: cluster_pools
+                name: pools
+          - id: cluster_pgs_count
+            title: Ceph Cluster Placement Groups
+            context: cluster_pgs_count
+            units: pgs
+            dimensions:
+              - selector: cluster_pgs
+                name: pgs
+          - id: cluster_pgs_by_status_count
+            title: Ceph Cluster Placement Groups by Status
+            context: cluster_pgs_by_status_count
+            units: pgs
+            type: stacked
+            dimensions:
+              - selector: 'cluster_pgs_by_status{status="clean"}'
+                name: clean
+              - selector: 'cluster_pgs_by_status{status="working"}'
+                name: working
+              - selector: 'cluster_pgs_by_status{status="warning"}'
+                name: warning
+              - selector: 'cluster_pgs_by_status{status="unknown"}'
+                name: unknown
+          - id: cluster_pgs_per_osd_count
+            title: Ceph Cluster Placement Groups per OSD
+            context: cluster_pgs_per_osd_count
+            units: pgs
+            dimensions:
+              - selector: cluster_pgs_per_osd
+                name: per_osd
+                options:
+                  float: true
+      - family: Performance
+        metrics:
+          - cluster_client_io_bytes_per_sec
+          - cluster_client_iops
+          - cluster_recovery_bytes_per_sec
+          - cluster_scrub_status
+        charts:
+          - id: cluster_client_io
+            title: Ceph Cluster Client IO
+            context: cluster_client_io
+            units: bytes/s
+            type: area
+            dimensions:
+              - selector: 'cluster_client_io_bytes_per_sec{direction="read"}'
+                name: read
+                options:
+                  float: true
+              - selector: 'cluster_client_io_bytes_per_sec{direction="written"}'
+                name: written
+                options:
+                  multiplier: -1
+                  float: true
+          - id: cluster_client_iops
+            title: Ceph Cluster Client IOPS
+            context: cluster_client_iops
+            units: ops/s
+            dimensions:
+              - selector: 'cluster_client_iops{direction="read"}'
+                name: read
+                options:
+                  float: true
+              - selector: 'cluster_client_iops{direction="write"}'
+                name: write
+                options:
+                  multiplier: -1
+                  float: true
+          - id: cluster_recovery_throughput
+            title: Ceph Cluster Recovery Throughput
+            context: cluster_recovery_throughput
+            units: bytes/s
+            dimensions:
+              - selector: cluster_recovery_bytes_per_sec
+                name: recovery
+                options:
+                  float: true
+          - id: cluster_scrub_status
+            title: Ceph Cluster Scrubbing Status
+            context: cluster_scrub_status
+            units: status
+            dimensions:
+              - selector: 'cluster_scrub_status{cluster_scrub_status="disabled"}'
+                name: disabled
+              - selector: 'cluster_scrub_status{cluster_scrub_status="active"}'
+                name: active
+              - selector: 'cluster_scrub_status{cluster_scrub_status="inactive"}'
+                name: inactive
+
+  - family: OSD
+    chart_defaults:
+      instances:
+        by_labels: [osd_uuid]
+      label_promotion: [fsid, osd_name, device_class]
+    groups:
+      - family: Status
+        metrics:
+          - osd_operational_status
+          - osd_membership_status
+        charts:
+          - id: osd_status
+            title: Ceph OSD Status
+            context: osd_status
+            units: status
+            dimensions:
+              - selector: 'osd_operational_status{osd_operational_status="up"}'
+                name: up
+              - selector: 'osd_operational_status{osd_operational_status="down"}'
+                name: down
+              - selector: 'osd_membership_status{osd_membership_status="in"}'
+                name: in
+              - selector: 'osd_membership_status{osd_membership_status="out"}'
+                name: out
+      - family: Space
+        metrics:
+          - osd_space_bytes
+        charts:
+          - id: osd_space_usage
+            title: Ceph OSD Space Usage
+            context: osd_space_usage
+            units: bytes
+            type: stacked
+            dimensions:
+              - selector: 'osd_space_bytes{state="avail"}'
+                name: avail
+              - selector: 'osd_space_bytes{state="used"}'
+                name: used
+      - family: Operations
+        metrics:
+          - osd_io_bytes_per_sec
+          - osd_iops
+          - osd_latency_ms
+        charts:
+          - id: osd_io
+            title: Ceph OSD IO
+            context: osd_io
+            units: bytes/s
+            type: area
+            dimensions:
+              - selector: 'osd_io_bytes_per_sec{direction="read"}'
+                name: read
+                options:
+                  float: true
+              - selector: 'osd_io_bytes_per_sec{direction="written"}'
+                name: written
+                options:
+                  multiplier: -1
+                  float: true
+          - id: osd_iops
+            title: Ceph OSD IOPS
+            context: osd_iops
+            units: ops/s
+            dimensions:
+              - selector: 'osd_iops{direction="read"}'
+                name: read
+                options:
+                  float: true
+              - selector: 'osd_iops{direction="write"}'
+                name: write
+                options:
+                  float: true
+          - id: osd_latency
+            title: Ceph OSD Latency
+            context: osd_latency
+            units: milliseconds
+            dimensions:
+              - selector: 'osd_latency_ms{stage="commit"}'
+                name: commit
+                options:
+                  float: true
+              - selector: 'osd_latency_ms{stage="apply"}'
+                name: apply
+                options:
+                  float: true
+
+  - family: Pool
+    chart_defaults:
+      instances:
+        # Ceph exposes no stable pool ID across all supported releases. Distinct
+        # names that normalize to the same chart ID are a known rare limitation.
+        by_labels: [pool_name]
+      label_promotion: [fsid]
+    groups:
+      - family: Space
+        metrics:
+          - pool_space_utilization_percent
+          - pool_space_bytes
+        charts:
+          - id: pool_space_utilization
+            title: Ceph Pool Space Utilization
+            context: pool_space_utilization
+            units: percent
+            type: area
+            dimensions:
+              - selector: pool_space_utilization_percent
+                name: utilization
+                options:
+                  float: true
+          - id: pool_space_usage
+            title: Ceph Pool Space Usage
+            context: pool_space_usage
+            units: bytes
+            type: stacked
+            dimensions:
+              - selector: 'pool_space_bytes{state="avail"}'
+                name: avail
+              - selector: 'pool_space_bytes{state="used"}'
+                name: used
+      - family: Objects
+        metrics:
+          - pool_objects
+        charts:
+          - id: pool_objects_count
+            title: Ceph Pool Objects
+            context: pool_objects_count
+            units: objects
+            dimensions:
+              - selector: pool_objects
+                name: objects
+      - family: Operations
+        metrics:
+          - pool_io_bytes_total
+          - pool_operations_total
+        charts:
+          - id: pool_io
+            title: Ceph Pool IO
+            context: pool_io
+            units: bytes/s
+            type: area
+            dimensions:
+              - selector: 'pool_io_bytes_total{direction="read"}'
+                name: read
+              - selector: 'pool_io_bytes_total{direction="written"}'
+                name: written
+                options:
+                  multiplier: -1
+          - id: pool_iops
+            title: Ceph Pool IOPS
+            context: pool_iops
+            units: ops/s
+            dimensions:
+              - selector: 'pool_operations_total{direction="read"}'
+                name: read
+              - selector: 'pool_operations_total{direction="write"}'
+                name: write
+                options:
+                  multiplier: -1

@@ -12,7 +12,7 @@ size_t aclk_get_http_api_version(void) {
 
 const struct capability *aclk_get_agent_capas()
 {
-    static struct capability agent_capabilities[] = {
+    static __thread struct capability agent_capabilities[] = {
         { .name = "json",        .version = 2, .enabled = 0 },
         { .name = "proto",       .version = 1, .enabled = 1 },
         { .name = "ml",          .version = 0, .enabled = 0 }, // index 2, below

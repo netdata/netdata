@@ -2,9 +2,10 @@
   "vnode": "ok",
   "update_every": 123,
   "autodetection_retry": 123,
+  "function_only": true,
   "url": "ok",
-  "body": "ok",
-  "method": "ok",
+  "body": "",
+  "method": "",
   "headers": {
     "ok": "ok"
   },
@@ -16,9 +17,17 @@
   "proxy_password": "ok",
   "timeout": 123.123,
   "not_follow_redirects": true,
+  "allowed_redirect_origins": [
+    "https://mgr-a.example:8443",
+    "https://mgr-b.example:8443"
+  ],
   "tls_ca": "ok",
   "tls_cert": "ok",
   "tls_key": "ok",
   "tls_skip_verify": true,
-  "force_http2": true
+  "force_http2": true,
+  "osd_selector": "osd.* !osd.0",
+  "max_osds": 123,
+  "pool_selector": "* !internal*",
+  "max_pools": 123
 }

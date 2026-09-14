@@ -60,6 +60,8 @@ When enabled, bearer token protection secures **all data APIs**, including:
 - Functions (`/api/v3/function`, `/api/v3/functions`)
 - Dynamic configuration (`/api/v3/config`)
 
+It also changes local MCP behavior: MCP requests over HTTP, SSE, and WebSocket require the local MCP API key when bearer token protection is enabled.
+
 ## What Remains Public
 
 **Static web files** (HTML, CSS, JavaScript) in Netdata's web directory are **not protected**. This means:
@@ -85,6 +87,15 @@ A small set of APIs also remain publicly accessible for operational reasons:
 These APIs are required for the authentication flow and dashboard initialization. The registry `hello` action returns node identifiers and cloud connection status, which the dashboard needs to initiate the authentication redirect.
 
 **Note:** Other v1 and v2 APIs (like `/api/v2/info`, `/api/v3/versions`, `/api/v3/progress`) **are protected** by bearer token - only the specific endpoints listed above bypass protection.
+
+## MCP Behavior with Bearer Protection
+
+For local Agent/Parent MCP endpoints (`/mcp`, `/sse`, MCP WebSocket):
+
+- If `[web].bearer token protection = yes`: anonymous MCP requests are rejected, and clients must pass the local MCP API key (`Authorization: Bearer <mcp_key>`).
+- If `[web].bearer token protection = no`: anonymous MCP requests continue to work with the default open-source access model (the MCP API key is still supported and unlocks sensitive operations).
+
+MCP network exposure is still controlled independently by `[web].allow mcp from`.
 
 ## Requirements
 

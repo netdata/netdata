@@ -6,6 +6,7 @@ modules:
       module_name: vernemq
       monitored_instance:
         name: VerneMQ
+        description: "Monitor VerneMQ nodes, sockets, queues, MQTT messages, subscriptions, traffic, and scheduler activity."
         link: https://vernemq.com
         icon_filename: vernemq.svg
         categories:
@@ -177,13 +178,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:8888/metrics
-                
+
                   - name: remote
                     url: http://203.0.113.10:8888/metrics
     troubleshooting:

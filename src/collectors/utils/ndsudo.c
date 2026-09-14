@@ -3,10 +3,19 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <errno.h>
+#include "exec-signals.h"
 
 #define MAX_SEARCH 3
 #define MAX_PARAMETERS 128
 #define ERROR_BUFFER_SIZE 1024
+#define FAIL2BAN_SOCKET_PATH_IN_DOCKER "/host/var/run/fail2ban/fail2ban.sock"
+#define NDSUDO_MACOS_POWERMETRICS_PATH "/usr/bin/powermetrics"
+#ifdef __APPLE__
+// IORegistryEntryGetPath() writes into io_string_t[512], including the terminator.
+#define NDSUDO_MACOS_IOKIT_PATH_MAX 511
+#define NDSUDO_MACOS_IOKIT_PATH_PREFIX "IOService:/"
+#endif
 
 struct command {
     const char *name;
@@ -76,14 +85,6 @@ struct command {
         },
     },
     {
-        .name = "chronyc-serverstats",
-        .params = "serverstats",
-        .search = {
-            [0] = "chronyc",
-            [1] = NULL,
-        },
-    },
-    {
         .name = "dmsetup-status-cache",
         .params = "status --target cache --noflush",
         .search = {
@@ -133,7 +134,7 @@ struct command {
     },
     {
         .name = "fail2ban-client-status-socket",
-        .params = "-s {{socket_path}} status",
+        .params = "-s " FAIL2BAN_SOCKET_PATH_IN_DOCKER " status",
         .search = {
             [0] = "fail2ban-client",
             [1] = NULL,
@@ -149,7 +150,7 @@ struct command {
     },
     {
         .name = "fail2ban-client-status-jail-socket",
-        .params = "-s {{socket_path}} status {{jail}}",
+        .params = "-s " FAIL2BAN_SOCKET_PATH_IN_DOCKER " status {{jail}}",
         .search = {
             [0] = "fail2ban-client",
             [1] = NULL,
@@ -220,6 +221,72 @@ struct command {
         },
     },
     {
+        .name = "powermetrics-thermal-smc-gpu",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-gpu",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc-gpu-loop",
+        // no -n: powermetrics must stream until netdata stops it
+        // (-n 0 means "zero samples and exit" on current macOS)
+        .params = "-b 0 -i {{sampleIntervalMs}} -s thermal,smc,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-gpu-loop",
+        .params = "-b 0 -i {{sampleIntervalMs}} -s thermal,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc-loop",
+        .params = "-b 0 -i {{sampleIntervalMs}} -s thermal,smc -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-loop",
+        .params = "-b 0 -i {{sampleIntervalMs}} -s thermal -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
         .name = "megacli-disk-info",
         .params = "-LDPDInfo -aAll -NoLog",
         .search = {
@@ -260,9 +327,24 @@ bool command_exists_in_dir(const char *dir, const char *cmd, char *dst, size_t d
     return access(dst, X_OK) == 0;
 }
 
+bool command_exists_absolute(const char *cmd, char *dst, size_t dst_size) {
+    if(!cmd || cmd[0] != '/' || !dst || !dst_size)
+        return false;
+
+    size_t len = strnlen(cmd, dst_size);
+    if(len >= dst_size)
+        return false;
+
+    memcpy(dst, cmd, len + 1);
+    return access(dst, X_OK) == 0;
+}
+
 bool command_exists_in_PATH(const char *cmd, char *dst, size_t dst_size) {
     if(!dst || !dst_size)
         return false;
+
+    if(cmd && cmd[0] == '/')
+        return command_exists_absolute(cmd, dst, dst_size);
 
     char *path = getenv("PATH");
     if(!path)
@@ -294,7 +376,7 @@ struct command *find_command(const char *cmd) {
     return NULL;
 }
 
-bool check_string(const char *str, size_t index, char *err, size_t err_size) {
+static bool check_string_with_extra_chars(const char *str, size_t index, const char *extra_chars, char *err, size_t err_size) {
     const char *s = str;
     while(*s) {
         char c = *s++;
@@ -302,7 +384,8 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
               c == ' ' || c == '_' || c == '-' || c == '/' || 
-              c == '.' || c == ',' || c == ':' || c == '=')) {
+              c == '.' || c == ',' || c == ':' || c == '=' ||
+              (extra_chars && strchr(extra_chars, c)))) {
             snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }
@@ -311,10 +394,126 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
     return true;
 }
 
-bool check_params(int argc, char **argv, char *err, size_t err_size) {
-    for(int i = 0 ; i < argc ;i++)
+bool check_string(const char *str, size_t index, char *err, size_t err_size) {
+    return check_string_with_extra_chars(str, index, NULL, err, err_size);
+}
+
+#ifdef __APPLE__
+static bool check_macos_iokit_device_path(const char *str, size_t index, char *err, size_t err_size) {
+    size_t len = strnlen(str, NDSUDO_MACOS_IOKIT_PATH_MAX + 1);
+    if (len > NDSUDO_MACOS_IOKIT_PATH_MAX) {
+        snprintf(err, err_size, "command line argument No %zu exceeds the maximum IOKit path length", index);
+        return false;
+    }
+
+    if (strncmp(str, NDSUDO_MACOS_IOKIT_PATH_PREFIX, sizeof(NDSUDO_MACOS_IOKIT_PATH_PREFIX) - 1) != 0) {
+        snprintf(err, err_size, "command line argument No %zu is not an IOService path", index);
+        return false;
+    }
+
+    return check_string_with_extra_chars(str, index, "@()", err, err_size);
+}
+#endif
+
+bool check_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
+#ifdef __APPLE__
+    int macos_iokit_device_path_index = -1;
+    if (strcmp(cmd, "smartctl-json-device-info") == 0) {
+        for (int i = 1; i < argc - 1; i++) {
+            if (strcmp(argv[i], "--deviceName") == 0) {
+                macos_iokit_device_path_index = i + 1;
+                break;
+            }
+        }
+    }
+#else
+    (void)cmd;
+#endif
+
+    for(int i = 0 ; i < argc ;i++) {
+#ifdef __APPLE__
+        if (i == macos_iokit_device_path_index) {
+            if (strncmp(argv[i], NDSUDO_MACOS_IOKIT_PATH_PREFIX, sizeof(NDSUDO_MACOS_IOKIT_PATH_PREFIX) - 1) != 0) {
+                if (!check_string(argv[i], i, err, err_size))
+                    return false;
+                continue;
+            }
+            if (!check_macos_iokit_device_path(argv[i], i, err, err_size))
+                return false;
+            continue;
+        }
+#endif
         if(!check_string(argv[i], i, err, err_size))
             return false;
+    }
+
+    return true;
+}
+
+bool check_positive_integer_argument(const char *cmd, int argc, char **argv, const char *name, unsigned long max, char *err, size_t err_size) {
+    for (int i = 2; i < argc - 1; i++) {
+        if (strcmp(argv[i], name) != 0)
+            continue;
+
+        const char *value = argv[i + 1];
+        if (!value || !*value) {
+            snprintf(err, err_size, "%s: %s requires a positive integer value", cmd, name);
+            return false;
+        }
+
+        for (const char *s = value; *s; s++) {
+            if (*s < '0' || *s > '9') {
+                snprintf(err, err_size, "%s: %s must be a positive integer", cmd, name);
+                return false;
+            }
+        }
+
+        bool all_zero = true;
+        for (const char *s = value; *s; s++) {
+            if (*s != '0') {
+                all_zero = false;
+                break;
+            }
+        }
+        if (all_zero) {
+            snprintf(err, err_size, "%s: %s must be greater than zero", cmd, name);
+            return false;
+        }
+
+        // Bound privileged-helper inputs: ndsudo is setuid-root, so an unbounded
+        // value here could keep a root powermetrics process running for a long time.
+        if (max) {
+            errno = 0;
+            unsigned long v = strtoul(value, NULL, 10);
+            if (errno == ERANGE || v > max) {
+                snprintf(err, err_size, "%s: %s must be at most %lu ms", cmd, name, max);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    snprintf(err, err_size, "%s: required argument %s is missing", cmd, name);
+    return false;
+}
+
+// Upper bound for powermetrics sample intervals accepted by the setuid helper,
+// to keep privileged powermetrics invocations bounded when ndsudo is invoked directly.
+#define NDSUDO_POWERMETRICS_INTERVAL_MS_MAX 60000UL
+
+bool check_command_specific_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
+    if (strcmp(cmd, "powermetrics-thermal-smc-gpu") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-gpu") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-smc") == 0 ||
+        strcmp(cmd, "powermetrics-thermal") == 0)
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", NDSUDO_POWERMETRICS_INTERVAL_MS_MAX, err, err_size);
+
+    if (strcmp(cmd, "powermetrics-thermal-smc-gpu-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-gpu-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-smc-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-loop") == 0)
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleIntervalMs", NDSUDO_POWERMETRICS_INTERVAL_MS_MAX, err, err_size);
 
     return true;
 }
@@ -419,7 +618,10 @@ void show_help() {
     fprintf(stdout, "Variables given as {{variable}} are expected on the command line as:\n");
     fprintf(stdout, "  --variable VALUE\n");
     fprintf(stdout, "\n");
-    fprintf(stdout, "VALUE can include space, A-Z, a-z, 0-9, _, -, /, and .\n");
+    fprintf(stdout, "VALUE can include letters, digits, spaces, underscores, hyphens, slashes, periods, commas, colons, and equals signs.\n");
+#ifdef __APPLE__
+    fprintf(stdout, "For smartctl-json-device-info, --deviceName also accepts @, (, and ) in IOService:/ paths up to 511 bytes.\n");
+#endif
     fprintf(stdout, "\n");
 }
 
@@ -431,20 +633,25 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if(!check_params(argc, argv, error_buffer, sizeof(error_buffer))) {
+    bool test = false;
+    const char *cmd = argv[1];
+    if(strcmp(cmd, "--test") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "a command is required after --test.\n");
+            return 1;
+        }
+        cmd = argv[2];
+        test = true;
+    }
+
+    if(!check_params(cmd, argc, argv, error_buffer, sizeof(error_buffer))) {
         fprintf(stderr, "invalid characters in parameters: %s\n", error_buffer);
         return 2;
     }
 
-    bool test = false;
-    const char *cmd = argv[1];
-    if(strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+    if(!test && (strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0)) {
         show_help();
         exit(0);
-    }
-    else if(strcmp(cmd, "--test") == 0) {
-        cmd = argv[2];
-        test = true;
     }
 
     struct command *command = find_command(cmd);
@@ -453,12 +660,36 @@ int main(int argc, char *argv[]) {
         return 3;
     }
 
-    char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+    if(!check_command_specific_params(cmd, argc, argv, error_buffer, sizeof(error_buffer))) {
+        fprintf(stderr, "invalid command parameters: %s\n", error_buffer);
+        return 2;
+    }
+
+    char new_path[] =
+#ifdef __APPLE__
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin";
+#else
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+#endif
     putenv(new_path);
 
-    setuid(0);
-    setgid(0);
-    setegid(0);
+    // Escalate to root before searching PATH and running the whitelisted
+    // command. This binary is installed setuid-root; if escalation fails
+    // (e.g. the setuid bit was lost, or a restrictive seccomp/no_new_privs
+    // policy is in effect) a real execution would run the command without
+    // the privileges it needs and misbehave, so we refuse to continue.
+    // --test never runs the privileged command (it only prints the command
+    // line), so a failed escalation is tolerated there -- e.g. inspecting a
+    // non-setuid build -- but it is reported so the output makes clear that a
+    // real run would fail. The escalation is still attempted pre-search in
+    // both modes to preserve the behaviour of installed setuid executions.
+    bool privileges_ok = (setuid(0) == 0 && setgid(0) == 0 && setegid(0) == 0);
+    int privileges_errno = privileges_ok ? 0 : errno; // capture before later syscalls clobber errno
+    if (!privileges_ok && !test) {
+        fprintf(stderr, "ndsudo: failed to acquire root privileges (is the binary setuid-root?): %s\n",
+                strerror(privileges_errno));
+        return 7;
+    }
 
     bool found = false;
     char filename[FILENAME_MAX];
@@ -494,9 +725,21 @@ int main(int argc, char *argv[]) {
 
         fprintf(stderr, "\n");
 
+        if(!privileges_ok)
+            fprintf(stderr,
+                    "WARNING: a real run would FAIL before executing this: could not acquire root "
+                    "privileges (is the binary setuid-root?): %s\n", strerror(privileges_errno));
+
         exit(0);
     }
     else {
+        // Restore default signal dispositions before exec. SIG_IGN survives execve(), so an ignored
+        // signal in our caller would be inherited by the command we run. netdata ignores SIGPIPE,
+        // and a command that gets EPIPE instead of dying keeps running after netdata closes its
+        // stdout - which, for a command we exec with root privileges, netdata can no longer signal.
+        // The spawn server resets this too; doing it here as well covers any other caller.
+        reset_signal_dispositions();
+
         char *clean_env[] = {NULL};
         execve(filename, params, clean_env);
         perror("execve"); // execve only returns on error

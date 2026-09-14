@@ -146,8 +146,6 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_stream_send_chart_slot_release(st);
 
-    dictionary_destroy(st->functions_view);
-
     rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 
     // ------------------------------------------------------------------------
@@ -191,6 +189,26 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     memset(st, 0, sizeof(RRDSET));
 }
 
+// Re-intern a chart metadata field only when the incoming raw value differs from the
+// already-stored one, and report whether it changed.
+//
+// *field holds the output of rrd_string_strdupz(), i.e. the sanitized form. So an exact
+// match against the raw incoming string means sanitizing it is a no-op and interning it
+// would hand back the very same STRING - the whole update is provably a no-op and can be
+// skipped. A mismatch (including one that only sanitizing would resolve) falls through to
+// the full path, so this is one-directional and cannot skip a real change.
+static inline bool rrdset_metadata_field_update(STRING **field, const char *value) {
+    if(!value || !*value || string_strcmp(*field, value) == 0)
+        return false;
+
+    STRING *old = *field;
+    *field = rrd_string_strdupz(value);
+    bool changed = (old != *field);
+    string_freez(old);
+
+    return changed;
+}
+
 // the item to be inserted, is already in the dictionary
 // this callback deals with the situation, migrating the existing object to the new values
 // the dictionary is write locked while this runs
@@ -212,53 +230,23 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
-    if(ctr->plugin && *ctr->plugin) {
-        STRING *old_plugin = st->plugin_name;
-        st->plugin_name = rrd_string_strdupz(ctr->plugin);
-        if (old_plugin != st->plugin_name)
-            ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
-        string_freez(old_plugin);
-    }
+    if(rrdset_metadata_field_update(&st->plugin_name, ctr->plugin))
+        ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
 
-    if(ctr->module && *ctr->module) {
-        STRING *old_module = st->module_name;
-        st->module_name = rrd_string_strdupz(ctr->module);
-        if (old_module != st->module_name)
-            ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
-        string_freez(old_module);
-    }
+    if(rrdset_metadata_field_update(&st->module_name, ctr->module))
+        ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
 
-    if(ctr->title && *ctr->title) {
-        STRING *old_title = st->title;
-        st->title = rrd_string_strdupz(ctr->title);
-        if(old_title != st->title)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_title);
-    }
+    if(rrdset_metadata_field_update(&st->title, ctr->title))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->units && *ctr->units) {
-        STRING *old_units = st->units;
-        st->units = rrd_string_strdupz(ctr->units);
-        if(old_units != st->units)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_units);
-    }
+    if(rrdset_metadata_field_update(&st->units, ctr->units))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->family && *ctr->family) {
-        STRING *old_family = st->family;
-        st->family = rrd_string_strdupz(ctr->family);
-        if(old_family != st->family)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_family);
-    }
+    if(rrdset_metadata_field_update(&st->family, ctr->family))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->context && *ctr->context) {
-        STRING *old_context = st->context;
-        st->context = rrd_string_strdupz(ctr->context);
-        if(old_context != st->context)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_context);
-    }
+    if(rrdset_metadata_field_update(&st->context, ctr->context))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
     if(st->chart_type != ctr->chart_type) {
         st->chart_type = ctr->chart_type;
@@ -268,8 +256,25 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rrdset_update_permanent_labels(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
-    rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+
+    // Only ask health to re-evaluate this chart when something it cares about
+    // actually changed. This callback runs on every re-registration of an
+    // already-known chart, which on a parent is continuous: children re-send
+    // chart definitions, and setting the flag unconditionally made health
+    // re-run health_prototype_*_for_rrdset() for essentially every chart,
+    // forever. Measured on an 806-node parent an hour after startup, with the
+    // chart population stable: 2124 charts/s re-initialised, 32% of the health
+    // thread.
+    //
+    // react_action is the right condition: every field this function mutates
+    // sets it, and the permanent labels written just above are derived from
+    // st->plugin_name / st->module_name, which are assigned earlier in this
+    // function and already raise RRDSET_REACT_PLUGIN_UPDATED / _MODULE_UPDATED
+    // when they change. So the labels cannot change while react_action is NONE.
+    if(ctr->react_action != RRDSET_REACT_NONE) {
+        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
 
     return ctr->react_action != RRDSET_REACT_NONE;
 }
@@ -282,7 +287,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDHOST *host = st->rrdhost;
 
     st->collector_tid = gettid_cached();
-    st->last_accessed_time_s = now_realtime_sec();
+    rrdset_touch_last_accessed_time_s(st);
 
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         if (ctr->react_action & RRDSET_REACT_NEW) {
@@ -310,6 +315,20 @@ void rrdset_index_init(RRDHOST *host) {
     rrdset_index_byname_init(host);
 }
 
+void rrdset_index_flush(RRDHOST *host) {
+    // empty the indexes but keep them allocated and the host pointers valid,
+    // so that in-flight queries holding acquired charts can still release them
+    // through rrdset_acquired_release() after the host is archived;
+    // the indexes are destroyed only in rrdhost_free_unlinked(), after the
+    // host has been removed from the indexes and cannot be found by new queries
+
+    // flush the name index first (it is a view of the id index)
+    dictionary_flush(host->rrdset_root_index_name);
+
+    // then flush the id index
+    dictionary_flush(host->rrdset_root_index);
+}
+
 void rrdset_index_destroy(RRDHOST *host) {
     // destroy the name index first
     dictionary_destroy(host->rrdset_root_index_name);
@@ -320,8 +339,8 @@ void rrdset_index_destroy(RRDHOST *host) {
     host->rrdset_root_index = NULL;
 }
 
-static inline RRDSET *rrdset_index_add(RRDHOST *host, const char *id, struct rrdset_constructor *st_ctr) {
-    return dictionary_set_advanced(host->rrdset_root_index, id, -1, NULL, sizeof(RRDSET), st_ctr);
+static inline const DICTIONARY_ITEM *rrdset_index_add_and_acquire(RRDHOST *host, const char *id, struct rrdset_constructor *st_ctr) {
+    return dictionary_set_and_acquire_item_advanced(host->rrdset_root_index, id, -1, NULL, sizeof(RRDSET), st_ctr);
 }
 
 static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
@@ -337,21 +356,33 @@ static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
 }
 
 RRDSET *rrdset_find(RRDHOST *host, const char *id, bool include_obsolete) {
-    netdata_log_debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(debug_flags & D_RRD_CALLS)) {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        netdata_log_debug(D_RRD_CALLS, "rrdset_find() for chart '%s' in host '%s'", id, string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
+    }
+#endif
     RRDSET *st = rrdset_index_find(host, id);
 
     if(st) {
         if(!include_obsolete && !rrdset_is_discoverable(st))
             return NULL;
 
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
     }
 
     return(st);
 }
 
 RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool include_obsolete) {
-    netdata_log_debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(debug_flags & D_RRD_CALLS)) {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        netdata_log_debug(D_RRD_CALLS, "rrdset_find_bytype() for chart '%s.%s' in host '%s'", type, id, string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
+    }
+#endif
 
     char buf[RRD_ID_LENGTH_MAX + 1];
     strncpyz(buf, type, RRD_ID_LENGTH_MAX - 1);
@@ -363,7 +394,19 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool
 }
 
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
-    netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(debug_flags & D_RRD_CALLS)) {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", string2str(identity.hostname), id);
+        rrdhost_identity_release(&identity);
+    }
+#endif
+
+    // the index stays allocated for the whole life of the host (archiving only
+    // flushes it); this guard is defense-in-depth for callers racing with
+    // rrdhost_free_unlinked()
+    if (unlikely(!host->rrdset_root_index))
+        return NULL;
 
     RRDSET_ACQUIRED *sta = (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
     if(sta) {
@@ -374,7 +417,7 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool inc
                 return NULL;
             }
 
-            st->last_accessed_time_s = now_realtime_sec();
+            rrdset_touch_last_accessed_time_s(st);
         }
     }
 
@@ -451,23 +494,26 @@ RRDSET *rrdset_create_custom(
 
     struct rrdset_constructor ctr;
 
-    RRDSET *st = NULL;
-    while(!st) {
-        st = rrdset_index_find(host, chart_full_id);
-        if(st) {
-            if(spinlock_trylock(&st->destroy_lock)) {
-                rrdset_isnot_obsolete___safe_from_collector_thread(st);
-                spinlock_unlock(&st->destroy_lock);
+    const DICTIONARY_ITEM *st_item = NULL;
+    while(!st_item) {
+        const DICTIONARY_ITEM *existing_item = dictionary_get_and_acquire_item(host->rrdset_root_index, chart_full_id);
+        if(existing_item) {
+            RRDSET *existing_st = dictionary_acquired_item_value(existing_item);
+            if(spinlock_trylock(&existing_st->destroy_lock)) {
+                rrdset_isnot_obsolete___safe_from_collector_thread(existing_st);
+                spinlock_unlock(&existing_st->destroy_lock);
             }
             else {
 #ifdef FSANITIZE_ADDRESS
                 fprintf(stderr, "rrdset_create_custom() - chart '%s' of host '%s' is being deleted but we need it. Retrying...\n",
                         chart_full_id, rrdhost_hostname(host));
 #endif
-                st = NULL;
+                dictionary_acquired_item_release(host->rrdset_root_index, existing_item);
                 microsleep(1 * USEC_PER_MS);
                 continue;
             }
+
+            dictionary_acquired_item_release(host->rrdset_root_index, existing_item);
         }
 
         ctr = (struct rrdset_constructor){
@@ -488,8 +534,24 @@ RRDSET *rrdset_create_custom(
             .history_entries = history_entries,
         };
 
-        st = rrdset_index_add(host, chart_full_id, &ctr);
+        st_item = rrdset_index_add_and_acquire(host, chart_full_id, &ctr);
+
+        if(unlikely(!st_item))
+            // The index refused the insert, which only happens once
+            // rrdset_index_destroy() has destroyed it - and that runs in
+            // rrdhost_free_unlinked(), after collection on this host has been
+            // stopped and the host unlinked. So we are being called with a
+            // host that is already being freed: retrying can never succeed
+            // (it would spin at 100% CPU forever) and we cannot return NULL,
+            // because rrdset_create() callers dereference the result
+            // unconditionally. The archive path only flushes the index, which
+            // keeps accepting inserts, so this is never the benign case.
+            fatal("RRDSET: chart '%s' of host '%s' cannot be created: the host's chart index is being destroyed. "
+                  "A collector is still creating charts on a host that is being freed.",
+                  chart_full_id, rrdhost_hostname(host));
     }
+
+    RRDSET *st = dictionary_acquired_item_value(st_item);
 
     bool name_updated = false;
     if(!st->name) {
@@ -509,8 +571,12 @@ RRDSET *rrdset_create_custom(
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
         rrdset_metadata_updated(st);
+        // health re-evaluation on rename is queued by rrdset_reset_name() itself;
+        // the branch above only assigns the initial name of a chart we just created,
+        // which rrdset_insert_callback() has already flagged for initialization
     }
 
+    dictionary_acquired_item_release(host->rrdset_root_index, st_item);
     return st;
 }
 

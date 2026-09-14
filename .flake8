@@ -1,2 +1,6 @@
 [flake8]
 max-line-length=120
+# packaging/tools/automation/mcp is a self-contained uv project with its own
+# ruff-based linting; exclude it from the repo-wide flake8 to avoid double-linting
+# it with two tools whose default rule sets disagree.
+extend-exclude=packaging/tools/automation/mcp

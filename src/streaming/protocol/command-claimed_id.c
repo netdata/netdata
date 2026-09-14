@@ -45,10 +45,8 @@ PARSER_RC stream_receiver_pluginsd_claimed_id(char **words, size_t num_words, PA
         return PARSER_RC_OK;
     }
 
-    if(!uuid_is_null(claim_uuid)) {
-        uuid_copy(host->aclk.claim_id_of_origin.uuid, claim_uuid);
-        stream_sender_send_claimed_id(host);
-    }
+    rrdhost_claim_id_of_origin_set(host, uuid2UUID(claim_uuid));
+    stream_sender_send_claimed_id(host);
 
     return PARSER_RC_OK;
 }
@@ -63,7 +61,7 @@ void stream_sender_send_claimed_id(RRDHOST *host) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
 
     char str[UUID_STR_LEN] = "";
-    ND_UUID uuid = host->aclk.claim_id_of_origin;
+    ND_UUID uuid = rrdhost_claim_id_of_origin_get(host);
     if(!UUIDiszero(uuid))
         uuid_unparse_lower(uuid.uuid, str);
     else

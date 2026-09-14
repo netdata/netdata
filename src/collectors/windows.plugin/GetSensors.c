@@ -4,6 +4,10 @@
 #include "windows-internals.h"
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
+#define _COMMON_PLUGIN_NAME "windows.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "GetSensors"
+#include "../common-contexts/common-contexts.h"
+
 #include <windows.h>
 #include <wchar.h>
 
@@ -14,6 +18,8 @@
 static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
 static netdata_mutex_t sensors_mutex;
+static volatile LONG sensors_thread_finished = 0;
+static const int SENSORS_THREAD_JOIN_FALLBACK_WAIT_MS = 2000;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
 #define NETDATA_WIN_VECTOR_POS (3)
@@ -316,6 +322,8 @@ struct sensor_data {
     bool initialized;
     bool first_time;
     bool enabled;
+    bool read_ok; // last collection cycle read this sensor's value successfully
+    size_t seen_generation; // last enumeration pass that returned this sensor
     enum netdata_win_sensor_monitored sensor_data_type;
     struct win_sensor_config *config;
     struct netdata_sensors_extra_values *values;
@@ -345,6 +353,12 @@ struct sensor_data {
 };
 
 DICTIONARY *sensors;
+
+// bumped by the sensor thread after each COMPLETED enumeration pass, so
+// consumers can tell current sensors from ones that disappeared from the
+// Sensor API; guarded by sensors_mutex. not bumped on failed polls - a
+// transient API failure freezes the last known state instead of aging it out
+static size_t sensors_enum_generation = 0;
 
 static void netdata_sensors_free_extra_values(struct netdata_sensors_extra_values *values)
 {
@@ -437,9 +451,9 @@ static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSenso
     HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, key, &pv);
     if (SUCCEEDED(hr) && pv.vt == VT_LPWSTR) {
         char value[8192];
-        int len = wcslen(pv.pwszVal);
-        len = wcstombs(value, pv.pwszVal, len);
-        if (len < 0) {
+        size_t len = wcstombs(value, pv.pwszVal, sizeof(value) - 1);
+        if (len == (size_t)-1) {
+            PropVariantClear(&pv);
             return NULL;
         }
         value[len] = '\0';
@@ -511,6 +525,7 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
             sd->sensor_data_type = i;
             sd->config = &configs[i];
             sd->enabled = true;
+            sd->read_ok = true;
 
             if (i == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
                 netdata_collect_sensor_data(&sd->current_data_value[1],
@@ -551,6 +566,7 @@ static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSe
                 sd->sensor_data_type = i;
                 sd->config = &configs[NETDATA_WIN_SENSOR_LAST_WELL_DEFINED];
                 sd->enabled = true;
+                sd->read_ok = true;
                 sd->current_data_value[0] = current;
             }  else {
                 if (unlikely(!sd->values)) {
@@ -629,6 +645,11 @@ static void netdata_get_sensors()
         __netdata_mutex_lock(&sensors_mutex);
         struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
+        // stamped with the NEXT generation: ">= sensors_enum_generation"
+        // keeps a sensor alive through the in-flight pass and expires it one
+        // completed pass after it disappears from the enumeration
+        sd->seen_generation = sensors_enum_generation + 1;
+
         if (unlikely(!sd->initialized)) {
             netdata_initialize_sensor_dict(sd, pSensor);
             sd->initialized = true;
@@ -643,10 +664,12 @@ static void netdata_get_sensors()
             if (unlikely(!sd->enabled))
                 netdata_sensors_get_custom_data(sd, pSensor);
         } else if (likely(sd->enabled)) {
-            netdata_collect_sensor_data(&sd->current_data_value[0],
-                                        pSensor,
-                                        sensor_keys[sd->sensor_data_type],
-                                        sd->div_factor);
+            // on failure the value is forced to 0 - track validity so the
+            // temperature histogram does not count failed reads as 0 degrees
+            sd->read_ok = netdata_collect_sensor_data(&sd->current_data_value[0],
+                                                      pSensor,
+                                                      sensor_keys[sd->sensor_data_type],
+                                                      sd->div_factor);
             if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
                 netdata_collect_sensor_data(&sd->current_data_value[1],
                                             pSensor,
@@ -681,6 +704,10 @@ static void netdata_get_sensors()
         pSensor->lpVtbl->Release(pSensor);
     }
 
+    __netdata_mutex_lock(&sensors_mutex);
+    sensors_enum_generation++;
+    __netdata_mutex_unlock(&sensors_mutex);
+
     pSensorCollection->lpVtbl->Release(pSensorCollection);
 }
 
@@ -695,7 +722,7 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Sensor thread: cannot initialize COM interface (error 0x%lX)", (unsigned long)hr);
-        return;
+        goto done;
     }
 
     // Create sensor manager instance for this thread
@@ -704,10 +731,7 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     if (FAILED(hr)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Sensor thread: cannot create ISensorManager (error 0x%lX)", (unsigned long)hr);
-        // Only uninitialize if we successfully initialized COM ourselves
-        if (com_initialized)
-            CoUninitialize();
-        return;
+        goto done;
     }
 
     heartbeat_t hb;
@@ -722,6 +746,7 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
         netdata_get_sensors();
     }
 
+done:
     // Thread cleanup - release sensor manager and uninitialize COM
     if (pSensorManager) {
         pSensorManager->lpVtbl->Release(pSensorManager);
@@ -731,6 +756,8 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     // Only uninitialize if we successfully initialized COM ourselves
     if (com_initialized)
         CoUninitialize();
+
+    InterlockedExchange(&sensors_thread_finished, 1);
 }
 
 void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -765,8 +792,11 @@ static int initialize(int update_every)
     dictionary_register_insert_callback(sensors, dict_sensor_insert, NULL);
     dictionary_register_delete_callback(sensors, dict_sensor_delete, NULL);
 
+    InterlockedExchange(&sensors_thread_finished, 0);
     sensors_thread_update =
         nd_thread_create("sensors_upd", NETDATA_THREAD_OPTION_DEFAULT, netdata_sensors_monitor, &update_every);
+    if (!sensors_thread_update)
+        InterlockedExchange(&sensors_thread_finished, 1);
 
     return 0;
 }
@@ -791,7 +821,7 @@ static void sensors_states_chart(struct sensor_data *sd, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(sd->st_sensor_state->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_state->rrdlabels, "label", sd->name, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_state->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_state->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
@@ -864,7 +894,7 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(sd->st_sensor_data->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_data->rrdlabels, "label", sd->name, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
@@ -905,6 +935,9 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
     rrdset_done(sd->st_sensor_data);
 }
 
+// cross-OS temperature histogram - contract in common-contexts/hw-sensors.h
+static HW_SENSORS_TEMPERATURE_HISTOGRAM sensors_temperature_histogram = {0};
+
 int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     int *update_every = data;
@@ -919,6 +952,19 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
         return 1;
 
     sensors_data_chart(sd, *update_every);
+
+    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_CELSIUS && sd->div_factor > 0 && sd->read_ok &&
+        sd->seen_generation >= sensors_enum_generation) {
+        // same value math as the per-sensor chart dimensions, including the
+        // external-config multiplier override
+        NETDATA_DOUBLE celsius =
+            (((NETDATA_DOUBLE)sd->current_data_value[0] + sd->add_factor) *
+             (sd->external_config ? (NETDATA_DOUBLE)sd->external_config->multiplier : sd->mult_factor)) /
+            sd->div_factor;
+
+        if (isfinite(celsius))
+            hw_sensors_temperature_histogram_add(&sensors_temperature_histogram, celsius);
+    }
 
     return 1;
 }
@@ -935,22 +981,52 @@ int do_GetSensors(int update_every, usec_t dt __maybe_unused)
     }
 
     __netdata_mutex_lock(&sensors_mutex);
+    hw_sensors_temperature_histogram_reset(&sensors_temperature_histogram);
     dictionary_sorted_walkthrough_read(sensors, dict_sensors_charts_cb, &update_every);
+    common_hw_sensors_temperature_histogram(
+        &sensors_temperature_histogram, update_every, "windows.plugin", "GetSensors");
     __netdata_mutex_unlock(&sensors_mutex);
     return 0;
 }
 
 void do_Sensors_cleanup()
 {
-    // Wait for sensor thread to finish
-    // The thread handles its own COM cleanup (CoUninitialize) and pSensorManager release
-    if (nd_thread_join(sensors_thread_update))
-        nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
-    sensors_thread_update = NULL;
+    if (sensors_thread_update) {
+        int join_result = nd_thread_join(sensors_thread_update);
+        sensors_thread_update = NULL;
 
-    __netdata_mutex_destroy(&sensors_mutex);
+        if (join_result) {
+            nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
+
+            size_t retries = 0;
+            while (!InterlockedCompareExchange(&sensors_thread_finished, 1, 1) &&
+                   retries < (size_t)SENSORS_THREAD_JOIN_FALLBACK_WAIT_MS) {
+                Sleep(1);
+                retries++;
+            }
+
+            if (!InterlockedCompareExchange(&sensors_thread_finished, 1, 1))
+                return;
+        }
+    } else if (sensors && !InterlockedCompareExchange(&sensors_thread_finished, 1, 1)) {
+        return;
+    }
+
+    if (!sensors)
+        return;
+
+    // retire the histogram chart like the per-sensor charts the dictionary
+    // destructor obsoletes below, and forget its state for a future lifecycle
+    if (sensors_temperature_histogram.st) {
+        rrdset_is_obsolete___safe_from_collector_thread(sensors_temperature_histogram.st);
+        memset(&sensors_temperature_histogram, 0, sizeof(sensors_temperature_histogram));
+    }
+
+    // destroy the mutex last, in case a future dictionary delete callback
+    // ever needs it (today none does; the sensor thread is already joined)
     dictionary_destroy(sensors);
     sensors = NULL;
+    __netdata_mutex_destroy(&sensors_mutex);
     // Note: pSensorManager is owned and cleaned up by the sensor thread itself
     // No additional cleanup needed here since the thread has already released resources
 }

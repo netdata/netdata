@@ -5,5 +5,6 @@
 
 #include "atomic_flags.h"
 #include "refcount.h"
+#include "single_writer.h"
 
 #endif //NETDATA_ATOMICS_H

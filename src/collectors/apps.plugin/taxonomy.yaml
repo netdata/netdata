@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: apps.plugin
+module_name: apps
+taxonomy_optout:
+  reason: apps.plugin exposes process, ebpf-derived, and internal collector health metrics through legacy dashboard handling; collector taxonomy is not yet authored for these charts.

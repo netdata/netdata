@@ -1,0 +1,77 @@
+<response status="success"><result>
+  <json>{
+    "peer-a": {
+      "remote-as": 65010,
+      "local-as": 65000,
+      "peer-group-name": "edge",
+      "state": "Established",
+      "local-ip": "192.0.2.9",
+      "peer-ip": "192.0.2.10",
+      "peer-name": "peer-a",
+      "status-time": 106879.0,
+      "ipv4": true,
+      "ipv6": false,
+      "detail": {
+        "remoteAs": 65010,
+        "localAs": 65000,
+        "peerGroup": "edge",
+        "remoteRouterId": "192.0.2.10",
+        "localRouterId": "192.0.2.1",
+        "bgpState": "Established",
+        "bgpTimerUpMsec": 106879000,
+        "connectionsEstablished": 1,
+        "connectionsDropped": 0,
+        "messageStats": {"updatesSent": 5, "updatesRecv": 2, "totalSent": 17820, "totalRecv": 19795},
+        "addressFamilyInfo": {"ipv4Unicast": {"acceptedPrefixCounter": 0, "sentPrefixCounter": 2}}
+      }
+    },
+    "peer-b": {
+      "remote-as": 65020,
+      "local-as": 65000,
+      "peer-group-name": "core",
+      "state": "Established",
+      "local-ip": "198.51.100.9",
+      "peer-ip": "198.51.100.10",
+      "peer-name": "peer-b",
+      "status-time": 1136150.0,
+      "ipv4": true,
+      "ipv6": false,
+      "detail": {
+        "remoteAs": 65020,
+        "localAs": 65000,
+        "peerGroup": "core",
+        "remoteRouterId": "198.51.100.10",
+        "localRouterId": "192.0.2.2",
+        "bgpState": "Established",
+        "bgpTimerUpMsec": 1136150000,
+        "connectionsEstablished": 1,
+        "connectionsDropped": 0,
+        "messageStats": {"updatesSent": 50, "updatesRecv": 17, "totalSent": 189407, "totalRecv": 189375},
+        "addressFamilyInfo": {"ipv4Unicast": {"acceptedPrefixCounter": 9, "sentPrefixCounter": 5}}
+      }
+    },
+    "peer-c": {
+      "remote-as": 65030,
+      "local-as": 65000,
+      "peer-group-name": "core",
+      "state": "Connect",
+      "peer-ip": "203.0.113.10",
+      "peer-name": "peer-c",
+      "status-time": 12965.0,
+      "ipv4": true,
+      "ipv6": false,
+      "detail": {
+        "remoteAs": 65030,
+        "localAs": 65000,
+        "peerGroup": "core",
+        "remoteRouterId": "0.0.0.0",
+        "localRouterId": "192.0.2.2",
+        "bgpState": "Connect",
+        "connectionsEstablished": 0,
+        "connectionsDropped": 0,
+        "messageStats": {"updatesSent": 0, "updatesRecv": 0, "totalSent": 0, "totalRecv": 0},
+        "addressFamilyInfo": {"ipv4Unicast": {"acceptedPrefixCounter": 0}}
+      }
+    }
+  }</json>
+</result></response>

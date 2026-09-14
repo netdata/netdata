@@ -23,7 +23,7 @@ func init() {
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		JobConfigSchema: configSchema,
-		Methods:         clickhouseMethods,
+		SharedFunctions: clickhouseMethods,
 		MethodHandler:   clickhouseFunctionHandler,
 	})
 }

@@ -63,6 +63,10 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 25), // when set, data collection is not available for this chart
 
     RRDSET_FLAG_HAS_RRDCALC_LINKED               = (1 << 26), // this chart has at least one rrdcal linked
+
+    RRDSET_FLAG_PENDING_LABEL_RECHECK            = (1 << 27), // chart labels changed since the last health
+                                                              // prototype evaluation; the health thread must
+                                                              // detach + reattach alerts for this chart.
 } RRDSET_FLAGS;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -152,8 +156,6 @@ struct rrdset {
     struct timeval last_collected_time;             // when did this data set last collected values
 
     size_t rrdlabels_last_saved_version;
-
-    DICTIONARY *functions_view;                     // collector functions this rrdset supports, can be NULL
 
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
@@ -252,6 +254,18 @@ struct rrdset {
 
 static inline uint32_t rrdset_metadata_version(RRDSET *st) {
     return __atomic_load_n(&st->version, __ATOMIC_RELAXED);
+}
+
+static inline time_t rrdset_last_accessed_time_s(RRDSET *st) {
+    return __atomic_load_n(&st->last_accessed_time_s, __ATOMIC_RELAXED);
+}
+
+static inline void rrdset_set_last_accessed_time_s(RRDSET *st, time_t last_accessed_time_s) {
+    __atomic_store_n(&st->last_accessed_time_s, last_accessed_time_s, __ATOMIC_RELAXED);
+}
+
+static inline void rrdset_touch_last_accessed_time_s(RRDSET *st) {
+    rrdset_set_last_accessed_time_s(st, now_realtime_sec());
 }
 
 static inline uint32_t rrdset_metadata_upstream_version(RRDSET *st) {

@@ -1,0 +1,14 @@
+{
+  "os": {
+    "discovery": {
+      "devices": [
+        {
+          "sysName": "cumulus-bgp",
+          "sysObjectID": ".1.3.6.1.4.1.40310",
+          "sysDescr": "Cumulus-linux 5.9.2 (Linux Kernel 6.1.94-1+cl5.9.2u6)",
+          "os": "cumulus"
+        }
+      ]
+    }
+  }
+}

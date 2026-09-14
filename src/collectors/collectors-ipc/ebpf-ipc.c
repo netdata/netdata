@@ -60,6 +60,10 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index shm_
     return false;
 }
 
+// Returns the slot index for pid, allocating a new slot if needed. A fresh
+// slot is memset to zero so callers never inherit stale bits or counters from
+// a prior PID that used the same index (prevents the compaction stale-tail
+// and PID-reuse contamination paths).
 static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
 {
     uint32_t idx;
@@ -75,6 +79,8 @@ static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
     uint32_t new_idx = ebpf_stat_values.current++;
     *Pvalue = IDX_TO_JVALUE(new_idx);
 
+    memset(&integration_shm[new_idx], 0, sizeof(integration_shm[new_idx]));
+
     return new_idx;
 }
 
@@ -88,9 +94,13 @@ bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_
 
 netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx)
 {
-    if (!integration_shm || ebpf_stat_values.current >= ebpf_stat_values.total)
+    if (!integration_shm)
         return NULL;
 
+    // Do NOT short-circuit on a full pool here: an already-tracked PID
+    // must still be reachable so its module bits can be updated or
+    // cleared. ebpf_find_or_create_index_pid() returns the existing slot
+    // regardless of pool saturation and only rejects *new* allocations.
     uint32_t shm_idx = ebpf_find_or_create_index_pid(pid);
     if (shm_idx == UINT32_MAX || shm_idx >= ebpf_stat_values.total)
         return NULL;
@@ -100,6 +110,52 @@ netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum
     ptr->threads |= (1UL << (idx << 1));
 
     return ptr;
+}
+
+// Read-only lookup: returns the existing slot for pid or NULL. Does not
+// allocate, does not set any bit. Aggregation paths that iterate PID lists
+// from /proc or cgroup snapshots MUST use this variant, otherwise every live
+// PID acquires module bits for modules that may never observe it in their own
+// BPF map and the bits can never be cleared — the shm pool then fills
+// monotonically.
+netdata_ebpf_pid_stats_t *netdata_ebpf_lookup_shm_pointer_unsafe(uint32_t pid)
+{
+    if (!integration_shm)
+        return NULL;
+
+    uint32_t shm_idx;
+    if (!ebpf_shm_find_index_unsafe(pid, &shm_idx))
+        return NULL;
+
+    if (shm_idx >= ebpf_stat_values.current)
+        return NULL;
+
+    return &integration_shm[shm_idx];
+}
+
+// Module teardown helper: clear this module's bit across every slot that has
+// it set. For slots that become empty the existing del path compacts in place,
+// which swaps the last slot into the freed index — so we do not advance i when
+// the current counter drops.
+void netdata_ebpf_sweep_shm_for_module_unsafe(enum ebpf_pids_index idx)
+{
+    if (!integration_shm)
+        return;
+
+    const uint32_t mask = (1U << (idx << 1));
+    uint32_t i = 0;
+    while (i < ebpf_stat_values.current) {
+        netdata_ebpf_pid_stats_t *ptr = &integration_shm[i];
+        if (!(ptr->threads & mask)) {
+            i++;
+            continue;
+        }
+
+        uint32_t before = ebpf_stat_values.current;
+        (void)ebpf_find_pid_shm_del_unsafe(ptr->pid, idx);
+        if (ebpf_stat_values.current >= before)
+            i++;
+    }
 }
 
 void netdata_integration_cleanup_shm()
@@ -122,6 +178,15 @@ void netdata_integration_cleanup_shm()
         close(shm_fd_ebpf_integration);
         shm_fd_ebpf_integration = -1;
     }
+
+    // Drop the POSIX shm object and the named semaphore so a subsequent
+    // plugin run starts from a fresh region and a freshly-initialised
+    // semaphore. Without the sem_unlink, a crashed previous instance can
+    // leave the semaphore at 0 and the next run will spin on
+    // sem_timedwait timeouts (sem_open(O_CREAT) ignores the initial value
+    // when the named semaphore already exists).
+    (void)shm_unlink(NETDATA_EBPF_INTEGRATION_NAME);
+    (void)sem_unlink(NETDATA_EBPF_SHM_INTEGRATION_NAME);
 }
 
 int netdata_integration_initialize_shm(size_t pids)
@@ -153,6 +218,15 @@ int netdata_integration_initialize_shm(size_t pids)
         goto end_shm;
     }
 
+    // Wipe any bytes left over from a prior plugin run — shm_open with
+    // O_CREAT on an existing object does not truncate, and ftruncate to the
+    // current size is a no-op.
+    memset(integration_shm, 0, length);
+
+    // Drop any leftover named semaphore from a previous (possibly crashed)
+    // run so sem_open honours the initial value below instead of reusing
+    // whatever state the previous instance left it in.
+    (void)sem_unlink(NETDATA_EBPF_SHM_INTEGRATION_NAME);
     shm_mutex_ebpf_integration = sem_open(
         NETDATA_EBPF_SHM_INTEGRATION_NAME, O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, 1);
     if (shm_mutex_ebpf_integration != SEM_FAILED) {

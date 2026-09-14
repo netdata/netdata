@@ -19,7 +19,7 @@
       list:
         - title: ''
           description: |
-            - The APIKEY and Sender from http://panel.kavenegar.com/client/setting/account
+            - Obtain your API key and sender information from [Kavenegar's REST API documentation](https://kavenegar.com/rest.html).
             - Access to the terminal where Netdata Agent is running
     configuration:
       file:

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -35,27 +36,9 @@ func main() {
 		exitErr("load input: %v", err)
 	}
 
-	var payload any
-	if err := json.Unmarshal(inputBytes, &payload); err != nil {
-		exitErr("parse input JSON: %v", err)
-	}
-
-	var schemaDoc any
-	if err := json.Unmarshal(schemaBytes, &schemaDoc); err != nil {
-		exitErr("parse schema JSON: %v", err)
-	}
-
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("schema.json", schemaDoc); err != nil {
-		exitErr("add schema resource: %v", err)
-	}
-	schema, err := compiler.Compile("schema.json")
+	payload, err := validateJSON(schemaBytes, inputBytes)
 	if err != nil {
-		exitErr("compile schema: %v", err)
-	}
-
-	if err := schema.Validate(payload); err != nil {
-		exitErr("validation failed: %v", err)
+		exitErr("%v", err)
 	}
 
 	if requireRows && minRows == 0 {
@@ -70,6 +53,41 @@ func main() {
 			exitErr("row check failed: expected at least %d rows, got %d", minRows, rows)
 		}
 	}
+}
+
+func validateJSON(schemaBytes, inputBytes []byte) (any, error) {
+	var payload any
+	if err := json.Unmarshal(inputBytes, &payload); err != nil {
+		return nil, fmt.Errorf("parse input JSON: %w", err)
+	}
+
+	var schemaDoc any
+	if err := json.Unmarshal(schemaBytes, &schemaDoc); err != nil {
+		return nil, fmt.Errorf("parse schema JSON: %w", err)
+	}
+
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource("schema.json", schemaDoc); err != nil {
+		return nil, fmt.Errorf("add schema resource: %w", err)
+	}
+	schema, err := compiler.Compile("schema.json")
+	if err != nil {
+		return nil, fmt.Errorf("compile schema: %w", err)
+	}
+
+	if err := schema.Validate(payload); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
+	if obj, ok := payload.(map[string]any); ok && isTopologyResponse(obj) {
+		if data, ok := obj["data"]; ok && topologyv1.IsDecodedData(data) {
+			if err := topologyv1.ValidateDecodedResponse(payload); err != nil {
+				return nil, fmt.Errorf("topology validation failed: %w", err)
+			}
+		}
+	}
+
+	return payload, nil
 }
 
 func countRows(payload any) (int, error) {
@@ -90,12 +108,21 @@ func countRows(payload any) (int, error) {
 		return 0, fmt.Errorf("missing data field")
 	}
 
+	if isTopologyResponse(obj) && topologyv1.IsDecodedData(data) {
+		return topologyv1.GraphRowsFromDecodedData(data)
+	}
+
 	rows, ok := data.([]any)
 	if !ok {
 		return 0, fmt.Errorf("data is not an array")
 	}
 
 	return len(rows), nil
+}
+
+func isTopologyResponse(obj map[string]any) bool {
+	responseType, ok := obj["type"].(string)
+	return ok && responseType == "topology"
 }
 
 func loadSchema(path string) ([]byte, error) {

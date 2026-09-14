@@ -68,10 +68,13 @@ A **context** groups charts by metric type and displayed dimensions. Contexts de
 
 - `apps.cpu` for **Apps CPU Time**
 - `apps.mem` for **Apps Real Memory**
+- `net.net` for **network Bandwidth**
 
 The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family.
 
 Contexts are also used for alert configurations.
+
+The contexts available on any given node depend on which collectors are enabled and what hardware and software Netdata detects, so there is no fixed universal list. To discover the contexts on your own system, browse the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) — charts there are grouped into sections by context — open the **Chart info** dialog on any chart to see its context value, or query the `/api/v3/contexts` endpoint programmatically. Each collector documents the metrics and contexts it produces on its integration page, which you can browse through the **Integrations tab** in the dashboard.
 
 ### Families
 
@@ -177,12 +180,28 @@ The **Group by** dropdown allows you to apply different grouping strategies on t
 
 ![Group by dropdown](https://user-images.githubusercontent.com/43294513/235468819-3af5a1d3-8619-48fb-a8b7-8e8b4cf6a8ff.png)
 
-| Grouping Option    | Description                                                |
-|--------------------|------------------------------------------------------------|
-| Group by Node      | Summarize data by node with one dimension per node         |
-| Group by Instance  | Summarize data by instance with one dimension per instance |
-| Group by Dimension | Aggregate data across all nodes by dimension               |
-| Group by Label     | Summarize data based on label values                       |
+| Grouping Option    | Description                                                                                               |
+|--------------------|-----------------------------------------------------------------------------------------------------------|
+| Group by Node      | Display each node (hostname) as a separate labeled dimension in the chart legend, with one entry per node |
+| Group by Instance  | Summarize data by instance with one dimension per instance                                                |
+| Group by Dimension | Aggregate data across all nodes by dimension                                                              |
+| Group by Label     | Summarize data based on label values                                                                      |
+
+The **Group by** option works together with the [Aggregate Functions dropdown](#aggregate-functions-dropdown). **Group by** decides how time-series are organized into chart lines, while the **Aggregate function** decides how multiple values combine *within* each group. Changing either one can change the number you see, even on the same chart.
+
+A common case is the network Bandwidth chart (`net.net`). Its dimensions are directional — `received` is displayed as positive and `sent` as negative (opposite signs, on an area chart). With **Group by Dimension**, `received` and `sent` stay as separate lines, so you can read each direction independently. With **Group by Instance**, both directions collapse into a single line per interface. Under the **Sum** aggregate function, the positive `received` and negative `sent` values then add up to a *net* value (received minus sent), not the total traffic — which is why the same interface can show very different numbers under the two groupings.
+
+:::tip
+
+To view total traffic on a specific interface, keep **Group by Dimension** and read `received` and `sent` separately — each represents one direction. Use the **Instances** dropdown to filter the chart to a single interface. Avoid using **Sum** to combine dimensions that have opposite signs: it produces a net difference, not a total.
+
+:::
+
+:::tip
+
+To see each node's hostname in the chart legend (the Dimensions Bar at the bottom of the chart), use **Group by Node**. Each node appears as a separate labeled dimension.
+
+:::
 
 :::tip
 
@@ -213,11 +232,11 @@ Each chart has a default aggregation function, which you can adjust as needed:
 
 When selecting aggregation functions over time, charts may offer dropdown menus for **Percentiles** and **Trimmed Mean / Median** selection. Below are examples of these dropdowns:
 
-### Percentile Selection Example:
+### Percentile Selection Example
 
 ![Percentile selection dropdown](https://user-images.githubusercontent.com/70198089/236410299-de5f3367-f3b0-4beb-a73f-a49007c543d4.png)
 
-### Trimmed Mean / Median Selection Example:
+### Trimmed Mean / Median Selection Example
 
 ![Trimmed Mean or Median selection dropdown](https://user-images.githubusercontent.com/70198089/236410858-74b46af9-280a-4ab2-ad26-5a6aa9403aa8.png)
 
@@ -348,6 +367,8 @@ Control chart playback and interact with time using the **Time Controls**. These
 
 These controls work when the **default “Pan” action** is selected in the toolbar.
 
+For Space Admins, clicking on the chart also starts a draft [annotation](/docs/dashboards-and-charts/chart-annotations.md) at that point in time.
+
 ## Toolbar
 
 The chart **Toolbar** provides interactive tools for manipulating the chart view:
@@ -400,6 +421,12 @@ The **Chart Zoom** tool allows you to zoom in and out to view different time ran
 | Zoom in/out      | Shift + mouse scrollwheel | Two-finger pinch or Shift + two-finger scroll |
 
 Zooming in helps you analyze recent events in detail, while zooming out provides an overview of longer-term trends.
+
+## Annotations
+
+Space **Admins** can click on a chart to pin a note to that moment in time, pick a priority color, and share it with everyone in the Space who can open dashboards. Hover the marker to edit it, make it visible on all charts, copy a link, or run Metric Correlations around it. Other roles with dashboard access see annotations read-only.
+
+See [Chart Annotations](/docs/dashboards-and-charts/chart-annotations.md) for the full guide.
 
 ## Dimensions Bar
 

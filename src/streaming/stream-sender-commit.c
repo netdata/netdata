@@ -33,10 +33,11 @@ static BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sen
               commit->last_function ? commit->last_function : "(null)",
               func ? func : "(null)");
 
-    if(unlikely(commit->receiver_tid && commit->receiver_tid != gettid_cached()))
+    pid_t receiver_tid = __atomic_load_n(&commit->receiver_tid, __ATOMIC_RELAXED);
+    if(unlikely(receiver_tid && receiver_tid != gettid_cached()))
         fatal("STREAM SND '%s' [to %s]: thread buffer is reserved for tid %d, but it used by thread %d function '%s()'.",
               rrdhost_hostname(s->host), s->remote_ip,
-              commit->receiver_tid, gettid_cached(), func ? func : "(null)");
+              receiver_tid, gettid_cached(), func ? func : "(null)");
 
     if(unlikely(commit->wb &&
                  commit->wb->size > default_size &&
@@ -99,7 +100,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
             s->scb, src_len * STREAM_CIRCULAR_BUFFER_ADAPT_TO_TIMES_MAX_SIZE, false))) {
         // adaptive sizing of the circular buffer
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "STREAM SND '%s' [to %s]: Increased max buffer size to %u (message size %zu).",
+               "STREAM SND '%s' [to %s]: Increased max buffer size to %zu (message size %zu).",
                rrdhost_hostname(s->host), s->remote_ip, stats->bytes_max_size, src_len + 1);
     }
 
@@ -125,9 +126,11 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                         // so that the decompressor will have a whole line to work with
 
                         const char *t = &src[COMPRESSION_MAX_MSG_SIZE];
-                        while (--t >= src)
+                        while (t > src) {
+                            t--;
                             if (unlikely(*t == '\n'))
                                 break;
+                        }
 
                         if (t <= src)
                             size_to_compress = COMPRESSION_MAX_MSG_SIZE;
@@ -144,7 +147,9 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                     "STREAM SND '%s' [to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                     rrdhost_hostname(s->host), s->remote_ip);
 
-                stream_compression_initialize(s);
+                if (!stream_compression_initialize(s))
+                    goto compression_failed_with_lock;
+
                 dst_len = stream_compress(&s->thread.compressor, src, size_to_compress, &dst);
                 if (!dst_len)
                     goto compression_failed_with_lock;
@@ -198,6 +203,7 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
     return;
 
 overflow_with_lock: {
+        STREAM_CIRCULAR_BUFFER_STATS stats_snapshot = *stats;
         msg = s->thread.msg;
         stream_sender_unlock(s);
         waitq_release(&s->waitq);
@@ -206,10 +212,10 @@ overflow_with_lock: {
         stream_sender_send_opcode(s, msg);
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %u, max size %u, available %u). "
+                     "STREAM SND '%s' [to %s]: buffer overflow (buffer size %zu, max size %zu, available %zu). "
                      "Restarting connection.",
                      rrdhost_hostname(s->host), s->remote_ip,
-                     stats->bytes_size, stats->bytes_max_size, stats->bytes_available);
+                     stats_snapshot.bytes_size, stats_snapshot.bytes_max_size, stats_snapshot.bytes_available);
         return;
     }
 
@@ -239,7 +245,7 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
     }
     else {
         commit = &s->host->stream.snd.commit;
-        is_receiver = commit->receiver_tid == gettid_cached();
+        is_receiver = __atomic_load_n(&commit->receiver_tid, __ATOMIC_RELAXED) == gettid_cached();
     }
 
     if (unlikely(wb != commit->wb))

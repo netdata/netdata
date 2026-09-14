@@ -1,0 +1,53 @@
+# Prometheus client process instrumentation shared by exporters.
+# The process start timestamp is an epoch gauge; the current profile schema cannot
+# derive uptime, so it is intentionally removed instead of charting a misleading age.
+
+match: 'process_*'
+relabeling:
+  - match: process_start_time_seconds
+    metric_relabel_configs:
+      - action: drop
+template:
+  family: Process Runtime
+  context_namespace: process_runtime
+  metrics:
+    - process_virtual_memory_bytes
+    - process_resident_memory_bytes
+    - process_cpu_seconds_total
+    - process_open_fds
+    - process_max_fds
+  charts:
+    - title: Process CPU Usage
+      context: process_cpu
+      units: cores
+      dimensions:
+        - selector: process_cpu_seconds_total
+          name: used
+
+    - title: Process Resident Memory
+      context: process_resident_memory
+      units: bytes
+      dimensions:
+        - selector: process_resident_memory_bytes
+          name: resident
+
+    - title: Process Virtual Memory
+      context: process_virtual_memory
+      units: bytes
+      dimensions:
+        - selector: process_virtual_memory_bytes
+          name: virtual
+
+    - title: Open File Descriptors
+      context: open_file_descriptors
+      units: fds
+      dimensions:
+        - selector: process_open_fds
+          name: open
+
+    - title: File Descriptor Limit
+      context: file_descriptor_limit
+      units: fds
+      dimensions:
+        - selector: process_max_fds
+          name: limit

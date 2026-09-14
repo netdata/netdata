@@ -5,9 +5,9 @@
 metrics:
   # HA installed flag (0 = not installed, non-zero = installed)
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.5.2.0
+      metric_type: gauge
       name: haInstalled
       # TODO: use mapping with 2 dimensions (e.g. installed/absent)
       chart_meta:
@@ -46,9 +46,9 @@ metrics:
 
   # HA status code (integer: 0 = OK, non-zero = problem)
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.5.101.0
+      metric_type: gauge
       name: haStatCode
       chart_meta:
         description: "HA/ClusterXL numeric status code (0 = healthy)"

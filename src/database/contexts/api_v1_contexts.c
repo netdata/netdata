@@ -361,7 +361,9 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
 
 int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, const char *context, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     if(!host->rrdctx.contexts) {
-        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -398,7 +400,9 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
 
 int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, RRDCONTEXT_TO_JSON_OPTIONS options, SIMPLE_PATTERN *chart_label_key, SIMPLE_PATTERN *chart_labels_filter, SIMPLE_PATTERN *chart_dimensions) {
     if(!host->rrdctx.contexts) {
-        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -411,7 +415,9 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
         rrdr_relative_window_to_absolute_query(&after, &before, NULL, false);
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+    buffer_json_member_add_string(wb, "hostname", string2str(identity.hostname));
+    rrdhost_identity_release(&identity);
     buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
     buffer_json_member_add_string(wb, "node_id", node_uuid);
     CLAIM_ID claim_id = rrdhost_claim_id_get(host);

@@ -6,20 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
-	"path/filepath"
-	"slices"
 	"strconv"
-	"strings"
 	"syscall"
 
-	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -30,8 +24,15 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		ctx = context.Background()
 	}
 
+	initializing := !c.initialized
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
+	}
+
+	if initializing && c.normal.recorder != nil {
+		for ordinal := uint64(1); ordinal <= c.normal.recorder.Cursor(); ordinal++ {
+			c.normal.initialization = append(c.normal.initialization, c.normal.recorder.Operation(ordinal))
+		}
 	}
 
 	if c.PingOnly {
@@ -99,149 +100,81 @@ func (c *Collector) ensureInitialized() error {
 		return errors.New("snmp client not initialized")
 	}
 
-	if c.sysInfo != nil {
+	if c.initialized {
 		return nil
 	}
 
-	si, err := snmputils.GetSysInfo(c.snmpClient)
-	if err != nil {
+	if err := c.ensureDeviceProfile(); err != nil {
 		return err
 	}
-
-	if c.snmpProfiles == nil {
-		c.snmpProfiles = c.setupProfiles(si)
-	}
+	si := c.sysInfo
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
-			SnmpClient:      c.snmpClient,
-			Profiles:        c.snmpProfiles,
-			Log:             c.Logger,
-			SysObjectID:     si.SysObjectID,
-			DisableBulkWalk: c.disableBulkWalk,
+			SnmpClient:          c.snmpClient,
+			Profiles:            c.snmpProfiles,
+			Log:                 c.Logger,
+			SysObjectID:         si.SysObjectID,
+			DisableBulkWalk:     c.disableBulkWalk,
+			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile),
 		})
 	}
 
-	if c.ddSnmpColl == nil && !c.PingOnly && !c.Ping.Enabled {
-		return errors.New("no profiles found and ping disabled")
-	}
-
-	if c.CreateVnode {
-		if c.ddSnmpColl == nil {
-			c.vnode = c.setupVnode(si, nil)
-		} else {
-			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
-			if err != nil {
-				return err
+	if c.CreateVnode && c.Vnode == "" {
+		var baseLabels map[string]string
+		if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
+			// Allow for collection and transmission delays.
+			baseLabels = map[string]string{
+				"_node_stale_after_seconds": strconv.Itoa(c.VnodeDeviceDownThreshold*c.UpdateEvery + 2),
 			}
-			c.vnode = c.setupVnode(si, deviceMeta)
+		}
+		identity, err := ddsnmp.AcquireDeviceIdentity(si, c.ddSnmpColl, ddsnmp.DeviceIdentityOptions{
+			Address:    c.Hostname,
+			GUID:       c.LocalVnode.GUID,
+			Hostname:   c.LocalVnode.Hostname,
+			BaseLabels: baseLabels,
+			Labels:     c.LocalVnode.Labels,
+		})
+		if c.ddSnmpColl != nil {
+			c.captureCollectionFailures()
+		}
+		if err != nil {
+			return err
+		}
+		c.LocalVnode.GUID = identity.GUID
+		c.LocalVnode.Hostname = identity.Hostname
+		c.vnode = &vnodes.VirtualNode{
+			GUID:     identity.GUID,
+			Hostname: identity.Hostname,
+			Labels:   identity.Labels,
 		}
 	}
-
-	c.sysInfo = si
 
 	if c.PingOnly || c.Ping.Enabled {
 		c.addPingCharts()
 	}
 
+	c.registerDeviceState(si, nil)
+	c.initialized = true
+
 	return nil
-}
-
-func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
-	if c.Vnode.GUID == "" {
-		c.Vnode.GUID = uuid.NewSHA1(uuid.NameSpaceDNS, []byte(c.Hostname)).String()
-	}
-
-	hostnames := []string{
-		c.Vnode.Hostname,
-		si.Name,
-		"snmp-device",
-	}
-	i := slices.IndexFunc(hostnames, func(s string) bool { return s != "" })
-	c.Vnode.Hostname = hostnames[i]
-
-	labels := map[string]string{
-		"_vnode_type":           "snmp",
-		"_net_default_iface_ip": c.Hostname,
-		"address":               c.Hostname,
-	}
-
-	if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
-		// Add 2 seconds buffer to account for collection/transmission delays
-		v := c.VnodeDeviceDownThreshold*c.UpdateEvery + 2
-		labels["_node_stale_after_seconds"] = strconv.Itoa(v)
-	}
-
-	labels["sys_object_id"] = si.SysObjectID
-	labels["name"] = si.Name
-	labels["description"] = si.Descr
-	labels["contact"] = si.Contact
-	labels["location"] = si.Location
-	if si.Vendor != "" {
-		labels["vendor"] = si.Vendor
-	} else if si.Organization != "" {
-		labels["vendor"] = si.Organization
-	}
-	if si.Category != "" {
-		labels["type"] = si.Category
-	}
-	if si.Model != "" {
-		labels["model"] = si.Model
-	}
-
-	for k, val := range deviceMeta {
-		if v, ok := labels[k]; !ok || v == "" || val.IsExactMatch {
-			labels[k] = val.Value
-		}
-	}
-
-	maps.Copy(labels, c.Vnode.Labels)
-
-	return &vnodes.VirtualNode{
-		GUID:     c.Vnode.GUID,
-		Hostname: c.Vnode.Hostname,
-		Labels:   labels,
-	}
-}
-
-func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
-	snmpProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
-	var profInfo []string
-
-	for _, prof := range snmpProfiles {
-		if logger.Level.Enabled(slog.LevelDebug) {
-			profInfo = append(profInfo, prof.SourceTree())
-		} else {
-			name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
-			profInfo = append(profInfo, name)
-		}
-	}
-
-	msg := fmt.Sprintf("device matched %d profile(s): %s (sysObjectID: '%s')", len(snmpProfiles), strings.Join(profInfo, ", "), si.SysObjectID)
-	if len(snmpProfiles) == 0 {
-		c.Warning(msg)
-	} else {
-		c.Info(msg)
-	}
-
-	return snmpProfiles
 }
 
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {
-		return nil, fmt.Errorf("init: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
 
 	if err := snmpClient.Connect(); err != nil {
-		return nil, fmt.Errorf("connect: %w", err)
+		return nil, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
 	}
 
 	if snmpClient.Version() == gosnmp.Version1 {
 		return snmpClient, nil
 	}
 
-	if c.Config.Options.MaxRepetitions == 0 {
+	if c.Options.MaxRepetitions == 0 {
 		c.disableBulkWalk = true
 		return snmpClient, nil
 	}
@@ -249,9 +182,13 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	if c.adjMaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
 	} else {
-		ok, err := c.adjustMaxRepetitions(snmpClient)
+		probeClient := snmpClient
+		if c.normal != nil && c.normal.recorder != nil {
+			probeClient = c.normal.recorder.Wrap(snmpClient)
+		}
+		ok, err := c.adjustMaxRepetitions(probeClient)
 		if err != nil {
-			return nil, fmt.Errorf("re-adjust max repetitions SNMP client: %w", err)
+			return nil, snmputils.WithFailure(fmt.Errorf("re-adjust max repetitions SNMP client: %w", err), "max_repetitions", "")
 		}
 		if !ok {
 			c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")
@@ -273,8 +210,8 @@ func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error
 		return false, nil
 	}
 
-	orig := c.Config.Options.MaxRepetitions
-	maxReps := c.Config.Options.MaxRepetitions
+	orig := c.Options.MaxRepetitions
+	maxReps := c.Options.MaxRepetitions
 	attempts := 0
 	const maxAttempts = 20 // Prevent infinite loops
 

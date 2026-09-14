@@ -10,179 +10,177 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestCloneSymbolConfig(t *testing.T) {
-	s := SymbolConfig{
-		OID:                  "1.2.3.4",
-		Name:                 "foo",
-		ExtractValue:         ".*",
-		ExtractValueCompiled: regexp.MustCompile(".*"),
-		MatchPattern:         ".*",
-		MatchPatternCompiled: regexp.MustCompile(".*"),
-		MatchValue:           "$1",
-		ScaleFactor:          100,
-		Format:               "mac_address",
-		ConstantValueOne:     true,
-		MetricType:           ProfileMetricTypeCounter,
-	}
-	s2 := s.Clone()
-	assert.Equal(t, s, s2)
-	// An issue with our previous deepcopy was that regexes were duplicated but
-	// didn't keep their private internals, causing them to fail when used, so
-	// double-check that the regex works fine.
-	assert.True(t, s2.ExtractValueCompiled.MatchString("foo"))
-}
-
-func TestCloneSymbolConfigCompat(t *testing.T) {
-	s := SymbolConfigCompat{
-		OID:                  "1.2.3.4",
-		Name:                 "foo",
-		ExtractValue:         ".*",
-		ExtractValueCompiled: regexp.MustCompile(".*"),
-		MatchPattern:         ".*",
-		MatchPatternCompiled: regexp.MustCompile(".*"),
-		MatchValue:           "$1",
-		ScaleFactor:          100,
-		Format:               "mac_address",
-		ConstantValueOne:     true,
-		MetricType:           ProfileMetricTypeCounter,
-	}
-	s2 := s.Clone()
-	assert.Equal(t, s, s2)
-}
-
-func TestCloneMetricTagConfig(t *testing.T) {
-	c := MetricTagConfig{
-		Tag:   "foo",
-		Index: 10,
-		Column: SymbolConfig{
+func TestSymbolConfig_Clone(t *testing.T) {
+	tests := map[string]struct{ symbol SymbolConfig }{
+		"empty": {},
+		"populated": {symbol: SymbolConfig{
 			OID:                  "1.2.3.4",
+			Name:                 "foo",
 			ExtractValue:         ".*",
 			ExtractValueCompiled: regexp.MustCompile(".*"),
-		},
-		OID:    "2.4",
-		Symbol: SymbolConfigCompat{},
-		LookupSymbol: SymbolConfigCompat{
-			OID:                  "2.4.6.8",
-			ExtractValue:         ".*",
-			ExtractValueCompiled: regexp.MustCompile(".*"),
-		},
-		IndexTransform: []MetricIndexTransform{
-			{
-				Start: 0,
-				End:   1,
-			},
-		},
-		Mapping: NewExactMapping(map[string]string{
-			"1": "bar",
-			"2": "baz",
-		}),
-		Match:   ".*",
-		Pattern: regexp.MustCompile(".*"),
-		Tags: map[string]string{
-			"foo": "$1",
-		},
-		SymbolTag: "baz",
+			MatchPattern:         ".*",
+			MatchPatternCompiled: regexp.MustCompile(".*"),
+			MatchValue:           "$1",
+			ScaleFactor:          100,
+			Format:               "mac_address",
+			MetricType:           "counter",
+		}},
 	}
-	c2 := c.Clone()
-	assert.Equal(t, c, c2)
-	c2.Tags["bar"] = "$2"
-	c2.IndexTransform = append(c2.IndexTransform, MetricIndexTransform{Start: 1, End: 3})
-	c2.Mapping.Items["3"] = "foo"
-	c2.Tag = "bar"
-	assert.NotEqual(t, c, c2)
-	// Validate that c has not changed
-	assert.Equal(t, c, MetricTagConfig{
-		Tag:   "foo",
-		Index: 10,
-		Column: SymbolConfig{
-			OID:                  "1.2.3.4",
-			ExtractValue:         ".*",
-			ExtractValueCompiled: regexp.MustCompile(".*"),
-		},
-		OID:    "2.4",
-		Symbol: SymbolConfigCompat{},
-		LookupSymbol: SymbolConfigCompat{
-			OID:                  "2.4.6.8",
-			ExtractValue:         ".*",
-			ExtractValueCompiled: regexp.MustCompile(".*"),
-		},
-		IndexTransform: []MetricIndexTransform{
-			{
-				Start: 0,
-				End:   1,
-			},
-		},
-		Mapping: NewExactMapping(map[string]string{
-			"1": "bar",
-			"2": "baz",
-		}),
-		Match:   ".*",
-		Pattern: regexp.MustCompile(".*"),
-		Tags: map[string]string{
-			"foo": "$1",
-		},
-		SymbolTag: "baz",
-	})
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			variants := map[string]struct {
+				clone func(SymbolConfig) SymbolConfig
+			}{
+				"symbol": {clone: func(s SymbolConfig) SymbolConfig { return s.Clone() }},
+				"compatibility symbol": {
+					clone: func(s SymbolConfig) SymbolConfig { return SymbolConfig(SymbolConfigCompat(s).Clone()) },
+				},
+			}
+			for name, variant := range variants {
+				t.Run(name, func(t *testing.T) {
+					got := variant.clone(tc.symbol)
+					require.Equal(t, tc.symbol, got)
+					// Executing regexes catches copies that lose regexp's private state.
+					if got.ExtractValueCompiled != nil {
+						assert.True(t, got.ExtractValueCompiled.MatchString("foo"))
+					}
+					if got.MatchPatternCompiled != nil {
+						assert.True(t, got.MatchPatternCompiled.MatchString("foo"))
+					}
+				})
+			}
+		})
+	}
 }
 
-func TestCloneMetricsConfig(t *testing.T) {
-	buildConf := func() MetricsConfig {
-		return MetricsConfig{
-			MIB: "FOO-MIB",
-			Table: SymbolConfig{
-				OID:                  "1.2.3.4",
-				ExtractValue:         ".*",
-				ExtractValueCompiled: regexp.MustCompile(".*"),
+func TestMetricTagConfig_Clone(t *testing.T) {
+	tests := map[string]struct {
+		newTag func() MetricTagConfig
+		mutate func(*MetricTagConfig)
+	}{
+		"empty": {newTag: func() MetricTagConfig { return MetricTagConfig{} }},
+		"populated": {
+			newTag: func() MetricTagConfig {
+				return MetricTagConfig{
+					Tag:   "foo",
+					Index: 10,
+					Column: SymbolConfig{
+						OID:                  "1.2.3.4",
+						ExtractValue:         ".*",
+						ExtractValueCompiled: regexp.MustCompile(".*"),
+					},
+					OID:    "2.4",
+					Symbol: SymbolConfigCompat{},
+					LookupSymbol: SymbolConfigCompat{
+						OID:                  "2.4.6.8",
+						ExtractValue:         ".*",
+						ExtractValueCompiled: regexp.MustCompile(".*"),
+					},
+					IndexTransform: []MetricIndexTransform{
+						{
+							Start: 0,
+							End:   1,
+						},
+					},
+					Mapping: NewExactMapping(map[string]string{
+						"1": "bar",
+						"2": "baz",
+					}),
+					Match:   ".*",
+					Pattern: regexp.MustCompile(".*"),
+					Tags: map[string]string{
+						"foo": "$1",
+					},
+				}
 			},
-			Symbol: SymbolConfig{
-				OID:                  "1.2.3.4",
-				ExtractValue:         ".*",
-				ExtractValueCompiled: regexp.MustCompile(".*"),
+			mutate: func(cloned *MetricTagConfig) {
+				cloned.Tags["bar"] = "$2"
+				cloned.IndexTransform[0].Start = 2
+				cloned.IndexTransform = append(cloned.IndexTransform, MetricIndexTransform{
+					Start: 1,
+					End:   3,
+				})
+				cloned.Mapping.Items["3"] = "foo"
+				cloned.Tag = "bar"
 			},
-			OID:  "1.2.3.4",
-			Name: "foo",
-			Symbols: []SymbolConfig{
-				{
-					OID:                  "1.2.3.4",
-					ExtractValue:         ".*",
-					ExtractValueCompiled: regexp.MustCompile(".*"),
-				},
-			},
-			StaticTags: []StaticMetricTagConfig{
-				{Tag: "foo", Value: "bar"},
-			},
-			MetricTags: []MetricTagConfig{
-				{
-					IndexTransform: make([]MetricIndexTransform, 0),
-				},
-			},
-			MetricType: ProfileMetricTypeGauge,
-			Options: MetricsConfigOption{
-				Placement:    1,
-				MetricSuffix: ".foo",
-			},
-		}
+		},
 	}
-	conf := buildConf()
-	unchanged := buildConf()
-
-	conf2 := conf.Clone()
-	assert.Equal(t, conf, conf2)
-	conf2.StaticTags[0] = StaticMetricTagConfig{Tag: "bar", Value: "baz"}
-	conf2.MetricTags[0].IndexTransform = []MetricIndexTransform{{Start: 5, End: 7}}
-	conf2.Options.Placement = 2
-	conf2.Options.MetricSuffix = ".bar"
-	assert.Equal(t, unchanged, conf)
-	assert.NotEqual(t, conf, conf2)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			original, want := tc.newTag(), tc.newTag()
+			cloned := original.Clone()
+			require.Equal(t, want, cloned)
+			if tc.mutate != nil {
+				tc.mutate(&cloned)
+				assert.NotEqual(t, want, cloned)
+			}
+			assert.Equal(t, want, original)
+		})
+	}
 }
 
-func TestCloneEmpty(t *testing.T) {
-	mc := MetricsConfig{}
-	assert.Equal(t, mc, mc.Clone())
-	sym := SymbolConfig{}
-	assert.Equal(t, sym, sym.Clone())
-	tag := MetricTagConfig{}
-	assert.Equal(t, tag, tag.Clone())
+func TestMetricsConfig_Clone(t *testing.T) {
+	tests := map[string]struct {
+		newMetrics func() MetricsConfig
+		mutate     func(*MetricsConfig)
+	}{
+		"empty": {newMetrics: func() MetricsConfig { return MetricsConfig{} }},
+		"populated": {
+			newMetrics: func() MetricsConfig {
+				return MetricsConfig{
+					MIB: "FOO-MIB",
+					Table: SymbolConfig{
+						OID:                  "1.2.3.4",
+						ExtractValue:         ".*",
+						ExtractValueCompiled: regexp.MustCompile(".*"),
+					},
+					Symbol: SymbolConfig{
+						OID:                  "1.2.3.4",
+						ExtractValue:         ".*",
+						ExtractValueCompiled: regexp.MustCompile(".*"),
+					},
+					OID:  "1.2.3.4",
+					Name: "foo",
+					Symbols: []SymbolConfig{
+						{
+							OID:                  "1.2.3.4",
+							ExtractValue:         ".*",
+							ExtractValueCompiled: regexp.MustCompile(".*"),
+						},
+					},
+					StaticTags: []StaticMetricTagConfig{
+						{Tag: "foo", Value: "bar"},
+					},
+					MetricTags: []MetricTagConfig{
+						{
+							IndexTransform: make([]MetricIndexTransform, 0),
+						},
+					},
+					MetricType: ProfileMetricTypeGauge,
+				}
+			},
+			mutate: func(cloned *MetricsConfig) {
+				cloned.StaticTags[0] = StaticMetricTagConfig{
+					Tag:   "bar",
+					Value: "baz",
+				}
+				cloned.MetricTags[0].IndexTransform = []MetricIndexTransform{{Start: 5, End: 7}}
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			original, want := tc.newMetrics(), tc.newMetrics()
+			cloned := original.Clone()
+			require.Equal(t, want, cloned)
+			if tc.mutate != nil {
+				tc.mutate(&cloned)
+				assert.NotEqual(t, want, cloned)
+			}
+			assert.Equal(t, want, original)
+		})
+	}
 }

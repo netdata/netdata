@@ -14,10 +14,10 @@
 // this has to be in-sync with the same at stream-thread.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION 24
 
-// this controls the max response size of a function
-#define PLUGINSD_MAX_DEFERRED_SIZE (100 * 1024 * 1024)
-
 #define PLUGINSD_MIN_RRDSET_POINTERS_CACHE 1024
+// Slots are cache indexes. Larger values are treated as uncached input to avoid sparse cache allocations.
+#define PLUGINSD_CHART_SLOT_MAX 1000000
+#define PLUGINSD_DIMENSION_SLOT_MAX 65535
 
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
@@ -58,8 +58,10 @@ typedef struct parser_user_object {
     int trust_durations;
     RRDLABELS *new_host_labels;
     size_t clabel_count;
+    bool clabel_changed;                     // any CLABEL in this commit changed a key, value or source
     size_t data_collections_count;
     int enabled;
+    bool retry;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     void *rpt;
@@ -99,12 +101,14 @@ typedef struct parser_user_object {
 
     struct {
         Pvoid_t JudyL;
+        time_t last_host_stale_check;
     } vnodes;
 
 } PARSER_USER_OBJECT;
 
 typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
 struct parser;
+struct nrpc_transport;
 typedef ssize_t (*send_to_plugin_callback_t)(const char *txt, void *data, STREAM_TRAFFIC_TYPE type);
 
 struct parser {
@@ -128,11 +132,21 @@ struct parser {
         BUFFER *response;
         parser_deferred_action_t action;
         void *action_data;
+
+        // function-family defers only: the acquired inflight-dictionary item
+        // held across the RESULT_BEGIN..END span, so a concurrent GC delete
+        // cannot free the record (and its result buffer) mid-stream
+        const DICTIONARY_ITEM *item;
     } defer;
 
     struct {
-        DICTIONARY *functions;
+        DICTIONARY *calls;
         usec_t smaller_monotonic_timeout_ut;
+
+        // the refcounted lifetime shell handed to everyone who may need to
+        // reach this parser later (registry entries, cancel/progress hooks,
+        // dyncfg nodes); see parser_destroy() for the teardown protocol
+        struct nrpc_transport *transport;
     } inflight;
 
     struct {

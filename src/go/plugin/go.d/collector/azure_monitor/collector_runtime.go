@@ -11,9 +11,10 @@ import (
 )
 
 type collectorRuntime struct {
-	Profiles          []*profileRuntime
-	ChartTemplateYAML string
-	Instruments       map[string]*instrumentRuntime
+	Profiles               []*profileRuntime
+	ChartTemplateYAML      string
+	Instruments            map[string]*instrumentRuntime
+	WorkloadResourceTagKey string
 }
 
 type profileRuntime struct {
@@ -46,25 +47,28 @@ type instrumentRuntime struct {
 	Counter metrix.SnapshotCounterVec
 }
 
-func (i *instrumentRuntime) observe(labelValues []string, value float64) {
+func (i *instrumentRuntime) observe(scope metrix.HostScope, labelValues []string, value float64) {
 	if i == nil {
 		return
 	}
 	switch i.Kind {
 	case azureprofiles.SeriesKindCounter:
-		i.Counter.WithLabelValues(labelValues...).ObserveTotal(value)
+		i.Counter.WithHostScope(scope).WithLabelValues(labelValues...).ObserveTotal(value)
 	default:
-		i.Gauge.WithLabelValues(labelValues...).Observe(value)
+		i.Gauge.WithHostScope(scope).WithLabelValues(labelValues...).Observe(value)
 	}
 }
 
 type discoveryState struct {
-	Resources    []resourceInfo
-	ByType       map[string][]resourceInfo
-	ByProfile    map[string][]resourceInfo
-	ExpiresAt    time.Time
-	FetchedAt    time.Time
-	FetchCounter uint64
+	Resources              []resourceInfo
+	ByType                 map[string][]resourceInfo
+	ByProfile              map[string][]resourceInfo
+	ExpiresAt              time.Time
+	FetchedAt              time.Time
+	FetchCounter           uint64
+	QueryTagsColumnMissing bool
+	QueryTagsWrongShape    bool
+	UnsafeWorkloadValues   map[string]int
 }
 
 type resourceTag struct {
@@ -81,6 +85,7 @@ type resourceInfo struct {
 	ResourceGroup  string
 	Region         string
 	Tags           []resourceTag
+	HostScope      metrix.HostScope
 }
 
 func (r resourceInfo) String() string {
@@ -103,6 +108,7 @@ type metricSample struct {
 	Instrument string
 	Kind       string
 	Labels     metrix.Labels
+	Scope      metrix.HostScope
 	Value      float64
 }
 
@@ -113,6 +119,7 @@ type queryBatchResult struct {
 
 type lastObservation struct {
 	instrument  string
+	scope       metrix.HostScope
 	labelValues []string
 	value       float64
 }

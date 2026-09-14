@@ -540,13 +540,15 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
         return;
     }
 
-    if(unlikely(m->reset)) {
-        m->histogram.ext->used = 0;
-        statsd_reset_metric(m);
-    }
-
     if(unlikely(value_is_zinit(value))) {
         // magic loading of metric, without affecting anything
+
+        netdata_mutex_lock(&m->histogram.ext->mutex);
+        if(unlikely(m->reset)) {
+            m->histogram.ext->used = 0;
+            statsd_reset_metric(m);
+        }
+        netdata_mutex_unlock(&m->histogram.ext->mutex);
     }
     else {
         NETDATA_DOUBLE v = statsd_parse_float(value, 1.0);
@@ -555,18 +557,23 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
         if(unlikely(isgreater(sampling_rate, 1.0))) sampling_rate = 1.0;
 
         long long samples = llrintndd(1.0 / sampling_rate);
-        while(samples-- > 0) {
+        netdata_mutex_lock(&m->histogram.ext->mutex);
 
+        if(unlikely(m->reset)) {
+            m->histogram.ext->used = 0;
+            statsd_reset_metric(m);
+        }
+
+        while(samples-- > 0) {
             if(unlikely(m->histogram.ext->used == m->histogram.ext->size)) {
-                netdata_mutex_lock(&m->histogram.ext->mutex);
                 m->histogram.ext->size += statsd.histogram_increase_step;
                 m->histogram.ext->values = reallocz(m->histogram.ext->values, sizeof(NETDATA_DOUBLE) * m->histogram.ext->size);
-                netdata_mutex_unlock(&m->histogram.ext->mutex);
             }
 
             m->histogram.ext->values[m->histogram.ext->used++] = v;
         }
 
+        netdata_mutex_unlock(&m->histogram.ext->mutex);
         metric_update_counters_and_obsoletion(m);
     }
 }
@@ -1972,29 +1979,32 @@ static inline void statsd_flush_timer_or_histogram(STATSD_METRIC *m, const char 
     netdata_log_debug(D_STATSD, "flushing %s metric '%s'", dim, m->name);
 
     int updated = 0;
-    if(unlikely(!m->reset && m->count && m->histogram.ext->used > 0)) {
+    if(unlikely(!m->reset && m->count)) {
         netdata_mutex_lock(&m->histogram.ext->mutex);
 
-        size_t len = m->histogram.ext->used;
-        NETDATA_DOUBLE *series = m->histogram.ext->values;
-        sort_series(series, len);
+        if(likely(m->histogram.ext->used > 0)) {
+            size_t len = m->histogram.ext->used;
+            NETDATA_DOUBLE *series = m->histogram.ext->values;
+            sort_series(series, len);
 
-        m->histogram.ext->last_min = (collected_number)roundndd(series[0] * statsd.decimal_detail);
-        m->histogram.ext->last_max = (collected_number)roundndd(series[len - 1] * statsd.decimal_detail);
-        m->last = (collected_number)roundndd(average(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_stddev = (collected_number)roundndd(standard_deviation(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_sum = (collected_number)roundndd(sum(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_median = (collected_number)roundndd(median_on_sorted_series(series, len) * statsd.decimal_detail);
-        m->histogram.ext->last_percentile = (collected_number)roundndd(percentile_on_sorted_series(series, len,  statsd.histogram_percentile / 100) * statsd.decimal_detail);
+            m->histogram.ext->last_min = (collected_number)roundndd(series[0] * statsd.decimal_detail);
+            m->histogram.ext->last_max = (collected_number)roundndd(series[len - 1] * statsd.decimal_detail);
+            m->last = (collected_number)roundndd(average(series, len) * statsd.decimal_detail);
+            m->histogram.ext->last_stddev = (collected_number)roundndd(standard_deviation(series, len) * statsd.decimal_detail);
+            m->histogram.ext->last_sum = (collected_number)roundndd(sum(series, len) * statsd.decimal_detail);
+            m->histogram.ext->last_median = (collected_number)roundndd(median_on_sorted_series(series, len) * statsd.decimal_detail);
+            m->histogram.ext->last_percentile = (collected_number)roundndd(percentile_on_sorted_series(series, len,  statsd.histogram_percentile / 100) * statsd.decimal_detail);
+
+            m->histogram.ext->zeroed = 0;
+            m->reset = 1;
+            updated = 1;
+        }
 
         netdata_mutex_unlock(&m->histogram.ext->mutex);
 
-        netdata_log_debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
-              dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
-
-        m->histogram.ext->zeroed = 0;
-        m->reset = 1;
-        updated = 1;
+        if(updated)
+            netdata_log_debug(D_STATSD, "STATSD %s metric %s: min " COLLECTED_NUMBER_FORMAT ", max " COLLECTED_NUMBER_FORMAT ", last " COLLECTED_NUMBER_FORMAT ", pcent " COLLECTED_NUMBER_FORMAT ", median " COLLECTED_NUMBER_FORMAT ", stddev " COLLECTED_NUMBER_FORMAT ", sum " COLLECTED_NUMBER_FORMAT,
+                  dim, m->name, m->histogram.ext->last_min, m->histogram.ext->last_max, m->last, m->histogram.ext->last_percentile, m->histogram.ext->last_median, m->histogram.ext->last_stddev, m->histogram.ext->last_sum);
     }
     else if(unlikely(!m->histogram.ext->zeroed)) {
         // reset the metrics

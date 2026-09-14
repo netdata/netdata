@@ -36,7 +36,6 @@ typedef struct silencers {
 extern SILENCERS *silencers;
 
 SILENCER *create_silencer(void);
-int health_silencers_json_read_callback(JSON_ENTRY *e);
 void health_silencers_add(SILENCER *silencer);
 SILENCER * health_silencers_addparam(SILENCER *silencer, char *key, char *value);
 int health_initialize_global_silencers();
@@ -51,5 +50,6 @@ void health_set_silencers_filename(void);
 void health_silencers_init(void);
 SILENCE_TYPE health_silencers_check_silenced(RRDCALC *rc, const char *host);
 int health_silencers_update_disabled_silenced(RRDHOST *host, RRDCALC *rc);
+bool health_silencers_all_alarms_disabled(void);
 
 #endif //NETDATA_HEALTH_SILENCERS_H

@@ -40,6 +40,8 @@ Nice=0
 CapabilityBoundingSet=CAP_DAC_OVERRIDE
 # is required for apps plugin
 CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+# is required for debugfs plugin audit subsystem monitoring
+CapabilityBoundingSet=CAP_AUDIT_CONTROL
 # is required for freeipmi plugin
 CapabilityBoundingSet=CAP_FOWNER CAP_SYS_RAWIO
 # is required for apps, perf and slabinfo plugins
@@ -52,6 +54,8 @@ CapabilityBoundingSet=CAP_SYS_PTRACE
 CapabilityBoundingSet=CAP_SYS_RESOURCE
 # is required for go.d/ping app
 CapabilityBoundingSet=CAP_NET_RAW
+# is required for go.d/snmp_traps to bind the standard SNMP trap port
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 # is required for cgroups plugin
 CapabilityBoundingSet=CAP_SYS_CHROOT
 # is required for nfacct plugin (bandwidth accounting)

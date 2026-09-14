@@ -25,6 +25,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt);
 int do_proc_sys_fs_file_nr(int update_every, usec_t dt);
 int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt);
 int do_proc_interrupts(int update_every, usec_t dt);
+int proc_interrupts_unittest(void);
 int do_proc_softirqs(int update_every, usec_t dt);
 int do_proc_pressure(int update_every, usec_t dt);
 int do_sys_kernel_mm_ksm(int update_every, usec_t dt);

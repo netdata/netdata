@@ -76,7 +76,7 @@ func (c *Collector) doQueryVersion() (string, error) {
 }
 
 func (c *Collector) collectStatsMySQLGlobal(mx map[string]int64) error {
-	// https://proxysql.com/documentation/stats-statistics/#stats_mysql_global
+	// https://proxysql.com/documentation/the-admin-schemas/stats/stats-mysql/#stats_mysql_global
 	q := queryStatsMySQLGlobal
 	c.Debugf("executing query: '%s'", q)
 
@@ -92,7 +92,7 @@ func (c *Collector) collectStatsMySQLGlobal(mx map[string]int64) error {
 }
 
 func (c *Collector) collectStatsMySQLMemoryMetrics(mx map[string]int64) error {
-	// https://proxysql.com/documentation/stats-statistics/#stats_mysql_memory_metrics
+	// https://proxysql.com/documentation/the-admin-schemas/stats/stats-general/#stats_memory_metrics
 	q := queryStatsMySQLMemoryMetrics
 	c.Debugf("executing query: '%s'", q)
 
@@ -108,7 +108,7 @@ func (c *Collector) collectStatsMySQLMemoryMetrics(mx map[string]int64) error {
 }
 
 func (c *Collector) collectStatsMySQLCommandsCounters(mx map[string]int64) error {
-	// https://proxysql.com/documentation/stats-statistics/#stats_mysql_commands_counters
+	// https://proxysql.com/documentation/the-admin-schemas/stats/stats-mysql/#stats_mysql_commands_counters
 	q := queryStatsMySQLCommandsCounters
 	c.Debugf("executing query: '%s'", q)
 
@@ -125,7 +125,7 @@ func (c *Collector) collectStatsMySQLCommandsCounters(mx map[string]int64) error
 }
 
 func (c *Collector) collectStatsMySQLUsers(mx map[string]int64) error {
-	// https://proxysql.com/documentation/stats-statistics/#stats_mysql_users
+	// https://proxysql.com/documentation/the-admin-schemas/stats/stats-mysql/#stats_mysql_users
 	q := queryStatsMySQLUsers
 	c.Debugf("executing query: '%s'", q)
 
@@ -146,7 +146,7 @@ func (c *Collector) collectStatsMySQLUsers(mx map[string]int64) error {
 }
 
 func (c *Collector) collectStatsMySQLConnectionPool(mx map[string]int64) error {
-	// https://proxysql.com/documentation/stats-statistics/#stats_mysql_connection_pool
+	// https://proxysql.com/documentation/the-admin-schemas/stats/stats-mysql/#stats_mysql_connection_pool
 	q := queryStatsMySQLConnectionPool
 	c.Debugf("executing query: '%s'", q)
 

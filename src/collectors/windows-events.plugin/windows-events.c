@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "libnetdata/libnetdata.h"
-#include "libnetdata/required_dummies.h"
 
 #include "windows-events.h"
 
@@ -134,9 +133,8 @@ static void wevt_lazy_loading_event_and_xml(struct wevt_bin_data *d, FACET_ROW *
                    "Event Record ID of row does not match the bin data associated with it");
 #endif
 
-    // the message needs the xml
     EvtFormatMessage_Xml_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.xml);
-    EvtFormatMessage_Event_utf8(&d->log->ops.unicode, d->provider, d->hEvent, &d->log->ops.event);
+    txt_utf8_empty(&d->log->ops.event);
     d->rendered = true;
 }
 
@@ -951,7 +949,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
     lqs->c.query = wevt_generate_query_no_xpath(lqs, wb);
     if(!lqs->c.query)
-        return rrd_call_function_error(wb, "failed to generate query", HTTP_RESP_INTERNAL_SERVER_ERROR);
+        return nrpc_call_error(wb, "failed to generate query", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     FACETS *facets = lqs->facets;
 
@@ -990,7 +988,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
         for(size_t f = 0; f < files_used ;f++)
             dictionary_acquired_item_release(wevt_sources, file_items[f]);
 
-        return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
+        return nrpc_call_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
     }
 
     // sort the files, so that they are optimal for facets
@@ -1016,7 +1014,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
             dictionary_acquired_item_release(wevt_sources, file_items[f]);
 
         netdata_log_error("WINDOWS EVENTS: cannot open windows event log");
-        return rrd_call_function_error(wb, "cannot open windows events log", HTTP_RESP_INTERNAL_SERVER_ERROR);
+        return nrpc_call_error(wb, "cannot open windows events log", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
     // sampling_query_init(lqs, facets);
@@ -1129,7 +1127,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     switch (status) {
         case WEVT_OK:
             if(lqs->rq.if_modified_since && !lqs->c.rows_useful)
-                return rrd_call_function_error(wb, "no useful logs, not modified", HTTP_RESP_NOT_MODIFIED);
+                return nrpc_call_error(wb, "no useful logs, not modified", HTTP_RESP_NOT_MODIFIED);
             break;
 
         case WEVT_TIMED_OUT:
@@ -1137,19 +1135,19 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
             break;
 
         case WEVT_CANCELLED:
-            return rrd_call_function_error(wb, "client closed connection", HTTP_RESP_CLIENT_CLOSED_REQUEST);
+            return nrpc_call_error(wb, "client closed connection", HTTP_RESP_CLIENT_CLOSED_REQUEST);
 
         case WEVT_NOT_MODIFIED:
-            return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
+            return nrpc_call_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
 
         case WEVT_FAILED_TO_OPEN:
-            return rrd_call_function_error(wb, "failed to open event log", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "failed to open event log", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         case WEVT_FAILED_TO_SEEK:
-            return rrd_call_function_error(wb, "failed to execute event log query", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "failed to execute event log query", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
         default:
-            return rrd_call_function_error(wb, "unknown status", HTTP_RESP_INTERNAL_SERVER_ERROR);
+            return nrpc_call_error(wb, "unknown status", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -1371,7 +1369,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" "HTTP_ACCESS_FORMAT" %d\n",
             WEVT_FUNCTION_NAME, WINDOWS_EVENTS_DEFAULT_TIMEOUT, WEVT_FUNCTION_DESCRIPTION,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
-            RRDFUNCTIONS_PRIORITY_DEFAULT);
+            NRPC_PRIORITY_DEFAULT);
 
     fflush(stdout);
     netdata_mutex_unlock(&stdout_mutex);

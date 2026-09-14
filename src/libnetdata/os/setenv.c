@@ -38,6 +38,6 @@ void nd_setenv(const char *name, const char *value, int overwrite) {
 #ifdef HAVE_SETENV
     setenv(name, value, overwrite);
 #else
-    os_setenv(name, value, overwite);
+    os_setenv(name, value, overwrite);
 #endif
 }

@@ -55,10 +55,10 @@ func (r *funcRouter) topQueriesLimit() int {
 	return r.collector.topQueriesLimit()
 }
 
-func oracledbMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
-		runningQueriesMethodConfig(),
+func oracledbMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
+		runningQueriesFunctionConfig(),
 	}
 }
 

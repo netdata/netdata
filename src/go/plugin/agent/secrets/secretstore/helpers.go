@@ -5,5 +5,5 @@ package secretstore
 import "github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
 func validateStoreName(name string) error {
-	return dyncfg.ValidateJobName(name)
+	return dyncfg.JobNameRuleAllowDots(name)
 }

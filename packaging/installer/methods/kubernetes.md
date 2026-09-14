@@ -14,7 +14,7 @@ The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts
 To deploy Kubernetes monitoring with Netdata, you'll need:
 
 - A working cluster running Kubernetes v1.9 or newer.
-- The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an administrative system.
+- The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version difference](https://kubernetes.io/releases/version-skew-policy/#kubectl) of your cluster, on an administrative system.
 - The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
 - A Netdata Cloud account with a Space to connect the cluster to.
 

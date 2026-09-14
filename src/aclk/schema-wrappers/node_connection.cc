@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "proto/nodeinstance/connection/v1/connection.pb.h"
+#include "nodeinstance/connection/v1/connection.pb.h"
 #include "node_connection.h"
 
 #include "schema_wrapper_utils.h"

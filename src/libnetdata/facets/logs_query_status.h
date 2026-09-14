@@ -493,8 +493,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
 
     buffer_json_member_add_object(wb, "_request");
 
-    char func_copy[strlen(function) + 1];
-    memcpy(func_copy, function, sizeof(func_copy));
+    CLEAN_CHAR_P *func_copy = strdupz(function);
 
     char *words[LQS_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_whitespace(func_copy, words, LQS_MAX_PARAMS);
@@ -545,7 +544,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
                 rq->slice = true;
         }
         else if(strncmp(keyword, LQS_PARAMETER_SOURCE ":", sizeof(LQS_PARAMETER_SOURCE ":") - 1) == 0) {
-            const char *value = &keyword[sizeof(LQS_PARAMETER_SOURCE ":") - 1];
+            char *value = &keyword[sizeof(LQS_PARAMETER_SOURCE ":") - 1];
 
             buffer_json_member_add_array(wb, LQS_PARAMETER_SOURCE);
 
@@ -773,8 +772,18 @@ static inline bool lqs_request_parse_and_validate(LOGS_QUERY_STATUS *lqs, BUFFER
         rq->before_s = tmp;
     }
 
-    if(rq->after_s == rq->before_s)
-        rq->after_s = rq->before_s - LQS_DEFAULT_QUERY_DURATION;
+    if(rq->after_s == rq->before_s &&
+       __builtin_sub_overflow(rq->before_s, (time_t)LQS_DEFAULT_QUERY_DURATION, &rq->after_s))
+        rq->after_s = rq->before_s;
+
+    // extreme absolute inputs must not wrap the unsigned seconds->microseconds
+    // conversion below (pre-1970 seconds are unrepresentable here; usec_t caps
+    // the upper bound). saturate both endpoints into the representable range.
+    const usec_t lqs_max_time_s = (UINT64_MAX - (USEC_PER_SEC - 1)) / USEC_PER_SEC;
+    if(rq->after_s < 0) rq->after_s = 0;
+    if(rq->before_s < 0) rq->before_s = 0;
+    if((usec_t)rq->after_s > lqs_max_time_s) rq->after_s = (time_t)lqs_max_time_s;
+    if((usec_t)rq->before_s > lqs_max_time_s) rq->before_s = (time_t)lqs_max_time_s;
 
     rq->after_ut = rq->after_s * USEC_PER_SEC;
     rq->before_ut = (rq->before_s * USEC_PER_SEC) + USEC_PER_SEC - 1;

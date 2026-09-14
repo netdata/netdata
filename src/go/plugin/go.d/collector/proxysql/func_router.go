@@ -49,9 +49,9 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func proxysqlMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
+func proxysqlMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
 	}
 }
 

@@ -75,10 +75,10 @@ void websocket_dump_debug(WS_CLIENT *wsc __maybe_unused, const char *payload __m
 
     // If payload is provided and not empty, create and log a hex dump
     if (payload && payload_length > 0) {
-        size_t bytes_to_dump = (payload_length < 32) ? payload_length : 32;
+        size_t bytes_to_dump = (payload_length < WS_DEBUG_DUMP_BYTES) ? payload_length : WS_DEBUG_DUMP_BYTES;
 
-        char hex_dump[bytes_to_dump * 2 + 1];
-        char ascii_dump[bytes_to_dump + 1];
+        char hex_dump[(WS_DEBUG_DUMP_BYTES * 2) + 1];
+        char ascii_dump[WS_DEBUG_DUMP_BYTES + 1];
 
         // Payload check is redundant as we already have it in the outer if
 

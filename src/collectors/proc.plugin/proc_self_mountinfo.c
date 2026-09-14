@@ -151,7 +151,7 @@ static char *strdupz_decoding_octal(const char *string) {
     while(*s) {
         if(unlikely(*s == '\\')) {
             s++;
-            if(likely(isdigit(*s) && isdigit(s[1]) && isdigit(s[2]))) {
+            if(likely(isdigit((uint8_t)*s) && isdigit((uint8_t)s[1]) && isdigit((uint8_t)s[2]))) {
                 char c = *s++ - '0';
                 c <<= 3;
                 c |= *s++ - '0';

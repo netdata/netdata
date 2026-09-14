@@ -85,14 +85,14 @@ typedef struct storage_number_tier1 {
 
 #define STORAGE_NUMBER_FORMAT "%u"
 
-typedef enum {
-    SN_FLAG_NONE              = 0,
-    SN_FLAG_NOT_ANOMALOUS     = (1 << 24), // the anomaly bit of the value (0:anomalous, 1:not anomalous)
-    SN_FLAG_RESET             = (1 << 25), // the value has been overflown
-    SN_FLAG_NOT_EXISTS_MUL100 = (1 << 26), // very large value (multiplier is 100 instead of 10)
-    SN_FLAG_MULTIPLY          = (1 << 30), // multiply, else divide
-    SN_FLAG_NEGATIVE          = (1 << 31), // negative, else positive
-} SN_FLAGS;
+typedef uint32_t SN_FLAGS;
+
+#define SN_FLAG_NONE              ((SN_FLAGS)0)
+#define SN_FLAG_NOT_ANOMALOUS     ((SN_FLAGS)(UINT32_C(1) << 24)) // the anomaly bit of the value (0:anomalous, 1:not anomalous)
+#define SN_FLAG_RESET             ((SN_FLAGS)(UINT32_C(1) << 25)) // the value has been overflown
+#define SN_FLAG_NOT_EXISTS_MUL100 ((SN_FLAGS)(UINT32_C(1) << 26)) // very large value (multiplier is 100 instead of 10)
+#define SN_FLAG_MULTIPLY          ((SN_FLAGS)(UINT32_C(1) << 30)) // multiply, else divide
+#define SN_FLAG_NEGATIVE          ((SN_FLAGS)(UINT32_C(1) << 31)) // negative, else positive
 
 #define SN_USER_FLAGS (SN_FLAG_NOT_ANOMALOUS | SN_FLAG_RESET)
 

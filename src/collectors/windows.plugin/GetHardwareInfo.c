@@ -527,14 +527,11 @@ void do_GetHardwareInfo_cleanup()
 {
     if (hardware_info_thread) {
         if (nd_thread_join(hardware_info_thread)) {
-            // nd_thread_join() frees the ND_THREAD object even on failure,
-            // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
-            // is already handled inside nd_thread_join(). For any other error,
-            // wait for up to one heartbeat interval plus slack for the worker
-            // to report completion before tearing down local resources it may
-            // still be touching. If it never does, abort cleanup: leaking here
-            // is safer than racing a live worker or hanging plugin shutdown
-            // indefinitely.
+            // nd_thread_join() keeps the ND_THREAD wrapper alive if the worker
+            // is not proven finished. Wait for the worker to report completion
+            // before tearing down local resources it may still be touching. If
+            // it never does, abort cleanup: leaking here is safer than racing a
+            // live worker or hanging plugin shutdown indefinitely.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
 
             size_t retries = 0;

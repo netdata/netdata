@@ -117,7 +117,7 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 	// lookup errors, and prune unsupported metrics/aggregations/time grains
 	// before final runtime build. Because runtime is currently global per job,
 	// multi-subscription capability differences need an explicit merge rule first.
-	runtime, err := buildCollectorRuntimeFromConfig(selection.Names, selection.Entries, c.profileCatalog)
+	runtime, err := buildCollectorRuntimeFromConfig(selection.Names, selection.Entries, c.profileCatalog, c.Config.workloadResourceTagKey())
 	if err != nil {
 		return fmt.Errorf("build collector runtime: %w", err)
 	}
@@ -128,7 +128,8 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 
 	c.runtime = runtime
 	c.observations = newObservationState(runtime.Instruments)
-	c.discovery = buildDiscoveryState(fetched.Resources, runtime, now, c.Discovery.RefreshEvery, 1)
+	c.discovery = buildDiscoveryState(fetched.Resources, runtime, now, c.Discovery.RefreshEvery, 1, fetched)
+	c.warnDiscoveryScopeFallbacks(c.discovery, runtime)
 
 	return nil
 }

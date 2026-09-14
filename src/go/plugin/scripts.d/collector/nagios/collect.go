@@ -51,7 +51,7 @@ func (c *Collector) skipDisallowedPeriod(now time.Time) bool {
 func (c *Collector) executeDueCheck(ctx context.Context, now time.Time) (checkRunResult, error) {
 	res, err := c.runner.Run(ctx, checkRunRequest{
 		Job:        c.job.config,
-		Vnode:      vnodeInfoFromVirtualNode(c.VirtualNode(), c.job.config.Vnode),
+		Vnode:      vnodeInfoFromVirtualNode(&c.vnode, c.job.config.Vnode),
 		MacroState: c.state.macroState(),
 		Now:        now,
 		Log:        c.Logger,
@@ -65,18 +65,29 @@ func (c *Collector) executeDueCheck(ctx context.Context, now time.Time) (checkRu
 }
 
 func (c *Collector) completeDueCheck(now time.Time, res checkRunResult) {
-	c.state.completeRun(now, res.ServiceState, res.JobState, c.router.route(c.job.config.CheckName, res.Parsed.Perfdata), c.job.config)
+	c.state.completeRun(
+		now,
+		res.ServiceState,
+		res.JobState,
+		c.router.route(c.job.config.CheckName, res.Parsed.Perfdata),
+		c.job.config,
+	)
 }
 
 func (c *Collector) emitMetrics(execMetrics executionMetrics) {
-	sm := c.store.Write().SnapshotMeter("nagios")
+	// Empty meter prefix: the namespace comes from charts.yaml context_namespace (nagios),
+	// which also prefixes autogen perfdata contexts. A "nagios" meter prefix would double it.
+	sm := c.store.Write().SnapshotMeter("")
 
 	jobName := c.job.config.Name
 	if jobName == "" {
 		jobName = c.Config.JobConfig.Name
 	}
 
-	jobLbl := sm.LabelSet(metrix.Label{Key: "nagios_job", Value: jobName})
+	jobLbl := sm.LabelSet(metrix.Label{
+		Key:   "nagios_job",
+		Value: jobName,
+	})
 	jobMeter := sm.WithLabelSet(jobLbl)
 	jobStatePoint := projectJobExecutionState(c.state.currentJobState(), c.state.isRetrying())
 

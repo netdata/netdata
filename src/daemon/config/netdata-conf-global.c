@@ -5,15 +5,17 @@
 
 size_t netdata_conf_cpus(void) {
     static size_t processors = 0;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
-    if(processors)
-        return processors;
+    size_t cached_processors = __atomic_load_n(&processors, __ATOMIC_ACQUIRE);
+    if(cached_processors)
+        return cached_processors;
 
-    SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
     size_t p = 0;
 
-    if(processors)
+    cached_processors = __atomic_load_n(&processors, __ATOMIC_ACQUIRE);
+    if(cached_processors)
         goto skip;
 
 #if defined(OS_LINUX)
@@ -29,15 +31,16 @@ size_t netdata_conf_cpus(void) {
     if(p < 1)
         p = 1;
 
-    processors = p;
+    cached_processors = p;
 
     char buf[24];
-    snprintfz(buf, sizeof(buf), "%zu", processors);
+    snprintfz(buf, sizeof(buf), "%zu", cached_processors);
     nd_setenv("NETDATA_CONF_CPUS", buf, 1);
+    __atomic_store_n(&processors, cached_processors, __ATOMIC_RELEASE);
 
 skip:
     spinlock_unlock(&spinlock);
-    return processors;
+    return cached_processors;
 }
 
 void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_threshold __maybe_unused) {
@@ -136,15 +139,7 @@ void libuv_initialize(void) {
 void netdata_conf_section_global_hostname(void) {
     FUNCTION_RUN_ONCE();
 
-    netdata_configured_host_prefix = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "host access prefix", "");
-    (void) verify_netdata_host_prefix(true);
-
-    char buf[HOST_NAME_MAX * 4 + 1];
-    if (!os_hostname(buf, sizeof(buf), netdata_configured_host_prefix))
-        netdata_log_error("Cannot get machine hostname.");
-
-    netdata_configured_hostname = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "hostname", buf);
-    netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
+    nd_runtime_paths_load_hostname_from_inicfg();
 }
 
 void netdata_conf_section_global(void) {
@@ -152,6 +147,7 @@ void netdata_conf_section_global(void) {
 
     netdata_conf_section_directories();
     netdata_conf_section_global_hostname();
+    netdata_conf_section_global_wmi_timeout();
 
     nd_profile_setup(); // required for configuring the database
     netdata_conf_section_db();
@@ -161,6 +157,24 @@ void netdata_conf_section_global(void) {
 
     os_get_system_cpus_uncached();
     os_get_system_pid_max();
+}
+
+void netdata_conf_section_global_wmi_timeout(void) {
+    // WMI startup timeout is Windows-only: the env var is consumed exclusively by the
+    // Windows WMI collector. Guard here so the config key is not materialized into the
+    // effective netdata.conf on other OSes, keeping behavior aligned with the docs.
+#if defined(OS_WINDOWS)
+    FUNCTION_RUN_ONCE();
+
+    long long default_ms = 5000;
+    long long configured = inicfg_get_number_range(
+        &netdata_config, CONFIG_SECTION_GLOBAL, "wmi startup timeout",
+        default_ms, 100, 60000);
+
+    char buf[32];
+    snprintfz(buf, sizeof(buf), "%lld", configured);
+    nd_setenv("NETDATA_WMI_STARTUP_TIMEOUT_MS", buf, 1);
+#endif
 }
 
 void netdata_conf_section_global_run_as_user(const char **user) {

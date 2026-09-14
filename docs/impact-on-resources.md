@@ -15,10 +15,10 @@ When deployed on an empty VM, Netdata collects and visualizes critical system me
 #### **Comprehensive Monitoring**
 
 - Over **2,000 unique time-series**, including metrics for:
-    - CPU, memory, disks, mount points, and filesystems.
-    - Network interfaces and the entire networking stack (all protocols, firewall).
-    - Containers, processes, users, user groups, and systemd units.
-    - All kernel technologies utilized.
+  - CPU, memory, disks, mount points, and filesystems.
+  - Network interfaces and the entire networking stack (all protocols, firewall).
+  - Containers, processes, users, user groups, and systemd units.
+  - All kernel technologies utilized.
 - Data is collected and visualized with 1-second granularity, ensuring no performance detail is missed.
 
 #### **Health Alerts**
@@ -37,30 +37,16 @@ When deployed on an empty VM, Netdata collects and visualizes critical system me
 
 - **Real-Time Anomaly Detection:** 18 machine learning models trained per time-series to identify and flag outliers based on behavioral trends over the last few days.
 
-#### **Data Retention**
-
-- **Metrics storage is limited to 3 GiB by default** (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about **4 GiB** of disk usage under normal conditions.
-- Default retention limits: per-second data for 1 GiB or 14 days, per-minute data for 1 GiB or 3 months, per-hour data for 1 GiB or 2 years.
-- The number of metrics collected determines how far back in time retention extends within these limits.
-- In practice, with an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of per-second data, 3 months of per-minute data, and more than 1 year of per-hour data.
-- These limits are [fully configurable](/src/database/CONFIGURATION.md#tiers).
-
 ### Resource Consumption
 
 Netdata operates with an exceptionally low footprint, even under demanding conditions. On an empty VM, the resource usage is as follows:
 
-- **CPU Usage:**
-    - ~1.5% of a single core without machine learning.
-    - ~3% with machine learning (ML training is spread over time, so there is a constant increase in CPU utilization without spikes).
-    - ~5% with machine learning and real-time streaming to a Netdata Parent.
-    - Rare spikes up to 20% during data flushes (once every 15–20 minutes).
-- **Memory Usage:**
-    - ~150 MB of RAM without machine learning.
-    - ~200 MB with machine learning enabled.
+- **CPU Usage:** 1%-5% of a single core with default settings, depending on machine learning and streaming to a Parent — see [CPU Utilization](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md) for details. Rare spikes up to 20% during data flushes (once every 15–20 minutes).
+- **Memory Usage:** 100MB-200MB of RAM, depending on the number of metrics collected and machine learning — see [RAM Utilization](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) for details.
 - **Disk I/O:**
-    - Reads: ~2 KiB/s without machine learning, ~9 KiB/s with machine learning.
-    - Writes: ~5 KiB/s.
-- **Storage:** ~4 GiB total (3 GiB metrics + metadata).
+  - Reads: ~2 KiB/s without machine learning, ~9 KiB/s with machine learning.
+  - Writes: ~5 KiB/s.
+- **Storage:** ~4 GiB total (3 GiB metrics + metadata), within configurable per-tier size and time limits. See [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#default-disk-footprint) for defaults and sizing guidance.
 
 ## Typical Netdata Resources Usage on Production Systems
 
@@ -69,9 +55,9 @@ In production systems with more data sources and features enabled, users can exp
 - **CPU Usage:** 5%-20% of a single core.
 - **Memory Usage:** 250–350 MB RAM.
 - **Disk I/O:** ~10 KiB/s reads and writes.
-- **Storage:** ~4 GiB total (3 GiB metrics + metadata).
+- **Storage:** Same as baseline, ~4 GiB total — see [Storage](#resource-consumption) above; storage scales with retention settings, not workload.
 
-## Impact of Running Netdata on Cloud VMs
+## Key Takeaways
 
 The baseline impact of running Netdata on an empty VM can be summarized as follows:
 
@@ -81,20 +67,25 @@ The baseline impact of running Netdata on an empty VM can be summarized as follo
 2. **Scalable Retention:**
     - Netdata efficiently uses disk space to retain high-resolution and long-term data without requiring additional storage or databases.
 
-3. **Real-Time Insights:**
-    - Despite its lightweight nature, Netdata provides a robust monitoring solution with granular, real-time insights and alerting capabilities.
+## Recommended VM Sizing
 
-4. **Comprehensive Monitoring Stack:**
-    - From system metrics to logs and network activity, Netdata provides an all-in-one observability solution without the overhead of deploying multiple tools.
+When choosing a VM size for Netdata on a cloud provider, what you need to provision depends on how you use it:
+
+- **A single Agent** monitoring the instance it runs on has the small footprint described in [Resource Consumption](#resource-consumption) and [Typical Netdata Resources Usage on Production Systems](#typical-netdata-resources-usage-on-production-systems) above. Most general-purpose VM sizes are more than enough.
+- **A Netdata Parent** that receives streams from many Child nodes needs more. Its resource use scales with the number of metrics collected and how long you keep them, so size the VM for your expected metric volume rather than for a single Agent.
+
+For detailed sizing guidance, see:
+
+- [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md): CPU, RAM, disk, and bandwidth requirements for a standalone Agent.
+- [Parent Configuration Best Practices](/docs/observability-centralization-points/best-practices.md): sizing and configuration guidance for Parent nodes receiving streams.
 
 ## Recommendations
 
 To ensure optimal performance and scalability, consider the following when deploying Netdata on cloud VMs:
 
-- **Baseline Impact:** Use the above metrics as a reference for resource planning on VMs with additional workloads.
 - **Retention Policies:** Adjust retention settings to match your specific needs and storage availability.
 - **Alert Fine-Tuning:** Customize alerts based on the workload and environment to reduce noise and increase actionable insights.
-- **Scaling:** For environments with high workloads or many containers, consider using Netdata Parents and Netdata Cloud to aggregate and analyze data from multiple nodes.
+- **Scaling:** For high-workload environments or fleets of many nodes, see [Recommended VM Sizing](#recommended-vm-sizing) above for Parent sizing guidance, and consider Netdata Cloud to aggregate and analyze data across multiple Parents.
 
 ## Independent Reviews
 
@@ -126,6 +117,6 @@ Note: Netdata does not stream metric samples to Netdata Cloud. Egress bandwidth 
 
 ## Conclusion
 
-Netdata is designed to provide detailed observability with minimal impact on system resources. When deployed on an empty cloud VM, it delivers real-time monitoring and alerting while maintaining a small resource footprint. This baseline serves as a practical reference for assessing Netdata’s performance in more complex environments.
+Netdata's resource footprint on cloud VMs is small enough that sizing for it is rarely the deciding factor when choosing an instance type — see [Recommended VM Sizing](#recommended-vm-sizing) above for what to provision. For workload-specific figures, see [CPU](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md), [RAM](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md), and [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
 
 For additional information, please visit [Netdata Documentation](https://learn.netdata.cloud/).

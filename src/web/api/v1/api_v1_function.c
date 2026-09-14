@@ -30,15 +30,31 @@ int api_v1_function(RRDHOST *host, struct web_client *w, char *url) {
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
+    // a request without a function= parameter is malformed - answer 400 here
+    // instead of forwarding a NULL cmd, which would fail the registry lookup
+    // and answer a misleading 404 "not available on this host"
+    if(!function || !*function)
+        return nrpc_call_error(wb, "No function given to execute.", HTTP_RESP_BAD_REQUEST);
+
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 
     CLEAN_BUFFER *source = buffer_create(100, NULL);
     user_auth_to_source_buffer(&w->user_auth, source);
 
-    return rrd_function_run(host, wb, timeout, w->user_auth.access, function, true, transaction,
-                            NULL, NULL,
-                            web_client_progress_functions_update, NULL,
-                            web_client_interrupt_callback, w, w->payload,
-                            buffer_tostring(source), false);
+    return nrpc_call(&(struct nrpc_call_spec) {
+        .owner = host ? rrdhost_nrpc_owner(host) : NRPC_OWNER_NONE,
+        .result_wb = wb,
+        .cmd = function,
+        .source = buffer_tostring(source),
+        .user_access = w->user_auth.access,
+        .timeout_s = timeout,
+        .wait = true,
+        .allow_restricted = false,
+        .call_id = transaction,
+        .payload = w->payload,
+        .progress.cb = web_client_progress_functions_update,
+        .is_cancelled.cb = web_client_interrupt_callback,
+        .is_cancelled.data = w,
+    });
 }

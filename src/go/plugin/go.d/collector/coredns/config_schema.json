@@ -117,14 +117,12 @@
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "bearer_token_file": {
         "title": "Bearer Token File",
@@ -144,14 +142,12 @@
       "proxy_username": {
         "title": "Proxy username",
         "description": "The username for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "proxy_password": {
         "title": "Proxy password",
         "description": "The password for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "headers": {
         "title": "Headers",
@@ -201,9 +197,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -286,12 +279,6 @@
     "per_zone_stats": {
       "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`.",
       "ui:collapsible": true
-    },
-    "username": {
-      "ui:widget": "password"
-    },
-    "proxy_username": {
-      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

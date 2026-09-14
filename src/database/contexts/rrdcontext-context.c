@@ -235,7 +235,7 @@ static void rrdcontext_react_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function) {
     if(rrd_flag_is_updated(rc) || !rrd_flag_check(rc, RRD_FLAG_LIVE_RETENTION))
-        rrdcontext_queue_for_post_processing(rc, function, rc->flags);
+        rrdcontext_queue_for_post_processing(rc, function, rrd_flags_get(rc));
 }
 
 void rrdhost_create_rrdcontexts(RRDHOST *host) {

@@ -4,8 +4,8 @@ mylocation=$(dirname "${0}")
 
 # Check if both parameters are provided
 if [ $# -ne 2 ]; then
-    echo "Error: Incorrect number of parameters."
-    echo "Usage: $0 <source_directory> <destination_directory>"
+    echo "Error: Incorrect number of parameters." >&2
+    echo "Usage: $0 <source_directory> <destination_directory>" >&2
     exit 1
 fi
 
@@ -19,11 +19,20 @@ SCRIPT_DIR="$(dirname "$0")"
 # Create a temporary batch file
 temp_bat=$(mktemp --suffix=.bat)
 
+# Determine paths for SDKs
+if ! win_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w)"; then
+    echo "ERROR: Failed to find Windows SDK" >&2
+    exit 1
+fi
+if ! vs_sdk_path="$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"; then
+    echo "ERROR: Failed to find Visual Studio SDK" >&2
+    exit 1
+fi
 # Write the contents to the temporary batch file
 # Use cygpath directly within the heredoc
 cat << EOF > "$temp_bat"
 @echo off
-set "PATH=%SYSTEMROOT%;$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --sdk -w);$("${mylocation}/../../../packaging/windows/find-sdk-path.sh" --visualstudio -w)"
+set "PATH=%SystemRoot%\System32;${win_sdk_path};${vs_sdk_path}"
 call "$(cygpath -w -a "$SCRIPT_DIR/wevt_netdata_compile.bat")" "$(cygpath -w -a "$src_dir")" "$(cygpath -w -a "$dest_dir")"
 EOF
 
@@ -42,7 +51,7 @@ rm "$temp_bat"
 if [ $exit_status -eq 0 ]; then
     echo "nd_wevents_compile.bat executed successfully."
 else
-    echo "nd_wevents_compile.bat failed with exit status $exit_status."
+    echo "nd_wevents_compile.bat failed with exit status $exit_status." >&2
 fi
 
 exit $exit_status

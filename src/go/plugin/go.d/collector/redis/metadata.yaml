@@ -10,6 +10,7 @@ modules:
         categories:
           - data-collection.databases
         icon_filename: redis.svg
+        description: 'Monitor Redis server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.'
       related_resources:
         integrations:
           list:

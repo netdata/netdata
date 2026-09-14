@@ -84,7 +84,7 @@ uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const 
 
     safecpy(to_hash.version, ds->version);
     safecpy(to_hash.filename, ds->fatal.filename);
-    safecpy(to_hash.filename, ds->fatal.function);
+    safecpy(to_hash.function, ds->fatal.function);
     safecpy(to_hash.stack_trace, ds->fatal.stack_trace);
     safecpy(to_hash.thread, ds->fatal.thread);
 
@@ -137,11 +137,10 @@ failed:
     return false;
 }
 
-bool daemon_status_dedup_load(void) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+bool daemon_status_dedup_load(bool log) {
+    // Do not call this from signal handlers; they use the already-loaded dedup table.
 
-    return status_file_io_load(DEDUP_FILENAME, status_file_dedup_load_and_parse, NULL);
+    return status_file_io_load(DEDUP_FILENAME, status_file_dedup_load_and_parse, NULL, log);
 }
 
 static bool daemon_status_dedup_save(void) {
@@ -157,11 +156,12 @@ static bool daemon_status_dedup_save(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // deduplication hashes management
 
-bool dedup_already_posted(DAEMON_STATUS_FILE *ds __maybe_unused, uint64_t hash, bool sentry) {
+bool dedup_already_posted(DAEMON_STATUS_FILE *ds __maybe_unused, uint64_t hash, bool sentry, DEDUP_LOAD_MODE load_mode) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
-    daemon_status_dedup_load();
+    if(load_mode == DEDUP_RELOAD_FROM_DISK)
+        daemon_status_dedup_load(true);
 
     usec_t now_ut = now_realtime_usec();
 
@@ -180,11 +180,12 @@ bool dedup_already_posted(DAEMON_STATUS_FILE *ds __maybe_unused, uint64_t hash, 
     return false;
 }
 
-void dedup_keep_hash(DAEMON_STATUS_FILE *ds __maybe_unused, uint64_t hash, bool sentry) {
+void dedup_keep_hash(DAEMON_STATUS_FILE *ds __maybe_unused, uint64_t hash, bool sentry, DEDUP_LOAD_MODE load_mode) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
-    daemon_status_dedup_load();
+    if(load_mode == DEDUP_RELOAD_FROM_DISK)
+        daemon_status_dedup_load(true);
 
     // find the same hash
     for(size_t i = 0; i < _countof(dedup.slot); i++) {

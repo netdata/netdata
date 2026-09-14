@@ -1,0 +1,188 @@
+bgp:
+  - id: arista-bgp-peer
+    MIB: ARISTA-BGP4V2-MIB
+    kind: peer
+    table: &arista_bgp_peer_table
+      name: aristaBgp4V2PeerTable
+      OID: 1.3.6.1.4.1.30065.4.1.1.2
+    identity: &arista_bgp_peer_identity
+      routing_instance: &arista_bgp_routing_instance
+        index: 1
+      neighbor: &arista_bgp_neighbor
+        index_transform:
+          - start: 3
+        name: aristaBgp4V2PeerRemoteAddrIndex
+        format: ip_address
+      remote_as: &arista_bgp_remote_as
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.10, name: aristaBgp4V2PeerRemoteAs, format: uint32 }
+    descriptors: &arista_bgp_peer_descriptors
+      local_address:
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3, name: aristaBgp4V2PeerLocalAddr, format: ip_address }
+      local_as:
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7, name: aristaBgp4V2PeerLocalAs, format: uint32 }
+      local_identifier:
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8, name: aristaBgp4V2PeerLocalIdentifier, format: ip_address }
+      peer_identifier:
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11, name: aristaBgp4V2PeerRemoteIdentifier, format: ip_address }
+      peer_type: &arista_bgp_peer_type
+        index: 2
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      description:
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14, name: aristaBgp4V2PeerDescription }
+    admin:
+      enabled:
+        symbol:
+          OID: 1.3.6.1.4.1.30065.4.1.1.2.1.12
+          name: aristaBgp4V2PeerAdminStatus
+          mapping:
+            1: halted
+            2: running
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.30065.4.1.1.2.1.13
+        name: aristaBgp4V2PeerState
+        mapping: &arista_bgp_state_mapping
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    previous_state:
+      symbol:
+        OID: 1.3.6.1.4.1.30065.4.1.1.2.1.15
+        name: aristaBgp4V2PeerPrevState
+        mapping: *arista_bgp_state_mapping
+    connection:
+      established_uptime:
+        table: aristaBgp4V2PeerEventTimesTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.4.1.1, name: bgpPeerFsmEstablishedTime }
+      last_received_update_age:
+        table: aristaBgp4V2PeerEventTimesTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.4.1.2, name: bgpPeerInUpdateElapsedTime }
+    traffic:
+      messages:
+        received:
+          table: aristaBgp4V2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.7.1.3, name: bgpPeerInTotalMessages }
+        sent:
+          table: aristaBgp4V2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.7.1.4, name: bgpPeerOutTotalMessages }
+      updates:
+        received:
+          table: aristaBgp4V2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.7.1.1, name: bgpPeerInUpdates }
+        sent:
+          table: aristaBgp4V2PeerCountersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.7.1.2, name: bgpPeerOutUpdates }
+    transitions:
+      established:
+        table: aristaBgp4V2PeerCountersTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.7.1.5, name: bgpPeerFsmEstablishedTransitions }
+    timers:
+      negotiated:
+        hold_time:
+          table: aristaBgp4V2PeerNegotiatedTimersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.6.1.1, name: bgpPeerHoldTime }
+        keepalive_time:
+          table: aristaBgp4V2PeerNegotiatedTimersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.6.1.2, name: bgpPeerKeepAlive }
+      configured:
+        connect_retry:
+          table: aristaBgp4V2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.5.1.1, name: bgpPeerConnectRetryInterval }
+        hold_time:
+          table: aristaBgp4V2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.5.1.2, name: bgpPeerHoldTimeConfigured }
+        keepalive_time:
+          table: aristaBgp4V2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.5.1.3, name: bgpPeerKeepAliveConfigured }
+        min_as_origination_interval:
+          table: aristaBgp4V2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.5.1.4, name: bgpPeerMinASOriginationInterval }
+        min_route_advertisement_interval:
+          table: aristaBgp4V2PeerConfiguredTimersTable
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.5.1.5, name: bgpPeerMinRouteAdvertisementInterval }
+    last_error:
+      code:
+        table: aristaBgp4V2PeerErrorsTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.3.1.1, name: bgpPeerLastErrorCode }
+      subcode:
+        table: aristaBgp4V2PeerErrorsTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.3.1.2, name: bgpPeerLastErrorSubcode }
+
+  - id: arista-bgp-peer-family
+    MIB: ARISTA-BGP4V2-MIB
+    kind: peer_family
+    table:
+      name: aristaBgp4V2PrefixGaugesTable
+      OID: 1.3.6.1.4.1.30065.4.1.1.8
+    identity:
+      routing_instance: *arista_bgp_routing_instance
+      neighbor:
+        index_transform:
+          - start: 3
+            drop_right: 2
+        name: aristaBgp4V2PrefixPeerRemoteAddrIndex
+        format: ip_address
+      remote_as:
+        <<: *arista_bgp_remote_as
+        table: aristaBgp4V2PeerTable
+        index_transform: &arista_bgp_peer_index_from_family
+          - start: 0
+            drop_right: 2
+      address_family:
+        index_from_end: 2
+        mapping:
+          1: ipv4
+          2: ipv6
+          25: l2vpn
+      subsequent_address_family:
+        index_from_end: 1
+        mapping:
+          1: unicast
+          2: multicast
+          4: labeled_unicast
+          5: mvpn
+          65: vpls
+          70: evpn
+          128: vpn
+          132: rtfilter
+          133: flow
+    descriptors:
+      <<: *arista_bgp_peer_descriptors
+      local_address:
+        table: aristaBgp4V2PeerTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.3, name: aristaBgp4V2PeerLocalAddr, format: ip_address }
+        index_transform: *arista_bgp_peer_index_from_family
+      local_as:
+        table: aristaBgp4V2PeerTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.7, name: aristaBgp4V2PeerLocalAs, format: uint32 }
+        index_transform: *arista_bgp_peer_index_from_family
+      local_identifier:
+        table: aristaBgp4V2PeerTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.8, name: aristaBgp4V2PeerLocalIdentifier, format: ip_address }
+        index_transform: *arista_bgp_peer_index_from_family
+      peer_identifier:
+        table: aristaBgp4V2PeerTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.11, name: aristaBgp4V2PeerRemoteIdentifier, format: ip_address }
+        index_transform: *arista_bgp_peer_index_from_family
+      description:
+        table: aristaBgp4V2PeerTable
+        symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.2.1.14, name: aristaBgp4V2PeerDescription }
+        index_transform: *arista_bgp_peer_index_from_family
+      peer_type: *arista_bgp_peer_type
+    routes:
+      current:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.8.1.3, name: bgpPeerPrefixesReceived }
+        accepted:
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.8.1.4, name: bgpPeerPrefixesAccepted }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.30065.4.1.1.8.1.5, name: bgpPeerPrefixesAdvertised }

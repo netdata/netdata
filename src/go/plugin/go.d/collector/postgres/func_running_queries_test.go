@@ -287,8 +287,8 @@ func TestFuncRunningQueries_formatValue_NonQueryStringNotTruncated(t *testing.T)
 	assert.Equal(t, len(longValue), len(resultStr), "non-query string columns should not be truncated")
 }
 
-func TestRunningQueriesMethodConfig(t *testing.T) {
-	config := runningQueriesMethodConfig()
+func TestRunningQueriesFunctionConfig(t *testing.T) {
+	config := runningQueriesFunctionConfig()
 
 	assert.Equal(t, "running-queries", config.ID)
 	assert.Equal(t, "Running Queries", config.Name)

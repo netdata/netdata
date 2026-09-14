@@ -49,9 +49,9 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func mongoMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
+func mongoMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
 	}
 }
 

@@ -19,8 +19,8 @@ typedef struct {
 // An array of lines
 
 typedef struct {
-    uint32_t words; // how many words this line has
-    uint32_t first; // the id of the first word of this line in the words array
+    size_t words;   // how many words this line has
+    size_t first;   // the id of the first word of this line in the words array
 } ffline;
 
 typedef struct {

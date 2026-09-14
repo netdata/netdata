@@ -9,7 +9,7 @@
 #define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_DISKSTATS_NAME
 #include "../common-contexts/common-contexts.h"
 
-#define RRDFUNCTIONS_DISKSTATS_HELP "Displays block device I/O statistics including read/write throughput, operations, latency, and utilization."
+#define FUNCTION_DISKSTATS_HELP "Displays block device I/O statistics including read/write throughput, operations, latency, and utilization."
 
 #define DISK_TYPE_UNKNOWN   0
 #define DISK_TYPE_PHYSICAL  1
@@ -993,7 +993,7 @@ static int diskstats_function_block_devices(BUFFER *wb, const char *function __m
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_DISKSTATS_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_DISKSTATS_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_io_reads = 0.0;
@@ -1407,11 +1407,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 inicfg_get(&netdata_config, CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
                 SIMPLE_PATTERN_EXACT, true);
 
-        rrd_function_add_inline(localhost, NULL, "block-devices", 10,
-                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
-                                RRDFUNCTIONS_DISKSTATS_HELP,
-                                "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                                diskstats_function_block_devices);
+        nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+            .owner = rrdhost_nrpc_owner(localhost),
+            .name = "block-devices",
+            .help = FUNCTION_DISKSTATS_HELP,
+            .tags = "top",
+            .timeout_s = 10,
+            .priority = NRPC_PRIORITY_DEFAULT,
+            .version = NRPC_VERSION_DEFAULT,
+            .access = HTTP_ACCESS_ANONYMOUS_DATA,
+            .handler = diskstats_function_block_devices,
+        });
     }
 
     // --------------------------------------------------------------------------

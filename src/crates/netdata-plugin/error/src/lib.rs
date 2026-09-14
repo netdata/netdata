@@ -6,8 +6,10 @@ pub type Result<T> = std::result::Result<T, NetdataPluginError>;
 /// Error types that can occur in netdata plugin operations
 #[derive(Error, Debug)]
 pub enum NetdataPluginError {
-    /// Transport layer error (I/O, network)
-    #[error("transport error: {0}")]
+    /// Transport layer error (I/O, network). Transparent: embedding the
+    /// source in the message while also chaining it would print it twice
+    /// in anyhow chains.
+    #[error(transparent)]
     Transport(#[from] std::io::Error),
 
     /// Protocol parsing or communication error

@@ -2,6 +2,9 @@
 
 Publishing documentation to [Learn](https://github.com/netdata/learn) involves a few key steps. Follow this guide carefully to avoid broken links or failed builds.
 
+Place in the documentation set: the runtime skill `.agents/skills/docs-learn-site-structure` cites sections of this
+file by heading anchor, so renaming or removing a heading here fails `.agents/sow/audit.sh` until that skill is updated.
+
 :warning: **Before You Begin**
 
 - If you plan to unpublish a file, see [Unpublishing Files](#unpublishing-files) first. It requires extra steps.
@@ -37,7 +40,7 @@ Each node is either:
 | **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
 | **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
 | **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
-| **description** | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                                                         |
+| **description** | Page description used by Learn metadata, search, and social previews.          | Write an accurate plain-text summary. Generated integration descriptions are not authored in this map; their metadata sources and validation contract are documented in [Integration description authoring](../../.agents/skills/integrations-lifecycle/description-authoring.md).          |
 
 #### Path Reconstruction
 
@@ -60,7 +63,7 @@ Placeholders are positional: the ingest pipeline replaces them in-place with gen
 - meta:
     label: "Linux"
     edit_url: "https://github.com/netdata/netdata/edit/master/docs/installation/linux.md"
-    description: "How to install Netdata Agent on Linux"
+    description: "Install Netdata Agent on Linux systems and choose the installation method that fits your environment."
     keywords:
       - "install"
       - "linux"
@@ -72,11 +75,18 @@ Before merging, **always test the map file**.
 
 1. Clone [Learn](https://github.com/netdata/learn) locally.
 2. Prepare environment and dependencies (see [ingest instructions](https://github.com/netdata/learn#ingest-and-process-documentation-files)).
-3. Run the ingest command:
+3. Run ingest against the local checkout that contains your documentation and `map.yaml` changes. Replace
+   `/path/to/netdata` with the absolute path to that checkout:
 
    ```bash
-   python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANCH
+   python3 ingest/ingest.py \
+     --local-repo netdata:/path/to/netdata \
+     --ignore-on-prem-repo \
+     --fail-links-netdata
    ```
+
+   Local-source mode also derives the kickstart checksum from the selected checkout. A full ingest that selects a remote
+   `OWNER/REPO:BRANCH` instead must pass that branch's 32-character checksum with `--kickstart-checksum`.
 
 4. Inspect the ingested changes.
 5. (Optional, advanced) [Deploy Learn](https://github.com/netdata/learn#local-deploy-of-learn) locally to confirm it builds correctly.

@@ -12,7 +12,7 @@ type cloneable[T any] interface {
 	Clone() T
 }
 
-// CloneSlice clones all the objects in a slice into a new slice.
+// cloneSlice clones all the objects in a slice into a new slice.
 func cloneSlice[Slice ~[]T, T cloneable[T]](s Slice) Slice {
 	if s == nil {
 		return nil
@@ -24,7 +24,7 @@ func cloneSlice[Slice ~[]T, T cloneable[T]](s Slice) Slice {
 	return result
 }
 
-// CloneMap clones a map[K]T for any cloneable type T.
+// cloneMap clones a map[K]T for any cloneable type T.
 // The map keys are shallow-copied; values are cloned.
 func cloneMap[Map ~map[K]T, K comparable, T cloneable[T]](m Map) Map {
 	if m == nil {

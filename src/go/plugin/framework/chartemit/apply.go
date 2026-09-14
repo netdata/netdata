@@ -3,12 +3,21 @@
 package chartemit
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
+	"math"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
+
+// ErrTypeIDBudgetExceeded identifies an emitted type/chart ID that cannot fit
+// the Netdata wire-protocol limit.
+var ErrTypeIDBudgetExceeded = errors.New("chartemit: type.id exceeds max length")
 
 const (
 	// Netdata wire protocol label sources (CLABEL third argument).
@@ -21,6 +30,7 @@ const (
 type normalizedActions struct {
 	createCharts     map[string]CreateChartAction
 	createDimsByID   map[string][]CreateDimensionAction
+	updateLabels     []UpdateChartLabelsAction
 	updateCharts     []UpdateChartAction
 	removeDimensions []RemoveDimensionAction
 	removeCharts     []RemoveChartAction
@@ -36,13 +46,41 @@ type dimensionEmission struct {
 	Obsolete   bool
 }
 
+type definitionVisitor interface {
+	visitChart(chartID string, meta chartengine.ChartMeta, labels map[string]string, emitLabels, obsolete bool)
+	visitDimension(chartID string, dim dimensionEmission)
+}
+
+type emissionDefinitionVisitor struct {
+	api *netdataapi.API
+	env EmitEnv
+}
+
+func (v emissionDefinitionVisitor) visitChart(
+	chartID string,
+	meta chartengine.ChartMeta,
+	labels map[string]string,
+	emitLabels bool,
+	obsolete bool,
+) {
+	emitChart(v.api, v.env, chartID, meta, obsolete)
+	if emitLabels {
+		emitChartLabels(v.api, v.env, labels)
+		v.api.CLABELCOMMIT()
+	}
+}
+
+func (v emissionDefinitionVisitor) visitDimension(_ string, dim dimensionEmission) {
+	emitDimension(v.api, dim)
+}
+
 // ApplyPlan emits chartengine actions to the Netdata wire API.
 func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if api == nil {
 		return fmt.Errorf("chartemit: nil netdata api")
 	}
-	if strings.TrimSpace(env.TypeID) == "" {
-		return fmt.Errorf("chartemit: emit env type_id is required")
+	if err := validateEmitEnv(env); err != nil {
+		return err
 	}
 	if env.UpdateEvery <= 0 {
 		env.UpdateEvery = 1
@@ -57,15 +95,28 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if err := emitHostSelection(api, env); err != nil {
 		return err
 	}
-	emitCreatePhase(api, env, normalized)
+	visitor := emissionDefinitionVisitor{
+		api: api,
+		env: env,
+	}
+	visitCreatePhase(visitor, normalized)
+	visitLabelUpdatePhase(visitor, normalized.updateLabels)
 	emitUpdatePhase(api, env, normalized.updateCharts)
-	emitRemovePhase(api, env, normalized)
+	visitRemovePhase(visitor, normalized)
+	return nil
+}
+
+func validateEmitEnv(env EmitEnv) error {
+	if strings.TrimSpace(env.TypeID) == "" {
+		return fmt.Errorf("chartemit: emit env type_id is required")
+	}
 	return nil
 }
 
 func hasEmissions(actions normalizedActions) bool {
 	return len(actions.createCharts) > 0 ||
 		len(actions.createDimsByID) > 0 ||
+		len(actions.updateLabels) > 0 ||
 		len(actions.updateCharts) > 0 ||
 		len(actions.removeDimensions) > 0 ||
 		len(actions.removeCharts) > 0
@@ -77,23 +128,14 @@ func emitHostSelection(api *netdataapi.API, env EmitEnv) error {
 		return nil
 	}
 
-	guid := sanitizeWireID(env.HostScope.GUID)
+	guid := strings.TrimSpace(env.HostScope.GUID)
 	if guid == "" {
 		return fmt.Errorf("chartemit: emit env host scope guid is required")
 	}
-	if env.HostScope.Define != nil {
-		defineGUID := sanitizeWireID(env.HostScope.Define.GUID)
-		if defineGUID == "" {
-			return fmt.Errorf("chartemit: host define guid is required")
-		}
-		if defineGUID != guid {
-			return fmt.Errorf("chartemit: host define guid %q does not match host scope guid %q", env.HostScope.Define.GUID, env.HostScope.GUID)
-		}
-		if strings.TrimSpace(env.HostScope.Define.Hostname) == "" {
-			return fmt.Errorf("chartemit: host define hostname is required")
-		}
-		api.HOSTINFO(*env.HostScope.Define)
+	if sanitizeWireID(guid) != guid {
+		return fmt.Errorf("chartemit: emit env host scope guid contains unsupported characters")
 	}
+
 	api.HOST(guid)
 	return nil
 }
@@ -110,6 +152,9 @@ func validateTypeIDBudget(typeID string, actions normalizedActions) error {
 	for chartID := range actions.createDimsByID {
 		seen[chartID] = struct{}{}
 	}
+	for _, update := range actions.updateLabels {
+		seen[update.ChartID] = struct{}{}
+	}
 	for _, update := range actions.updateCharts {
 		seen[update.ChartID] = struct{}{}
 	}
@@ -122,23 +167,28 @@ func validateTypeIDBudget(typeID string, actions normalizedActions) error {
 	for chartID := range seen {
 		id := sanitizeWireID(chartID)
 		if len(typeID)+1+len(id) > maxTypeIDLen {
-			return fmt.Errorf("chartemit: type.id exceeds max length (%d): %s.%s", maxTypeIDLen, typeID, id)
+			return fmt.Errorf("%w (%d): %s.%s", ErrTypeIDBudgetExceeded, maxTypeIDLen, typeID, id)
 		}
 	}
 	return nil
 }
 
 func normalizeActions(actions []EngineAction) normalizedActions {
-	out := normalizedActions{
-		createCharts:   make(map[string]CreateChartAction),
-		createDimsByID: make(map[string][]CreateDimensionAction),
-	}
+	var out normalizedActions
 	for _, action := range actions {
 		switch v := action.(type) {
 		case CreateChartAction:
+			if out.createCharts == nil {
+				out.createCharts = make(map[string]CreateChartAction)
+			}
 			out.createCharts[v.ChartID] = v
 		case CreateDimensionAction:
+			if out.createDimsByID == nil {
+				out.createDimsByID = make(map[string][]CreateDimensionAction)
+			}
 			out.createDimsByID[v.ChartID] = append(out.createDimsByID[v.ChartID], v)
+		case UpdateChartLabelsAction:
+			out.updateLabels = append(out.updateLabels, v)
 		case UpdateChartAction:
 			out.updateCharts = append(out.updateCharts, v)
 		case RemoveDimensionAction:
@@ -150,7 +200,7 @@ func normalizeActions(actions []EngineAction) normalizedActions {
 	return out
 }
 
-func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions) {
+func visitCreatePhase[V definitionVisitor](visitor V, actions normalizedActions) {
 	createdChartIDs := make([]string, 0, len(actions.createCharts))
 	for chartID := range actions.createCharts {
 		createdChartIDs = append(createdChartIDs, chartID)
@@ -158,12 +208,10 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 	sort.Strings(createdChartIDs)
 	for _, chartID := range createdChartIDs {
 		createChart := actions.createCharts[chartID]
-		emitChart(api, env, createChart.ChartID, createChart.Meta, false)
-		emitChartLabels(api, env, createChart.Labels)
-		api.CLABELCOMMIT()
+		visitor.visitChart(createChart.ChartID, createChart.Meta, createChart.Labels, true, false)
 		dims := actions.createDimsByID[chartID]
 		for _, dim := range dims {
-			emitDimension(api, dimensionEmission{
+			visitor.visitDimension(chartID, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
 				Float:      dim.Float,
@@ -186,12 +234,9 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 		if len(dims) == 0 {
 			continue
 		}
-		emitChart(api, env, chartID, dims[0].ChartMeta, false)
-		// Dimension-only chart creation path still needs chart labels and commit.
-		emitChartLabels(api, env, nil)
-		api.CLABELCOMMIT()
+		visitor.visitChart(chartID, dims[0].ChartMeta, nil, false, false)
 		for _, dim := range dims {
-			emitDimension(api, dimensionEmission{
+			visitor.visitDimension(chartID, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
 				Float:      dim.Float,
@@ -200,6 +245,20 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 				Divisor:    dim.Divisor,
 			})
 		}
+	}
+}
+
+func visitLabelUpdatePhase[V definitionVisitor](visitor V, updates []UpdateChartLabelsAction) {
+	if len(updates) == 0 {
+		return
+	}
+	if len(updates) > 1 {
+		slices.SortFunc(updates, func(a, b UpdateChartLabelsAction) int {
+			return cmp.Compare(a.ChartID, b.ChartID)
+		})
+	}
+	for _, update := range updates {
+		visitor.visitChart(update.ChartID, update.Meta, update.Labels, true, false)
 	}
 }
 
@@ -212,6 +271,12 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 				continue
 			}
 			if dim.IsFloat {
+				// Defensive: a non-finite float renders as 0 on the wire (the C parser accepts
+				// only lowercase "nan"); emit a gap. The planner already maps these to IsEmpty.
+				if math.IsNaN(dim.Float64) || math.IsInf(dim.Float64, 0) {
+					api.SETEMPTY(sanitizeWireID(dim.Name))
+					continue
+				}
 				api.SETFLOAT(sanitizeWireID(dim.Name), dim.Float64)
 				continue
 			}
@@ -221,10 +286,10 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 	}
 }
 
-func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions) {
+func visitRemovePhase[V definitionVisitor](visitor V, actions normalizedActions) {
 	for _, removeDim := range actions.removeDimensions {
-		emitChart(api, env, removeDim.ChartID, removeDim.ChartMeta, false)
-		emitDimension(api, dimensionEmission{
+		visitor.visitChart(removeDim.ChartID, removeDim.ChartMeta, nil, false, false)
+		visitor.visitDimension(removeDim.ChartID, dimensionEmission{
 			Name:       removeDim.Name,
 			Hidden:     removeDim.Hidden,
 			Float:      removeDim.Float,
@@ -235,21 +300,29 @@ func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 		})
 	}
 	for _, removeChart := range actions.removeCharts {
-		emitChart(api, env, removeChart.ChartID, removeChart.Meta, true)
+		visitor.visitChart(removeChart.ChartID, removeChart.Meta, nil, false, true)
 	}
 }
 
 func emitDimension(api *netdataapi.API, dim dimensionEmission) {
-	name := sanitizeWireID(dim.Name)
-	if name == "" {
+	opts, ok := prepareDimension(dim)
+	if !ok {
 		return
 	}
-	api.DIMENSION(netdataapi.DimensionOpts{
+	api.DIMENSION(opts)
+}
+
+func prepareDimension(dim dimensionEmission) (netdataapi.DimensionOpts, bool) {
+	name := sanitizeWireID(dim.Name)
+	if name == "" {
+		return netdataapi.DimensionOpts{}, false
+	}
+	return netdataapi.DimensionOpts{
 		ID:         name,
 		Name:       name,
 		Algorithm:  dim.Algorithm,
 		Multiplier: handleZero(dim.Multiplier),
 		Divisor:    handleZero(dim.Divisor),
 		Options:    makeDimensionOptions(dim.Hidden, dim.Obsolete, dim.Float),
-	})
+	}, true
 }

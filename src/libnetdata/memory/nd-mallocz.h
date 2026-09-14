@@ -7,6 +7,8 @@
 
 // memory allocation functions that handle failures
 #ifdef NETDATA_TRACE_ALLOCATIONS
+#include "../avl/avl-types.h"
+
 struct malloc_trace {
     avl_t avl;
 
@@ -33,6 +35,8 @@ struct malloc_trace {
 };
 
 int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data);
+void malloc_trace_mmap(size_t size);
+void malloc_trace_munmap(size_t size);
 
 #define strdupz(s) strdupz_int(s, __FILE__, __FUNCTION__, __LINE__)
 #define strndupz(s, len) strndupz_int(s, len, __FILE__, __FUNCTION__, __LINE__)

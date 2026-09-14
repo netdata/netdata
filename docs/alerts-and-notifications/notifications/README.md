@@ -78,7 +78,7 @@ When you receive an alert, Netdata provides tools to help you understand and res
 
 ### Netdata Assistant
 
-The [Netdata Assistant](https://learn.netdata.cloud/docs/machine-learning-and-anomaly-detection/ai-powered-troubleshooting-assistant) is an AI-powered feature that guides you through troubleshooting alerts by providing:
+The [Netdata Assistant](/docs/netdata-ai/troubleshooting/index.md) is an AI-powered feature that guides you through troubleshooting alerts by providing:
 
 - Clear explanations of what the alert means
 - Assessment of potential causes
@@ -116,6 +116,15 @@ Netdata ships with hundreds of pre-configured alerts. You can also create your o
 - **[Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md)** — Describe what you want in plain English; AI suggests alerts, generates the configuration, and tests it against historical data before deployment
 - **[Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md)** — Visual UI wizard for creating and editing alerts
 - **[Manual configuration](/src/health/REFERENCE.md)** — Edit `health.d/*.conf` files directly for full control over alert syntax
+
+## On-Call Rotations and Escalation
+
+Netdata does not provide a native on-call rotation, escalation, or shift-scheduling engine. These capabilities are handled by the dedicated incident-management integrations that Netdata delivers alerts to.
+
+- **From the Agent:** incident-management and incident-response integrations such as [PagerDuty](/src/health/notifications/pagerduty/README.md), [Opsgenie](/src/health/notifications/opsgenie/README.md), [SIGNL4](/src/health/notifications/signl4/README.md), and [ilert](/src/health/notifications/ilert/README.md), where you define on-call schedules, escalation policies, and shift rotations. See the full list of [supported Agent integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications).
+- **From Cloud:** PagerDuty is available as a [paid-plan notification method](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#service-classification).
+
+To use on-call rotations, configure one of these integrations to receive your Netdata alerts, then set up your rotations, escalation policies, and shift schedules inside that service. To change where alerts are sent, see [Notification Methods](#notification-methods) or the [Cloud notification methods](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md) guide.
 
 ## Next Steps
 

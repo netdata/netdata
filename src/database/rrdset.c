@@ -44,7 +44,7 @@ time_t rrdset_first_entry_s(RRDSET *st) {
 
     rrddim_foreach_read(rd, st) {
         time_t t = rrddim_first_entry_s(rd);
-        if(t < first_entry_s)
+        if(t && t < first_entry_s)
             first_entry_s = t;
     }
     rrddim_foreach_done(rd);
@@ -125,7 +125,23 @@ void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
+
+        // The parent skips replication for obsolete charts, so the natural
+        // "replication finished" decrement at stream-replication-sender.c will
+        // never fire for this chart. Release any pending replication slot now,
+        // otherwise rrdhost_sender_replicating_charts pins above zero and
+        // observability (SND_REPLICATING vs SND_RUNNING) stays stuck on the
+        // wrong state. Mirror the natural-finalize path's pulse-status flip on
+        // the 0/1 boundary so SND_REPLICATING -> SND_RUNNING is observed.
+        RRDSET_FLAGS old_repl = rrdset_flag_set_and_clear(
+            st,
+            RRDSET_FLAG_SENDER_REPLICATION_FINISHED,
+            RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+        if(old_repl & RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS) {
+            if(rrdhost_sender_replicating_charts_minus_one(st->rrdhost) == 0)
+                pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_RUNNING, 0);
+        }
 
         rrdset_metadata_updated(st);
 
@@ -143,7 +159,7 @@ void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
 //                rrdhost_hostname(st->rrdhost), rrdset_id(st));
 
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
 
         rrdset_metadata_updated(st);
 
@@ -163,24 +179,25 @@ void rrdset_update_heterogeneous_flag(RRDSET *st) {
 
     bool init = false, is_heterogeneous = false;
     RRD_ALGORITHM algorithm;
-    int32_t multiplier;
-    int32_t divisor;
+    int64_t multiplier;
+    int64_t divisor;
 
     rrddim_foreach_read(rd, st) {
         if(!init) {
             algorithm = rd->algorithm;
-            multiplier = rd->multiplier;
-            divisor = ABS(rd->divisor);
+            multiplier = rrddim_scale_magnitude(rd->multiplier);
+            divisor = rrddim_scale_magnitude(rd->divisor);
             init = true;
             continue;
         }
 
-        if(algorithm != rd->algorithm || multiplier != ABS(rd->multiplier) || divisor != ABS(rd->divisor)) {
+        if(algorithm != rd->algorithm || multiplier != rrddim_scale_magnitude(rd->multiplier) ||
+           divisor != rrddim_scale_magnitude(rd->divisor)) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present "
-                     "(algorithm is '%s' vs '%s', multiplier is %d vs %d, "
-                     "divisor is %d vs %d).",
+                     "(algorithm is '%s' vs '%s', multiplier is %d vs %" PRId64 ", "
+                     "divisor is %d vs %" PRId64 ").",
                      rrddim_name(rd),
                      rrdset_name(st),
                      rrdhost_hostname(host),

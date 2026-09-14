@@ -13,19 +13,21 @@ import (
 )
 
 type routeBinding struct {
+	autogenGuard      *autogenRouteGuard
 	ChartTemplateID   string
 	ChartID           string
 	DimensionIndex    int
 	DimensionName     string
 	DimensionKeyLabel string
 	Algorithm         program.Algorithm
-	Hidden            bool
 	Multiplier        int
 	Divisor           int
+	Hidden            bool
 	Float             bool
 	Static            bool
 	Inferred          bool
 	Autogen           bool
+	Aggregation       program.Aggregation
 	Meta              program.ChartMeta
 	Lifecycle         program.LifecyclePolicy
 }
@@ -38,6 +40,8 @@ type routeCandidate struct {
 
 type matchIndex struct {
 	chartsByID       map[string]program.Chart
+	labelPolicies    map[string]*chartLabelPolicy
+	autogenLabels    *chartLabelPolicy
 	byMetricName     map[string][]routeCandidate
 	wildcardMatchers []routeCandidate
 }
@@ -45,12 +49,15 @@ type matchIndex struct {
 func buildMatchIndex(charts []program.Chart) matchIndex {
 	index := matchIndex{
 		chartsByID:       make(map[string]program.Chart, len(charts)),
+		labelPolicies:    make(map[string]*chartLabelPolicy, len(charts)),
+		autogenLabels:    compileAutogenChartLabelPolicy(),
 		byMetricName:     make(map[string][]routeCandidate),
 		wildcardMatchers: make([]routeCandidate, 0),
 	}
 
 	for _, chart := range charts {
 		index.chartsByID[chart.TemplateID] = chart
+		index.labelPolicies[chart.TemplateID] = compileChartLabelPolicy(chart)
 		for i, dim := range chart.Dimensions {
 			candidate := routeCandidate{
 				chartTemplateID: chart.TemplateID,
@@ -78,10 +85,13 @@ func newRouteCache() *routeCache {
 
 func (e *Engine) resolveSeriesRoutes(
 	cache *routeCache,
+	useCache bool,
+	observe func(PlanRouteDiagnostic),
 	identity metrix.SeriesIdentity,
 	name string,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
+	reader metrix.Reader,
 	index matchIndex,
 	revision uint64,
 	buildSeq uint64,
@@ -90,28 +100,63 @@ func (e *Engine) resolveSeriesRoutes(
 		return nil, false, fmt.Errorf("chartengine: route cache is not initialized")
 	}
 
-	if cached, ok := cache.Lookup(identity, revision, buildSeq); ok {
-		return cached, true, nil
+	if useCache {
+		if cached, ok := cache.Lookup(identity, revision, buildSeq); ok {
+			return cached, true, nil
+		}
 	}
 
 	candidates := make([]routeCandidate, 0, len(index.byMetricName[name])+len(index.wildcardMatchers))
 	candidates = append(candidates, index.byMetricName[name]...)
 	candidates = append(candidates, index.wildcardMatchers...)
 
+	// Inherit the family-level float hint (the same source autogen uses) so float-native
+	// metrics render at full precision in template charts; the authored options.float only adds to it.
+	// Skip the lookup when there are no template candidates (the common autogen-only series).
+	metricFloat := false
+	if len(candidates) > 0 {
+		if mm, ok := reader.MetricMeta(name); ok {
+			metricFloat = mm.Float
+		}
+	}
+
 	routes := make([]routeBinding, 0)
 	for _, candidate := range candidates {
 		if !candidate.dimension.Selector.Matcher.Matches(name, labels) {
+			if observe != nil {
+				observe(PlanRouteDiagnostic{
+					Decision:        PlanRouteCandidateSelectorRejected,
+					SeriesIdentity:  identity,
+					MetricName:      name,
+					ChartTemplateID: candidate.chartTemplateID,
+					DimensionIndex:  candidate.dimensionIndex,
+				})
+			}
 			continue
 		}
 		chart, ok := index.chartsByID[candidate.chartTemplateID]
 		if !ok {
 			return nil, false, fmt.Errorf("chartengine: route references unknown chart template %q", candidate.chartTemplateID)
 		}
-		chartID, ok, err := renderChartInstanceIDFromView(chart.Identity, labels)
+		labelPolicy, ok := index.labelPolicies[candidate.chartTemplateID]
+		if !ok {
+			return nil, false, fmt.Errorf("chartengine: route references unknown label policy %q", candidate.chartTemplateID)
+		}
+		chartID, ok, err := renderChartInstanceIDFromViewWithPlan(chart.Identity, labelPolicy.instancePlan, labels)
 		if err != nil {
 			return nil, false, err
 		}
 		if !ok || strings.TrimSpace(chartID) == "" {
+			if observe != nil {
+				observe(PlanRouteDiagnostic{
+					Decision:              PlanRouteChartIdentityRejected,
+					SeriesIdentity:        identity,
+					MetricName:            name,
+					ChartTemplateID:       candidate.chartTemplateID,
+					DimensionIndex:        candidate.dimensionIndex,
+					MissingInstanceLabels: missingChartInstanceLabels(labelPolicy.instancePlan, labels),
+				})
+			}
 			continue
 		}
 		dimName, dimKeyLabel, ok, err := resolveDimensionName(candidate.dimension, name, labels, meta)
@@ -119,19 +164,55 @@ func (e *Engine) resolveSeriesRoutes(
 			return nil, false, err
 		}
 		if !ok {
+			if observe != nil {
+				observe(PlanRouteDiagnostic{
+					Decision:        PlanRouteDimensionRejected,
+					SeriesIdentity:  identity,
+					MetricName:      name,
+					ChartTemplateID: candidate.chartTemplateID,
+					DimensionIndex:  candidate.dimensionIndex,
+					ChartID:         chartID,
+				})
+			}
 			continue
 		}
+		var instanceLabels []string
+		if observe != nil {
+			instanceIdentity, resolvedLabels, ok, err := diagnosticChartInstance(labelPolicy.instancePlan, labels)
+			if err != nil {
+				return nil, false, err
+			}
+			if !ok {
+				return nil, false, fmt.Errorf("chartengine: diagnostic instance identity diverged for chart template %q", candidate.chartTemplateID)
+			}
+			instanceLabels = resolvedLabels
+			observe(PlanRouteDiagnostic{
+				Decision:          PlanRouteResolved,
+				SeriesIdentity:    identity,
+				MetricName:        name,
+				ChartTemplateID:   candidate.chartTemplateID,
+				DimensionIndex:    candidate.dimensionIndex,
+				ChartID:           chartID,
+				DimensionName:     dimName,
+				DimensionKeyLabel: dimKeyLabel,
+				InstanceIdentity:  instanceIdentity,
+				InstanceLabels:    instanceLabels,
+			})
+		}
+		dimensionFloat := candidate.dimension.Float || metricFloat ||
+			candidate.dimension.Aggregation == program.AggregationAvg
 		routes = append(routes, routeBinding{
 			ChartTemplateID:   candidate.chartTemplateID,
 			ChartID:           chartID,
 			DimensionIndex:    candidate.dimensionIndex,
 			DimensionName:     dimName,
 			DimensionKeyLabel: dimKeyLabel,
+			Aggregation:       candidate.dimension.Aggregation,
 			Algorithm:         chart.Meta.Algorithm,
 			Hidden:            candidate.dimension.Hidden,
 			Multiplier:        candidate.dimension.Multiplier,
 			Divisor:           candidate.dimension.Divisor,
-			Float:             candidate.dimension.Float,
+			Float:             dimensionFloat,
 			Static:            !candidate.dimension.Dynamic,
 			Inferred:          candidate.dimension.InferNameFromSeriesMeta,
 			Autogen:           false,
@@ -153,6 +234,8 @@ func (e *Engine) resolveSeriesRoutes(
 		return routes[i].DimensionName < routes[j].DimensionName
 	})
 
-	cache.Store(identity, revision, buildSeq, routes)
+	if useCache {
+		cache.Store(identity, revision, buildSeq, routes)
+	}
 	return routes, false, nil
 }

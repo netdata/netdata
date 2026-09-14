@@ -60,10 +60,20 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
         .id = string_strdupz(sd->id),
         .name = string_strdupz(sd->name),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomic
+        .algorithm = (RRD_ALGORITHM)sd->algorithm,
     };
     if(sd->hidden) trm.flags |= RRD_FLAG_HIDDEN;
 
-    dictionary_set(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
+    if(!dictionary_set(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm))) {
+        // the metrics dictionary is being destroyed; the insert callback never
+        // ran, so free what we duplicated above (mirrors rrdmetric_free()).
+        // NULL is unambiguous here only because value_len > 0 and the name is
+        // valid - see the set-family contract in dictionary.h
+        th_ignored_metrics++;
+        string_freez(trm.id);
+        string_freez(trm.name);
+        uuidmap_free(trm.uuid);
+    }
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);
@@ -134,6 +144,12 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
     RRDHOST *host = data;
     (void)host;
 
+    // the insert callback replaces the SQLite-owned hub string pointers with
+    // owned copies only when hub.version is set - a versionless row would
+    // keep dangling pointers, so skip it
+    if(unlikely(!ctx_data->version))
+        return;
+
     RRDCONTEXT trc = {
         .id = string_strdupz(ctx_data->id),
         .flags = RRD_FLAG_ARCHIVED | RRD_FLAG_UPDATE_REASON_LOAD_SQL, // no need for atomics
@@ -143,7 +159,13 @@ static void rrdcontext_load_context_callback(VERSIONED_CONTEXT_DATA *ctx_data, v
 
         .hub = *ctx_data,
     };
-    dictionary_set(host->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc));
+    if(!dictionary_set(host->rrdctx.contexts, string2str(trc.id), &trc, sizeof(trc)))
+        // the contexts dictionary is being destroyed; the insert callback never
+        // ran, so it never took ownership of the hub strings - only the id we
+        // duplicated above is ours to free (mirrors rrdcontext_freez()).
+        // NULL is unambiguous here only because value_len > 0 and the name is
+        // valid - see the set-family contract in dictionary.h
+        string_freez(trc.id);
 }
 
 void rrdhost_load_rrdcontext_data(RRDHOST *host) {
@@ -156,8 +178,16 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
     th_ignored_metrics = th_ignored_instances = th_zero_retention_metrics = 0;
 
     ctx_get_context_list(&host->host_id.uuid, rrdcontext_load_context_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
+
     ctx_get_chart_list(&host->host_id.uuid, rrdinstance_load_instance_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
+
     ctx_get_dimension_list(&host->host_id.uuid, rrdinstance_load_dimension_callback, host);
+    if (unlikely(exit_initiated_get()))
+        return;
 
     size_t ignored_metrics = th_ignored_metrics, ignored_instances = th_ignored_instances, zero_retention_metrics = th_zero_retention_metrics;
     size_t loaded_metrics = 0, loaded_instances = 0, loaded_contexts = 0;
@@ -165,6 +195,9 @@ void rrdhost_load_rrdcontext_data(RRDHOST *host) {
 
     RRDCONTEXT *rc;
     dfe_start_read(host->rrdctx.contexts, rc) {
+        if (unlikely(exit_initiated_get()))
+            break;
+
         size_t instances = 0;
 
         RRDINSTANCE *ri;

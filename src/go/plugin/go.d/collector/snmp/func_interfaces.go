@@ -28,8 +28,8 @@ const (
 	ifacesDefaultTypeGroup = "ethernet"
 )
 
-func ifacesMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func ifacesFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:          ifacesMethodID,
 		Name:        "Network Interfaces",
 		UpdateEvery: 10,

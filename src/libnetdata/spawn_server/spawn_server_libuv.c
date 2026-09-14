@@ -352,7 +352,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     return item.instance;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
+int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms) {
     if(!si) return -1;
 
     // close all pipe descriptors to force the child to exit
@@ -364,7 +364,45 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
         return -1;
     }
 
+    // escalate to SIGKILL if the child does not exit promptly after SIGTERM (or if the wait could
+    // not be completed), so a SIGTERM-ignoring child cannot make the final wait block forever.
+    // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
+    int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
+    int status;
+    if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED) {
+        if(uv_process_kill(&si->process, SIGKILL))
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_process_kill(SIGKILL) failed");
+    }
+    else
+        return status;
+
     return spawn_server_exec_wait(server, si);
+}
+
+SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
+    if (!si) { if(status) *status = -1; return SPAWN_TIMEDWAIT_EXITED; }
+
+    // close all pipe descriptors to force the child to exit
+    if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
+    if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
+
+    // a negative timeout would become a huge usec_t deadline (= unbounded wait); clamp to poll-once
+    if(timeout_ms < 0) timeout_ms = 0;
+    usec_t deadline_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
+
+    while(uv_sem_trywait(&si->sem) != 0) {
+        if(now_monotonic_usec() >= deadline_ut)
+            return SPAWN_TIMEDWAIT_RUNNING;
+
+        sleep_usec(10 * USEC_PER_MS);
+    }
+
+    // the semaphore is consumed - finish exactly like spawn_server_exec_wait()
+    int st = si->exit_code;
+    uv_sem_destroy(&si->sem);
+    freez(si);
+    if(status) *status = st;
+    return SPAWN_TIMEDWAIT_EXITED;
 }
 
 int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si) {

@@ -10,11 +10,11 @@ groups:
     groups:
       - family: Execution
         metrics:
-          - nagios.job.execution_state
-          - nagios.job.perfdata.threshold_state
-          - nagios.job.execution_duration
-          - nagios.job.execution_cpu_total
-          - nagios.job.execution_max_rss
+          - job.execution_state
+          - job.perfdata.threshold_state
+          - job.execution_duration
+          - job.execution_cpu_total
+          - job.execution_max_rss
         charts:
           - id: job_execution_state
             title: Job Execution State
@@ -24,7 +24,7 @@ groups:
             instances:
               by_labels: [nagios_job]
             dimensions:
-              - selector: nagios.job.execution_state
+              - selector: job.execution_state
           - id: job_perfdata_threshold_state
             title: Job Perfdata Threshold State
             context: perfdata_threshold_state
@@ -33,7 +33,7 @@ groups:
             instances:
               by_labels: [nagios_job, perfdata_value]
             dimensions:
-              - selector: nagios.job.perfdata.threshold_state
+              - selector: job.perfdata.threshold_state
           - id: job_execution_duration
             title: Execution Duration
             context: execution_duration
@@ -42,7 +42,7 @@ groups:
             instances:
               by_labels: [nagios_job]
             dimensions:
-              - selector: nagios.job.execution_duration
+              - selector: job.execution_duration
                 name: duration
                 options:
                   float: true
@@ -54,7 +54,7 @@ groups:
             instances:
               by_labels: [nagios_job]
             dimensions:
-              - selector: nagios.job.execution_cpu_total
+              - selector: job.execution_cpu_total
                 name: total
                 options:
                   float: true
@@ -66,5 +66,5 @@ groups:
             instances:
               by_labels: [nagios_job]
             dimensions:
-              - selector: nagios.job.execution_max_rss
+              - selector: job.execution_max_rss
                 name: rss

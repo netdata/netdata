@@ -1,4 +1,18 @@
 plugin_name: go.d.plugin
+profile_coverage:
+  modules:
+    collector-go.d.plugin-prometheus-generic:
+      - fastapi
+      - process_runtime
+      - python_gc
+    collector-go.d.plugin-prometheus-ceph:
+      - ceph
+    collector-go.d.plugin-prometheus-haproxy:
+      - haproxy
+    collector-go.d.plugin-prometheus-litellm:
+      - litellm
+    collector-go.d.plugin-prometheus-vllm:
+      - vllm
 modules:
   - &module
     meta: &meta
@@ -16,7 +30,7 @@ modules:
         - openmetrics
       related_resources:
         integrations:
-          list: [ ]
+          list: []
       info_provided_to_referring_integrations:
         description: ""
     overview: &overview
@@ -26,8 +40,8 @@ modules:
         method_description: |
           It collects metrics by periodically sending HTTP requests to the target instance.
       supported_platforms:
-        include: [ ]
-        exclude: [ ]
+        include: []
+        exclude: []
       multi_instance: true
       additional_permissions:
         description: ""
@@ -41,8 +55,8 @@ modules:
           description: ""
     setup: &setup
       prerequisites:
-        list: [ ]
-      configuration:
+        list: []
+      configuration: &prometheus_configuration
         file:
           name: go.d/prometheus.conf
         options:
@@ -73,6 +87,17 @@ modules:
               default_value: 10
               required: false
               group: Target
+            - name: expected_prefix
+              description: If set, the job's check passes only when at least one post-job, pre-profile metric name starts with this prefix. Guards against scraping an unexpected endpoint; profile-owned relabeling cannot satisfy it.
+              default_value: ""
+              required: false
+              group: Target
+
+            - name: app
+              description: Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name.
+              default_value: ""
+              required: false
+              group: Customization
 
             - name: selector
               description: Time series selector (filter).
@@ -85,7 +110,7 @@ modules:
                 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
                 - Pattern syntax: [selector](/src/go/pkg/prometheus/selector/README.md).
                 - Option syntax:
-                
+
                 ```yaml
                 selector:
                   allow:
@@ -97,28 +122,36 @@ modules:
                 ```
 
             - name: max_time_series
-              description: Global time series limit. If an endpoint returns more time series than this, the data is not processed.
+              description: Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed.
               default_value: 2000
               required: false
               group: Limits
 
             - name: max_time_series_per_metric
-              description: Per-metric time series limit. Metrics with more time series than this are skipped.
+              description: Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped.
               default_value: 200
               required: false
               group: Limits
 
             - name: fallback_type
-              description: Fallback type rules for untyped metrics.
+              description: Job-level fallback type overrides for untyped metrics.
               default_value: ""
               required: false
               group: Customization
               detailed_description: |
-                This option allows you to process Untyped metrics as Counter or Gauge instead of ignoring them.
+                This job option allows you to process untyped metrics as Counter or Gauge instead of ignoring them.
+                Classification uses the post-job, pre-profile metric name. Profile relabeling preserves the selected
+                type but cannot create or change it by renaming the final metric.
+
+                Selected profiles may provide exporter-owned `fallback_type` defaults inside their own `match` scope.
+                Job gauge rules take precedence over job counter rules, and both job rule sets take precedence over
+                every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
+                belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
+                counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
 
                 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
                 - Option syntax:
-                
+
                 ```yaml
                 fallback_type:
                   counter:
@@ -129,11 +162,79 @@ modules:
                     - metric_name_pattern4
                 ```
 
-            - name: label_prefix
-              description: "Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`."
+            - name: relabeling
+              description: Job-owned Prometheus-compatible metric relabeling, applied before profile selection.
               default_value: ""
               required: false
               group: Customization
+              detailed_description: |
+                A list of job-owned relabeling blocks, applied after `selector` and before profile selection. Each block
+                applies a list of Prometheus `metric_relabel_configs` rules to the metrics whose name matches `match`.
+                Profiles may own the same block format for exporter normalization after selection. See the
+                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
+                the full action set and more examples.
+
+                - `match`: Netdata simple patterns matched against the full metric name — including any
+                  `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact `app_lat`
+                  (space-separated; `*` matches any sequence, `?` any character, a leading `!` negates). Use `*` to
+                  target every metric. Required.
+                - `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`, `regex`, `modulus`,
+                  `target_label`, `replacement`, `action`), applied in order to the scraped samples before charts are
+                  built.
+
+                Relabeling that would corrupt a histogram or summary — splitting it, dropping a component, mutating the
+                `le`/`quantile` label, or merging two families — is rejected.
+
+                ```yaml
+                relabeling:
+                  - match: 'http_*'
+                    metric_relabel_configs:
+                      - source_labels: [code]
+                        regex: '(\d)\d\d'
+                        target_label: code_class
+                        replacement: '${1}xx'
+                ```
+
+            - name: profiles
+              description: Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`.
+              default_value: auto
+              required: false
+              group: Customization
+              detailed_description: |
+                Profiles ship curated charts for recognized exporters -- see the
+                [profile format](/src/go/plugin/go.d/collector/prometheus/profile-format.md) for the file format and how
+                to author your own. `profiles.mode` selects them:
+
+                - `auto` (default): every profile whose `match` hits at least one scraped metric.
+                - `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its
+                  check).
+                - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
+                - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
+
+                Selection uses post-job, pre-profile family names. A selected profile may carry `fallback_type` rules
+                that classify untyped scalar families inside its `match` scope and `relabeling` blocks that normalize
+                matching source families automatically before chart routing. Job fallback policy takes precedence;
+                conflicting profile rules use the same ordering as normalization. Each original family is
+                processed only by the first applicable profile normalizer: profile-name order in `auto`, configured
+                entry order in `exact`, and configured entries followed by remaining auto profiles in name order in
+                `combined`. Later profile pipelines do not see the family. All selected templates consume the same
+                final names and labels; the collector does not create a private metric stream per profile.
+
+                Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the
+                other block are ignored. Metrics not covered by an authored profile chart keep their generic autogen
+                charts unless an applicable profile `autogen.selector` rejects them. Every selector is limited to its
+                profile's `match` scope; when scopes overlap, every applicable selector must accept the series. This
+                changes fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
+                Stock profiles leave unknown future families eligible for generic fallback; closed fallback selectors are a
+                user-owned deployment policy, not a stock-profile authoring pattern.
+
+                ```yaml
+                profiles:
+                  mode: exact
+                  mode_exact:
+                    entries:
+                      - name: haproxy
+                ```
 
             - name: username
               description: Username for Basic HTTP authentication.
@@ -267,19 +368,58 @@ modules:
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
                 > **Note**: Change the port of the monitored application on which it provides metrics.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1:9090/metrics
-                
+
                   - name: remote
                     url: http://192.0.2.1:9090/metrics
+            - name: Metric relabeling
+              description: Derive a `code_class` label (2xx, 4xx, ...) on metrics named `http_*`.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9090/metrics
+                    relabeling:
+                      - match: 'http_*'
+                        metric_relabel_configs:
+                          - source_labels: [code]
+                            regex: '(\d)\d\d'
+                            target_label: code_class
+                            replacement: '${1}xx'
+            - name: Rename labels that collide with Netdata's reserved labels
+              description: |
+                When these metrics are re-exported in Prometheus format, Netdata adds its own `instance`,
+                `family`, `chart`, and `dimension` labels. If the scraped endpoint already uses one of those
+                names, the re-export emits a duplicate label and a downstream Prometheus rejects the scrape.
+                Rename the colliding labels to avoid it (the use case the former `label_prefix` option served).
+              config: |
+                jobs:
+                  - name: coredns
+                    url: http://127.0.0.1:9153/metrics
+                    relabeling:
+                      - match: '*'
+                        metric_relabel_configs:
+                          - regex: '(instance|family)'
+                            action: labelmap
+                            replacement: 'coredns_$1'
+                          - regex: '(instance|family)'
+                            action: labeldrop
     troubleshooting:
       problems:
-        list: [ ]
-    alerts: [ ]
+        list:
+          - name: "Disappearing or sparse metrics not clearing alerts"
+            description: |
+              The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
+              and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or
+              dimension makes its alerts `REMOVED`; this is not a normal `CLEAR` transition and does not send a recovery
+              notification. Export an explicit normal value (for example `0`) whenever an alert needs a reliable recovery
+              transition. A failed scrape does not advance the expiry lifetime; use the generic collector collection-failure
+              alert to detect that separate condition.
+    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -304,8 +444,62 @@ modules:
         - As Histogram if it has 'le' label.
 
         **The rest are ignored**.
-      availability: [ ]
-      scopes: [ ]
+      availability: []
+      dynamic_context_prefixes:
+        - prefix: prometheus.
+          reason: >-
+            Generic autogen and built-in profiles emit endpoint- and application-specific contexts under the prometheus
+            namespace.
+      scopes: []
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-haproxy
+      monitored_instance:
+        name: HAProxy Prometheus
+        link: https://www.haproxy.com/documentation/haproxy-configuration-tutorials/alerts-and-monitoring/prometheus/
+        icon_filename: haproxy.svg
+        categories:
+          - data-collection.web-servers-and-proxies
+      keywords:
+        - haproxy
+        - web
+        - proxy
+        - prometheus
+      info_provided_to_referring_integrations:
+        description: Collects HAProxy's Prometheus endpoint through the generic Prometheus collector and its stock HAProxy profile.
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor HAProxy process, frontend, listener, backend, server, and stick-table behavior through its Prometheus endpoint.
+        method_description: |
+          Netdata periodically scrapes the HAProxy Prometheus endpoint with the generic Prometheus collector and applies the
+          built-in `haproxy` profile.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable the HAProxy Prometheus endpoint
+            description: |
+              Configure HAProxy's built-in Prometheus exporter as described in the
+              [HAProxy documentation](https://www.haproxy.com/documentation/haproxy-configuration-tutorials/alerts-and-monitoring/prometheus/).
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: HAProxy Prometheus
+              folding:
+                enabled: false
+              description: Collect HAProxy metrics with the automatically matched stock profile.
+              config: |
+                jobs:
+                  - name: haproxy
+                    url: http://127.0.0.1:8404/metrics
+                    expected_prefix: haproxy_
   - <<: *module
     meta:
       <<: *meta
@@ -325,9 +519,16 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Track AWS EC2 instances key metrics for optimized performance and cost management.
+          Monitor Amazon EC2 inventory and capacity information exposed by AWS EC2 Exporter.
+
+          This integration complements the
+          [Amazon CloudWatch](/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) collector,
+          which queries runtime metrics from CloudWatch. The integrations use different AWS data sources and do
+          not replace one another.
         method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS EC2 Exporter](https://github.com/O1ahmad/aws_ec2_exporter).
+          Netdata periodically scrapes Prometheus metrics from
+          [AWS EC2 Exporter](https://github.com/O1ahmad/aws_ec2_exporter), which obtains inventory and capacity
+          information from Amazon EC2 APIs rather than CloudWatch.
     setup:
       <<: *setup
       prerequisites:
@@ -373,7 +574,7 @@ modules:
         icon_filename: cilium.png
         categories:
           - data-collection.containers-and-vms
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -399,7 +600,7 @@ modules:
         icon_filename: cilium.png
         categories:
           - data-collection.containers-and-vms
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -425,7 +626,7 @@ modules:
         icon_filename: cilium.png
         categories:
           - data-collection.containers-and-vms
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -442,35 +643,6 @@ modules:
               Install [Cilium Proxy](https://github.com/cilium/proxy) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
-      id: collector-go.d.plugin-prometheus-aws_cloudwatch
-      <<: *meta
-      community: true
-      monitored_instance:
-        name: CloudWatch
-        link: https://github.com/prometheus/cloudwatch_exporter
-        icon_filename: aws-cloudwatch.png
-        categories:
-          - data-collection.cloud-and-devops
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor AWS CloudWatch metrics for comprehensive AWS resource management and performance optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [CloudWatch exporter](https://github.com/prometheus/cloudwatch_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [CloudWatch exporter](https://github.com/prometheus/cloudwatch_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-concourse
       community: true
@@ -480,7 +652,7 @@ modules:
         icon_filename: concourse.png
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -494,7 +666,7 @@ modules:
         list:
           - title: Configure built-in Prometheus exporter
             description: |
-              To configure the built-in Prometheus exporter, follow the [official documentation](https://concourse-ci.org/metrics.html#configuring-metrics).
+              To configure the built-in Prometheus exporter, follow the [official documentation](https://concourse-ci.org/docs/operation/metrics/#configuring-metrics).
   - <<: *module
     meta:
       <<: *meta
@@ -506,7 +678,7 @@ modules:
         icon_filename: scylladb.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -525,7 +697,7 @@ modules:
         icon_filename: crowdsec.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -551,7 +723,7 @@ modules:
         icon_filename: discourse.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -577,7 +749,7 @@ modules:
         icon_filename: dynatrace.svg
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -603,7 +775,7 @@ modules:
         icon_filename: eos.png
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -629,7 +801,7 @@ modules:
         icon_filename: etcd.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -648,7 +820,7 @@ modules:
         icon_filename: freebsd.svg
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -674,7 +846,7 @@ modules:
         icon_filename: freebsd.svg
         categories:
           - data-collection.operating-systems
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -700,7 +872,7 @@ modules:
         icon_filename: gcp-gce.svg
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -726,7 +898,7 @@ modules:
         icon_filename: github.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -752,7 +924,7 @@ modules:
         icon_filename: gitlab.png
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -778,7 +950,7 @@ modules:
         icon_filename: gobetween.svg
         categories:
           - data-collection.web-servers-and-proxies
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -855,7 +1027,7 @@ modules:
         icon_filename: grafana.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -874,7 +1046,7 @@ modules:
         icon_filename: graylog.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -901,7 +1073,7 @@ modules:
         icon_filename: sap.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -927,7 +1099,7 @@ modules:
         icon_filename: intrinsec.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -953,7 +1125,7 @@ modules:
         icon_filename: hubble.png
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -979,7 +1151,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1034,7 +1206,7 @@ modules:
         icon_filename: jenkins.svg
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1060,7 +1232,7 @@ modules:
         icon_filename: java.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1173,7 +1345,7 @@ modules:
         icon_filename: linode.svg
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1195,11 +1367,12 @@ modules:
       community: true
       monitored_instance:
         name: loki
+        description: "Collect Loki metrics from its Prometheus endpoint and group the returned series into Netdata charts."
         link: https://github.com/grafana/loki
         icon_filename: loki.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1225,7 +1398,7 @@ modules:
         icon_filename: minecraft.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1251,7 +1424,7 @@ modules:
         icon_filename: mosquitto.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1277,7 +1450,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1303,7 +1476,7 @@ modules:
         icon_filename: mqtt.svg
         categories:
           - data-collection.synthetic-testing
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1387,7 +1560,7 @@ modules:
         icon_filename: ovs.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1442,7 +1615,7 @@ modules:
         icon_filename: hue.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1468,7 +1641,7 @@ modules:
         icon_filename: podman.png
         categories:
           - data-collection.containers-and-vms
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1494,7 +1667,7 @@ modules:
         icon_filename: proxmox.png
         categories:
           - data-collection.containers-and-vms
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1520,7 +1693,7 @@ modules:
         icon_filename: radius.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1575,7 +1748,7 @@ modules:
         icon_filename: ripe.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1601,7 +1774,7 @@ modules:
         icon_filename: slurm.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1627,7 +1800,7 @@ modules:
         icon_filename: spacelift.png
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1653,7 +1826,7 @@ modules:
         icon_filename: starlink.svg
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1679,7 +1852,7 @@ modules:
         icon_filename: statuspage.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1705,7 +1878,7 @@ modules:
         icon_filename: tacacs.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1731,7 +1904,7 @@ modules:
         icon_filename: tesla.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1757,7 +1930,7 @@ modules:
         icon_filename: twitch.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1783,7 +1956,7 @@ modules:
         icon_filename: ubiquiti.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1809,7 +1982,7 @@ modules:
         icon_filename: uptimerobot.svg
         categories:
           - data-collection.synthetic-testing
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1835,7 +2008,7 @@ modules:
         icon_filename: vault.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1861,7 +2034,7 @@ modules:
         icon_filename: vertica.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1887,7 +2060,7 @@ modules:
         icon_filename: vscode.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1913,7 +2086,7 @@ modules:
         icon_filename: 4d_server.png
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1939,7 +2112,7 @@ modules:
         icon_filename: mtc.svg
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1965,7 +2138,7 @@ modules:
         icon_filename: a2s.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -1991,7 +2164,7 @@ modules:
         icon_filename: alamos_fe2.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2017,7 +2190,7 @@ modules:
         icon_filename: amd.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2043,7 +2216,7 @@ modules:
         icon_filename: apicast.png
         categories:
           - data-collection.web-servers-and-proxies
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2069,7 +2242,7 @@ modules:
         icon_filename: linux.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2091,6 +2264,7 @@ modules:
       community: true
       monitored_instance:
         name: AWS Quota
+        description: Monitor AWS Service Quotas and usage exposed by the AWS Quota Exporter.
         link: https://github.com/emylincon/aws_quota_exporter
         icon_filename: aws.svg
         categories:
@@ -2103,9 +2277,16 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor AWS service quotas for effective resource usage and cost management.
+          Monitor AWS Service Quotas exposed by aws_quota_exporter.
+
+          This integration complements the
+          [Amazon CloudWatch](/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) collector,
+          which queries runtime metrics from CloudWatch. The integrations use different AWS data sources and do
+          not replace one another.
         method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [aws_quota_exporter](https://github.com/emylincon/aws_quota_exporter).
+          Netdata periodically scrapes Prometheus metrics from
+          [aws_quota_exporter](https://github.com/emylincon/aws_quota_exporter), which obtains quota information
+          from AWS Service Quotas rather than CloudWatch.
     setup:
       <<: *setup
       prerequisites:
@@ -2124,7 +2305,7 @@ modules:
         icon_filename: bosh.png
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2150,7 +2331,7 @@ modules:
         icon_filename: bungee.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2176,7 +2357,7 @@ modules:
         icon_filename: celery.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2202,7 +2383,7 @@ modules:
         icon_filename: chia.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2228,7 +2409,7 @@ modules:
         icon_filename: christelec.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2254,7 +2435,7 @@ modules:
         icon_filename: clamav.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2280,7 +2461,7 @@ modules:
         icon_filename: clamav.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2306,7 +2487,7 @@ modules:
         icon_filename: clash.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2390,7 +2571,7 @@ modules:
         icon_filename: lustre.png
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2416,7 +2597,7 @@ modules:
         icon_filename: cluster-control.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2442,7 +2623,7 @@ modules:
         icon_filename: collectd.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2468,7 +2649,7 @@ modules:
         icon_filename: craftbeer.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2494,7 +2675,7 @@ modules:
         icon_filename: cryptowatch.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2549,7 +2730,7 @@ modules:
         icon_filename: dnsbl.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2577,7 +2758,7 @@ modules:
         icon_filename: bird.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2603,7 +2784,7 @@ modules:
         icon_filename: elgato.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2621,32 +2802,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-energomera
-      community: true
-      monitored_instance:
-        name: Energomera smart power meters
-        link: https://github.com/peak-load/energomera_exporter
-        icon_filename: energomera.png
-        categories:
-          - data-collection.hardware-and-sensors
-      keywords: [ ]
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Track Energomera electricity meter metrics for efficient energy management and monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [Energomera electricity meter exporter](https://github.com/peak-load/energomera_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [energomera-exporter Energomera electricity meter exporter](https://github.com/peak-load/energomera_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-fastd
       community: true
       monitored_instance:
@@ -2655,7 +2810,7 @@ modules:
         icon_filename: fastd.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2681,7 +2836,7 @@ modules:
         icon_filename: freifunk.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2707,7 +2862,7 @@ modules:
         icon_filename: frrouting.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2733,7 +2888,7 @@ modules:
         icon_filename: github.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2760,7 +2915,7 @@ modules:
         icon_filename: gpsd.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2786,7 +2941,7 @@ modules:
         icon_filename: halon.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2812,7 +2967,7 @@ modules:
         icon_filename: hitron.svg
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2838,7 +2993,7 @@ modules:
         icon_filename: homebridge.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2864,7 +3019,7 @@ modules:
         icon_filename: homey.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2890,7 +3045,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2916,7 +3071,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2942,7 +3097,7 @@ modules:
         icon_filename: jarvis.jpg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2969,7 +3124,7 @@ modules:
         icon_filename: storage-enclosure.svg
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -2995,7 +3150,7 @@ modules:
         icon_filename: linux.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3021,7 +3176,7 @@ modules:
         icon_filename: kannel.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3047,7 +3202,7 @@ modules:
         icon_filename: Keepalived.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3073,7 +3228,7 @@ modules:
         icon_filename: lynis.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3099,7 +3254,7 @@ modules:
         icon_filename: meilisearch.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3125,7 +3280,7 @@ modules:
         icon_filename: mesos.svg
         categories:
           - data-collection.containers-and-vms
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3151,7 +3306,7 @@ modules:
         icon_filename: xiaomi.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3206,7 +3361,7 @@ modules:
         icon_filename: filesystem.svg
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3232,7 +3387,7 @@ modules:
         icon_filename: mtail.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3258,7 +3413,7 @@ modules:
         icon_filename: nature-remo.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3342,7 +3497,7 @@ modules:
         icon_filename: nextdns.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3368,7 +3523,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3394,7 +3549,7 @@ modules:
         icon_filename: nrpelinux.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3420,7 +3575,7 @@ modules:
         icon_filename: obs-studio.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3446,7 +3601,7 @@ modules:
         icon_filename: linux.png
         categories:
           - data-collection.operating-systems
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3501,7 +3656,7 @@ modules:
         icon_filename: openweather.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3527,7 +3682,7 @@ modules:
         icon_filename: dutch-electricity.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3554,7 +3709,7 @@ modules:
         icon_filename: patroni.png
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3580,7 +3735,7 @@ modules:
         icon_filename: wunderground.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3606,7 +3761,7 @@ modules:
         icon_filename: pgbackrest.png
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3632,7 +3787,7 @@ modules:
         icon_filename: pgpool2.png
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3658,7 +3813,7 @@ modules:
         icon_filename: pimorino.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3684,7 +3839,7 @@ modules:
         icon_filename: powerpal.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3710,7 +3865,7 @@ modules:
         icon_filename: proftpd.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3736,7 +3891,7 @@ modules:
         icon_filename: rq.png
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3762,7 +3917,7 @@ modules:
         icon_filename: radiots.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3788,7 +3943,7 @@ modules:
         icon_filename: raritan.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3814,7 +3969,7 @@ modules:
         icon_filename: sabnzbd.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3840,7 +3995,7 @@ modules:
         icon_filename: salicru.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3866,7 +4021,7 @@ modules:
         icon_filename: sense.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3892,7 +4047,7 @@ modules:
         icon_filename: shelly.jpg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3918,7 +4073,7 @@ modules:
         icon_filename: siemens.svg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3944,7 +4099,7 @@ modules:
         icon_filename: site24x7.svg
         categories:
           - data-collection.synthetic-testing
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3970,7 +4125,7 @@ modules:
         icon_filename: sma.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -3996,7 +4151,7 @@ modules:
         icon_filename: sml.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4022,7 +4177,7 @@ modules:
         icon_filename: softether.svg
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4048,7 +4203,7 @@ modules:
         icon_filename: solar.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4074,7 +4229,7 @@ modules:
         icon_filename: solis.jpg
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4100,7 +4255,7 @@ modules:
         icon_filename: sonic.png
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4126,7 +4281,7 @@ modules:
         icon_filename: ibm.svg
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4152,7 +4307,7 @@ modules:
         icon_filename: sphinx.png
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4178,7 +4333,7 @@ modules:
         icon_filename: storidge.png
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4204,7 +4359,7 @@ modules:
         icon_filename: strongswan.svg
         categories:
           - data-collection.networking
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4230,7 +4385,7 @@ modules:
         icon_filename: sunspec.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4256,7 +4411,7 @@ modules:
         icon_filename: suricata.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4284,7 +4439,7 @@ modules:
         icon_filename: synology.png
         categories:
           - data-collection.storage
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4310,7 +4465,7 @@ modules:
         icon_filename: sysload.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4336,7 +4491,7 @@ modules:
         icon_filename: tado.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4363,7 +4518,7 @@ modules:
         icon_filename: tanker.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4389,7 +4544,7 @@ modules:
         icon_filename: tesla.png
         categories:
           - data-collection.hardware-and-sensors
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4407,6 +4562,653 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-go.d.plugin-prometheus-ceph
+      monitored_instance:
+        name: Ceph Prometheus
+        link: https://docs.ceph.com/en/latest/mgr/prometheus/
+        icon_filename: ceph.svg
+        categories:
+          - data-collection.storage
+      keywords:
+        - ceph
+        - storage
+        - prometheus
+        - ceph-exporter
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor Ceph through its official Prometheus surfaces without narrowing the exporter to the native Ceph collector's
+          different Dashboard REST API.
+
+          The built-in profile separates cluster-wide MGR health, quorum, capacity, placement groups, pools, and OSD metadata
+          from host-local `ceph-exporter` daemon availability and MON, MGR, OSD, and RGW performance. You can monitor
+          CephFS/MDS and CephFS Mirror, RBD images, RBD Mirror, SMB, NVMe-oF, RGW user/bucket/topic/cache/multisite and dmClock
+          scheduling, RocksDB binned caches, external block devices, and Ceph client I/O across Reef 18.2.8, Squid 19.2.5,
+          and Tentacle 20.2.3. On Tentacle, the endpoints also expose primary-OSD PG-rebuild duration, while the MGR additionally
+          exposes cephadm node-proxy CPU, memory, storage, cooling, temperature, and per-component health metrics. Firmware
+          inventory remains available as metadata. PG state flags and RGW global/user/bucket views provide diagnostic detail
+          rather than additive totals. The profile gives dynamic MDS-client, librbd ImageCtx/PWL, ObjectCacher, objecter,
+          RocksDB cache, Finisher, Throttle, KernelDevice, mClock, messenger, RDMA, DPDK, and service-identity families stable
+          chart identities while preserving their source keys.
+
+          Charts follow each producer's lifecycle. Current populations that Ceph increments and decrements remain absolute,
+          while cumulative work published through gauges is rendered incrementally so Netdata performs rate calculation and
+          reset detection. Shared charts compare only the same counted or measured population, keeping requests, objects,
+          bytes, reservations, and state transitions separate even when their numeric scales are similar.
+
+          The profile also covers priority-0 daemon counters exposed when `ceph-exporter` is configured with
+          `exporter_prio_limit=0`, conditional exporter process CPU, memory, thread, and page-fault metrics, and the official
+          NVMe-oF gateway's Python process runtime surface. On Tentacle, the optional MGR node-proxy hardware surface is
+          charted per reported component and temperature sensor with its hostname, category, component, or sensor identity.
+          These families are absent on Reef and Squid; their absence creates no chart or alert there.
+
+          Configure one logical MGR job per Ceph cluster for cluster-health alerts and one native Ceph Dashboard job for
+          API component integrity. The generic Prometheus collection alert reports a configured MGR job that cannot scrape;
+          the native collector reports Dashboard API component failures. Monitor and OSD cluster-summary charts represent
+          one cluster job or virtual node. Use one stable endpoint or failover target that follows the active MGR, and keep
+          one stable job or virtual-node identity per cluster.
+
+          Cluster-summary alerts evaluate the latest stored dimensions on each Netdata health beat. A failed scrape does not
+          obsolete the chart or fabricate new values, so the data-state alert may continue evaluating the last stored state;
+          the generic collection alert owns that scrape failure. When the collector knows the chart has disappeared and
+          obsoletes it, its instance alerts are removed.
+
+          Netdata's per-filesystem and per-interface host alerts monitor root-filesystem usage and packet drops on each Ceph
+          node. These host-wide policies use Netdata's thresholds, windows, directionality, hysteresis, and routing.
+        method_description: |
+          Netdata periodically scrapes the Ceph MGR Prometheus module or official `ceph-exporter` endpoint and applies the
+          built-in `ceph` profile. The MGR module refreshes its enabled metric cache every 15 seconds by default, and standalone
+          `ceph-exporter` refreshes daemon metrics every 5 seconds by default. Scrapes read those producer caches; choosing a
+          5-, 10-, 15-, or 60-second Netdata interval does not schedule Ceph producer refresh. Match the interval to the
+          configured producer cache period to avoid redundant samples, unless the MGR cache is deliberately disabled.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable an official Ceph Prometheus endpoint
+            description: |
+              Enable the [Ceph MGR Prometheus module](https://docs.ceph.com/en/latest/mgr/prometheus/) for cluster metrics,
+              deploy the official `ceph-exporter` for host-local daemon performance metrics, or enable the Ceph NVMe-oF
+              gateway exporter on each gateway endpoint. The stock profile supports the
+              default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
+              counters are required and size the job limits for the resulting series count. When cephadm node-proxy hardware
+              reporting is enabled, hardware series scale with the cluster-wide component inventory; size both
+              `max_time_series` and `max_time_series_per_metric` for that surface.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Ceph MGR and ceph-exporter
+              folding:
+                enabled: false
+              description: |
+                Collect one logical MGR endpoint per Ceph cluster and each local official ceph-exporter endpoint with the
+                automatically matched Ceph and process-runtime profiles. Configure one MGR job per cluster and do not scrape
+                multiple active MGR endpoints into the same job. Repeat the exporter job for every exporter endpoint, using
+                each host's own scope. The Ceph profile preserves source labels that collide with Netdata's Prometheus
+                re-export labels under a `ceph_` prefix, retains opaque dynamic group keys, and normalizes only source families
+                whose suffix grammar is unambiguous.
+              config: |
+                jobs:
+                  - name: ceph-mgr
+                    url: http://127.0.0.1:9283/metrics
+                    update_every: 15
+                    expected_prefix: ceph_
+                    max_time_series: 20000
+                    max_time_series_per_metric: 4000
+                  - name: ceph-exporter
+                    url: http://127.0.0.1:9926/metrics
+                    update_every: 5
+                    expected_prefix: ceph_
+                    max_time_series: 20000
+                    max_time_series_per_metric: 4000
+            - name: Ceph NVMe-oF gateway exporter
+              description: |
+                Collect one local gateway endpoint per Ceph NVMe-oF gateway whose local state is required. The gateway
+                exporter is independent of the MGR endpoint and normally listens on port 10008. Preserve one stable job
+                identity for each gateway and size the local series limits independently.
+              config: |
+                jobs:
+                  - name: ceph-nvmeof-gateway-a
+                    url: http://127.0.0.1:10008/metrics
+                    update_every: 5
+                    expected_prefix: ceph_
+                    max_time_series: 10000
+                    max_time_series_per_metric: 2000
+            - name: Ceph MGR with virtual node
+              description: |
+                Use a virtual node when the cluster identity should remain independent of the Agent currently scraping its
+                active MGR. First define the vnode in `/etc/netdata/vnodes/vnodes.conf`:
+
+                ```yaml
+                - hostname: ceph-cluster
+                  guid: <your-uuid-here>
+                ```
+
+                Then reference that exact hostname in the MGR job. An undefined vnode makes the job fail to start. Keep one
+                logical MGR job and one stable vnode identity per Ceph cluster.
+              config: |
+                jobs:
+                  - name: ceph-mgr-vnode
+                    vnode: ceph-cluster
+                    url: http://127.0.0.1:9283/metrics
+                    update_every: 15
+                    expected_prefix: ceph_
+                    max_time_series: 20000
+                    max_time_series_per_metric: 4000
+    alerts:
+      - name: ceph_nvmeof_subsystem_open_security
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.subsystems.state_metadata
+        info: 'Every available sample in the 5-minute observation window reports an NVMe-oF subsystem configured without host security.'
+      - name: ceph_nvmeof_gateway_cpu
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.gateways.time_accumulation
+        info: 'The current lowest local reactor busy-rate sample in the 10-minute observation window is above 80 percent.'
+      - name: ceph_nvmeof_high_read_latency
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
+        info: 'The current local one-minute read service-time ratio exceeds 10 milliseconds per completed read.'
+      - name: ceph_nvmeof_high_write_latency
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.block_devices.time_accumulation
+        info: 'The current local one-minute write service-time ratio exceeds 20 milliseconds per completed write.'
+      - name: ceph_nvmeof_host_keepalive_timeout
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.hosts.keepalive_timeout_state
+        info: 'The gateway exporter currently reports host ${label:host_nqn} disconnected from subsystem ${label:nqn}. Inspect the initiator link and reconnect behavior. Exporter refresh reads and clears this one-shot state.'
+      - name: ceph_nvmeof_subsystem_namespace_limit
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.subsystems.namespace_capacity
+        info: 'The current subsystem namespace count is at or above its configured limit.'
+      - name: ceph_nvmeof_too_many_namespaces
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.nvme_of.gateways.namespace_count
+        info: 'The current local exporter namespace inventory is at or above the supported maximum of 4096.'
+      - name: rgw_notification_event_lost
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.events
+        info: 'One or more final notification-event losses occurred in the 1-minute observation window. Inspect the affected RGW instance and notification endpoint.'
+      - name: rgw_notification_missing_configuration
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.missing_configurations
+        info: 'One or more notifications were rejected for missing configuration in the 1-minute observation window. Inspect the affected RGW instance and notification configuration.'
+      - name: rgw_lua_script_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.lua.script_executions
+        info: 'One or more configured Lua request scripts failed in the 1-minute observation window. Inspect the affected RGW instance and script error logs.'
+      - name: rgw_failed_request_rate_fallback
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.requests_and_queue.failed_requests
+        info: 'Every available sample in the 5-minute observation window reports a non-zero aborted-request rate. This is a fallback signal and does not identify HTTP 5xx responses.'
+      - name: rgw_notification_push_or_store_failures
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.failure_outcomes
+        info: 'Every available sample in the 5-minute observation window reports non-zero retryable notification push or store failures.'
+      - name: rgw_notification_inflight_pressure
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.pending_events
+        info: 'Every available sample in the 5-minute observation window reports at least 1000 notification events pending endpoint reply. Tune this policy threshold for the endpoint.'
+      - name: rgw_notification_store_backlog
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.notifications.event_state
+        info: 'Every available sample in the 5-minute observation window reports at least 1000 events stored in the persistent notification store. Tune this policy threshold for the workload.'
+      - name: rgw_request_queue_pressure
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway.requests_and_queue.current_requests
+        info: 'Every available sample in the 5-minute observation window reports at least 1000 queued requests. Tune this policy threshold for the RGW instance.'
+      - name: rgw_multisite_fetch_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway_multisite.object_work
+        info: 'Every available sample in the 5-minute observation window reports a non-zero multisite data-fetch error rate.'
+      - name: rgw_multisite_poll_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.object_gateway_multisite.replication_log_request_errors
+        info: 'Every available sample in the 5-minute observation window reports a non-zero replication-log poll error rate.'
+      - name: ceph_health_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.cluster_status.state
+        info: 'Every available Ceph MGR health sample in the 5-minute observation window is HEALTH_ERR. Review active cause-specific Ceph alerts and use `ceph health detail` for the current cause.'
+      - name: ceph_health_warning
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.cluster_status.state
+        info: 'Every available Ceph MGR health sample in the 15-minute observation window is HEALTH_WARN. Use `ceph health detail` for the current cause.'
+      - name: ceph_daemon_crash
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a recent daemon crash. Use `ceph health detail` for the affected daemon and crash details.'
+      - name: ceph_mgr_module_crash
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports a recent manager-module crash. Use `ceph health detail` for the affected module and crash details.'
+      - name: ceph_daemon_slow_ops
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.daemon_health.item_count
+        info: 'Every available sample in the 30-second observation window reports one or more slow operations for this daemon.'
+      - name: ceph_slow_ops
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.slow_operations.current_operations
+        info: 'Every available sample in the 30-second observation window reports one or more cluster slow operations. Use `ceph health detail` to identify the cause.'
+      - name: cephadm_daemon_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a failed cephadm daemon. Use `ceph health detail` for the affected daemon and failure details.'
+      - name: cephadm_paused
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports that cephadm is paused. Resume cephadm or use `ceph health detail` to determine why it was paused.'
+      - name: cephadm_upgrade_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a cephadm upgrade exception. Use `ceph health detail` for the failed upgrade step.'
+      - name: ceph_device_failure_predicted
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a device predicted to fail. Use `ceph health detail` and `ceph device ls` to identify it.'
+      - name: ceph_device_failure_prediction_too_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports that removing all predicted failures would compromise availability. Add capacity before relocating data.'
+      - name: ceph_device_failure_relocation_incomplete
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports blocked relocation from a predicted device failure. Check free capacity and the balancer.'
+      - name: ceph_cooling_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log.'
+      - name: ceph_cooling_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect fan health, airflow, and the system event log.'
+      - name: ceph_dimm_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized DIMM temperature sensor above 80°C.'
+      - name: ceph_hardware_fan_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph fan hardware error.'
+      - name: ceph_hardware_memory_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph memory hardware error.'
+      - name: ceph_hardware_network_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph network hardware error.'
+      - name: ceph_hardware_power_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph power hardware error.'
+      - name: ceph_hardware_processor_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph processor hardware error.'
+      - name: ceph_hardware_storage_error
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports a Ceph storage hardware error.'
+      - name: ceph_memory_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors.'
+      - name: ceph_memory_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect DIMM health and memory errors.'
+      - name: ceph_motherboard_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized motherboard temperature sensor above 60°C.'
+      - name: ceph_nvme_drive_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs.'
+      - name: ceph_nvme_drive_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect drive health and kernel logs.'
+      - name: ceph_nvme_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized NVMe temperature sensor above 70°C.'
+      - name: ceph_network_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors.'
+      - name: ceph_network_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the interface, link state, and network errors.'
+      - name: ceph_power_supply_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log.'
+      - name: ceph_power_supply_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect the host power supply and system event log.'
+      - name: ceph_processor_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports warning health for ${label:component} on ${label:hostname}. Inspect processor health and thermals.'
+      - name: ceph_processor_failed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.health.state
+        info: 'Every available sample in the 1-minute observation window reports error health for ${label:component} on ${label:hostname}. Inspect processor health and thermals.'
+      - name: ceph_processor_temperature_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.node_hardware.temperature.temperature
+        info: 'Every available sample in the 1-minute observation window reports a recognized processor temperature sensor above 80°C.'
+      - name: ceph_filesystem_damaged
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports filesystem metadata damage.'
+      - name: ceph_filesystem_degraded
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a degraded Ceph filesystem.'
+      - name: ceph_filesystem_failure_no_standby
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a failed MDS rank with no standby.'
+      - name: ceph_filesystem_insufficient_standby
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports insufficient CephFS standby daemons.'
+      - name: ceph_filesystem_mds_ranks_low
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports fewer active MDS ranks than configured.'
+      - name: ceph_filesystem_offline
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports all MDS ranks unavailable.'
+      - name: ceph_filesystem_read_only
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a Ceph filesystem forced read-only.'
+      - name: ceph_rbd_mirror_images_not_in_sync
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.rbd_mirror.snapshot_replication.timestamp
+        info: 'The current local and remote snapshot timestamps differ for this mirrored image.'
+      - name: ceph_object_missing
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'The current unfound condition is active while every configured OSD is up; client I/O for affected objects can block.'
+      - name: ceph_pg_backfill_at_risk
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports placement-group backfill blocked by fullness.'
+      - name: ceph_pg_not_deep_scrubbed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports placement groups overdue for deep scrub.'
+      - name: ceph_pg_not_scrubbed
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports placement groups overdue for scrub.'
+      - name: ceph_pg_recovery_at_risk
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports recovery blocked by OSD fullness.'
+      - name: ceph_pg_unavailable_blocking_io
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'The current PG-unavailable condition is active while the separate OSD-down condition is not.'
+      - name: ceph_pgs_damaged
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports damaged placement-group data.'
+      - name: ceph_pgs_high_per_osd
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports excessive placement groups per OSD.'
+      - name: ceph_pgs_inactive
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state
+        info: 'The current per-pool count reports fewer active placement groups than the pool total.'
+      - name: ceph_pgs_unclean
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.placement_groups_and_recovery.healthy_state.pg_state
+        info: 'The current per-pool count reports fewer clean placement groups than the pool total.'
+      - name: ceph_pool_backfill_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 10-second observation window reports a pool at its backfill-full threshold.'
+      - name: ceph_pool_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a full pool.'
+      - name: ceph_pool_near_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports a near-full pool.'
+      - name: ceph_mon_clock_skew
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports monitor clock skew. Use `ceph time-sync-status` and inspect the monitors'' time synchronization services.'
+      - name: ceph_mon_diskspace_critical
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports critically low monitor-store space. Use `ceph health detail` to identify the affected monitor.'
+      - name: ceph_mon_diskspace_low
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports low monitor-store space. Use `ceph health detail` to identify the affected monitor.'
+      - name: ceph_mon_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.control_plane.monitor.cluster_summary
+        info: 'The current MGR cluster summary reports fewer monitors in quorum than configured, while a majority still remains.'
+      - name: ceph_mon_quorum_at_risk
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.control_plane.monitor.cluster_summary
+        info: 'The current MGR cluster summary reports exactly the minimum surviving monitor majority; one more monitor loss would remove quorum.'
+      - name: ceph_osd_backfill_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports that an OSD has reached its backfill-full threshold and rebalance cannot complete.'
+      - name: ceph_osd_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports a down OSD. Use `ceph health detail` to identify affected OSDs and hosts.'
+      - name: ceph_osd_down_high
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.osd_capacity_and_state.osd_state.cluster_summary
+        info: 'The current MGR cluster summary reports that at least 10% of configured OSDs are down.'
+      - name: ceph_osd_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports an OSD at its full threshold. Use `ceph health detail` and `ceph osd df` to identify it.'
+      - name: ceph_osd_host_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports an offline OSD host. Use `ceph health detail` to identify the host and its OSDs.'
+      - name: ceph_osd_internal_disk_size_mismatch
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports a BlueStore device-size mismatch that can cause the affected OSD to crash.'
+      - name: ceph_osd_near_full
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 5-minute observation window reports an OSD at its near-full threshold. Use `ceph health detail` and `ceph osd df` to identify it.'
+      - name: ceph_osd_read_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports BlueStore read errors that succeeded only after retries. Inspect the affected hardware and kernel.'
+      - name: ceph_osd_timeouts_cluster_network
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports slow backend OSD heartbeats. Inspect the cluster network for latency or loss.'
+      - name: ceph_osd_timeouts_public_network
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports slow frontend OSD heartbeats. Inspect the public network for latency or loss.'
+      - name: ceph_osd_too_many_repairs
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 30-second observation window reports excessive repaired reads, which may indicate a failing drive.'
+      - name: ceph_unknown_health_check
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
+        metric: prometheus.ceph.health.health_checks.state
+        info: 'Every available sample in the 1-minute observation window reports the unclassified health check ${label:name}. Use `ceph health detail` for its recorded explanation.'
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-litellm
+      monitored_instance:
+        name: LiteLLM
+        link: https://docs.litellm.ai/docs/proxy/prometheus
+        icon_filename: prometheus.svg
+        categories:
+          - data-collection.applications
+      keywords:
+        - litellm
+        - llm
+        - gateway
+        - inference
+        - prometheus
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor LiteLLM gateway workload, routing, provider performance, usage, cost, governance, and internal dependencies.
+
+          The built-in profile follows requests through proxy admission, in-flight work and queueing, guardrails and LiteLLM
+          overhead, routing and fallback, deployment selection, and the provider API response. Side branches organize response
+          and provider caches, tokens and media, spend and budgets, rate limits, MCP tools, managed batches and files, callback
+          failures, Redis/PostgreSQL operations, spend-update queues, and the single-process Python/process runtime. Optional
+          charts appear when their callbacks, features, or runtime mode export metrics.
+
+          Each context represents one monitored entity type. Labels identifying that entity form chart instances; bounded
+          aspects such as status, stream mode, service tier, and validated rate-limit classification become dimensions;
+          ownership and descriptive details remain filterable chart metadata. When LiteLLM configuration omits a supported
+          optional dimension label, the same context and instance remain available with an `unclassified` dimension.
+
+          Additive counters and histogram components always produce complete service or capability views. Selected additional
+          views break them down by deployment, provider/model, route, accounting entity, guardrail/hook, MCP server/tool,
+          managed batch, or callback when LiteLLM exports the required identity labels. Point-in-time gauges retain their
+          complete exported identity, including multiprocess `pid`, so distinct states, limits, budgets, queues, and last-seen
+          values are not summed together. Deployment-configured custom metadata and `tag_*` labels remain part of complete
+          gauge identity when LiteLLM emits them. Additive service views intentionally roll those deployment-controlled
+          labels up unless a dedicated entity breakdown is defined.
+        method_description: |
+          Netdata periodically scrapes the authenticated LiteLLM Prometheus `/metrics` endpoint and applies the built-in
+          `litellm` profile.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable LiteLLM Prometheus metrics
+            description: |
+              Enable the LiteLLM
+              [Prometheus callback](https://docs.litellm.ai/docs/proxy/prometheus) and configure the Netdata job with access to
+              its `/metrics` endpoint. LiteLLM's `prometheus_metrics_config` controls which metrics and labels the endpoint
+              exports. Service views remain complete when optional dimension labels are omitted, and optional entity views
+              appear only when their identity labels are available. Gauge identity follows every non-redundant label required
+              to distinguish the emitted state, including configured custom metadata, custom tags, and the opt-in user
+              email/alias budget labels. Arbitrary configured label names are not turned into dimensions because they are
+              deployment-defined, unbounded classifications rather than one stable bounded aspect. Size `max_time_series` and
+              `max_time_series_per_metric` for the exported surface.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: LiteLLM
+              folding:
+                enabled: false
+              description: |
+                Collect the complete LiteLLM surface with automatically matched application, process-runtime, and Python-GC
+                profiles.
+              config: |
+                jobs:
+                  - name: litellm
+                    url: http://127.0.0.1:4000/metrics
+                    expected_prefix: litellm_
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-vllm
+      monitored_instance:
+        name: vLLM
+        link: https://docs.vllm.ai/en/stable/design/metrics/
+        icon_filename: prometheus.svg
+        categories:
+          - data-collection.applications
+      keywords:
+        - vllm
+        - llm
+        - inference
+        - prometheus
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor vLLM inference-serving workload, latency, scheduling, token throughput, cache behavior, connector activity,
+          and runtime health.
+
+          The built-in profiles follow requests through scheduling, prefill, decode, engine execution, and HTTP service
+          boundaries. They separate model-engine, endpoint, parser, service-runtime, and Ray replica-worker identities, and
+          organize KV cache residency and offloading, connector operations, speculative or diffusion decoding, and WebSocket
+          activity under their causal owners. Optional charts appear when the corresponding vLLM features export metrics.
+        method_description: |
+          Netdata periodically scrapes either the vLLM server Prometheus `/metrics` endpoint or the Ray node metrics endpoint.
+          Auto-selection applies one built-in `vllm` profile to native `vllm:*` and Ray `ray_vllm_*` metrics. The profile
+          normalizes Ray metric names into the native vLLM namespace, preserves replica and worker identity, and suppresses
+          Ray 2.48's deprecated unsuffixed counter aliases so each counter is presented once.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Expose the vLLM metrics endpoint
+            description: |
+              Run a vLLM server with a reachable Prometheus `/metrics` endpoint, or configure a Ray deployment whose node
+              metrics endpoint exposes `ray_vllm_*` families. For Ray, configure or discover each node's metrics export port;
+              Ray commonly uses port 8080 when `--metrics-export-port=8080` is set. Ray 2.48 exports an unsuffixed compatibility
+              gauge beside most canonical `_total` counters unless `RAY_EXPORT_COUNTER_AS_GAUGE=0` is set.
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Native vLLM
+              folding:
+                enabled: false
+              description: |
+                Collect native vLLM server metrics with automatically matched application, FastAPI, process-runtime, and
+                Python-GC profiles.
+              config: |
+                jobs:
+                  - name: vllm
+                    url: http://127.0.0.1:8000/metrics
+                    expected_prefix: 'vllm:'
+            - name: vLLM on Ray
+              description: |
+                Collect vLLM families from a Ray node metrics endpoint. The automatically matched unified profile normalizes
+                them into the native vLLM namespace, removes Ray 2.48's deprecated unsuffixed compatibility gauges, and
+                removes vLLM's pre-canonical KV-offload duplicates. Other Ray system families remain available for generic
+                collection or another matching profile.
+              config: |
+                jobs:
+                  - name: vllm-ray
+                    url: http://127.0.0.1:8080
+                    expected_prefix: ray_vllm_
+
+  - <<: *module
+    meta:
+      <<: *meta
       id: collector-go.d.plugin-prometheus-warp10
       community: true
       monitored_instance:
@@ -4415,7 +5217,7 @@ modules:
         icon_filename: warp10.svg
         categories:
           - data-collection.databases
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4442,7 +5244,7 @@ modules:
         icon_filename: yourls.png
         categories:
           - data-collection.applications
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:
@@ -4468,7 +5270,7 @@ modules:
         icon_filename: zerto.png
         categories:
           - data-collection.cloud-and-devops
-      keywords: [ ]
+      keywords: []
     overview:
       <<: *overview
       data_collection:

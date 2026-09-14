@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -47,4 +48,29 @@ func TestNewWithWriter_WithKeepsWriter(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "captured")
 	assert.True(t, strings.Contains(out, "component=test") || strings.Contains(out, "\"component\":\"test\""))
+}
+
+func TestMessageSanitizerSurvivesWithAndFailsClosed(t *testing.T) {
+	var buf bytes.Buffer
+	log := NewWithWriter(&buf).
+		WithMessageSanitizer(func(string) string { return "sanitized" }).
+		With("component", "test")
+	log.Error("raw marker")
+	require.NotContains(t, buf.String(), "raw marker")
+	require.Contains(t, buf.String(), "sanitized")
+
+	buf.Reset()
+	log.With("endpoint", "raw attribute marker").Error("raw marker")
+	require.NotContains(t, buf.String(), "raw attribute marker")
+	require.NotContains(t, buf.String(), "endpoint")
+	require.Contains(t, buf.String(), "redacted_attribute=sanitized")
+
+	buf.Reset()
+	log = NewWithWriter(&buf).WithMessageSanitizer(func(string) string {
+		panic("raw panic marker")
+	})
+	log.Error("raw message marker")
+	require.NotContains(t, buf.String(), "raw panic marker")
+	require.NotContains(t, buf.String(), "raw message marker")
+	require.Contains(t, buf.String(), "log message redacted")
 }

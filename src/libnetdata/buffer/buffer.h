@@ -158,10 +158,15 @@ static const char *buffer_tostring(BUFFER *wb)
 
 ALWAYS_INLINE
 static void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    assert(wb->json.depth <= BUFFER_JSON_MAX_DEPTH && "BUFFER JSON: max nesting reached");
-#endif
-    wb->json.depth++;
+    int next_depth = wb->json.depth + 1;
+
+    if(next_depth < 0 || next_depth >= BUFFER_JSON_MAX_DEPTH) {
+        fatal("BUFFER JSON: invalid nesting depth %d (next %d, max %d)",
+              wb->json.depth, next_depth, BUFFER_JSON_MAX_DEPTH - 1);
+        return;
+    }
+
+    wb->json.depth = (int8_t)next_depth;
 #ifdef NETDATA_INTERNAL_CHECKS
     assert(wb->json.depth >= 0 && "Depth wrapped around and is negative");
 #endif
@@ -558,14 +563,15 @@ static size_t print_uint64(char *dst, uint64_t value) {
 ALWAYS_INLINE
 static size_t print_int64(char *dst, int64_t value) {
     size_t len = 0;
+    uint64_t magnitude = (uint64_t)value;
 
     if(value < 0) {
         *dst++ = '-';
-        value = -value;
+        magnitude = UINT64_C(0) - magnitude;
         len++;
     }
 
-    return print_uint64(dst, value) + len;
+    return print_uint64(dst, magnitude) + len;
 }
 
 #define UINT64_MAX_LENGTH (24) // 21 should be enough
@@ -643,13 +649,14 @@ static void buffer_print_uint64_base64(BUFFER *wb, uint64_t value) {
 ALWAYS_INLINE
 static void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, 2);
+    uint64_t magnitude = (uint64_t)value;
 
     if(value < 0) {
         buffer_putc(wb, '-');
-        value = -value;
+        magnitude = UINT64_C(0) - magnitude;
     }
 
-    buffer_print_uint64_hex(wb, (uint64_t)value);
+    buffer_print_uint64_hex(wb, magnitude);
 
     buffer_overflow_check(wb);
 }
@@ -657,13 +664,14 @@ static void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
 ALWAYS_INLINE
 static void buffer_print_int64_base64(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, 2);
+    uint64_t magnitude = (uint64_t)value;
 
     if(value < 0) {
         buffer_putc(wb, '-');
-        value = -value;
+        magnitude = UINT64_C(0) - magnitude;
     }
 
-    buffer_print_uint64_base64(wb, (uint64_t)value);
+    buffer_print_uint64_base64(wb, magnitude);
 
     buffer_overflow_check(wb);
 }
@@ -688,16 +696,25 @@ static void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_overflow_check(wb);
 }
 
+ALWAYS_INLINE
+static void buffer_print_netdata_double_fixed(BUFFER *wb, NETDATA_DOUBLE value) {
+    if(unlikely(!netdata_double_isnumber(value)))
+        buffer_fast_strcat(wb, "null", 4);
+    else
+        buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, value);
+}
+
 #define DOUBLE_HEX_MAX_LENGTH ((sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
 ALWAYS_INLINE
 static void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, DOUBLE_HEX_MAX_LENGTH);
 
-    uint64_t *ptr = (uint64_t *) (&value);
+    uint64_t representation;
+    memcpy(&representation, &value, sizeof(representation));
     buffer_fast_strcat(wb, IEEE754_DOUBLE_HEX_PREFIX, sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1);
 
     char *s = &wb->buffer[wb->len];
-    char *d = print_uint64_hex_reversed(s, *ptr);
+    char *d = print_uint64_hex_reversed(s, representation);
     char_array_reverse(s, d - 1);
     *d = '\0';
     wb->len += d - s;
@@ -710,11 +727,12 @@ ALWAYS_INLINE
 static void buffer_print_netdata_double_base64(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, DOUBLE_B64_MAX_LENGTH);
 
-    uint64_t *ptr = (uint64_t *) (&value);
+    uint64_t representation;
+    memcpy(&representation, &value, sizeof(representation));
     buffer_fast_strcat(wb, IEEE754_DOUBLE_B64_PREFIX, sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1);
 
     char *s = &wb->buffer[wb->len];
-    char *d = print_uint64_base64_reversed(s, *ptr);
+    char *d = print_uint64_base64_reversed(s, representation);
     char_array_reverse(s, d - 1);
     *d = '\0';
     wb->len += d - s;

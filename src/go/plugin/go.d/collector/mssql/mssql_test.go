@@ -4,15 +4,31 @@ package mssql
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	require.NotNil(t, dataConfigJSON)
+	require.NotNil(t, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestCollector_Init(t *testing.T) {
 	c := New()
@@ -72,6 +88,7 @@ func TestCollector_Configuration(t *testing.T) {
 
 	// Verify defaults
 	assert.Equal(t, "sqlserver://localhost:1433", c.DSN)
+	assert.False(t, c.CollectDisabledJobs)
 }
 
 func TestCollector_Charts(t *testing.T) {
@@ -103,6 +120,71 @@ func TestParseMajorVersion(t *testing.T) {
 			assert.Equal(t, tt.expected, parseMajorVersion(tt.version))
 		})
 	}
+}
+
+func TestQueryVersionIncludesEngineEdition(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("ProductVersion.*EngineEdition").
+		WillReturnRows(sqlmock.NewRows([]string{"version", "engine_edition"}).AddRow("16.0.4265.3", 3))
+
+	c := New()
+	c.db = db
+
+	version, engineEdition, err := c.queryVersion()
+	require.NoError(t, err)
+	assert.Equal(t, "16.0.4265.3", version)
+	assert.Equal(t, 3, engineEdition)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestEnsureEngineEditionAlsoCachesVersion(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("ProductVersion.*EngineEdition").
+		WillReturnRows(sqlmock.NewRows([]string{"version", "engine_edition"}).AddRow("16.0.4265.3", 3))
+
+	c := New()
+	c.db = db
+
+	edition, err := c.ensureEngineEdition(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 3, edition)
+	assert.Equal(t, 16, c.currentMajorVersion())
+	assert.Equal(t, "16.0.4265.3", c.version)
+
+	// Both properties are cached, so the second call does no database I/O.
+	edition, err = c.ensureEngineEdition(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 3, edition)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestEnsureEngineEditionCachesUnparsableVersion(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("ProductVersion.*EngineEdition").
+		WillReturnRows(sqlmock.NewRows([]string{"version", "engine_edition"}).AddRow("invalid", 3))
+
+	c := New()
+	c.db = db
+
+	edition, err := c.ensureEngineEdition(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 3, edition)
+	assert.Equal(t, 0, c.currentMajorVersion())
+
+	// A successful query is cached even when the version cannot be parsed.
+	edition, err = c.ensureEngineEdition(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 3, edition)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestCleanAGName(t *testing.T) {
@@ -142,6 +224,692 @@ func TestAGDatabaseReplicaQuery(t *testing.T) {
 	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(16))
 }
 
+func TestQueryJobLastExecutionsAvoidsSQLServer2012OnlyFunctions(t *testing.T) {
+	for _, query := range []string{queryJobLastExecutions, queryJobLastExecutionsAll} {
+		query = strings.ToUpper(query)
+		assert.NotContains(t, query, "TRY_CONVERT")
+		assert.NotContains(t, query, "LEAD(")
+	}
+}
+
+func TestSQLAgentExecutionQuerySelection(t *testing.T) {
+	assert.Contains(t, queryJobLastExecutions, "AND j.enabled = 1")
+	assert.NotContains(t, queryJobLastExecutionsAll, "AND j.enabled = 1")
+	assert.Contains(t, queryJobCurrentExecutions, "AND j.enabled = 1")
+	assert.NotContains(t, queryJobCurrentExecutionsAll, "AND j.enabled = 1")
+}
+
+func TestCollectJobLastExecution(t *testing.T) {
+	job := sqlAgentJob{id: "job-id", name: "Job", chartID: "job"}
+
+	tests := map[string]struct {
+		exec           *sqlAgentJobLastExecution
+		wantStatus     string
+		wantDuration   *int64
+		wantAge        *int64
+		notWantMetrics []string
+	}{
+		"no history": {
+			wantStatus: jobLastExecutionStatusUnknown,
+			notWantMetrics: []string{
+				"job_job_last_execution_duration",
+				"job_job_last_execution_age",
+			},
+		},
+		"succeeded": {
+			exec: &sqlAgentJobLastExecution{
+				runStatus:       sqlAgentJobRunStatusSucceeded,
+				durationSeconds: 90,
+				ageSeconds:      sql.NullInt64{Int64: 30, Valid: true},
+			},
+			wantStatus:   jobLastExecutionStatusOK,
+			wantDuration: new(int64(90)),
+			wantAge:      new(int64(30)),
+		},
+		"succeeded with failed step": {
+			exec: &sqlAgentJobLastExecution{
+				runStatus:       sqlAgentJobRunStatusSucceeded,
+				durationSeconds: 120,
+				ageSeconds:      sql.NullInt64{Int64: 60, Valid: true},
+				hasFailedStep:   true,
+			},
+			wantStatus:   jobLastExecutionStatusWarning,
+			wantDuration: new(int64(120)),
+			wantAge:      new(int64(60)),
+		},
+		"failed": {
+			exec: &sqlAgentJobLastExecution{
+				runStatus:       sqlAgentJobRunStatusFailed,
+				durationSeconds: 8,
+				ageSeconds:      sql.NullInt64{Int64: 10, Valid: true},
+			},
+			wantStatus:   jobLastExecutionStatusError,
+			wantDuration: new(int64(8)),
+			wantAge:      new(int64(10)),
+		},
+		"canceled": {
+			exec: &sqlAgentJobLastExecution{
+				runStatus:       sqlAgentJobRunStatusCanceled,
+				durationSeconds: 15,
+				ageSeconds:      sql.NullInt64{Int64: 20, Valid: true},
+			},
+			wantStatus:   jobLastExecutionStatusCanceled,
+			wantDuration: new(int64(15)),
+			wantAge:      new(int64(20)),
+		},
+		"unknown status with invalid age": {
+			exec: &sqlAgentJobLastExecution{
+				runStatus:       9,
+				durationSeconds: 42,
+				ageSeconds:      sql.NullInt64{},
+			},
+			wantStatus:   jobLastExecutionStatusUnknown,
+			wantDuration: new(int64(42)),
+			notWantMetrics: []string{
+				"job_job_last_execution_age",
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mx := make(map[string]int64)
+			collectJobLastExecution(mx, job, tc.exec)
+
+			for _, status := range jobLastExecutionStatusNames {
+				want := int64(0)
+				if status == tc.wantStatus {
+					want = 1
+				}
+				assert.Equalf(t, want, mx["job_job_last_execution_status_"+status], "status %s", status)
+			}
+			if tc.wantDuration != nil {
+				assert.Equal(t, *tc.wantDuration, mx["job_job_last_execution_duration"])
+			}
+			if tc.wantAge != nil {
+				assert.Equal(t, *tc.wantAge, mx["job_job_last_execution_age"])
+			}
+			for _, key := range tc.notWantMetrics {
+				_, ok := mx[key]
+				assert.Falsef(t, ok, "metric %s should not be present", key)
+			}
+		})
+	}
+}
+
+func TestAssignJobChartIDs(t *testing.T) {
+	jobs := []sqlAgentJob{
+		{id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", name: "A-B"},
+		{id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "A.B"},
+		{id: "cccccccc-cccc-cccc-cccc-cccccccccccc", name: "Plain"},
+	}
+
+	assignJobChartIDs(jobs, nil)
+
+	assert.Equal(t, "a_b", jobs[0].chartID)
+	assert.Equal(t, "a_b_aaaaaaaa_aaaa_aaaa_aaaa_aaaaaaaaaaaa", jobs[1].chartID)
+	assert.Equal(t, "plain", jobs[2].chartID)
+}
+
+func TestAssignJobChartIDsPreservesPreviousAssignments(t *testing.T) {
+	jobs := []sqlAgentJob{
+		{id: "11111111-1111-1111-1111-111111111111", name: "A-B"},
+		{id: "22222222-2222-2222-2222-222222222222", name: "A.B"},
+	}
+	previous := map[string]string{
+		"22222222-2222-2222-2222-222222222222": "a_b",
+	}
+
+	assignJobChartIDs(jobs, previous)
+
+	assert.Equal(t, "a_b_11111111_1111_1111_1111_111111111111", jobs[0].chartID)
+	assert.Equal(t, "a_b", jobs[1].chartID)
+}
+
+func TestCollector_CollectJobStatus(t *testing.T) {
+	const (
+		jobID1 = "11111111-1111-1111-1111-111111111111"
+		jobID2 = "22222222-2222-2222-2222-222222222222"
+	)
+
+	tests := map[string]struct {
+		prepareMock        func(mock sqlmock.Sqlmock)
+		configureCollector func(c *Collector)
+		wantMetrics        map[string]int64
+		notWantMetrics     []string
+		checkCollector     func(t *testing.T, c *Collector)
+	}{
+		"disabled job keeps only administrative status by default": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID2, "Disabled Job", int64(0)),
+				)
+			},
+			wantMetrics: map[string]int64{
+				"job_disabled_job_enabled":  0,
+				"job_disabled_job_disabled": 1,
+			},
+			notWantMetrics: []string{
+				"job_disabled_job_last_execution_status_error",
+				"job_disabled_job_last_execution_duration",
+				"job_disabled_job_last_execution_age",
+				"job_disabled_job_current_execution_time",
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				chart := c.Charts().Get("job_disabled_job_status")
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+
+				for _, chartID := range []string{
+					"job_disabled_job_last_execution_status",
+					"job_disabled_job_last_execution_duration",
+					"job_disabled_job_last_execution_age",
+					"job_disabled_job_current_execution_time",
+				} {
+					chart := c.Charts().Get(chartID)
+					assert.Truef(t, chart == nil || chart.IsRemoved(), "execution chart %s should not be active", chartID)
+				}
+			},
+		},
+		"disabled job is collected when enabled": {
+			configureCollector: func(c *Collector) {
+				c.CollectDisabledJobs = true
+			},
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID2, "Disabled Job", int64(0)),
+				)
+				mock.ExpectQuery(queryJobLastExecutionsAll).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "run_status", "duration_seconds", "age_seconds", "has_failed_step"}).
+						AddRow(jobID2, int64(sqlAgentJobRunStatusFailed), int64(30), int64(60), int64(0)),
+				)
+				mock.ExpectQuery(queryJobCurrentExecutionsAll).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "current_execution_time_seconds"}).
+						AddRow(jobID2, int64(15)),
+				)
+			},
+			wantMetrics: map[string]int64{
+				"job_disabled_job_enabled":                     0,
+				"job_disabled_job_disabled":                    1,
+				"job_disabled_job_last_execution_status_error": 1,
+				"job_disabled_job_last_execution_duration":     30,
+				"job_disabled_job_last_execution_age":          60,
+				"job_disabled_job_current_execution_time":      15,
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				chart := c.Charts().Get("job_disabled_job_status")
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+			},
+		},
+		"complete collection": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Clean Job", int64(1)).
+						AddRow(jobID2, "Middle.Job", int64(0)).
+						AddRow("33333333-3333-3333-3333-333333333333", "Never Job", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "run_status", "duration_seconds", "age_seconds", "has_failed_step"}).
+						AddRow(jobID1, int64(sqlAgentJobRunStatusSucceeded), int64(90), int64(30), int64(0)).
+						AddRow(jobID2, int64(sqlAgentJobRunStatusSucceeded), int64(3723), nil, int64(1)),
+				)
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "current_execution_time_seconds"}).
+						AddRow(jobID1, int64(0)).
+						AddRow(jobID2, int64(3600)),
+				)
+			},
+			wantMetrics: map[string]int64{
+				"job_clean_job_enabled":                       1,
+				"job_clean_job_disabled":                      0,
+				"job_clean_job_last_execution_status_ok":      1,
+				"job_clean_job_last_execution_status_warning": 0,
+				"job_clean_job_last_execution_duration":       90,
+				"job_clean_job_last_execution_age":            30,
+				"job_clean_job_current_execution_time":        0,
+				"job_never_job_last_execution_status_unknown": 1,
+				"job_never_job_current_execution_time":        0,
+				"job_middle_job_enabled":                      0,
+				"job_middle_job_disabled":                     1,
+			},
+			notWantMetrics: []string{
+				"job_middle_job_last_execution_status_warning",
+				"job_middle_job_last_execution_duration",
+				"job_middle_job_last_execution_age",
+				"job_middle_job_current_execution_time",
+				"job_never_job_last_execution_duration",
+				"job_never_job_last_execution_age",
+			},
+		},
+		"history query failure keeps base and activity metrics": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Clean Job", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "current_execution_time_seconds"}),
+				)
+			},
+			wantMetrics: map[string]int64{
+				"job_clean_job_enabled":                1,
+				"job_clean_job_disabled":               0,
+				"job_clean_job_current_execution_time": 0,
+			},
+			notWantMetrics: []string{
+				"job_clean_job_last_execution_status_unknown",
+				"job_clean_job_last_execution_duration",
+				"job_clean_job_last_execution_age",
+			},
+		},
+		"activity query failure omits current runtime": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Clean Job", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "run_status", "duration_seconds", "age_seconds", "has_failed_step"}),
+				)
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			wantMetrics: map[string]int64{
+				"job_clean_job_enabled":                       1,
+				"job_clean_job_last_execution_status_unknown": 1,
+			},
+			notWantMetrics: []string{
+				"job_clean_job_current_execution_time",
+			},
+		},
+		"base query failure is non fatal": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			wantMetrics: map[string]int64{},
+		},
+		"disappeared job removes exact charts only": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "abc", int64(1)).
+						AddRow(jobID2, "abc.def", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID2, "abc.def", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				mx := make(map[string]int64)
+				c.collectJobStatus(mx)
+
+				removed := c.Charts().Get("job_abc_status")
+				require.NotNil(t, removed)
+				assert.True(t, removed.IsRemoved())
+
+				survived := c.Charts().Get("job_abc_def_status")
+				require.NotNil(t, survived)
+				assert.False(t, survived.IsRemoved())
+			},
+		},
+		"disappeared job can reappear without duplicate stale charts": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "abc", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(sqlmock.NewRows([]string{"job_id", "name", "enabled"}))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "abc", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(sqlmock.NewRows([]string{"job_id", "name", "enabled"}))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				mx := make(map[string]int64)
+				c.collectJobStatus(mx)
+
+				removed := c.Charts().Get("job_abc_status")
+				require.NotNil(t, removed)
+				assert.True(t, removed.IsRemoved())
+				assert.Equal(t, 1, countCollectorChartsByID(c, "job_abc_status"))
+
+				mx = make(map[string]int64)
+				c.collectJobStatus(mx)
+
+				reappeared := c.Charts().Get("job_abc_status")
+				require.NotNil(t, reappeared)
+				assert.False(t, reappeared.IsRemoved())
+				assert.Equal(t, 1, countCollectorChartsByID(c, "job_abc_status"))
+
+				mx = make(map[string]int64)
+				c.collectJobStatus(mx)
+
+				removedAgain := c.Charts().Get("job_abc_status")
+				require.NotNil(t, removedAgain)
+				assert.True(t, removedAgain.IsRemoved())
+				assert.Equal(t, 1, countCollectorChartsByID(c, "job_abc_status"))
+			},
+		},
+		"enabled job can be disabled and re-enabled": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job", int64(0)),
+				)
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				mx := make(map[string]int64)
+				c.collectJobStatus(mx)
+				chart := c.Charts().Get("job_job_status")
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+				assert.Equal(t, int64(1), mx["job_job_disabled"])
+				assert.Equal(t, "job", c.jobChartIDs[jobID1])
+				assert.Equal(t, "job", c.activeJobs[jobID1])
+
+				execution := c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.True(t, execution.IsRemoved())
+
+				mx = make(map[string]int64)
+				c.collectJobStatus(mx)
+				chart = c.Charts().Get("job_job_status")
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+				assert.Equal(t, int64(1), mx["job_job_enabled"])
+				assert.Equal(t, "job", c.activeJobs[jobID1])
+
+				execution = c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.False(t, execution.IsRemoved())
+			},
+		},
+		"configuration can exclude and restore a disabled job": {
+			configureCollector: func(c *Collector) {
+				c.CollectDisabledJobs = true
+			},
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job", int64(0)),
+				)
+				mock.ExpectQuery(queryJobLastExecutionsAll).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutionsAll).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job", int64(0)),
+				)
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job", int64(0)),
+				)
+				mock.ExpectQuery(queryJobLastExecutionsAll).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutionsAll).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				c.CollectDisabledJobs = false
+				c.collectJobStatus(make(map[string]int64))
+				chart := c.Charts().Get("job_job_status")
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+				assert.Equal(t, "job", c.jobChartIDs[jobID1])
+				execution := c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.True(t, execution.IsRemoved())
+
+				c.CollectDisabledJobs = true
+				c.collectJobStatus(make(map[string]int64))
+				chart = c.Charts().Get("job_job_status")
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+				assert.Equal(t, "job", c.activeJobs[jobID1])
+				assert.Equal(t, 1, countCollectorChartsByID(c, "job_job_status"))
+				execution = c.Charts().Get("job_job_last_execution_status")
+				require.NotNil(t, execution)
+				assert.False(t, execution.IsRemoved())
+				assert.Equal(t, 1, countCollectorChartsByID(c, "job_job_last_execution_status"))
+			},
+		},
+		"inventory failure preserves active job charts": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnError(fmt.Errorf("temporary failure"))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				c.collectJobStatus(make(map[string]int64))
+				chart := c.Charts().Get("job_job_status")
+				require.NotNil(t, chart)
+				assert.False(t, chart.IsRemoved())
+				assert.Equal(t, "job", c.jobChartIDs[jobID1])
+				assert.Equal(t, "job", c.activeJobs[jobID1])
+			},
+		},
+		"disabled collision owner reserves the base chart ID": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "A-B", int64(0)).
+						AddRow(jobID2, "A.B", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				suffix := "a_b_" + cleanJobID(jobID2)
+				assert.Equal(t, "a_b", c.jobChartIDs[jobID1])
+				assert.Equal(t, suffix, c.jobChartIDs[jobID2])
+				assert.Equal(t, "a_b", c.activeJobs[jobID1])
+				assert.Equal(t, suffix, c.activeJobs[jobID2])
+
+				base := c.Charts().Get("job_a_b_status")
+				require.NotNil(t, base)
+				assert.False(t, base.IsRemoved())
+				baseExecution := c.Charts().Get("job_a_b_last_execution_status")
+				assert.True(t, baseExecution == nil || baseExecution.IsRemoved())
+				active := c.Charts().Get("job_" + suffix + "_status")
+				require.NotNil(t, active)
+				assert.False(t, active.IsRemoved())
+			},
+		},
+		"partial inventory applies observed disablement and retains unobserved jobs": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job One", int64(1)).
+						AddRow(jobID2, "Job Two", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "Job One", int64(0)).
+						AddRow(jobID2, nil, int64(1)),
+				)
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				mx := make(map[string]int64)
+				c.collectJobStatus(mx)
+
+				observedDisabled := c.Charts().Get("job_job_one_status")
+				require.NotNil(t, observedDisabled)
+				assert.False(t, observedDisabled.IsRemoved())
+				assert.Equal(t, int64(1), mx["job_job_one_disabled"])
+				observedExecution := c.Charts().Get("job_job_one_last_execution_status")
+				require.NotNil(t, observedExecution)
+				assert.True(t, observedExecution.IsRemoved())
+
+				unobserved := c.Charts().Get("job_job_two_status")
+				require.NotNil(t, unobserved)
+				assert.False(t, unobserved.IsRemoved())
+				unobservedExecution := c.Charts().Get("job_job_two_last_execution_status")
+				require.NotNil(t, unobservedExecution)
+				assert.False(t, unobservedExecution.IsRemoved())
+				assert.Equal(t, "job_two", c.activeJobs[jobID2])
+			},
+		},
+		"new colliding job keeps existing owner charts": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID2, "A.B", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "A-B", int64(1)).
+						AddRow(jobID2, "A.B", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				require.Equal(t, "a_b", c.jobChartIDs[jobID2])
+
+				mx := make(map[string]int64)
+				c.collectJobStatus(mx)
+
+				suffix := "a_b_" + cleanJobID(jobID1)
+				assert.Equal(t, "a_b", c.jobChartIDs[jobID2])
+				assert.Equal(t, suffix, c.jobChartIDs[jobID1])
+				assert.Equal(t, int64(1), mx["job_a_b_enabled"])
+				assert.Equal(t, int64(1), mx["job_"+suffix+"_enabled"])
+
+				baseChart := c.Charts().Get("job_a_b_status")
+				require.NotNil(t, baseChart)
+				assert.False(t, baseChart.IsRemoved())
+				assert.Equal(t, []collectorapi.Label{{Key: "job_name", Value: "A.B"}}, baseChart.Labels)
+
+				suffixChart := c.Charts().Get("job_" + suffix + "_status")
+				require.NotNil(t, suffixChart)
+				assert.False(t, suffixChart.IsRemoved())
+				assert.Equal(t, []collectorapi.Label{{Key: "job_name", Value: "A-B"}}, suffixChart.Labels)
+			},
+		},
+		"surviving colliding job keeps suffix when base owner disappears": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID1, "A-B", int64(1)).
+						AddRow(jobID2, "A.B", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+
+				mock.ExpectQuery(queryJobs).WillReturnRows(
+					sqlmock.NewRows([]string{"job_id", "name", "enabled"}).
+						AddRow(jobID2, "A.B", int64(1)),
+				)
+				mock.ExpectQuery(queryJobLastExecutions).WillReturnError(fmt.Errorf("permission denied"))
+				mock.ExpectQuery(queryJobCurrentExecutions).WillReturnError(fmt.Errorf("permission denied"))
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				suffix := "a_b_" + cleanJobID(jobID2)
+				require.Equal(t, "a_b", c.jobChartIDs[jobID1])
+				require.Equal(t, suffix, c.jobChartIDs[jobID2])
+
+				mx := make(map[string]int64)
+				c.collectJobStatus(mx)
+
+				assert.Equal(t, suffix, c.jobChartIDs[jobID2])
+				assert.NotContains(t, c.jobChartIDs, jobID1)
+				assert.Equal(t, int64(1), mx["job_"+suffix+"_enabled"])
+
+				removedBase := c.Charts().Get("job_a_b_status")
+				require.NotNil(t, removedBase)
+				assert.True(t, removedBase.IsRemoved())
+
+				survived := c.Charts().Get("job_" + suffix + "_status")
+				require.NotNil(t, survived)
+				assert.False(t, survived.IsRemoved())
+				assert.Equal(t, []collectorapi.Label{{Key: "job_name", Value: "A.B"}}, survived.Labels)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			require.NoError(t, err)
+			defer func() { _ = db.Close() }()
+
+			c := New()
+			c.db = db
+			if tc.configureCollector != nil {
+				tc.configureCollector(c)
+			}
+			tc.prepareMock(mock)
+
+			mx := make(map[string]int64)
+			c.collectJobStatus(mx)
+
+			for key, want := range tc.wantMetrics {
+				assert.Equalf(t, want, mx[key], "metric %s", key)
+			}
+			for _, key := range tc.notWantMetrics {
+				_, ok := mx[key]
+				assert.Falsef(t, ok, "metric %s should not be present", key)
+			}
+			if tc.checkCollector != nil {
+				tc.checkCollector(t, c)
+			}
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func countCollectorChartsByID(c *Collector, id string) int {
+	var count int
+	for _, chart := range *c.Charts() {
+		if chart.ID == id {
+			count++
+		}
+	}
+	return count
+}
+
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		majorVersion   int // 0 means default (16)
@@ -152,6 +920,68 @@ func TestCollector_Collect(t *testing.T) {
 		notWantMetrics []string
 		checkCollector func(t *testing.T, c *Collector)
 	}{
+		"database log counters: complete unordered rows": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnRows(
+					sqlmock.NewRows([]string{"database_name", "counter_name", "cntr_value"}).
+						AddRow("AppDB", "Log Shrinks", int64(2)).
+						AddRow("AppDB", "Log File(s) Used Size (KB)", int64(256)).
+						AddRow("AppDB", "Log Truncations", int64(3)).
+						AddRow("AppDB", "Log File(s) Size (KB)", int64(1024)),
+				)
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantMetrics: map[string]int64{
+				"database_appdb_log_size_used":    256 * 1024,
+				"database_appdb_log_size_free":    768 * 1024,
+				"database_appdb_log_percent_used": 2500,
+				"database_appdb_log_truncations":  3,
+				"database_appdb_log_shrinks":      2,
+			},
+			checkCollector: func(t *testing.T, c *Collector) {
+				assert.True(t, c.seenDatabasesWithLog["AppDB"])
+			},
+		},
+		"database log counters: missing used skips size and percent": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnRows(
+					sqlmock.NewRows([]string{"database_name", "counter_name", "cntr_value"}).
+						AddRow("AppDB", "Log File(s) Size (KB)", int64(1024)).
+						AddRow("AppDB", "Log Truncations", int64(3)),
+				)
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantMetrics: map[string]int64{
+				"database_appdb_log_truncations": 3,
+			},
+			notWantMetrics: []string{
+				"database_appdb_log_size_used",
+				"database_appdb_log_size_free",
+				"database_appdb_log_percent_used",
+			},
+		},
+		"database log counters: used greater than size clamps free": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnRows(
+					sqlmock.NewRows([]string{"database_name", "counter_name", "cntr_value"}).
+						AddRow("AppDB", "Log File(s) Size (KB)", int64(100)).
+						AddRow("AppDB", "Log File(s) Used Size (KB)", int64(150)),
+				)
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantMetrics: map[string]int64{
+				"database_appdb_log_size_used":    150 * 1024,
+				"database_appdb_log_size_free":    0,
+				"database_appdb_log_percent_used": 15000,
+			},
+		},
+		"database log counters: query error": {
+			prepareMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(queryDatabaseLogCounters).WillReturnError(fmt.Errorf("access denied"))
+			},
+			collectFn: func(c *Collector, mx map[string]int64) error { return c.collectDatabaseLogCounters(mx) },
+			wantErr:   true,
+		},
 		"ag health: success": {
 			prepareMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(queryAGHealth).WillReturnRows(

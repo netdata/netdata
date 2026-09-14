@@ -404,7 +404,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_PROGRESS_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_PROGRESS_HELP);
     buffer_json_member_add_array(wb, "data");
 
     spinlock_lock(&progress.spinlock);
@@ -616,12 +616,12 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 // ----------------------------------------------------------------------------
 
 int progress_unittest(void) {
-    size_t permanent = 100;
-    nd_uuid_t valid[permanent];
+    enum { PROGRESS_UNITTEST_PERMANENT = 100 };
+    nd_uuid_t valid[PROGRESS_UNITTEST_PERMANENT];
 
     usec_t started = now_monotonic_usec();
 
-    for(size_t i = 0; i < permanent ;i++) {
+    for(size_t i = 0; i < PROGRESS_UNITTEST_PERMANENT ;i++) {
         uuid_generate_random(valid[i]);
         query_progress_start_or_update(&valid[i], 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK, "permanent", NULL, "test");
     }
@@ -633,7 +633,7 @@ int progress_unittest(void) {
         query_progress_finished(&t, 0, 200, 1234, 123, 12);
 
         QUERY_PROGRESS *qp;
-        for(size_t i = 0; i < permanent ;i++) {
+        for(size_t i = 0; i < PROGRESS_UNITTEST_PERMANENT ;i++) {
             qp = query_progress_find_in_hashtable_unsafe(&valid[i]);
             assert(qp);
             (void)qp;

@@ -21,7 +21,8 @@ typedef struct dmi_info {
     } sys;
 
     struct {
-        char name[64];
+        char id[64];
+        char name[96];
         char version[64];
         char sku[64];
         char family[64];

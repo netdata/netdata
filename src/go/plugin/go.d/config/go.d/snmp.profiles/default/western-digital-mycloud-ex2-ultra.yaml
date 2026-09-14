@@ -18,23 +18,28 @@ metadata:
 
 metric_tags:
   - tag: wdmycloudex2_agent_ver
-    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.1.0
-    symbol: wdmycloudex2AgentVer
+    symbol:
+      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.1.0
+      name: wdmycloudex2AgentVer
   - tag: wdmycloudex2_software_version
-    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.2.0
-    symbol: wdmycloudex2SoftwareVersion
+    symbol:
+      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.2.0
+      name: wdmycloudex2SoftwareVersion
   - tag: wdmycloudex2_host_name
-    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.3.0
-    symbol: wdmycloudex2HostName
+    symbol:
+      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.3.0
+      name: wdmycloudex2HostName
   - tag: _wdmycloudex2_ftp_server
-    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.5.0
-    symbol: wdmycloudex2FTPServer
+    symbol:
+      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.5.0
+      name: wdmycloudex2FTPServer
     mapping:
       0: disable
       1: enable
   - tag: _wdmycloudex2_net_type
-    OID: 1.3.6.1.4.1.5127.1.1.1.8.1.6.0
-    symbol: wdmycloudex2NetType
+    symbol:
+      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.6.0
+      name: wdmycloudex2NetType
     mapping:
       0: workgroup
       1: active_directory
@@ -56,8 +61,6 @@ metrics:
 #      name: wdmycloudex2VolumeTable
 #      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9
 #    symbols:
-#      - name: wdmycloudex2Volume
-#        constant_value_one: true
 #      - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.9.1.5
 #        name: wdmycloudex2VolumeSize
 # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
@@ -90,8 +93,6 @@ metrics:
 #      #      - OID: 1.3.6.1.4.1.5127.1.1.1.8.1.10.1.5
 #      #        name: wdmycloudex2DiskTemperature
 #      # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)
-#      - name: wdmycloudex2Disk
-#        constant_value_one: true
 #    metric_tags:
 #      - symbol:
 #          name: wdmycloudex2DiskNum
@@ -119,8 +120,6 @@ metrics:
 #      name: wdmycloudex2UPSTable
 #      OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11
 #    symbols:
-#      - name: wdmycloudex2UPS
-#        constant_value_one: true
 #    #      - name: wdmycloudex2UPSBatteryCharge
 #    #        OID: 1.3.6.1.4.1.5127.1.1.1.8.1.11.5
 #    # string metric is not supported yet (keep this metric and this comment in profile until it's fixed)

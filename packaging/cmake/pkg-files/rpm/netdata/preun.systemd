@@ -1,0 +1,8 @@
+%systemd_preun netdata.service
+%systemd_preun netdata-updater.timer
+
+if [ "${1}" -eq 0 ]; then
+  if [ -x "/usr/libexec/netdata/netdata-updater.sh" ]; then
+    /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+  fi
+fi

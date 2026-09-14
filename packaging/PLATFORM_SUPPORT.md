@@ -64,34 +64,28 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 
 | Platform                 | Version        | Official Native Packages      | Notes                                                                                                          |
 |--------------------------|----------------|-------------------------------|----------------------------------------------------------------------------------------------------------------|
-| Alpine Linux             | 3.23           | No                            | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
-| Alpine Linux             | 3.22           | No                            |                                                                                                                |
+| Alpine Linux             | 3.23           | No                            | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images. Alpine uses OpenRC and does not include systemd, so the systemd-journal plugin and local systemd integrations are unavailable. Logs can be forwarded to a remote `systemd-journal-remote` endpoint using `systemd-cat-native --url=URL`. |
+| Alpine Linux             | 3.22           | No                            | Alpine uses OpenRC and does not include systemd, so the systemd-journal plugin and local systemd integrations are unavailable. Logs can be forwarded to a remote `systemd-journal-remote` endpoint using `systemd-cat-native --url=URL`. |
 | Alma Linux               | 9.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Alma Linux               | 8.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Amazon Linux             | 2023           | x86\_64, AArch64              |                                                                                                                |
-| Amazon Linux             | 2              | x86\_64, AArch64              |                                                                                                                |
-| CentOS                   | 7.x            | x86\_64                       |                                                                                                                |
 | Docker                   | 19.03 or newer | x86\_64, ARMv7, AArch64       | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
 | Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
-| Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Fedora                   | 44             | x86\_64, AArch64              |                                                                                                                |
 | Fedora                   | 43             | x86\_64, AArch64              |                                                                                                                |
-| Fedora                   | 42             | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Tumbleweed     | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Leap 16.0      | x86\_64, AArch64              |                                                                                                                |
-| openSUSE                 | Leap 15.6      | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 10.x           | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 9.x            | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 8.x            | x86\_64, AArch64              |                                                                                                                |
+| Red Hat Enterprise Linux | 10.x           | x86\_64, AArch64              |                                                                                                                |
 | Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64              |                                                                                                                |
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64              |                                                                                                                |
-| Red Hat Enterprise Linux | 7.x            | x86\_64                       |                                                                                                                |
 | Rocky Linux              | 10.x           | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Rocky Linux              | 9.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Rocky Linux              | 8.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Ubuntu                   | 26.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
-| Ubuntu                   | 25.10          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
 
@@ -116,9 +110,9 @@ Platforms in the community support tier are those which are primarily supported 
 | Fedora      | Rawhide   | No                       |                                                                                                           |
 | FreeBSD     | 13-STABLE | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | Gentoo      | Latest    | No                       |                                                                                                           |
-| macOS       | 13        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
-| macOS       | 12        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
-| macOS       | 11        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
+| macOS       | 26        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
+| macOS       | 15        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
+| macOS       | 14        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
 
 ## Binary Distribution Packages
 
@@ -146,7 +140,7 @@ Source builds are expected to work for all platforms in the Core tier because th
 |  **FreeBSD and derivatives**   |     13-STABLE     |
 |   **Gentoo and derivatives**   |      Latest       |
 | **Arch Linux and derivatives** |  Latest from AUR  |
-|           **macOS**            |    11, 12, 13     |
+|           **macOS**            |    14, 15, 26     |
 
 ## Third-party supported platforms
 
@@ -175,15 +169,20 @@ Platforms that meet these criteria will be immediately transitioned to the **Pre
 
 This is a list of platforms that we have supported in the recent past but no longer officially support:
 
-| Platform | Version   | Notes                |
-|----------|-----------|----------------------|
-| Debian   | 10.x      | EOL as of 2024-07-01 |
-| Fedora   | 41        | EOL as of 2025-12-15 |
-| Fedora   | 40        | EOL as of 2024-11-12 |
-| openSUSE | Leap 15.5 | EOL as of 2024-12-31 |
-| Ubuntu   | 25.04     | EOL as of 2026-01-17 |
-| Ubuntu   | 20.04     | EOL as of 2025-05-31 |
-| Ubuntu   | 18.04     | EOL as of 2023-04-02 |
+| Platform                 | Version   | Notes                |
+|--------------------------|-----------|----------------------|
+| Amazon Linux             | 2         | EOL as of 2026-06-30 |
+| CentOS                   | 7.x       | EOL as of 2026-06-30 |
+| Debian                   | 11.x      | EOL as of 2026-08-31 |
+| Debian                   | 10.x      | EOL as of 2024-07-01 |
+| Fedora                   | 42        | EOL as of 2026-05-13 |
+| Fedora                   | 41        | EOL as of 2025-12-15 |
+| openSUSE                 | Leap 15.5 | EOL as of 2024-12-31 |
+| Red Hat Enterprise Linux | 7.x       | EOL as of 2026-06-30 |
+| Ubuntu                   | 18.04     | EOL as of 2023-04-02 |
+| Ubuntu                   | 25.04     | EOL as of 2026-01-17 |
+| Ubuntu                   | 20.04     | EOL as of 2025-05-31 |
+| Ubuntu                   | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds
 
@@ -212,6 +211,14 @@ When you use static builds, you'll miss certain features that require specific o
 ### Systemd
 
 Many of our systemd integrations are not supported in our static builds. This is due to a general refusal by the systemd developers to support static linking (or any C runtime other than glibc), and is not something we can resolve.
+
+Beyond static builds, some operating systems (notably Alpine Linux) do not include systemd at all — they use OpenRC as their init system. This OS-level absence of systemd affects:
+
+- The **systemd-journal plugin** for log viewing, which requires a local `systemd-journald` installation.
+- **log2journal** output delivery — while log2journal itself is a standalone text processor with no systemd dependencies, its Journal Export Format output must be piped through `systemd-cat-native` to reach a journal. Without a local `systemd-journald`, use `systemd-cat-native --url=URL` to forward logs to a remote `systemd-journal-remote` endpoint instead.
+- Local systemd service management integrations.
+
+The `systemd-cat-native --url` mode is the supported workaround: it sends logs directly to a remote systemd-journal-remote and does not require any local systemd components.
 
 ### Impact of Platform End-of-Life (EOL)
 

@@ -25,10 +25,10 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 5,
 		},
-		Create:        func() collectorapi.CollectorV1 { return New() },
-		Config:        func() any { return &Config{} },
-		Methods:       elasticsearchMethods,
-		MethodHandler: elasticsearchFunctionHandler,
+		Create:          func() collectorapi.CollectorV1 { return New() },
+		Config:          func() any { return &Config{} },
+		SharedFunctions: elasticsearchMethods,
+		MethodHandler:   elasticsearchFunctionHandler,
 	})
 }
 

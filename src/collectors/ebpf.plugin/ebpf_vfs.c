@@ -355,524 +355,7 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
 
 static void ebpf_obsolete_specific_vfs_charts(char *type, ebpf_module_t *em);
 
-/**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_vfs_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_FILE_DELETED,
-        "",
-        "Files deleted",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT,
-        20065,
-        em->update_every);
 
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
-        "",
-        "Write to disk",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_WRITE_CONTEXT,
-        20066,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
-            "",
-            "Fails to write",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT,
-            20067,
-            em->update_every);
-    }
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
-        "",
-        "Read from disk",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_READ_CONTEXT,
-        20068,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
-            "",
-            "Fails to read",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT,
-            20069,
-            em->update_every);
-    }
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
-        "",
-        "Bytes written on disk",
-        EBPF_COMMON_UNITS_BYTES,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT,
-        20070,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
-        "",
-        "Bytes read from disk",
-        EBPF_COMMON_UNITS_BYTES,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT,
-        20071,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_VFS_FSYNC,
-        "",
-        "Calls to vfs_fsync.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT,
-        20072,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR,
-            "",
-            "Sync error",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT,
-            20073,
-            em->update_every);
-    }
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_VFS_OPEN,
-        "",
-        "Calls to vfs_open.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_OPEN_CONTEXT,
-        20074,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR,
-            "",
-            "Open error",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_SYSTEMD_VFS_OPEN_ERROR_CONTEXT,
-            20075,
-            em->update_every);
-    }
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_VFS_CREATE,
-        "",
-        "Calls to vfs_create.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_VFS_CREATE_CONTEXT,
-        20076,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR,
-            "",
-            "Create error",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEXT,
-            20077,
-            em->update_every);
-    }
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_vfs_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_vfs_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_vfs_charts(ect->name, em);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
- * Obsolette apps charts
- *
- * Obsolete apps charts.
- *
- * @param em a pointer to the structure with the default values.
- */
-void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
-{
-    int order = 20275;
-    struct ebpf_target *w;
-    int update_every = em->update_every;
-    netdata_mutex_lock(&collect_data_mutex);
-    for (w = apps_groups_root_target; w; w = w->next) {
-        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_VFS_IDX))))
-            continue;
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_unlink",
-            "Files deleted.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_unlink",
-            order++,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_write",
-            "Write to disk.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_write",
-            order++,
-            update_every);
-
-        if (em->mode < MODE_ENTRY) {
-            ebpf_write_chart_obsolete(
-                NETDATA_APP_FAMILY,
-                w->clean_name,
-                "_ebpf_call_vfs_write_error",
-                "Fails to write.",
-                EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                NETDATA_VFS_GROUP,
-                NETDATA_EBPF_CHART_TYPE_STACKED,
-                "app.ebpf_call_vfs_write_error",
-                order++,
-                update_every);
-        }
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_read",
-            "Read from disk.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_read",
-            order++,
-            update_every);
-
-        if (em->mode < MODE_ENTRY) {
-            ebpf_write_chart_obsolete(
-                NETDATA_APP_FAMILY,
-                w->clean_name,
-                "_ebpf_call_vfs_read_error",
-                "Fails to read.",
-                EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                NETDATA_VFS_GROUP,
-                NETDATA_EBPF_CHART_TYPE_STACKED,
-                "app.ebpf_call_vfs_read_error",
-                order++,
-                update_every);
-        }
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_write_bytes",
-            "Bytes written on disk.",
-            EBPF_COMMON_UNITS_BYTES,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_write_bytes",
-            order++,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_read_bytes",
-            "Bytes read from disk.",
-            EBPF_COMMON_UNITS_BYTES,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_read_bytes",
-            order++,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_fsync",
-            "Calls to vfs_fsync.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_fsync",
-            order++,
-            update_every);
-
-        if (em->mode < MODE_ENTRY) {
-            ebpf_write_chart_obsolete(
-                NETDATA_APP_FAMILY,
-                w->clean_name,
-                "_ebpf_call_vfs_fsync_error",
-                "Fails to sync.",
-                EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                NETDATA_VFS_GROUP,
-                NETDATA_EBPF_CHART_TYPE_STACKED,
-                "app.ebpf_call_vfs_fsync_error",
-                order++,
-                update_every);
-        }
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_open",
-            "Calls to vfs_open.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_open",
-            order++,
-            update_every);
-
-        if (em->mode < MODE_ENTRY) {
-            ebpf_write_chart_obsolete(
-                NETDATA_APP_FAMILY,
-                w->clean_name,
-                "_ebpf_call_vfs_open_error",
-                "Fails to open.",
-                EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                NETDATA_VFS_GROUP,
-                NETDATA_EBPF_CHART_TYPE_STACKED,
-                "app.ebpf_call_vfs_open_error",
-                order++,
-                update_every);
-        }
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_vfs_create",
-            "Calls to vfs_create.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_vfs_create",
-            order++,
-            update_every);
-
-        if (em->mode < MODE_ENTRY) {
-            ebpf_write_chart_obsolete(
-                NETDATA_APP_FAMILY,
-                w->clean_name,
-                "_ebpf_call_vfs_create_error",
-                "Fails to create.",
-                EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                NETDATA_VFS_GROUP,
-                NETDATA_EBPF_CHART_TYPE_STACKED,
-                "app.ebpf_call_vfs_create_error",
-                order++,
-                update_every);
-        }
-        w->charts_created &= ~(1 << EBPF_MODULE_VFS_IDX);
-    }
-    netdata_mutex_unlock(&collect_data_mutex);
-}
-
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_VFS_FILE_CLEAN_COUNT,
-        "",
-        "Remove files",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "filesystem.vfs_deleted_objects",
-        NETDATA_CHART_PRIO_FILESYSTEM_VFS_CLEAN,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_VFS_FILE_IO_COUNT,
-        "",
-        "Calls to IO",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "filesystem.vfs_io",
-        NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_COUNT,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_VFS_IO_FILE_BYTES,
-        "",
-        "Bytes written and read",
-        EBPF_COMMON_UNITS_BYTES,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "filesystem.vfs_io_bytes",
-        NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_BYTES,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_VFS_FSYNC,
-        "",
-        "Calls to vfs_fsync.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "filesystem.vfs_fsync",
-        NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_FSYNC,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_VFS_OPEN,
-        "",
-        "Calls to vfs_open.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "filesystem.vfs_open",
-        NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_OPEN,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_VFS_CREATE,
-        "",
-        "Calls to vfs_create.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_VFS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "filesystem.vfs_create",
-        NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_CREATE,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            NETDATA_FILESYSTEM_FAMILY,
-            NETDATA_VFS_FILE_ERR_COUNT,
-            "",
-            "Fails to write or read",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "filesystem.vfs_io_error",
-            NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EBYTES,
-            em->update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_FILESYSTEM_FAMILY,
-            NETDATA_VFS_OPEN_ERR,
-            "",
-            "Fails to open a file",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "filesystem.vfs_open_error",
-            NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EOPEN,
-            em->update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_FILESYSTEM_FAMILY,
-            NETDATA_VFS_FSYNC_ERR,
-            "",
-            "Fails to synchronize",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "filesystem.vfs_fsync_error",
-            NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_EFSYNC,
-            em->update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_FILESYSTEM_FAMILY,
-            NETDATA_VFS_CREATE_ERR,
-            "",
-            "Fails to create a file.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_VFS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "filesystem.vfs_create_error",
-            NETDATA_CHART_PRIO_FILESYSTEM_VFS_IO_ECREATE,
-            em->update_every);
-    }
-}
 
 /**
  * Exit
@@ -909,28 +392,18 @@ static void ebpf_vfs_exit(void *pptr)
     if (ebpf_read_vfs.thread)
         nd_thread_signal_cancel(ebpf_read_vfs.thread);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_vfs_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_vfs_apps_charts(em);
-        }
-
-        ebpf_obsolete_vfs_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_VFS_IDX);
+        sem_post(shm_mutex_ebpf_integration);
     }
 
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1135,8 +608,8 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
 
     for (; root; root = root->next) {
         uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_VFS_IDX);
-        if (!local_pid)
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+        if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_VFS_IDX << 1))))
             continue;
 
         netdata_publish_vfs_t *w = &local_pid->vfs;
@@ -1303,13 +776,13 @@ static void ebpf_vfs_read_apps(int maps_per_core)
 
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_VFS_IDX);
         if (!local_pid)
-            continue;
+            goto end_vfs_loop;
         netdata_publish_vfs_t *publish = &local_pid->vfs;
 
         if (!publish->ct || publish->ct != vv->ct) {
             vfs_aggregate_set_vfs(publish, vv);
         } else {
-            if (kill((pid_t)key, 0)) { // No PID found
+            if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
                 if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_VFS_IDX))
                     memset(publish, 0, sizeof(*publish));
             }
@@ -1343,8 +816,8 @@ static void read_update_vfs_cgroup()
             netdata_publish_vfs_t *out = &pids->vfs;
             memset(out, 0, sizeof(netdata_publish_vfs_t));
 
-            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_VFS_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_VFS_IDX << 1))))
                 continue;
             netdata_publish_vfs_t *in = &local_pid->vfs;
 
@@ -2251,8 +1724,8 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_vfs_charts(em);
         }
         ebpf_send_systemd_vfs_charts(em);
@@ -2353,7 +1826,7 @@ void ebpf_read_vfs_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             read_update_vfs_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -2422,7 +1895,7 @@ static void vfs_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_vfs_send_cgroup_data(em);
 
         netdata_mutex_unlock(&lock);
@@ -2978,6 +2451,7 @@ void ebpf_vfs_thread(void *ptr)
     if (ebpf_vfs_load_bpf(em)) {
         goto endvfs;
     }
+    ebpf_mark_program_loaded();
 
     int algorithms[NETDATA_KEY_PUBLISH_VFS_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX,

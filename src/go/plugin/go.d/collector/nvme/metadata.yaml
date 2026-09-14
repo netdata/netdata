@@ -21,7 +21,7 @@ modules:
       data_collection:
         metrics_description: >
           This collector monitors the health of NVMe devices.
-          It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool but avoids directly executing the binary.
+          It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli-and-libnvme) CLI tool but avoids directly executing the binary.
           Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
           This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
         method_description: ""
@@ -43,7 +43,7 @@ modules:
         list:
           - title: Install nvme-cli
             description: |
-              See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
+              See [Quick start](https://github.com/linux-nvme/nvme-cli#quick-start). Install `nvme-cli` using your distribution's package manager.
           - title: "For Netdata running in a Docker container: grant NVMe device access"
             description: |
               Your NVMe devices need to be accessible within the Docker container for Netdata to monitor them.

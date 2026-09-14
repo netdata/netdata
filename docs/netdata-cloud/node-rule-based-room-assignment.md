@@ -105,3 +105,53 @@ You can view each Node's membership status in the Room's Nodes table under the "
 Group membership can be either STATIC or RULE—these work independently. A node can belong to groups through STATIC assignments (added manually) or through RULE assignments (matched automatically). RULEs cannot override STATIC memberships, and removing a node's STATIC membership does not affect its RULE memberships.
 
 :::
+
+<details>
+<summary><strong>Example: Kubernetes environments</strong></summary><br/>
+
+If you run multiple environments (such as dev, acc, and prod) in a single Kubernetes cluster, you can use custom host labels and room assignment rules to automatically route each environment's Nodes into separate Rooms.
+
+### Step 1 — Set host labels on child Nodes
+
+Use the Helm chart's `child.configs.netdata.data` override to add a `[host labels]` section to every child Node. Create (or edit) an `override.yml` file:
+
+```yaml
+child:
+  configs:
+    netdata:
+      data: |
+        [host labels]
+          environment = ${CLUSTER_ENV}
+```
+
+Deploy or upgrade with the override:
+
+```bash
+helm upgrade --install -f override.yml netdata netdata/netdata
+```
+
+Set `CLUSTER_ENV` to `dev`, `acc`, or `prod` per cluster (or node pool) via your deployment tooling. For more Helm chart options, see the [Kubernetes installation guide](/packaging/installer/methods/kubernetes.md) and the [Helm chart reference](https://github.com/netdata/helmchart#configuration).
+
+### Step 2 — Create one Room per environment
+
+In Netdata Cloud, create three Rooms — for example **Dev**, **Acc**, and **Prod**.
+
+### Step 3 — Create inclusion rules
+
+In each Room's **Nodes** tab, add an inclusion rule that matches the `environment` host label:
+
+| Room | Label         | Operator | Value  |
+|:-----|:--------------|:---------|:-------|
+| Dev  | `environment` | equals   | `dev`  |
+| Acc  | `environment` | equals   | `acc`  |
+| Prod | `environment` | equals   | `prod` |
+
+Rules are evaluated in real time — as soon as a child Node connects with the matching label, it is assigned to the corresponding Room.
+
+:::note
+
+Netdata deploys one child Agent per Kubernetes **node**, not per namespace or workload, and Room assignment rules apply to that child Agent as a whole. This pattern works best when each environment runs on dedicated nodes or node pools. If environments share the same nodes, host-label rules cannot route namespaces on those nodes into different Rooms.
+
+:::
+
+</details>

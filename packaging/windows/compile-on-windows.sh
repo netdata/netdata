@@ -8,6 +8,45 @@ CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 
 set -eu -o pipefail
 
+windows_path_prefix=
+windows_path_prefix_arg=()
+
+usage() {
+    cat <<EOF
+Usage: $0 [options]
+
+Options:
+  --windows-path-prefix <path>  Override NETDATA_WINDOWS_PATH_PREFIX for this build.
+  --help                        Show this help message.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --windows-path-prefix)
+            if [ $# -lt 2 ]; then
+                echo "Missing value for --windows-path-prefix" >&2
+                exit 1
+            fi
+            windows_path_prefix="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unrecognized option '$1'" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [ -n "${windows_path_prefix}" ]; then
+    windows_path_prefix_arg=("-DNETDATA_WINDOWS_PATH_PREFIX=${windows_path_prefix}")
+fi
+
 if [ -d "${build}" ]; then
 	rm -rf "${build}"
 fi
@@ -47,6 +86,7 @@ CFLAGS="${BUILD_CFLAGS}" /usr/bin/cmake \
     -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
     -DRust_COMPILER=/ucrt64/bin/rustc \
+    "${windows_path_prefix_arg[@]}" \
     ${EXTRA_CMAKE_OPTIONS:-}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 

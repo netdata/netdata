@@ -261,11 +261,21 @@ void worker_unregister(void) {
         spinlock_unlock(&workname->spinlock);
 
         if(!workname->base) {
+            JError_t J_Error = { 0 };
+
             JudyAllocThreadPulseReset();
-            JudyHSDel(&workers_globals.worknames_JudyHS, (void *) worker->workname, workname_size, PJE0);
+            int ret = JudyHSDel(&workers_globals.worknames_JudyHS, (void *)worker->workname, workname_size, &J_Error);
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
-            freez(workname);
-            workers_globals.memory = (int64_t)workers_globals.memory - (int64_t)sizeof(struct workers_workname) + judy_mem;
+            workers_globals.memory = (int64_t)workers_globals.memory + judy_mem;
+
+            if(likely(ret == 1)) {
+                freez(workname);
+                workers_globals.memory = (int64_t)workers_globals.memory - (int64_t)sizeof(struct workers_workname);
+            }
+            else if(unlikely(ret == JERR))
+                netdata_log_error("WORKER_UTILIZATION: cannot delete worker workname '%s' from JudyHS, JU_ERRNO_* == %u, ID == %d", worker->workname, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
+            else
+                netdata_log_error("WORKER_UTILIZATION: worker workname '%s' disappeared from JudyHS during unregister", worker->workname);
         }
     }
     workers_globals.memory -= sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;

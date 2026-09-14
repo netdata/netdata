@@ -6,6 +6,7 @@ modules:
       module_name: pika
       monitored_instance:
         name: Pika
+        description: "Monitor Pika connections, clients, commands, memory, replication, and key statistics across databases."
         link: https://github.com/OpenAtomFoundation/pika
         icon_filename: pika.svg
         categories:
@@ -22,9 +23,9 @@ modules:
       data_collection:
         metrics_description: |
           This collector monitors Pika servers.
-          
+
           It collects information and statistics about the server executing the following commands:
-          
+
           - [`INFO ALL`](https://github.com/OpenAtomFoundation/pika/wiki/pika-info%E4%BF%A1%E6%81%AF%E8%AF%B4%E6%98%8E)
         method_description: ""
       supported_platforms:
@@ -137,13 +138,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                   - name: local
                     address: 'redis://:password@127.0.0.1:9221'
-                
+
                   - name: remote
                     address: 'redis://user:password@203.0.113.0:9221'
     troubleshooting:

@@ -57,7 +57,10 @@ func (p *numericValueProcessor) processValue(sym ddprofiledefinition.SymbolConfi
 	}
 }
 
-func (p *numericValueProcessor) processOpaqueFloat(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+func (p *numericValueProcessor) processOpaqueFloat(
+	sym ddprofiledefinition.SymbolConfig,
+	pdu gosnmp.SnmpPDU,
+) (int64, error) {
 	floatVal, ok := pdu.Value.(float32)
 	if !ok {
 		return 0, fmt.Errorf("OpaqueFloat has unexpected type %T", pdu.Value)
@@ -69,7 +72,10 @@ func (p *numericValueProcessor) processOpaqueFloat(sym ddprofiledefinition.Symbo
 	return int64(floatVal), nil
 }
 
-func (p *numericValueProcessor) processOpaqueDouble(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+func (p *numericValueProcessor) processOpaqueDouble(
+	sym ddprofiledefinition.SymbolConfig,
+	pdu gosnmp.SnmpPDU,
+) (int64, error) {
 	floatVal, ok := pdu.Value.(float64)
 	if !ok {
 		return 0, fmt.Errorf("OpaqueDouble has unexpected type %T", pdu.Value)
@@ -81,7 +87,10 @@ func (p *numericValueProcessor) processOpaqueDouble(sym ddprofiledefinition.Symb
 	return int64(floatVal), nil
 }
 
-func (p *numericValueProcessor) processInteger(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+func (p *numericValueProcessor) processInteger(
+	sym ddprofiledefinition.SymbolConfig,
+	pdu gosnmp.SnmpPDU,
+) (int64, error) {
 	value, err := convNumericPduToInt64f(pdu, sym.Format)
 	if err != nil {
 		return 0, err
@@ -147,6 +156,15 @@ func parseStringMetricValue(sym ddprofiledefinition.SymbolConfig, s string) (int
 	base := 10
 	if sym.Format == "hex" {
 		base = 16
+	}
+
+	if sym.Mapping.EffectiveMode() == ddprofiledefinition.MappingModeBitmask {
+		// Keep the unsigned bit pattern in the metric's existing int64 carrier.
+		value, err := strconv.ParseUint(s, base, 64)
+		if err != nil {
+			return 0, fmt.Errorf("cannot convert %q to uint64 bitmask: %w", s, err)
+		}
+		return int64(value), nil
 	}
 
 	value, err := strconv.ParseInt(s, base, 64)

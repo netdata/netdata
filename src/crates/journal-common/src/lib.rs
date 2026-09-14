@@ -14,4 +14,4 @@ pub use time::{Microseconds, RealtimeClock, Seconds, monotonic_now};
 pub use collections::{HashMap, HashSet, VecDeque};
 
 // Re-export system utilities for convenience
-pub use system::{load_boot_id, load_machine_id};
+pub use system::{load_boot_id, load_hostname, load_machine_id};

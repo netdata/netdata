@@ -16,7 +16,8 @@ typedef struct mrg_entry {
 } MRG_ENTRY;
 
 struct mrg_statistics {
-    // --- non-atomic --- under a write lock
+    // --- sampled lock-free by mrg_get_statistics() ---
+    // Writers use relaxed atomics. The padded fields below are updated on hotter reader/writer paths.
 
     size_t entries;
     int64_t size;    // total memory used, with indexing
@@ -28,7 +29,7 @@ struct mrg_statistics {
     size_t delete_having_retention_or_referenced;
     size_t delete_misses;
 
-    // --- atomic --- multiple readers / writers
+    // --- hot counters --- multiple readers / writers
 
     PAD64(ssize_t) entries_acquired;
     PAD64(ssize_t) current_references;
@@ -43,7 +44,7 @@ struct mrg_statistics {
 MRG *mrg_create(void);
 MRG *mrg_create_for_unittest(void);
 
-// returns the number of metrics that were freed, but were still referenced
+// returns the number of metrics still referenced; when non-zero the MRG is left allocated
 size_t mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
@@ -57,6 +58,14 @@ bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric);
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric);
 nd_uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric);
 UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg, METRIC *metric);
+
+// Read the metric's uuidmap id WITHOUT taking a uuidmap reference.
+// Use this to store an id somewhere that must NOT own the metric (an
+// open-cache page, for example): ids are unique for the lifetime of the
+// uuidmap, so a stale id simply fails to resolve rather than aliasing a
+// different metric. Taking a reference instead would make the holder an
+// owner, which is exactly what we want to avoid.
+UUIDMAP_ID mrg_metric_uuidmap_id(MRG *mrg, METRIC *metric);
 Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_first_time_s(MRG *mrg, METRIC *metric, time_t first_time_s);

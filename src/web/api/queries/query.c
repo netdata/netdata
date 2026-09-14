@@ -154,7 +154,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t last_db_points_read = 0;
     size_t last_result_points_generated = 0;
 
-    // internal_fatal(released_ops, "QUERY: released_ops should be NULL when the query starts");
+    QUERY_ENGINE_OPS_CACHE ops_cache = { 0 };
 
     query_progress_set_finish_line(qt->request.transaction, qt->query.used);
 
@@ -167,7 +167,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     size_t queries_prepared = 0;
     while(queries_prepared < max_queries_to_prepare) {
         // preload another query
-        ops[queries_prepared] = rrd2rrdr_query_ops_prep(r_tmp, queries_prepared);
+        ops[queries_prepared] = rrd2rrdr_query_ops_prep(r_tmp, &ops_cache, queries_prepared);
         queries_prepared++;
     }
 
@@ -193,7 +193,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         if(queries_prepared < qt->query.used) {
             // preload another query
-            ops[queries_prepared] = rrd2rrdr_query_ops_prep(r_tmp, queries_prepared);
+            ops[queries_prepared] = rrd2rrdr_query_ops_prep(r_tmp, &ops_cache, queries_prepared);
             queries_prepared++;
         }
 
@@ -230,7 +230,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                                              qt->request.group_by[0].aggregation, &qm->query_points, 0);
             }
 
-            rrd2rrdr_query_ops_release(ops[d]); // reuse this ops allocation
+            rrd2rrdr_query_ops_release(&ops_cache, ops[d]); // reuse this ops allocation
             ops[d] = NULL;
 
             qi->metrics.queried++;
@@ -322,7 +322,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             for(size_t i = d + 1; i < queries_prepared ; i++) {
                 if(ops[i]) {
                     query_planer_finalize_remaining_plans(ops[i]);
-                    rrd2rrdr_query_ops_release(ops[i]);
+                    rrd2rrdr_query_ops_release(&ops_cache, ops[i]);
                     ops[i] = NULL;
                 }
             }
@@ -390,11 +390,10 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     // free the query pipelining ops
     for(size_t d = 0; d < qt->query.used ; d++) {
-        rrd2rrdr_query_ops_release(ops[d]);
+        rrd2rrdr_query_ops_release(&ops_cache, ops[d]);
         ops[d] = NULL;
     }
-    rrd2rrdr_query_ops_freeall(r);
-    // internal_fatal(released_ops, "QUERY: released_ops should be NULL when the query ends");
+    rrd2rrdr_query_ops_freeall(r, &ops_cache);
 
     onewayalloc_freez(owa, ops);
 

@@ -13,10 +13,7 @@ func (j *JobV2) registerRuntimeComponent() error {
 	if j == nil || j.runtimeService == nil || j.runtimeComponentRegistered {
 		return nil
 	}
-	if j.engine == nil {
-		return fmt.Errorf("nil engine")
-	}
-	store := j.engine.RuntimeStore()
+	store := j.runtimeStore
 	if store == nil {
 		return fmt.Errorf("nil runtime store")
 	}

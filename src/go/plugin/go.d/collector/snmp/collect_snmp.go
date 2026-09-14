@@ -17,80 +17,108 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	}
 
 	pms, err := c.ddSnmpColl.Collect()
+	c.captureCollectionFailures()
 	if err != nil {
+		c.markBGPCollectFailed(err)
 		return err
+	}
+	c.syncDeviceMetadata(pms)
+	if c.bgp == nil && profileMetricsHaveBGP(pms) {
+		c.enableBGPIntegration()
 	}
 
 	c.resetIfaceCache()
+	c.collectLicensing(mx, pms)
 
-	c.collectProfileScalarMetrics(mx, pms)
-	c.collectProfileTableMetrics(mx, pms)
+	metrics := c.prepareProfileMetrics(pms)
+	c.collectProfileScalarMetrics(mx, metrics)
+	c.collectProfileTableMetrics(mx, metrics)
 	c.collectProfileStats(mx, pms)
 
 	c.finalizeIfaceCache()
+	c.finalizeProfileMetrics()
+	c.commitNormalConsumers(pms)
 
 	return nil
 }
 
-func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
-	for _, pm := range pms {
-		for _, m := range pm.Metrics {
-			if m.IsTable || m.Name == "" {
-				continue
-			}
-
-			if !c.seenScalarMetrics[m.Name] {
-				c.seenScalarMetrics[m.Name] = true
-				c.addProfileScalarMetricChart(m)
-			}
-
-			if len(m.MultiValue) == 0 {
-				id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
-				mx[id] = m.Value
-			} else {
-				for k, v := range m.MultiValue {
-					id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, k)
-					mx[id] = v
-				}
-			}
+func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
+	for _, m := range metrics {
+		if m.IsTable {
+			continue
 		}
+		if m.Name == "" {
+			c.recordNormalMetric(m, "missing_name", nil)
+			continue
+		}
+
+		if !c.seenScalarMetrics[m.Name] {
+			c.seenScalarMetrics[m.Name] = true
+			c.addProfileScalarMetricChart(m)
+		}
+
+		if len(m.MultiValue) == 0 {
+			id := metricIDFromName(m.Name)
+			mx[id] = m.Value
+			c.recordNormalMetric(m, "set", []string{id})
+			continue
+		}
+
+		var ids []string
+		for k, v := range m.MultiValue {
+			id := metricIDFromName(m.Name, k)
+			mx[id] = v
+			ids = append(ids, id)
+		}
+		c.recordNormalMetric(m, "set", ids)
 	}
 }
 
-func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {
+func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
 	seen := make(map[string]bool)
 
-	for _, pm := range pms {
-		for _, m := range pm.Metrics {
-			if !m.IsTable || m.Name == "" || len(m.Tags) == 0 {
-				continue
+	for _, m := range metrics {
+		if !m.IsTable {
+			continue
+		}
+		if m.Name == "" || len(m.Tags) == 0 {
+			reason := "missing_tags"
+			if m.Name == "" {
+				reason = "missing_name"
 			}
+			c.recordNormalMetric(m, reason, nil)
+			continue
+		}
 
-			key := tableMetricKey(m)
-			if key == "" {
-				continue
+		key := tableMetricKey(m)
+		if key == "" {
+			c.recordNormalMetric(m, "missing_table_key", nil)
+			continue
+		}
+
+		seen[key] = true
+
+		if !c.seenTableMetrics[key] {
+			c.seenTableMetrics[key] = true
+			c.addProfileTableMetricChart(m)
+		}
+
+		if len(m.MultiValue) == 0 {
+			id := metricIDFromKey(key)
+			mx[id] += m.Value
+			c.recordNormalMetric(m, "sum", []string{id})
+		} else {
+			var ids []string
+			for k, v := range m.MultiValue {
+				id := metricIDFromKey(key, k)
+				mx[id] = v
+				ids = append(ids, id)
 			}
+			c.recordNormalMetric(m, "set", ids)
+		}
 
-			seen[key] = true
-
-			if !c.seenTableMetrics[key] {
-				c.seenTableMetrics[key] = true
-				c.addProfileTableMetricChart(m)
-			}
-
-			if len(m.MultiValue) == 0 {
-				id := fmt.Sprintf("snmp_device_prof_%s", key)
-				mx[id] += m.Value
-			} else {
-				for k, v := range m.MultiValue {
-					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
-					mx[id] = v
-				}
-			}
-
-			if isIfaceMetric(m.Name) {
-				c.updateIfaceCacheEntry(m)
-			}
+		if isIfaceMetric(m.Name) {
+			c.updateIfaceCacheEntry(m)
 		}
 	}
 
@@ -113,7 +141,10 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 
 		px := fmt.Sprintf("snmp_device_prof_%s_stats_", name)
 		mx[px+"timings_scalar"] = pm.Stats.Timing.Scalar.Milliseconds()
+		mx[px+"timings_preparation"] = pm.Stats.Timing.Preparation.Milliseconds()
 		mx[px+"timings_table"] = pm.Stats.Timing.Table.Milliseconds()
+		mx[px+"timings_licensing"] = pm.Stats.Timing.Licensing.Milliseconds()
+		mx[px+"timings_bgp"] = pm.Stats.Timing.BGP.Milliseconds()
 		mx[px+"timings_virtual"] = pm.Stats.Timing.VirtualMetrics.Milliseconds()
 		mx[px+"snmp_get_requests"] = pm.Stats.SNMP.GetRequests
 		mx[px+"snmp_get_oids"] = pm.Stats.SNMP.GetOIDs
@@ -124,13 +155,18 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 		mx[px+"metrics_scalar"] = pm.Stats.Metrics.Scalar
 		mx[px+"metrics_table"] = pm.Stats.Metrics.Table
 		mx[px+"metrics_virtual"] = pm.Stats.Metrics.Virtual
+		mx[px+"metrics_licensing"] = pm.Stats.Metrics.Licensing
+		mx[px+"metrics_bgp"] = pm.Stats.Metrics.BGP
 		mx[px+"metrics_tables"] = pm.Stats.Metrics.Tables
 		mx[px+"metrics_rows"] = pm.Stats.Metrics.Rows
 		mx[px+"table_cache_hits"] = pm.Stats.TableCache.Hits
 		mx[px+"table_cache_misses"] = pm.Stats.TableCache.Misses
 		mx[px+"errors_snmp"] = pm.Stats.Errors.SNMP
 		mx[px+"errors_processing_scalar"] = pm.Stats.Errors.Processing.Scalar
+		mx[px+"errors_processing_preparation"] = pm.Stats.Errors.Processing.Preparation
 		mx[px+"errors_processing_table"] = pm.Stats.Errors.Processing.Table
+		mx[px+"errors_processing_licensing"] = pm.Stats.Errors.Processing.Licensing
+		mx[px+"errors_processing_bgp"] = pm.Stats.Errors.Processing.BGP
 	}
 }
 

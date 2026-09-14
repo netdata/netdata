@@ -108,6 +108,7 @@
     categories:
       - auth
     icon_filename: 'scim.svg'
+    description: 'Provision and manage user identities in Netdata Cloud through the System for Cross-domain Identity Management protocol.'
   keywords:
     - scim
     - identity-management

@@ -1,0 +1,252 @@
+# yamllint disable rule:line-length
+---
+id: 'service-discovery-docker'
+meta:
+  kind: 'docker'
+  name: 'Docker'
+  tagline: 'Running containers on the local Docker daemon.'
+  link: 'https://www.docker.com/'
+  icon_filename: 'docker.svg'
+keywords:
+  - 'service discovery'
+  - 'sd'
+  - 'docker'
+  - 'containers'
+  - 'discovery'
+overview:
+  description: |
+    Netdata can automatically discover running Docker containers on the local Docker daemon and generate collector jobs for the services running inside them. The discoverer queries the Docker API on a fixed interval, builds one target per container port, and applies your `services:` rules to render collector job YAML — typically picking the right go.d module from the container image (nginx, postgres, redis, …).
+
+    This page covers Docker-specific setup. For the broader Service Discovery model and the shared template-helper reference, see [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md).
+  how_it_works: |
+    Each discovery cycle, the discoverer:
+
+    1. **Calls** `ContainerList` on the Docker API at the configured `address`.
+    2. **Builds one target per `(container, network, port)` triple** for every container that has at least one network and at least one published port. Containers running in `network: host` mode are intentionally skipped — those are picked up by the [`net_listeners`](/src/go/plugin/go.d/discovery/sdext/discoverer/netlistensd/README.md) discoverer instead.
+    3. **Exposes** target fields: `.Name`, `.Image`, `.Command`, `.Labels`, `.PrivatePort`, `.PublicPort`, `.PublicPortIP`, `.PortProtocol`, `.NetworkMode`, `.NetworkDriver`, `.IPAddress`, `.Address` (the convenience `IPAddress:PrivatePort`).
+    4. **Runs the `services:` rules** against each target. The default stock conf carries curated rules for ~40 popular images (nginx, postgres, redis, rabbitmq, etc.) keyed on `.Image` patterns.
+    5. **Reconciles** disappeared containers — when a container exits, its target is removed and the corresponding collector job stops on the next reconcile.
+  limitations: |
+    - Containers in **`network: host` mode** are not produced as Docker targets. Configure the `net_listeners` discoverer to pick them up via the host's process table.
+    - Only **TCP** ports are typically useful; the stock conf's first rule explicitly skips non-TCP, missing-port, and IPv6-mapped entries.
+    - Only **published ports** appear as targets. A container that exposes ports only inside a Docker network without `-p` mapping still produces a target via its private port and network IP.
+    - The discoverer reads the live container list; it does not inspect image manifests, healthcheck output, or process tables inside the container. Anything beyond labels/image/ports must be inferred via service rules.
+    - Only the **local Docker daemon** is supported (Unix socket or TCP). There is no docker-swarm or remote-cluster discovery mode.
+setup:
+  prerequisites:
+    list:
+      - title: 'Access to the Docker socket'
+        description: |
+          The Netdata Agent must be able to reach the Docker daemon. The default `address` is `unix:///var/run/docker.sock`. If you run Netdata in a container, mount the socket: `-v /var/run/docker.sock:/var/run/docker.sock:ro`. The Netdata user (or the container) must have read access to the socket.
+      - title: 'Discovery is enabled by default'
+        description: |
+          The stock conf at `/etc/netdata/go.d/sd/docker.conf` ships with `disabled: no` and a curated set of `services:` rules covering ~40 popular images. To turn discovery off, set `disabled: yes` at the top of the file.
+  configuration:
+    file:
+      name: 'go.d/sd/docker.conf'
+    options:
+      description: |
+        The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
+
+        After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
+      folding:
+        title: 'Discoverer options'
+        enabled: false
+      list:
+        - name: 'address'
+          description: 'Docker daemon address.'
+          default_value: 'unix:///var/run/docker.sock'
+          required: false
+          detailed_description: |
+            Supports both Unix-socket (`unix:///var/run/docker.sock`) and TCP (`tcp://hostname:2375`) endpoints.
+
+            If unset, Netdata also honors the `DOCKER_HOST` environment variable when present.
+        - name: 'timeout'
+          description: 'Maximum time to wait for a Docker API response (per request).'
+          default_value: '2s'
+          required: false
+    examples:
+      folding:
+        title: 'Configuration examples'
+        enabled: true
+      list:
+        - name: 'Default (Unix socket)'
+          description: 'Use the default local Docker socket and the stock services rules.'
+          config: |
+            disabled: no
+            discoverer:
+              docker:
+                address: unix:///var/run/docker.sock
+            services:
+              # See the stock conf for the full curated rule set.
+              - id: skip
+                match: |
+                  {{ or (eq .NetworkMode "host") (not (eq .PortProtocol "tcp")) (empty .PrivatePort) }}
+              - id: nginx
+                match: '{{ match "sp" .Image "nginx nginx:*" }}'
+                config_template: |
+                  name: docker_{{.Name}}
+                  url: http://{{.Address}}/stub_status
+        - name: 'Remote daemon over TCP'
+          description: 'Point the discoverer at a remote Docker daemon. TLS is not yet wired into the discoverer; either expose the daemon on a trusted internal network or use a stunnel/socat proxy.'
+          config: |
+            disabled: no
+            discoverer:
+              docker:
+                address: tcp://docker.internal:2375
+                timeout: 5s
+            services:
+              - id: skip
+                match: '{{ or (eq .NetworkMode "host") (not (eq .PortProtocol "tcp")) (empty .PrivatePort) }}'
+              - id: redis
+                match: '{{ match "sp" .Image "redis redis:* */redis */redis:*" }}'
+                config_template: |
+                  name: docker_{{.Name}}
+                  address: redis://@{{.Address}}
+services:
+  description: |
+    A `services:` rule turns each discovered container target into one or more collector jobs. Most rules match on `.Image` (using the `match "sp"` simple-pattern helper for the typical `image image:* */image */image:*` family), some also gate on `.PrivatePort`, and a few use `.Labels` to honor user intent.
+
+    The shared rule model — function reference (`match`, `glob`, sprig, `toYaml`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are Docker-specific.
+  evaluation:
+    description: |
+      Quick reference — see [Rule evaluation semantics](/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model.
+    list:
+      - name: 'The first rule in the stock conf is a skip rule'
+        description: 'It drops targets that are unreachable or uninteresting (host networking, non-TCP, missing port, IPv6-mapped public IP). Keep it as the first rule — every subsequent rule assumes it has filtered out the noise.'
+      - name: 'Match on .Image with `match "sp"`'
+        description: |
+          The simple-patterns matcher (`match "sp" .Image "nginx nginx:* */nginx */nginx:*"`) is the idiomatic way to handle the four-form image family (bare, tagged, namespaced, namespaced-tagged). Use `glob` if you only need shell-style globbing without the simple-patterns engine.
+      - name: 'Module inference from rule id'
+        description: 'For Docker, set `id: <module-name>` (e.g. `id: nginx`) so the rendered job inherits the module name automatically. Use a different `id` only when you also include `module:` explicitly in the template.'
+  template_variables:
+    description: 'Available inside both `match` expressions and `config_template` bodies for Docker targets.'
+    list:
+      - name: '.Name'
+        type: 'string'
+        description: 'Container name (without the leading slash).'
+      - name: '.Image'
+        type: 'string'
+        description: 'Container image as reported by Docker (e.g. `nginx:1.25`, `myorg/redis:6`).'
+      - name: '.Command'
+        type: 'string'
+        description: 'Container command line.'
+      - name: '.Labels'
+        type: 'map'
+        description: 'All container labels. Use `index .Labels "key"` or `hasKey .Labels "key"` to read individual entries.'
+      - name: '.IPAddress'
+        type: 'string'
+        description: 'IP of the container on the matched network.'
+      - name: '.Address'
+        type: 'string'
+        description: 'Convenience `IPAddress:PrivatePort` — the canonical address used in most stock rule templates.'
+      - name: '.PrivatePort'
+        type: 'string'
+        description: 'Container-side port.'
+      - name: '.PublicPort'
+        type: 'string'
+        description: 'Host-side port (empty when the container does not publish a host mapping for this port).'
+      - name: '.PublicPortIP'
+        type: 'string'
+        description: 'Host IP that the container port is bound to (empty when no public mapping).'
+      - name: '.PortProtocol'
+        type: 'string'
+        description: 'Port protocol — `tcp` or `udp`. Stock rules typically gate on `eq .PortProtocol "tcp"`.'
+      - name: '.NetworkMode'
+        type: 'string'
+        description: 'Container network mode (`bridge`, `host`, `overlay`, custom network names, …). The stock skip rule drops `host` mode.'
+      - name: '.NetworkDriver'
+        type: 'string'
+        description: 'Driver of the matched network.'
+      - name: '.ID'
+        type: 'string'
+        description: 'Container ID (full hex).'
+  examples:
+    description: 'Each example shows one or more entries from the `services:` array. Order matters — see [How rules are evaluated](#how-rules-are-evaluated).'
+    list:
+      - name: 'Skip rule for unreachable / uninteresting targets'
+        description: 'The first rule in the stock conf. Drops `host` networking (those are local-listener targets), non-TCP ports, ports without a private side, and IPv6-mapped public IPs. Place it first.'
+        config: |
+          - id: skip
+            match: |
+              {{ $netNOK := eq .NetworkMode "host" -}}
+              {{ $protoNOK := not (eq .PortProtocol "tcp") -}}
+              {{ $portNOK := empty .PrivatePort -}}
+              {{ $addrNOK := or (empty .IPAddress) (glob .PublicPortIP "*:*") -}}
+              {{ or $netNOK $protoNOK $portNOK $addrNOK }}
+      - name: 'Nginx — module inferred from rule id'
+        description: |
+          Match the four common image-name forms with `match "sp"`. `id: nginx` makes the module name infer to `nginx` automatically — no `module:` line needed in the template.
+        config: |
+          - id: nginx
+            match: '{{ match "sp" .Image "nginx nginx:*" }}'
+            config_template: |
+              - name: docker_{{.Name}}
+                url: http://{{.Address}}/stub_status
+              - name: docker_{{.Name}}
+                url: http://{{.Address}}/basic_status
+              - name: docker_{{.Name}}
+                url: http://{{.Address}}/nginx_status
+              - name: docker_{{.Name}}
+                url: http://{{.Address}}/status
+      - name: 'Postgres — explicit module override'
+        description: |
+          When the rule `id` is something other than the target module name, set `module:` explicitly inside the rendered job.
+        config: |
+          - id: postgres
+            match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
+            config_template: |
+              module: postgres
+              name: docker_{{.Name}}
+              dsn: postgres://netdata:postgres@{{.Address}}/postgres
+      - name: 'Label-driven custom matching'
+        description: |
+          Use container labels to override behaviour without changing rules — e.g. opt a container in or out of monitoring, or pick a non-default endpoint. The example below requires the operator to set the label `netdata.go.d/module=mymodule` on the container.
+        config: |
+          - id: label-routed
+            match: '{{ and (hasKey .Labels "netdata.go.d/module") (eq (index .Labels "netdata.go.d/module") "mymodule") }}'
+            config_template: |
+              module: mymodule
+              name: docker_{{.Name}}
+              url: http://{{.Address}}/metrics
+verify:
+  description: 'After enabling the discoverer, confirm it is finding containers and producing jobs.'
+  checks:
+    list:
+      - name: 'Confirm containers are being listed'
+        description: |
+          Watch the agent log for Docker discoverer messages. With systemd:
+
+          ```bash
+          journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep "discoverer=docker"
+          ```
+
+          On a healthy daemon you should see the agent successfully calling `ContainerList`. If the log shows `error on creating docker client` or permission errors, the agent cannot reach `/var/run/docker.sock`.
+      - name: 'Confirm jobs are being created'
+        description: |
+          In the Netdata UI go to `Collectors -> go.d -> <module>` for whatever modules your service rules target (nginx, redis, postgres, …) — each container that matched a rule should appear as a `docker_<container-name>` job.
+      - name: 'Confirm metrics are being collected'
+        description: |
+          If a job was created but no charts appear, the rendered `config_template` produced a config the collector module rejected (wrong DSN, unreachable URL, missing credential). Check the collector's log.
+troubleshooting:
+  problems:
+    list:
+      - name: 'Permission denied on docker.sock'
+        description: |
+          The Netdata user must be able to read the Docker socket. On a typical Linux host:
+
+          ```bash
+          sudo usermod -aG docker netdata
+          systemctl restart netdata
+          ```
+
+          In containers, mount the socket read-only and verify the file is readable from inside.
+      - name: 'No targets discovered for containers in `host` networking'
+        description: |
+          `host`-mode containers are intentionally skipped by the Docker discoverer. Enable the `net_listeners` discoverer instead — it picks up locally-listening processes, which includes `host`-mode containers.
+      - name: 'Wrong module picked for an image'
+        description: |
+          Stock rules match on `.Image` patterns. Custom forks or in-house image names won't match. Add a rule above the stock catch-alls keyed on your own image name (`match "sp" .Image "myorg/nginx myorg/nginx:*"`) or use a `.Labels`-driven rule.
+      - name: 'Generated jobs fail to start'
+        description: |
+          Common causes: the rendered URL is not reachable from the agent (different network, firewall); credentials baked into the template are wrong; the module's port is not the one Docker reported. Check the rendered job YAML in the agent's debug output.

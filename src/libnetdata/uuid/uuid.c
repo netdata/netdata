@@ -6,11 +6,8 @@ ND_UUID UUID_generate_from_hash(const void *payload, size_t payload_len) {
     assert(sizeof(XXH128_hash_t) == sizeof(ND_UUID));
 
     ND_UUID uuid = UUID_ZERO;
-    XXH128_hash_t *xxh3_128 = (XXH128_hash_t *)&uuid;
-
-    // Hash the payload using XXH128
-    // Assume xxh128_hash_function is your function to generate XXH128 hash
-    *xxh3_128 = XXH3_128bits(payload, payload_len);
+    XXH128_hash_t xxh3_128 = XXH3_128bits(payload, payload_len);
+    memcpy(uuid.uuid, &xxh3_128, sizeof(xxh3_128));
 
     // Set the UUID version (here, setting it to 4)
     uuid.uuid[6] = (uuid.uuid[6] & 0x0F) | 0x40; // Version 4

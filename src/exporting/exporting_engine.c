@@ -6,7 +6,7 @@ static struct engine *engine = NULL;
 
 void analytics_exporting_connectors_ssl(BUFFER *b)
 {
-    if (netdata_ssl_exporting_ctx) {
+    if (netdata_ssl_exporting_ctx && engine) {
         for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
             struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
             if (SSL_connection(&connector_specific_data->ssl)) {
@@ -111,6 +111,7 @@ static void exporting_clean_engine()
 
     freez((void *)engine->config.hostname);
     freez(engine);
+    engine = NULL;
 }
 
 /**
@@ -182,7 +183,6 @@ static void exporting_main_cleanup(void *pptr)
  *
  * @param ptr a pointer to netdata_static_structure.
  *
- * @return It always returns NULL.
  */
 void exporting_main(void *ptr)
 {
@@ -217,7 +217,7 @@ void exporting_main(void *ptr)
         send_main_rusage(st_main_rusage, rd_main_user, rd_main_system);
 
 #ifdef UNIT_TESTING
-        return NULL;
+        break;
 #endif
     }
     service_exits();

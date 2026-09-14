@@ -102,8 +102,13 @@ RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host) {
 
 int16_t rrdhost_ingestion_hops(RRDHOST *host) {
     if(host == localhost) return 0;
-    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !host->system_info) return 1;
-    return rrdhost_system_info_hops(host->system_info);
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST)) return 1;
+
+    spinlock_lock(&host->rrdhost_update_lock);
+    int16_t hops = host->system_info ? rrdhost_system_info_hops(host->system_info) : 1;
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return hops;
 }
 
 static inline RRDHOST_DB_STATUS rrdhost_status_db(RRDHOST *host, time_t now, RRDHOST_STATUS *s, RRDHOST_FLAGS flags, bool online) {
@@ -149,8 +154,19 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
     uint32_t collected_metrics = UINT32_MAX;
     uint32_t replicating_instances = UINT32_MAX;
 
-    time_t since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
-    STREAM_HANDSHAKE reason = host->stream.rcv.status.reason;
+    time_t last_connected;
+    time_t last_disconnected;
+    uint32_t connections;
+    STREAM_HANDSHAKE reason;
+
+    rrdhost_receiver_lock(host);
+    last_connected = host->stream.rcv.status.last_connected;
+    last_disconnected = host->stream.rcv.status.last_disconnected;
+    connections = __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED);
+    reason = host->stream.rcv.status.reason;
+    rrdhost_receiver_unlock(host);
+
+    time_t since = MAX(last_connected, last_disconnected);
 
     if (online) {
         if (db_status == RRDHOST_DB_STATUS_INITIALIZING)
@@ -169,7 +185,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             status = RRDHOST_INGEST_STATUS_ONLINE;
     }
     else {
-        if(!host->stream.rcv.status.connections)
+        if(!connections)
             status = RRDHOST_INGEST_STATUS_ARCHIVED;
         else
             status = RRDHOST_INGEST_STATUS_OFFLINE;
@@ -210,12 +226,12 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             s->ingest.type = RRDHOST_INGEST_TYPE_LOCALHOST;
         else if(has_receiver)
             s->ingest.type = RRDHOST_INGEST_TYPE_CHILD;
-        else if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+        else if(flags & RRDHOST_FLAG_VIRTUAL_HOST)
             s->ingest.type = RRDHOST_INGEST_TYPE_VIRTUAL;
         else
             s->ingest.type = RRDHOST_INGEST_TYPE_ARCHIVED;
 
-        s->ingest.id = host->stream.rcv.status.connections;
+        s->ingest.id = connections;
     }
 
     return status;
@@ -228,6 +244,7 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
     if (!host->sender) {
         s->stream.status = RRDHOST_STREAM_STATUS_DISABLED;
         s->stream.hops = (int16_t)(s->ingest.hops + 1);
+        s->stream.id = __atomic_load_n(&host->stream.snd.status.connections, __ATOMIC_RELAXED);
     }
     else {
         stream_sender_lock(host->sender);
@@ -264,11 +281,10 @@ static void rrdhost_status_stream_internal(RRDHOST_STATUS *s) {
             s->stream.hops = (int16_t)(s->ingest.hops + 1);
         }
         s->stream.reason = host->stream.snd.status.reason;
+        s->stream.id = __atomic_load_n(&host->stream.snd.status.connections, __ATOMIC_RELAXED);
 
         stream_sender_unlock(host->sender);
     }
-
-    s->stream.id = host->stream.snd.status.connections;
 
     if(!s->stream.since)
         s->stream.since = netdata_start_time;
@@ -306,10 +322,17 @@ static void rrdhost_status_health_internal(RRDHOST_STATUS *s, RRDHOST_FLAGS flag
 
         RRDCALC *rc;
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+            if (unlikely(!st))
                 continue;
+            if (unlikely(!st->last_collected_time.tv_sec)) {
+                rrdcalc_rrdset_read_unlock(st);
+                continue;
+            }
 
-            switch (rc->status) {
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
+            switch (snapshot.status) {
                 default:
                 case RRDCALC_STATUS_REMOVED:
                     break;
@@ -334,6 +357,7 @@ static void rrdhost_status_health_internal(RRDHOST_STATUS *s, RRDHOST_FLAGS flag
                     s->health.alerts.uninitialized++;
                     break;
             }
+            rrdcalc_rrdset_read_unlock(st);
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
     }
@@ -395,4 +419,3 @@ RRDHOST_INGEST_STATUS rrdhost_get_ingest_status(RRDHOST *host, time_t now) {
     RRDHOST_DB_STATUS db_status = rrdhost_status_db(host, now, NULL, flags, online);
     return rrdhost_status_ingest(host, NULL, flags, db_status, online);
 }
-

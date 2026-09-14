@@ -1,0 +1,34 @@
+[package]
+name = "ng-ingest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "ng-ingest"
+path = "src/main.rs"
+
+[[bin]]
+name = "ng-ingest-traces"
+path = "src/bin/traces.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+file-registry = { workspace = true }
+journal-common = { workspace = true }
+ng-flatten = { workspace = true }
+opentelemetry-proto = { workspace = true }
+prost = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true, features = ["gzip"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+wal = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+uuid = { workspace = true }

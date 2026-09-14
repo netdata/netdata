@@ -34,12 +34,12 @@ func TestParseRangeVariants(t *testing.T) {
 		high      *float64
 		inclusive bool
 	}{
-		"simple":          {input: "10", low: floatPtr(0), high: floatPtr(10)},
-		"range":           {input: "10:20", low: floatPtr(10), high: floatPtr(20)},
-		"inclusive":       {input: "@5:15", low: floatPtr(5), high: floatPtr(15), inclusive: true},
-		"lower_unbounded": {input: "~:5", low: nil, high: floatPtr(5)},
-		"upper_unbounded": {input: "10:", low: floatPtr(10), high: nil},
-		"default_low":     {input: ":30", low: floatPtr(0), high: floatPtr(30)},
+		"simple":          {input: "10", low: new(float64(0)), high: new(float64(10))},
+		"range":           {input: "10:20", low: new(float64(10)), high: new(float64(20))},
+		"inclusive":       {input: "@5:15", low: new(float64(5)), high: new(float64(15)), inclusive: true},
+		"lower_unbounded": {input: "~:5", low: nil, high: new(float64(5))},
+		"upper_unbounded": {input: "10:", low: new(float64(10)), high: nil},
+		"default_low":     {input: ":30", low: new(float64(0)), high: new(float64(30))},
 		"unknown":         {input: "U", expectNil: true},
 	}
 	for name, tc := range tests {
@@ -67,8 +67,9 @@ func TestParseRangeVariants(t *testing.T) {
 	}
 }
 
+//go:fix inline
 func floatPtr(v float64) *float64 {
-	return &v
+	return new(v)
 }
 
 func TestParseLongOutputPreservesLeadingWhitespace(t *testing.T) {

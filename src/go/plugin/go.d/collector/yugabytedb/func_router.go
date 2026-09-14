@@ -114,10 +114,10 @@ func (r *funcRouter) topQueriesLimit() int {
 	return r.collector.topQueriesLimit()
 }
 
-func yugabyteMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topQueriesMethodConfig(),
-		runningQueriesMethodConfig(),
+func yugabyteMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topQueriesFunctionConfig(),
+		runningQueriesFunctionConfig(),
 	}
 }
 

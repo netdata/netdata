@@ -17,7 +17,8 @@
 
 // returns the old flags (before applying the changes)
 #define atomic_flags_set_and_clear(pvalue, set, clear) ({                    \
-    __typeof__(*pvalue) __old = *(pvalue), __new;                            \
+    __typeof__(*pvalue) __old =                                             \
+        __atomic_load_n((pvalue), __ATOMIC_RELAXED), __new;                  \
     do {                                                                     \
         __new = (__old | (set)) & ~(clear);                                  \
     } while(!__atomic_compare_exchange_n((pvalue), &__old, __new,            \

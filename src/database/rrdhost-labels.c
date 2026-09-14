@@ -4,14 +4,63 @@
 #include "rrdhost.h"
 #include "streaming/stream.h"
 
+// Gate hot-path events before they touch label storage.
+// The slow path re-reads the receiver count before writing.
+static SPINLOCK is_parent_label_commit_spinlock = SPINLOCK_INITIALIZER;
+static uint32_t is_parent_label_cached_state = 0;
+
+static uint32_t rrdhost_is_parent_state_from_count(uint32_t count) {
+    return count ? 1 : 0;
+}
+
+static bool rrdhost_update_is_parent_label_for_state(RRDLABELS *labels, uint32_t state) {
+    if (!labels)
+        return false;
+
+    return rrdlabels_add_changed(labels, "_is_parent", state ? "true" : "false", RRDLABEL_SRC_AUTO);
+}
+
+static uint32_t rrdhost_read_is_parent_desired_state(uint32_t (*count_reader)(void)) {
+    return rrdhost_is_parent_state_from_count(count_reader());
+}
+
+static bool rrdhost_is_parent_label_claim_transition(uint32_t desired) {
+    uint32_t cached = __atomic_load_n(&is_parent_label_cached_state, __ATOMIC_RELAXED);
+
+    while (cached != desired) {
+        if (__atomic_compare_exchange_n(
+                &is_parent_label_cached_state, &cached, desired, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return true;
+    }
+
+    return false;
+}
+
+static bool rrdhost_update_is_parent_label(RRDLABELS *labels, uint32_t (*count_reader)(void), bool force) {
+    if (!labels || !count_reader)
+        return false;
+
+    uint32_t desired = rrdhost_read_is_parent_desired_state(count_reader);
+
+    if (!force && !rrdhost_is_parent_label_claim_transition(desired))
+        return false;
+
+    spinlock_lock(&is_parent_label_commit_spinlock);
+    desired = rrdhost_read_is_parent_desired_state(count_reader);
+    __atomic_store_n(&is_parent_label_cached_state, desired, __ATOMIC_RELAXED);
+    bool changed = rrdhost_update_is_parent_label_for_state(labels, desired);
+    spinlock_unlock(&is_parent_label_commit_spinlock);
+
+    return changed;
+}
+
 void rrdhost_set_is_parent_label(void) {
-    uint32_t count = stream_receivers_currently_connected();
+    if (!localhost || !localhost->rrdlabels)
+        return;
 
-    if (count == 0 || count == 1) {
-        RRDLABELS *labels = localhost->rrdlabels;
-        rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    if (rrdhost_update_is_parent_label(localhost->rrdlabels, stream_receivers_currently_connected, false)) {
+        rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
-        // queue a node info
         aclk_queue_node_info(localhost, false);
     }
 }
@@ -111,7 +160,11 @@ static void rrdhost_load_config_labels(void) {
     inicfg_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
 }
 
-static void rrdhost_load_kubernetes_labels(void) {
+// Returns true if the kubernetes labels script ran to a clean exit. A false
+// return tells the caller the refresh was best-effort: callers must preserve
+// the previously-loaded k8s labels (see reload_host_labels()) so a transient
+// script failure does not silently delete them.
+static bool rrdhost_load_kubernetes_labels(void) {
     char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
     sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
 
@@ -120,29 +173,43 @@ static void rrdhost_load_kubernetes_labels(void) {
                "Kubernetes pod label fetching script %s not found.",
                label_script);
 
-        return;
+        return false;
     }
 
     POPEN_INSTANCE *instance = spawn_popen_run(label_script);
-    if(!instance) return;
+    if(!instance) return false;
+
+    FILE *child_stdout = spawn_popen_stdout(instance);
+    if(unlikely(!child_stdout)) {
+        spawn_popen_kill(instance, 0);
+        return false;
+    }
 
     char buffer[1000 + 1];
-    while (fgets(buffer, 1000, spawn_popen_stdout(instance)) != NULL)
+    while (fgets(buffer, 1000, child_stdout) != NULL)
         rrdlabels_add_pair(localhost->rrdlabels, buffer, RRDLABEL_SRC_AUTO|RRDLABEL_SRC_K8S);
 
     // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
     // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
     int rc = spawn_popen_wait(instance);
-    if(rc)
+    if(rc) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "%s exited abnormally. Failed to get kubernetes labels.",
                label_script);
+        return false;
+    }
+
+    return true;
 }
 
 static void rrdhost_load_auto_labels(void) {
     RRDLABELS *labels = localhost->rrdlabels;
 
-    rrdhost_system_info_to_rrdlabels(localhost->system_info, labels);
+    spinlock_lock(&localhost->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(localhost->system_info);
+    spinlock_unlock(&localhost->rrdhost_update_lock);
+    rrdhost_system_info_to_rrdlabels(system_info, labels);
+    rrdhost_system_info_free(system_info);
     add_aclk_host_labels();
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
@@ -154,7 +221,7 @@ static void rrdhost_load_auto_labels(void) {
     int has_unstable_connection = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_GLOBAL, "has unstable connection", CONFIG_BOOLEAN_NO);
     rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 
-    rrdlabels_add(labels, "_is_parent", (stream_receivers_currently_connected() > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    (void)rrdhost_update_is_parent_label(labels, stream_receivers_currently_connected, true);
 
     rrdlabels_add(labels, "_hostname", string2str(localhost->hostname), RRDLABEL_SRC_AUTO);
     rrdlabels_add(labels, "_os", string2str(localhost->os), RRDLABEL_SRC_AUTO);
@@ -178,10 +245,24 @@ void reload_host_labels(void) {
 
     // priority is important here
     rrdhost_load_config_labels();
-    rrdhost_load_kubernetes_labels();
+    bool k8s_loaded = rrdhost_load_kubernetes_labels();
     rrdhost_load_auto_labels();
 
-    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    // If the kubernetes loader did not run cleanly (script missing, spawn
+    // failure, or non-zero exit), the previously-loaded k8s labels were not
+    // refreshed and must survive the prune below -- otherwise a transient
+    // script failure would silently delete them. Re-mark them so the next
+    // step keeps them.
+    if (!k8s_loaded)
+        rrdlabels_mark_source_as_old(localhost->rrdlabels, RRDLABEL_SRC_K8S);
+
+    // drop entries that the loaders did not re-add (e.g. a label removed from
+    // netdata.conf, or no longer returned by get-kubernetes-labels.sh).
+    // RRDLABEL_FLAG_DONT_DELETE entries are preserved.
+    rrdlabels_remove_all_unmarked(localhost->rrdlabels);
+
+    rrdhost_flag_set(localhost,
+                     RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
 
     stream_send_host_labels(localhost);
 }
@@ -196,6 +277,165 @@ static int env_expand_unittest_check(const char *src, const char *expected, cons
     int err = strcmp(buf, expected) != 0;
     fprintf(stderr, "  env_expand(%s): %s, expected '%s', got '%s'\n",
             test_name, err ? "FAILED" : "OK", expected, buf);
+    return err;
+}
+
+static uint32_t is_parent_label_unittest_receiver_count = 0;
+
+static uint32_t is_parent_label_unittest_count_reader(void) {
+    return is_parent_label_unittest_receiver_count;
+}
+
+static void is_parent_label_unittest_set_cached(uint32_t state) {
+    __atomic_store_n(&is_parent_label_cached_state, rrdhost_is_parent_state_from_count(state), __ATOMIC_RELAXED);
+}
+
+static int is_parent_label_unittest_check(
+    RRDLABELS *labels, uint32_t count, bool expected_changed, const char *expected_value, const char *test_name) {
+    is_parent_label_unittest_receiver_count = count;
+    bool changed = rrdhost_update_is_parent_label(labels, is_parent_label_unittest_count_reader, false);
+
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, value, sizeof(value), "_is_parent");
+
+    int err = (changed != expected_changed) || strcmp(value, expected_value) != 0;
+    fprintf(stderr, "  _is_parent(%s): %s, expected changed=%s value='%s', got changed=%s value='%s'\n",
+            test_name,
+            err ? "FAILED" : "OK",
+            expected_changed ? "true" : "false",
+            expected_value,
+            changed ? "true" : "false",
+            value);
+
+    return err;
+}
+
+static int is_parent_label_unittest_check_force(
+    RRDLABELS *labels, uint32_t count, bool expected_changed, const char *expected_value, const char *test_name) {
+    is_parent_label_unittest_receiver_count = count;
+    bool changed = rrdhost_update_is_parent_label(labels, is_parent_label_unittest_count_reader, true);
+
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, value, sizeof(value), "_is_parent");
+
+    int err = (changed != expected_changed) || strcmp(value, expected_value) != 0;
+    fprintf(stderr, "  _is_parent(%s): %s, expected force changed=%s value='%s', got changed=%s value='%s'\n",
+            test_name,
+            err ? "FAILED" : "OK",
+            expected_changed ? "true" : "false",
+            expected_value,
+            changed ? "true" : "false",
+            value);
+
+    return err;
+}
+
+static int is_parent_label_unittest_check_refreshed_nonzero_count(RRDLABELS *labels) {
+    is_parent_label_unittest_set_cached(0);
+    is_parent_label_unittest_receiver_count = 1;
+    bool changed = rrdhost_update_is_parent_label(labels, is_parent_label_unittest_count_reader, false);
+
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, value, sizeof(value), "_is_parent");
+
+    int err = changed || strcmp(value, "true") != 0;
+    fprintf(stderr,
+            "  _is_parent(refreshed non-zero receiver count after pending false transition): %s, "
+            "cached state reset to false, current count=%u expected changed=false value='true', "
+            "got changed=%s value='%s'\n",
+            err ? "FAILED" : "OK",
+            is_parent_label_unittest_receiver_count,
+            changed ? "true" : "false",
+            value);
+
+    return err;
+}
+
+static int is_parent_label_unittest(void) {
+    int errors = 0;
+
+    RRDLABELS *labels = rrdlabels_create();
+
+    is_parent_label_unittest_set_cached(1);
+    errors += is_parent_label_unittest_check(labels, 0, true, "false", "initial zero receivers");
+    errors += is_parent_label_unittest_check(labels, 0, false, "false", "unchanged zero receivers");
+    errors += is_parent_label_unittest_check(labels, 2, true, "true", "two receivers after stale false");
+    errors += is_parent_label_unittest_check(labels, 1, false, "true", "one receiver after already true");
+    errors += is_parent_label_unittest_check_force(labels, 1, false, "true", "forced reload while already true");
+    errors += is_parent_label_unittest_check_force(labels, 0, true, "false", "forced reload from true to false");
+    errors += is_parent_label_unittest_check_force(labels, 2, true, "true", "forced reload from false to true");
+    errors += is_parent_label_unittest_check_refreshed_nonzero_count(labels);
+    errors += is_parent_label_unittest_check(labels, 0, true, "false", "last receiver disconnected");
+
+    rrdlabels_destroy(labels);
+
+    return errors;
+}
+
+static int os_metadata_labels_unittest(void) {
+    struct rrdhost_system_info *system_info = rrdhost_system_info_create();
+    RRDLABELS *labels = rrdlabels_create();
+    int errors = 0;
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_NAME", "Ubuntu");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_VERSION", "24.04");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_RELEASE", "24.04");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_CODENAME", "noble");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_VERSION", "Ubuntu 24.04.3 LTS");
+    rrdhost_system_info_to_rrdlabels(system_info, labels);
+
+    const struct {
+        const char *name;
+        const char *expected;
+    } cases[] = {
+        { "_os_name", "Ubuntu" },
+        { "_os_version", "Ubuntu 24.04.3 LTS" },
+        { "_os_marketing_version", "24.04" },
+        { "_os_release", "24.04" },
+        { "_os_codename", "noble" },
+    };
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        rrdlabels_get_value_strcpyz(labels, value, sizeof(value), cases[i].name);
+        int err = strcmp(value, cases[i].expected) != 0;
+        fprintf(stderr, "  os metadata %s: %s, expected '%s', got '%s'\n", cases[i].name,
+                err ? "FAILED" : "OK", cases[i].expected, value);
+        errors += err;
+    }
+
+    rrdlabels_destroy(labels);
+    rrdhost_system_info_free(system_info);
+    return errors;
+}
+
+static int streamed_windows_system_info_unittest(void) {
+    RRDLABELS *labels = rrdlabels_create();
+    rrdlabels_add(labels, "_os", "windows", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_name", "Windows", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_version", "Microsoft Windows 11 Home", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_marketing_version", "11", RRDLABEL_SRC_AUTO);
+
+    struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(labels);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    rrdhost_system_info_to_json_v1(wb, system_info);
+
+    RRDLABELS *roundtrip = rrdlabels_create();
+    rrdhost_system_info_to_rrdlabels(system_info, roundtrip);
+    char version[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    char marketing_version[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(roundtrip, version, sizeof(version), "_os_version");
+    rrdlabels_get_value_strcpyz(roundtrip, marketing_version, sizeof(marketing_version), "_os_marketing_version");
+
+    int err = !strstr(buffer_tostring(wb), "Microsoft Windows") ||
+              !strstr(buffer_tostring(wb), "Microsoft Windows 11 Home") ||
+              strcmp(version, "Microsoft Windows 11 Home") || strcmp(marketing_version, "11");
+    fprintf(stderr, "  streamed Windows OS labels and public metadata: %s\n", err ? "FAILED" : "OK");
+
+    rrdlabels_destroy(roundtrip);
+    rrdhost_system_info_free(system_info);
+    rrdlabels_destroy(labels);
     return err;
 }
 
@@ -331,6 +571,10 @@ int rrdhost_labels_unittest(void) {
     unsetenv("ND_TEST_RACK");
     unsetenv("ND_TEST_EMPTY");
     unsetenv("ND_TEST_NESTED");
+
+    errors += is_parent_label_unittest();
+    errors += os_metadata_labels_unittest();
+    errors += streamed_windows_system_info_unittest();
 
     fprintf(stderr, "%s: %d errors\n", __FUNCTION__, errors);
     return errors;

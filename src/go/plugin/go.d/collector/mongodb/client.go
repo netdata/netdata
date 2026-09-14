@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
@@ -245,7 +245,7 @@ func (c *mongoClient) initClient(uri string, timeout time.Duration) error {
 	ctxConn, cancelConn := context.WithTimeout(context.Background(), c.timeout)
 	defer cancelConn()
 
-	client, err := mongo.Connect(ctxConn, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return err
 	}

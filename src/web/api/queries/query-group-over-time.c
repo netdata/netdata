@@ -15,6 +15,7 @@
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
 #include "extremes/extremes.h"
+#include "latest/latest.h"
 
 // ----------------------------------------------------------------------------
 
@@ -53,6 +54,7 @@ static struct {
     NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
     TIER_QUERY_FETCH tier_query_fetch;
+    QUERY_POINT_MODE point_mode;
 } api_v1_data_groups[] = {
     {.name = "average",
      .hash  = 0,
@@ -496,7 +498,8 @@ static struct {
      .free  = tg_sum_free,
      .add   = tg_sum_add,
      .flush = tg_sum_flush,
-     .tier_query_fetch = TIER_QUERY_FETCH_SUM
+     .tier_query_fetch = TIER_QUERY_FETCH_SUM,
+     .point_mode = QUERY_POINT_MODE_TOTAL
     },
 
     // standard deviation
@@ -627,6 +630,20 @@ static struct {
      .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
     },
 
+    {.name = "latest",
+     .hash  = 0,
+     .value = RRDR_GROUPING_LATEST,
+     .add_flush = RRDR_GROUPING_LATEST,
+     .init  = NULL,
+     .create= tg_latest_create,
+     .reset = tg_latest_reset,
+     .free  = tg_latest_free,
+     .add   = tg_latest_add,
+     .flush = tg_latest_flush,
+     // tiers store no last value - the tier point average is the proxy
+     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+    },
+
     // terminator
     {.name = NULL,
      .hash  = 0,
@@ -707,6 +724,7 @@ void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
             r->time_grouping.add     = api_v1_data_groups[i].add;
             r->time_grouping.flush   = api_v1_data_groups[i].flush;
             r->time_grouping.tier_query_fetch = api_v1_data_groups[i].tier_query_fetch;
+            r->time_grouping.point_mode = api_v1_data_groups[i].point_mode;
             r->time_grouping.add_flush = api_v1_data_groups[i].add_flush;
             found = 1;
         }
@@ -720,6 +738,7 @@ void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
         r->time_grouping.add     = tg_average_add;
         r->time_grouping.flush   = tg_average_flush;
         r->time_grouping.tier_query_fetch = TIER_QUERY_FETCH_AVERAGE;
+        r->time_grouping.point_mode = QUERY_POINT_MODE_LINEAR;
         r->time_grouping.add_flush = RRDR_GROUPING_AVERAGE;
     }
 }
@@ -758,6 +777,10 @@ void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING a
 
         case RRDR_GROUPING_EXTREMES:
             tg_extremes_add(r, value);
+            break;
+
+        case RRDR_GROUPING_LATEST:
+            tg_latest_add(r, value);
             break;
 
         case RRDR_GROUPING_TRIMMED_MEAN:
@@ -815,6 +838,9 @@ NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options
 
         case RRDR_GROUPING_EXTREMES:
             return tg_extremes_flush(r, rrdr_value_options_ptr);
+
+        case RRDR_GROUPING_LATEST:
+            return tg_latest_flush(r, rrdr_value_options_ptr);
 
         case RRDR_GROUPING_TRIMMED_MEAN:
             return tg_trimmed_mean_flush(r, rrdr_value_options_ptr);

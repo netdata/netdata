@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,24 @@ func setupMockHandler(t *testing.T) (*gomock.Controller, *snmpmock.MockHandler) 
 	return ctrl, mockHandler
 }
 
+func matchedProfileByFile(t *testing.T, sysObjectID, profileFile string) *ddsnmp.Profile {
+	t.Helper()
+
+	matched := ddsnmp.FindProfiles(sysObjectID, "", nil)
+	for _, prof := range matched {
+		if strings.HasSuffix(prof.SourceFile, profileFile) {
+			return prof
+		}
+	}
+
+	require.FailNowf(t, "missing profile", "expected %s for %s", profileFile, sysObjectID)
+	return nil
+}
+
+func oidWithIndex(baseOID, index string) string {
+	return strings.Trim(baseOID, ".") + "." + strings.Trim(index, ".")
+}
+
 func createTestProfile(sourceFile string, metrics []ddprofiledefinition.MetricsConfig) *ddsnmp.Profile {
 	return &ddsnmp.Profile{
 		SourceFile: sourceFile,
@@ -59,6 +78,21 @@ func expectSNMPGet(mockHandler *snmpmock.MockHandler, oids []string, pdus []gosn
 
 func expectSNMPGetError(mockHandler *snmpmock.MockHandler, oids []string, err error) {
 	mockHandler.EXPECT().Get(gomock.InAnyOrder(oids)).Return(nil, err)
+}
+
+func expectSystemMetadataGets(mockHandler *snmpmock.MockHandler, sysObjectID, sysName string) {
+	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+		createStringPDU("1.0.8802.1.1.2.1.3.1.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.2.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.3.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.4.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.5.0", sysName),
+		createStringPDU("1.0.8802.1.1.2.1.3.6.0", sysName),
+		createStringPDU("1.3.6.1.2.1.1.1.0", "SNMP device"),
+		createPDU("1.3.6.1.2.1.1.2.0", gosnmp.ObjectIdentifier, sysObjectID),
+		createStringPDU("1.3.6.1.2.1.1.5.0", sysName),
+		createStringPDU("1.3.6.1.2.1.1.6.0", "lab"),
+	}}, nil).AnyTimes()
 }
 
 func expectSNMPWalk(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpVersion, oid string, pdus []gosnmp.SnmpPDU) {

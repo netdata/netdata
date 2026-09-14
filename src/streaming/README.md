@@ -10,7 +10,7 @@ This guide covers Netdata's advanced streaming and replication capabilities, whi
 
 If you're new to Netdata streaming or prefer a guided approach, [jump to our step-by-step guide](#step-by-step-setup-guide) at the end of this document. The guide will walk you through setting up a basic streaming configuration and then connecting to the comprehensive reference sections as needed.
 
-For a quick reference on setting up the Parent-Child relationship, see the [Configuration Examples](#complete-configuration-examples) or refer to our comprehensive [Parents: Your Centralization Points](https://learn.netdata.cloud/docs/deployment-guides/parents-your-centralization-points) documentation for more details.
+For a quick reference on setting up the Parent-Child relationship, see the [Configuration Examples](#complete-configuration-examples) or refer to our comprehensive [Parents: Your Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md) documentation for more details.
 
 :::
 
@@ -86,12 +86,12 @@ Netdata streaming uses a **custom binary protocol over TCP**, not HTTP/HTTPS. Th
 
 ## Quick Reference
 
-| Task                                     | Configuration                             | Example                                                        |
-|------------------------------------------|-------------------------------------------|----------------------------------------------------------------|
-| Enable streaming on a Child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br/>`enabled = yes`<br/>`destination = 192.168.1.5` |
+| Task                                     | Configuration                             | Example                                                               |
+|------------------------------------------|-------------------------------------------|-----------------------------------------------------------------------|
+| Enable streaming on a Child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br/>`enabled = yes`<br/>`destination = 192.168.1.5`        |
 | Configure a Parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br/>`type = api`<br/>`enabled = yes`<br/>`allow from = *` |
-| Set up high availability                 | Configure multiple destinations on Child  | `[stream]`<br/>`destination = parent1:19999 parent2:19999`     |
-| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`               |
+| Set up high availability                 | Configure multiple destinations on Child  | `[stream]`<br/>`destination = parent1:19999 parent2:19999`            |
+| Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`                      |
 
 ## Configuration Overview
 
@@ -238,6 +238,11 @@ With these settings, you can configure how your Child nodes send metrics to Pare
 | `initial clock resync iterations`               | `60`                      | Syncs chart clocks during startup.                                  |
 | `parent using h2o`                              | `no`                      | Set to `yes` if connecting to a Parent using the H2O web server.    |
 
+The detected profile supplies the sender defaults. The `iot` and `parent` profiles use the fastest settings (ZSTD 1,
+LZ4 acceleration 9, Brotli 1, and Gzip 1); the `child` and `standalone` profiles use balanced settings (ZSTD 3, LZ4
+acceleration 1, Brotli 3, and Gzip 3). Each explicit compression option in `[stream]` overrides only its corresponding
+profile default.
+
 ### `[API_KEY]` Section (Parent Node Authentication)
 
 Here you can define settings for authentication and access control between Parents and Children.
@@ -252,6 +257,7 @@ Here you can define settings for authentication and access control between Paren
 | `health enabled`             | `auto`     | Controls alerts and notifications (`auto`, `yes`, or `no`). |
 | `postpone alerts on connect` | `1m`       | Delay alerts for a period after the Child connects.         |
 | `health log retention`       | `5d`       | Duration (in seconds) to keep health log events.            |
+| `tcp keepalive idle`         | `auto`     | Parent TCP keepalive idle: `auto`, `off`, or a duration from 30 seconds through 1 hour. |
 | `proxy enabled`              | (empty)    | Enables routing metrics through a proxy.                    |
 | `proxy destination`          | (empty)    | IP and port of the proxy server.                            |
 | `proxy api key`              | (empty)    | API key for the proxy server.                               |
@@ -276,6 +282,7 @@ This area lets you customize settings for specific Child nodes by their unique I
 | `health enabled`             | `auto`     | Controls alerts (`auto`, `yes`, `no`).                   |
 | `postpone alerts on connect` | `1m`       | Delay alerts for a period after connection.              |
 | `health log retention`       | `5d`       | Duration to keep health log events.                      |
+| `tcp keepalive idle`         | API-key value | Overrides the API-key Parent TCP keepalive idle for this Child. |
 | `proxy enabled`              | (empty)    | Routes metrics through a proxy if enabled.               |
 | `proxy destination`          | (empty)    | Proxy server IP and port.                                |
 | `proxy api key`              | (empty)    | API key for the proxy.                                   |
@@ -285,6 +292,20 @@ This area lets you customize settings for specific Child nodes by their unique I
 | `replication period`         | `1d`       | Maximum replication window.                              |
 | `replication step`           | `10m`      | Time interval for each replication step.                 |
 | `is ephemeral node`          | `no`       | Marks the node as ephemeral (removes after inactivity).  |
+
+#### Receiver TCP keepalive
+
+`tcp keepalive idle` is a Parent receiver setting. Configure it under `[API_KEY]`, or under `[MACHINE_GUID]` to override the API-key
+value for one Child. It is not a `[stream]` sender setting and does not require a Child update.
+
+`[MACHINE_GUID]` takes precedence over `[API_KEY]`. The default `auto` value is half of the fastest chart cadence observed on the
+connection, rounded up and bounded to 30 seconds through 1 hour. A positive duration overrides it; `0`, `off`, or `never` disables
+`SO_KEEPALIVE`. Invalid durations use `auto`.
+
+On platforms with per-socket keepalive tuning, the Parent sends three probes 10 seconds apart after the idle period. Other platforms
+retain `SO_KEEPALIVE` with the operating system's default idle, interval, and probe count. The Parent application-idle timeout is
+independently calculated as `max(10 minutes, 2 × fastest observed chart cadence)`. The observed cadence resets on reconnect and can
+only decrease while connected.
 
 ### Additional Settings
 
@@ -371,7 +392,6 @@ The `netdata.conf` file is the primary configuration file for the Netdata agent.
 This section defines global settings for the Netdata agent.
 
 - **hostname**: The hostname used by the agent.
-- **memory mode**: Choose the memory mode for data collection (e.g., `ram` or `swap`).
 - **error log file**: Path to the file where error logs are saved.
 
 ### [web]
@@ -382,13 +402,27 @@ Configure the web interface settings here.
 - **port**: Set the port for the web interface (default: 19999).
 - **disable SSL**: Set to `yes` to disable SSL support.
 
-### [database]
+### [db]
 
 Manage database settings for data storage and retention.
 
-- **memory mode**: Choose between in-memory or disk-based storage.
-- **data retention**: Set how long to keep historical data.
-- **compression**: Enable or disable data compression.
+- **db** (formerly `memory mode`): Choose between in-memory or disk-based storage (e.g., `dbengine`, `ram`, `none`).
+- **retention**: Set how long to keep historical data.
+- **update every**: The data collection frequency in seconds.
+
+:::note
+
+**Parent and Child `update every` do not need to match**
+
+The `update every` setting controls the collection granularity of the metrics **this node collects locally**. In a Parent-Child streaming setup, the Parent's `[db] update every` and a Child's `update every` are independent — they do **not** need to match:
+
+- The Parent's `update every` governs only the metrics the Parent collects from its **own** host.
+- A streaming Child automatically sends its own `update every` to the Parent, and the Parent stores that Child's metrics at the Child's collection frequency — regardless of the Parent's `update every`.
+- Each streaming Child is a separate host on the Parent, each keeping its own `update every`.
+
+Configuring both nodes with the same value is neither required nor beneficial — if they happen to be equal, it is coincidental and has no effect on correctness. Set each node's `update every` based on the collection granularity you want for that node's own data.
+
+:::
 
 ## Complete Configuration Examples
 
@@ -671,6 +705,17 @@ You can enable SSL in the destination setting by adding `:SSL` at the end. Confi
 <br/>
 
 Yes, you need to configure each Child node with its own streaming configuration. However, you can use configuration management tools to deploy a standard configuration across your infrastructure, making this process more efficient.
+
+</details>
+
+<details>
+<summary><strong>Do the Parent and Child need the same update every setting?</strong></summary>
+<br/>
+
+No. Each Child automatically sends its own `update every` to the Parent when it streams. The Parent stores that Child's metrics at the Child's collection frequency, regardless of the Parent's `update every`. The Parent's `[db] update every` setting only affects the metrics the Parent collects from its own host.
+
+Set each node's `update every` based on the collection granularity you want for that node's own data. Matching the two values is neither required nor beneficial — if they happen to be equal, it is coincidental and has no effect on correctness.
+
 </details>
 
 ## Step-by-Step Setup Guide
@@ -763,12 +808,12 @@ The Child node streams its metrics to the Parent node.
    sudo ./edit-config stream.conf
    ```
 
-2. Find the `[stream]` section and update it (replace PARENT_IP with your Parent's actual IP address):
+2. Find the `[stream]` section and update it (replace PARENT_HOSTNAME_OR_IP with your Parent's actual hostname/FQDN or IP address):
 
    ```ini
    [stream]
        enabled = yes
-       destination = PARENT_IP:19999
+       destination = PARENT_HOSTNAME_OR_IP:19999
        api key = 11111111-2222-3333-4444-555555555555
    ```
 
@@ -812,11 +857,11 @@ Check that streaming is working properly between your nodes.
 3. On the Child node, you should see:
 
    ```
-   STREAM xxx [send to PARENT_IP:19999]: connecting...
-   STREAM xxx [send to PARENT_IP:19999]: established communication - sending metrics...
+   STREAM xxx [send to PARENT_HOSTNAME_OR_IP:19999]: connecting...
+   STREAM xxx [send to PARENT_HOSTNAME_OR_IP:19999]: established communication - sending metrics...
    ```
 
-4. Open the Netdata dashboard on the Parent node (http://PARENT_IP:19999) and look for the Child node's hostname in the menu
+4. Open the Netdata dashboard on the Parent node (http://PARENT_HOSTNAME_OR_IP:19999) and look for the Child node's hostname in the menu
 
 :::tip
 
@@ -849,7 +894,7 @@ Add the following to the Child's `[stream]` section:
 
    ```ini
    [stream]
-       destination = PARENT_IP:19999:SSL
+       destination = PARENT_HOSTNAME_OR_IP:19999:SSL
    ```
 
 2. If using self-signed certificates, you may need to add:
@@ -865,7 +910,7 @@ Add the following to the Child's `[stream]` section:
 
    ```ini
    [stream]
-       destination = PARENT1_IP:19999 PARENT2_IP:19999
+       destination = PARENT1_HOSTNAME_OR_IP:19999 PARENT2_HOSTNAME_OR_IP:19999
    ```
 
 2. The Child will connect to the first available Parent and automatically switch if that connection fails

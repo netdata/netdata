@@ -4,11 +4,28 @@
 
 #define MAX_USEC 512 // Maximum backoff limit in microseconds
 
-#define PRIORITY_SHIFT 32
-#define NO_PRIORITY 0
+#define WAITQ_PRIORITY_BITS 3
+#define WAITQ_SEQUENCE_BITS (64 - WAITQ_PRIORITY_BITS)
+#define WAITQ_SEQUENCE_MASK ((UINT64_C(1) << WAITQ_SEQUENCE_BITS) - 1)
+#define WAITQ_SEQUENCE_WRAP_HALF (UINT64_C(1) << (WAITQ_SEQUENCE_BITS - 1))
+#define NO_PRIORITY WAITQ_NO_PRIORITY
+
+_Static_assert(WAITQ_PRIO_MAX < (UINT64_C(1) << WAITQ_PRIORITY_BITS),
+               "WAITQ priority bits must leave room for the no-priority sentinel");
 
 static ALWAYS_INLINE uint64_t make_order(WAITQ_PRIORITY priority, uint64_t seqno) {
-    return ((uint64_t)priority << PRIORITY_SHIFT) + seqno;
+    return ((uint64_t)priority << WAITQ_SEQUENCE_BITS) | (seqno & WAITQ_SEQUENCE_MASK);
+}
+
+static ALWAYS_INLINE bool order_is_before(uint64_t current, uint64_t candidate) {
+    uint64_t current_priority = current >> WAITQ_SEQUENCE_BITS;
+    uint64_t candidate_priority = candidate >> WAITQ_SEQUENCE_BITS;
+
+    if(current_priority != candidate_priority)
+        return current_priority < candidate_priority;
+
+    uint64_t diff = (current - candidate) & WAITQ_SEQUENCE_MASK;
+    return diff != 0 && (diff & WAITQ_SEQUENCE_WRAP_HALF);
 }
 
 static ALWAYS_INLINE uint64_t get_our_order(WAITQ *waitq, WAITQ_PRIORITY priority) {
@@ -18,7 +35,7 @@ static ALWAYS_INLINE uint64_t get_our_order(WAITQ *waitq, WAITQ_PRIORITY priorit
 
 ALWAYS_INLINE void waitq_init(WAITQ *waitq) {
     spinlock_init(&waitq->spinlock);
-    waitq->current_priority = 0;
+    waitq->current_priority = NO_PRIORITY;
     waitq->last_seqno = 0;
 }
 
@@ -30,7 +47,7 @@ static ALWAYS_INLINE bool write_our_priority(WAITQ *waitq, uint64_t our_order) {
 
     do {
 
-        if(current != NO_PRIORITY && current < our_order)
+        if(current != NO_PRIORITY && order_is_before(current, our_order))
             return false;
 
     } while(!__atomic_compare_exchange_n(
@@ -100,6 +117,11 @@ ALWAYS_INLINE void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priorit
                 worker_spinlock_contention(func, spins);
                 return;
             }
+
+            spins++;
+            if ((spins % SPINS_BEFORE_DEADLOCK_CHECK) == 0)
+                spinlock_deadlock_detect(&deadlock_timestamp, "waitq", func);
+
             yield_the_processor();
         }
 
@@ -125,6 +147,13 @@ ALWAYS_INLINE void waitq_release(WAITQ *waitq) {
 #define THREADS_PER_PRIORITY 2
 #define TEST_DURATION_SEC 2
 
+#define WAITQ_TEST(condition, message) do {        \
+    if(!(condition)) {                             \
+        fprintf(stderr, "WAITQ TEST FAILED: %s\n", message); \
+        errors++;                                  \
+    }                                              \
+} while(0)
+
 // For stress test statistics
 typedef struct thread_stats {
     WAITQ_PRIORITY priority;
@@ -148,6 +177,34 @@ static const char *priority_to_string(WAITQ_PRIORITY p) {
         case WAITQ_PRIO_LOW:    return "LOW";
         default:                        return "UNKNOWN";
     }
+}
+
+static int unittest_order_wrap(void) {
+    int errors = 0;
+
+    uint64_t normal_before_u32_wrap = make_order(WAITQ_PRIO_NORMAL, UINT32_MAX);
+    uint64_t normal_after_u32_wrap = make_order(WAITQ_PRIO_NORMAL, (uint64_t)UINT32_MAX + 1);
+
+    WAITQ_TEST(order_is_before(normal_before_u32_wrap, normal_after_u32_wrap),
+               "same-priority order survives the old uint32 sequence boundary");
+    WAITQ_TEST(!order_is_before(normal_after_u32_wrap, normal_before_u32_wrap),
+               "newer same-priority order is not selected before older order at uint32 boundary");
+
+    uint64_t normal_before_sequence_wrap = make_order(WAITQ_PRIO_NORMAL, WAITQ_SEQUENCE_MASK);
+    uint64_t normal_after_sequence_wrap = make_order(WAITQ_PRIO_NORMAL, WAITQ_SEQUENCE_MASK + 1);
+
+    WAITQ_TEST(order_is_before(normal_before_sequence_wrap, normal_after_sequence_wrap),
+               "same-priority order survives the packed sequence field boundary");
+    WAITQ_TEST(!order_is_before(normal_after_sequence_wrap, normal_before_sequence_wrap),
+               "newer same-priority order is not selected before older order at packed sequence boundary");
+
+    WAITQ_TEST(order_is_before(make_order(WAITQ_PRIO_URGENT, normal_after_u32_wrap),
+                               make_order(WAITQ_PRIO_NORMAL, normal_before_u32_wrap)),
+               "priority ordering remains stronger than FIFO ordering");
+    WAITQ_TEST(make_order(WAITQ_PRIO_LOW, WAITQ_SEQUENCE_MASK) != NO_PRIORITY,
+               "valid waitq orders cannot collide with the no-priority sentinel");
+
+    return errors;
 }
 
 static void stress_thread(void *arg) {
@@ -204,8 +261,10 @@ static int unittest_stress(void) {
     fprintf(stderr, "\nStress testing waiting queue...\n");
 
     WAITQ wq = WAITQ_INITIALIZER;
-    const size_t num_priorities = 4;
-    const size_t total_threads = num_priorities * THREADS_PER_PRIORITY;
+    enum {
+        WAITQ_STRESS_NUM_PRIORITIES = 4,
+        WAITQ_STRESS_TOTAL_THREADS = WAITQ_STRESS_NUM_PRIORITIES * THREADS_PER_PRIORITY
+    };
 
     // Test both with and without sleep
     for(int test = 0; test < 2; test++) {
@@ -216,12 +275,12 @@ static int unittest_stress(void) {
                 TEST_DURATION_SEC, with_sleep ? "with" : "without");
 
         // Prepare thread stats and args
-        THREAD_STATS stats[total_threads];
-        struct thread_args thread_args[total_threads];
-        ND_THREAD *threads[total_threads];
+        THREAD_STATS stats[WAITQ_STRESS_TOTAL_THREADS];
+        struct thread_args thread_args[WAITQ_STRESS_TOTAL_THREADS];
+        ND_THREAD *threads[WAITQ_STRESS_TOTAL_THREADS];
 
         fprintf(stderr, "Starting %zu threads for %ds test %s sleep...\n",
-                total_threads,
+                (size_t)WAITQ_STRESS_TOTAL_THREADS,
                 TEST_DURATION_SEC,
                 with_sleep ? "with" : "without");
 
@@ -264,12 +323,12 @@ static int unittest_stress(void) {
         __atomic_store_n(&stop_flag, true, __ATOMIC_RELEASE);
 
         // Wait for threads and collect stats
-        fprintf(stderr, "Waiting for %zu threads to finish...\n", total_threads);
-        for(size_t i = 0; i < total_threads; i++)
+        fprintf(stderr, "Waiting for %zu threads to finish...\n", (size_t)WAITQ_STRESS_TOTAL_THREADS);
+        for(size_t i = 0; i < WAITQ_STRESS_TOTAL_THREADS; i++)
             nd_thread_join(threads[i]);
 
         // Print stats
-        print_thread_stats(stats, total_threads, TEST_DURATION_SEC * USEC_PER_SEC);
+        print_thread_stats(stats, WAITQ_STRESS_TOTAL_THREADS, TEST_DURATION_SEC * USEC_PER_SEC);
     }
 
     waitq_destroy(&wq);
@@ -277,6 +336,7 @@ static int unittest_stress(void) {
 }
 
 int unittest_waiting_queue(void) {
-   int errors = unittest_stress();
+   int errors = unittest_order_wrap();
+   errors += unittest_stress();
    return errors;
 }

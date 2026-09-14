@@ -91,13 +91,18 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
     CLEAN_CHAR_P *buf = mallocz(buf_size);
     snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
-    rrd_function_run(
-        host, e->wb, 10,
-        HTTP_ACCESS_ALL, buf, false, NULL,
-        dyncfg_echo_cb, e,
-        NULL, NULL,
-        NULL, NULL,
-        NULL, string2str(df->dyncfg.source), false);
+    nrpc_call(&(struct nrpc_call_spec) {
+        .owner = rrdhost_nrpc_owner(host),
+        .result_wb = e->wb,
+        .cmd = buf,
+        .source = string2str(df->dyncfg.source),
+        .user_access = HTTP_ACCESS_ALL,
+        .timeout_s = 10,
+        .wait = false,
+        .allow_restricted = false,
+        .result.cb = dyncfg_echo_cb,
+        .result.data = e,
+    });
 }
 
 // ----------------------------------------------------------------------------
@@ -125,13 +130,19 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
     CLEAN_CHAR_P *buf = mallocz(buf_size);
     snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
-    rrd_function_run(
-        host, e->wb, 10,
-        HTTP_ACCESS_ALL, buf, false, NULL,
-        dyncfg_echo_cb, e,
-        NULL, NULL,
-        NULL, NULL,
-        df->dyncfg.payload, string2str(df->dyncfg.source), false);
+    nrpc_call(&(struct nrpc_call_spec) {
+        .owner = rrdhost_nrpc_owner(host),
+        .result_wb = e->wb,
+        .cmd = buf,
+        .source = string2str(df->dyncfg.source),
+        .user_access = HTTP_ACCESS_ALL,
+        .timeout_s = 10,
+        .wait = false,
+        .allow_restricted = false,
+        .payload = df->dyncfg.payload,
+        .result.cb = dyncfg_echo_cb,
+        .result.data = e,
+    });
 }
 
 // ----------------------------------------------------------------------------
@@ -161,13 +172,19 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
     CLEAN_CHAR_P *buf = mallocz(buf_size);
     snprintfz(buf, buf_size, "%s %s", string2str(df_template->function), cmd);
 
-    rrd_function_run(
-        host, e->wb, 10,
-        HTTP_ACCESS_ALL, buf, false, NULL,
-        dyncfg_echo_cb, e,
-        NULL, NULL,
-        NULL, NULL,
-        df_job->dyncfg.payload, string2str(df_job->dyncfg.source), false);
+    nrpc_call(&(struct nrpc_call_spec) {
+        .owner = rrdhost_nrpc_owner(host),
+        .result_wb = e->wb,
+        .cmd = buf,
+        .source = string2str(df_job->dyncfg.source),
+        .user_access = HTTP_ACCESS_ALL,
+        .timeout_s = 10,
+        .wait = false,
+        .allow_restricted = false,
+        .payload = df_job->dyncfg.payload,
+        .result.cb = dyncfg_echo_cb,
+        .result.data = e,
+    });
 }
 
 void dyncfg_echo_add(const DICTIONARY_ITEM *item_template, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *template_id, const char *job_name) {

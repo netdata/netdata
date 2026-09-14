@@ -37,85 +37,6 @@ static netdata_publish_syscall_t oomkill_publish_aggregated =
 
 static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every);
 
-/**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_OOMKILL_CHART,
-        "",
-        "Systemd service OOM kills.",
-        EBPF_OOMKILL_UNIT_KILLS,
-        NETDATA_EBPF_MEMORY_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_CGROUP_OOMKILLS_CONTEXT,
-        20191,
-        em->update_every);
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_oomkill_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_oomkill_charts(ect->name, em->update_every);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
-{
-    struct ebpf_target *w;
-    int update_every = em->update_every;
-    netdata_mutex_lock(&collect_data_mutex);
-    for (w = apps_groups_root_target; w; w = w->next) {
-        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_OOMKILL_IDX))))
-            continue;
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            NETDATA_OOMKILL_CHART,
-            "Processes OOM kills.",
-            EBPF_OOMKILL_UNIT_KILLS,
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "ebpf.app_oomkill",
-            20072,
-            update_every);
-
-        w->charts_created &= ~(1 << EBPF_MODULE_OOMKILL_IDX);
-    }
-    netdata_mutex_unlock(&collect_data_mutex);
-}
-
 static void oomkill_cleanup(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -126,24 +47,11 @@ static void oomkill_cleanup(void *pptr)
     collect_pids &= ~(1 << EBPF_MODULE_OOMKILL_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-
-        if (em->cgroup_charts) {
-            ebpf_obsolete_oomkill_cgroup_charts(em);
-        }
-
-        ebpf_obsolete_oomkill_apps(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
-    }
-
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -328,8 +236,8 @@ void ebpf_oomkill_send_cgroup_data(int update_every)
     netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_oomkill_charts(update_every);
         }
         ebpf_send_systemd_oomkill_charts();
@@ -479,7 +387,7 @@ static void oomkill_collector(ebpf_module_t *em)
         stats[NETDATA_CONTROLLER_PID_TABLE_ADD] += (uint64_t)count;
         stats[NETDATA_CONTROLLER_PID_TABLE_DEL] += (uint64_t)count;
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_update_oomkill_cgroup(keys, count);
 
         if (ebpf_plugin_stop())
@@ -488,7 +396,7 @@ static void oomkill_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         netdata_mutex_lock(&lock);
         // write everything from the ebpf map.
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_oomkill_send_cgroup_data(update_every);
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
@@ -565,14 +473,14 @@ void ebpf_oomkill_thread(void *ptr)
         // When we are not running integration with apps, we won't fill necessary variables for this thread to run, so
         // we need to disable it.
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (em->enabled)
+        if (ebpf_module_enabled_get(em))
             netdata_log_info("%s apps integration is completely disabled.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
 
         goto endoomkill;
     } else if (running_on_kernel < NETDATA_EBPF_KERNEL_4_14) {
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (em->enabled)
+        if (ebpf_module_enabled_get(em))
             netdata_log_info("%s kernel does not have necessary tracepoints.", NETDATA_DEFAULT_OOM_DISABLED_MSG);
         netdata_mutex_unlock(&ebpf_exit_cleanup);
 
@@ -590,6 +498,7 @@ void ebpf_oomkill_thread(void *ptr)
     if (!em->probe_links) {
         goto endoomkill;
     }
+    ebpf_mark_program_loaded();
 
     netdata_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);

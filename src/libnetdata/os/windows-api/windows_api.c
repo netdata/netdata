@@ -5,7 +5,10 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
+
 
 struct netdata_windows_ip_labels {
     char *local_iface;
@@ -46,10 +49,21 @@ int netdata_fill_default_ip()
     PIP_ADAPTER_ADDRESSES aa = adapters;
     while (aa) {
         if (aa->IfIndex == ifIndex) {
-            char iface[1024];
-            size_t required_size = wcstombs(NULL , aa->FriendlyName, 0) + 1;
-            wcstombs(iface, aa->FriendlyName, required_size);
-            default_ip.local_iface = strdup(iface);
+            if (aa->FriendlyName) {
+                size_t required_size = wcstombs(NULL, aa->FriendlyName, 0);
+                if (required_size != (size_t)-1) {
+                    char *iface = malloc(required_size + 1);
+                    if (iface) {
+                        size_t converted = wcstombs(iface, aa->FriendlyName, required_size + 1);
+                        if (converted != (size_t)-1 && converted <= required_size) {
+                            iface[converted] = '\0';
+                            default_ip.local_iface = iface;
+                        }
+                        else
+                            free(iface);
+                    }
+                }
+            }
 
             PIP_ADAPTER_UNICAST_ADDRESS ua = aa->FirstUnicastAddress;
             while (ua) {

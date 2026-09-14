@@ -10,7 +10,7 @@ This page tracks the package maintainers for Netdata, for various operating syst
 
 |          Linux Distribution           | Netdata Version |      Maintainer       | Related URL                                                                           |
 |:-------------------------------------:|:---------------:|:---------------------:|:--------------------------------------------------------------------------------------|
-|              Arch Linux               |     Release     |      @svenstaro       | [netdata @ Arch Linux](https://www.archlinux.org/packages/community/x86_64/netdata/)  |
+|              Arch Linux               |     Release     |      @svenstaro       | [netdata @ Arch Linux](https://archlinux.org/packages/extra/x86_64/netdata/)          |
 |            Arch Linux AUR             |       Git       |    @sanskritfritz     | [netdata @ AUR](https://aur.archlinux.org/packages/netdata-git/)                      |
 |             Gentoo Linux              |  Release + Git  |       @candrews       | [netdata @ gentoo](https://github.com/gentoo/gentoo/tree/master/net-analyzer/netdata) |
 |                Debian                 |     Release     | @lhw @FedericoCeratto | [netdata @ debian](http://salsa.debian.org/debian/netdata)                            |
@@ -51,7 +51,6 @@ This page tracks the package maintainers for Netdata, for various operating syst
 |:--------------:|:---------------:|:-------------:|:---------------------------------------------------------------------------------|
 |    OpenWRT     |     Release     |  @nitroshift  | [openwrt package](https://github.com/openwrt/packages/tree/master/admin/netdata) |
 |    ReadyNAS    |     Release     |   @NAStools   | <https://github.com/nastools/netdata>                                            |
-|      QNAP      |     Release     | QNAP_Stephane | <https://forum.qnap.com/viewtopic.php?t=121518>                                  |
 |     DietPi     |     Release     |   @Fourdee    | <https://github.com/Fourdee/DietPi>                                              |
 
 ---

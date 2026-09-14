@@ -32,4 +32,7 @@ NETDATA_DOUBLE percentile_on_sorted_series(const NETDATA_DOUBLE *series, size_t 
 NETDATA_DOUBLE *copy_series(const NETDATA_DOUBLE *series, size_t entries);
 void sort_series(NETDATA_DOUBLE *series, size_t entries);
 
+// unit tests
+int statistical_unittest(void);
+
 #endif //NETDATA_STATISTICAL_H

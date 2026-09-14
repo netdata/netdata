@@ -1,0 +1,17 @@
+if command -v systemd-sysusers >/dev/null 2>&1; then
+    systemd-sysusers /usr/lib/sysusers.d/netdata.conf
+else
+    if ! getent group netdata > /dev/null; then
+        groupadd --system netdata
+    fi
+
+    if ! getent passwd netdata > /dev/null; then
+        useradd --system -g netdata --home /usr/share/netdata --no-create-home -s /sbin/nologin -c "Netdata pseudo user" netdata
+    fi
+fi
+
+for item in docker ceph I2C video; do
+  if getent group $item > /dev/null 2>&1; then
+    usermod -a -G ${item} netdata
+  fi
+done

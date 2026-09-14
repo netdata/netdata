@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "src/aclk/aclk-schemas/proto/agent/v1/connection.pb.h"
-#include "src/aclk/aclk-schemas/proto/agent/v1/disconnect.pb.h"
+#include "agent/v1/connection.pb.h"
+#include "agent/v1/disconnect.pb.h"
 #include "connection.h"
 
 #include "schema_wrapper_utils.h"
@@ -15,7 +15,8 @@ char *generate_update_agent_connection(size_t *len, const update_agent_connectio
 {
     UpdateAgentConnection connupd;
 
-    connupd.set_claim_id(data->claim_id);
+    if (data->claim_id)
+        connupd.set_claim_id(data->claim_id);
     connupd.set_reachable(data->reachable);
     connupd.set_session_id(data->session_id);
 

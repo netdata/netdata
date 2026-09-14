@@ -3,23 +3,17 @@
 package ceph
 
 import (
-	"net/url"
+	"encoding/json"
 )
 
 // https://docs.ceph.com/en/reef/mgr/ceph_api/
 
 const (
 	urlPathApiAuth          = "/api/auth"
-	urlPathApiAuthCheck     = "/api/auth/check"
-	urlPathApiAuthLogout    = "/api/auth/logout"
 	urlPathApiHealthMinimal = "/api/health/minimal"
 	urlPathApiMonitor       = "/api/monitor"
 	urlPathApiOsd           = "/api/osd"
 	urlPathApiPool          = "/api/pool"
-)
-
-var (
-	urlQueryApiPool = url.Values{"stats": {"true"}}.Encode()
 )
 
 const (
@@ -27,25 +21,30 @@ const (
 	hdrContentTypeJson = "application/json"
 )
 
+type authLoginResp struct {
+	Token string `json:"token"`
+}
+
 type apiHealthMinimalResponse struct {
-	Health struct {
+	Health *struct {
 		Status string `json:"status"`
 	} `json:"health"`
-	MonStatus struct {
+	MonStatus *struct {
 		MonMap struct {
 			Mons []any `json:"mons"`
 		} `json:"monmap"`
 	} `json:"mon_status"`
-	ScrubStatus string `json:"scrub_status"`
-	OsdMap      struct {
+	ScrubStatus *string `json:"scrub_status"`
+	OsdMap      *struct {
 		Osds []struct {
 			In int64 `json:"in"`
 			Up int64 `json:"up"`
 		} `json:"osds"`
 	} `json:"osd_map"`
-	PgInfo struct {
+	PgInfo *struct {
 		ObjectStats struct {
 			NumObjects          int64 `json:"num_objects"`
+			NumObjectCopies     int64 `json:"num_object_copies"`
 			NumObjectsDegraded  int64 `json:"num_objects_degraded"`
 			NumObjectsMisplaced int64 `json:"num_objects_misplaced"`
 			NumObjectsUnfound   int64 `json:"num_objects_unfound"`
@@ -53,40 +52,44 @@ type apiHealthMinimalResponse struct {
 		Statuses  map[string]int64 `json:"statuses"`
 		PgsPerOsd float64          `json:"pgs_per_osd"`
 	} `json:"pg_info"`
-	Pools  []any `json:"pools"`
-	MgrMap struct {
+	Pools  *[]json.RawMessage `json:"pools"`
+	MgrMap *struct {
 		ActiveName string `json:"active_name"`
 		Standbys   []struct {
 			Gid int `json:"gid"`
 		} `json:"standbys"`
 	} `json:"mgr_map"`
-	Df struct {
+	Df *struct {
 		Stats struct {
 			TotalAvailBytes   int64 `json:"total_avail_bytes"`
 			TotalBytes        int64 `json:"total_bytes"`
 			TotalUsedRawBytes int64 `json:"total_used_raw_bytes"`
 		} `json:"stats"`
 	} `json:"df"`
-	ClientPerf struct {
+	ClientPerf *struct {
 		ReadBytesSec          float64 `json:"read_bytes_sec"`
 		ReadOpPerSec          float64 `json:"read_op_per_sec"`
 		WriteBytesSec         float64 `json:"write_bytes_sec"`
 		WriteOpPerSec         float64 `json:"write_op_per_sec"`
 		RecoveringBytesPerSec float64 `json:"recovering_bytes_per_sec"`
 	} `json:"client_perf"`
-	Hosts        int64 `json:"hosts"`
-	Rgw          int64 `json:"rgw"`
-	IscsiDaemons struct {
+	Hosts        *int64 `json:"hosts"`
+	Rgw          *int64 `json:"rgw"`
+	IscsiDaemons *struct {
 		Up   int64 `json:"up"`
 		Down int64 `json:"down"`
 	} `json:"iscsi_daemons"`
 }
 
 type apiOsdResponse struct {
-	UUID     string `json:"uuid"`
-	ID       int64  `json:"id"`
-	Up       int64  `json:"up"`
-	In       int64  `json:"in"`
+	UUID              string `json:"uuid"`
+	ID                int64  `json:"id"`
+	Up                int64  `json:"up"`
+	In                int64  `json:"in"`
+	OperationalStatus string `json:"operational_status"`
+	Host              struct {
+		Name string `json:"name"`
+	} `json:"host"`
 	OsdStats struct {
 		Statfs struct {
 			Total     int64 `json:"total"`
@@ -113,14 +116,13 @@ type apiOsdResponse struct {
 type apiPoolResponse struct {
 	PoolName string `json:"pool_name"`
 	Stats    struct {
-		Stored       struct{ Latest float64 } `json:"stored"`
-		Objects      struct{ Latest float64 } `json:"objects"`
-		AvailRaw     struct{ Latest float64 } `json:"avail_raw"`
-		BytesUsed    struct{ Latest float64 } `json:"bytes_used"`
-		PercentUsed  struct{ Latest float64 } `json:"percent_used"`
-		Reads        struct{ Latest float64 } `json:"rd"`
-		ReadBytes    struct{ Latest float64 } `json:"rd_bytes"`
-		Writes       struct{ Latest float64 } `json:"wr"`
-		WrittenBytes struct{ Latest float64 } `json:"wr_bytes"`
+		Objects      struct{ Latest json.Number } `json:"objects"`
+		AvailRaw     struct{ Latest json.Number } `json:"avail_raw"`
+		BytesUsed    struct{ Latest json.Number } `json:"bytes_used"`
+		PercentUsed  struct{ Latest json.Number } `json:"percent_used"`
+		Reads        struct{ Latest json.Number } `json:"rd"`
+		ReadBytes    struct{ Latest json.Number } `json:"rd_bytes"`
+		Writes       struct{ Latest json.Number } `json:"wr"`
+		WrittenBytes struct{ Latest json.Number } `json:"wr_bytes"`
 	} `json:"stats"`
 }

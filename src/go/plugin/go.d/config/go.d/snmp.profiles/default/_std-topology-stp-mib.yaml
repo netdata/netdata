@@ -1,0 +1,54 @@
+# Supplemental topology profile for STP-derived bridge links.
+# Source: BRIDGE-MIB dot1dStpPortTable.
+
+extends:
+  - _std-topology-bridge-base-mib.yaml
+
+topology:
+  - kind: stp_port
+    MIB: BRIDGE-MIB
+    table:
+      OID: 1.3.6.1.2.1.17.2.15.1
+      name: dot1dStpPortTable
+    symbols:
+      # Use port state as the row-presence anchor.
+      - OID: 1.3.6.1.2.1.17.2.15.1.3
+        name: stp_port
+    metric_tags:
+      - tag: stp_port
+        index: 1
+      - tag: stp_port_priority
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.2
+          name: dot1dStpPortPriority
+      - tag: stp_port_state
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.3
+          name: dot1dStpPortState
+      - tag: stp_port_enable
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.4
+          name: dot1dStpPortEnable
+      - tag: stp_port_path_cost
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.5
+          name: dot1dStpPortPathCost
+      - tag: stp_port_designated_root
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.6
+          name: dot1dStpPortDesignatedRoot
+          format: hex
+      - tag: stp_port_designated_cost
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.7
+          name: dot1dStpPortDesignatedCost
+      - tag: stp_port_designated_bridge
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.8
+          name: dot1dStpPortDesignatedBridge
+          format: hex
+      - tag: stp_port_designated_port
+        symbol:
+          OID: 1.3.6.1.2.1.17.2.15.1.9
+          name: dot1dStpPortDesignatedPort
+          format: hex

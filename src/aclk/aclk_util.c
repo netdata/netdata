@@ -76,7 +76,7 @@ void aclk_env_t_destroy(aclk_env_t *env) {
 
 int aclk_env_has_capa(const char *capa)
 {
-    for (int i = 0; i < (int) aclk_env->capability_count; i++) {
+    for (size_t i = 0; i < aclk_env->capability_count; i++) {
         if (!strcasecmp(capa, aclk_env->capabilities[i]))
             return 1;
     }
@@ -147,6 +147,7 @@ struct topic_name {
     { .id = ACLK_TOPICID_NODE_COLLECTORS,       .name = "node-instance-collectors" },
     { .id = ACLK_TOPICID_CTXS_SNAPSHOT,         .name = "contexts-snapshot"        },
     { .id = ACLK_TOPICID_CTXS_UPDATED,          .name = "contexts-updated"         },
+    { .id = ACLK_TOPICID_NODE_MANIFEST,         .name = "node-instance-manifest"   },
     { .id = ACLK_TOPICID_UNKNOWN,               .name = NULL                       }
 };
 
@@ -172,6 +173,9 @@ enum aclk_topics compulsory_topics[] = {
     ACLK_TOPICID_NODE_COLLECTORS,
     ACLK_TOPICID_CTXS_SNAPSHOT,
     ACLK_TOPICID_CTXS_UPDATED,
+    // ACLK_TOPICID_NODE_MANIFEST is intentionally NOT compulsory: older clouds do
+    // not advertise it. The agent sends the manifest only when the topic is present
+    // (see aclk_topic_available()), staying compatible with clouds that lack it.
     ACLK_TOPICID_UNKNOWN
 };
 
@@ -305,6 +309,18 @@ int aclk_generate_topic_cache(struct json_object *json)
     return 0;
 }
 
+static struct aclk_topic *topic_cache_find(enum aclk_topics topic)
+{
+    if (!aclk_topic_cache)
+        return NULL;
+
+    for (size_t i = 0; i < aclk_topic_cache_items; i++) {
+        if (aclk_topic_cache[i]->topic_id == topic)
+            return aclk_topic_cache[i];
+    }
+    return NULL;
+}
+
 /*
  * Build a topic based on sub_topic and final_topic
  * if the sub topic starts with / assume that is an absolute topic
@@ -317,12 +333,24 @@ const char *aclk_get_topic(enum aclk_topics topic)
         return NULL;
     }
 
-    for (size_t i = 0; i < aclk_topic_cache_items; i++) {
-        if (aclk_topic_cache[i]->topic_id == topic)
-            return aclk_topic_cache[i]->topic;
+    struct aclk_topic *t = topic_cache_find(topic);
+    if (!t) {
+        netdata_log_error("Unknown topic");
+        return NULL;
     }
-    netdata_log_error("Unknown topic");
-    return NULL;
+
+    return t->topic;
+}
+
+// Quiet variant of aclk_get_topic() that does not log when the topic is absent.
+// Used to gate optional outgoing messages (e.g. the node instance manifest) on
+// whether the cloud advertised the topic in its password response. Requires a
+// usable topic string, not just the id: topic_generate_final() leaves ->topic
+// NULL when the cloud sent no #{claim_id} tag to substitute.
+bool aclk_topic_available(enum aclk_topics topic)
+{
+    struct aclk_topic *t = topic_cache_find(topic);
+    return t && t->topic;
 }
 
 /*
@@ -361,12 +389,26 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms
         return 0;
     }
 
-    attempt++;
+    if (attempt < INT_MAX)
+        attempt++;
 
     if (attempt == 0)
         return 0;
 
-    unsigned long int delay = pow(base, attempt - 1);
+    unsigned long int delay = 1;
+    unsigned long int delay_limit = MAX(mins_ms, min_ms);
+    unsigned long int base_ul = (unsigned long int)base;
+
+    // Once the exponential term exceeds both clamp thresholds, the result is clamped.
+    if (base_ul > 1) {
+        for (int i = 0; i < attempt - 1; i++) {
+            if (delay > delay_limit / base_ul)
+                return min_ms;
+
+            delay *= base_ul;
+        }
+    }
+
     delay *= MSEC_PER_SEC;
 
     delay += (os_random32() % (MAX(1000, delay/2)));
@@ -543,17 +585,92 @@ static int aclk_poll_for_io(int fd, short events, int timeout_ms)
     return 1;
 }
 
-static int aclk_timeout_remaining_ms(usec_t start, int timeout_ms)
+// Clock-free so it can be unit tested; the guard against a negative timeout_ms must precede the
+// unsigned cast, or a negative budget would become a ~584 million year one (the comparison is in
+// milliseconds).
+static int aclk_timeout_remaining_ms_at(usec_t start_ut, int timeout_ms, usec_t now_ut)
 {
     if (timeout_ms <= 0)
         return 0;
 
-    usec_t elapsed_ms = (now_monotonic_usec() - start) / USEC_PER_MS;
-    if (elapsed_ms >= (usec_t)timeout_ms)
+    // Also keeps the subtraction below in range: it only runs when elapsed_ms < timeout_ms, so
+    // the result is positive and (int) cannot overflow.
+    msec_t elapsed_ms = clocks_usec_delta_or_zero(now_ut, start_ut) / USEC_PER_MS;
+    if (elapsed_ms >= (msec_t)timeout_ms)
         return 0;
 
     return timeout_ms - (int)elapsed_ms;
 }
+
+int aclk_timeout_remaining_ms(usec_t start_ut, int timeout_ms)
+{
+    return aclk_timeout_remaining_ms_at(start_ut, timeout_ms, now_monotonic_usec());
+}
+
+#define ACLK_TIMEOUT_TEST(condition, msg) do {                                   \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "aclk timeout unittest FAILED: %s (%s:%d)\n",        \
+                    (msg), __FUNCTION__, __LINE__);                              \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+int aclk_timeout_unittest(void)
+{
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning aclk timeout unittest\n");
+
+    const usec_t start_ut = 100 * USEC_PER_SEC;
+
+    // a fresh deadline hands back the whole budget
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut) == 1000,
+                      "full budget was not returned intact");
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 400 * USEC_PER_MS) == 600,
+                      "partially elapsed budget did not return the remainder");
+
+    // exactly-elapsed reports 0, i.e. spent, which is what the callers' "remaining <= 0" checks
+    // rely on. Note this does not pin the >= in the guard: at exact equality the fall-through
+    // would compute the same 0, so >= and > are indistinguishable here for every input.
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 1000 * USEC_PER_MS) == 0,
+                      "exactly elapsed budget was not reported as expired");
+
+    // over-elapsed must clamp to 0, never a negative remainder: this is what the guard actually
+    // buys, and without it the subtraction would return -4000 here
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 5000 * USEC_PER_MS) == 0,
+                      "over-elapsed budget returned a negative remainder instead of 0");
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 999 * USEC_PER_MS) == 1,
+                      "1ms short of the deadline was not still live");
+
+    // never hand back 0 while time is left, or callers would poll() non-blocking and spin
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut + 999999) == 1,
+                      "sub-millisecond remainder collapsed to a spinning zero timeout");
+
+    // a non-positive budget must expire immediately rather than wrap to ~584 million years
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 0, start_ut) == 0,
+                      "zero timeout was not treated as expired");
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, -1, start_ut) == 0,
+                      "negative timeout was not treated as expired");
+
+    // a backward monotonic reading must not be mistaken for elapsed time
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, 1000, start_ut - USEC_PER_SEC) == 1000,
+                      "backward clock reading consumed the budget");
+
+    // the widest budget must survive the subtraction without overflowing int
+    ACLK_TIMEOUT_TEST(aclk_timeout_remaining_ms_at(start_ut, INT_MAX, start_ut + 5 * USEC_PER_MS) ==
+                          INT_MAX - 5,
+                      "maximum budget did not round-trip through int");
+
+
+    if (errors)
+        fprintf(stderr, "aclk timeout unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "aclk timeout unittest: OK\n");
+
+    return errors;
+}
+
+#undef ACLK_TIMEOUT_TEST
 
 static int aclk_write_all_timeout(int fd, const void *buf, size_t len, int timeout_ms)
 {
@@ -572,7 +689,7 @@ static int aclk_write_all_timeout(int fd, const void *buf, size_t len, int timeo
         ssize_t n = write(fd, ((const uint8_t *)buf) + written, len - written);
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-                if ((now_monotonic_usec() - start) / USEC_PER_MS > (usec_t)timeout_ms)
+                if (aclk_timeout_remaining_ms(start, timeout_ms) <= 0)
                     return 1;
                 continue;
             }
@@ -603,7 +720,7 @@ static int aclk_read_exact_timeout(int fd, void *buf, size_t len, int timeout_ms
             return 1;
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-                if ((now_monotonic_usec() - start) / USEC_PER_MS > (usec_t)timeout_ms)
+                if (aclk_timeout_remaining_ms(start, timeout_ms) <= 0)
                     return 1;
                 continue;
             }

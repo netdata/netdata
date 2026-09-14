@@ -16,6 +16,237 @@ const char *inicfg_set(struct config *root, const char *section, const char *nam
     return string2str(opt->value);
 }
 
+static STRING *reformat_path(STRING *value) {
+#if defined(OS_WINDOWS)
+    CLEAN_CHAR_P *converted = os_translate_windows_to_msys_path(string2str(value));
+    if(string_strcmp(value, converted) != 0) {
+        string_freez(value);
+        return string_strdupz(converted);
+    }
+    // value unchanged: fall through and return as-is
+#else
+    // no-op on non-Windows: paths are always POSIX-style
+    (void)value;
+#endif
+
+    return value;
+}
+
+#if defined(OS_WINDOWS)
+static bool log_setting_output_is_special(const char *output) {
+    return !output || !*output ||
+           strcmp(output, "none") == 0 ||
+           strcmp(output, "off") == 0 ||
+           strcmp(output, "journal") == 0 ||
+           strcmp(output, "syslog") == 0 ||
+           strcmp(output, "system") == 0 ||
+           strcmp(output, "stderr") == 0 ||
+           strcmp(output, "stdout") == 0 ||
+           strcmp(output, "/dev/null") == 0
+#if defined(HAVE_ETW)
+           || strcmp(output, "etw") == 0
+#endif
+#if defined(HAVE_WEL)
+           || strcmp(output, "wel") == 0
+#endif
+        ;
+}
+
+static char *transform_log_path_setting(const char *setting, bool for_display) {
+    if(!setting)
+        return strdupz("");
+
+    CLEAN_CHAR_P *copy = strdupz(setting);
+    char *output = strrchr(copy, '@');
+    size_t prefix_len = 0;
+
+    if(output) {
+        prefix_len = (size_t)(output - copy);
+        *output = '\0';
+        output++;
+    }
+    else
+        output = copy;
+
+    if(log_setting_output_is_special(output))
+        return strdupz(setting);
+
+    CLEAN_CHAR_P *translated = for_display
+        ? os_translate_msys_to_windows_path(output)
+        : os_translate_windows_to_msys_path(output);
+    // os_translate_*_path() returns an allocated non-NULL string, using ""
+    // for empty input, so no NULL fallback is needed here.
+    size_t translated_len = strnlen(translated, CONFIG_MAX_VALUE + 1);
+
+    if(output == copy)
+        return strdupz(translated);
+
+    BUFFER *wb = buffer_create(prefix_len + translated_len + 2, NULL);
+    buffer_sprintf(wb, "%s@%s", copy, translated);
+    char *result = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
+
+    return result;
+}
+
+static bool windows_native_path_p(const char *value) {
+    if(!value || !*value)
+        return false;
+
+    return (isalpha((unsigned char)value[0]) && value[1] == ':') ||
+           ((value[0] == '\\' && value[1] == '\\') || (value[0] == '/' && value[1] == '/'));
+}
+
+static bool windows_path_list_needs_reformat_p(const char *value) {
+    if(!value || !*value)
+        return false;
+
+    return strchr(value, ';') || strchr(value, '\\') || windows_native_path_p(value);
+}
+
+static STRING *reformat_path_list(STRING *value) {
+    const char *src = string2str(value);
+    size_t src_len = string_strlen(value);
+    if(!windows_path_list_needs_reformat_p(src))
+        return value;
+
+    BUFFER *wb = buffer_create(src_len + 1, NULL);
+    bool first = true;
+    const char *segment_start = src;
+
+    while(true) {
+        const char *separator = strchr(segment_start, ';');
+        size_t segment_len = separator
+            ? (size_t)(separator - segment_start)
+            : src_len - (size_t)(segment_start - src);
+
+        CLEAN_CHAR_P *segment = strndupz(segment_start, segment_len);
+        char *trimmed = trim(segment);
+        CLEAN_CHAR_P *converted = os_translate_windows_to_msys_path(trimmed);
+
+        if(!first)
+            buffer_strcat(wb, ":");
+        buffer_strcat(wb, converted);
+        first = false;
+
+        if(!separator)
+            break;
+
+        segment_start = separator + 1;
+    }
+
+    if(string_strcmp(value, buffer_tostring(wb)) != 0) {
+        string_freez(value);
+        value = string_strdupz(buffer_tostring(wb));
+    }
+
+    buffer_free(wb);
+    return value;
+}
+
+static STRING *reformat_quoted_path_list(STRING *value) {
+    CLEAN_CHAR_P *copy = strdupz(string2str(value));
+    // 256 slots is far more than any realistic plugins list; entries beyond this are silently ignored.
+    char *words[256] = { 0 };
+    size_t num_words = quoted_strings_splitter_config(copy, words, _countof(words));
+    if(!num_words)
+        return value;
+
+    BUFFER *wb = buffer_create(string_strlen(value) + 1, NULL);
+    for(size_t i = 0; i < num_words; i++) {
+        CLEAN_CHAR_P *converted = os_translate_windows_to_msys_path(words[i]);
+        if(i)
+            buffer_strcat(wb, " ");
+        buffer_sprintf(wb, "\"%s\"", converted);
+    }
+
+    if(string_strcmp(value, buffer_tostring(wb)) != 0) {
+        string_freez(value);
+        value = string_strdupz(buffer_tostring(wb));
+    }
+
+    buffer_free(wb);
+    return value;
+}
+
+static STRING *reformat_log_path_setting(STRING *value) {
+    CLEAN_CHAR_P *converted = transform_log_path_setting(string2str(value), false);
+    if(string_strcmp(value, converted) != 0) {
+        string_freez(value);
+        return string_strdupz(converted);
+    }
+
+    return value;
+}
+#else
+static STRING *reformat_path_list(STRING *value) {
+    return value;
+}
+
+static STRING *reformat_quoted_path_list(STRING *value) {
+    return value;
+}
+
+static STRING *reformat_log_path_setting(STRING *value) {
+    return value;
+}
+#endif
+
+const char *inicfg_get_filename(struct config *root, const char *section, const char *name, const char *default_value) {
+    struct config_option *opt = inicfg_get_raw_value(root, section, name, default_value, CONFIG_VALUE_TYPE_FILENAME, reformat_path);
+    if(!opt)
+        return NULL;
+
+    return string2str(opt->value);
+}
+
+const char *inicfg_get_path(struct config *root, const char *section, const char *name, const char *default_value) {
+    struct config_option *opt = inicfg_get_raw_value(root, section, name, default_value, CONFIG_VALUE_TYPE_PATH, reformat_path);
+    if(!opt)
+        return NULL;
+
+    return string2str(opt->value);
+}
+
+const char *inicfg_get_path_list(struct config *root, const char *section, const char *name, const char *default_value) {
+    struct config_option *opt = inicfg_get_raw_value(root, section, name, default_value, CONFIG_VALUE_TYPE_TEXT, reformat_path_list);
+    if(!opt)
+        return NULL;
+
+    return string2str(opt->value);
+}
+
+const char *inicfg_get_quoted_path_list(struct config *root, const char *section, const char *name, const char *default_value) {
+    struct config_option *opt = inicfg_get_raw_value(root, section, name, default_value, CONFIG_VALUE_TYPE_TEXT, reformat_quoted_path_list);
+    if(!opt)
+        return NULL;
+
+    return string2str(opt->value);
+}
+
+const char *inicfg_get_log_path_setting(struct config *root, const char *section, const char *name, const char *default_value) {
+    struct config_option *opt = inicfg_get_raw_value(root, section, name, default_value, CONFIG_VALUE_TYPE_TEXT, reformat_log_path_setting);
+    if(!opt)
+        return NULL;
+
+    return string2str(opt->value);
+}
+
+const char *inicfg_log_path_setting_for_display(const char *value, char *dst, size_t dst_size) {
+#if defined(OS_WINDOWS)
+    if(!dst || dst_size == 0)
+        return value ? value : "";
+
+    CLEAN_CHAR_P *converted = transform_log_path_setting(value, true);
+    snprintfz(dst, dst_size, "%s", converted);
+    return dst;
+#else
+    (void)dst;
+    (void)dst_size;
+    return value ? value : "";
+#endif
+}
+
 bool inicfg_test_boolean_value(const char *s) {
     if(!strcasecmp(s, "yes") || !strcasecmp(s, "true") || !strcasecmp(s, "on")
         || !strcasecmp(s, "auto") || !strcasecmp(s, "on demand"))
@@ -105,14 +336,16 @@ time_t inicfg_get_duration_seconds(struct config *root, const char *section, con
 
     const char *s = string2str(opt->value);
 
-    int result = 0;
-    if(!duration_parse_seconds(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
+    int parsed = 0;
+    time_t result = 0;
+    if(!duration_parse_seconds(s, &parsed) ||
+       (parsed < 0 && __builtin_sub_overflow((time_t)0, parsed, &result))) {
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
         return default_value;
     }
 
-    return ABS(result);
+    return parsed < 0 ? result : (time_t)parsed;
 }
 
 time_t inicfg_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value) {
@@ -150,8 +383,8 @@ msec_t inicfg_get_duration_ms(struct config *root, const char *section, const ch
 
     smsec_t result = 0;
     if(!duration_parse_msec_t(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_MS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_MS);
         return default_value;
     }
 
@@ -182,7 +415,7 @@ static STRING *reformat_duration_days_to_seconds(STRING *value) {
 
 time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *section, const char *name, unsigned default_value_seconds) {
     char default_str[128];
-    duration_snprintf(default_str, sizeof(default_str), (int)default_value_seconds, "s", false);
+    duration_snprintf(default_str, sizeof(default_str), (int64_t)default_value_seconds, "s", false);
 
     struct config_option *opt = inicfg_get_raw_value(
         root, section, name, default_str,
@@ -196,17 +429,17 @@ time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *sect
 
     int64_t result = 0;
     if(!duration_parse(s, &result, "d", "s")) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS_TO_SECONDS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS_TO_SECONDS);
         return default_value_seconds;
     }
 
-    return (unsigned)ABS(result);
+    return ABS(result);
 }
 
 long long inicfg_get_number(struct config *root, const char *section, const char *name, long long value) {
     char buffer[100];
-    sprintf(buffer, "%lld", value);
+    snprintfz(buffer, sizeof(buffer), "%lld", value);
 
     struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
     if(!opt) return value;
@@ -217,7 +450,7 @@ long long inicfg_get_number(struct config *root, const char *section, const char
 
 long long inicfg_get_number_range(struct config *root, const char *section, const char *name, long long value, long long min, long long max) {
     char buffer[100];
-    sprintf(buffer, "%lld", value);
+    snprintfz(buffer, sizeof(buffer), "%lld", value);
 
     struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER, NULL);
     if(!opt) return value;
@@ -237,9 +470,21 @@ long long inicfg_get_number_range(struct config *root, const char *section, cons
     return rc;
 }
 
+// Formats a NETDATA_DOUBLE for the configuration file.
+// The fixed-point format is preferred for readability, but it needs thousands of digits for
+// huge magnitudes (e.g. 1e100), which would be silently truncated to a completely different
+// number. When it does not fit, fall back to the exponential format, which always fits.
+// snprintf() is used (not snprintfz()) because it returns the length the value would need,
+// so truncation is detected without rejecting a value that fits exactly.
+static void inicfg_double_to_str(char *dst, size_t dst_size, NETDATA_DOUBLE value) {
+    int len = snprintf(dst, dst_size, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    if(len < 0 || (size_t)len >= dst_size)
+        snprintfz(dst, dst_size, NETDATA_DOUBLE_FORMAT_G, value);
+}
+
 NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {
     char buffer[100];
-    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    inicfg_double_to_str(buffer, sizeof(buffer), value);
 
     struct config_option *opt = inicfg_get_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE, NULL);
     if(!opt) return value;
@@ -250,7 +495,7 @@ NETDATA_DOUBLE inicfg_get_double(struct config *root, const char *section, const
 
 long long inicfg_set_number(struct config *root, const char *section, const char *name, long long value) {
     char buffer[100];
-    sprintf(buffer, "%lld", value);
+    snprintfz(buffer, sizeof(buffer), "%lld", value);
 
     inicfg_set_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_INTEGER);
     return value;
@@ -258,7 +503,7 @@ long long inicfg_set_number(struct config *root, const char *section, const char
 
 NETDATA_DOUBLE inicfg_set_double(struct config *root, const char *section, const char *name, NETDATA_DOUBLE value) {
     char buffer[100];
-    sprintf(buffer, "%0.5" NETDATA_DOUBLE_MODIFIER, value);
+    inicfg_double_to_str(buffer, sizeof(buffer), value);
 
     inicfg_set_raw_value(root, section, name, buffer, CONFIG_VALUE_TYPE_DOUBLE);
     return value;
@@ -290,8 +535,8 @@ uint64_t inicfg_get_size_bytes(struct config *root, const char *section, const c
     const char *s = string2str(opt->value);
     uint64_t result = 0;
     if(!size_parse_bytes(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_BYTES);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid size", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_BYTES);
         return default_value;
     }
 
@@ -331,12 +576,12 @@ uint64_t inicfg_get_size_mb(struct config *root, const char *section, const char
     const char *s = string2str(opt->value);
     uint64_t result = 0;
     if(!size_parse_mb(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_MB);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid size", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_MB);
         return default_value;
     }
 
-    return (unsigned)result;
+    return result;
 }
 
 uint64_t inicfg_set_size_mb(struct config *root, const char *section, const char *name, uint64_t value) {

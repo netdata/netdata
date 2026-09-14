@@ -7,6 +7,7 @@ meta:
   categories:
     - export
   icon_filename: 'opentsdb.png'
+  description: 'Export Netdata metrics to OpenTSDB for long-term storage, further analysis, and correlation with other data sources.'
 keywords:
   - exporter
   - OpenTSDB
@@ -71,7 +72,7 @@ setup:
           description: 'The hostname to be used for sending data to the external database server.'
           required: false
         - name: 'prefix'
-          default_value: 'Netdata'
+          default_value: 'netdata'
           description: 'The prefix to add to all metrics.'
           required: false
         - name: 'update every'

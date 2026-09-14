@@ -33,11 +33,11 @@ func init() {
 
 // Config is the public v2 config surface.
 type Config struct {
-	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every,omitempty"`
-	AutoDetectEvery int `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	UpdateEvery     int `yaml:"update_every,omitempty"         json:"update_every,omitempty"`
+	AutoDetectEvery int `yaml:"autodetection_retry,omitempty"  json:"autodetection_retry,omitempty"`
 	JobConfig       `yaml:",inline" json:",inline"`
-	TimePeriods     []timeperiod.Config `yaml:"time_periods,omitempty" json:"time_periods,omitempty"`
-	Notes           string              `yaml:"notes,omitempty" json:"notes,omitempty"`
+	TimePeriods     []timeperiod.Config `yaml:"time_periods,omitempty"         json:"time_periods,omitempty"`
+	Notes           string              `yaml:"notes,omitempty"                json:"notes,omitempty"`
 	DirectorySource string              `yaml:"__directory_source__,omitempty" json:"-"`
 }
 
@@ -75,7 +75,7 @@ func New() *Collector {
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) VirtualNode() *vnodes.VirtualNode { return &c.vnode }
+func (c *Collector) SetConfiguredVnode(vnode vnodes.VirtualNode) { c.vnode = vnode }
 
 func (c *Collector) Init(context.Context) error { return c.initCollector() }
 

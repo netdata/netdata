@@ -4,7 +4,7 @@
 #include "mcp-tools-execute-function-internal.h"
 #include "mcp-tools-execute-function-registry.h"
 #include "mcp-params.h"
-#include "database/rrdfunctions.h"
+#include "nrpc/nrpc.h"
 
 // Analyze the JSON response and determine its type
 MCP_FUNCTION_TYPE mcp_functions_analyze_response(struct json_object *json_obj, int *out_status) {
@@ -1057,7 +1057,9 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
     struct json_object *columns_obj = NULL;
 
     if (!json_object_object_get_ex(data->input.jobj, "data", &data_obj) ||
-        !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj)) {
+        !json_object_is_type(data_obj, json_type_array) ||
+        !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj) ||
+        !json_object_is_type(columns_obj, json_type_object)) {
         buffer_strcat(data->output.result, json_str); // Missing required elements
         return;
     }
@@ -1193,8 +1195,12 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
     // Copy rows for filtering/sorting, applying filters if specified
     for (size_t i = 0; i < row_count; i++) {
         struct json_object *row = json_object_array_get_idx(data_obj, i);
-        if (!row)
-            continue;
+        if (!json_object_is_type(row, json_type_array)) {
+            data->output.status = MCP_TABLE_NOT_PROCESSABLE;
+            buffer_strcat(data->output.result, json_str);
+            freez((void *)rows);
+            return;
+        }
 
         bool include_row = true;
 
@@ -2215,24 +2221,18 @@ static MCP_RETURN_CODE mcp_function_run(MCP_FUNCTION_DATA *data, BUFFER *payload
     BUFFER *result_buffer = buffer_create(0, NULL);
     
     // Execute the function
-    int ret = rrd_function_run(
-        data->request.host,
-        result_buffer,
-        (int)data->request.timeout,
-        data->request.auth->access,
-        data->request.function,
-        true,
-        data->request.transaction,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        NULL,
-        payload,
-        buffer_tostring(source),
-        false
-    );
+    int ret = nrpc_call(&(struct nrpc_call_spec) {
+        .owner = rrdhost_nrpc_owner(data->request.host),
+        .result_wb = result_buffer,
+        .cmd = data->request.function,
+        .source = buffer_tostring(source),
+        .user_access = data->request.auth->access,
+        .timeout_s = (int)data->request.timeout,
+        .wait = true,
+        .allow_restricted = false,
+        .call_id = data->request.transaction,
+        .payload = payload,
+    });
     
     if (ret != HTTP_RESP_OK) {
         buffer_sprintf(data->request.mcpc->error,
@@ -2286,7 +2286,9 @@ static MCP_RETURN_CODE mcp_functions_process_table(MCP_FUNCTION_DATA *data, MCP_
         struct json_object *columns_obj = NULL;
         
         if (!json_object_object_get_ex(data->input.jobj, "data", &data_obj) ||
-            !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj)) {
+            !json_object_is_type(data_obj, json_type_array) ||
+            !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj) ||
+            !json_object_is_type(columns_obj, json_type_object)) {
             // Missing required fields, treat as not processable
             data->output.status = MCP_TABLE_NOT_PROCESSABLE;
             buffer_strcat(data->output.result, buffer_tostring(data->input.json));
@@ -2616,7 +2618,32 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
         mcp_functions_data_cleanup(&data);
         return rc;
     }
-    
+
+    // Authorize the caller BEFORE fetching or disclosing any function metadata.
+    // The function "info" path used to build required_params/options runs with elevated
+    // privileges, so without this gate an unauthorized caller could read protected metadata
+    // (log source names, file counts, sizes, coverage, timestamps) that the normal
+    // /api/v3/function path denies. Enforce the same access here (GHSA-6628-vxm3-4g8g).
+    {
+        CLEAN_BUFFER *access_error = buffer_create(0, NULL);
+        int access_code = nrpc_method_authorize(
+            data.request.host ? rrdhost_nrpc_owner(data.request.host) : NRPC_OWNER_NONE,
+            access_error, data.request.function,
+            data.request.auth ? data.request.auth->access : HTTP_ACCESS_NONE,
+            false, NULL);
+
+        if (access_code != HTTP_RESP_OK) {
+            // Echo back only the caller-supplied node identifier, never the resolved
+            // hostname, so the denial does not disclose node metadata to an unauthorized caller.
+            buffer_sprintf(mcpc->error,
+                           "You are not authorized to execute function '%s' on node '%s'.",
+                           data.request.function ? data.request.function : "(unknown)",
+                           data.request.node ? data.request.node : "(unknown)");
+            mcp_functions_data_cleanup(&data);
+            return MCP_RC_ERROR;
+        }
+    }
+
     // Get function registry entry
     CLEAN_BUFFER *registry_error = buffer_create(0, NULL);
     MCP_FUNCTION_REGISTRY_ENTRY *registry_entry = mcp_functions_registry_get(data.request.host, data.request.function, registry_error);

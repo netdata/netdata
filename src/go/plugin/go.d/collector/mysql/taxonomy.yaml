@@ -1,0 +1,303 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: mysql
+placements:
+  - id: mysql
+    section_id: applications.mysql
+    title: MySQL
+    icon: mysql
+    items:
+      - type: grid
+        id: mysql-heads
+        title: mysql-heads
+        items:
+          - type: context
+            title: No. of Slow Queries
+            contexts: [mysql.queries]
+            chart_library: number
+            group_by: [selected]
+            selected_dimensions: [slow_queries]
+            colors: ["#3366CC", "#66AA00"]
+            layout: { left: 0, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Total No. of Deadlocks
+            contexts: [mysql.innodb_deadlocks]
+            chart_library: number
+            group_by: [selected]
+            colors: ["#DC3912", "#FE3912"]
+            layout: { left: 3, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Galera Cluster Status
+            contexts: [mysql.galera_cluster_status]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            colors: ["#109618", "#3366CC"]
+            layout: { left: 6, top: 0, width: 3, height: 4 }
+          - type: context
+            title: Total Open Transactions
+            contexts: [mysql.galera_open_transactions]
+            chart_library: easypiechart
+            group_by: [selected]
+            colors: ["#FF9900", "#D66300"]
+            layout: { left: 9, top: 0, width: 3, height: 4 }
+          - type: context
+            title: MySQL Join Operation Issues
+            contexts: [mysql.join_issues]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            layout: { left: 0, top: 4, width: 3, height: 4 }
+          - type: context
+            title: Number of MySQL threads
+            contexts: [mysql.threads_created]
+            chart_library: number
+            group_by: [selected]
+            colors: ["#990099", "#0099C6"]
+            layout: { left: 3, top: 4, width: 3, height: 4 }
+          - type: context
+            title: InnoDB Buffer Pool Read Ahead
+            contexts: [mysql.innodb_buffer_pool_read_ahead]
+            chart_library: bars
+            dimensions_sort: valueDesc
+            colors: ["#3B3EAC", "#5054e6"]
+            layout: { left: 6, top: 4, width: 3, height: 4 }
+          - type: context
+            title: Longest Query Duration
+            contexts: [mysql.process_list_longest_query_duration]
+            chart_library: number
+            group_by: [selected]
+            aggregation_method: max
+            colors: ["#66AA00", "#EE9911"]
+            layout: { left: 9, top: 4, width: 3, height: 4 }
+      - type: context
+        id: mysql-servers
+        title: List MySQL Servers
+        contexts:
+          - mysql.connections_active
+          - mysql.queries_type
+          - mysql.net
+        chart_library: table
+        group_by: [dimension, label, node, context]
+        group_by_label: [_collect_job]
+        table_columns: [context, dimension]
+        labels:
+          mysql.connections_active: Connections
+          mysql.queries_type: Queries
+          mysql.net: Network
+      - type: group
+        id: queries
+        title: Queries
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: statistics
+            title: Statistics
+            items:
+              - mysql.queries
+              - mysql.queries_type
+              - mysql.process_list_queries_count
+              - mysql.process_list_longest_query_duration
+              - mysql.process_list_fetch_query_duration
+          - type: group
+            id: cache
+            title: Cache
+            items:
+              - mysql.qcache_ops
+              - mysql.qcache
+              - mysql.qcache_freemem
+              - mysql.qcache_memblocks
+          - type: group
+            id: issues
+            title: Issues
+            items:
+              - mysql.join_issues
+              - mysql.sort_issues
+              - mysql.tmp
+      - type: group
+        id: resources
+        title: Resources
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: handlers
+            title: Handlers
+            items:
+              - mysql.handlers
+          - type: group
+            id: connections-and-threads
+            title: Connections & Threads
+            items:
+              - mysql.connections
+              - mysql.connections_active
+              - mysql.connection_errors
+              - mysql.threads
+              - mysql.threads_created
+              - mysql.thread_cache_misses
+          - type: group
+            id: network
+            title: Network
+            items:
+              - mysql.net
+          - type: group
+            id: files-and-tables
+            title: Files & Tables
+            items:
+              - mysql.files
+              - mysql.files_rate
+              - mysql.open_tables
+              - mysql.opened_tables
+              - mysql.table_open_cache_overflows
+              - mysql.table_locks
+      - type: group
+        id: storage-engine
+        title: Storage Engine
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: innodb
+            title: InnoDB
+            properties: { grouping: true }
+            items:
+              - type: group
+                id: buffer-pool
+                title: Buffer Pool
+                items:
+                  - mysql.innodb_buffer_pool_pages
+                  - mysql.innodb_buffer_pool_bytes
+                  - mysql.innodb_buffer_pool_ops
+                  - mysql.innodb_buffer_pool_read_ahead
+                  - mysql.innodb_buffer_pool_pages_flushed
+                  - mysql.innodb_buffer_pool_read_ahead_rnd
+              - type: group
+                id: io
+                title: I/O
+                items:
+                  - mysql.innodb_io
+                  - mysql.innodb_io_ops
+                  - mysql.innodb_io_pending_ops
+              - type: group
+                id: transactions-and-locks
+                title: Transactions & Locks
+                items:
+                  - mysql.innodb_rows
+                  - mysql.innodb_cur_row_lock
+                  - mysql.innodb_deadlocks
+              - type: group
+                id: logging
+                title: Logging
+                items:
+                  - mysql.innodb_log
+                  - mysql.innodb_os_log
+                  - mysql.innodb_os_log_fsync_writes
+                  - mysql.innodb_os_log_io
+                  - mysql.innodb_redo_log_activity
+                  - mysql.innodb_redo_log_checkpoint_age
+                  - mysql.innodb_redo_log_occupancy
+          - type: group
+            id: myisam
+            title: MyISAM
+            items:
+              - mysql.key_blocks
+              - mysql.key_requests
+              - mysql.key_disk_ops
+      - type: group
+        id: replication
+        title: Replication
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: slave-status
+            title: Slave Status
+            items:
+              - mysql.slave_status
+              - mysql.slave_behind
+          - type: group
+            id: binary-logging
+            title: Binary Logging
+            items:
+              - mysql.binlog_cache
+              - mysql.binlog_stmt_cache
+      - type: group
+        id: galera-cluster
+        title: Galera Cluster
+        properties: { grouping: true }
+        items:
+          - type: group
+            id: cluster-status
+            title: Cluster Status
+            items:
+              - mysql.galera_cluster_status
+              - mysql.galera_cluster_state
+              - mysql.galera_cluster_size
+              - mysql.galera_cluster_weight
+              - mysql.galera_connected
+              - mysql.galera_ready
+          - type: group
+            id: galera-replication
+            title: Replication
+            items:
+              - mysql.galera_writesets
+              - mysql.galera_bytes
+              - mysql.galera_queue
+          - type: group
+            id: conflicts-and-flow-control
+            title: Conflicts & Flow Control
+            items:
+              - mysql.galera_conflicts
+              - mysql.galera_flow_control
+          - type: group
+            id: galera-resources
+            title: Resources
+            items:
+              - mysql.galera_open_transactions
+              - mysql.galera_thread_count
+      - type: group
+        id: user-statistics
+        title: User Statistics
+        properties: { grouping: true }
+        items:
+          - type: context
+            id: mysql-users
+            title: List MySQL Users
+            contexts:
+              - mysql.userstats_cpu
+              - mysql.userstats_rows
+              - mysql.userstats_commands
+              - mysql.userstats_created_transactions
+              - mysql.userstats_empty_queries
+            chart_library: table
+            group_by: [dimension, label, node, context]
+            group_by_label: [user]
+            table_columns: [context, dimension]
+            labels:
+              mysql.userstats_cpu: Cpu
+              mysql.userstats_rows: Rows
+              mysql.userstats_commands: Commands
+              mysql.userstats_created_transactions: Transactions
+              mysql.userstats_empty_queries: Empty Queries
+          - type: group
+            id: resource-usage
+            title: Resource Usage
+            short_name: Rusage
+            items:
+              - mysql.userstats_cpu
+              - mysql.userstats_rows
+          - type: group
+            id: commands
+            title: Commands
+            items:
+              - mysql.userstats_commands
+              - mysql.userstats_denied_commands
+          - type: group
+            id: user-connections
+            title: Connections
+            items:
+              - mysql.userstats_connections
+              - mysql.userstats_lost_connections
+              - mysql.userstats_denied_connections
+          - type: group
+            id: transactions
+            title: Transactions
+            items:
+              - mysql.userstats_created_transactions
+              - mysql.userstats_binlog_written
+              - mysql.userstats_empty_queries

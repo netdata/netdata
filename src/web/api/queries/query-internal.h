@@ -13,6 +13,7 @@
 typedef struct query_point {
     STORAGE_POINT sp;
     NETDATA_DOUBLE value;
+    uint8_t tier;
     bool added;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
@@ -47,10 +48,13 @@ typedef struct query_engine_ops {
     time_t view_update_every;
     time_t query_granularity;
     TIER_QUERY_FETCH tier_query_fetch;
+    QUERY_POINT_MODE point_mode;
 
     // query planer
     size_t current_plan;
     time_t current_plan_expire_time;
+    time_t result_plan_expire_time;
+    time_t plan_switch_time_offset;
     time_t plan_expanded_after;
     time_t plan_expanded_before;
 
@@ -70,6 +74,15 @@ typedef struct query_engine_ops {
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
 
+    bool result_plan_expire_time_overflow;
+
+    // the LATEST grouping with a single output point reached by the metric's
+    // latest collection interval is answered from the collector's cached value,
+    // without querying the storage engine (no query plan is built)
+    bool latest_fast_path;
+    NETDATA_DOUBLE latest_fast_path_value;
+    time_t latest_fast_path_time;
+
     struct {
         time_t expanded_after;
         time_t expanded_before;
@@ -81,14 +94,21 @@ typedef struct query_engine_ops {
     struct query_engine_ops *next;
 } QUERY_ENGINE_OPS;
 
+typedef struct query_engine_ops_cache {
+    QUERY_ENGINE_OPS *released_ops;
+} QUERY_ENGINE_OPS_CACHE;
+
 // query planner
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
+#define query_result_plan_should_switch_plan(ops, now) \
+    ((now) >= (ops)->result_plan_expire_time && !(ops)->result_plan_expire_time_overflow)
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time);
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
-QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, size_t query_metric_id);
-void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS *ops);
-time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier);
-void rrd2rrdr_query_ops_freeall(RRDR *r);
+QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id);
+void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS_CACHE *cache, QUERY_ENGINE_OPS *ops);
+time_t query_target_min_update_every_for_tier(QUERY_TARGET *qt, size_t tier);
+int query_plan_unittest(void);
+void rrd2rrdr_query_ops_freeall(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache);
 
 // query execution
 void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops);

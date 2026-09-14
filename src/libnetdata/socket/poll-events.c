@@ -140,7 +140,9 @@ int poll_default_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
 
                 return -1;
             }
-        } else if (rc) {
+        } else if (!rc) {
+            return -1;
+        } else {
             // data received
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d",
@@ -366,6 +368,11 @@ void poll_events(LISTEN_SOCKETS *sockets
         .snd_callback = snd_callback?snd_callback:poll_default_snd_callback,
         .tmr_callback = tmr_callback?tmr_callback:poll_default_tmr_callback
     };
+
+    if(unlikely(!p.ndpl)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "POLLFD: failed to create nd_poll");
+        return;
+    }
 
     size_t i;
     for(i = 0; i < sockets->opened ;i++) {

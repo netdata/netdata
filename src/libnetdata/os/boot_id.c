@@ -4,6 +4,7 @@
 #include "libnetdata/libnetdata.h"
 
 static ND_UUID cached_boot_id = { 0 };
+static bool cached_boot_id_available = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 #if defined(OS_LINUX)
@@ -49,19 +50,22 @@ static ND_UUID get_boot_id(void) {
 #endif // OS_LINUX
 
 ND_UUID os_boot_id(void) {
-    // Fast path - return cached value if available
-    if(!UUIDiszero(cached_boot_id))
+    if(__atomic_load_n(&cached_boot_id_available, __ATOMIC_ACQUIRE))
         return cached_boot_id;
 
     spinlock_lock(&spinlock);
 
-    // Check again under lock in case another thread set it
-    if(UUIDiszero(cached_boot_id)) {
-        cached_boot_id = get_boot_id();
+    ND_UUID boot_id = cached_boot_id;
+    if(UUIDiszero(boot_id)) {
+        boot_id = get_boot_id();
+        cached_boot_id = boot_id;
+
+        if(!UUIDiszero(boot_id))
+            __atomic_store_n(&cached_boot_id_available, true, __ATOMIC_RELEASE);
     }
 
     spinlock_unlock(&spinlock);
-    return cached_boot_id;
+    return boot_id;
 }
 
 bool os_boot_ids_match(ND_UUID a, ND_UUID b) {

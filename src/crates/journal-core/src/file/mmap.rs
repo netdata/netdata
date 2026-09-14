@@ -206,12 +206,16 @@ impl<M: MemoryMap> WindowManager<M> {
         } else if let Some(idx) = self.lookup_window_by_position(position) {
             // Remap the window
 
-            let window = self.windows.remove(idx);
+            let _window = self.windows.remove(idx);
             // Invalidate active_window_idx before removal to maintain consistency.
             // If create_window fails, the index won't point to a non-existent window.
             self.active_window_idx = None;
 
-            let window_start = window.offset;
+            // Keep the remapped window centered on the requested range instead of
+            // preserving the old window start. Preserving the old start lets
+            // sequential append access grow one mapping from the beginning of the
+            // file toward the tail, which defeats the intended bounded-window model.
+            let window_start = self.get_chunk_aligned_start(position);
             let window_end = self.get_chunk_aligned_end(position + size_needed);
             let num_chunks = (window_end - window_start) / self.chunk_size;
 
@@ -468,5 +472,37 @@ mod tests {
             "Expected get_slice to succeed after recovery"
         );
         assert_eq!(wm.windows.len(), 1);
+    }
+
+    #[test]
+    fn sequential_boundary_crossing_slides_window_instead_of_growing_from_start() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(&[0u8; 64 * 1024]).unwrap();
+        temp_file.flush().unwrap();
+
+        let file = File::open(temp_file.path()).unwrap();
+        let mut wm: WindowManager<FailingMmap> =
+            WindowManager::new(file, PAGE_SIZE_TEST, 1).unwrap();
+
+        MOCK_CONTROLLER.with(|ctrl| {
+            ctrl.set_fail_next(false);
+            ctrl.create_count.set(0);
+        });
+
+        let _ = wm.get_slice(0, 100).unwrap();
+        assert_eq!(wm.windows[0].offset, 0);
+        assert_eq!(wm.windows[0].size, PAGE_SIZE_TEST);
+
+        let _ = wm.get_slice(PAGE_SIZE_TEST - 6, 32).unwrap();
+        assert_eq!(wm.windows[0].offset, 0);
+        assert_eq!(wm.windows[0].size, PAGE_SIZE_TEST * 2);
+
+        let _ = wm.get_slice((PAGE_SIZE_TEST * 2) - 12, 32).unwrap();
+        assert_eq!(wm.windows[0].offset, PAGE_SIZE_TEST);
+        assert_eq!(wm.windows[0].size, PAGE_SIZE_TEST * 2);
+
+        let _ = wm.get_slice((PAGE_SIZE_TEST * 3) - 20, 32).unwrap();
+        assert_eq!(wm.windows[0].offset, PAGE_SIZE_TEST * 2);
+        assert_eq!(wm.windows[0].size, PAGE_SIZE_TEST * 2);
     }
 }

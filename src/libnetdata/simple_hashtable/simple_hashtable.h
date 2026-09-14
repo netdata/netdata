@@ -153,7 +153,13 @@ static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAME
 
     // Ensure there's enough space in the sorted array
     if (ht->sorted.used >= ht->sorted.size) {
+        if(unlikely(ht->sorted.size > SIZE_MAX / 2))
+            fatal("SIMPLE_HASHTABLE: cannot resize sorted array with %zu entries", ht->sorted.size);
+
         size_t size = ht->sorted.size ? ht->sorted.size * 2 : 64;
+        if(unlikely(size > SIZE_MAX / sizeof(SIMPLE_HASHTABLE_VALUE_TYPE)))
+            fatal("SIMPLE_HASHTABLE: cannot allocate sorted array with %zu entries", size);
+
         SIMPLE_HASHTABLE_VALUE_TYPE *array = mallocz(size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
         if(ht->sorted.array) {
             memcpy(array, ht->sorted.array, ht->sorted.size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
@@ -174,7 +180,10 @@ static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAME
     size_t index = simple_hashtable_sorted_binary_search_named(ht, value);
 
     // Check if the value exists at the found index
-    assert(index < ht->sorted.used && ht->sorted.array[index] == value);
+    bool found = index < ht->sorted.used && ht->sorted.array[index] == value;
+    assert(found);
+    if(unlikely(!found))
+        return;
 
     // Use memmove to shift elements and close the gap
     memmove(&ht->sorted.array[index], &ht->sorted.array[index + 1], (ht->sorted.used - index - 1) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
@@ -186,7 +195,10 @@ static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_
         return;
 
     size_t old_value_index = simple_hashtable_sorted_binary_search_named(ht, old_value);
-    assert(old_value_index < ht->sorted.used && ht->sorted.array[old_value_index] == old_value);
+    bool old_value_found = old_value_index < ht->sorted.used && ht->sorted.array[old_value_index] == old_value;
+    assert(old_value_found);
+    if(unlikely(!old_value_found))
+        return;
 
     int r = SIMPLE_HASHTABLE_SORT_FUNCTION(old_value, new_value);
     if(r == 0) {
@@ -258,7 +270,7 @@ static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_
 
 static inline void simple_hashtable_init_named(SIMPLE_HASHTABLE_NAMED *ht, size_t size) {
     memset(ht, 0, sizeof(*ht));
-    ht->size = size;
+    ht->size = size ? size : 1;
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
 }
 
@@ -305,7 +317,8 @@ static inline bool simple_hashtable_can_use_slot_named(
     return false;
 }
 
-#define SIMPLE_HASHTABLE_NEEDS_RESIZE(ht) ((ht)->size <= ((ht)->used - (ht)->deleted) << 1 || (ht)->used >= (ht)->size)
+#define SIMPLE_HASHTABLE_NEEDS_RESIZE(ht) \
+    ((ht)->used >= (ht)->size || ((ht)->used - (ht)->deleted) >= ((ht)->size / 2 + ((ht)->size & 1)))
 
 // IMPORTANT: the pointer returned by this call is valid up to the next call of this function (or the resize one).
 // If you need to cache something, cache the hash, not the slot pointer.
@@ -377,7 +390,7 @@ static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_get_slot_named(
             else {
                 // the hashtable is full, but resize is false.
                 // this should never happen.
-                assert(sl != sl_started);
+                fatal("SIMPLE_HASHTABLE: lookup without resize reached a full table");
             }
         }
     }
@@ -461,8 +474,12 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
 
     size_t new_size = ht->size;
 
-    if(SIMPLE_HASHTABLE_NEEDS_RESIZE(ht))
-        new_size = (ht->size << 1) - ((ht->size > 16) ? 1 : 0);
+    if(SIMPLE_HASHTABLE_NEEDS_RESIZE(ht)) {
+        if(unlikely(ht->size > SIZE_MAX / 2))
+            fatal("SIMPLE_HASHTABLE: cannot resize table with %zu slots", ht->size);
+
+        new_size = (ht->size * 2) - ((ht->size > 16) ? 1 : 0);
+    }
 
     ht->resizes++;
     ht->size = new_size;
@@ -485,7 +502,14 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
         used++;
     }
 
-    assert(used == ht->used - ht->deleted);
+    if(unlikely(ht->deleted > ht->used))
+        fatal("SIMPLE_HASHTABLE: resize accounting invalid, deleted slots %zu exceed used slots %zu",
+              ht->deleted, ht->used);
+
+    size_t expected_used = ht->used - ht->deleted;
+    if(unlikely(used != expected_used))
+        fatal("SIMPLE_HASHTABLE: resize accounting mismatch, rehashed %zu slots, expected %zu slots (used %zu, deleted %zu)",
+              used, expected_used, ht->used, ht->deleted);
 
     ht->used = used;
     ht->deleted = 0;

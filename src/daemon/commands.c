@@ -354,19 +354,53 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, bool unregister)
+static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool report_error, bool unregister)
 {
+    rrd_rdlock();
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (!host) {
+        rrd_rdunlock();
+        return 0;
+    }
+
     if (host == localhost) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is our localhost - not changing it",
                            rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
         return 0;
     }
+
+    // the context-load workers (sqlite_metadata.c) hold raw RRDHOST pointers to
+    // every host carrying this flag; freeing such a host is a use-after-free
+    // (marking ephemeral without unregistering does not free it, so it may proceed)
+    if (unregister && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
+        if (report_error)
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy loading contexts - try again",
+                           rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
+        return -1;
+    }
+
+    bool locked = unregister ? rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)
+                             : rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
+    if (!locked) {
+        if (report_error)
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                           rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
+        return -1;
+    }
+    rrd_rdunlock();
 
     if (rrdhost_is_online(host)) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
                            rrdhost_hostname(host), host->machine_guid);
+        if (unregister)
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+        else
+            rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 0;
     }
 
@@ -376,11 +410,29 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
         marked = true;
     }
 
-    sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
+    // host->rrdlabels is the copy that matters: build_node_info() transmits it as the
+    // node's complete label set, and meta_store_host_labels() rewrites the host_label
+    // rows from it. Updating only the row below leaves the cloud believing the node is
+    // permanent, and lets a later metadata store revert that row. Update the dictionary
+    // in place - RRDLABELS is internally locked, while replacing the pointer would race
+    // readers that assume it stays valid for the lifetime of the host.
+    bool label_changed = host->rrdlabels &&
+        rrdlabels_add_changed(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
+    marked |= label_changed;
+
+    sql_set_host_label(&host->host_id.uuid, HOST_LABEL_IS_EPHEMERAL, "true");
     pulse_host_status(host, 0, 0);
 
-    if (marked)
+    // only a change in the transmitted labels needs an update; a host that has none in
+    // memory gets no update at all, because that would publish an empty set and drop
+    // every other label this node has
+    if (label_changed)
         send_node_info_with_wait(host);
+    else if (!host->rrdlabels)
+        nd_log_daemon(NDLP_WARNING,
+                      "Node '%s' (machine guid: %s) has no labels in memory - "
+                      "could not inform Netdata Cloud that it is ephemeral",
+                      rrdhost_hostname(host), host->machine_guid);
 
     if (unregister) {
         send_node_update_with_wait(host, 0, 0);
@@ -389,15 +441,14 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
         host->node_id = UUID_ZERO;
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
                        rrdhost_hostname(host), host->machine_guid);
-        rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host);
-        rrd_wrunlock();
+        rrdhost_free___consume_metadata_lifetime_writelock(host);
         return 1;
     }
 
     if (marked) {
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been marked ephemeral",
                        rrdhost_hostname(host), host->machine_guid);
+        rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 1;
     }
 
@@ -406,6 +457,7 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
                        rrdhost_hostname(host), host->machine_guid);
     }
 
+    rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
     return 0;
 }
 
@@ -421,12 +473,16 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
         goto done;
     }
 
-    RRDHOST *host = NULL;
-    host = rrdhost_find_by_guid(args);
+    char machine_guid[UUID_STR_LEN] = "";
+    rrd_rdlock();
+    RRDHOST *host = rrdhost_find_by_guid(args);
     if (!host)
         host = rrdhost_find_by_node_id(args);
+    if (host)
+        strncpyz(machine_guid, host->machine_guid, sizeof(machine_guid));
+    rrd_rdunlock();
 
-    if (!host) {
+    if (!machine_guid[0]) {
         sqlite3_stmt *res = NULL;
 
         bool report_error = strcmp(args, "ALL_NODES") != 0;
@@ -441,30 +497,36 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
 
         param = 0;
         int cnt = 0;
+        int busy = 0;
         while (sqlite3_step_monitored(res) == SQLITE_ROW) {
             char guid[UUID_STR_LEN];
-            uuid_unparse_lower(*(nd_uuid_t *)sqlite3_column_blob(res, 0), guid);
-            host = rrdhost_find_by_guid(guid);
-            if (host) {
-                int rc = remove_ephemeral_host(wb, host, report_error, unregister);
-                if(rc) {
-                    cnt += rc;
+            if (!sqlite3_column_uuid_unparse_lower(res, 0, guid))
+                continue;
+            int rc = remove_ephemeral_host(wb, guid, report_error, unregister);
+            if (rc > 0) {
+                cnt += rc;
+                buffer_fast_strcat(wb, "\n", 1);
+            }
+            else if (rc < 0) {
+                busy++;
+                if (report_error)
                     buffer_fast_strcat(wb, "\n", 1);
-                }
             }
         }
-        if (!cnt && buffer_strlen(wb) == 0) {
+        if (!cnt && !busy && buffer_strlen(wb) == 0) {
             if (report_error)
                 buffer_sprintf(wb, "No match for \"%s\"", args);
             else
                 buffer_sprintf(wb, "No stale nodes found");
         }
+        else if (busy && !report_error)
+            buffer_sprintf(wb, "%d node%s %s busy - try again", busy, busy == 1 ? "" : "s", busy == 1 ? "is" : "are");
     done0:
         REPORT_BIND_FAIL(res, param);
         SQLITE_FINALIZE(res);
     }
     else
-        (void) remove_ephemeral_host(wb, host, true, unregister);
+        (void) remove_ephemeral_host(wb, machine_guid, true, unregister);
 
 done:
     *message = strdupz(buffer_tostring(wb));
@@ -604,6 +666,9 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
         netdata_log_error("uv_write(): %s", uv_strerror(ret));
+        buffer_free(reply_string);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
+        --clients;
     }
 }
 

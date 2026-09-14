@@ -42,4 +42,24 @@ bool rrdhost_is_host_in_stream_path_before_us(struct rrdhost *host, ND_UUID remo
 // returns the number of entries copied (up to max)
 uint16_t rrdhost_stream_path_get_host_ids(struct rrdhost *host, uint16_t from, ND_UUID *host_ids, uint16_t max);
 
+// Visitor callback. Called once per stream-path entry from index 'from' onward.
+// hostname is a borrowed reference; do NOT retain it after the callback returns.
+// flags is the STREAM_PATH_FLAGS bitmap as a uint32_t (treat as opaque).
+// Return false from the callback to stop iteration early.
+typedef bool (*stream_path_visit_cb)(
+    void *userdata, uint16_t index,
+    STRING *hostname,
+    ND_UUID host_id, ND_UUID node_id, ND_UUID claim_id,
+    int16_t hops,
+    time_t since, time_t first_time_t,
+    uint32_t start_time_ms, uint32_t shutdown_time_ms,
+    STREAM_CAPABILITIES capabilities,
+    uint32_t flags);
+
+// Visit each path entry from 'from' onward. Acquires the path read-spinlock
+// for the duration of the iteration; keep the callback fast. Returns the
+// number of entries visited.
+uint16_t rrdhost_stream_path_visit(struct rrdhost *host, uint16_t from,
+                                    stream_path_visit_cb cb, void *userdata);
+
 #endif //NETDATA_STREAM_PATH_H

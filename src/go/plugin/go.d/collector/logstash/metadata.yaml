@@ -6,6 +6,7 @@ modules:
       module_name: logstash
       monitored_instance:
         name: Logstash
+        description: "Monitor Logstash JVM, garbage collection, events, pipelines, queues, uptime, and file descriptor usage."
         link: https://www.elastic.co/products/logstash
         icon_filename: elastic-logstash.svg
         categories:
@@ -183,13 +184,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://localhost:9600
-                
+
                   - name: remote
                     url: http://192.0.2.1:9600
     troubleshooting:

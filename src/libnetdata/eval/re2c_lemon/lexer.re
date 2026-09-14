@@ -33,6 +33,8 @@ int scan(Scanner *s, YYSTYPE *lval) {
     const char *YYMARKER;
     const char *YYCURSOR = s->cursor;
     char variable_buffer[EVAL_MAX_VARIABLE_NAME_LENGTH + 1] = {0};
+
+    lval->strval = NULL;
     
     // Skip whitespace
     while (1) {
@@ -189,13 +191,7 @@ EVAL_NODE *parse_expression_with_re2c_lemon(const char *string, const char **fai
     // Save the token start position for error reporting
     const char *error_pos = scanner.cursor;
     
-    // Variable to track if we need to free token_value.strval
-    int free_strval = 0;
-    
     while ((token_type = scan(&scanner, &token_value)) > 0) {
-        // If the token is a variable, remember to free it if there's an error
-        free_strval = (token_type == TOK_VARIABLE);
-        
         Parse(parser, token_type, token_value, &result);
         
         // Save position before potential error
@@ -212,24 +208,9 @@ EVAL_NODE *parse_expression_with_re2c_lemon(const char *string, const char **fai
             // Clean up
             eval_node_free(result);
             ParseFree(parser, freez);
-            
-            // If we just scanned a variable, free its strval
-            if (free_strval && token_value.strval) {
-                freez(token_value.strval);
-            }
-            
+
             return NULL;
         }
-        
-        // Reset free_strval since the parser has taken ownership of the string
-        free_strval = 0;
-    }
-    
-    // If the last token was a variable and scanning stopped due to an error,
-    // we need to free the token_value.strval
-    if (free_strval && token_value.strval) {
-        freez(token_value.strval);
-        token_value.strval = NULL;
     }
     
     // Finish parsing

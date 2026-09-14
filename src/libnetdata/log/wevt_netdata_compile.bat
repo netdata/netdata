@@ -18,8 +18,6 @@ set "BIN_DIR=%~2"
 set "MC_FILE=%BIN_DIR%\wevt_netdata.mc"
 set "MAN_FILE=%BIN_DIR%\wevt_netdata_manifest.xml"
 set "BASE_NAME=wevt_netdata"
-set "SDK_PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
-set "VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.39.33519\bin\Hostx64\x64"
 
 if not exist "%SRC_DIR%" (
     echo Error: Source directory does not exist.
@@ -40,9 +38,6 @@ if not exist "%MAN_FILE%" (
     echo Error: %MAN_FILE% not found.
     exit /b 1
 )
-
-REM Add SDK paths to PATH
-set "PATH=C:\Windows\System32;%SDK_PATH%;%VS_PATH%;%PATH%"
 
 REM Check if commands are available
 where mc >nul 2>nul

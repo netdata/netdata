@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -27,9 +28,14 @@ type jobV2HostRef struct {
 
 func jobV2HostFromVnode(vnode vnodes.VirtualNode) jobV2HostRef {
 	if vnode.GUID == "" {
-		return jobV2HostRef{kind: jobV2HostGlobal}
+		return jobV2HostRef{
+			kind: jobV2HostGlobal,
+		}
 	}
-	return jobV2HostRef{kind: jobV2HostVnode, guid: vnode.GUID}
+	return jobV2HostRef{
+		kind: jobV2HostVnode,
+		guid: vnode.GUID,
+	}
 }
 
 func (r jobV2HostRef) isSet() bool    { return r.kind != jobV2HostUnset }
@@ -40,24 +46,17 @@ type jobV2EmissionDecision struct {
 	targetHost       jobV2HostRef
 	needEngineReload bool
 	hostScope        *chartemit.HostScope
-	defineEmitted    bool
-	defineInfo       netdataapi.HostInfo
+	owner            *hostoutput.Owner
+	definition       *hostoutput.Definition
 }
 
 type jobV2HostState struct {
-	definedHost   jobV2HostRef
-	definedInfo   netdataapi.HostInfo
-	engineHost    jobV2HostRef
-	cleanupOwner  jobV2HostRef
-	cleanupCharts map[string]chartengine.ChartMeta
-}
-
-func (s *jobV2HostState) invalidateDefine() {
-	if s == nil {
-		return
-	}
-	s.definedHost = jobV2HostRef{}
-	s.definedInfo = netdataapi.HostInfo{}
+	engineHost        jobV2HostRef
+	cleanupOwner      jobV2HostRef
+	cleanupDefinition *hostoutput.Definition
+	cleanupCharts     map[string]chartengine.ChartMeta
+	owner             *hostoutput.Owner
+	ownerGUID         string
 }
 
 func (s *jobV2HostState) prepareEmission(vnode vnodes.VirtualNode) (jobV2EmissionDecision, error) {
@@ -70,51 +69,46 @@ func (s *jobV2HostState) prepareEmission(vnode vnodes.VirtualNode) (jobV2Emissio
 		return decision, nil
 	}
 
-	info, needDefine, err := s.prepareDefine(vnode, target)
-	if err != nil {
-		return jobV2EmissionDecision{}, err
-	}
-	scope := &chartemit.HostScope{GUID: target.guid}
-	if needDefine {
-		scope.Define = &info
+	scope := &chartemit.HostScope{
+		GUID: target.guid,
 	}
 	decision.hostScope = scope
-	decision.defineEmitted = needDefine
-	decision.defineInfo = info
 	return decision, nil
 }
 
-func (s *jobV2HostState) prepareDefine(vnode vnodes.VirtualNode, target jobV2HostRef) (netdataapi.HostInfo, bool, error) {
-	info, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{
-		GUID:     vnode.GUID,
-		Hostname: vnode.Hostname,
-		Labels:   vnode.Labels,
-	})
-	if err != nil {
-		return netdataapi.HostInfo{}, false, err
+func (s *jobV2HostState) prepareScopedEmission(scope metrix.HostScope) (jobV2EmissionDecision, error) {
+	target := jobV2HostRef{
+		kind: jobV2HostVnode,
+		guid: scope.GUID,
 	}
-	if s != nil && s.definedHost == target && hostInfoEqual(s.definedInfo, info) {
-		return netdataapi.HostInfo{}, false, nil
+	decision := jobV2EmissionDecision{
+		targetHost:       target,
+		needEngineReload: s != nil && s.engineHost.isSet() && s.engineHost != target,
+		hostScope: &chartemit.HostScope{
+			GUID: target.guid,
+		},
 	}
-	return info, true, nil
-}
-
-func (s *jobV2HostState) onEngineReload(target jobV2HostRef) {
-	if s == nil {
-		return
-	}
-	s.engineHost = target
+	return decision, nil
 }
 
 func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decision jobV2EmissionDecision) {
-	if s == nil || len(plan.Actions) == 0 {
+	if s == nil {
 		return
 	}
-	s.engineHost = decision.targetHost
-	if decision.defineEmitted {
-		s.definedHost = decision.targetHost
-		s.definedInfo = decision.defineInfo
+	if len(plan.Actions) == 0 {
+		if decision.needEngineReload {
+			// Quiet host switches still need to finish after the scope attempt commits.
+			s.engineHost = decision.targetHost
+		}
+		return
 	}
+	if s.owner != decision.owner {
+		s.owner.Release()
+	}
+	s.owner = decision.owner
+	s.ownerGUID = decision.targetHost.guid
+	s.engineHost = decision.targetHost
+	s.cleanupDefinition = decision.definition
 	if s.cleanupCharts == nil {
 		s.cleanupCharts = make(map[string]chartengine.ChartMeta)
 	}
@@ -151,12 +145,6 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 	}
 
 	s.cleanupOwner = decision.targetHost
-}
-
-func hostInfoEqual(left, right netdataapi.HostInfo) bool {
-	return left.GUID == right.GUID &&
-		left.Hostname == right.Hostname &&
-		maps.Equal(left.Labels, right.Labels)
 }
 
 func (r jobV2HostRef) String() string {

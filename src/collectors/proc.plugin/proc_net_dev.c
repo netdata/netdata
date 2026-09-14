@@ -6,7 +6,7 @@
 #define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
 #define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
 
-#define RRDFUNCTIONS_NETDEV_HELP "Shows real-time network interface performance including traffic rates, packet counts, drops, and link status."
+#define FUNCTION_NETDEV_HELP "Shows real-time network interface performance including traffic rates, packet counts, drops, and link status."
 
 #define STATE_LENGTH_MAX 32
 
@@ -499,7 +499,7 @@ static int netdev_function_net_interfaces(BUFFER *wb, const char *function __may
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_NETDEV_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_NETDEV_HELP);
     buffer_json_member_add_array(wb, "data");
 
     double max_traffic_rx = 0.0;
@@ -881,36 +881,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static int enable_new_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1,
                do_events = -1, do_speed = -1, do_duplex = -1, do_operstate = -1, do_carrier = -1, do_mtu = -1;
-    static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL,
-                *proc_net_dev_filename = NULL;
-    static char *path_to_sys_class_net_duplex = NULL;
-    static char *path_to_sys_class_net_operstate = NULL;
-    static char *path_to_sys_class_net_carrier = NULL;
-    static char *path_to_sys_class_net_mtu = NULL;
+    static char *proc_net_dev_filename = NULL;
 
     if(unlikely(enable_new_interfaces == -1)) {
         char filename[FILENAME_MAX + 1];
 
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, (*netdata_configured_host_prefix)?"/proc/1/net/dev":"/proc/net/dev");
         proc_net_dev_filename = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/devices/virtual/net/%s");
-        path_to_sys_devices_virtual_net = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/speed");
-        path_to_sys_class_net_speed = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/duplex");
-        path_to_sys_class_net_duplex = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/operstate");
-        path_to_sys_class_net_operstate = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/carrier");
-        path_to_sys_class_net_carrier = strdupz(filename);
-
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/class/net/%s/mtu");
-        path_to_sys_class_net_mtu = strdupz(filename);
 
         enable_new_interfaces = CONFIG_BOOLEAN_YES;
 
@@ -983,7 +960,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->enabled = !simple_pattern_matches(disabled_list, d->name);
 
             char buf[FILENAME_MAX + 1];
-            snprintfz(buf, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/devices/virtual/net/%s", netdata_configured_host_prefix, d->name);
 
             d->virtual = likely(access(buf, R_OK) == 0) ? true : false;
 
@@ -1001,20 +978,20 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             if(likely(!d->virtual)) {
                 // set the filename to get the interface speed
-                snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_speed, d->name);
+                snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/speed", netdata_configured_host_prefix, d->name);
                 d->filename_speed = strdupz(buf);
 
-                snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_duplex, d->name);
+                snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/duplex", netdata_configured_host_prefix, d->name);
                 d->filename_duplex = strdupz(buf);
             }
 
-            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_operstate, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/operstate", netdata_configured_host_prefix, d->name);
             d->filename_operstate = strdupz(buf);
 
-            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_carrier, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/carrier", netdata_configured_host_prefix, d->name);
             d->filename_carrier = strdupz(buf);
 
-            snprintfz(buf, FILENAME_MAX, path_to_sys_class_net_mtu, d->name);
+            snprintfz(buf, FILENAME_MAX, "%s/sys/class/net/%s/mtu", netdata_configured_host_prefix, d->name);
             d->filename_mtu = strdupz(buf);
 
             snprintfz(buf, FILENAME_MAX, "plugin:proc:/proc/net/dev:%s", d->name);
@@ -1721,11 +1698,17 @@ void netdev_main(void *ptr_is_null __maybe_unused)
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
         virtual_device_collect_delay_secs = 300;
 
-    rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,
-                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
-                            RRDFUNCTIONS_NETDEV_HELP,
-                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
-                            netdev_function_net_interfaces);
+    nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .name = "network-interfaces",
+        .help = FUNCTION_NETDEV_HELP,
+        .tags = "top",
+        .timeout_s = 10,
+        .priority = NRPC_PRIORITY_DEFAULT,
+        .version = NRPC_VERSION_DEFAULT,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .handler = netdev_function_net_interfaces,
+    });
 
     heartbeat_t hb;
     heartbeat_init(&hb, localhost->rrd_update_every * USEC_PER_SEC);

@@ -58,6 +58,23 @@ struct rrdeng_cmd;
 
 #define MAX_EXTENT_UNCOMPRESSED_SIZE (MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE))
 
+static inline size_t rrdeng_min_extent_disk_size(void) {
+    return sizeof(struct rrdeng_df_extent_header) +
+           sizeof(struct rrdeng_extent_page_descr) +
+           sizeof(struct rrdeng_df_extent_trailer);
+}
+
+static inline size_t rrdeng_max_extent_disk_size(void) {
+    return sizeof(struct rrdeng_df_extent_header) +
+           sizeof(struct rrdeng_extent_page_descr) * MAX_PAGES_PER_EXTENT +
+           MAX_EXTENT_UNCOMPRESSED_SIZE +
+           sizeof(struct rrdeng_df_extent_trailer);
+}
+
+static inline bool rrdeng_valid_extent_disk_size(size_t size) {
+    return size >= rrdeng_min_extent_disk_size() && size <= rrdeng_max_extent_disk_size();
+}
+
 
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
@@ -160,7 +177,7 @@ struct page_details *page_details_get(void);
 
 #define pdc_page_status_check(pd, flag) (__atomic_load_n(&((pd)->status), __ATOMIC_ACQUIRE) & (flag))
 #define pdc_page_status_set(pd, flag)   __atomic_or_fetch(&((pd)->status), flag, __ATOMIC_RELEASE)
-#define pdc_page_status_clear(pd, flag) __atomic_and_fetch(&((od)->status), ~(flag), __ATOMIC_RELEASE)
+#define pdc_page_status_clear(pd, flag) __atomic_and_fetch(&((pd)->status), ~(flag), __ATOMIC_RELEASE)
 
 struct jv2_extents_info {
     uint32_t index;
@@ -189,6 +206,7 @@ struct jv2_page_info {
 
     // private
     struct pgc_page *page;
+    struct jv2_extents_info *ei;    // the extent this page was counted into
 };
 
 typedef enum __attribute__ ((__packed__)) {
@@ -214,6 +232,7 @@ typedef enum __attribute__ ((__packed__)) {
     RRDENG_PAGE_UPDATE_EVERY_CHANGE   = (1 << 11),
     RRDENG_PAGE_STEP_TOO_SMALL        = (1 << 12),
     RRDENG_PAGE_STEP_UNALIGNED        = (1 << 13),
+    RRDENG_PAGE_RETENTION_RECORDED    = (1 << 14),
 } RRDENG_COLLECT_PAGE_FLAGS;
 
 struct rrdeng_collect_handle {
@@ -304,6 +323,15 @@ struct extent_io_data {
     unsigned fileno;
     uint32_t block;
     unsigned bytes;
+
+    // The metric this page belongs to, as a uuidmap id.
+    //
+    // This exists so journal-v2 indexing never has to dereference the page's
+    // metric_id, which is a bare METRIC pointer with no reference behind it and
+    // can therefore be stale. Resolving the id through the MRG index is an
+    // indexed lookup that cannot touch freed memory; a dead metric simply
+    // misses. NOT a uuidmap reference - see mrg_metric_uuidmap_id().
+    UUIDMAP_ID uuid_id;
 };
 
 struct extent_io_descriptor {
@@ -464,6 +492,106 @@ static inline void ctx_io_error(struct rrdengine_instance *ctx) {
 static inline void ctx_fs_error(struct rrdengine_instance *ctx) {
     __atomic_add_fetch(&ctx->stats.fs_errors, 1, __ATOMIC_RELAXED);
     rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
+}
+
+static inline bool rrdeng_retention_samples_delta(
+    struct rrdengine_instance *ctx,
+    time_t first_time_s,
+    time_t last_time_s,
+    uint32_t update_every_s,
+    const char *reason,
+    uint64_t *samples)
+{
+    *samples = 0;
+
+    if(!update_every_s || !first_time_s || !last_time_s || first_time_s == last_time_s)
+        return false;
+
+    if(unlikely(first_time_s > last_time_s)) {
+        int tier = ctx ? ctx->config.tier : -1;
+
+        internal_fatal(
+            true,
+            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u)",
+            tier,
+            reason,
+            (long)first_time_s,
+            (long)last_time_s,
+            update_every_s);
+
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(
+            &erl,
+            NDLS_DAEMON,
+            NDLP_ERR,
+            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u); not updating sample counter",
+            tier,
+            reason,
+            (long)first_time_s,
+            (long)last_time_s,
+            update_every_s);
+
+        return false;
+    }
+
+    *samples = (last_time_s - first_time_s) / update_every_s;
+    return *samples > 0;
+}
+
+static inline bool rrdeng_atomic_uint64_sub_saturating(
+    struct rrdengine_instance *ctx,
+    uint64_t *counter,
+    uint64_t value,
+    const char *counter_name,
+    const char *reason)
+{
+    if(!value)
+        return true;
+
+    uint64_t old = __atomic_load_n(counter, __ATOMIC_RELAXED);
+    while(true) {
+        if(unlikely(old < value)) {
+            int tier = ctx ? ctx->config.tier : -1;
+
+            internal_fatal(
+                true,
+                "DBENGINE: tier %d: %s counter underflow while %s (current=%" PRIu64 ", subtract=%" PRIu64 ")",
+                tier,
+                counter_name,
+                reason,
+                old,
+                value);
+
+            nd_log_limit_static_global_var(erl, 60, 0);
+            nd_log_limit(
+                &erl,
+                NDLS_DAEMON,
+                NDLP_ERR,
+                "DBENGINE: tier %d: %s counter underflow while %s (current=%" PRIu64 ", subtract=%" PRIu64 "); saturating to zero",
+                tier,
+                counter_name,
+                reason,
+                old,
+                value);
+
+            if(__atomic_compare_exchange_n(counter, &old, 0, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+                return false;
+
+            continue;
+        }
+
+        uint64_t wanted = old - value;
+        if(__atomic_compare_exchange_n(counter, &old, wanted, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return true;
+    }
+}
+
+static inline void rrdeng_reset_accounting_if_fresh(struct rrdengine_instance *ctx, bool freshly_initialized_ctx) {
+    if(!freshly_initialized_ctx)
+        return;
+
+    ctx->atomic.metrics = 0;
+    ctx->atomic.samples = 0;
 }
 
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)

@@ -110,10 +110,6 @@ func (a *smartAttribute) value() string {
 	return a.data.Get("value").String()
 }
 
-func (a *smartAttribute) rawValue() string {
-	return a.data.Get("raw.value").String()
-}
-
 func (a *smartAttribute) rawString() string {
 	return a.data.Get("raw.string").String()
 }

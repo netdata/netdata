@@ -1,0 +1,47 @@
+{
+  "name": "aws-replication",
+  "vnode": "storage-cluster",
+  "update_every": 120,
+  "mode": "aws_replication",
+  "mode_aws_replication": {
+    "prefix": "netdata-s3check/",
+    "source": {
+      "name": "primary",
+      "endpoint": "https://s3.us-east-1.amazonaws.com",
+      "region": "us-east-1",
+      "bucket": "source-bucket",
+      "credentials": {
+        "access_key_id": "AKIAEXAMPLE",
+        "secret_access_key": "secret",
+        "session_token": "session"
+      },
+      "assume_role": {
+        "role_arn": "arn:aws:iam::000000000000:role/netdata",
+        "external_id": "external"
+      },
+      "path_style": false,
+      "timeout": "10s",
+      "proxy_url": "http://proxy.example:8080",
+      "tls_ca": "/etc/netdata/ca.pem",
+      "tls_cert": "/etc/netdata/client.pem",
+      "tls_key": "/etc/netdata/client.key",
+      "tls_skip_verify": false
+    },
+    "destination": {
+      "name": "replica",
+      "endpoint": "https://s3.us-west-2.amazonaws.com",
+      "region": "us-west-2",
+      "bucket": "destination-bucket",
+      "path_style": false,
+      "timeout": "15s",
+      "tls_ca": "",
+      "tls_cert": "",
+      "tls_key": "",
+      "tls_skip_verify": false
+    },
+    "write_objective": "15m",
+    "write_timeout": "30m",
+    "delete_objective": "5m",
+    "delete_timeout": "15m"
+  }
+}

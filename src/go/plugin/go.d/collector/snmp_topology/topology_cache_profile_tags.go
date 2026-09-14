@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmptopology
+
+import (
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+)
+
+func (c *topologyBuilder) applyLLDPLocalDeviceProfileTags(tags map[string]string) {
+	if c == nil || len(tags) == 0 {
+		return
+	}
+
+	if v := tags[tagLldpLocChassisID]; v != "" && strings.TrimSpace(c.localDevice.ChassisID) == "" {
+		c.localDevice.ChassisID = v
+	}
+	if v := tags[tagLldpLocChassisIDSubtype]; v != "" && strings.TrimSpace(c.localDevice.ChassisIDType) == "" {
+		c.localDevice.ChassisIDType = normalizeLLDPSubtype(v, lldpChassisIDSubtypeMap)
+	}
+	if v := tags[tagLldpLocSysName]; v != "" && strings.TrimSpace(c.localDevice.SysName) == "" {
+		c.localDevice.SysName = v
+	}
+	if v := tags[tagLldpLocSysDesc]; v != "" && strings.TrimSpace(c.localDevice.SysDescr) == "" {
+		c.localDevice.SysDescr = v
+	}
+	if v := tags[tagLldpLocSysCapSupported]; v != "" {
+		c.localDevice.Labels = ensureLabels(c.localDevice.Labels)
+		c.localDevice.Labels[tagLldpLocSysCapSupported] = v
+		caps := decodeLLDPCapabilities(v)
+		if len(caps) > 0 {
+			c.localDevice.CapabilitiesSupported = caps
+		}
+	}
+	if v := tags[tagLldpLocSysCapEnabled]; v != "" {
+		c.localDevice.Labels = ensureLabels(c.localDevice.Labels)
+		c.localDevice.Labels[tagLldpLocSysCapEnabled] = v
+		caps := decodeLLDPCapabilities(v)
+		if len(caps) > 0 {
+			c.localDevice.CapabilitiesEnabled = caps
+			if len(c.localDevice.Capabilities) == 0 {
+				c.localDevice.Capabilities = caps
+			}
+		}
+	}
+}
+
+func (c *topologyBuilder) applyOSPFProfileTags(tags map[string]string) {
+	if c == nil || len(tags) == 0 {
+		return
+	}
+	if v := topologyutil.NormalizeTopologyRouterID(tags[tagOSPFRouterID]); v != "" {
+		c.localDevice.OSPFRouterID = v
+		c.localDevice.Labels = ensureLabels(c.localDevice.Labels)
+		c.localDevice.Labels[tagOSPFRouterID] = v
+	}
+}
+
+func (c *topologyBuilder) applyAuthoritativeBridgeIdentity(mac string) {
+	mac = topologyutil.NormalizeMAC(mac)
+	if mac == "" || mac == "00:00:00:00:00:00" {
+		return
+	}
+	c.bridgeBaseAddress = mac
+	c.localDevice.ChassisID = mac
+	c.localDevice.ChassisIDType = "macAddress"
+}
+
+func (c *topologyBuilder) applyBridgeProfileTags(tags map[string]string) {
+	if c == nil || len(tags) == 0 {
+		return
+	}
+	if v := stpBridgeAddressToMAC(tags[tagBridgeBaseAddress]); v != "" {
+		c.applyAuthoritativeBridgeIdentity(v)
+	}
+}

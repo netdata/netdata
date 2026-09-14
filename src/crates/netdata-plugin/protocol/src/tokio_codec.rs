@@ -210,8 +210,8 @@ impl Encoder<Message> for MessageParser {
                     .as_bytes(),
                 );
             }
-            Message::FunctionProgressRequest(_) => {
-                // Inbound-only message, not encoded for output
+            Message::FunctionProgressRequest(_) | Message::Quit => {
+                // Inbound-only messages, not encoded for output
             }
         }
 

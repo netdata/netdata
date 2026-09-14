@@ -3,7 +3,7 @@
 #ifndef NETDATA_ALIGNMENT_H
 #define NETDATA_ALIGNMENT_H
 
-#include "../common.h"
+#include "../libnetdata-base.h"
 
 #if ENV32BIT
 #define SYSTEM_REQUIRED_ALIGNMENT (sizeof(uintptr_t) * 2)

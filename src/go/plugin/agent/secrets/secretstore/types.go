@@ -2,8 +2,6 @@
 
 package secretstore
 
-import "time"
-
 type StoreKind string
 
 const (
@@ -22,18 +20,6 @@ func (k StoreKind) IsValid() bool {
 	}
 }
 
-type ValidationStatus struct {
-	CheckedAt time.Time `json:"checked_at" yaml:"checked_at"`
-	OK        bool      `json:"ok" yaml:"ok"`
-}
-
-type StoreStatus struct {
-	Name             string            `json:"name" yaml:"name"`
-	Kind             StoreKind         `json:"kind" yaml:"kind"`
-	LastValidation   *ValidationStatus `json:"last_validation,omitempty" yaml:"last_validation,omitempty"`
-	LastErrorSummary string            `json:"last_error_summary,omitempty" yaml:"last_error_summary,omitempty"`
-}
-
 type ResolveRequest struct {
 	StoreKey  string    `json:"store_key" yaml:"store_key"`
 	StoreKind StoreKind `json:"store_kind" yaml:"store_kind"`
@@ -43,7 +29,6 @@ type ResolveRequest struct {
 }
 
 var (
-	ErrStoreExists   = errStore("store already exists")
 	ErrStoreNotFound = errStore("store is not configured")
 )
 

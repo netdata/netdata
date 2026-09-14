@@ -10,6 +10,7 @@ modules:
         categories:
           - data-collection.web-servers-and-proxies
         icon_filename: nginx.svg
+        description: 'Monitor NGINX server activity and performance, including active connections, connection states, and client requests through the stub status endpoint.'
       related_resources:
         integrations:
           list:

@@ -51,12 +51,18 @@ bool EvtFormatMessage_utf16(
         }
 
         // Try again with the resized buffer
+        if(!size)
+            goto cleanup;
+
         txt_utf16_resize(dst, size, false);
         if (!EvtFormatMessage(hMetadata, hEvent, dwMessageId, 0, NULL, flags, dst->size, dst->data, &size)) {
             // nd_log(NDLS_COLLECTORS, NDLP_ERR, "EvtFormatMessage() failed after resizing buffer.");
             goto cleanup;
         }
     }
+
+    if(!size || !dst->size)
+        goto cleanup;
 
     // make sure it is null terminated
     if(size <= dst->size)
@@ -333,6 +339,9 @@ static inline bool wEvtRender(WEVT_LOG *log, EVT_HANDLE context, WEVT_VARIANT *r
             return false;
         }
 
+        if (!bytes_used)
+            return false;
+
         wevt_variant_resize(raw, bytes_used);
         if (!EvtRender(context, log->hEvent, EvtRenderEventValues, raw->size, raw->data, &bytes_used, &property_count)) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -341,6 +350,17 @@ static inline bool wEvtRender(WEVT_LOG *log, EVT_HANDLE context, WEVT_VARIANT *r
             return false;
         }
     }
+
+    if (property_count) {
+#if SIZE_MAX <= UINT32_MAX
+        if ((size_t)property_count > SIZE_MAX / sizeof(*raw->data))
+            return false;
+#endif
+
+        if (!raw->data || bytes_used < property_count * sizeof(*raw->data))
+            return false;
+    }
+
     raw->used = bytes_used;
     raw->count = property_count;
 
@@ -354,6 +374,13 @@ static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
         goto cleanup;
 
     EVT_VARIANT *content = log->ops.raw.system.data;
+    if(!content || log->ops.raw.system.count < EvtSystemPropertyIdEND) {
+        nd_log_limit_static_thread_var(system_fields_log_limit, 60, 0);
+        nd_log_limit(&system_fields_log_limit, NDLS_COLLECTORS, NDLP_ERR,
+                     "EvtRender() returned %u system fields, expected at least %u",
+                     log->ops.raw.system.count, EvtSystemPropertyIdEND);
+        goto cleanup;
+    }
 
     ev->id          = wevt_field_get_uint64(&content[EvtSystemEventRecordId]);
     ev->event_id    = wevt_field_get_uint16(&content[EvtSystemEventID]);
@@ -377,7 +404,7 @@ static bool wevt_get_next_event_one(WEVT_LOG *log, WEVT_EVENT *ev) {
         wevt_field_get_sid(&content[EvtSystemUserID], &log->ops.account, &log->ops.domain, &log->ops.sid);
 
         PROVIDER_META_HANDLE *p = log->provider =
-                provider_get(ev->provider, content[EvtSystemProviderName].StringVal);
+                provider_get(ev->provider, wevt_field_get_string(&content[EvtSystemProviderName]));
 
         ev->platform = provider_get_platform(p);
 

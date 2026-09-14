@@ -10,6 +10,46 @@
 #include "stream-parents.h"
 #include "stream-circular-buffer.h"
 
+static inline bool stream_sender_parse_replay_endpoint(const char *value, time_t *endpoint) {
+    if(!value || !endpoint || value[0] < '0' || value[0] > '9')
+        return false;
+
+    char *endptr;
+    int saved_errno = errno;
+    errno = 0;
+    uintmax_t parsed = strtoumax(value, &endptr, 10);
+    int conversion_errno = errno;
+    errno = saved_errno;
+
+    uintmax_t maximum = (uintmax_t)nd_time_t_max();
+    if(maximum > (uintmax_t)ULONG_MAX)
+        maximum = (uintmax_t)ULONG_MAX;
+    if(maximum > (uintmax_t)SIZE_MAX)
+        maximum = (uintmax_t)SIZE_MAX;
+
+    if(conversion_errno != 0 || *endptr != '\0' || parsed > maximum)
+        return false;
+
+    *endpoint = (time_t)parsed;
+    return true;
+}
+
+static inline bool stream_sender_parse_replay_endpoints(
+    const char *after, const char *before, time_t *parsed_after, time_t *parsed_before)
+{
+    if(!parsed_after || !parsed_before)
+        return false;
+
+    time_t validated_after;
+    time_t validated_before;
+    bool valid = stream_sender_parse_replay_endpoint(after, &validated_after) &&
+                 stream_sender_parse_replay_endpoint(before, &validated_before);
+
+    *parsed_after = valid ? validated_after : 0;
+    *parsed_before = valid ? validated_before : 0;
+    return valid;
+}
+
 // connector thread
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTING                          0
 #define WORKER_SENDER_CONNECTOR_JOB_CONNECTED                           1
@@ -32,6 +72,22 @@ typedef void (*stream_defer_cleanup_t)(struct sender_state *s, void *data);
 
 struct sender_state {
     SPINLOCK spinlock;
+
+    // Serializes {render + commit} of the global-functions payload across its
+    // two call sites (the flag poll in stream_send_metrics_init() on
+    // collection/receiver threads, and the reconnect push in
+    // stream_send_global_functions() on the sender thread). The pending-dels
+    // protocol makes the FUNCTION_DEL queue lossless, but each caller renders
+    // into a private buffer and sender_commit() serializes in LOCK-ARRIVAL
+    // order - without this lock a stale buffer holding "FUNCTION_DEL f" could
+    // commit AFTER a fresh re-list that re-added f, making the parent delete a
+    // live function. Lock order: this -> the component-global registries
+    // index locks (the nRPC outer dictionary the renderer resolves the
+    // host's registry entry through) -> {inner registry locks, pending_dels
+    // spinlock, the commit spinlock above}; never acquired while holding any
+    // of those.
+    SPINLOCK global_functions_spinlock;
+
     STREAM_CAPABILITIES capabilities;
     STREAM_CAPABILITIES disabled_capabilities;
     int16_t hops;
@@ -130,7 +186,7 @@ struct sender_state {
 void stream_sender_add_to_connector_queue(RRDHOST *host);
 
 void stream_sender_execute_commands_cleanup(struct sender_state *s);
-void stream_sender_execute_commands(struct sender_state *s);
+bool stream_sender_execute_commands(struct sender_state *s);
 
 bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeout);
 

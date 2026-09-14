@@ -2,6 +2,11 @@
 
 #	--dedup-logfile=/opt/agent-events/log/dedup.log \
 
+# Dual-write evaluation: add the flag below to the server command to also
+# export accepted events as OTel log records to the local Netdata OTel plugin
+# (see otlp.go). The journald pipeline below is unaffected.
+#	--otlp-endpoint=127.0.0.1:4317 \
+
 stdbuf -oL /opt/agent-events/server \
 	--port=30001 \
 	--dedup-key=agent.id \

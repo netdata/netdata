@@ -4,8 +4,7 @@
 
 #ifdef OS_WINDOWS
 ALWAYS_INLINE void tinysleep(void) {
-    Sleep(0);
-    // SwitchToThread();
+    Sleep(1);
 }
 #else
 ALWAYS_INLINE void tinysleep(void) {

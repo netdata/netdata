@@ -27,7 +27,7 @@ jobs:
           exit 1
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Update server.json version
         id: update_version

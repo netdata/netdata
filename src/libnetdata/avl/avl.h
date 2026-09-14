@@ -4,6 +4,7 @@
 #define _AVL_H 1
 
 #include "../libnetdata.h"
+#include "avl-types.h"
 
 /* Maximum AVL tree height. */
 #ifndef AVL_MAX_HEIGHT
@@ -15,19 +16,6 @@
 #else
 #define AVL_LOCK_INITIALIZER RW_SPINLOCK_INITIALIZER
 #endif
-
-/* Data structures */
-
-/* One element of the AVL tree */
-typedef struct avl_element {
-    struct avl_element *avl_link[2];  /* Subtrees. */
-    signed char avl_balance;       /* Balance factor. */
-} avl_t;
-
-typedef struct __attribute__((packed)) avl_element_packed {
-    struct avl_element *avl_link[2];  /* Subtrees. */
-    signed char avl_balance;       /* Balance factor. */
-} avl_t_packed;
 
 /* An AVL tree */
 typedef struct avl_tree_type {

@@ -5,6 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+#define WAITQ_NO_PRIORITY UINT64_MAX
+
 /*
  * WAITING QUEUE
  * Like a spinlock, but:
@@ -35,11 +37,11 @@ typedef enum __attribute__((packed)) {
 typedef struct waiting_queue {
     SPINLOCK spinlock;          // protects the actual resource
     pid_t writer;               // the pid the thread currently holding the lock
-    uint64_t current_priority;  // current highest priority attempting to acquire
-    uint32_t last_seqno;        // for FIFO ordering within same priority
+    uint64_t current_priority;  // current highest priority/order attempting to acquire
+    uint64_t last_seqno;        // for FIFO ordering within same priority
 } WAITQ;
 
-#define WAITQ_INITIALIZER (WAITQ){ .spinlock = SPINLOCK_INITIALIZER, .current_priority = 0, .last_seqno = 0, }
+#define WAITQ_INITIALIZER (WAITQ){ .spinlock = SPINLOCK_INITIALIZER, .current_priority = WAITQ_NO_PRIORITY, .last_seqno = 0, }
 
 // Initialize a waiting queue
 void waitq_init(WAITQ *waitq);

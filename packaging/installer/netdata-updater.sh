@@ -22,7 +22,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U001F
+# Next unused error code: U0029
 
 set -e
 
@@ -563,44 +563,160 @@ _cannot_use_tmpdir() {
 }
 
 create_exec_tmp_directory() {
-  if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
-    echo "${NETDATA_TMPDIR_PATH}"
-    return
+  if [ -z "${ndtmpdir}" ]; then
+    if [ -n "${NETDATA_TMPDIR_PATH}" ]; then
+        ndtmpdir="${NETDATA_TMPDIR_PATH}"
+    else
+      root_dir=""
+
+      if [ -n "${NETDATA_TMPDIR}" ] && ! _cannot_use_tmpdir "${NETDATA_TMPDIR}"; then
+          root_dir="${NETDATA_TMPDIR}"
+      elif [ -n "${TMPDIR}" ] && ! _cannot_use_tmpdir "${TMPDIR}"; then
+          root_dir="${TMPDIR}"
+      elif ! _cannot_use_tmpdir /tmp; then
+          root_dir="/tmp"
+      elif ! _cannot_use_tmpdir "${PWD}"; then
+          root_dir="${PWD}"
+      else
+          fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." U0003
+      fi
+
+      TMPDIR="${root_dir}"
+
+      ndtmpdir="$(mktemp -d -p "${root_dir}" -t netdata-updater-XXXXXXXXXX)"
+    fi
   fi
 
-  root_dir=""
-
-  if [ -n "${NETDATA_TMPDIR}" ] && ! _cannot_use_tmpdir "${NETDATA_TMPDIR}"; then
-    root_dir="${NETDATA_TMPDIR}"
-  elif [ -n "${TMPDIR}" ] && ! _cannot_use_tmpdir "${TMPDIR}"; then
-    root_dir="${TMPDIR}"
-  elif ! _cannot_use_tmpdir /tmp; then
-    root_dir="/tmp"
-  elif ! _cannot_use_tmpdir "${PWD}"; then
-    root_dir="${PWD}"
-  else
-    fatal "Unable to find a usable temporary directory. Please set \$TMPDIR to a path that is both writable and allows execution of files and try again." U0003
-  fi
-
-  TMPDIR="${root_dir}"
-
-  mktemp -d -p "${root_dir}" -t netdata-updater-XXXXXXXXXX
+  info "Putting temporary files in ${ndtmpdir}"
 }
 
 check_for_curl() {
   if [ -z "${curl}" ]; then
-    curl="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+    curl="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null || true)"
+  fi
+}
+
+check_for_wget() {
+  if [ -z "${wget}" ]; then
+    wget="$(command -v wget 2>/dev/null || true)"
+  fi
+
+  if [ -z "${wget}" ]; then
+    wget="$(command -v wget2 2>/dev/null || true)"
   fi
 }
 
 _safe_download() {
   url="${1}"
   dest="${2}"
+
+  if echo "${url}" | grep -Eq "^file:///"; then
+    cp "${url#file://}" "${dest}" || return 1
+    return 0
+  fi
+
+  check_for_curl
+  check_for_wget
+  create_exec_tmp_directory
+  dl_log="${ndtmpdir}/download.log"
+  rm -f "${dl_log}"
+
+  if [ -n "${curl}" ]; then
+    set +e
+    "${curl}" --silent --fail --location --write-out "%{http_code}" --connect-timeout 10 --retry 3 "${url}" --output "${dest}" > "${dl_log}"
+    result="$?"
+    set -e
+
+    case "${result}" in
+      0) return 0 ;;
+      22|78)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+          case "$(tail -n 1 "${dl_log}")" in
+            404) return 1 ;;
+            4*) return 5 ;;
+            5*) return 6 ;;
+            *) return 4 ;;
+          esac
+          ;;
+      5|6|7)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+          return 2
+          ;;
+      35|60|83)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+          return 3
+          ;;
+      *)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+          return 4
+          ;;
+    esac
+  elif [ -n "${wget}" ]; then
+    set +e
+    "${wget}" -T 15 -S -o "${dl_log}" -O "${dest}" "${url}"
+    result="$?"
+    set -e
+
+    case "${result}" in
+      0) return 0 ;;
+      8)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+
+          case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
+            404) return 1 ;;
+            4*) return 5 ;;
+            5*) return 6 ;;
+            *) return 4 ;;
+          esac
+          ;;
+      4)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+          return 2
+          ;;
+      5)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+          return 3
+          ;;
+      *)
+          [ "${dest}" != "/dev/null" ] && rm -f "${dest}"
+          return 4
+          ;;
+    esac
+  fi
+
+  return 255
+}
+
+download() {
+  url="${1}"
+  dest="${2}"
+
+  set +e
+  _safe_download "${url}" "${dest}"
+  ret=$?
+  set -e
+
+  case "${ret}" in
+    0) return 0 ;;
+    1) fatal "File ${url} not found on remote server" U0022 ;;
+    2) fatal "Unable to connect to remote host to download ${url}" U0023 ;;
+    3) fatal "TLS error connecting to remote host to download ${url}" U0024 ;;
+    5) fatal "Client error when trying to download ${url}" U0027 ;;
+    6) fatal "Internal server error when trying to download ${url}" U0028 ;;
+    255) fatal "I need curl or wget to proceed, but neither is available on this system." U0004 ;;
+    *) fatal "Cannot download ${url}" U0005 ;;
+  esac
+}
+
+check_for_remote_file() {
+  url="${1}"
   succeeded=0
   checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
-    cp "${url#file://}" "${dest}" || return 1
+    [ -e "${url#file://}" ] || return 1
+    return 0
+  elif [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ]; then
     return 0
   fi
 
@@ -609,10 +725,8 @@ _safe_download() {
   if [ -n "${curl}" ]; then
     checked=1
 
-    if "${curl}" -fsSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"; then
+    if "${curl}" --output /dev/null --silent --head --fail "${url}"; then
       succeeded=1
-    elif [ "${dest}" != "/dev/null" ]; then
-      rm -f "${dest}"
     fi
   fi
 
@@ -620,10 +734,8 @@ _safe_download() {
     if command -v wget > /dev/null 2>&1; then
       checked=1
 
-      if wget -T 15 -O - "${url}" > "${dest}"; then
+      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
         succeeded=1
-      elif [ "${dest}" != "/dev/null" ]; then
-        rm -f "${dest}"
       fi
     fi
   fi
@@ -637,58 +749,45 @@ _safe_download() {
   fi
 }
 
-download() {
-  url="${1}"
-  dest="${2}"
-
-  set +e
-  _safe_download "${url}" "${dest}"
-  ret=$?
-  set -e
-
-  if [ ${ret} -eq 0 ]; then
-    return 0
-  elif [ ${ret} -eq 255 ]; then
-    fatal "I need curl or wget to proceed, but neither is available on this system." U0004
-  else
-    fatal "Cannot download ${url}" U0005
-  fi
-}
-
 get_netdata_latest_tag() {
   url="${1}/latest"
 
   check_for_curl
+  check_for_wget
+
+  if [ -z "${curl}" ] && [ -z "${wget}" ]; then
+    fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
+  fi
 
   if [ -n "${curl}" ]; then
-    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}')
+    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' || true)
   fi
 
   if [ -z "${tag}" ]; then
-    if command -v wget >/dev/null 2>&1; then
-      tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep Location)
+    if [ -n "${wget}" ]; then
+      tag=$("${wget}" -S -O /dev/null "${url}" 2>&1 | grep Location || true)
     fi
   fi
 
   if [ -z "${tag}" ]; then
-    fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
+    tag='latest'
   fi
 
   tag="$(echo "${tag}" | grep -Eom 1 '[^/]*/?$')"
 
   # Fallback case for simpler local testing.
   if echo "${tag}" | grep -Eq 'latest/?$'; then
-    if _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt; then
-      tag="$(cat ./ndupdate-version.txt)"
+    set +e
+    _safe_download "${url}/latest-version.txt" ./ndupdate-version.txt
+    result="$?"
+    set -e
 
-      if grep -q 'Not Found' ./ndupdate-version.txt; then
-        tag="latest"
-      fi
+    case "${result}" in
+      0) tag="$(cat ./ndupdate-version.txt)" ;;
+      *) tag='latest' ;;
+    esac
 
-      rm -f ./ndupdate-version.txt
-    else
-      tag="latest"
-    fi
+    rm -f ./ndupdate-version.txt
   fi
 
   echo "${tag}"
@@ -697,7 +796,7 @@ get_netdata_latest_tag() {
 newer_commit_date() {
   info "Checking if a newer version of the updater script is available."
 
-  ndtmpdir="$(create_exec_tmp_directory)"
+  create_exec_tmp_directory
   commit_check_file="${ndtmpdir}/latest-commit.json"
   commit_check_url="https://api.github.com/repos/netdata/netdata/commits?path=packaging%2Finstaller%2Fnetdata-updater.sh&page=1&per_page=1"
   python_version_check="
@@ -712,7 +811,11 @@ else:
     print(data[0]['commit']['committer']['date'] if isinstance(data, list) and data else '')
 "
 
-  _safe_download "${commit_check_url}" "${commit_check_file}"
+  if ! _safe_download "${commit_check_url}" "${commit_check_file}"; then
+    warning "Failed to check for an updated updater script, skipping self-update check."
+    rm -f "${commit_check_file}" 2>/dev/null || true
+    return 1
+  fi
 
   if command -v jq > /dev/null 2>&1; then
     commit_date="$(jq '.[0].commit.committer.date' 2>/dev/null < "${commit_check_file}" | tr -d '"')"
@@ -723,7 +826,7 @@ else:
   fi
 
   if [ -z "${NETDATA_TMPDIR_PATH}" ]; then
-    rm -rf "${ndtmpdir}" >&3 2>&3
+    rm -f "${commit_check_file}" 2>/dev/null || true
   fi
 
   if [ -z "${commit_date}" ] ; then
@@ -751,8 +854,8 @@ self_update() {
   if [ -z "${NETDATA_NO_UPDATER_SELF_UPDATE}" ] && newer_commit_date; then
     info "Downloading newest version of updater script."
 
-    ndtmpdir=$(create_exec_tmp_directory)
-    cd "$ndtmpdir" || exit 1
+    create_exec_tmp_directory
+    cd "${ndtmpdir}" || exit 1
 
     if _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
       chmod +x ./netdata-updater.sh || exit 1
@@ -770,12 +873,21 @@ self_update() {
   fi
 }
 
+# Parse the version into a (large) integer for easy comparison.
+#
+# The resultant integer consists of three groups of three digits encoding the major, minor, and patch versions,
+# followed by a single digit encoding the version type (0 for nightly builds and git builds based on a stable or
+# nightly version, 1 for release candidate builds, 2 for git builds based on a release candidate version, 3 for
+# stable versions, and 9 for unknown), three digits for the release candidate number (all zeroes if the build
+# isn’t a release candidate build), and five digits for the commit number for git builds (all zeroes if the
+# build isn’t a git build).
 parse_version() {
   r="${1}"
+  vmax="999999999999999999"
   if [ "${r}" = "latest" ]; then
     # If we get ‘latest’ as a version, return the largest possible
     # version value.
-    printf "999999999999999"
+    printf "%s" "${vmax}"
     return 0
   elif echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
@@ -785,10 +897,33 @@ parse_version() {
 
   tmpfile="$(mktemp)"
   echo "${r}" | tr '-' ' ' > "${tmpfile}"
-  read -r v b _ < "${tmpfile}"
+  read -r v b1 b2 _ < "${tmpfile}"
 
-  if echo "${b}" | grep -vEq "^[0-9]+$"; then
-    b="0"
+  if echo "${b1}" | grep -Eq "^rc[0-9]+$"; then
+    rc="$(echo "${b1}" | tr -d 'rc')"
+
+    if echo "${b2}" | grep -Eq "^[0-9]+$"; then
+      t=2
+      b="${b2}"
+    elif [ -z "${b2}" ]; then
+      t=1
+      b=0
+    else
+      t=9
+      b=99999
+    fi
+  elif echo "${b1}" | grep -Eq "^[0-9]+$"; then
+    t=0
+    rc=0
+    b="${b1}"
+  elif [ -z "${b1}" ]; then
+    t=3
+    rc=0
+    b=0
+  else
+    t=9
+    rc=999
+    b=99999
   fi
 
   echo "${v}" | tr '.' ' ' > "${tmpfile}"
@@ -796,7 +931,13 @@ parse_version() {
 
   rm -f "${tmpfile}"
 
-  printf "%04d%03d%03d%05d" "${maj}" "${min}" "${patch}" "${b}"
+  if [ "${#maj}" -gt 3 ] || [ "${#min}" -gt 3 ] || [ "${#patch}" -gt 3 ] || [ "${#rc}" -gt 3 ] || [ "${#b}" -gt 5 ]; then
+    warning "Failed to parse version ${r}"
+    printf "%s" "${vmax}"
+    return 0
+  fi
+
+  printf "%03d%03d%03d%01d%03d%05d" "${maj}" "${min}" "${patch}" "${t}" "${rc}" "${b}"
 }
 
 get_latest_tag() {
@@ -860,8 +1001,8 @@ update_available() {
     info "Update available"
 
     if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
-      current_major="$(echo "${current_version}" | head -c 4)"
-      latest_major="$(echo "${latest_version}" | head -c 4)"
+      current_major="$(echo "${current_version}" | head -c 3)"
+      latest_major="$(echo "${latest_version}" | head -c 3)"
 
       if [ "${current_major}" -ne "${latest_major}" ]; then
         update_safe=0
@@ -902,11 +1043,11 @@ set_tarball_urls() {
     export NETDATA_TARBALL_URL="file://${path}/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
   elif [ "$1" = "stable" ]; then
-    latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
+    latest="$(get_latest_tag)"
     export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
   else
-    tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
+    tag="$(get_latest_tag)"
     export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/sha256sums.txt"
   fi
@@ -916,7 +1057,7 @@ update_build() {
   [ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
   RUN_INSTALLER=0
-  ndtmpdir=$(create_exec_tmp_directory)
+  create_exec_tmp_directory
   cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
 
   install_build_dependencies
@@ -1015,7 +1156,7 @@ update_build() {
 }
 
 update_static() {
-  ndtmpdir="$(create_exec_tmp_directory)"
+  create_exec_tmp_directory
   PREVDIR="$(pwd)"
 
   info "Entering ${ndtmpdir}"
@@ -1190,13 +1331,21 @@ update_binpkg() {
   elif ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
     RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
-  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]*0{5}$'; then # All five final digits are zero and at least one preceeding digit is non-zero.
-    RELEASE_CHANNEL="stable"
-  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]{0,4}$'; then # At least one of the final five digits is non-zero.
-    RELEASE_CHANNEL="nightly"
   else
-    RELEASE_CHANNEL="none"
-    warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
+    case "$(echo "${initial_version}" | cut -c 10)" in
+      0)
+        RELEASE_CHANNEL="nightly"
+        repopkg="netdata-repo-edge"
+        ;;
+      3)
+        RELEASE_CHANNEL="stable"
+        repopkg="netdata-repo"
+        ;;
+      *)
+        RELEASE_CHANNEL="none"
+        warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
+        ;;
+    esac
   fi
 
   if [ -n "${repo_path}" ]; then
@@ -1210,7 +1359,7 @@ update_binpkg() {
     info "Checking if native packages are still being published for this platform."
 
     set +e
-    _safe_download "${check_url}" /dev/null
+    check_for_remote_file "${check_url}"
     ret=$?
     set -e
 
@@ -1227,6 +1376,11 @@ update_binpkg() {
         error ""
         fatal "Unable to update due to native packages no longer being published for this platform" U001E
         ;;
+      2) fatal "Failed to connect to Netdata package repositories. This is most likely a result of networking problems with this system." U001F ;;
+      3) fatal "TLS error when trying to connect to Netdata package repositories." U0020 ;;
+      4) fatal "Unknown error when trying to connect to Netdata package repositories." U0021 ;;
+      5) fatal "Client error when trying to connect to Netdata package repositories." U0025 ;;
+      6) fatal "Internal server error when trying to connect to Netdata package repositories." U0026 ;;
       255) warning "Unable to check whether native packages are being published, wget or curl is required." ;;
     esac
   fi
@@ -1240,7 +1394,7 @@ update_binpkg() {
     fi
   fi
 
-  current_major="$(get_current_version | head -c 4 | awk '{ print $1 + 0 }')"
+  current_major="$(get_current_version | head -c 3 | awk '{ print $1 + 0 }')"
   latest_major="$(get_new_binpkg_major)"
 
   # current_major == 0 means we could not determine the installed version

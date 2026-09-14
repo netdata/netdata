@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<response status="success">
+  <result>
+    <power-supply>
+      <Slot1>
+        <entry>
+          <slot>1</slot>
+          <description>Power Supply 1</description>
+          <Inserted>True</Inserted>
+          <alarm>False</alarm>
+        </entry>
+      </Slot1>
+    </power-supply>
+    <thermal>
+      <Slot1>
+        <entry>
+          <slot>1</slot>
+          <description>Temperature Inlet</description>
+          <DegreesC>40.9</DegreesC>
+          <min>0.0</min>
+          <max>60.0</max>
+          <alarm>False</alarm>
+        </entry>
+      </Slot1>
+    </thermal>
+    <fan>
+      <Slot1>
+        <entry>
+          <slot>1</slot>
+          <description>Fan 1 RPM</description>
+          <RPMs>9157</RPMs>
+          <min>2500</min>
+          <alarm>False</alarm>
+        </entry>
+      </Slot1>
+    </fan>
+    <power>
+      <Slot1>
+        <entry>
+          <slot>1</slot>
+          <description>3.3V Power Rail</description>
+          <Volts>3.332</Volts>
+          <min>2.97</min>
+          <max>3.63</max>
+          <alarm>True</alarm>
+        </entry>
+      </Slot1>
+    </power>
+  </result>
+</response>

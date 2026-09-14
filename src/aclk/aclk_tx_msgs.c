@@ -11,29 +11,46 @@
 #pragma region aclk_tx_msgs helper functions
 #endif
 
-static void freez_aclk_publish5a(void *ptr) {
+static void freez_aclk_publish_msg(void *ptr) {
     freez(ptr);
 }
-static void freez_aclk_publish5b(void *ptr) {
-    freez(ptr);
+
+static bool aclk_size_add_overflow(size_t *total, size_t add)
+{
+    if (add > SIZE_MAX - *total)
+        return true;
+
+    *total += add;
+    return false;
 }
 
 #define ACLK_HEADER_VERSION (2)
 
-uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+// Returns MQTT_WSS_OK (0) when the message was handed to the mqtt layer, non-zero otherwise -
+// mqtt_wss_publish5()'s error code where it produced one, and 1 for a message that never reached
+// it. Either way the message has been freed. `packet_id` is optional and reports the assigned id
+// (0 when none was assigned).
+//
+// Callers that must know whether the message really went out MUST test the return code: the send
+// can fail for reasons that carry no packet id at all - an offline or disconnecting client, a full
+// mqtt buffer, a message the server rejects as too big - and a caller that does not want the id
+// passes NULL. The id is informational, for matching a later PUBACK.
+int aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname, uint16_t *packet_id)
 {
 #ifndef ACLK_LOG_CONVERSATION_DIR
     UNUSED(msgname);
 #endif
-    uint16_t packet_id;
+    uint16_t pid = 0;
     const char *topic = aclk_get_topic(subtopic);
+
+    if (packet_id)
+        *packet_id = 0;
 
     if (unlikely(!topic)) {
         netdata_log_error("Couldn't get topic. Aborting message send.");
-        return 0;
+        freez(msg);
+        return 1;
     }
-
-    mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (aclklog_enabled) {
         char *json = protomsg_to_json(msg, msg_len, msgname);
@@ -41,13 +58,20 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         freez(json);
     }
 
-    return packet_id;
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, msg, &freez_aclk_publish_msg, msg_len, MQTT_WSS_PUB_QOS1, &pid);
+    if (rc != MQTT_WSS_OK)
+        return rc;
+
+    if (packet_id)
+        *packet_id = pid;
+
+    return MQTT_WSS_OK;
 }
 
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
 static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
 {
-    uint16_t packet_id;
+    uint16_t packet_id = 0;
     const char *str;
     char *full_msg = NULL;
     size_t len;
@@ -61,24 +85,31 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
     len = strlen(str);
 
+    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
     size_t full_msg_len = len;
-    if (payload_len)
-        full_msg_len += strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len;
+    if (payload_len && unlikely(
+            aclk_size_add_overflow(&full_msg_len, sep_len) ||
+            aclk_size_add_overflow(&full_msg_len, payload_len))) {
+        json_object_put(msg);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
 
     full_msg = mallocz(full_msg_len);
     memcpy(full_msg, str, len);
     json_object_put(msg);
 
     if (payload_len) {
-        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1);
-        len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
+        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+        len += sep_len;
         memcpy(&full_msg[len], payload, payload_len);
     }
 
-    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
+    int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish_msg, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG)
         return HTTP_RESP_CONTENT_TOO_LONG;
+    if (rc != MQTT_WSS_OK)
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     return 0;
 }
@@ -124,12 +155,14 @@ static struct json_object *create_hdr(const char *type, const char *msg_id)
     tmp = json_object_new_int64(ts_us);
     json_object_object_add(obj, "timestamp-offset-usec", tmp);
 
-    tmp = json_object_new_int64(aclk_session_sec);
+    usec_t session = aclk_session_load();
+
+    tmp = json_object_new_int64(session / USEC_PER_SEC);
     json_object_object_add(obj, "connect", tmp);
 
 // TODO handle this somehow see above
-//    tmp = json_object_new_uint64(0 /* TODO aclk_session_us */);
-    tmp = json_object_new_int64(aclk_session_us);
+//    tmp = json_object_new_uint64(session % USEC_PER_SEC);
+    tmp = json_object_new_int64(session % USEC_PER_SEC);
     json_object_object_add(obj, "connect-offset-usec", tmp);
 
     tmp = json_object_new_int(ACLK_HEADER_VERSION);
@@ -196,6 +229,86 @@ short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *ms
     return rc;
 }
 
+short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const char *msg_id,
+                               usec_t t_exec, usec_t created, short http_code,
+                               const char *http_headers, size_t http_headers_len,
+                               const char *body, size_t body_len)
+{
+    if (unlikely(!topic || topic[0] != '/')) {
+        netdata_log_error("Full topic required!");
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
+
+    // normalize NULL-with-len so the allocation size and the memcpys stay in sync
+    if (!http_headers)
+        http_headers_len = 0;
+    if (!body)
+        body_len = 0;
+
+    json_object *msg = create_hdr("http", msg_id);
+    json_object *tmp;
+
+    tmp = json_object_new_int64(t_exec);
+    json_object_object_add(msg, "t-exec", tmp);
+
+    tmp = json_object_new_int64(created);
+    json_object_object_add(msg, "t-rx", tmp);
+
+    tmp = json_object_new_int(http_code);
+    json_object_object_add(msg, "http-code", tmp);
+
+    size_t json_len;
+    const char *json_str = json_object_to_json_string_length(msg, JSON_C_TO_STRING_PLAIN, &json_len);
+
+    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
+    const bool has_payload = (http_headers_len != 0 || body_len != 0);
+
+    size_t total = json_len;
+    if (unlikely(
+            (has_payload && aclk_size_add_overflow(&total, sep_len)) ||
+            aclk_size_add_overflow(&total, http_headers_len) ||
+            aclk_size_add_overflow(&total, body_len))) {
+        json_object_put(msg);
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
+
+    char *raw = mallocz(total);
+
+    size_t pos = 0;
+    memcpy(raw + pos, json_str, json_len);
+    pos += json_len;
+    json_object_put(msg);
+
+    if (has_payload) {
+        memcpy(raw + pos, V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+        pos += sep_len;
+    }
+
+    if (http_headers_len) {
+        memcpy(raw + pos, http_headers, http_headers_len);
+        pos += http_headers_len;
+    }
+
+    if (body_len)
+        memcpy(raw + pos, body, body_len);
+
+    uint16_t packet_id = 0;
+    int rc = mqtt_wss_publish5(client, (char *)topic, NULL, raw, &freez_aclk_publish_msg, total, MQTT_WSS_PUB_QOS1, &packet_id);
+
+    if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
+
+    if (rc != MQTT_WSS_OK) {
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_INTERNAL_SERVER_ERROR, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, NULL, 0);
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+    }
+
+    return http_code;
+}
+
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {
     size_t len;
     uint16_t pid;
@@ -203,7 +316,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = aclk_get_agent_capas(),
     };
 
@@ -226,7 +339,8 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
         return 0;
     }
 
-    pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
+    // a failed publish leaves pid at 0, which is what this returned before it reported the code
+    (void)aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection", &pid);
     if (claim_id_is_set(previous_claim_id))
         claim_id_clear_previous_working();
 
@@ -237,7 +351,7 @@ char *aclk_generate_lwt(size_t *size) {
     update_agent_connection_t conn = {
         .reachable = 0,
         .lwt = 1,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = NULL
     };
 

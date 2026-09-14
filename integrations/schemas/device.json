@@ -1,0 +1,6 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Netdata Network Performance Monitoring catalog integrations metadata.",
+    "description": "NPM catalog entries (per-vendor device metrics, BGP, and licensing) share the same shape as collector integrations: identity, overview, setup, troubleshooting. Every entry under integration_type=device validates against this schema, which delegates to collector.json. These entries are generated from SNMP device profiles by integrations/gen_npm_catalog.py.",
+    "$ref": "./collector.json"
+}

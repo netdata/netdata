@@ -1,0 +1,26 @@
+[package]
+name = "ng-flatten"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bincode = { workspace = true }
+hashbrown = { workspace = true }
+opentelemetry-proto = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
+
+[dev-dependencies]
+criterion = { workspace = true }
+lz4_flex = { workspace = true }
+prost = { workspace = true }
+
+[[bench]]
+name = "ingest"
+harness = false

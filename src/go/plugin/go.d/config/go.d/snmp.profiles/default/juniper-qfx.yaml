@@ -1,5 +1,5 @@
 extends:
-  - _std-bgp4-mib.yaml
+  - _juniper-bgp4-v2.yaml
   - _std-host-resources-mib.yaml
   - _std-if-mib.yaml
   - _std-ospf-mib.yaml
@@ -8,6 +8,8 @@ extends:
   - _juniper-firewall.yaml
   - _juniper-virtualchassis.yaml
   - _juniper.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
 
 metadata:
   device:

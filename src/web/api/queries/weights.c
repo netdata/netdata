@@ -2,8 +2,17 @@
 
 #include "database/rrd.h"
 #include "KolmogorovSmirnovDist.h"
+#include "weights-ranking.h"
 
 #define MAX_POINTS 10000
+
+static bool weights_points_exceed_max(size_t points, uint32_t shifts) {
+    if(unlikely(shifts >= sizeof(points) * CHAR_BIT))
+        return points != 0;
+
+    return points > ((size_t)MAX_POINTS >> shifts);
+}
+
 int metric_correlations_version = 1;
 
 typedef struct weights_stats {
@@ -56,6 +65,7 @@ typedef enum {
 struct register_result {
     RESULT_FLAGS flags;
     RRDHOST *host;
+    STRING *hostname;
     RRDCONTEXT_ACQUIRED *rca;
     RRDINSTANCE_ACQUIRED *ria;
     RRDMETRIC_ACQUIRED *rma;
@@ -63,7 +73,67 @@ struct register_result {
     STORAGE_POINT highlighted;
     STORAGE_POINT baseline;
     usec_t duration_ut;
+    bool selected;
+    bool instance_selected;
+    bool context_selected;
+    bool node_selected;
 };
+
+struct weights_host_snapshot {
+    RRDHOST *host;
+    STRING *hostname;
+};
+
+static bool weights_host_snapshot_conflict_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value, void *data __maybe_unused) {
+    struct weights_host_snapshot *snapshot = new_value;
+
+    string_freez(snapshot->hostname);
+    snapshot->hostname = NULL;
+    return false;
+}
+
+static void weights_host_snapshot_delete_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct weights_host_snapshot *snapshot = value;
+
+    string_freez(snapshot->hostname);
+    snapshot->hostname = NULL;
+}
+
+static DICTIONARY *weights_host_snapshots_init(void) {
+    DICTIONARY *snapshots = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct weights_host_snapshot));
+
+    dictionary_register_conflict_callback(snapshots, weights_host_snapshot_conflict_callback, NULL);
+    dictionary_register_delete_callback(snapshots, weights_host_snapshot_delete_callback, NULL);
+    return snapshots;
+}
+
+static struct weights_host_snapshot *weights_host_snapshot_get(DICTIONARY *snapshots, RRDHOST *host) {
+    char key[2 * sizeof(void *) + 3];
+    int key_len = snprintfz(key, sizeof(key), "%p", (void *)host);
+
+    struct weights_host_snapshot *snapshot = dictionary_get_advanced(snapshots, key, key_len);
+    if(likely(snapshot))
+        return snapshot;
+
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+    struct weights_host_snapshot candidate = {
+        .host = host,
+        .hostname = identity.hostname,
+    };
+    identity.hostname = NULL;
+    rrdhost_identity_release(&identity);
+
+    snapshot = dictionary_set_advanced(snapshots, key, key_len, &candidate, sizeof(candidate), NULL);
+    if(unlikely(!snapshot)) {
+        string_freez(candidate.hostname);
+        fatal("QUERY WEIGHTS: failed to retain a host hostname");
+    }
+
+    return snapshot;
+}
 
 static DICTIONARY *register_result_init() {
     DICTIONARY *results = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct register_result));
@@ -108,7 +178,8 @@ static void merge_results_dictionaries(DICTIONARY *main_results, DICTIONARY *loc
 static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryable);
 static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 
-static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria,
+static void register_result(DICTIONARY *results, RRDHOST *host, STRING *hostname,
+                            RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria,
                             RRDMETRIC_ACQUIRED *rma, NETDATA_DOUBLE value, RESULT_FLAGS flags,
                             STORAGE_POINT *highlighted, STORAGE_POINT *baseline, WEIGHTS_STATS *stats,
                             bool register_zero, usec_t duration_ut) {
@@ -129,6 +200,7 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
     struct register_result t = {
         .flags = flags,
         .host = host,
+        .hostname = hostname,
         .rca = rca,
         .ria = ria,
         .rma = rma,
@@ -146,6 +218,84 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
     char buf[20 + 1];
     ssize_t len = snprintfz(buf, sizeof(buf) - 1, "%p", rma);
     dictionary_set_advanced(results, buf, len, &t, sizeof(struct register_result), NULL);
+}
+
+static int weights_result_compare(const void *left, const void *right, void *data) {
+    const struct register_result *a = left, *b = right;
+    bool normalized = *(bool *)data;
+    if(a->value != b->value)
+        return ((a->value < b->value) == normalized) ? -1 : 1;
+
+    const ND_UUID *aid = UUIDiszero(a->host->host_id) ? &a->host->node_id : &a->host->host_id;
+    const ND_UUID *bid = UUIDiszero(b->host->host_id) ? &b->host->node_id : &b->host->host_id;
+    int rc = memcmp(aid->uuid, bid->uuid, sizeof(aid->uuid));
+    if(!rc) rc = strcmp(rrdcontext_acquired_id(a->rca), rrdcontext_acquired_id(b->rca));
+    if(!rc) rc = strcmp(rrdinstance_acquired_id(a->ria), rrdinstance_acquired_id(b->ria));
+    if(!rc) rc = strcmp(rrdmetric_acquired_id(a->rma), rrdmetric_acquired_id(b->rma));
+    return rc;
+}
+
+static void weights_parent_key(char *key, size_t size, char type, const void *parent) {
+    snprintfz(key, size, "%c%p", type, parent);
+}
+
+static WEIGHTS_RANKING weights_select_results(DICTIONARY *results, size_t limit, bool *normalized, bool mark_parents) {
+    size_t total = dictionary_entries(results);
+    WEIGHTS_RANKING ranking = {
+        .capacity = MIN(limit, total), .compare = weights_result_compare, .data = normalized,
+    };
+    struct register_result *t;
+    if(mark_parents && limit >= total) {
+        dfe_start_read(results, t)
+            t->selected = t->instance_selected = t->context_selected = t->node_selected = true;
+        dfe_done(t);
+        return ranking;
+    }
+
+    ranking.items = callocz(ranking.capacity, sizeof(*ranking.items));
+    dfe_start_read(results, t)
+        weights_ranking_offer(&ranking, t);
+    dfe_done(t);
+
+    if(!mark_parents)
+        return ranking;
+
+    DICTIONARY *parents = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    char key[2 * sizeof(void *) + 4];
+    for(size_t i = 0; i < ranking.used; i++) {
+        t = ranking.items[i];
+        t->selected = true;
+        weights_parent_key(key, sizeof(key), 'n', t->host);
+        dictionary_set(parents, key, "", 1);
+        weights_parent_key(key, sizeof(key), 'c', t->rca);
+        dictionary_set(parents, key, "", 1);
+        weights_parent_key(key, sizeof(key), 'i', t->ria);
+        dictionary_set(parents, key, "", 1);
+    }
+    dfe_start_read(results, t) {
+        weights_parent_key(key, sizeof(key), 'n', t->host);
+        t->node_selected = dictionary_get(parents, key) != NULL;
+        weights_parent_key(key, sizeof(key), 'c', t->rca);
+        t->context_selected = dictionary_get(parents, key) != NULL;
+        weights_parent_key(key, sizeof(key), 'i', t->ria);
+        t->instance_selected = dictionary_get(parents, key) != NULL;
+    }
+    dfe_done(t);
+    dictionary_destroy(parents);
+    return ranking;
+}
+
+static void weights_result_limit_to_json(BUFFER *wb, size_t limit, size_t total, size_t returned, bool grouped) {
+    if(!limit)
+        return;
+    buffer_json_member_add_object(wb, "result_limit");
+    buffer_json_member_add_uint64(wb, "limit", limit);
+    buffer_json_member_add_uint64(wb, "total", total);
+    buffer_json_member_add_uint64(wb, "returned", returned);
+    buffer_json_member_add_string(wb, "unit", grouped ? "groups" : "dimensions");
+    buffer_json_member_add_boolean(wb, "truncated", total > returned);
+    buffer_json_member_add_string(wb, "summary_scope", "all");
+    buffer_json_object_close(wb);
 }
 
 // ----------------------------------------------------------------------------
@@ -199,7 +349,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 size_t points, WEIGHTS_METHOD method,
                                                 RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
-                                                WEIGHTS_STATS *stats) {
+                                                WEIGHTS_STATS *stats, size_t limit) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -212,6 +362,8 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
     struct register_result *t;
     RRDINSTANCE_ACQUIRED *last_ria = NULL; // never access this - we use it only for comparison
     dfe_start_read(results, t) {
+        if(limit && !t->selected)
+            continue;
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
@@ -238,8 +390,9 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     return total_dimensions;
@@ -251,7 +404,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   size_t points, WEIGHTS_METHOD method,
                                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
-                                                  WEIGHTS_STATS *stats) {
+                                                  WEIGHTS_STATS *stats, size_t limit) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -266,6 +419,8 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     RRDCONTEXT_ACQUIRED *last_rca = NULL;
     RRDINSTANCE_ACQUIRED *last_ria = NULL;
     dfe_start_read(results, t) {
+        if(limit && !t->context_selected)
+            continue;
 
         if(t->rca != last_rca) {
             last_rca = t->rca;
@@ -290,6 +445,11 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             last_ria = NULL;
         }
 
+        contexts_total_weight += t->value;
+        context_dims++;
+        if(limit && !t->instance_selected)
+            continue;
+
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
@@ -307,12 +467,12 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             charts_total_weight = 0.0;
         }
 
-        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
         charts_total_weight += t->value;
-        contexts_total_weight += t->value;
         chart_dims++;
-        context_dims++;
-        total_dimensions++;
+        if(!limit || t->selected) {
+            buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+            total_dimensions++;
+        }
     }
     dfe_done(t);
 
@@ -328,8 +488,9 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
 
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     return total_dimensions;
@@ -344,6 +505,7 @@ struct workload_stats {
 
 struct query_weights_data {
     QUERY_WEIGHTS_REQUEST *qwr;
+    struct query_weights_data *shared_qwd;
 
     SIMPLE_PATTERN *scope_nodes_sp;
     SIMPLE_PATTERN *scope_contexts_sp;
@@ -370,6 +532,9 @@ struct query_weights_data {
     bool register_zero;
 
     DICTIONARY *results;
+    DICTIONARY *host_snapshots;
+    struct weights_host_snapshot *host_snapshot;
+    ONEWAYALLOC *query_owa;
     WEIGHTS_STATS stats;
     RRDHOST **hosts_array;
     size_t total_hosts;
@@ -394,6 +559,25 @@ struct query_weights_thread_data {
     size_t thread_id;
 };
 
+static inline struct query_weights_data *query_weights_status_qwd(struct query_weights_data *qwd) {
+    return qwd->shared_qwd ? qwd->shared_qwd : qwd;
+}
+
+static inline bool query_weights_is_stopped(struct query_weights_data *qwd) {
+    struct query_weights_data *status_qwd = query_weights_status_qwd(qwd);
+
+    return __atomic_load_n(&status_qwd->timed_out, __ATOMIC_RELAXED) ||
+           __atomic_load_n(&status_qwd->interrupted, __ATOMIC_RELAXED);
+}
+
+static inline void query_weights_set_timed_out(struct query_weights_data *qwd) {
+    __atomic_store_n(&query_weights_status_qwd(qwd)->timed_out, true, __ATOMIC_RELAXED);
+}
+
+static inline void query_weights_set_interrupted(struct query_weights_data *qwd) {
+    __atomic_store_n(&query_weights_status_qwd(qwd)->interrupted, true, __ATOMIC_RELAXED);
+}
+
 // Worker thread function for parallel host processing
 void query_weights_worker_thread(void *arg)
 {
@@ -404,6 +588,29 @@ void query_weights_worker_thread(void *arg)
     memset(&thread_data->local_stats, 0, sizeof(WEIGHTS_STATS));
     thread_data->local_examined_dimensions = 0;
     memset(&thread_data->local_versions, 0, sizeof(struct query_versions));
+
+    // Copy only immutable query inputs; mutable state is shared atomically or owned by this worker.
+    struct query_weights_data local_qwd = {
+        .qwr = main_qwd->qwr,
+        .shared_qwd = main_qwd,
+        .scope_contexts_sp = main_qwd->scope_contexts_sp,
+        .scope_instances_sp = main_qwd->scope_instances_sp,
+        .scope_dimensions_sp = main_qwd->scope_dimensions_sp,
+        .contexts_sp = main_qwd->contexts_sp,
+        .instances_sp = main_qwd->instances_sp,
+        .dimensions_sp = main_qwd->dimensions_sp,
+        .alerts_sp = main_qwd->alerts_sp,
+        .scope_labels_pa = main_qwd->scope_labels_pa,
+        .labels_pa = main_qwd->labels_pa,
+        .timeout_us = main_qwd->timeout_us,
+        .timings.received_ut = main_qwd->timings.received_ut,
+        .examined_dimensions = thread_data->local_examined_dimensions,
+        .register_zero = main_qwd->register_zero,
+        .results = thread_data->local_results,
+        .host_snapshots = main_qwd->host_snapshots,
+        .stats = thread_data->local_stats,
+        .shifts = main_qwd->shifts,
+    };
 
     // Process assigned hosts
     for (size_t i = 0; i < thread_data->host_count; i++) {
@@ -429,22 +636,18 @@ void query_weights_worker_thread(void *arg)
             break;
         }
 
-        // Create a local query_weights_data for this thread
-        struct query_weights_data local_qwd = *main_qwd;
-        local_qwd.results = thread_data->local_results;
-        local_qwd.stats = thread_data->local_stats;
-        local_qwd.examined_dimensions = thread_data->local_examined_dimensions;
-        local_qwd.versions = thread_data->local_versions;
-
         char uuid[UUID_STR_LEN];
         if(!UUIDiszero(host->node_id))
             uuid_unparse_lower(host->node_id.uuid, uuid);
         else
             uuid[0] = '\0';
 
+        local_qwd.host_snapshot = weights_host_snapshot_get(local_qwd.host_snapshots, host);
+
         SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
         if(main_qwd->scope_nodes_sp) {
-            match = simple_pattern_matches_string_extract(main_qwd->scope_nodes_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(
+                main_qwd->scope_nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(main_qwd->scope_nodes_sp, host->machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *uuid)
@@ -456,7 +659,8 @@ void query_weights_worker_thread(void *arg)
             continue;
 
         if(main_qwd->nodes_sp) {
-            match = simple_pattern_matches_string_extract(main_qwd->nodes_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(
+                main_qwd->nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(main_qwd->nodes_sp, host->machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *uuid)
@@ -481,6 +685,8 @@ void query_weights_worker_thread(void *arg)
         thread_data->local_examined_dimensions = local_qwd.examined_dimensions;
         thread_data->local_stats = local_qwd.stats;
     }
+
+    onewayalloc_destroy(local_qwd.query_owa);
 }
 
 // Thread-safe statistics merging - use simple addition since we're in single-threaded merge
@@ -649,6 +855,8 @@ typedef enum {
 
 struct aggregated_weight {
     const char *name;
+    const char *id;
+    bool selected;
     NETDATA_DOUBLE min;
     NETDATA_DOUBLE max;
     NETDATA_DOUBLE sum;
@@ -656,6 +864,28 @@ struct aggregated_weight {
     STORAGE_POINT hsp;
     STORAGE_POINT bsp;
 };
+
+static NETDATA_DOUBLE weights_group_score(const struct aggregated_weight *aw, RRDR_GROUP_BY_FUNCTION aggregation) {
+    switch(aggregation) {
+        case RRDR_GROUP_BY_FUNCTION_MIN: return aw->min;
+        case RRDR_GROUP_BY_FUNCTION_MAX:
+        case RRDR_GROUP_BY_FUNCTION_EXTREMES: return aw->max;
+        case RRDR_GROUP_BY_FUNCTION_SUM:
+        case RRDR_GROUP_BY_FUNCTION_PERCENTAGE: return aw->sum;
+        default: return aw->count ? aw->sum / (NETDATA_DOUBLE)aw->count : 0.0;
+    }
+}
+
+static int weights_group_compare(const void *left, const void *right, void *data) {
+    const struct aggregated_weight *a = left, *b = right;
+    const QUERY_WEIGHTS_REQUEST *qwr = data;
+    NETDATA_DOUBLE av = weights_group_score(a, qwr->group_by.aggregation);
+    NETDATA_DOUBLE bv = weights_group_score(b, qwr->group_by.aggregation);
+    bool normalized = !(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE;
+    if(av != bv)
+        return ((av < bv) == normalized) ? -1 : 1;
+    return strcmp(a->id, b->id);
+}
 
 static inline void storage_point_to_json(BUFFER *wb, WEIGHTS_POINT_TYPE type, ssize_t di, ssize_t ii, ssize_t ci, ssize_t ni, struct aggregated_weight *aw, RRDR_OPTIONS options __maybe_unused, bool baseline) {
     if(type != WPT_GROUP) {
@@ -920,6 +1150,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
     bool baseline = method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME;
     multinode_data_schema(wb, options, "schema", baseline, false);
+    size_t limit = qwd->qwr->cardinality_limit;
 
     DICTIONARY *dict_nodes = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_node));
     DICTIONARY *dict_contexts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name_units));
@@ -940,27 +1171,33 @@ static size_t registered_results_to_json_multinode_no_group_by(
     ssize_t di = -1, ii = -1, ci = -1, ni = -1;
     ssize_t di_max = 0, ii_max = 0, ci_max = 0, ni_max = 0;
     size_t total_dimensions = 0;
+    bool node_selected = false;
     dfe_start_read(results, t) {
 
         // close instance
         if(t->ria != last_ria && last_ria) {
-            storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
-            instance_dun->exposed = true;
+            if(instance_dun) {
+                storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
+                instance_dun->exposed = true;
+            }
             last_ria = NULL;
             instance_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close context
         if(t->rca != last_rca && last_rca) {
-            storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
-            context_dun->exposed = true;
+            if(context_dun) {
+                storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
+                context_dun->exposed = true;
+            }
             last_rca = NULL;
             context_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close node
         if(t->host != last_host && last_host) {
-            storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
+            if(node_selected)
+                storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
             node_dun->exposed = true;
             last_host = NULL;
             node_aw = AGGREGATED_WEIGHT_EMPTY;
@@ -971,64 +1208,68 @@ static size_t registered_results_to_json_multinode_no_group_by(
             last_host = t->host;
             node_dun = dict_unique_node_add(dict_nodes, t->host, &ni_max);
             ni = node_dun->i;
+            node_selected = !limit || t->node_selected;
+            node_dun->exposed = true;
         }
 
         // open context
         if(t->rca != last_rca) {
             last_rca = t->rca;
-            context_dun = dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
-                                                     rrdcontext_acquired_units(t->rca), &ci_max);
-            ci = context_dun->i;
+            context_dun = (!limit || t->context_selected) ?
+                dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
+                                           rrdcontext_acquired_units(t->rca), &ci_max) : NULL;
+            ci = context_dun ? context_dun->i : -1;
         }
 
         // open instance
         if(t->ria != last_ria) {
             last_ria = t->ria;
-            instance_dun = dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max);
-            ii = instance_dun->i;
+            instance_dun = (!limit || t->instance_selected) ?
+                dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max) : NULL;
+            ii = instance_dun ? instance_dun->i : -1;
         }
 
-        dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
-        di = dimension_dun->i;
-
-        struct aggregated_weight aw = {
+        if(!limit || t->selected) {
+            dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
+            di = dimension_dun->i;
+            struct aggregated_weight aw = {
                 .min = t->value,
                 .max = t->value,
                 .sum = t->value,
                 .count = 1,
                 .hsp = t->highlighted,
                 .bsp = t->baseline,
-        };
+            };
 
-        storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
-        node_dun->exposed = true;
-        context_dun->exposed = true;
-        instance_dun->exposed = true;
-        dimension_dun->exposed = true;
+            storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
+            context_dun->exposed = true;
+            instance_dun->exposed = true;
+            dimension_dun->exposed = true;
+            total_dimensions++;
+        }
 
         merge_into_aw(instance_aw, t);
         merge_into_aw(context_aw, t);
         merge_into_aw(node_aw, t);
 
         node_dun->duration_ut += t->duration_ut;
-        total_dimensions++;
     }
     dfe_done(t);
 
     // close instance
-    if(last_ria) {
+    if(last_ria && instance_dun) {
         storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
         instance_dun->exposed = true;
     }
 
     // close context
-    if(last_rca) {
+    if(last_rca && context_dun) {
         storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
         context_dun->exposed = true;
     }
 
     // close node
-    if(last_host) {
+    if(last_host && node_selected) {
         storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
         node_dun->exposed = true;
     }
@@ -1043,8 +1284,10 @@ static size_t registered_results_to_json_multinode_no_group_by(
             if(!dun->exposed)
                 continue;
 
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(dun->host);
             buffer_json_add_array_item_object(wb);
-            buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut, true);
+            buffer_json_node_add_v2(wb, dun->host, &identity, dun->i, dun->duration_ut, true);
+            rrdhost_identity_release(&identity);
             buffer_json_object_close(wb);
         }
         dfe_done(dun);
@@ -1107,8 +1350,9 @@ static size_t registered_results_to_json_multinode_no_group_by(
     buffer_json_object_close(wb); //dictionaries
 
     buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     dictionary_destroy(dict_nodes);
@@ -1175,7 +1419,7 @@ static size_t registered_results_to_json_multinode_group_by(
                 buffer_fast_strcat(key, "@", 1);
                 buffer_fast_strcat(name, "@", 1);
                 buffer_strcat(key, node_uuid);
-                buffer_strcat(name, rrdhost_hostname(t->host));
+                buffer_strcat(name, string2str(t->hostname));
             }
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_NODE) {
@@ -1185,7 +1429,7 @@ static size_t registered_results_to_json_multinode_group_by(
             }
 
             buffer_strcat(key, node_uuid);
-            buffer_strcat(name, rrdhost_hostname(t->host));
+            buffer_strcat(name, string2str(t->hostname));
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_CONTEXT) {
             if(buffer_strlen(key)) {
@@ -1224,28 +1468,46 @@ static size_t registered_results_to_json_multinode_group_by(
     buffer_free(name); name = NULL;
 
     struct aggregated_weight *aw;
+    size_t limit = qwd->qwr->cardinality_limit;
+    size_t total_groups = dictionary_entries(group_by), returned_groups = 0;
+    WEIGHTS_RANKING ranking = {.capacity = MIN(limit, total_groups), .compare = weights_group_compare, .data = qwd->qwr};
+    if(limit && limit < total_groups) {
+        ranking.items = callocz(ranking.capacity, sizeof(*ranking.items));
+        dfe_start_read(group_by, aw) {
+            aw->id = aw_dfe.name;
+            weights_ranking_offer(&ranking, aw);
+        }
+        dfe_done(aw);
+        for(size_t i = 0; i < ranking.used; i++)
+            ((struct aggregated_weight *)ranking.items[i])->selected = true;
+    }
     buffer_json_member_add_array(wb, "result");
     dfe_start_read(group_by, aw) {
         const char *k = aw_dfe.name;
         const char *n = aw->name;
 
-        buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "id", k);
+        if(!limit || limit >= total_groups || aw->selected) {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "id", k);
 
-        if(strcmp(k, n) != 0)
-            buffer_json_member_add_string(wb, "nm", n);
+            if(strcmp(k, n) != 0)
+                buffer_json_member_add_string(wb, "nm", n);
 
-        storage_point_to_json(wb, WPT_GROUP, 0, 0, 0, 0, aw, options, baseline);
-        buffer_json_object_close(wb);
+            storage_point_to_json(wb, WPT_GROUP, 0, 0, 0, 0, aw, options, baseline);
+            buffer_json_object_close(wb);
+            returned_groups++;
+        }
 
         freez((void *)aw->name);
     }
     dfe_done(aw);
     buffer_json_array_close(wb); // result
+    freez(ranking.items);
 
     buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, total_groups, returned_groups, true);
     buffer_json_finalize(wb);
 
     dictionary_destroy(group_by);
@@ -1259,30 +1521,18 @@ static size_t registered_results_to_json_multinode_group_by(
 typedef long int DIFFS_NUMBERS;
 #define DOUBLE_TO_INT_MULTIPLIER 100000
 
-static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS K) {
-    // binary search to find the index the smallest index
-    // of the first value in the array that is greater than K
-
-    int right = size;
-    while(left < right) {
-        int middle = (int)(((unsigned int)(left + right)) >> 1);
-
-        if(arr[middle] > K)
-            right = middle;
-
-        else
-            left = middle + 1;
-    }
-
-    return left;
-}
-
 int compare_diffs(const void *left, const void *right) {
     DIFFS_NUMBERS lt = *(DIFFS_NUMBERS *)left;
     DIFFS_NUMBERS rt = *(DIFFS_NUMBERS *)right;
 
     // https://stackoverflow.com/a/3886497/1114110
     return (lt > rt) - (lt < rt);
+}
+
+static inline int cursor_bigger_than(const DIFFS_NUMBERS arr[], int cursor, int size, DIFFS_NUMBERS key) {
+    while(cursor < size && arr[cursor] <= key)
+        cursor++;
+    return cursor;
 }
 
 static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, NETDATA_DOUBLE *arr, size_t size) {
@@ -1304,6 +1554,15 @@ static double ks_2samp(
         DIFFS_NUMBERS highlight_diffs[], int high_size,
         uint32_t base_shifts) {
 
+    // high_idx is bounded by high_size; keep the scaled comparison representable.
+    if(unlikely(base_shifts >= sizeof(int64_t) * CHAR_BIT - 1))
+        return NAN;
+    int64_t high_multiplier = 1;
+    for(uint32_t shift = 0; shift < base_shifts; shift++)
+        high_multiplier *= 2;
+    if(unlikely((int64_t)high_size > INT64_MAX / high_multiplier))
+        return NAN;
+
     qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
     qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
 
@@ -1316,27 +1575,26 @@ static double ks_2samp(
     //
     // It should look like this:
     //
-    // base_pcent = binary_search_bigger_than(...) / base_size;
-    // high_pcent = binary_search_bigger_than(...) / high_size;
+    // base_pcent = upper_bound(baseline_diffs, K) / base_size;
+    // high_pcent = upper_bound(highlight_diffs, K) / high_size;
     // delta = base_pcent - high_pcent;
     // if(delta < min) min = delta;
     // if(delta > max) max = delta;
     //
     // This would require a lot of multiplications and divisions.
     //
-    // To speed it up, we do the binary search to find the index of each number
-    // but, then we divide the base index by the power of two number (shifts) it
-    // is bigger than high index. So the 2 indexes are now comparable.
+    // Sorted keys let each upper-bound cursor advance monotonically.
+    // Scale the highlight index by the requested power-of-two baseline ratio.
     // We also keep track of the original indexes with min and max, to properly
     // calculate their percentages once the loops finish.
 
 
     // initialize min and max using the first number of baseline_diffs
     DIFFS_NUMBERS K = baseline_diffs[0];
-    int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
-    int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
-    int delta = base_idx - (high_idx << base_shifts);
-    int min = delta, max = delta;
+    int base_idx = cursor_bigger_than(baseline_diffs, 1, base_size, K);
+    int high_idx = cursor_bigger_than(highlight_diffs, 0, high_size, K);
+    int64_t delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+    int64_t min = delta, max = delta;
     int base_min_idx = base_idx;
     int base_max_idx = base_idx;
     int high_min_idx = high_idx;
@@ -1345,10 +1603,10 @@ static double ks_2samp(
     // do the baseline_diffs starting from 1 (we did position 0 above)
     for(int i = 1; i < base_size; i++) {
         K = baseline_diffs[i];
-        base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
-        high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+        base_idx = cursor_bigger_than(baseline_diffs, base_idx, base_size, K);
+        high_idx = cursor_bigger_than(highlight_diffs, high_idx, high_size, K);
 
-        delta = base_idx - (high_idx << base_shifts);
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
             min = delta;
             base_min_idx = base_idx;
@@ -1361,13 +1619,14 @@ static double ks_2samp(
         }
     }
 
-    // do the highlight_diffs starting from 0
+    // Preserve baseline-first visitation and first-winner ties when lengths do not match the shift ratio.
+    base_idx = high_idx = 0;
     for(int i = 0; i < high_size; i++) {
         K = highlight_diffs[i];
-        base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
-        high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
+        base_idx = cursor_bigger_than(baseline_diffs, base_idx, base_size, K);
+        high_idx = cursor_bigger_than(highlight_diffs, high_idx, high_size, K);
 
-        delta = base_idx - (high_idx << base_shifts);
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
             min = delta;
             base_min_idx = base_idx;
@@ -1405,13 +1664,19 @@ static double ks_2samp(
 }
 
 static double kstwo(
+    ONEWAYALLOC *owa,
     NETDATA_DOUBLE baseline[], int baseline_points,
     NETDATA_DOUBLE highlight[], int highlight_points,
     uint32_t base_shifts) {
 
+    if(unlikely(baseline_points <= 1 || highlight_points <= 1))
+        return NAN;
+
     // -1 in size, since the calculate_pairs_diffs() returns one less point
-    DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
-    DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
+    DIFFS_NUMBERS *baseline_diffs = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal((size_t)(baseline_points - 1), sizeof(*baseline_diffs), "baseline diffs"));
+    DIFFS_NUMBERS *highlight_diffs = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal((size_t)(highlight_points - 1), sizeof(*highlight_diffs), "highlight diffs"));
 
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
@@ -1494,7 +1759,8 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         goto cleanup;
 
     *entries = rrdr_rows(r);
-    ret = onewayalloc_mallocz(owa, sizeof(NETDATA_DOUBLE) * rrdr_rows(r));
+    size_t ret_size = onewayalloc_mul_or_fatal(rrdr_rows(r), sizeof(*ret), "weight values");
+    ret = onewayalloc_mallocz(owa, ret_size);
 
     if(sp)
         *sp = r->internal.qt->query.array[0].query_points;
@@ -1502,7 +1768,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     // copy the points of the dimension to a contiguous array
     // there is no need to check for empty values, since empty values are already zero
     // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
-    memcpy(ret, r->v, rrdr_rows(r) * sizeof(NETDATA_DOUBLE));
+    memcpy(ret, r->v, ret_size);
 
 cleanup:
     rrdr_free(owa, r);
@@ -1511,7 +1777,8 @@ cleanup:
 }
 
 static void rrdset_metric_correlations_ks2(
-        RRDHOST *host,
+        ONEWAYALLOC *owa,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
@@ -1525,8 +1792,6 @@ static void rrdset_metric_correlations_ks2(
     options |= RRDR_OPTION_NATURAL_POINTS;
 
     usec_t started_ut = now_monotonic_usec();
-    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
-
     size_t high_points = 0;
     STORAGE_POINT highlighted_sp;
     NETDATA_DOUBLE *highlight = NULL, *baseline = NULL;
@@ -1547,9 +1812,9 @@ static void rrdset_metric_correlations_ks2(
     if(!baseline)
         goto cleanup;
 
-    stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
+    // Sorted cursor scans perform no binary searches.
 
-    double prob = kstwo(baseline, (int)base_points, highlight, (int)high_points, shifts);
+    double prob = kstwo(owa, baseline, (int)base_points, highlight, (int)high_points, shifts);
     if(!isnan(prob) && !isinf(prob)) {
 
         // these conditions should never happen, but still let's check
@@ -1566,14 +1831,14 @@ static void rrdset_metric_correlations_ks2(
 
         // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
         // so, we flip the result of kstwo()
-        register_result(results, host, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp,
+        register_result(results, host, hostname, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp,
                         &baseline_sp, stats, register_zero, ended_ut - started_ut);
     }
 
 cleanup:
     onewayalloc_freez(owa, highlight);
     onewayalloc_freez(owa, baseline);
-    onewayalloc_destroy(owa);
+    onewayalloc_reset(owa);
 }
 
 // ----------------------------------------------------------------------------
@@ -1588,7 +1853,8 @@ static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, si
 }
 
 static void rrdset_metric_correlations_volume(
-        RRDHOST *host,
+        ONEWAYALLOC *owa,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
@@ -1599,9 +1865,11 @@ static void rrdset_metric_correlations_volume(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before,
-                                                   options, time_group_method, time_group_options, tier, 0,
-                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE baseline_average = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, baseline_after, baseline_before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&baseline_average, stats, 1);
 
     if(!netdata_double_isnumber(baseline_average.value)) {
@@ -1609,9 +1877,11 @@ static void rrdset_metric_correlations_volume(
         baseline_average.value = 0.0;
     }
 
-    QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before,
-                                                    options, time_group_method, time_group_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE highlight_average = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&highlight_average, stats, 1);
 
     if(!netdata_double_isnumber(highlight_average.value))
@@ -1629,9 +1899,11 @@ static void rrdset_metric_correlations_volume(
 
     char highlight_countif_options[50 + 1];
     snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
-    QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
-                                                    options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE highlight_countif = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&highlight_countif, stats, 1);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
@@ -1655,7 +1927,7 @@ static void rrdset_metric_correlations_volume(
         pcent = highlight_countif.value;
     }
 
-    register_result(results, host, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats,
+    register_result(results, host, hostname, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats,
                     register_zero, baseline_average.duration_ut + highlight_average.duration_ut + highlight_countif.duration_ut);
 }
 
@@ -1663,7 +1935,8 @@ static void rrdset_metric_correlations_volume(
 // VALUE / ANOMALY RATE algorithm functions
 
 static void rrdset_weights_value(
-        RRDHOST *host,
+        ONEWAYALLOC *owa,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t after, time_t before,
@@ -1673,14 +1946,16 @@ static void rrdset_weights_value(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before,
-                                     options, time_group_method, time_group_options, tier, 0,
-                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE qv = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
 
     merge_query_value_to_stats(&qv, stats, 1);
 
     if(netdata_double_isnumber(qv.value))
-        register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
+        register_result(results, host, hostname, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
 }
 
 static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
@@ -1726,6 +2001,8 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     };
 
     size_t queries = 0;
+    RRDHOST *last_host = NULL;
+    struct weights_host_snapshot *host_snapshot = NULL;
     for(size_t d = 0; d < r->d ;d++) {
         qwd->examined_dimensions++;
 
@@ -1747,7 +2024,12 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             QUERY_CONTEXT *qc = query_context(r->internal.qt, qm->link.query_context_id);
             QUERY_NODE *qn = query_node(r->internal.qt, qm->link.query_node_id);
 
-            register_result(qwd->results, qn->rrdhost, qc->rca, qi->ria, qd->rma, qv.value, 0,
+            if(!host_snapshot || qn->rrdhost != last_host) {
+                last_host = qn->rrdhost;
+                host_snapshot = weights_host_snapshot_get(qwd->host_snapshots, last_host);
+            }
+
+            register_result(qwd->results, qn->rrdhost, host_snapshot->hostname, qc->rca, qi->ria, qd->rma, qv.value, 0,
                             &r->internal.qt->query.array[d].query_points, NULL,
                             &qwd->stats, qwd->register_zero, qm->duration_ut);
         }
@@ -1805,7 +2087,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
         stats->max_base_high_ratio = 1.0;
 
     // create an array of the right size and copy all the values in it
-    NETDATA_DOUBLE slots[dimensions];
+    NETDATA_DOUBLE *slots = mallocz(dimensions * sizeof(*slots));
     dimensions = 0;
     dfe_start_read(results, t) {
         if(t->flags & RESULT_IS_PERCENTAGE_OF_TIME)
@@ -1815,7 +2097,10 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     }
     dfe_done(t);
 
-    if(!dimensions) return 0;   // Coverity fix
+    if(!dimensions) {
+        freez(slots);
+        return 0;   // Coverity fix
+    }
 
     // sort the array with the values of all dimensions
     qsort(slots, dimensions, sizeof(NETDATA_DOUBLE), compare_netdata_doubles);
@@ -1844,6 +2129,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     }
     dfe_done(t);
 
+    freez(slots);
     return dimensions;
 }
 
@@ -1851,16 +2137,6 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 // MCP format output
 
 // Comparator for sorting results by value (descending order - highest scores first)
-static int registered_results_value_compare(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
-    struct register_result *r1 = dictionary_acquired_item_value(*item1);
-    struct register_result *r2 = dictionary_acquired_item_value(*item2);
-    
-    // Sort by value in descending order (highest first)
-    if (r1->value < r2->value) return 1;
-    if (r1->value > r2->value) return -1;
-    return 0;
-}
-
 // Callback for sorted dictionary walkthrough
 struct mcp_output_state {
     BUFFER *wb;
@@ -1926,7 +2202,7 @@ static int registered_results_to_json_mcp_callback(const DICTIONARY_ITEM *item _
 
     // Add metadata
     // Add node name
-    buffer_json_add_array_item_string(wb, rrdhost_hostname(t->host));
+    buffer_json_add_array_item_string(wb, string2str(t->hostname));
     
     // Add context
     buffer_json_add_array_item_string(wb, rrdcontext_acquired_id(t->rca));
@@ -2018,8 +2294,12 @@ static size_t registered_results_to_json_mcp(
         .limit = cardinality_limit
     };
     
-    // Walk through dictionary in sorted order (by value descending)
-    dictionary_sorted_walkthrough_rw(results, 'r', registered_results_to_json_mcp_callback, &state, registered_results_value_compare);
+    bool normalized = false;
+    WEIGHTS_RANKING ranking = weights_select_results(results, cardinality_limit, &normalized, false);
+    weights_ranking_sort(&ranking);
+    for(size_t i = 0; i < ranking.used; i++)
+        registered_results_to_json_mcp_callback(NULL, ranking.items[i], &state);
+    freez(ranking.items);
     
     buffer_json_array_close(wb); // results
     
@@ -2028,7 +2308,7 @@ static size_t registered_results_to_json_mcp(
     buffer_json_member_add_uint64(wb, "total_time_series_analyzed", examined_dimensions);
     buffer_json_member_add_uint64(wb, "total_time_series_returned", state.count);
     buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
-    if (state.count >= cardinality_limit) {
+    if (dictionary_entries(results) > state.count) {
         buffer_json_member_add_uint64(wb, "cardinality_limit", cardinality_limit);
         buffer_json_member_add_boolean(wb, "truncated", true);
     }
@@ -2059,17 +2339,24 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     struct query_weights_data *qwd = data;
     QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
+    if(query_weights_is_stopped(qwd))
+        return -1;
+
     if(qwd->qwr->interrupt_callback && qwd->qwr->interrupt_callback(qwd->qwr->interrupt_callback_data)) {
-        __atomic_store_n(&qwd->interrupted, true, __ATOMIC_RELAXED);
+        query_weights_set_interrupted(qwd);
         return -1;
     }
 
     __atomic_fetch_add(&qwd->examined_dimensions, 1, __ATOMIC_RELAXED);
 
+    if(unlikely(!qwd->query_owa))
+        qwd->query_owa = onewayalloc_create(16 * 1024);
+
     switch(qwr->method) {
         case WEIGHTS_METHOD_VALUE:
             rrdset_weights_value(
-                    host, rca, ria, rma,
+                    qwd->query_owa,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
                     qwr->options, qwr->time_group_method, qwr->time_group_options, qwr->tier,
@@ -2078,19 +2365,21 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
             break;
 
         case WEIGHTS_METHOD_ANOMALY_RATE:
-            qwr->options |= RRDR_OPTION_ANOMALY_BIT;
             rrdset_weights_value(
-                    host, rca, ria, rma,
+                    qwd->query_owa,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
-                    qwr->options, qwr->time_group_method, qwr->time_group_options, qwr->tier,
+                    qwr->options,
+                    qwr->time_group_method, qwr->time_group_options, qwr->tier,
                     &qwd->stats, qwd->register_zero
             );
             break;
 
         case WEIGHTS_METHOD_MC_VOLUME:
             rrdset_metric_correlations_volume(
-                    host, rca, ria, rma,
+                    qwd->query_owa,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
                     qwr->after, qwr->before,
@@ -2102,7 +2391,8 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
         default:
         case WEIGHTS_METHOD_MC_KS2:
             rrdset_metric_correlations_ks2(
-                    host, rca, ria, rma,
+                    qwd->query_owa,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
                     qwr->after, qwr->before, qwr->points,
@@ -2114,7 +2404,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
     qwd->timings.executed_ut = now_monotonic_usec();
     if(qwd->timings.executed_ut - qwd->timings.received_ut > qwd->timeout_us) {
-        qwd->timed_out = true;
+        query_weights_set_timed_out(qwd);
         return -1;
     }
 
@@ -2171,8 +2461,15 @@ static ssize_t weights_count_node_callback(void *data, RRDHOST *host, bool query
 
     struct query_weights_data *qwd = data;
     if (qwd->total_hosts >= qwd->hosts_array_capacity) {
-        qwd->hosts_array_capacity *= 2;
-        qwd->hosts_array = reallocz(qwd->hosts_array, sizeof(RRDHOST *) * qwd->hosts_array_capacity);
+        if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / 2))
+            fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+        size_t new_capacity = qwd->hosts_array_capacity ? qwd->hosts_array_capacity * 2 : 1;
+        if(unlikely(new_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
+            fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+        qwd->hosts_array = reallocz(qwd->hosts_array, new_capacity * sizeof(*qwd->hosts_array));
+        qwd->hosts_array_capacity = new_capacity;
     }
     qwd->hosts_array[qwd->total_hosts++] = host;
 
@@ -2219,6 +2516,9 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
                                             qwd->dimensions_sp,
                                             true, true, qwd->qwr->version,
                                             weights_for_rrdmetric, qwd);
+    if(query_weights_is_stopped(qwd))
+        return -1;
+
     return ret;
 }
 
@@ -2233,8 +2533,11 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
 #else
     size_t host_count = dictionary_entries(rrdhost_root_index);
-    qwd->hosts_array = mallocz(sizeof(RRDHOST *) * host_count);
-    qwd->hosts_array_capacity = host_count;
+    qwd->hosts_array_capacity = host_count ? host_count : 1;
+    if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
+        fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+    qwd->hosts_array = mallocz(qwd->hosts_array_capacity * sizeof(*qwd->hosts_array));
     qwd->total_hosts = 0;
 
     (void) query_scope_foreach_host(scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL);
@@ -2320,6 +2623,9 @@ static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryabl
 
     struct query_weights_data *qwd = data;
 
+    if(!qwd->host_snapshot || qwd->host_snapshot->host != host)
+        qwd->host_snapshot = weights_host_snapshot_get(qwd->host_snapshots, host);
+
     ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
                                 qwd->scope_contexts_sp, qwd->contexts_sp,
                                 weights_do_context_callback, queryable, qwd);
@@ -2363,6 +2669,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .examined_dimensions = 0,
             .register_zero = true,
             .results = register_result_init(),
+            .host_snapshots = weights_host_snapshots_init(),
             .stats = {},
             .shifts = 0,
             .total_workload = {0}, // Initialize workload statistics
@@ -2432,12 +2739,12 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
         // if the baseline size will not comply to MAX_POINTS
         // lower the window of the baseline
-        while(qwd.shifts && (qwr->points << qwd.shifts) > MAX_POINTS)
+        while(qwd.shifts && weights_points_exceed_max(qwr->points, qwd.shifts))
             qwd.shifts--;
 
         // if the baseline size still does not comply to MAX_POINTS
         // lower the resolution of the highlight and the baseline
-        while((qwr->points << qwd.shifts) > MAX_POINTS)
+        while(weights_points_exceed_max(qwr->points, qwd.shifts))
             qwr->points = qwr->points >> 1;
 
         if(qwr->points < 15) {
@@ -2457,14 +2764,16 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         qwr->options &= ~RRDR_OPTION_NONZERO;
     }
 
+    if(qwr->method == WEIGHTS_METHOD_ANOMALY_RATE)
+        // the method means anomaly rates: imply the option on every
+        // path, so all paths rank by anomaly rates and the response
+        // reports the option
+        qwr->options |= RRDR_OPTION_ANOMALY_BIT;
+
     if(qwr->host && qwr->version == 1)
         weights_do_node_callback(&qwd, qwr->host, true);
     else {
         if((qwd.qwr->method == WEIGHTS_METHOD_VALUE || qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE) && (qwd.contexts_sp || qwd.scope_contexts_sp)) {
-
-            if(qwd.qwr->format == WEIGHTS_FORMAT_MCP && qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE)
-                qwd.qwr->options |= RRDR_OPTION_ANOMALY_BIT;
-
             rrdset_weights_multi_dimensional_value(&qwd);
         }
         else {
@@ -2497,6 +2806,15 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         qwr->format != WEIGHTS_FORMAT_MCP)
         spread_results_evenly(qwd.results, &qwd.stats);
 
+    // Select only after complete scoring and normalization; parents keep full-query aggregates.
+    qwr->group_by.group_by &= ~(RRDR_GROUP_BY_LABEL|RRDR_GROUP_BY_SELECTED|RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
+    if(qwr->cardinality_limit && qwr->format != WEIGHTS_FORMAT_MCP &&
+       (qwr->format != WEIGHTS_FORMAT_MULTINODE || qwr->group_by.group_by == RRDR_GROUP_BY_NONE)) {
+        bool normalized = !(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE;
+        WEIGHTS_RANKING ranking = weights_select_results(qwd.results, qwr->cardinality_limit, &normalized, true);
+        freez(ranking.items);
+    }
+
     usec_t ended_usec = qwd.timings.executed_ut = now_monotonic_usec();
 
     // generate the json output we need
@@ -2512,7 +2830,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.timings.received_ut, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats, qwr->cardinality_limit);
             break;
 
         case WEIGHTS_FORMAT_CONTEXTS:
@@ -2523,7 +2841,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.timings.received_ut, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats, qwr->cardinality_limit);
             break;
 
         case WEIGHTS_FORMAT_MCP:
@@ -2539,8 +2857,6 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
         default:
         case WEIGHTS_FORMAT_MULTINODE:
-            // we don't support these groupings in weights
-            qwr->group_by.group_by &= ~(RRDR_GROUP_BY_LABEL|RRDR_GROUP_BY_SELECTED|RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
             if(qwr->group_by.group_by == RRDR_GROUP_BY_NONE) {
                 added_dimensions =
                         registered_results_to_json_multinode_no_group_by(
@@ -2570,6 +2886,8 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     }
 
 cleanup:
+    onewayalloc_destroy(qwd.query_owa);
+
     simple_pattern_free(qwd.scope_nodes_sp);
     simple_pattern_free(qwd.scope_contexts_sp);
     simple_pattern_free(qwd.scope_instances_sp);
@@ -2586,6 +2904,7 @@ cleanup:
     pattern_array_free(qwd.labels_pa);
 
     register_result_destroy(qwd.results);
+    dictionary_destroy(qwd.host_snapshots);
 
     if(error) {
         buffer_flush(wb);
@@ -2645,6 +2964,178 @@ static int double_expect(double v, const char *str, const char *descr) {
     return ret;
 }
 
+// Keep the original lookup only as a regression-test oracle.
+static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS key) {
+    int right = size;
+    while(left < right) {
+        int middle = (int)(((unsigned int)(left + right)) >> 1);
+        if(arr[middle] > key)
+            right = middle;
+        else
+            left = middle + 1;
+    }
+    return left;
+}
+
+// Differential reference: netdata/netdata @ 5e76a5ca7f,
+// src/web/api/queries/weights.c:1416-1528. Known-answer tests below remain independent.
+static double ks_2samp_binary_reference(
+        DIFFS_NUMBERS baseline_diffs[], int base_size,
+        DIFFS_NUMBERS highlight_diffs[], int high_size,
+        uint32_t base_shifts) {
+
+    // high_idx is bounded by high_size; keep the scaled comparison representable.
+    if(unlikely(base_shifts >= sizeof(int64_t) * CHAR_BIT - 1))
+        return NAN;
+    int64_t high_multiplier = 1;
+    for(uint32_t shift = 0; shift < base_shifts; shift++)
+        high_multiplier *= 2;
+    if(unlikely((int64_t)high_size > INT64_MAX / high_multiplier))
+        return NAN;
+
+    qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+    qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+
+    // Preserve the pre-cursor algorithm independently of the production walk.
+    // initialize min and max using the first number of baseline_diffs
+    DIFFS_NUMBERS K = baseline_diffs[0];
+    int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
+    int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+    int64_t delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+    int64_t min = delta, max = delta;
+    int base_min_idx = base_idx;
+    int base_max_idx = base_idx;
+    int high_min_idx = high_idx;
+    int high_max_idx = high_idx;
+
+    // do the baseline_diffs starting from 1 (we did position 0 above)
+    for(int i = 1; i < base_size; i++) {
+        K = baseline_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
+        high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+        if(delta < min) {
+            min = delta;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
+        }
+        else if(delta > max) {
+            max = delta;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
+        }
+    }
+
+    // do the highlight_diffs starting from 0
+    for(int i = 0; i < high_size; i++) {
+        K = highlight_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
+        high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
+
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+        if(delta < min) {
+            min = delta;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
+        }
+        else if(delta > max) {
+            max = delta;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
+        }
+    }
+
+    // now we have the min, max and their indexes
+    // properly calculate min and max as dmin and dmax
+    double dbase_size = (double)base_size;
+    double dhigh_size = (double)high_size;
+    double dmin = ((double)base_min_idx / dbase_size) - ((double)high_min_idx / dhigh_size);
+    double dmax = ((double)base_max_idx / dbase_size) - ((double)high_max_idx / dhigh_size);
+
+    dmin = -dmin;
+    if(islessequal(dmin, 0.0)) dmin = 0.0;
+    else if(isgreaterequal(dmin, 1.0)) dmin = 1.0;
+
+    double d;
+    if(isgreaterequal(dmin, dmax)) d = dmin;
+    else d = dmax;
+
+    double en = round(dbase_size * dhigh_size / (dbase_size + dhigh_size));
+
+    // under these conditions, KSfbar() crashes
+    if(unlikely(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d)))
+        return NAN;
+
+    return KSfbar((int)en, d);
+}
+
+static uint64_t ks2_test_random(uint64_t *state) {
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    return *state;
+}
+
+static int ks2_cursor_unittest(void) {
+    uint64_t random = 0x9182abcd1234ULL;
+    DIFFS_NUMBERS *base = mallocz(MAX_POINTS * sizeof(*base));
+    DIFFS_NUMBERS *high = mallocz(MAX_POINTS * sizeof(*high));
+    DIFFS_NUMBERS *base_ref = mallocz(MAX_POINTS * sizeof(*base_ref));
+    DIFFS_NUMBERS *high_ref = mallocz(MAX_POINTS * sizeof(*high_ref));
+    int errors = 0;
+    for(size_t trial = 0; trial < 20000; trial++) {
+        int bs = 1 + ks2_test_random(&random) % 64;
+        int hs = 1 + ks2_test_random(&random) % 64;
+        uint32_t shifts = ks2_test_random(&random) % 10;
+        // Include request-bound-sized arrays and the largest reachable window ratio.
+        if(trial >= 19980) {
+            bs = MAX_POINTS - 1;
+            hs = trial % 2 ? 14 : MAX_POINTS - 1;
+            shifts = trial % 10;
+        }
+        for(int i = 0; i < bs; i++)
+            base[i] = (DIFFS_NUMBERS)(ks2_test_random(&random) % 17) - 8;
+        for(int i = 0; i < hs; i++)
+            high[i] = (DIFFS_NUMBERS)(ks2_test_random(&random) % 17) - 8;
+        if(trial % 3 == 0) base[0] = LONG_MIN;
+        if(trial % 5 == 0) high[0] = LONG_MAX;
+        memcpy(base_ref, base, bs * sizeof(*base));
+        memcpy(high_ref, high, hs * sizeof(*high));
+        double expected = ks_2samp_binary_reference(base_ref, bs, high_ref, hs, shifts);
+        double actual = ks_2samp(base, bs, high, hs, shifts);
+        if(!(actual == expected || (isnan(actual) && isnan(expected)))) {
+            fprintf(stderr, "FAILED KS2 cursor trial %zu (%d/%d shift %u): %.17g != %.17g\n",
+                    trial, bs, hs, shifts, actual, expected);
+            errors++;
+            break;
+        }
+        // Every visited upper-bound pair must match, including equal-delta ties.
+        for(int pass = 0; pass < 2; pass++) {
+            int bi = 0, hi = 0, size = pass ? hs : bs;
+            DIFFS_NUMBERS *keys = pass ? high : base;
+            for(int i = 0; i < size; i++) {
+                bi = cursor_bigger_than(base, bi, bs, keys[i]);
+                hi = cursor_bigger_than(high, hi, hs, keys[i]);
+                if(bi != binary_search_bigger_than(base, 0, bs, keys[i]) ||
+                   hi != binary_search_bigger_than(high, 0, hs, keys[i])) {
+                    fprintf(stderr, "FAILED KS2 cursor upper-bound pair trial %zu\n", trial);
+                    errors++;
+                    goto cleanup;
+                }
+            }
+        }
+    }
+cleanup:
+    freez(base);
+    freez(high);
+    freez(base_ref);
+    freez(high_ref);
+    fprintf(stderr, "%s KS2 cursor: 20000 unequal-length/tie/extreme/boundary differential trials\n",
+            errors ? "FAILED" : "OK");
+    return errors;
+}
+
 static int mc_unittest1(void) {
     int bs = 3, hs = 3;
     DIFFS_NUMBERS base[3] = { 1, 2, 3 };
@@ -2678,17 +3169,65 @@ static int mc_unittest4(void) {
     DIFFS_NUMBERS high[3] = { 365, -123, 0 };
 
     double prob = ks_2samp(base, bs, high, hs, 2);
-    return double_expect(prob, "0.777778", "12x3");
+    int errors = double_expect(prob, "0.777778", "12x3");
+
+    DIFFS_NUMBERS invalid_base[1] = { 1 };
+    DIFFS_NUMBERS invalid_high[1] = { 1 };
+    prob = ks_2samp(invalid_base, 1, invalid_high, 1, (uint32_t)(sizeof(int64_t) * CHAR_BIT));
+    int ret = isnan(prob) ? 0 : 1;
+
+    fprintf(stderr, "%s invalid shift, expected NAN, got %f\n", ret ? "FAILED" : "OK", prob);
+    return errors + ret;
+}
+
+static int weights_points_exceed_max_unittest(void) {
+    static const struct {
+        size_t points;
+        uint32_t shifts;
+        bool expected;
+        const char *description;
+    } cases[] = {
+        { 0, UINT32_MAX, false, "zero points at maximum shift" },
+        { MAX_POINTS - 1, 0, false, "below maximum" },
+        { MAX_POINTS, 0, false, "at maximum" },
+        { MAX_POINTS + 1, 0, true, "above maximum" },
+        { MAX_POINTS / 2, 1, false, "shifted value at maximum" },
+        { MAX_POINTS / 2 + 1, 1, true, "shifted value above maximum" },
+        { 1, 13, false, "one point below shift threshold" },
+        { 2, 13, true, "two points at shift threshold" },
+        { 1, 14, true, "one point above shift threshold" },
+        { (size_t)1 << (sizeof(size_t) * CHAR_BIT - 1), 1, true, "native-width wrap pair" },
+        { SIZE_MAX, 0, true, "maximum points" },
+        { SIZE_MAX, 29, true, "maximum points at source maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT - 1), true, "one point at native maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT), true, "one point at native width" },
+        { 1, UINT32_MAX, true, "one point at maximum shift" },
+    };
+
+    int errors = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        bool actual = weights_points_exceed_max(cases[i].points, cases[i].shifts);
+        int ret = actual == cases[i].expected ? 0 : 1;
+
+        fprintf(stderr, "%s weights point limit %s: points=%zu, shifts=%u, expected=%s, got=%s\n",
+                ret ? "FAILED" : "OK", cases[i].description, cases[i].points, cases[i].shifts,
+                cases[i].expected ? "true" : "false", actual ? "true" : "false");
+        errors += ret;
+    }
+
+    return errors;
 }
 
 int mc_unittest(void) {
     int errors = 0;
 
+    errors += ks2_cursor_unittest();
+
     errors += mc_unittest1();
     errors += mc_unittest2();
     errors += mc_unittest3();
     errors += mc_unittest4();
+    errors += weights_points_exceed_max_unittest();
 
     return errors;
 }
-

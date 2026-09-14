@@ -101,6 +101,51 @@ func validateInstanceLabelSelectors(selectors []InstanceLabelSelector) error {
 	return errors.Join(errs...)
 }
 
+func validateInstanceLabelPolicy(selectors []InstanceLabelSelector, optionalKeys []string) error {
+	if len(optionalKeys) == 0 {
+		return validateInstanceLabelSelectors(selectors)
+	}
+
+	var errs []error
+	if err := validateInstanceLabelSelectors(selectors); err != nil {
+		errs = append(errs, err)
+	}
+
+	requiredKeys := make(map[string]struct{}, len(selectors))
+	includeAll := false
+	for _, selector := range selectors {
+		includeAll = includeAll || selector.IncludeAll
+		if selector.Key != "" {
+			requiredKeys[selector.Key] = struct{}{}
+		}
+	}
+
+	seen := make(map[string]struct{}, len(optionalKeys))
+	for i, key := range optionalKeys {
+		if key == "" {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key is required", i))
+			continue
+		}
+		if strings.TrimSpace(key) != key {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key must be trimmed", i))
+		}
+		if key == "*" || strings.HasPrefix(key, "!") {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key must be explicit", i))
+		}
+		if _, ok := seen[key]; ok {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: duplicate key %q", i, key))
+		}
+		seen[key] = struct{}{}
+		if includeAll {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: cannot be combined with include-all", i))
+		}
+		if _, ok := requiredKeys[key]; ok {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key %q conflicts with required selectors", i, key))
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // InstanceLabelSelector is a normalized token from instances.by_labels.
 type InstanceLabelSelector struct {
 	// IncludeAll corresponds to token "*".

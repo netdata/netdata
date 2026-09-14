@@ -21,11 +21,11 @@ var configSchema string
 
 func init() {
 	collectorapi.Register("sql", collectorapi.Creator{
-		Create:          func() collectorapi.CollectorV1 { return New() },
-		JobConfigSchema: configSchema,
-		Config:          func() any { return &Config{} },
-		JobMethods:      sqlJobMethods,
-		MethodHandler:   sqlMethodHandler,
+		Create:            func() collectorapi.CollectorV1 { return New() },
+		JobConfigSchema:   configSchema,
+		Config:            func() any { return &Config{} },
+		InstanceFunctions: sqlInstanceFunctions,
+		MethodHandler:     sqlMethodHandler,
 	})
 }
 

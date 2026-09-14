@@ -6,7 +6,8 @@
 // ----------------------------------------------------------------------------
 // sampling support
 
-static inline void sampling_query_init(LOGS_QUERY_STATUS *lqs, FACETS *facets)
+static __always_inline
+void sampling_query_init(LOGS_QUERY_STATUS *lqs, FACETS *facets)
 {
     if (!lqs->rq.sampling)
         return;
@@ -71,7 +72,8 @@ static inline void sampling_query_init(LOGS_QUERY_STATUS *lqs, FACETS *facets)
         lqs->c.samples_per_time_slot.enable_after_samples = lqs->rq.entries;
 }
 
-static inline void sampling_file_init(LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf __maybe_unused)
+static __always_inline
+void sampling_file_init(LOGS_QUERY_STATUS *lqs, struct nd_journal_file *jf __maybe_unused)
 {
     lqs->c.samples_per_file.sampled = 0;
     lqs->c.samples_per_file.unsampled = 0;
@@ -81,7 +83,8 @@ static inline void sampling_file_init(LOGS_QUERY_STATUS *lqs, struct nd_journal_
     lqs->c.samples_per_file.recalibrate = 0;
 }
 
-static inline size_t sampling_file_lines_scanned_so_far(LOGS_QUERY_STATUS *lqs)
+static __always_inline
+size_t sampling_file_lines_scanned_so_far(LOGS_QUERY_STATUS *lqs)
 {
     size_t sampled = lqs->c.samples_per_file.sampled + lqs->c.samples_per_file.unsampled;
     if (!sampled)
@@ -89,7 +92,8 @@ static inline size_t sampling_file_lines_scanned_so_far(LOGS_QUERY_STATUS *lqs)
     return sampled;
 }
 
-static inline void sampling_running_file_query_overlapping_timeframe_ut(
+static __always_inline
+void sampling_running_file_query_overlapping_timeframe_ut(
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction,
@@ -135,7 +139,8 @@ static inline void sampling_running_file_query_overlapping_timeframe_ut(
     *before_ut = newest_ut;
 }
 
-static inline double sampling_running_file_query_progress_by_time(
+static __always_inline
+double sampling_running_file_query_progress_by_time(
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction,
@@ -155,7 +160,8 @@ static inline double sampling_running_file_query_progress_by_time(
     return progress;
 }
 
-static inline usec_t sampling_running_file_query_remaining_time(
+static __always_inline
+usec_t sampling_running_file_query_remaining_time(
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction,
@@ -199,7 +205,8 @@ static inline usec_t sampling_running_file_query_remaining_time(
     return remaining_ut;
 }
 
-static inline size_t sampling_running_file_query_estimate_remaining_lines_by_time(
+static __always_inline
+size_t sampling_running_file_query_estimate_remaining_lines_by_time(
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
     FACETS_ANCHOR_DIRECTION direction,
@@ -254,7 +261,8 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines_by_tim
     return remaining_logs_by_time;
 }
 
-static inline size_t sampling_running_file_query_estimate_remaining_lines(
+static __always_inline
+size_t sampling_running_file_query_estimate_remaining_lines(
     NsdJournal *j __maybe_unused,
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
@@ -302,7 +310,8 @@ static inline size_t sampling_running_file_query_estimate_remaining_lines(
     return sampling_running_file_query_estimate_remaining_lines_by_time(lqs, jf, direction, msg_ut);
 }
 
-static inline void sampling_decide_file_sampling_every(
+static __always_inline
+void sampling_decide_file_sampling_every(
     NsdJournal *j,
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
@@ -330,7 +339,8 @@ typedef enum {
     SAMPLING_SKIP_FIELDS = 1,
 } sampling_t;
 
-static inline sampling_t is_row_in_sample(
+static __always_inline
+sampling_t is_row_in_sample(
     NsdJournal *j,
     LOGS_QUERY_STATUS *lqs,
     struct nd_journal_file *jf,
@@ -395,7 +405,8 @@ static inline sampling_t is_row_in_sample(
     return SAMPLING_SKIP_FIELDS;
 }
 
-static inline void sampling_update_running_query_file_estimates(
+static __always_inline
+void sampling_update_running_query_file_estimates(
     FACETS *facets,
     NsdJournal *j,
     LOGS_QUERY_STATUS *lqs,

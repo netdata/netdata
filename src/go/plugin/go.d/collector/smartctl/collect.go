@@ -22,16 +22,21 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if err != nil {
 			return nil, err
 		}
+		devicesChanged := !maps.EqualFunc(c.scannedDevices, devices, func(left, right *scanDevice) bool {
+			return *left == *right
+		})
 
-		for k, dev := range c.scannedDevices {
+		for k := range c.scannedDevices {
 			if _, ok := devices[k]; !ok {
 				delete(c.scannedDevices, k)
-				delete(c.seenDevices, k)
-				c.removeDeviceCharts(dev)
+				if attached, ok := c.attachedDevices[k]; ok {
+					delete(c.attachedDevices, k)
+					removeDeviceCharts(attached.charts)
+				}
 			}
 		}
 
-		c.forceDevicePoll = !maps.Equal(c.scannedDevices, devices)
+		c.forceDevicePoll = devicesChanged
 		c.scannedDevices = devices
 		c.lastScanTime = now
 		c.forceScan = false
@@ -134,12 +139,28 @@ func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoRe
 		return nil
 	}
 
-	if !c.seenDevices[scanDev.key()] {
-		c.seenDevices[scanDev.key()] = true
-		c.addDeviceCharts(dev)
+	key := scanDev.key()
+	id := newDeviceIdentity(dev.deviceName(), dev.deviceType())
+	attached, seen := c.attachedDevices[key]
+	if !seen || attached.id != id {
+		for otherKey, other := range c.attachedDevices {
+			if otherKey != key && other.id.prefix == id.prefix {
+				return fmt.Errorf("device identity collides with already attached device '%s'", otherKey)
+			}
+		}
+		smartAttrs := newSmartAttributeIdentities(dev)
+		charts, err := c.addDeviceCharts(dev, id, smartAttrs)
+		if err != nil {
+			return fmt.Errorf("failed to add charts for device '%s' type '%s': %w", scanDev.name, scanDev.typ, err)
+		}
+		if seen {
+			removeDeviceCharts(attached.charts)
+		}
+		attached = attachedDevice{id: id, charts: charts, smartAttrs: smartAttrs}
+		c.attachedDevices[key] = attached
 	}
 
-	c.collectSmartDevice(mx, dev)
+	c.collectSmartDevice(mx, dev, id, attached.smartAttrs)
 
 	return nil
 }
@@ -153,8 +174,8 @@ func (c *Collector) collectScannedDevice(mx map[string]int64, scanDev *scanDevic
 	})
 }
 
-func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
-	px := fmt.Sprintf("device_%s_type_%s_", dev.deviceName(), dev.deviceType())
+func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice, id deviceIdentity, smartAttrs smartAttributeIdentities) {
+	px := id.prefix
 
 	if v, ok := dev.powerOnTime(); ok {
 		mx[px+"power_on_time"] = v
@@ -180,19 +201,18 @@ func (c *Collector) collectSmartDevice(mx map[string]int64, dev *smartDevice) {
 
 	if attrs, ok := dev.ataSmartAttributeTable(); ok {
 		for _, attr := range attrs {
-			if !isSmartAttrValid(attr) {
+			if !isSmartAttrChartable(attr) {
 				continue
 			}
-			n := strings.ToLower(attr.name())
-			n = strings.ReplaceAll(n, " ", "_")
+			identity, ok := smartAttrs[attr.id()]
+			if !ok {
+				continue
+			}
+			n := identity.name
 			px := fmt.Sprintf("%sattr_%s_", px, n)
 
 			if v, err := strconv.ParseInt(attr.value(), 10, 64); err == nil {
 				mx[px+"normalized"] = v
-			}
-
-			if v, err := strconv.ParseInt(attr.rawValue(), 10, 64); err == nil {
-				mx[px+"raw"] = v
 			}
 
 			rs := strings.TrimSpace(attr.rawString())

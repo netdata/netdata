@@ -76,7 +76,7 @@ func (f fromFile) certificates() ([]*x509.Certificate, error) {
 
 	block, _ := pem.Decode(content)
 	if block == nil {
-		return nil, fmt.Errorf("error on decoding '%s': %v", f.path, err)
+		return nil, fmt.Errorf("error on decoding '%s': PEM decode failed (not a valid PEM file)", f.path)
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)

@@ -71,7 +71,7 @@ void mark_pending_req_cancel_all()
     spinlock_lock(&pending_req_list_lock);
     struct pending_req_list *curr = pending_req_list_head;
     while (curr) {
-        curr->canceled = 1;
+        __atomic_store_n(&curr->canceled, 1, __ATOMIC_RELAXED);
         curr = curr->next;
     }
     spinlock_unlock(&pending_req_list_lock);
@@ -86,7 +86,7 @@ int mark_pending_req_cancelled(const char *msg_id)
 
     while (curr) {
         if (curr->hash == hash && strcmp(curr->msg_id, msg_id) == 0) {
-            curr->canceled = 1;
+            __atomic_store_n(&curr->canceled, 1, __ATOMIC_RELAXED);
             spinlock_unlock(&pending_req_list_lock);
             return 0;
         }
@@ -100,7 +100,7 @@ int mark_pending_req_cancelled(const char *msg_id)
 static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, void *data)
 {
     struct pending_req_list *req = (struct pending_req_list *)data;
-    return req->canceled;
+    return __atomic_load_n(&req->canceled, __ATOMIC_RELAXED);
 }
 
 int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
@@ -112,11 +112,14 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     ND_LOG_STACK_PUSH(lgs);
 
     int retval = 0;
-    BUFFER *local_buffer = NULL;
     usec_t dt_ut = 0;
 
     int z_ret;
     BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
+
+    // set while the compressed buffer is installed in w->response.data; holds the pooled
+    // web client's own buffer so it can be put back before the client is released
+    BUFFER *uncompressed = NULL;
 
     struct web_client *w = web_client_get_from_cache();
     web_client_set_conn_cloud(w);
@@ -137,7 +140,8 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     if(validation != HTTP_VALIDATION_OK) {
         nd_log(NDLS_ACCESS, NDLP_ERR, "ACLK received request is not valid, code %d", validation);
         retval = 1;
-        w->response.code = HTTP_RESP_BAD_REQUEST;
+        w->response.code =
+            validation == HTTP_VALIDATION_URI_TOO_LONG ? HTTP_RESP_URI_TOO_LONG : HTTP_RESP_BAD_REQUEST;
         w->response.code = (short)aclk_http_msg_v2(client, query->callback_topic, query->msg_id,
                                                    dt_ut, query->created, w->response.code,
                                                    NULL, 0);
@@ -183,58 +187,75 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
             z_buffer->len += bytes_to_cpy;
         } while(z_ret != Z_STREAM_END);
 
-        // so that web_client_build_http_header
-        // puts correct content length into header
-        buffer_free(w->response.data);
+        // web_client_build_http_header() reads the response buffer to size Content-Length
+        // and to emit Content-Type and the cacheability headers, so it has to see the
+        // compressed buffer. Borrow the slot instead of replacing it: response.data belongs
+        // to the pooled web client and web_client_reuse_from_cache() deliberately keeps it,
+        // so freeing it here would make every ACLK query re-grow its response buffer from
+        // NETDATA_WEB_RESPONSE_INITIAL_SIZE.
+        //
+        // Carry the description of the payload across, otherwise the headers would describe
+        // a freshly created buffer (text/plain, cacheable for a day) instead of what the API
+        // handler produced.
+        z_buffer->content_type = w->response.data->content_type;
+        z_buffer->options = w->response.data->options;
+        z_buffer->date = w->response.data->date;
+        z_buffer->expires = w->response.data->expires;
+
+        uncompressed = w->response.data;
         w->response.data = z_buffer;
         z_buffer = NULL;
     }
 
     web_client_build_http_header(w);
-    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
-    local_buffer->content_type = CT_APPLICATION_JSON;
 
-    buffer_strcat(local_buffer, w->response.header_output->buffer);
-
-    if (w->response.data->len) {
-        if (w->response.zinitialized) {
-            buffer_need_bytes(local_buffer, w->response.data->len);
-            memcpy(&local_buffer->buffer[local_buffer->len], w->response.data->buffer, w->response.data->len);
-            local_buffer->len += w->response.data->len;
-        } else
-            buffer_strcat(local_buffer, w->response.data->buffer);
-    }
-
-    // send msg.
-    w->response.code = (short)aclk_http_msg_v2(
+    w->response.code = (short)aclk_http_msg_v2_direct(
         client,
         query->callback_topic,
         query->msg_id,
         dt_ut,
         query->created,
         w->response.code,
-        local_buffer->buffer,
-        local_buffer->len);
+        w->response.header_output->buffer,
+        w->response.header_output->len,
+        w->response.data->buffer,
+        w->response.data->len);
 
 cleanup:
+    if (uncompressed) {
+        // give the compressed buffer back to the local, so buffer_free() below releases it
+        // and the pooled client keeps its own already-grown buffer
+        z_buffer = w->response.data;
+        w->response.data = uncompressed;
+    }
+
     web_client_log_completed_request(w, false);
     web_client_release_to_cache(w);
 
     pending_req_list_rm(query->msg_id);
 
     buffer_free(z_buffer);
-    buffer_free(local_buffer);
     return retval;
 }
 
+// Returns 0 when the message was handed to the mqtt layer, non-zero when it was dropped. The payload
+// is consumed either way.
+//
+// Callers that keep state describing what the cloud has been told MUST reconcile it with this result.
+// The node manifest does that by recording the state as it enqueues and undoing the record when this
+// reports a drop - see build_node_manifest() and aclk_node_manifest_publish_result(). Recording only
+// on success would be wrong for it: the record is what suppresses later identical builds, and it has
+// to be in place for as long as the message is in flight.
 int send_bin_msg(mqtt_wss_client client, aclk_query_t *query)
 {
     // this will be simplified when legacy support is removed
-    aclk_send_bin_message_subtopic_pid(
+    int rc = aclk_send_bin_message_subtopic_pid(
         client,
         query->data.bin_payload.payload,
         query->data.bin_payload.size,
         query->data.bin_payload.topic,
-        query->data.bin_payload.msg_name);
-    return 0;
+        query->data.bin_payload.msg_name,
+        NULL);
+    query->data.bin_payload.payload = NULL;
+    return rc;
 }

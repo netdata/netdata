@@ -224,7 +224,7 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedResult: []ddsnmp.Metric{},
 			expectedError:  false,
-			checkMissing:   map[string]bool{"1.3.6.1.2.1.2.2": true},
+			checkMissing:   map[string]bool{"1.3.6.1.2.1.2.2": false},
 		},
 		"table walk error": {
 			profile: &ddsnmp.Profile{
@@ -935,7 +935,7 @@ func TestTableCollector_Collect(t *testing.T) {
 				{
 					Name:       "devClientCount",
 					Value:      10,
-					Tags:       map[string]string{"mac_address": "00:50:56:AB:CD:EF"},
+					Tags:       map[string]string{"mac_address": "00:50:56:ab:cd:ef"},
 					MetricType: "rate",
 					IsTable:    true,
 					Table:      "devTable",
@@ -1404,12 +1404,15 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
 									Name: "processorDeviceStatusReading",
-									Mapping: ddprofiledefinition.NewBitmaskMapping(map[string]string{
-										"1":    "internalError",
-										"2":    "thermalTrip",
-										"128":  "processorPresent",
-										"1024": "processorThrottled",
-									}),
+									Mapping: ddprofiledefinition.MappingConfig{
+										Mode: ddprofiledefinition.MappingModeBitmask,
+										Items: map[string]string{
+											"1":    "internalError",
+											"2":    "thermalTrip",
+											"128":  "processorPresent",
+											"1024": "processorThrottled",
+										},
+									},
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
@@ -3735,113 +3738,6 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		"mikrotik sensor table real-world example": {
-			profile: &ddsnmp.Profile{
-				SourceFile: "mikrotik-profile.yaml",
-				Definition: &ddprofiledefinition.ProfileDefinition{
-					Metrics: []ddprofiledefinition.MetricsConfig{
-						{
-							Table: ddprofiledefinition.SymbolConfig{
-								OID:  "1.3.6.1.4.1.14988.1.1.3.100",
-								Name: "mtxrHlTable",
-							},
-							Symbols: []ddprofiledefinition.SymbolConfig{
-								{
-									OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.3",
-									Name: "mtxrHlSensorValue",
-									Transform: `
-{{- $config := get (dict 
-    "1" (dict "name" "temperature" "unit" "celsius" "family" "Health/Temperature")
-    "2" (dict "name" "fan_speed" "unit" "rpm" "family" "Health/Cooling")
-    "3" (dict "name" "voltage" "unit" "volts" "family" "Health/Power" "divisor" 10.0)
-    "6" (dict "name" "sensor_status" "family" "Health/Status" 
-         "mapping" (i64map 0 "not_ok" 1 "ok"))
-) (index .Metric.Tags "sensor_type" | default "") -}}
-
-{{- if $config -}}
-  {{- setName .Metric (printf "%s_%s" .Metric.Name (get $config "name")) -}}
-  {{- setFamily .Metric (get $config "family") -}}
-  {{- with get $config "unit" -}}{{- setUnit $.Metric . -}}{{- end -}}
-  {{- with get $config "divisor" -}}{{- setValue $.Metric (int64 (div (float64 $.Metric.Value) .)) -}}{{- end -}}
-  {{- with get $config "mapping" -}}{{- setMultivalue $.Metric . -}}{{- end -}}
-{{- end -}}
-
-{{- deleteTag .Metric "sensor_type" -}}`,
-								},
-							},
-							MetricTags: []ddprofiledefinition.MetricTagConfig{
-								{
-									Tag: "sensor_name",
-									Symbol: ddprofiledefinition.SymbolConfigCompat{
-										OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.2",
-										Name: "mtxrHlSensorName",
-									},
-								},
-								{
-									Tag: "sensor_type",
-									Symbol: ddprofiledefinition.SymbolConfigCompat{
-										OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.4",
-										Name: "mtxrHlSensorType",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.14988.1.1.3.100", []gosnmp.SnmpPDU{
-					// Temperature sensor
-					createIntegerPDU("1.3.6.1.4.1.14988.1.1.3.100.1.3.1", 45),
-					createStringPDU("1.3.6.1.4.1.14988.1.1.3.100.1.2.1", "cpu-temperature"),
-					createIntegerPDU("1.3.6.1.4.1.14988.1.1.3.100.1.4.1", 1),
-					// PSU status sensor
-					createIntegerPDU("1.3.6.1.4.1.14988.1.1.3.100.1.3.2", 1),
-					createStringPDU("1.3.6.1.4.1.14988.1.1.3.100.1.2.2", "psu1-state"),
-					createIntegerPDU("1.3.6.1.4.1.14988.1.1.3.100.1.4.2", 6),
-					// Voltage sensor
-					createIntegerPDU("1.3.6.1.4.1.14988.1.1.3.100.1.3.3", 240), // 24.0V
-					createStringPDU("1.3.6.1.4.1.14988.1.1.3.100.1.2.3", "psu-voltage"),
-					createIntegerPDU("1.3.6.1.4.1.14988.1.1.3.100.1.4.3", 3),
-				})
-			},
-			expectedResult: []ddsnmp.Metric{
-				{
-					Name:       "mtxrHlSensorValue_temperature",
-					Value:      45,
-					Tags:       map[string]string{"sensor_name": "cpu-temperature"},
-					Unit:       "celsius",
-					Family:     "Health/Temperature",
-					MetricType: "gauge",
-					IsTable:    true,
-					Table:      "mtxrHlTable",
-				},
-				{
-					Name:       "mtxrHlSensorValue_sensor_status",
-					Value:      1,
-					Tags:       map[string]string{"sensor_name": "psu1-state"},
-					Family:     "Health/Status",
-					MetricType: "gauge",
-					IsTable:    true,
-					Table:      "mtxrHlTable",
-					MultiValue: map[string]int64{
-						"not_ok": 0,
-						"ok":     1,
-					},
-				},
-				{
-					Name:       "mtxrHlSensorValue_voltage",
-					Value:      24,
-					Tags:       map[string]string{"sensor_name": "psu-voltage"},
-					Unit:       "volts",
-					Family:     "Health/Power",
-					MetricType: "gauge",
-					IsTable:    true,
-					Table:      "mtxrHlTable",
-				},
-			},
-			expectedError: false,
-		},
 		"table transformation with dynamic tags": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
@@ -4125,7 +4021,7 @@ func TestTableCollector_Collect(t *testing.T) {
 
 			tc.setupMock(mockHandler)
 
-			handleCrossTableTagsWithoutMetrics(tc.profile)
+			ddsnmp.FinalizeProfiles([]*ddsnmp.Profile{tc.profile})
 			if err := ddsnmp.CompileTransforms(tc.profile); err != nil {
 				if tc.expectedError && tc.errorContains != "" && strings.Contains(err.Error(), tc.errorContains) {
 					return // Expected error during compilation
@@ -4927,6 +4823,7 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			mockHandler := snmpmock.NewMockHandler(ctrl)
 			tc.setupMock(mockHandler)
 
+			ddsnmp.FinalizeProfiles(tc.profiles)
 			collector := New(Config{
 				SnmpClient:  mockHandler,
 				Profiles:    tc.profiles,

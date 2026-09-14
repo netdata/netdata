@@ -79,7 +79,7 @@ struct functions_evloop_globals {
 static void rrd_functions_worker_canceller(void *data) {
     struct functions_evloop_globals *wg = data;
     netdata_mutex_lock(&wg->worker_mutex);
-    wg->workers_exit = true;
+    __atomic_store_n(&wg->workers_exit, true, __ATOMIC_RELAXED);
     netdata_cond_signal(&wg->worker_cond_var);
     netdata_mutex_unlock(&wg->worker_mutex);
 }
@@ -89,33 +89,34 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
 
     nd_thread_register_canceller(rrd_functions_worker_canceller, wg);
 
-    bool last_acquired = true;
     while (true) {
-        netdata_mutex_lock(&wg->worker_mutex);
-
-        if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
-            netdata_mutex_unlock(&wg->worker_mutex);
-            break;
-        }
-
-        if(dictionary_entries(wg->worker_queue) == 0 || !last_acquired)
-            netdata_cond_wait(&wg->worker_cond_var, &wg->worker_mutex);
-
         const DICTIONARY_ITEM *acquired = NULL;
         struct functions_evloop_worker_job *j;
-        dfe_start_write(wg->worker_queue, j) {
-            if(j->running || j->cancelled)
-                continue;
 
-            acquired = dictionary_acquired_item_dup(wg->worker_queue, j_dfe.item);
-            j->running = true;
-            break;
+        netdata_mutex_lock(&wg->worker_mutex);
+
+        // Keep the scan and the wait under worker_mutex so a new-job signal
+        // cannot land after we decide to sleep but before the thread blocks.
+        while(!__atomic_load_n(&wg->workers_exit, __ATOMIC_RELAXED) && !nd_thread_signaled_to_cancel()) {
+            dfe_start_write(wg->worker_queue, j) {
+                if(j->running || __atomic_load_n(&j->cancelled, __ATOMIC_RELAXED))
+                    continue;
+
+                acquired = dictionary_acquired_item_dup(wg->worker_queue, j_dfe.item);
+                j->running = true;
+                break;
+            }
+            dfe_done(j);
+
+            if(acquired)
+                break;
+
+            netdata_cond_wait(&wg->worker_cond_var, &wg->worker_mutex);
         }
-        dfe_done(j);
 
         netdata_mutex_unlock(&wg->worker_mutex);
 
-        if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
+        if(__atomic_load_n(&wg->workers_exit, __ATOMIC_RELAXED) || nd_thread_signaled_to_cancel()) {
             if(acquired)
                 dictionary_acquired_item_release(wg->worker_queue, acquired);
 
@@ -129,15 +130,18 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
             };
             ND_LOG_STACK_PUSH(lgs);
 
-            last_acquired = true;
             j = dictionary_acquired_item_value(acquired);
             j->cb(j->transaction, j->cmd, &j->stop_monotonic_ut, &j->cancelled, j->payload, j->access, j->source, j->cb_data);
             dictionary_del(wg->worker_queue, j->transaction);
             dictionary_acquired_item_release(wg->worker_queue, acquired);
             dictionary_garbage_collect(wg->worker_queue);
+
+            // when all workers become idle, return the freed query memory to the OS;
+            // otherwise glibc keeps it in its arenas and the plugin retains the RSS
+            // high-water mark of the biggest query it ever executed
+            if(!dictionary_entries(wg->worker_queue))
+                mallocz_release_as_much_memory_to_the_system();
         }
-        else
-            last_acquired = false;
     }
 }
 
@@ -327,7 +331,9 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
     }
 
     int status = 0;
-    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE)) {
+    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE) && !nd_thread_signaled_to_cancel()) {
+        // a genuine stdin EOF/error - not a QUIT command and not the plugin
+        // shutting down on its own and cancelling this thread
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Read error on stdin");
         status = 1;
     }
@@ -396,6 +402,13 @@ void functions_evloop_cancel_threads(struct functions_evloop_globals *wg) {
 
     for(size_t i = 0; i < wg->workers ; i++)
         nd_thread_signal_cancel(wg->worker_threads[i]);
+}
+
+void functions_evloop_join_threads(struct functions_evloop_globals *wg) {
+    nd_thread_join(wg->reader_thread);
+
+    for(size_t i = 0; i < wg->workers ; i++)
+        nd_thread_join(wg->worker_threads[i]);
 }
 
 // ----------------------------------------------------------------------------

@@ -51,6 +51,13 @@ enum ml_worker_result {
 
     // Chart is under replication
     ML_WORKER_RESULT_CHART_UNDER_REPLICATION,
+
+    // This dimension is now supplied by downstream ML models; stop local requeueing
+    ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
+
+    // Another worker is already training this dimension; the item is requeued
+    // so the dim stays in the periodic retrain cycle.
+    ML_WORKER_RESULT_TRAINING_IN_PROGRESS,
 };
 
 const char *ml_worker_result_to_string(enum ml_worker_result tr);
