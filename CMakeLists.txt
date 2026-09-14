@@ -1938,8 +1938,8 @@ if(ENABLE_DBENGINE)
             src/database/engine/mrg-load.c
             src/database/engine/pdc.c
             src/database/engine/pdc.h
-            src/database/engine/dbengine-unittest.c
-            src/database/engine/dbengine-stresstest.c
+            src/database/dbengine-unittest.c
+            src/database/dbengine-stresstest.c
             src/database/engine/dbengine-compression.c
             src/database/engine/dbengine-compression.h
             src/database/engine/dbengine-config.c
