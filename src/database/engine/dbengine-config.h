@@ -35,8 +35,13 @@ struct dbengine_config {
     int libuv_worker_threads;                   // size of the libuv thread pool the engine dispatches work into;
                                                 // 0 = the daemon's minimum pool
 
-    // notifications to whoever embeds the engine; NULL = nobody listens
+    // services the embedder may provide; NULL = not provided
     void (*on_db_rotation)(void);               // a tier deleted its oldest datafile: retention just shrank
+    size_t (*preload_metrics)(void *mrg, void (*add)(void *mrg, Word_t section, nd_uuid_t *uuid));
+                                                // called once, when the metrics registry is created and before any
+                                                // tier loads its journals: feed every metric uuid the embedder already
+                                                // knows through add(), so the registry is populated in one pass instead
+                                                // of metric by metric as the journals are read; returns the count
 };
 
 #define DEFAULT_PAGES_PER_EXTENT (109)
@@ -64,6 +69,7 @@ struct dbengine_config {
     .default_update_every_s = 1,                                \
     .libuv_worker_threads = 0,                                  \
     .on_db_rotation = NULL,                                     \
+    .preload_metrics = NULL,                                    \
 }
 
 // One tier's configuration, handed to rrdeng_init(); the engine copies what it needs.
