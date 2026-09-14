@@ -230,6 +230,37 @@ size_t pgd_padding_bytes(void) {
     return (x > 0) ? x : 0;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// gorilla compression counters
+
+static struct {
+    PAD64(uint64_t) hot_buffers_added;
+    PAD64(uint64_t) tier0_disk_actual_bytes;
+    PAD64(uint64_t) tier0_disk_optimal_bytes;
+    PAD64(uint64_t) tier0_disk_original_bytes;
+} gorilla_stats = { 0 };
+
+static inline void gorilla_stats_hot_buffer_added(void) {
+    __atomic_fetch_add(&gorilla_stats.hot_buffers_added, 1, __ATOMIC_RELAXED);
+}
+
+static inline void gorilla_stats_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t original) {
+    __atomic_fetch_add(&gorilla_stats.tier0_disk_actual_bytes, actual, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&gorilla_stats.tier0_disk_optimal_bytes, optimal, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&gorilla_stats.tier0_disk_original_bytes, original, __ATOMIC_RELAXED);
+}
+
+struct rrdeng_gorilla_stats rrdeng_get_gorilla_stats(void) {
+    return (struct rrdeng_gorilla_stats) {
+        .hot_buffers_added         = __atomic_load_n(&gorilla_stats.hot_buffers_added, __ATOMIC_RELAXED),
+        .tier0_disk_actual_bytes   = __atomic_load_n(&gorilla_stats.tier0_disk_actual_bytes, __ATOMIC_RELAXED),
+        .tier0_disk_optimal_bytes  = __atomic_load_n(&gorilla_stats.tier0_disk_optimal_bytes, __ATOMIC_RELAXED),
+        .tier0_disk_original_bytes = __atomic_load_n(&gorilla_stats.tier0_disk_original_bytes, __ATOMIC_RELAXED),
+    };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
 struct aral_statistics *pgd_aral_stats(void) {
     return &pgd_aral_statistics;
 }
@@ -486,7 +517,7 @@ ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
             // allocate new gorilla buffer
             gorilla_buffer_t *gbuf = pgd_gorilla_buffer_alloc(pg->partition);
             memset(gbuf, 0, RRDENG_GORILLA_32BIT_BUFFER_SIZE);
-            pulse_gorilla_hot_buffer_added();
+            gorilla_stats_hot_buffer_added();
 
             *pg->gorilla.writer = gorilla_writer_init(gbuf, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
             pg->gorilla.num_buffers = 1;
@@ -839,7 +870,7 @@ uint32_t pgd_disk_footprint(PGD *pg)
                 size = pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
 
                 if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR)
-                    pulse_gorilla_tier0_page_flush(
+                    gorilla_stats_tier0_page_flush(
                         gorilla_writer_actual_nbytes(pg->gorilla.writer),
                         gorilla_writer_optimal_nbytes(pg->gorilla.writer),
                         tier_page_size[0]);
@@ -964,7 +995,7 @@ size_t pgd_append_point(
 
                 gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
                 pg->gorilla.num_buffers += 1;
-                pulse_gorilla_hot_buffer_added();
+                gorilla_stats_hot_buffer_added();
 
                 ok = gorilla_writer_write(pg->gorilla.writer, t);
                 internal_fatal(ok == false, "Failed to writer value in newly allocated gorilla buffer.");

@@ -230,6 +230,16 @@ struct rrdeng_buffer_sizes {
     size_t xt_buf;
 };
 
+// tier-0 gorilla compression counters, kept by the engine since process start; a snapshot of the
+// running totals (the daemon charts the deltas)
+struct rrdeng_gorilla_stats {
+    uint64_t hot_buffers_added;         // gorilla buffers allocated for pages being collected
+    uint64_t tier0_disk_actual_bytes;   // bytes the flushed pages occupy on disk
+    uint64_t tier0_disk_optimal_bytes;  // bytes they would occupy with perfectly sized buffers
+    uint64_t tier0_disk_original_bytes; // bytes of the uncompressed samples they hold
+};
+struct rrdeng_gorilla_stats rrdeng_get_gorilla_stats(void);
+
 struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void);
 const char *rrdeng_mem_name(RRDENG_MEM idx);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

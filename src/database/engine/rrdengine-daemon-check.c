@@ -6,7 +6,8 @@
 
 #include "rrdengine-daemon.h"
 
-#include "daemon/pulse/pulse-gorilla.h"
+// the daemon headers below are written to be included after the daemon's common header
+#include "daemon/common.h"
 #include "web/api/queries/weights.h"
 #include "database/contexts/rrdcontext.h"
 #include "database/sqlite/sqlite_metadata.h"
