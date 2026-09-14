@@ -211,11 +211,28 @@ Why:
 Use:
 
 - `RunUnprivileged` / `RunUnprivilegedWithOptions...` for unprivileged commands;
+- `UnprivilegedCommandContext` when callers need to own stdio and output limits, such as secret file reads;
 - `RunNDSudo` for commands exposed through `ndsudo`;
 - `RunDirect` only when direct execution is intentionally required;
 - `FindBinary` for PATH/default-path discovery.
 
 Do not call `exec.Command` directly unless the helper cannot support the case and the reason is documented.
+
+`UnprivilegedCommandContext` returns an unstarted `*exec.Cmd` using the same helper discovery and cancellation
+as the Run APIs. The caller MUST configure stdio and call Start/Wait (or Run), and MUST supply a context deadline
+when execution needs a timeout. Construction does not log arguments or output. Secret consumers MUST bound stdout
+and discard stderr: the Run APIs buffer stdout and include stderr snippets in errors, so they are unsuitable for
+secret output without caller-owned handling.
+
+On Unix, `nd-run` also replaces the child environment with a minimal environment. Custom variables, including
+authentication tokens, are not inherited; HOME, USER and LOGNAME come from the selected account. Supplying `Env`
+to a Go wrapper does not bypass this C helper policy. The helper selects the configured Netdata user (fallback
+`nobody`); an unprivileged caller that cannot switch users retains its current identity. Capability clearing is
+performed by the helper when built with capability support. Windows callers need an explicit platform path when
+this Unix privilege-drop behavior does not apply.
+
+The file secret provider uses this helper. The command secret provider retains direct execution because it needs
+inherited authentication variables; migrating it requires helper support for that environment contract first.
 
 ## Log File Collectors
 

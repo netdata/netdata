@@ -39,6 +39,14 @@ func newRunnerFromBuildinfo() *runner {
 
 var defaultRunner = newRunnerFromBuildinfo()
 
+// UnprivilegedCommandContext constructs an unstarted command through nd-run.
+// The caller owns stdio, output limits, and Start/Wait. It does not log arguments
+// or output. Cancellation uses the same process containment as the Run helpers.
+func UnprivilegedCommandContext(ctx context.Context, binPath string, args ...string) *exec.Cmd {
+	argv := append([]string{binPath}, args...)
+	return commandContext(ctx, defaultRunner.ndRunPath, argv...)
+}
+
 // RunUnprivileged runs binPath via nd-run with a timeout.
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
 func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
@@ -203,8 +211,7 @@ func (r *runner) runContext(
 		defer cancel()
 	}
 
-	ex := exec.CommandContext(ctx, helperPath, argv...) // argv comes from trusted sources; no shell, args passed separately
-	configureCommandCancellation(ex)
+	ex := commandContext(ctx, helperPath, argv...)
 	if dir != "" {
 		ex.Dir = dir
 	}
@@ -243,4 +250,13 @@ func (r *runner) runContext(
 	}
 
 	return out, cmdStr, usage, nil
+}
+
+func commandContext(ctx context.Context, binPath string, args ...string) *exec.Cmd {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := exec.CommandContext(ctx, binPath, args...) // No shell; arguments are passed separately.
+	configureCommandCancellation(cmd)
+	return cmd
 }

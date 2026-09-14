@@ -96,6 +96,8 @@ jobs:
                 "The file path must be absolute.",
                 "Netdata trims leading and trailing whitespace from the file contents.",
                 "The file must exist on the Netdata host and be readable by the `netdata` user.",
+                "On Unix, Netdata reads the file through `nd-run`, without the collector plugin's elevated privileges. Files that were readable only because of those privileges no longer resolve.",
+                "On Unix, file reads time out after 3 seconds, or sooner if the caller's deadline expires or the request is cancelled.",
                 "**Docker Secrets**: Docker mounts secrets as files under `/run/secrets/` inside the container. Use `${file:/run/secrets/<secret-name>}` to read them.",
                 "**Kubernetes Secrets**: If you mount Kubernetes Secrets as volume files in the Netdata pod, reference them with `${file:/path/to/mounted/secret}`.",
             ],
@@ -206,6 +208,7 @@ jobs:
         "Secretstore configuration values (such as tokens and client secrets) also support `${env:...}`, `${file:...}`, and `${cmd:...}` resolvers. Use them to avoid storing backend credentials in plain text. Note that `${store:...}` references are not supported inside secretstore configurations.",
         "Keep local secret material readable only by the `netdata` user, including token files, service account files, and any files used with `${file:...}`.",
         "Use `${cmd:...}` only with trusted local commands and absolute paths.",
+        "On Unix, local file resolution requires `nd-run`; Netdata does not fall back to privileged file access if the helper fails. The helper normally uses the `netdata` account, falls back to `nobody` if that account is absent, and retains the current user if an unprivileged process cannot switch accounts. On Windows, file resolution uses the collector process's existing permissions.",
     ],
     "troubleshooting": {
         "intro": [
