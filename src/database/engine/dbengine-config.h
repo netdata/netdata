@@ -34,6 +34,9 @@ struct dbengine_config {
     time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1
     int libuv_worker_threads;                   // size of the libuv thread pool the engine dispatches work into;
                                                 // 0 = the daemon's minimum pool
+
+    // notifications to whoever embeds the engine; NULL = nobody listens
+    void (*on_db_rotation)(void);               // a tier deleted its oldest datafile: retention just shrank
 };
 
 #define DEFAULT_PAGES_PER_EXTENT (109)
@@ -60,6 +63,7 @@ struct dbengine_config {
     .journal_v2_unmount_time_s = 120,                           \
     .default_update_every_s = 1,                                \
     .libuv_worker_threads = 0,                                  \
+    .on_db_rotation = NULL,                                     \
 }
 
 // One tier's configuration, handed to rrdeng_init(); the engine copies what it needs.

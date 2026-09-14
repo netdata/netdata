@@ -145,6 +145,7 @@ void netdata_conf_dbengine_apply(void) {
     netdata_conf_dbengine.cache_statistics = pulse_enabled;
     netdata_conf_dbengine.default_update_every_s = nd_profile.update_every;
     netdata_conf_dbengine.libuv_worker_threads = libuv_worker_threads;
+    netdata_conf_dbengine.on_db_rotation = rrdcontext_db_rotation;
 
     dbengine_init(&netdata_conf_dbengine);
 #endif
