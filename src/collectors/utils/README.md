@@ -60,9 +60,9 @@ It covers default and preserved environments, duplicate controlled fields, accou
 PATH lookup, exit errors, exec replacement, SIGPIPE, and observed identities/groups. Test failures withhold environment
 values. Native non-root runs verify the existing inability-to-switch path; they do not prove root privilege dropping.
 Inherited groups are compared with a directly executed C probe: Python's `os.getgroups()` can report account
-memberships on macOS, which may differ from the C process's supplementary groups. The test forces that distinction
-with a synthetic Python group list while observing real subprocess credentials. Root transitions still check the
-target account's expected groups.
+memberships on macOS, which may differ from the C process's supplementary groups. The patched Python group list
+guards against reintroducing `os.getgroups()` as the expected process groups; the correct test does not call it.
+It does not change subprocess credentials. Root transitions still check the target account's expected groups.
 
 In a disposable Linux environment, install a compiler, Python 3 and libcap development headers. Create an unprivileged
 test account, then run as root with `--user <account> --capabilities`. This additionally verifies root-to-account IDs,

@@ -189,7 +189,8 @@ class NdRunTests(unittest.TestCase):
         self.success(baseline)
         inherited_groups = {int(item) for item in baseline.stdout.splitlines()[1].split()}
         # macOS Python can report account memberships instead of inherited process groups.
-        # Force that distinction even on hosts where the two lists happen to match.
+        # Guard against reintroducing os.getgroups() as the expected process groups.
+        # The correct oracle does not call the patched function.
         with patch("os.getgroups", return_value=[0x7fffffff]):
             for helper, user in ((HELPER, OPTIONS.user), (FALLBACK, "nobody")):
                 for prefix in ([], ["--preserve-env", "--"]):
