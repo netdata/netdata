@@ -199,8 +199,8 @@ anything of the daemon. Everything flows through the engine's own headers:
   The same struct carries the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest
   datafile) and `preload_metrics` (the list of metric uuids the embedder already knows, fed into the metrics registry
   before the journals load).
-- **Published statistics** (`rrdengineapi.h`): the engine keeps its own counters and exposes snapshot getters, such as
-  `rrdeng_get_cache_efficiency_stats()`, `rrdeng_get_gorilla_stats()` and `rrdeng_pulse_memory_sizes()` with
+- **Published statistics** (`dbengine-stats.h`): the engine keeps its own counters and exposes snapshot getters, such as
+  `rrdeng_get_cache_efficiency_stats()`, `rrdeng_get_gorilla_stats()` and `rrdeng_get_memory_sizes()` with
   `rrdeng_mem_name()`; the daemon's pulse subsystem reads them each cycle. The engine never pushes into daemon charts.
 - **Work** (`rrdengineapi.h`): the embedder can run a function on the engine's worker pool with `rrdeng_enq_work()`.
 - **Worker job ids** (`dbengine-workers.h`): the engine's jobs occupy the first block of the shared libuv pool's job

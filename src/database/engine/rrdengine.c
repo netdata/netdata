@@ -2364,7 +2364,7 @@ const char *rrdeng_mem_name(RRDENG_MEM idx) {
     return idx < RRDENG_MEM_MAX ? names[idx] : NULL;
 }
 
-struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void) {
+struct rrdeng_buffer_sizes rrdeng_get_memory_sizes(void) {
     return (struct rrdeng_buffer_sizes) {
         .as = {
             [RRDENG_MEM_PGC]            = pgc_aral_stats(),

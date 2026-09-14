@@ -68,9 +68,9 @@ void pulse_aral_init(void) {
 
 #ifdef ENABLE_DBENGINE
     // the engine publishes its ARAL statistics; register them here instead of the engine calling into pulse.
-    // rrdeng_pulse_memory_sizes() dereferences the engine's ARALs, so only when the engine is up.
+    // rrdeng_get_memory_sizes() dereferences the engine's ARALs, so only when the engine is up.
     if(dbengine_enabled) {
-        struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
+        struct rrdeng_buffer_sizes dbmem = rrdeng_get_memory_sizes();
         for(size_t i = 0; i < RRDENG_MEM_MAX; i++)
             pulse_aral_register_statistics(dbmem.as[i], rrdeng_mem_name(i));
     }
