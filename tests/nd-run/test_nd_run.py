@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -166,7 +167,7 @@ class NdRunTests(unittest.TestCase):
                 self.assertFalse(stderr)
                 self.assertEqual(int(stdout), child.pid)
 
-    def check_identity(self, result, user, switched):
+    def check_identity(self, result, user, switched, inherited_groups=None):
         self.success(result)
         lines = result.stdout.splitlines()
         account = pwd.getpwnam(user)
@@ -176,7 +177,7 @@ class NdRunTests(unittest.TestCase):
         self.assertEqual(ids, expected)
         groups = {int(item) for item in lines[1].split()}
         expected_groups = (set(os.getgrouplist(account.pw_name, account.pw_gid)) if switched
-                           else set(os.getgroups()))
+                           else inherited_groups)
         self.assertEqual(groups, expected_groups)
         self.assertEqual(lines[2], b"-1 -1", "child regained root IDs")
         if OPTIONS.capabilities:
@@ -184,10 +185,16 @@ class NdRunTests(unittest.TestCase):
             self.assertIn(b"ambient=0", lines)
 
     def test_identity_groups_and_privilege_drop(self):
-        for helper, user in ((HELPER, OPTIONS.user), (FALLBACK, "nobody")):
-            for prefix in ([], ["--preserve-env", "--"]):
-                result = self.invoke([*prefix, PROBE, "identity"], helper=helper)
-                self.check_identity(result, user, os.geteuid() == 0)
+        baseline = self.invoke(["identity"], helper=PROBE)
+        self.success(baseline)
+        inherited_groups = {int(item) for item in baseline.stdout.splitlines()[1].split()}
+        # macOS Python can report account memberships instead of inherited process groups.
+        # Force that distinction even on hosts where the two lists happen to match.
+        with patch("os.getgroups", return_value=[0x7fffffff]):
+            for helper, user in ((HELPER, OPTIONS.user), (FALLBACK, "nobody")):
+                for prefix in ([], ["--preserve-env", "--"]):
+                    result = self.invoke([*prefix, PROBE, "identity"], helper=helper)
+                    self.check_identity(result, user, os.geteuid() == 0, inherited_groups)
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux capabilities")
     def test_inherited_capabilities(self):
