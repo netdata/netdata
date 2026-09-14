@@ -132,7 +132,7 @@ it through an environment variable or file reference. Slack manages the channel,
 configuration. Runtime channel/user/username/icon overrides from Bash's legacy Slack integration remain pending and
 are not accepted by this provider. This does not change the active Bash integration.
 
-Messages use Block Kit plain-text sections and fields inside a status-colored attachment: warning/yellow,
+Messages show a plain-text Block Kit summary above details in a status-colored attachment: warning/yellow,
 critical/red, clear/green. They include the status transition, node, alert, summary, chart/context when present,
 known current/previous values with units, timestamp, and details. Unknown values are omitted; zero remains visible.
 An optional event `url` adds a **View alert** link without requiring an interaction server. The plain-text fallback

@@ -30,6 +30,7 @@ type slackMessage struct {
 	Parse       string            `json:"parse"`
 	UnfurlLinks bool              `json:"unfurl_links"`
 	UnfurlMedia bool              `json:"unfurl_media"`
+	Blocks      []slackBlock      `json:"blocks"`
 	Attachments []slackAttachment `json:"attachments"`
 }
 
@@ -68,7 +69,7 @@ func renderSlack(event Event) (slackMessage, error) {
 	if err != nil {
 		return slackMessage{}, err
 	}
-	blocks := []slackBlock{{Type: "section", Text: &summary}}
+	var blocks []slackBlock
 	values := []string{"Node\n" + event.Node, "Alert\n" + event.Alert, "Status\n" + status}
 	if event.Chart != "" {
 		values = append(values, "Chart\n"+event.Chart)
@@ -118,6 +119,8 @@ func renderSlack(event Event) (slackMessage, error) {
 	}
 	return slackMessage{
 		Text: strings.Join(fallback, "\n\n"), Parse: "none",
+		// Root blocks make Text a fallback instead of duplicating the attachment as a visible body.
+		Blocks:      []slackBlock{{Type: "section", Text: &summary}},
 		Attachments: []slackAttachment{{Color: color, Blocks: blocks}},
 	}, nil
 }

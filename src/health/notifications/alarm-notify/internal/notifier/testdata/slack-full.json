@@ -4,14 +4,13 @@
   "parse": "none",
   "unfurl_links": false,
   "unfurl_media": false,
+  "blocks": [
+    {"type": "section", "text": {"type": "plain_text", "text": "WARNING: Temperature is high"}}
+  ],
   "attachments": [
     {
       "color": "warning",
       "blocks": [
-        {
-          "type": "section",
-          "text": {"type": "plain_text", "text": "WARNING: Temperature is high"}
-        },
         {
           "type": "section",
           "fields": [

@@ -4,11 +4,13 @@
   "parse": "none",
   "unfurl_links": false,
   "unfurl_media": false,
+  "blocks": [
+    {"type": "section", "text": {"type": "plain_text", "text": "WARNING: Something happened"}}
+  ],
   "attachments": [
     {
       "color": "warning",
       "blocks": [
-        {"type": "section", "text": {"type": "plain_text", "text": "WARNING: Something happened"}},
         {
           "type": "section",
           "fields": [
