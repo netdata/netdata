@@ -1946,24 +1946,6 @@ if(ENABLE_DBENGINE)
             src/database/engine/dbengine-config.h
             src/database/engine/dbengine-workers.h
     )
-
-    # The engine is being decoupled from the daemon headers. Until that is complete, make a
-    # prototype that goes missing a build error instead of an implicit int declaration.
-    set_source_files_properties(
-            src/database/engine/rrdengine.c
-            src/database/engine/datafile.c
-            src/database/engine/journalfile.c
-            src/database/engine/rrdenginelib.c
-            src/database/engine/rrdengineapi.c
-            src/database/engine/pagecache.c
-            src/database/engine/page.c
-            src/database/engine/cache.c
-            src/database/engine/mrg.c
-            src/database/engine/mrg-load.c
-            src/database/engine/pdc.c
-            src/database/engine/dbengine-compression.c
-            src/database/engine/dbengine-config.c
-            PROPERTIES COMPILE_OPTIONS "-Werror=implicit-function-declaration;-Werror=implicit-int")
 endif()
 
 set(REGISTRY_PLUGIN_FILES
