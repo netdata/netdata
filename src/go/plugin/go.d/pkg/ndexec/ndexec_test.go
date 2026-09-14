@@ -3,6 +3,7 @@
 package ndexec
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -15,6 +16,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestUnprivilegedCommandContext(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a Unix helper script")
+	}
+	helper := filepath.Join(t.TempDir(), "nd-run")
+	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o700))
+	t.Cleanup(SetRunnerPathsForTests(helper, ""))
+
+	for name, ctx := range map[string]context.Context{
+		"caller context": t.Context(),
+		"nil context":    nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			cmd := UnprivilegedCommandContext(ctx, "/usr/bin/printf", "%s|", "a b", "$(exit 73)")
+			require.Nil(t, cmd.Process, "construction must not start a process")
+			assert.Equal(t, helper, cmd.Path)
+			var out bytes.Buffer
+			cmd.Stdout = &out
+			require.NoError(t, cmd.Run())
+			assert.Equal(t, "a b|$(exit 73)|", out.String())
+		})
+	}
+}
 
 func TestRunner_run(t *testing.T) {
 	if runtime.GOOS == "windows" {
