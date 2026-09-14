@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 # Common helpers for triage-support-bundle scripts.
 #
-# These scripts read a support bundle from the local filesystem. They make no
-# network calls and handle no credentials, so this lib intentionally ships no
-# load_env and no masked-token run wrappers: there is no token to mask. The
-# bundle CONTENT is customer data - callers keep output under the skill's audit
-# directory and never publish it.
+# bundle-summary.sh reads a bundle from the local filesystem and makes no
+# network calls. analyze-bundle.sh additionally calls an OpenAI-compatible
+# endpoint, so this lib carries a credential.
+#
+# Token safety: helpers that touch credential bytes are prefixed with an
+# underscore, are internal-only, and return values through namerefs into the
+# caller's locals - never to stdout. The public wrapper emits only the response
+# body. sb_selftest_no_token_leak drives the wrapper with a sentinel and asserts
+# the sentinel never reaches captured output.
+#
+# The bundle CONTENT is customer data - callers keep output under the skill's
+# audit directory and never publish it.
 #
 # Sourced from the per-action scripts; not executed directly.
 
@@ -216,4 +223,106 @@ sb_resolve_bundle() {
 sb_cleanup_bundle() {
     [ -n "${SB_BUNDLE_TMP:-}" ] && [ -d "${SB_BUNDLE_TMP}" ] && rm -rf "${SB_BUNDLE_TMP}"
     return 0
+}
+
+# --------------------------------------------------------------------------
+# Model endpoint (OpenAI-compatible)
+# --------------------------------------------------------------------------
+
+# Load the model configuration from <repo>/.env into the caller's locals.
+# Internal: the third nameref receives the API key and must stay a local.
+# Usage: local ep mo key; _sb_load_llm_env ep mo key
+_sb_load_llm_env() {
+    local -n _ep_ref="$1" _model_ref="$2" _key_ref="$3"
+    local root env
+    root="$(sb_repo_root)"
+    env="${root}/.env"
+    [ -f "$env" ] && [ -r "$env" ] \
+        || sb_die "missing ${env}. See <repo>/.agents/ENV.md for the setup guide."
+    set -a
+    # shellcheck disable=SC1090
+    . "$env"
+    set +a
+    : "${NETDATA_LLM_ENDPOINT:?NETDATA_LLM_ENDPOINT is empty - see .agents/ENV.md}"
+    : "${NETDATA_LLM_MODEL:?NETDATA_LLM_MODEL is empty - see .agents/ENV.md}"
+    : "${NETDATA_LLM_API_KEY:?NETDATA_LLM_API_KEY is empty - see .agents/ENV.md}"
+    _ep_ref="${NETDATA_LLM_ENDPOINT%/}"
+    _model_ref="${NETDATA_LLM_MODEL}"
+    _key_ref="${NETDATA_LLM_API_KEY}"
+    # do not leave the credential in the environment of anything we spawn
+    unset NETDATA_LLM_API_KEY
+}
+
+# POST a chat-completions request body and emit ONLY the assistant message
+# content on stdout. The credential is passed to curl through a header file on
+# a private descriptor, so it never appears in the process table, in the shell
+# trace, or in any diagnostic this script prints.
+#
+# Usage: sb_llm_chat <request-body.json>            (config from .env)
+#        SB_LLM_ENDPOINT/_MODEL/_KEY may be preset to override .env (self-test).
+sb_llm_chat() {
+    local body="$1"
+    local ep model key hdr rc out
+    [ -f "$body" ] || sb_die "no such request body: ${body}"
+
+    if [ -n "${SB_LLM_ENDPOINT:-}" ] && [ -n "${SB_LLM_KEY:-}" ]; then
+        ep="${SB_LLM_ENDPOINT%/}"; model="${SB_LLM_MODEL:-unset}"; key="${SB_LLM_KEY}"
+    else
+        _sb_load_llm_env ep model key
+    fi
+
+    hdr="$(mktemp "${TMPDIR:-/tmp}/sb-hdr.XXXXXX")"
+    chmod 600 "$hdr"
+    printf 'Authorization: Bearer %s\n' "$key" > "$hdr"
+    unset key
+
+    out="$(mktemp "${TMPDIR:-/tmp}/sb-resp.XXXXXX")"
+    set +e
+    curl -sS --max-time "${SB_LLM_TIMEOUT:-180}" \
+        -H @"$hdr" -H 'Content-Type: application/json' \
+        --data-binary @"$body" \
+        "${ep}/v1/chat/completions" -o "$out"
+    rc=$?
+    set -e
+    rm -f "$hdr"
+
+    if [ "$rc" -ne 0 ]; then
+        rm -f "$out"
+        sb_die "model request failed (curl exit ${rc}); endpoint or network unreachable."
+    fi
+    if jq -e '.error' "$out" >/dev/null 2>&1; then
+        local msg; msg="$(jq -r '.error.message // "unknown error"' "$out")"
+        rm -f "$out"
+        sb_die "model endpoint returned an error: ${msg}"
+    fi
+    jq -r '.choices[0].message.content // empty' "$out"
+    rm -f "$out"
+}
+
+# Drive the public wrapper with a sentinel credential and assert the sentinel
+# never reaches captured stdout or stderr. Runs offline against an endpoint that
+# cannot resolve; the failure path is exactly where a naive implementation would
+# echo the request it tried to make.
+sb_selftest_no_token_leak() {
+    local sentinel='SENTINEL-TOKEN-do-not-log-0000' body captured rc=0
+    body="$(mktemp "${TMPDIR:-/tmp}/sb-selftest.XXXXXX")"
+    printf '{"model":"selftest","messages":[{"role":"user","content":"ping"}]}\n' > "$body"
+
+    # sb_die exits the substitution subshell outright, so an inner "|| true"
+    # would never run; the guard belongs on the assignment itself.
+    captured="$(
+        SB_LLM_ENDPOINT='http://127.0.0.1:1' \
+        SB_LLM_MODEL='selftest' \
+        SB_LLM_KEY="$sentinel" \
+        sb_llm_chat "$body" 2>&1
+    )" || true
+    rm -f "$body"
+
+    if printf '%s' "$captured" | grep -qF "$sentinel"; then
+        echo -e "${SB_RED}FAIL${SB_NC} sentinel credential reached captured output" >&2
+        rc=1
+    else
+        echo -e "${SB_GREEN}PASS${SB_NC} credential never reaches stdout or stderr"
+    fi
+    return "$rc"
 }

@@ -88,6 +88,18 @@ it during a triage session).
 | `SONAR_PROJECT` | projectKey on SonarCloud | For Netdata: `netdata_netdata` | `org_repo` form |
 | `SONAR_TOKEN` | personal access token | https://sonarcloud.io/account/security -> Generate | long opaque token |
 
+### Model endpoint (triage-support-bundle automated triage)
+
+| Key | Role | Where to find it | Sample format |
+|---|---|---|---|
+| `NETDATA_LLM_ENDPOINT` | base URL of an OpenAI-compatible gateway, without the trailing `/v1` | The lab's model gateway. Keep bundle content on infrastructure you control. | `https://<gateway-host>` |
+| `NETDATA_LLM_MODEL` | model name as the gateway exposes it | The gateway's `/v1/models` listing | short model name |
+| `NETDATA_LLM_API_KEY` | gateway API key | Whoever operates the gateway | long opaque token |
+
+Only `scripts/analyze-bundle.sh` reads these. `bundle-summary.sh` makes no network calls and needs
+none of them. Verify the credential never reaches stdout with
+`.agents/skills/triage-support-bundle/scripts/analyze-bundle.sh --selftest`.
+
 ### Codacy Cloud (triage-codacy skill)
 
 | Key | Role | Where to find it | Sample format |

@@ -1,6 +1,6 @@
 ---
 name: triage-support-bundle
-description: Investigate a Netdata support bundle offline - the archive `netdata-support-bundle` produces - to explain one host's alerts, missing data, collector failures, crashes, high CPU or memory, streaming, cloud claiming, retention, dashboard reachability, permissions, install and update, container and Windows problems. Use for "analyse this support bundle", "a customer sent a bundle", "what does this bundle say", "why did this agent crash", "why is this collector showing no data", "why are alerts not firing", or when reading `MANIFEST.json`, `summary.txt`, `status-file.json`, or anything under `01-system` through `09-permissions`. Not for SNMP evidence under `06-state/snmp-diagnostics` (triage-snmp-diagnostics), not for fleet-wide crash or regression clustering (triage-agent-events), not for live queries against an Agent or Cloud (query-netdata-agents, query-netdata-cloud), and not for changing the bundle collector itself.
+description: Investigate a Netdata support bundle offline - the archive `netdata-support-bundle` produces - to explain one host's alerts, missing data, collector failures, crashes, high CPU or memory, streaming, cloud claiming, retention, dashboard reachability, permissions, install and update, container and Windows problems. Also automates that triage: `scripts/analyze-bundle.sh` classifies a bundle and drafts an internal note for a helpdesk connector. Use for "analyse this support bundle", "a customer sent a bundle", "what does this bundle say", "why did this agent crash", "why is this collector showing no data", "why are alerts not firing", "auto-triage this bundle", or when reading `MANIFEST.json`, `summary.txt`, `status-file.json`, or anything under `01-system` through `09-permissions`. Not for SNMP evidence under `06-state/snmp-diagnostics` (triage-snmp-diagnostics), not for fleet-wide crash or regression clustering (triage-agent-events), not for live queries against an Agent or Cloud (query-netdata-agents, query-netdata-cloud), and not for changing the bundle collector itself.
 ---
 
 # Support bundle triage
@@ -89,6 +89,11 @@ and never mentions alerts. Read it, then use this table.
 Two files support every branch: `./bundle-map.md` is the artifact reference - what each path holds,
 which platform produces it, and what its absence means - and `./evidence-limits.md` is what a bundle
 structurally cannot answer. Check `./false-signals.md` before reporting any conclusion.
+
+To run this reasoning without a human - classifying a bundle and drafting an internal note for a
+helpdesk connector to post - see `./triage-automation.md`, which owns the analyzer, the gate, and the
+`verdict.json` contract. Its model guardrails are assembled from
+`./prompts/triage-system-prompt.md` plus the two files above.
 
 ## Rules
 

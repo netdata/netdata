@@ -782,8 +782,9 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `triage-support-bundle`: offline investigation of a `netdata-support-bundle` archive - one host, one moment;
     alerts, missing data and collector failures, crashes, resource use, retention, streaming, cloud claiming,
     dashboard reachability, permissions, install and update, containers, Windows; the artifact map and what each
-    absence means, the evidence limits, and `scripts/bundle-summary.sh`. Not SNMP evidence, not fleet-wide crash
-    clustering, not live queries
+    absence means, the evidence limits, `scripts/bundle-summary.sh`, and the automated triage path
+    (`scripts/analyze-bundle.sh`, the deterministic gate, the `verdict.json` contract a helpdesk connector consumes).
+    Not SNMP evidence, not fleet-wide crash clustering, not live queries
   - `triage-snmp-diagnostics`: offline SNMP evidence investigations and diagnostics-tool/interpretation reviews
     with `src/go/tools/snmp-diagnostics`;
     topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`,
