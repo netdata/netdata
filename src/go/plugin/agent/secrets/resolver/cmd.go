@@ -35,13 +35,28 @@ func resolveCmd(ctx context.Context, cmdLine, original string, timeout time.Dura
 
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
 	configureCommandProcessTree(cmd)
+	out, err := runSecretCommand(cmd)
+	if err != nil {
+		if cmd.Process != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", fmt.Errorf("resolving secret '%s': command timed out after %s", original, timeout)
+		}
+		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
+	}
+
+	value := strings.TrimSpace(string(out))
+	logResolved(ctx, "resolved secret via command '%s'", parts[0])
+	return value, nil
+}
+
+// Keep secret output bounded and stderr out of errors, including failures in nd-run.
+func runSecretCommand(cmd *exec.Cmd) ([]byte, error) {
 	cmd.Stderr = io.Discard
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", fmt.Errorf("resolving secret '%s': command stdout: %w", original, err)
+		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
+		return nil, err
 	}
 	out, readErr := readBoundedSecret(stdout, MaximumAtomicResolvedBytes)
 	if readErr != nil && cmd.Cancel != nil {
@@ -49,13 +64,7 @@ func resolveCmd(ctx context.Context, cmdLine, original string, timeout time.Dura
 	}
 	waitErr := cmd.Wait()
 	if readErr != nil || waitErr != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return "", fmt.Errorf("resolving secret '%s': command timed out after %s", original, timeout)
-		}
-		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, errors.Join(readErr, waitErr))
+		return nil, errors.Join(readErr, waitErr)
 	}
-
-	value := strings.TrimSpace(string(out))
-	logResolved(ctx, "resolved secret via command '%s'", parts[0])
-	return value, nil
+	return out, nil
 }
