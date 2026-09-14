@@ -14,10 +14,12 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use common::{req, sp, sealed_source, tail_source, write_wal};
+use common::{kv_str, req, req_with, sp, sealed_source, tail_source, write_wal};
 use sfsq::traces::{
-    DURATION_BIN_COUNT, DurationPercentiles, FACET_TOP_K, OverviewData, OverviewQuery,
-    PartialReason, QueryStatus, TraceQuery, TraceSource, overview, trace_by_id,
+    AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_COUNT, DurationPercentiles,
+    FACET_TOP_K, OverviewData, OverviewQuery, OverviewRequestError, PartialReason, Predicate,
+    PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, TimeWindow,
+    TraceQuery, TraceSource, overview, search, trace_by_id,
 };
 
 /// One second-wide bucket per second, 10 buckets from t=0.
@@ -666,3 +668,289 @@ fn the_ceiling_prefix_keeps_the_facet_identity() {
         assert_eq!(sum + list.other + list.unattributed, data.total_traces);
     }
 }
+
+// ── Filtered grid (the page's selections applied to the heatmap) ─────
+
+fn text(v: &str) -> PredicateValue {
+    PredicateValue::Text(v.to_string())
+}
+
+fn cond(target: PredicateTarget, op: CompareOp, values: &[&str]) -> Condition {
+    Condition {
+        target,
+        op,
+        values: values.iter().map(|v| text(v)).collect(),
+    }
+}
+
+/// `name = <values...>` (the rail's operation filter).
+fn name_in(values: &[&str]) -> Predicate {
+    Predicate {
+        conditions: vec![cond(
+            PredicateTarget::Builtin(BuiltinField::Name),
+            CompareOp::Eq,
+            values,
+        )],
+    }
+}
+
+/// `resource.service.name = <value>` (the rail's service filter).
+fn service_eq(value: &str) -> Predicate {
+    Predicate {
+        conditions: vec![cond(
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".to_string()),
+            CompareOp::Eq,
+            &[value],
+        )],
+    }
+}
+
+fn filtered(sources: Vec<TraceSource>, predicate: Predicate) -> OverviewData {
+    run(sources, OverviewQuery::new(grid()).predicate(predicate))
+}
+
+/// The filter selects TRACES by a matching stored row and keeps each
+/// selected trace whole: envelope, span and error totals are the
+/// trace's, not the matching rows'.
+#[test]
+fn filtered_grid_bins_only_traces_with_a_matching_stored_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "sealed");
+    let src = || vec![sealed_source(dir.path(), &wal, "a")];
+
+    // One matching span of C selects C; C's OTHER span still counts.
+    let data = filtered(src(), name_in(&["c-1"]));
+    assert_eq!(data.status, QueryStatus::Complete);
+    let mut cells = vec![[0u64; DURATION_BIN_COUNT]; 10];
+    cells[5][5] = 1;
+    assert_eq!(data.cells, cells);
+    assert_eq!(data.total_traces, 1);
+    assert_eq!(data.total_spans, 2, "the whole trace, not the matched row");
+    assert_eq!(data.total_errors, 0);
+    assert!(data.bucket_percentiles[5].is_some());
+    assert!(data.bucket_percentiles[1].is_none(), "A is not binned");
+
+    // Values OR within a key: A or B.
+    let data = filtered(src(), name_in(&["a-2", "b-err"]));
+    let mut cells = vec![[0u64; DURATION_BIN_COUNT]; 10];
+    cells[1][3] = 1;
+    cells[3][0] = 1;
+    assert_eq!(data.cells, cells);
+    assert_eq!((data.total_traces, data.total_spans, data.total_errors), (2, 3, 1));
+
+    // The match-all predicate IS the unfiltered grid.
+    let all = filtered(src(), Predicate::all());
+    let plain = run(src(), OverviewQuery::new(grid()));
+    assert_eq!(all.cells, plain.cells);
+    assert_eq!(all.total_traces, plain.total_traces);
+
+    // Nothing matches: an empty, COMPLETE grid.
+    let none = filtered(src(), name_in(&["nope"]));
+    assert_eq!(none.status, QueryStatus::Complete);
+    assert_eq!(none.total_traces, 0);
+    assert!(none.cells.iter().flatten().all(|&c| c == 0));
+}
+
+/// A resource attribute filter (the rail's service picker) selects the
+/// traces whose stored rows carry it — per request/resource, so two
+/// services in one corpus split cleanly.
+#[test]
+fn filtered_grid_honours_resource_attributes() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal = write_wal(
+        dir.path(),
+        vec![
+            req_with(vec![kv_str("service.name", "cart")], None, &c[..2]), // A
+            req_with(vec![kv_str("service.name", "flagd")], None, &c[2..]), // B, C
+        ],
+        "svc",
+    );
+    let src = || vec![sealed_source(dir.path(), &wal, "a")];
+    let cart = filtered(src(), service_eq("cart"));
+    assert_eq!(cart.total_traces, 1);
+    assert_eq!(cart.cells[1][3], 1, "A binned");
+    let flagd = filtered(src(), service_eq("flagd"));
+    assert_eq!(flagd.total_traces, 2);
+    assert_eq!((flagd.cells[3][0], flagd.cells[5][5]), (1, 1), "B and C binned");
+}
+
+/// A trace straddling a sealed file and a tail is selected by a match in
+/// EITHER source and bins by its MERGED envelope — the sealed side's
+/// non-matching span still widens it.
+#[test]
+fn filtered_grid_selects_straddling_traces_from_either_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&c[..4])], "sealed"); // A, B, c-1
+    let wal_tail = write_wal(dir.path(), vec![req(&c[4..])], "tail"); // c-2
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    for name in ["c-1", "c-2"] {
+        let data = filtered(src(), name_in(&[name]));
+        assert_eq!(data.status, QueryStatus::Complete, "{name}");
+        assert_eq!(data.total_traces, 1, "{name}");
+        assert_eq!(data.cells[5][5], 1, "{name}: merged 12s envelope, bucket 5");
+        assert_eq!(data.total_spans, 2, "{name}: both stored spans of C");
+    }
+    // A match confined to the tail selects a tail-only trace too.
+    let data = filtered(src(), name_in(&["b-err"]));
+    assert_eq!((data.total_traces, data.total_errors), (1, 1));
+}
+
+/// The matching row must START inside the grid (the search engine's
+/// window rule): a trace binned by its early envelope is NOT selected by
+/// a match that lies past the grid's end.
+#[test]
+fn filtered_grid_requires_the_match_to_start_inside_the_grid() {
+    let dir = tempfile::tempdir().unwrap();
+    // D: d-1 at 2s (in the grid), d-2 at 12s (past the 10s grid end).
+    let d = vec![
+        tspan(0xD, 6, 2_000_000_000, 2_100_000_000, "d-1"),
+        tspan(0xD, 7, 12_000_000_000, 12_100_000_000, "d-2"),
+    ];
+    let wal = write_wal(dir.path(), vec![req(&d)], "d");
+    for (id, src) in [
+        ("sealed", vec![sealed_source(dir.path(), &wal, "s")]),
+        ("tail", vec![tail_source(&wal, "t")]),
+    ] {
+        let plain = run(src.clone(), OverviewQuery::new(grid()));
+        assert_eq!(plain.total_traces, 1, "{id}: D bins by its 2s envelope start");
+        assert_eq!(plain.cells[2][5], 1, "{id}: 10.1s envelope");
+        let by_d1 = filtered(src.clone(), name_in(&["d-1"]));
+        assert_eq!(by_d1.total_traces, 1, "{id}: in-grid match selects D");
+        assert_eq!(by_d1.cells[2][5], 1, "{id}: still the whole envelope");
+        let by_d2 = filtered(src, name_in(&["d-2"]));
+        assert_eq!(by_d2.total_traces, 0, "{id}: a match past the grid end selects nothing");
+    }
+}
+
+/// Stored-row semantics, like the totals: a resent copy that matches
+/// selects the trace even if the canonical copy carries another value.
+#[test]
+fn filtered_grid_selects_by_any_stored_copy() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = tspan(0xA, 1, 1_000_000_000, 1_200_000_000, "a-1");
+    let resent = tspan(0xA, 1, 1_000_000_000, 1_200_000_000, "a-1-resent");
+    let wal = write_wal(dir.path(), vec![req(&[first, resent])], "resend");
+    let src = || vec![sealed_source(dir.path(), &wal, "s")];
+    for name in ["a-1", "a-1-resent"] {
+        let data = filtered(src(), name_in(&[name]));
+        assert_eq!(data.total_traces, 1, "{name}: either stored copy selects A");
+        assert_eq!(data.total_spans, 2, "{name}: both stored rows count");
+    }
+}
+
+/// The filter's scans share the fold's ceiling: an exhausted budget
+/// stops the merge with the overview's own partial, and nothing
+/// half-flagged is binned.
+#[test]
+fn filtered_grid_charges_the_visited_ceiling() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "c");
+    for src in [
+        vec![sealed_source(dir.path(), &wal, "s")],
+        vec![tail_source(&wal, "t")],
+    ] {
+        let data = run(
+            src,
+            OverviewQuery::new(grid())
+                .predicate(name_in(&["c-1"]))
+                .visited_rows_ceiling_for_tests(1),
+        );
+        assert!(data.status.has(PartialReason::OverviewCeiling));
+        assert_eq!(data.total_traces, 0);
+    }
+}
+
+/// Trace-level and trace-id conditions cannot be answered from stored
+/// rows: a clean request error names the offending target, never a
+/// silently unfiltered grid.
+#[test]
+fn filtered_grid_rejects_trace_level_conditions() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "c");
+    for (field, value) in [
+        (BuiltinField::RootName, text("a-1")),
+        (BuiltinField::RootServiceName, text("svc")),
+        (BuiltinField::TraceDuration, PredicateValue::Integer(1000)),
+        (
+            BuiltinField::TraceId,
+            text("0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"),
+        ),
+    ] {
+        let predicate = Predicate {
+            conditions: vec![Condition {
+                target: PredicateTarget::Builtin(field),
+                op: CompareOp::Eq,
+                values: vec![value],
+            }],
+        };
+        let err = overview(
+            vec![sealed_source(dir.path(), &wal, "a")],
+            OverviewQuery::new(grid()).predicate(predicate),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, OverviewRequestError::TraceLevelCondition { .. }),
+            "{field:?}: {err}"
+        );
+    }
+}
+
+/// Cross-check against the list: on a resend-free corpus the filtered
+/// grid's trace count equals the number of traces `search` returns for
+/// the same predicate over the same window and sources.
+#[test]
+fn filtered_grid_agrees_with_search_on_a_canonical_corpus() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&c[..3])], "sealed"); // A, B
+    let wal_tail = write_wal(dir.path(), vec![req(&c[3..])], "tail"); // C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let window = TimeWindow::new(0, 10_000_000_000).unwrap();
+    let predicates = vec![
+        name_in(&["c-1"]),
+        name_in(&["a-1", "b-err"]),
+        name_in(&["nope"]),
+        Predicate {
+            conditions: vec![cond(
+                PredicateTarget::Builtin(BuiltinField::Name),
+                CompareOp::Regex,
+                &["a-.*"],
+            )],
+        },
+        service_eq("svc"),
+        Predicate::all(),
+    ];
+    for predicate in predicates {
+        let grid_data = filtered(src(), predicate.clone());
+        let list = search(
+            SearchSources {
+                window: src(),
+                completion: src(),
+            },
+            SearchQuery::new(predicate.clone()).window(window).limit(100),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap();
+        assert_eq!(
+            grid_data.total_traces,
+            list.traces.len() as u64,
+            "{predicate:?}: heatmap population = list population"
+        );
+    }
+}
+
