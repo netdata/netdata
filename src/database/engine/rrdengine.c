@@ -1043,22 +1043,26 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 }
 
 
-static void after_weights_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
+static void after_external_work(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
 {
     ;
 }
 
-static void *weights_worker(
+static void *external_work_worker(
     struct rrdengine_instance *ctx __maybe_unused,
     void *data,
     struct completion *completion,
     uv_work_t *req __maybe_unused)
 {
-    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
-    query_weights_worker_thread(data);
+    struct rrdeng_work_request *work = data;
+    work->fn(work->data);
     completion_mark_complete(completion);
     worker_is_idle();
     return NULL;
+}
+
+void rrdeng_enq_work(struct rrdeng_work_request *req) {
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EXTERNAL_WORK, req, &req->completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
@@ -2591,7 +2595,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY,                      "ctx flush all");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
-    worker_register_job_name(RRDENG_OPCODE_PARALLEL_WEIGHT,                          "parallel weight");
+    worker_register_job_name(RRDENG_OPCODE_EXTERNAL_WORK,                            "external work");
     worker_register_job_name(RRDENG_OPCODE_MRG_LOAD,                                 "mrg tier load");
 
 
@@ -2607,7 +2611,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_SHUTDOWN,         "ctx shutdown cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_FLUSH_DIRTY,      "ctx flush dirty cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PARALLEL_WEIGHT,      "parallel weight cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTERNAL_WORK,        "external work cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_MRG_LOAD,             "mrg tier load cb");
 
     // special jobs
@@ -2655,9 +2659,8 @@ void dbengine_event_loop(void* arg) {
                     work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, tier_mrg_load, NULL);
                     break;
 
-                case RRDENG_OPCODE_PARALLEL_WEIGHT:;
-
-                    work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, weights_worker, after_weights_worker);
+                case RRDENG_OPCODE_EXTERNAL_WORK:
+                    work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, external_work_worker, after_external_work);
                     break;
 
                 case RRDENG_OPCODE_EXTENT_READ:
