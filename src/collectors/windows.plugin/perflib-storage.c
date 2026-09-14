@@ -926,16 +926,24 @@ static void logical_disk_set_space(PERF_DATA_BLOCK *pDataBlock,
     d->divisor = 1024;
 }
 
+static void logical_disk_path_chart_id(const char *name, char *buffer, size_t buffer_size)
+{
+    snprintfz(buffer, buffer_size, "%s", name);
+    netdata_fix_chart_id(buffer);
+    size_t len = strlen(buffer);
+    XXH64_hash_t hash = XXH3_64bits(name, strlen(name));
+    snprintfz(buffer + len, buffer_size - len, "_%016llx", (unsigned long long)hash);
+}
+
 static const char *logical_disk_chart_id(
     const struct logical_disk *d, const char *name, char *buffer, size_t buffer_size)
 {
-    // Preserve legacy identities when a raw chart exists; sanitize only new path-based IDs.
+    // Preserve legacy identities; new path IDs include a raw-name hash because sanitization is not injective.
     if (d->st_disk_space || !strchr(name, '\\') ||
         rrdset_find_bytype(localhost, "disk_space", name, true))
         return name;
 
-    snprintfz(buffer, buffer_size, "%s", name);
-    netdata_fix_chart_id(buffer);
+    logical_disk_path_chart_id(name, buffer, buffer_size);
     return buffer;
 }
 
@@ -960,7 +968,7 @@ static void logical_disk_labels(struct logical_disk *d, const char *name)
 static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
 {
     if (!d->st_disk_space) {
-        char chart_id[ND_MOUNT_PATH_MAX];
+        char chart_id[RRD_ID_LENGTH_MAX + 1];
         const char *id = logical_disk_chart_id(d, name, chart_id, sizeof(chart_id));
         d->st_disk_space = rrdset_create_localhost(
             "disk_space",
@@ -1241,6 +1249,21 @@ static const struct logical_disk_collection_ops logical_disk_unittest_ops = {
     .get_instance_name = logical_disk_unittest_get_instance_name,
     .collect_instance = logical_disk_unittest_collect_instance,
 };
+
+static int logical_disk_chart_id_unittest_run(void)
+{
+    char first[RRD_ID_LENGTH_MAX + 1];
+    char second[RRD_ID_LENGTH_MAX + 1];
+    logical_disk_path_chart_id("C:\\mount one", first, sizeof(first));
+    logical_disk_path_chart_id("C:\\mount_one", second, sizeof(second));
+
+    if (!strcmp(first, second)) {
+        fprintf(stderr, "perflib storage unittest: normalized mount paths share a chart ID\n");
+        return 1;
+    }
+
+    return 0;
+}
 
 static int logical_disk_unittest_run(
     const char *pattern,
@@ -1560,6 +1583,7 @@ int perflib_storage_unittest(void)
     int errors = 0;
 
     errors += storage_helpers_unittest_run();
+    errors += logical_disk_chart_id_unittest_run();
     errors += logical_disk_unittest_run("*AssuredRecoveryTemp*", 1, "C:", NULL);
     errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
     errors += mount_points_query_failure_unittest_run();
