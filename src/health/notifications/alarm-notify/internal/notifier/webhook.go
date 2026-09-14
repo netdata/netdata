@@ -16,6 +16,10 @@ import (
 )
 
 func sendWebhook(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+	return postJSON(ctx, dst, event, timeout)
+}
+
+func postJSON(ctx context.Context, dst Destination, message any, timeout time.Duration) error {
 	endpoint, err := resolveSecret(ctx, dst.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
@@ -33,13 +37,13 @@ func sendWebhook(ctx context.Context, dst Destination, event Event, timeout time
 			return errors.New("destination.bearer_token must not contain line breaks")
 		}
 	}
-	payload, err := json.Marshal(event)
+	payload, err := json.Marshal(message)
 	if err != nil {
 		return errors.New("could not encode notification")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return errors.New("could not construct webhook request")
+		return fmt.Errorf("could not construct %s request", dst.Type)
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("User-Agent", "netdata-alarm-notify")
@@ -62,14 +66,18 @@ func sendWebhook(ctx context.Context, dst Destination, event Event, timeout time
 		case errors.Is(err, context.DeadlineExceeded), errors.As(err, &networkError) && networkError.Timeout():
 			return errors.New("notification timed out")
 		default:
-			return errors.New("webhook transport failed; check connectivity, TLS, and proxy settings")
+			return fmt.Errorf("%s transport failed; check connectivity, TLS, and proxy settings", dst.Type)
 		}
 	}
-	// The response body is not part of this webhook's acknowledgment contract.
+	// These providers acknowledge delivery through HTTP status, not the response body.
 	// Close without buffering or draining an arbitrary remote body.
 	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("webhook returned HTTP %d", response.StatusCode)
+	accepted := response.StatusCode >= 200 && response.StatusCode < 300
+	if dst.Type == "slack" {
+		accepted = response.StatusCode == http.StatusOK
+	}
+	if !accepted {
+		return fmt.Errorf("%s returned HTTP %d", dst.Type, response.StatusCode)
 	}
 	return nil
 }

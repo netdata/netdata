@@ -1,12 +1,12 @@
 # Experimental Go notifier
 
-This standalone Go module routes a JSON notification to named webhook destinations. It has no imports from
-the existing `src/go` module. It is for local development and is not installed, packaged, or invoked by the Agent.
+This standalone Go module routes a JSON notification to named generic webhook and Slack destinations. It has no imports
+from the existing `src/go` module. It is for local development and is not installed, packaged, or invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
-The current increments provide explicit delivery and role-based routing. [CAPABILITIES.md](CAPABILITIES.md) tracks
-the remaining Bash functionality. Configuration and code may change substantially before production adoption;
-final redesign follows the working functional baseline.
+The current increments provide explicit delivery, role-based routing, and modern Slack app webhooks.
+[CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
+before production adoption; final redesign follows the working functional baseline.
 
 ## Build and run
 
@@ -28,7 +28,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         print(self.rfile.read(int(self.headers["Content-Length"])).decode(), flush=True)
-        self.send_response(204)
+        self.send_response(200)
         self.end_headers()
 
 HTTPServer(("127.0.0.1", 18080), Receiver).serve_forever()
@@ -62,10 +62,11 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
   is requested. Invalid options/configuration/input, all selected deliveries failing, or command cancellation/timeout
   return `1`. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
 
-Configuration has `version: 1` and a `destinations` mapping. Each destination requires `type: webhook` and `url`;
-`bearer_token` is optional. Destination names are nonsecret identifiers. The URL must be an absolute HTTP or HTTPS
-URL with a host and without embedded user/password information or a fragment. HTTP allows deliberate local or
-self-hosted delivery; HTTPS verifies certificates. Proxy selection follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
+Configuration has `version: 1` and a `destinations` mapping. Each destination requires `type: webhook` or `type: slack`
+and `url`; `bearer_token` is optional for generic webhooks and rejected for Slack. Destination names are nonsecret
+identifiers. The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
+or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
+follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 The URL and bearer token accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
@@ -106,9 +107,51 @@ the individual results to see failures. On interruption, counts cover results re
 not claim an outcome for interrupted or unstarted deliveries.
 
 Each delivery sends one POST with `Content-Type: application/json` and, when configured, `Authorization: Bearer ...`.
-HTTP 200–299 acknowledges delivery. Redirects and other status codes fail; there are no application retries.
+Generic webhooks accept HTTP 200–299; Slack accepts HTTP 200. Redirects and other status codes fail; there are no
+application retries.
 Response bodies are closed without being buffered, logged, or interpreted. Errors do not echo config/input values,
 secret contents, or endpoint URLs.
+
+## Slack app webhooks
+
+Create a [Slack app incoming webhook](https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/)
+for each channel, then configure one named destination per webhook URL:
+
+```yaml
+destinations:
+  slack:
+    type: slack
+    url: ${env:NOTIFY_SLACK_URL}
+routing:
+  roles:
+    chatops: [slack]
+```
+
+Use this with the top-level `version: 1`, as shown in `examples/notify.yaml`. Slack's webhook URL is a secret; supply
+it through an environment variable or file reference. Slack manages the channel, username and icon in the app's
+configuration. Runtime channel/user/username/icon overrides from Bash's legacy Slack integration remain pending and
+are not accepted by this provider. This does not change the active Bash integration.
+
+Messages use Block Kit plain-text sections and fields inside a status-colored attachment: warning/yellow,
+critical/red, clear/green. They include the status transition, node, alert, summary, chart/context when present,
+known current/previous values with units, timestamp, and details. Unknown values are omitted; zero remains visible.
+An optional event `url` adds a **View alert** link without requiring an interaction server. The plain-text fallback
+includes the same content and link.
+Alert text cannot introduce mentions or markdown formatting; automatic link parsing and unfurls are disabled.
+
+Slack enforces [section/field limits](https://docs.slack.dev/reference/block-kit/blocks/section-block/) of 3000/2000
+characters. Counts include labels, escaped Slack control characters, and the navigation link markup. Oversized content
+fails that destination with a safe error rather than being truncated; other selected destinations are still attempted.
+
+For a local demonstration using the receiver above, set the URL to that receiver for this one invocation:
+
+```sh
+NOTIFY_SLACK_URL=http://127.0.0.1:18080/slack /tmp/alarm-notify send \
+  --config examples/notify.yaml --role chatops < examples/event.json
+```
+
+Tests inspect complete Slack payloads and HTTP behavior using local receivers. They do not require or post to a live
+Slack workspace, so native Slack rendering is not part of the automated validation.
 
 ## Event document
 
@@ -116,8 +159,11 @@ The webhook receives the typed event as JSON. `version` must be `1`. Required fi
 (RFC 3339), `node`, `alert`, `status`, and `summary`. `incident_id` is an opaque stable incident identifier supplied by
 the caller. Current statuses are `WARNING`, `CRITICAL`, and `CLEAR`.
 
-Optional fields are `chart`, `context`, `previous_status`, `info`, `value`, `previous_value`, and `units`.
+Optional fields are `chart`, `context`, `previous_status`, `info`, `value`, `previous_value`, `units`, and `url`.
 `previous_status` accepts the three current statuses plus `UNINITIALIZED`, `UNDEFINED`, and `REMOVED`.
+`url` is a caller-supplied alert navigation link: absolute HTTP(S), without embedded user/password information;
+fragments are allowed. Use a URL suitable for disclosure in notifications. The notifier does not fetch this link.
+Generic webhooks include `url` when it is supplied and omit it otherwise.
 Values are finite JSON numbers or null; missing values are sent as null and zero remains zero. Unknown fields and
 trailing documents are rejected. Strings are encoded as JSON, including quotes, newlines, and Unicode.
 

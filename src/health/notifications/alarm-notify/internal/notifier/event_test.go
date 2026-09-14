@@ -3,6 +3,7 @@
 package notifier
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -45,6 +46,38 @@ func expectedEvent() Event {
 		Value:          &value,
 		PreviousValue:  &previous,
 		Units:          "C",
+	}
+}
+
+func TestReadEventURL(t *testing.T) {
+	tests := map[string]struct {
+		url   string
+		valid bool
+	}{
+		"HTTPS":         {url: "https://example.com/alert?id=1#chart", valid: true},
+		"HTTP":          {url: "http://localhost/alert", valid: true},
+		"omitted":       {valid: true},
+		"relative":      {url: "/synthetic-private-value"},
+		"unsafe scheme": {url: "javascript:synthetic-private-value"},
+		"userinfo":      {url: "https://user:synthetic-private-value@example.com/alert"},
+		"missing host":  {url: "https:///synthetic-private-value"},
+		"malformed":     {url: "https://example.com/%synthetic-private-value"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			input := strings.Replace(validEvent, `"version": 1`, fmt.Sprintf(`"version": 1, "url": %q`, test.url), 1)
+			got, err := readEvent(strings.NewReader(input))
+			if !test.valid {
+				require.ErrorContains(t, err, "event url must be")
+				assert.Equal(t, Event{}, got)
+				assert.NotContains(t, err.Error(), "synthetic-private-value")
+				return
+			}
+			require.NoError(t, err)
+			want := expectedEvent()
+			want.URL = test.url
+			assert.Equal(t, want, got)
+		})
 	}
 }
 

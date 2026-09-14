@@ -21,7 +21,7 @@ Usage:
   alarm-notify send --config FILE --destination NAME [--timeout 10s] < event.json
   alarm-notify send --config FILE --role ROLE [--role ROLE ...] [--timeout 10s] < event.json
 
-send reads one JSON event and posts it to the selected webhook destinations.
+send reads one JSON event and delivers it to the selected destinations.
 Use either one explicit destination or roles resolved through YAML routing.
 validate checks configuration without resolving secrets or sending requests.
 The positive timeout covers the whole invocation, including input reads.
@@ -53,7 +53,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	var destination string
 	var roles []string
 	if args[0] == "send" {
-		flags.Func("destination", "named webhook destination", func(value string) error {
+		flags.Func("destination", "named notification destination", func(value string) error {
 			if strings.TrimSpace(value) == "" {
 				return errors.New("destination must not be empty")
 			}

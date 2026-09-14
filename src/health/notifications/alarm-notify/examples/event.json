@@ -12,5 +12,6 @@
   "info": "Synthetic event for local development",
   "value": 42.5,
   "previous_value": 30,
-  "units": "C"
+  "units": "C",
+  "url": "https://example.com/alerts/test-incident"
 }

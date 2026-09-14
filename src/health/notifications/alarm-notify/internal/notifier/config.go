@@ -63,8 +63,11 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
-	if dst.Type != "webhook" {
-		return errors.New("destination.type must be webhook; other providers are not implemented yet")
+	if dst.Type != "webhook" && dst.Type != "slack" {
+		return errors.New("destination.type must be webhook or slack; other providers are not implemented yet")
+	}
+	if dst.Type == "slack" && dst.BearerToken != "" {
+		return errors.New("slack destinations authenticate through their URL; bearer_token is not supported")
 	}
 	reference, err := secretReference(dst.URL)
 	if err != nil {
@@ -111,10 +114,14 @@ func secretReference(value string) (bool, error) {
 }
 
 func validateURL(value string) error {
-	u, err := url.Parse(value)
-	if err != nil || u.Hostname() == "" || u.Opaque != "" || u.User != nil || u.Fragment != "" ||
-		(u.Scheme != "http" && u.Scheme != "https") {
+	if !validHTTPURL(value, false) {
 		return errors.New("destination.url must be an absolute HTTP(S) URL without user information or fragment")
 	}
 	return nil
+}
+
+func validHTTPURL(value string, allowFragment bool) bool {
+	u, err := url.Parse(value)
+	return err == nil && u.Hostname() != "" && u.Opaque == "" && u.User == nil &&
+		(allowFragment || u.Fragment == "") && (u.Scheme == "http" || u.Scheme == "https")
 }
