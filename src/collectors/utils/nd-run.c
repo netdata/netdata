@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #include "exec-signals.h"
 
@@ -26,14 +28,6 @@ extern char **environ;
 
 #define FALLBACK_USER "nobody"
 
-// USER, LOGNAME, HOME, SHELL, LC_ALL, PATH, PWD, TZ, TZDIR, TMPDIR, NULL
-#define MAX_ENV_VARS 16
-
-// The environment we hand to the child. It must be static: environ has to stay
-// valid until execvp() replaces the process image.
-static char *new_environ[MAX_ENV_VARS];
-static size_t new_environ_entries = 0;
-
 void show_help() {
     fprintf(stdout, "\n");
     fprintf(stdout, "nd-run\n");
@@ -41,6 +35,14 @@ void show_help() {
     fprintf(stdout, "Copyright 2025 Netdata Inc.\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "A helper to run a command as an unprivileged user without any extra privileges\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "Usage: nd-run command [args...]\n");
+    fprintf(stdout, "       nd-run --preserve-env -- command [args...]\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "The default is a minimal environment. --preserve-env retains inherited application variables\n");
+    fprintf(stdout, "for trusted commands, but USER, LOGNAME, HOME, SHELL and LC_ALL remain helper-controlled.\n");
+    fprintf(stdout, "TMPDIR is inherited when set, otherwise it defaults to /tmp. Privilege dropping is unchanged.\n");
+    fprintf(stdout, "The -- delimiter is required after --preserve-env.\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "Defaults to running the command as '%s', but will fall back to '%s' if '%s' is not found on the system.\n", NETDATA_USER, FALLBACK_USER, NETDATA_USER);
     fprintf(stdout, "\n");
@@ -85,7 +87,7 @@ static void clear_caps() {
 }
 #endif
 
-static void add_env_var(const char *name, const char *value) {
+static void add_env_var(char **env, size_t *entries, const char *name, const char *value) {
     // Append "name=value" to the environment we are building for the child.
     // Variables that are not set are skipped.
 
@@ -93,11 +95,13 @@ static void add_env_var(const char *name, const char *value) {
         return;
     }
 
-    if (new_environ_entries + 1 >= MAX_ENV_VARS) {
-        fatal_msg("too many environment variables");
+    size_t name_len = strlen(name);
+    size_t value_len = strlen(value);
+    if (name_len > SIZE_MAX - 2 || value_len > SIZE_MAX - name_len - 2) {
+        fatal_msg("environment variable is too large");
     }
 
-    size_t size = strlen(name) + 1 + strlen(value) + 1;
+    size_t size = name_len + value_len + 2;
     char *entry = malloc(size);
     if (entry == NULL) {
         fatal("malloc");
@@ -105,38 +109,89 @@ static void add_env_var(const char *name, const char *value) {
 
     snprintf(entry, size, "%s=%s", name, value);
 
-    new_environ[new_environ_entries++] = entry;
-    new_environ[new_environ_entries] = NULL;
+    env[(*entries)++] = entry;
 }
 
-static void build_environment(struct passwd *pw) {
-    // Build a minimal environment for the child from scratch, only passing on
-    // a few things we know are needed to make things work correctly.
-    //
+static char **build_environment(struct passwd *pw, bool preserve_env) {
     // We never modify our own environment: getenv() keeps returning valid
     // pointers into the original environment block until main() replaces
     // environ, right before execvp(). Clearing the environment in place is not
     // portable - clearenv() does not exist everywhere, and setting environ to
     // NULL makes setenv() dereference a NULL environment array on macOS.
 
-    const char *tmpdir = getenv("TMPDIR");
+    const struct {
+        const char *name;
+        const char *value;
+    } controlled[] = {
+        { "USER", pw->pw_name },
+        { "LOGNAME", pw->pw_name },
+        { "HOME", pw->pw_dir },
+        { "SHELL", "/bin/sh" },
+        { "LC_ALL", "C" },
+    };
+    const size_t controlled_count = sizeof(controlled) / sizeof(controlled[0]);
 
-    add_env_var("USER", pw->pw_name);
-    add_env_var("LOGNAME", pw->pw_name);
-    add_env_var("HOME", pw->pw_dir);
-    add_env_var("SHELL", "/bin/sh"); // Ignore user default shell
-    add_env_var("LC_ALL", "C"); // Force C locale
-    add_env_var("PATH", getenv("PATH"));
-    add_env_var("PWD", getenv("PWD"));
-    add_env_var("TZ", getenv("TZ"));
-    add_env_var("TZDIR", getenv("TZDIR"));
-    add_env_var("TMPDIR", (tmpdir == NULL) ? "/tmp" : tmpdir); // Use a sane default for TMPDIR if it wasn't set.
+    // Space for the controlled fields, PATH/PWD/TZ/TZDIR, TMPDIR and NULL,
+    // plus every inherited entry in preservation mode. calloc leaves the terminator.
+    size_t capacity = controlled_count + 6;
+    if (preserve_env) {
+        for (char **entry = environ; *entry; entry++) {
+            if (capacity >= SIZE_MAX / sizeof(char *))
+                fatal_msg("environment is too large");
+            capacity++;
+        }
+    }
+    char **env = calloc(capacity, sizeof(*env));
+    if (!env)
+        fatal("calloc");
+
+    size_t entries = 0;
+    for (size_t i = 0; i < controlled_count; i++)
+        add_env_var(env, &entries, controlled[i].name, controlled[i].value);
+
+    if (preserve_env) {
+        for (char **entry = environ; *entry; entry++) {
+            bool reserved = false;
+            for (size_t i = 0; i < controlled_count; i++) {
+                size_t len = strlen(controlled[i].name);
+                if (strncmp(*entry, controlled[i].name, len) == 0 && (*entry)[len] == '=') {
+                    reserved = true;
+                    break;
+                }
+            }
+            if (!reserved) {
+                env[entries] = strdup(*entry);
+                if (!env[entries])
+                    fatal("strdup");
+                entries++;
+            }
+        }
+    } else {
+        add_env_var(env, &entries, "PATH", getenv("PATH"));
+        add_env_var(env, &entries, "PWD", getenv("PWD"));
+        add_env_var(env, &entries, "TZ", getenv("TZ"));
+        add_env_var(env, &entries, "TZDIR", getenv("TZDIR"));
+    }
+
+    const char *tmpdir = getenv("TMPDIR");
+    if (!preserve_env || tmpdir == NULL)
+        add_env_var(env, &entries, "TMPDIR", tmpdir == NULL ? "/tmp" : tmpdir);
+
+    return env;
 }
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         show_help();
         return EXIT_FAILURE;
+    }
+
+    bool preserve_env = strcmp(argv[1], "--preserve-env") == 0;
+    int command = 1;
+    if (preserve_env) {
+        if (argc < 4 || strcmp(argv[2], "--") != 0)
+            fatal_msg("usage: nd-run --preserve-env -- command [args...]");
+        command = 3;
     }
 
     uid_t euid = geteuid();
@@ -197,7 +252,7 @@ int main(int argc, char *argv[]) {
         clear_caps();
     #endif
 
-    build_environment(pw);
+    char **new_environ = build_environment(pw, preserve_env);
 
     // Replace the environment wholesale. From here on we must not call
     // setenv()/putenv()/unsetenv(): libc may try to realloc() or free() an
@@ -211,7 +266,7 @@ int main(int argc, char *argv[]) {
     reset_signal_dispositions();
 
     // Exec the requested command (replaces the current process on success)
-    execvp(argv[1], &argv[1]);
+    execvp(argv[command], &argv[command]);
 
     // Only reached on error. Use the exit codes every exec wrapper uses, so
     // that callers can tell an exec failure apart from the command exiting 1.
