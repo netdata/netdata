@@ -546,7 +546,8 @@ struct query_weights_data {
     struct workload_stats total_workload; // Overall workload statistics for progress tracking
 };
 
-// Thread-local data for parallel processing
+#ifdef ENABLE_DBENGINE
+// Thread-local data for parallel processing (the parallel path runs on the engine's worker pool)
 struct query_weights_thread_data {
     struct query_weights_data *main_qwd;
     DICTIONARY *local_results;
@@ -554,10 +555,11 @@ struct query_weights_thread_data {
     size_t local_examined_dimensions;
     struct query_versions local_versions;
     RRDHOST **hosts;
-    struct completion completion;
+    struct rrdeng_work_request work;    // runs query_weights_worker_thread(this) on the engine's pool
     size_t host_count;
     size_t thread_id;
 };
+#endif
 
 static inline struct query_weights_data *query_weights_status_qwd(struct query_weights_data *qwd) {
     return qwd->shared_qwd ? qwd->shared_qwd : qwd;
@@ -578,9 +580,12 @@ static inline void query_weights_set_interrupted(struct query_weights_data *qwd)
     __atomic_store_n(&query_weights_status_qwd(qwd)->interrupted, true, __ATOMIC_RELAXED);
 }
 
+#ifdef ENABLE_DBENGINE
 // Worker thread function for parallel host processing
-void query_weights_worker_thread(void *arg)
+static void query_weights_worker_thread(void *arg)
 {
+    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
+
     struct query_weights_thread_data *thread_data = (struct query_weights_thread_data *)arg;
     struct query_weights_data *main_qwd = thread_data->main_qwd;
 
@@ -688,6 +693,7 @@ void query_weights_worker_thread(void *arg)
 
     onewayalloc_destroy(local_qwd.query_owa);
 }
+#endif
 
 // Thread-safe statistics merging - use simple addition since we're in single-threaded merge
 static void merge_weights_stats(WEIGHTS_STATS *dest, const WEIGHTS_STATS *src) {
@@ -2579,15 +2585,17 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         thread_data[i].host_count = hosts_per_thread + (i < remaining_hosts ? 1 : 0);
         current_host_idx += thread_data[i].host_count;
 
-        completion_init(&thread_data[i].completion);
-        rrdeng_enq_cmd(NULL, RRDENG_OPCODE_PARALLEL_WEIGHT, &thread_data[i], &thread_data[i].completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        thread_data[i].work.fn = query_weights_worker_thread;
+        thread_data[i].work.data = &thread_data[i];
+        completion_init(&thread_data[i].work.completion);
+        rrdeng_enq_work(&thread_data[i].work);
     }
 
     // Wait for all threads to complete
     ssize_t total_added = 0;
     for (size_t i = 0; i < num_threads; i++) {
-        completion_wait_for(&thread_data[i].completion);
-        completion_destroy(&thread_data[i].completion);
+        completion_wait_for(&thread_data[i].work.completion);
+        completion_destroy(&thread_data[i].work.completion);
 
         // Merge results from this thread
         merge_results_dictionaries(qwd->results, thread_data[i].local_results);

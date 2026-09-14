@@ -240,6 +240,16 @@ struct rrdeng_gorilla_stats {
 };
 struct rrdeng_gorilla_stats rrdeng_get_gorilla_stats(void);
 
+// work the embedder wants run on the engine's worker pool, next to the engine's own jobs. The caller owns the
+// request and its completion (init before, destroy after); the engine runs fn(data) on a worker and marks the
+// completion when it returns. fn is responsible for its own worker_is_busy() attribution.
+struct rrdeng_work_request {
+    void (*fn)(void *data);
+    void *data;
+    struct completion completion;
+};
+void rrdeng_enq_work(struct rrdeng_work_request *req);
+
 struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void);
 const char *rrdeng_mem_name(RRDENG_MEM idx);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

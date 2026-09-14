@@ -8,7 +8,6 @@
 
 // the daemon headers below are written to be included after the daemon's common header
 #include "daemon/common.h"
-#include "web/api/queries/weights.h"
 #include "database/sqlite/sqlite_metadata.h"
 
 typedef int rrdengine_daemon_check_is_not_an_empty_translation_unit;
