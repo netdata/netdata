@@ -20,9 +20,6 @@
 #include "daemon/daemon-service.h"                // service_register()                                -> hooks
 
 // telemetry the engine pushes into daemon/pulse                                                      -> published stats
-void pulse_aral_register(ARAL *ar, const char *name);                           // daemon/pulse/pulse-aral.h
-void pulse_aral_register_statistics(struct aral_statistics *stats, const char *name);
-void pulse_aral_unregister_statistics(struct aral_statistics *stats);
 void pulse_gorilla_hot_buffer_added(void);                                      // daemon/pulse/pulse-gorilla.h
 void pulse_gorilla_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t original);
 

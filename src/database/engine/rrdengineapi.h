@@ -231,6 +231,7 @@ struct rrdeng_buffer_sizes {
 };
 
 struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void);
+const char *rrdeng_mem_name(RRDENG_MEM idx);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);

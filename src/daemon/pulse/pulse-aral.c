@@ -65,6 +65,16 @@ void pulse_aral_init(void) {
     pulse_aral_register_statistics(aral_by_size_statistics(), "by-size");
     pulse_aral_register_statistics(judy_aral_statistics(), "judy");
     pulse_aral_register_statistics(uuidmap_aral_statistics(), "uuidmap");
+
+#ifdef ENABLE_DBENGINE
+    // the engine publishes its ARAL statistics; register them here instead of the engine calling into pulse.
+    // rrdeng_pulse_memory_sizes() dereferences the engine's ARALs, so only when the engine is up.
+    if(dbengine_enabled) {
+        struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
+        for(size_t i = 0; i < RRDENG_MEM_MAX; i++)
+            pulse_aral_register_statistics(dbmem.as[i], rrdeng_mem_name(i));
+    }
+#endif
 }
 
 void pulse_aral_do(bool extended) {

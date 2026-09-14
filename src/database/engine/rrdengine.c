@@ -181,7 +181,6 @@ static void work_request_init(void) {
         NULL, NULL, false, false, true
     );
 
-    pulse_aral_register(rrdeng_main.work_cmd.ar, "workers");
 }
 
 enum LIBUV_WORKERS_STATUS {
@@ -321,7 +320,6 @@ void page_descriptors_init(void) {
             NULL,
             NULL, NULL, false, false, true);
 
-    pulse_aral_register(rrdeng_main.descriptors.ar, "descriptors");
 }
 
 struct page_descr_with_data *page_descriptor_get(void) {
@@ -348,7 +346,6 @@ static void extent_io_descriptor_init(void) {
             NULL, NULL, false, false, true
             );
 
-    pulse_aral_register(rrdeng_main.xt_io_descr.ar, "extent io");
 }
 
 static struct extent_io_descriptor *extent_io_descriptor_get(void) {
@@ -373,7 +370,6 @@ void rrdeng_query_handle_init(void) {
             NULL,
             NULL, NULL, false, false, true);
 
-    pulse_aral_register(rrdeng_main.handles.ar, "query handles");
 }
 
 ALWAYS_INLINE struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
@@ -493,7 +489,6 @@ static void rrdeng_cmd_queue_init(void) {
                                            NULL,
                                            NULL, NULL, false, false, true);
 
-    pulse_aral_register(rrdeng_main.cmd_queue.ar, "opcodes");
 }
 
 static inline STORAGE_PRIORITY rrdeng_enq_cmd_map_opcode_to_priority(enum rrdeng_opcode opcode, STORAGE_PRIORITY priority) {
@@ -2296,6 +2291,27 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
     __atomic_store_n(&ctx->atomic.migration_to_v2_running, false, __ATOMIC_RELAXED);
 
     check_and_schedule_db_rotation(ctx);
+}
+
+// the name each RRDENG_MEM slot is charted under; the daemon's pulse reads these together with the
+// statistics below instead of the engine registering them one by one
+const char *rrdeng_mem_name(RRDENG_MEM idx) {
+    static const char *const names[RRDENG_MEM_MAX] = {
+        [RRDENG_MEM_PGC]            = "pgc",
+        [RRDENG_MEM_PGD]            = "pgd",
+        [RRDENG_MEM_MRG]            = "mrg",
+        [RRDENG_MEM_OPCODES]        = "opcodes",
+        [RRDENG_MEM_HANDLES]        = "query handles",
+        [RRDENG_MEM_DESCRIPTORS]    = "descriptors",
+        [RRDENG_MEM_WORKERS]        = "workers",
+        [RRDENG_MEM_PDC]            = "pdc",
+        [RRDENG_MEM_XT_IO]          = "extent io",
+        [RRDENG_MEM_EPDL]           = "epdl",
+        [RRDENG_MEM_DEOL]           = "deol",
+        [RRDENG_MEM_PD]             = "pd",
+        [RRDENG_MEM_EPDL_EXTENT]    = "epdl_extent",
+    };
+    return idx < RRDENG_MEM_MAX ? names[idx] : NULL;
 }
 
 struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void) {
