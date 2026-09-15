@@ -2583,6 +2583,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.retention_timer);
         if (ret) {
             netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
+            uv_close((uv_handle_t *)&rrdeng_main.timer, NULL);
             uv_close((uv_handle_t *)&rrdeng_main.async, NULL);
             fatal_assert(0 == uv_loop_close(&rrdeng_main.loop));
             goto fail;

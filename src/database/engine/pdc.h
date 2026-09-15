@@ -3,7 +3,7 @@
 #ifndef DBENGINE_PDC_H
 #define DBENGINE_PDC_H
 
-#include "../engine/rrdengine.h"
+#include "rrdengine.h"
 
 struct rrdeng_cmd;
 

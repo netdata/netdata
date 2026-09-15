@@ -10,14 +10,7 @@
 #define RRDENG_MIN_DISK_SPACE_MB (25)
 #define RRDENG_DEFAULT_TIER_DISK_SPACE_MB (1024)
 
-#define RRDENG_FD_BUDGET_PER_INSTANCE (50)
-
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
-extern size_t page_type_size[];
-extern size_t tier_page_size[];
-
-#define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
-
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
@@ -54,6 +47,14 @@ int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);
 void rrdeng_flush_all(struct rrdengine_instance *ctx);
+
+// after rrdeng_exit(): close the tier's datafiles (the embedder's final teardown)
+void finalize_rrd_files(struct rrdengine_instance *ctx);
+
+// what the embedder reads about the tiers
+size_t rrdeng_active_tiers(void);
+uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
+uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 
 bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
 bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);

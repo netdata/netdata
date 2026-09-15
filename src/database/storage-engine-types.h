@@ -2,7 +2,8 @@
 
 // The plain types shared by the storage-engine vtable and the engines that implement it.
 // This header depends on libnetdata only, so an engine can include it without seeing the
-// rest of the daemon; everything that needs RRDHOST/RRDSET/RRDDIM stays in storage-engine.h.
+// rest of the daemon; RRDDIM is only forward-declared here for the vtable, and everything that
+// needs the RRDHOST/RRDSET/RRDDIM definitions stays in storage-engine.h.
 
 #ifndef NETDATA_STORAGE_ENGINE_TYPES_H
 #define NETDATA_STORAGE_ENGINE_TYPES_H

@@ -32,6 +32,12 @@
 
 // the process-wide configuration, copied once by dbengine_init() and read-only afterwards
 extern struct dbengine_config dbengine_cfg;
+
+#define RRDENG_FD_BUDGET_PER_INSTANCE (50)
+
+extern size_t page_type_size[];
+extern size_t tier_page_size[];
+#define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
 bool dbengine_initialized(void);
 
 #include "rrddiskprotocol.h"
@@ -492,7 +498,6 @@ static inline bool rrdeng_ctx_is_mrg_populated(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.mrg_populated, __ATOMIC_ACQUIRE);
 }
 
-size_t rrdeng_active_tiers(void);
 
 #define ctx_current_disk_space_get(ctx) __atomic_load_n(&(ctx)->atomic.current_disk_space, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_increase(ctx, size) __atomic_add_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
@@ -636,7 +641,6 @@ static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, uns
 
 bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
-void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
 void dbengine_event_loop(void *arg);
 
@@ -728,8 +732,6 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
-uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 void dbengine_shutdown(void);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
