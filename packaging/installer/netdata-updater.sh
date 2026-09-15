@@ -1025,7 +1025,7 @@ update_available() {
 }
 
 set_tarball_urls() {
-  filename="netdata-latest.tar.gz"
+  filename="netdata-latest.tar"
 
   if [ "$2" = "yes" ]; then
     if [ -e /opt/netdata/etc/netdata/.install-type ]; then
@@ -1038,18 +1038,26 @@ set_tarball_urls() {
     fi
   fi
 
+  export archive_base_name="${filename}"
+
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
     export NETDATA_TARBALL_URL="file://${path}/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
-  elif [ "$1" = "stable" ]; then
-    latest="$(get_latest_tag)"
-    export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
   else
-    tag="$(get_latest_tag)"
-    export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/sha256sums.txt"
+    case "${1}" in
+      stable)
+        latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
+        export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/${filename}"
+        export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/sha256sums.txt"
+        ;;
+      nightly)
+        latest="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
+        export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/${filename}"
+        export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/sha256sums.txt"
+        ;;
+      *) fatal "Unknown release channel ${RELEASE_CHANNEL}, unable to update" U0029 ;;
+    esac
   fi
 }
 
@@ -1060,21 +1068,7 @@ update_build() {
   create_exec_tmp_directory
   cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
 
-  archive_base_name="netdata-latest.tar"
-
-  case "${RELEASE_CHANNEL}" in
-    stable)
-      latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
-      NETDATA_TARBALL_BASE_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/${archive_base_name}"
-      NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/sha256sums.txt"
-      ;;
-    nightly)
-      latest="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
-      NETDATA_TARBALL_BASE_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/${archive_base_name}"
-      NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/sha256sums.txt"
-      ;;
-    *) fatal "Unknown release channel ${RELEASE_CHANNEL}, unable to update" U0029 ;;
-  esac
+  set_tarball_urls "${RELEASE_CHANNEL}"
 
   zstd="$(command -v zstd 2>/dev/null || true)"
 
@@ -1086,7 +1080,7 @@ update_build() {
     archive_name=""
 
     if [ -n "${zstd}" ]; then
-      if _safe_download "${NETDATA_TARBALL_BASE_URL}.zst" "${ndtmpdir}/${archive_base_name}.zst"; then
+      if _safe_download "${NETDATA_TARBALL_URL}.zst" "${ndtmpdir}/${archive_base_name}.zst"; then
         archive_name="${archive_base_name}.zst"
         decompress="${zstd} -dc"
       else
@@ -1095,7 +1089,7 @@ update_build() {
     fi
 
     if [ -z "${archive_name}" ]; then
-      if download "${NETDATA_TARBALL_BASE_URL}.gz" "${ndtmpdir}/${archive_base_name}.gz"; then
+      if download "${NETDATA_TARBALL_URL}.gz" "${ndtmpdir}/${archive_base_name}.gz"; then
         archive_name="${archive_base_name}.gz"
         decompress="$(command -v gzip 2>/dev/null) -dc"
       fi
