@@ -942,11 +942,11 @@ parse_version() {
 
 get_latest_tag() {
   if [ -z "${_latest_tag}" ]; then
-    if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-        _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
-    else
-        _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
-    fi
+    case "${RELEASE_CHANNEL}" in
+      stable) _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")" ;;
+      nightly) _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")" ;;
+      *) fatal "Unknown release channel ${RELEASE_CHANNEL}, unable to update" U0029 ;;
+    esac
   fi
 
   echo "${_latest_tag}"
@@ -1045,14 +1045,13 @@ set_tarball_urls() {
     export NETDATA_TARBALL_URL="file://${path}/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
   else
+    latest="$(get_latest_tag)"
     case "${1}" in
       stable)
-        latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
         export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/${filename}"
         export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/sha256sums.txt"
         ;;
       nightly)
-        latest="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
         export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/${filename}"
         export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/sha256sums.txt"
         ;;
@@ -1067,8 +1066,6 @@ update_build() {
   RUN_INSTALLER=0
   create_exec_tmp_directory
   cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
-
-  set_tarball_urls "${RELEASE_CHANNEL}"
 
   zstd="$(command -v zstd 2>/dev/null || true)"
 
@@ -1482,7 +1479,7 @@ update_binpkg() {
 
 # Simple function to encapsulate original updater behavior.
 update_legacy() {
-  set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+  set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
   case "${IS_NETDATA_STATIC_BINARY}" in
     yes) update_static && exit 0 ;;
     *) update_build && exit 0 ;;
@@ -1625,12 +1622,12 @@ dev_null_fix
 case "${INSTALL_TYPE}" in
     *-build)
       validate_environment_file
-      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+      set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
       update_build && exit 0
       ;;
     *-static*)
       validate_environment_file
-      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+      set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
     *binpkg*) update_binpkg && exit 0 ;;
