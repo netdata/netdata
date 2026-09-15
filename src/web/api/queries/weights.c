@@ -697,6 +697,7 @@ static void query_weights_worker_thread(void *arg)
 }
 #endif
 
+#ifdef ENABLE_DBENGINE
 // Thread-safe statistics merging - use simple addition since we're in single-threaded merge
 static void merge_weights_stats(WEIGHTS_STATS *dest, const WEIGHTS_STATS *src) {
     dest->db_queries += src->db_queries;
@@ -713,6 +714,7 @@ static void merge_weights_stats(WEIGHTS_STATS *dest, const WEIGHTS_STATS *src) {
         dest->db_points_per_tier[tier] += src->db_points_per_tier[tier];
     }
 }
+#endif
 
 #define AGGREGATED_WEIGHT_EMPTY (struct aggregated_weight) {        \
     .min = NAN,                                                     \

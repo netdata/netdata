@@ -349,6 +349,9 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 
     if(uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback)) {
         internal_fatal(true, "DBENGINE: cannot queue work");
+        // whoever waits on this must not wait forever
+        if(completion)
+            completion_mark_complete(completion);
         work_done(work_request);
         return false;
     }
