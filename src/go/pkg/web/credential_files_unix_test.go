@@ -24,24 +24,31 @@ import (
 
 // Use the actual helper to verify that scoped public constructors share one
 // child across CA/cert/key reads and release it on both success and failure.
-func TestCScopedTLSConstruction(t *testing.T) {
+func scopedHelperFixture(t *testing.T) (dir, pidLog string) {
+	t.Helper()
 	helper := os.Getenv("NETDATA_TEST_ND_RUN")
 	if helper == "" {
 		t.Skip("set NETDATA_TEST_ND_RUN to a prebuilt nd-run to test scoped TLS lifecycle")
 	}
 	helper, err := filepath.Abs(helper)
 	require.NoError(t, err)
-	dir, err := os.MkdirTemp("/tmp", "netdata-scoped-tls-test-")
+	dir, err = os.MkdirTemp("/tmp", "netdata-scoped-tls-test-")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, os.RemoveAll(dir)) })
 	require.NoError(t, os.Chmod(dir, 0755))
-	pidLog := filepath.Join(dir, "children")
+	pidLog = filepath.Join(dir, "children")
 	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
 	script := "#!/bin/sh\nprintf '%s\\n' \"$$\" >> " + quote(pidLog) + "\nexec " + quote(helper) + " \"$@\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "nd-run"), []byte(script), 0755))
 	oldBinDir := buildinfo.NetdataBinDir
 	buildinfo.NetdataBinDir = dir
 	t.Cleanup(func() { buildinfo.NetdataBinDir = oldBinDir })
+
+	return dir, pidLog
+}
+
+func TestCScopedTLSConstruction(t *testing.T) {
+	dir, pidLog := scopedHelperFixture(t)
 
 	server := httptest.NewTLSServer(nil)
 	defer server.Close()
@@ -61,7 +68,7 @@ func TestCScopedTLSConstruction(t *testing.T) {
 			return err
 		},
 		"http": func(cfg tlscfg.TLSConfig) error {
-			client, err := NewTransportClient(context.Background(), ClientConfig{TLSConfig: cfg})
+			client, err := NewHTTPClient(context.Background(), ClientConfig{TLSConfig: cfg})
 			if client != nil {
 				client.CloseIdleConnections()
 			}
@@ -97,5 +104,50 @@ func TestCScopedTLSConstruction(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// Public request helpers launch only for configured files and retire each
+// operation's child. Rotation, permission changes and deletion stay visible.
+func TestCImplicitBearerReads(t *testing.T) {
+	dir, pidLog := scopedHelperFixture(t)
+	client, err := NewHTTPClient(context.Background(), ClientConfig{})
+	require.NoError(t, err)
+	defer client.CloseIdleConnections()
+	_, err = NewHTTPRequest(context.Background(), RequestConfig{URL: "http://localhost"})
+	require.NoError(t, err)
+	_, err = os.Stat(pidLog)
+	require.ErrorIs(t, err, os.ErrNotExist, "no-file operations must not start a helper")
+
+	path := filepath.Join(dir, "token")
+	cfg := RequestConfig{URL: "http://localhost", BearerTokenFile: path}
+	for _, token := range []string{"synthetic-first", "synthetic-replaced"} {
+		require.NoError(t, os.WriteFile(path+".new", []byte(token), 0644))
+		require.NoError(t, os.Rename(path+".new", path))
+		req, err := NewHTTPRequest(context.Background(), cfg)
+		require.NoError(t, err)
+		require.Equal(t, "Bearer "+token, req.Header.Get("Authorization"))
+	}
+	require.NoError(t, os.Chmod(path, 0000))
+	_, err = NewHTTPRequest(context.Background(), cfg)
+	require.ErrorIs(t, err, os.ErrPermission)
+	require.NoError(t, os.Remove(path))
+	_, err = NewHTTPRequestWithPath(context.Background(), cfg, "metrics")
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	logged, err := os.ReadFile(pidLog)
+	require.NoError(t, err)
+	pids := strings.Fields(string(logged))
+	require.Len(t, pids, 4, "each file operation must use a fresh helper")
+	for _, text := range pids {
+		pid, err := strconv.Atoi(text)
+		require.NoError(t, err)
+		require.Eventually(
+			t,
+			func() bool { return syscall.Kill(pid, 0) == syscall.ESRCH },
+			5*time.Second,
+			10*time.Millisecond,
+			"request helper must be closed and reaped",
+		)
 	}
 }

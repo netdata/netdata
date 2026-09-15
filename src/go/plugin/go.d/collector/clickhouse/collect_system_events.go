@@ -3,10 +3,11 @@
 package clickhouse
 
 import (
+	"context"
 	"errors"
 	"strconv"
 
-	"context"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const querySystemEvents = `
@@ -18,7 +19,7 @@ FROM
 `
 
 func (c *Collector) collectSystemEvents(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

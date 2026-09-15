@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -67,7 +68,7 @@ type Collector struct {
 	addGlobalChartsOnce          *sync.Once
 	addServerAutopilotChartsOnce *sync.Once
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	prom       prometheus.Prometheus
 
 	cfg               *consulConfig

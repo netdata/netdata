@@ -6,16 +6,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"context"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 func TestNew(t *testing.T) {
-	_, err := New(context.Background(), web.ClientConfig{}, web.RequestConfig{}, nil)
+	_, err := New(context.Background(), web.ClientConfig{}, web.RequestConfig{})
 	assert.NoError(t, err)
 }
 
@@ -116,8 +116,7 @@ func prepareSrvClient(ctx context.Context, t *testing.T) (*httptest.Server, *Cli
 		URL:      srv.URL,
 		Username: testUser,
 		Password: testPassword,
-	}, nil,
-	)
+	})
 	assert.NoError(t, err)
 	return srv, client
 }

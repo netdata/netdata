@@ -3,12 +3,11 @@
 package dockerhub
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"path"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -22,12 +21,12 @@ type repository struct {
 	LastUpdated string `json:"last_updated"`
 }
 
-func newAPIClient(client *web.HTTPClient, request web.RequestConfig) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
 	return &apiClient{httpClient: client, request: request}
 }
 
 type apiClient struct {
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	request    web.RequestConfig
 }
 
@@ -56,5 +55,5 @@ func (a apiClient) createRequest(ctx context.Context, urlPath string) (*http.Req
 	u.Path = path.Join(u.Path, urlPath)
 	req.URL = u.String()
 
-	return a.httpClient.NewRequest(ctx, req)
+	return web.NewHTTPRequest(ctx, req)
 }

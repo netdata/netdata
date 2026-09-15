@@ -1,9 +1,8 @@
 package geth
 
 import (
-	"errors"
-
 	"context"
+	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -17,7 +16,7 @@ func (c *Collector) validateConfig() error {
 }
 
 func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}

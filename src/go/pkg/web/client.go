@@ -12,16 +12,11 @@ import (
 )
 
 type Client struct {
-	httpClient HTTPDoer
+	httpClient *http.Client
 	onNokCode  func(resp *http.Response) (bool, error)
 }
 
-// HTTPDoer is implemented by both HTTPClient and the standard http.Client.
-type HTTPDoer interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
-func DoHTTP(cl HTTPDoer) *Client {
+func DoHTTP(cl *http.Client) *Client {
 	return &Client{
 		httpClient: cl,
 	}

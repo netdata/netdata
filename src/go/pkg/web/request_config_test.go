@@ -93,7 +93,7 @@ func TestRequest_Copy(t *testing.T) {
 	}
 }
 
-func TestHTTPClientNewRequest(t *testing.T) {
+func TestNewHTTPRequest(t *testing.T) {
 	// Create a temporary file for bearer token test
 	tmpDir := t.TempDir()
 	bearerTokenFile := filepath.Join(tmpDir, "token")
@@ -263,7 +263,7 @@ func TestHTTPClientNewRequest(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			httpReq, err := WrapHTTPClient(&http.Client{}, credentialfiletest.New(t)).NewRequest(context.Background(), test.req)
+			httpReq, err := newHTTPRequest(context.Background(), test.req, credentialfiletest.New(t).Read)
 
 			if test.wantErr {
 				assert.Error(t, err)
@@ -315,10 +315,10 @@ func TestBearerTokenFileBounds(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			req, err := WrapHTTPClient(&http.Client{}, credentialfiletest.New(t)).NewRequest(context.Background(), RequestConfig{
+			req, err := newHTTPRequest(context.Background(), RequestConfig{
 				URL:             "http://example.com",
 				BearerTokenFile: tc.prepare(t),
-			})
+			}, credentialfiletest.New(t).Read)
 
 			if len(tc.wantErrs) > 0 {
 				require.Error(t, err)
@@ -338,10 +338,10 @@ func TestBearerTokenFileOutsideK8sSuppression(t *testing.T) {
 		t.Skip("suppression applies only outside Kubernetes")
 	}
 
-	req, err := WrapHTTPClient(&http.Client{}, credentialfiletest.New(t)).NewRequest(context.Background(), RequestConfig{
+	req, err := newHTTPRequest(context.Background(), RequestConfig{
 		URL:             "http://example.com",
 		BearerTokenFile: "/var/run/secrets/netdata-test-missing-token",
-	})
+	}, credentialfiletest.New(t).Read)
 
 	require.NoError(t, err)
 	require.Empty(t, req.Header.Get("Authorization"))
@@ -388,7 +388,7 @@ func TestOptionalK8sTokenFileError(t *testing.T) {
 	}
 }
 
-func TestHTTPClientNewRequestWithPath(t *testing.T) {
+func TestNewHTTPRequestWithPath(t *testing.T) {
 	tests := map[string]struct {
 		config  RequestConfig
 		path    string
@@ -453,7 +453,7 @@ func TestHTTPClientNewRequestWithPath(t *testing.T) {
 			// Store original headers count
 			originalHeadersCount := len(test.config.Headers)
 
-			req, err := WrapHTTPClient(&http.Client{}, credentialfiletest.New(t)).NewRequestWithPath(context.Background(), test.config, test.path)
+			req, err := newHTTPRequestWithPath(context.Background(), test.config, test.path, credentialfiletest.New(t).Read)
 
 			if test.wantErr {
 				assert.Error(t, err)

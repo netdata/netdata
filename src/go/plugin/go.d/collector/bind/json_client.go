@@ -3,9 +3,9 @@
 package bind
 
 import (
-	"fmt"
-
 	"context"
+	"fmt"
+	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -30,17 +30,17 @@ type jsonViewResolver struct {
 	CacheStats map[string]int64
 }
 
-func newJSONClient(client *web.HTTPClient, request web.RequestConfig) *jsonClient {
+func newJSONClient(client *http.Client, request web.RequestConfig) *jsonClient {
 	return &jsonClient{httpClient: client, request: request}
 }
 
 type jsonClient struct {
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	request    web.RequestConfig
 }
 
 func (c jsonClient) serverStats(ctx context.Context) (*serverStats, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.request, "/server")
+	req, err := web.NewHTTPRequestWithPath(ctx, c.request, "/server")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}

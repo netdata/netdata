@@ -38,7 +38,7 @@ type (
 	}
 
 	prometheus struct {
-		client *web.HTTPClient
+		client *http.Client
 		src    fetcher
 
 		parser promTextParser
@@ -48,12 +48,12 @@ type (
 )
 
 // New creates a Prometheus instance.
-func New(client *web.HTTPClient, request web.RequestConfig) Prometheus {
+func New(client *http.Client, request web.RequestConfig) Prometheus {
 	return NewWithSelector(client, request, nil)
 }
 
 // NewWithSelector creates a Prometheus instance with the selector.
-func NewWithSelector(client *web.HTTPClient, request web.RequestConfig, sr selector.Selector) Prometheus {
+func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector.Selector) Prometheus {
 	p := &prometheus{
 		client: client,
 		buf:    bytes.NewBuffer(make([]byte, 0, 16000)),
@@ -70,10 +70,7 @@ func NewWithSelector(client *web.HTTPClient, request web.RequestConfig, sr selec
 }
 
 func (p *prometheus) HTTPClient() *http.Client {
-	if p.client == nil {
-		return nil
-	}
-	return p.client.Client
+	return p.client
 }
 
 // ScrapeSeries scrapes metrics, parses and sorts

@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -53,7 +54,7 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	nodeType string
 }
@@ -67,7 +68,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return errors.New("URL is required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP client: %v", err)
 	}

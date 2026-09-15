@@ -11,13 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
 type localReader struct{}
 
-func New(t testing.TB) credentialfile.FileReader {
+func New(t testing.TB) *localReader {
 	t.Helper()
 	r := &localReader{}
 	t.Cleanup(func() { _ = r.Close() })

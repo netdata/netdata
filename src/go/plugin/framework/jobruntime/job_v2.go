@@ -272,7 +272,7 @@ func (j *JobV2) cleanup(emit bool) {
 	snapshots := j.captureScopeCleanupSnapshots()
 	j.unregisterRuntimeComponent()
 	if j.module != nil {
-		collectorapi.CleanupCollector(context.Background(), j.module)
+		j.module.Cleanup(context.Background())
 	}
 	if !emit || !collectorapi.ShouldObsoleteCharts() {
 		return

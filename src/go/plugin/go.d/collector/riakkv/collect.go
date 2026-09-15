@@ -3,10 +3,9 @@
 package riakkv
 
 import (
+	"context"
 	"errors"
 	"net/http"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -30,7 +29,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) getStats(ctx context.Context) (*riakStats, error) {
-	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, err
 	}

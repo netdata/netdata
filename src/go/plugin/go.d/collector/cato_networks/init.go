@@ -3,10 +3,9 @@
 package cato_networks
 
 import (
+	"context"
 	"fmt"
 	"strings"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -32,7 +31,7 @@ func (c *Collector) initClient(ctx context.Context) error {
 		return nil
 	}
 
-	httpClient, err := web.NewTransportClient(ctx, c.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %w", err)
 	}

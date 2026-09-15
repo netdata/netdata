@@ -14,7 +14,6 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
@@ -43,45 +42,16 @@ type ClientConfig struct {
 	ForceHTTP2 bool `yaml:"force_http2,omitempty" json:"force_http2"`
 }
 
-// HTTPClient builds requests using a borrowed credential reader and sends them
-// through the embedded standard client. The reader's owner must close it after
-// all users finish; CloseIdleConnections only closes idle HTTP connections.
-type HTTPClient struct {
-	*http.Client
-	files credentialfile.RegularReader
-}
-
-// WrapHTTPClient binds a reader to an existing client, preserving its transport,
-// cookie jar and redirect policy. A nil reader rejects configured file reads.
-func WrapHTTPClient(client *http.Client, files credentialfile.RegularReader) *HTTPClient {
-	return &HTTPClient{Client: client, files: files}
-}
-
-// NewHTTPClient configures an HTTP client and binds its borrowed credential reader.
-func NewHTTPClient(ctx context.Context, cfg ClientConfig, files credentialfile.RegularReader) (*HTTPClient, error) {
-	client, err := newHTTPClient(ctx, cfg, files)
-	if err != nil {
-		return nil, err
-	}
-	return WrapHTTPClient(client, files), nil
-}
-
-// NewTransportClient configures a standard client for consumers that build their
-// own requests. Its scoped reader is closed after loading the TLS configuration.
-func NewTransportClient(ctx context.Context, cfg ClientConfig) (*http.Client, error) {
-	files := credentialfile.New()
-	defer files.Close()
-	return newHTTPClient(ctx, cfg, files)
-}
-
-func newHTTPClient(ctx context.Context, cfg ClientConfig, files credentialfile.RegularReader) (*http.Client, error) {
+// NewHTTPClient returns a configured standard client. TLS credential reads are
+// scoped to construction and require no caller-owned file reader.
+func NewHTTPClient(ctx context.Context, cfg ClientConfig) (*http.Client, error) {
 	var transport http.RoundTripper
 	var err error
 
 	if cfg.ForceHTTP2 {
-		transport, err = newHTTP2Transport(ctx, cfg, files)
+		transport, err = newHTTP2Transport(ctx, cfg)
 	} else {
-		transport, err = newHTTPTransport(ctx, cfg, files)
+		transport, err = newHTTPTransport(ctx, cfg)
 	}
 	if err != nil {
 		return nil, err
@@ -96,11 +66,8 @@ func newHTTPClient(ctx context.Context, cfg ClientConfig, files credentialfile.R
 	return client, nil
 }
 
-func newHTTPTransport(ctx context.Context,
-	cfg ClientConfig,
-	files credentialfile.RegularReader,
-) (*http.Transport, error) {
-	tlsConfig, err := tlscfg.NewTLSConfigWithReader(ctx, cfg.TLSConfig, files)
+func newHTTPTransport(ctx context.Context, cfg ClientConfig) (*http.Transport, error) {
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}
@@ -123,11 +90,8 @@ func newHTTPTransport(ctx context.Context,
 	return transport, nil
 }
 
-func newHTTP2Transport(ctx context.Context,
-	cfg ClientConfig,
-	files credentialfile.RegularReader,
-) (*http2Transport, error) {
-	tlsConfig, err := tlscfg.NewTLSConfigWithReader(ctx, cfg.TLSConfig, files)
+func newHTTP2Transport(ctx context.Context, cfg ClientConfig) (*http2Transport, error) {
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}

@@ -253,7 +253,7 @@ func hasExplicitPort(host string) bool {
 func newPangoTransport(ctx context.Context,
 	cfg web.ClientConfig,
 ) (*http.Transport, error) {
-	client, err := web.NewTransportClient(ctx, cfg)
+	client, err := web.NewHTTPClient(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

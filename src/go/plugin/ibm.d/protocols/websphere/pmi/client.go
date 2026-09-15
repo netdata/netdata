@@ -43,7 +43,7 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		cfg.HTTPConfig.ClientConfig.Timeout = confopt.Duration(5 * time.Second)
 	}
 
-	httpClient, err := web.NewTransportClient(ctx, cfg.HTTPConfig.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("pmi protocol: creating http client failed: %w", err)
 	}

@@ -301,7 +301,7 @@ func (f *funcTopQueries) buildQueryRequest(ctx context.Context, statement string
 	}
 	reqCfg.Headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-	req, err := f.router.collector.httpClient.NewRequest(ctx, reqCfg)
+	req, err := web.NewHTTPRequest(ctx, reqCfg)
 	if err != nil {
 		return nil, err
 	}

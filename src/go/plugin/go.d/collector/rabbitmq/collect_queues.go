@@ -3,16 +3,16 @@
 package rabbitmq
 
 import (
+	"context"
 	"fmt"
 
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collectQueues(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIQueues)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIQueues)
 	if err != nil {
 		return fmt.Errorf("failed to create queues stats request: %w", err)
 	}

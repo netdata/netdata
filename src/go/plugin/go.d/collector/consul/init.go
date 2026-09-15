@@ -3,10 +3,10 @@
 package consul
 
 import (
-	"errors"
-	"net/url"
-
 	"context"
+	"errors"
+	"net/http"
+	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -19,14 +19,14 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initHTTPClient(ctx context.Context) (*web.HTTPClient, error) {
-	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+	return web.NewHTTPClient(ctx, c.ClientConfig)
 }
 
 const urlPathAgentMetrics = "/v1/agent/metrics"
 
-func (c *Collector) initPrometheusClient(ctx context.Context, httpClient *web.HTTPClient) (prometheus.Prometheus, error) {
-	r, err := httpClient.NewRequest(ctx, c.RequestConfig.Copy())
+func (c *Collector) initPrometheusClient(ctx context.Context, httpClient *http.Client) (prometheus.Prometheus, error) {
+	r, err := web.NewHTTPRequest(ctx, c.RequestConfig.Copy())
 	if err != nil {
 		return nil, err
 	}

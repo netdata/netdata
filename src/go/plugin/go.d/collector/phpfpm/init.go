@@ -3,11 +3,10 @@
 package phpfpm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -27,7 +26,7 @@ func (c *Collector) initClient(ctx context.Context) (client, error) {
 }
 
 func (c *Collector) initHTTPClient(ctx context.Context) (*httpClient, error) {
-	cli, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	cli, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %v", err)
 	}

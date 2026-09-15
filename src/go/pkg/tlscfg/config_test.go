@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewTLSConfigWithReader(t *testing.T) {
+func TestTLSConfig(t *testing.T) {
 	certPEM, keyPEM := newTestKeyPair(t)
 	tooLarge := make([]byte, safefile.MaxSize+1)
 	caAtLimit := padToLimit(t, certPEM)
@@ -104,7 +104,7 @@ func TestNewTLSConfigWithReader(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg, err := NewTLSConfigWithReader(context.Background(), tc.config(t), credentialfiletest.New(t))
+			cfg, err := newTLSConfig(context.Background(), tc.config(t), credentialfiletest.New(t))
 
 			if len(tc.wantErrs) > 0 {
 				require.Error(t, err)

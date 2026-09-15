@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfiletest"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
@@ -185,7 +184,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			client, err := NewHTTPClient(context.Background(), test.config, credentialfiletest.New(t))
+			client, err := NewHTTPClient(context.Background(), test.config)
 
 			if test.wantErr {
 				assert.Error(t, err)
@@ -200,7 +199,7 @@ func TestNewHTTPClient(t *testing.T) {
 			require.NotNil(t, client)
 
 			if test.validate != nil {
-				test.validate(t, client.Client, test.config)
+				test.validate(t, client, test.config)
 			}
 		})
 	}
@@ -215,7 +214,7 @@ func TestHTTP2Transport_RoundTrip(t *testing.T) {
 		},
 	}
 
-	client, err := NewHTTPClient(context.Background(), cfg, credentialfiletest.New(t))
+	client, err := NewHTTPClient(context.Background(), cfg)
 	require.NoError(t, err)
 
 	// Verify the transport is http2Transport
@@ -358,8 +357,7 @@ func TestClientIntegration(t *testing.T) {
 	t.Run("follow redirects", func(t *testing.T) {
 		client, err := NewHTTPClient(context.Background(), ClientConfig{
 			NotFollowRedirect: false,
-		}, credentialfiletest.New(t),
-		)
+		})
 		require.NoError(t, err)
 
 		resp, err := client.Get(server.URL + "/redirect")
@@ -372,8 +370,7 @@ func TestClientIntegration(t *testing.T) {
 	t.Run("not follow redirects", func(t *testing.T) {
 		client, err := NewHTTPClient(context.Background(), ClientConfig{
 			NotFollowRedirect: true,
-		}, credentialfiletest.New(t),
-		)
+		})
 		require.NoError(t, err)
 
 		_, err = client.Get(server.URL + "/redirect")
@@ -389,8 +386,7 @@ func TestClientIntegration(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
 		client, err := NewHTTPClient(context.Background(), ClientConfig{
 			Timeout: confopt.Duration(time.Millisecond * 500),
-		}, credentialfiletest.New(t),
-		)
+		})
 		require.NoError(t, err)
 
 		_, err = client.Get(server.URL + "/timeout")
@@ -409,8 +405,7 @@ func TestTransportWithDifferentSchemes(t *testing.T) {
 		TLSConfig: tlscfg.TLSConfig{
 			InsecureSkipVerify: true,
 		},
-	}, credentialfiletest.New(t),
-	)
+	})
 	require.NoError(t, err)
 
 	// HTTP server

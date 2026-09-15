@@ -3,13 +3,12 @@
 package maxscale
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 	"unicode"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -37,7 +36,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) collectMaxScaleGlobal(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathMaxscale)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathMaxscale)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}
@@ -58,7 +57,7 @@ func (c *Collector) collectMaxScaleGlobal(ctx context.Context, mx map[string]int
 }
 
 func (c *Collector) collectMaxScaleThreads(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathMaxscaleThreads)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathMaxscaleThreads)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}
@@ -94,7 +93,7 @@ func (c *Collector) collectMaxScaleThreads(ctx context.Context, mx map[string]in
 }
 
 func (c *Collector) collectServers(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathServers)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServers)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}

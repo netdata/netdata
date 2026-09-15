@@ -3,9 +3,8 @@
 package ipfs
 
 import (
-	"fmt"
-
 	"context"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -124,7 +123,7 @@ func (c *Collector) collectPinLs(ctx context.Context, mx map[string]int64) error
 }
 
 func (c *Collector) queryStatsBandwidth(ctx context.Context) (*ipfsStatsBw, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatsBandwidth)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatsBandwidth)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +141,7 @@ func (c *Collector) queryStatsBandwidth(ctx context.Context) (*ipfsStatsBw, erro
 }
 
 func (c *Collector) querySwarmPeers(ctx context.Context) (*ipfsSwarmPeers, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathSwarmPeers)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathSwarmPeers)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +155,7 @@ func (c *Collector) querySwarmPeers(ctx context.Context) (*ipfsSwarmPeers, error
 }
 
 func (c *Collector) queryStatsRepo(ctx context.Context) (*ipfsStatsRepo, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatsRepo)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatsRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +169,7 @@ func (c *Collector) queryStatsRepo(ctx context.Context) (*ipfsStatsRepo, error) 
 }
 
 func (c *Collector) queryPinLs(ctx context.Context) (*ipfsPinsLs, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathPinLs)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathPinLs)
 	if err != nil {
 		return nil, err
 	}

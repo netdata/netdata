@@ -3,10 +3,10 @@
 package activemq
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
-
-	"context"
+	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -43,7 +43,7 @@ type stats struct {
 
 const pathStats = "/%s/xml/%s.jsp"
 
-func newAPIClient(client *web.HTTPClient, request web.RequestConfig, webadmin string) *apiClient {
+func newAPIClient(client *http.Client, request web.RequestConfig, webadmin string) *apiClient {
 	return &apiClient{
 		httpClient: client,
 		request:    request,
@@ -52,13 +52,13 @@ func newAPIClient(client *web.HTTPClient, request web.RequestConfig, webadmin st
 }
 
 type apiClient struct {
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	request    web.RequestConfig
 	webadmin   string
 }
 
 func (a *apiClient) getQueues(ctx context.Context) (*queues, error) {
-	req, err := a.httpClient.NewRequestWithPath(ctx, a.request, fmt.Sprintf(pathStats, a.webadmin, keyQueues))
+	req, err := web.NewHTTPRequestWithPath(ctx, a.request, fmt.Sprintf(pathStats, a.webadmin, keyQueues))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request '%s': %v", a.request.URL, err)
 	}
@@ -73,7 +73,7 @@ func (a *apiClient) getQueues(ctx context.Context) (*queues, error) {
 }
 
 func (a *apiClient) getTopics(ctx context.Context) (*topics, error) {
-	req, err := a.httpClient.NewRequestWithPath(ctx, a.request, fmt.Sprintf(pathStats, a.webadmin, keyTopics))
+	req, err := web.NewHTTPRequestWithPath(ctx, a.request, fmt.Sprintf(pathStats, a.webadmin, keyTopics))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request '%s': %v", a.request.URL, err)
 	}

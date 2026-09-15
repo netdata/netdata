@@ -3,11 +3,10 @@
 package pihole
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -17,7 +16,7 @@ func (c *Collector) checkAuthSession(ctx context.Context) error {
 		return nil
 	}
 
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIAuth)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIAuth)
 	if err != nil {
 		return err
 	}
@@ -53,7 +52,7 @@ func (c *Collector) getAuthSession(ctx context.Context) (*ftlAPIAuthResponse, er
 	cfg.Method = http.MethodPost
 	cfg.Body = string(bs)
 
-	req, err := c.httpClient.NewRequestWithPath(ctx, cfg, urlPathAPIAuth)
+	req, err := web.NewHTTPRequestWithPath(ctx, cfg, urlPathAPIAuth)
 	if err != nil {
 		return nil, err
 	}

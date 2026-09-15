@@ -5,9 +5,8 @@ package bind
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/web"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
@@ -26,7 +25,7 @@ func (c *Collector) initPermitViewMatcher() (matcher.Matcher, error) {
 	return matcher.NewSimplePatternsMatcher(c.PermitView)
 }
 
-func (c *Collector) initBindApiClient(httpClient *web.HTTPClient) (bindAPIClient, error) {
+func (c *Collector) initBindApiClient(httpClient *http.Client) (bindAPIClient, error) {
 	switch {
 	case strings.HasSuffix(c.URL, "/xml/v3"): // BIND 9.9+
 		return newXML3Client(httpClient, c.RequestConfig), nil

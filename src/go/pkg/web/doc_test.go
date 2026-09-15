@@ -4,8 +4,6 @@ package web
 
 import (
 	"context"
-
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 )
 
 func ExampleHTTPConfig_usage() {
@@ -16,12 +14,10 @@ func ExampleHTTPConfig_usage() {
 	}
 
 	var m myModule
-	files := credentialfile.New()
-	defer files.Close()
-	client, err := NewHTTPClient(context.Background(), m.ClientConfig, files)
+	client, err := NewHTTPClient(context.Background(), m.ClientConfig)
 	if err != nil {
 		return
 	}
 	defer client.CloseIdleConnections()
-	_, _ = client.NewRequest(context.Background(), m.RequestConfig)
+	_, _ = NewHTTPRequest(context.Background(), m.RequestConfig)
 }

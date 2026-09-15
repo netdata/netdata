@@ -106,7 +106,7 @@ func TestNewDiscoverer(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			d, err := newLocalDiscoverer(t, tc.cfg)
+			d, err := NewDiscoverer(tc.cfg)
 
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -136,7 +136,7 @@ func TestDiscoverer_fetchTargetGroup(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{
 				URL:      srv.URL,
@@ -178,7 +178,7 @@ func TestDiscoverer_NotFollowRedirects(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 			ClientConfig:  web.ClientConfig{NotFollowRedirect: true},
@@ -193,8 +193,9 @@ func TestDiscoverer_NotFollowRedirects(t *testing.T) {
 }
 
 func TestDiscoverer_BearerTokenFileReread(t *testing.T) {
-	tokenFile := t.TempDir() + "/token"
-	require.NoError(t, os.WriteFile(tokenFile, []byte("token-1"), 0o600))
+	useCredentialHelper(t)
+	tokenFile := credentialTestDir(t) + "/token"
+	require.NoError(t, os.WriteFile(tokenFile, []byte("token-1"), 0o644))
 
 	var mu sync.Mutex
 	var auths []string
@@ -208,7 +209,7 @@ func TestDiscoverer_BearerTokenFileReread(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{
 				URL:             srv.URL,
@@ -220,7 +221,7 @@ func TestDiscoverer_BearerTokenFileReread(t *testing.T) {
 
 	_, err = d.fetchTargetGroup(context.Background())
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(tokenFile, []byte("token-2"), 0o600))
+	require.NoError(t, os.WriteFile(tokenFile, []byte("token-2"), 0o644))
 	_, err = d.fetchTargetGroup(context.Background())
 	require.NoError(t, err)
 
@@ -242,7 +243,7 @@ func TestDiscoverer_ResponseBodyLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},
@@ -261,7 +262,7 @@ func TestDiscoverer_ErrorUsesSanitizedURL(t *testing.T) {
 	defer srv.Close()
 
 	rawURL := strings.Replace(srv.URL, "http://", "http://user:pass@", 1) + "/path?token=secret#fragment"
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: rawURL},
 		},
@@ -285,7 +286,7 @@ func TestDiscoverer_DiscoverFailureDoesNotEmit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},
@@ -310,7 +311,7 @@ func TestDiscoverer_DiscoverEmptySuccessEmitsEmptyTargetGroup(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},
@@ -345,7 +346,7 @@ func TestDiscoverer_DiscoverPollsInterval(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := newLocalDiscoverer(t, Config{
+	d, err := NewDiscoverer(Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},

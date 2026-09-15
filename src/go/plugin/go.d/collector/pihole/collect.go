@@ -3,12 +3,11 @@
 package pihole
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
 	"time"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -47,7 +46,7 @@ func (c *Collector) collectMetrics(ctx context.Context, mx map[string]int64) err
 		return errors.New("no auth session")
 	}
 
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIStatsSummary)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIStatsSummary)
 	if err != nil {
 		return err
 	}

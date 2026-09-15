@@ -4,12 +4,11 @@ package squid
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -43,7 +42,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) collectCounters(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathServerStats)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return fmt.Errorf("failed to create '%s' request: %w", urlPathServerStats, err)
 	}

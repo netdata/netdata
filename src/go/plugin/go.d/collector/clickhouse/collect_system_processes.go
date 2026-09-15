@@ -3,9 +3,10 @@
 package clickhouse
 
 import (
+	"context"
 	"strconv"
 
-	"context"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const queryLongestQueryTime = `
@@ -16,7 +17,7 @@ FROM
 `
 
 func (c *Collector) collectLongestRunningQueryTime(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

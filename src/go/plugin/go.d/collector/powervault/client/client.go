@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/json"
@@ -12,19 +13,12 @@ import (
 	"path"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 // New creates a new PowerVault MCI REST API client.
-func New(ctx context.Context,
-	client web.ClientConfig, request web.RequestConfig, digest string,
-	files credentialfile.RegularReader,
-) (*Client, error) {
-	httpClient, err := web.NewHTTPClient(ctx, client, files)
+func New(ctx context.Context, client web.ClientConfig, request web.RequestConfig, digest string) (*Client, error) {
+	httpClient, err := web.NewHTTPClient(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +33,7 @@ func New(ctx context.Context,
 // Client represents a Dell PowerVault MCI API client.
 type Client struct {
 	request    web.RequestConfig
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	digest     string // "sha256" or "md5"
 
 	mu         sync.Mutex // protects sessionKey reads/writes
@@ -283,7 +277,7 @@ func (c *Client) newSessionRequest(urlPath string) web.RequestConfig {
 }
 
 func (c *Client) doOK(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := c.httpClient.NewRequest(ctx, req)
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request to %s: %v", req.URL, err)
 	}

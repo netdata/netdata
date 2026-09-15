@@ -105,7 +105,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return errors.New("config: username and password aren't set")
 	}
 
-	cli, err := client.New(ctx, c.ClientConfig, c.RequestConfig, c.CredentialFiles())
+	cli, err := client.New(ctx, c.ClientConfig, c.RequestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating PowerStore client: %v", err)
 	}

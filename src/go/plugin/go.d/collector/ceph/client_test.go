@@ -342,7 +342,7 @@ func TestCephClientLogicalOperationUsesSingleDeadline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client, err := newCephClient(credentialfiletest.New(t), &http.Client{
+	client, err := newLocalCephClient(t, &http.Client{
 		Timeout: 100 * time.Millisecond,
 	}, web.RequestConfig{
 		URL:      srv.URL,
@@ -382,7 +382,7 @@ func TestCephClientIdentityFallbackUsesSingleDeadline(t *testing.T) {
 			return delayedHTTPResponse(req, requestDelay, status, body)
 		}),
 	}
-	client, err := newCephClient(credentialfiletest.New(t), httpClient, web.RequestConfig{
+	client, err := newLocalCephClient(t, httpClient, web.RequestConfig{
 		URL: "https://ceph.example",
 	}, false, nil)
 	require.NoError(t, err)
@@ -419,7 +419,7 @@ func TestCephClientIdentityGenerationRetryUsesSingleDeadline(t *testing.T) {
 		}),
 	}
 	var err error
-	client, err = newCephClient(credentialfiletest.New(t), httpClient, web.RequestConfig{
+	client, err = newLocalCephClient(t, httpClient, web.RequestConfig{
 		URL: "https://ceph.example",
 	}, false, nil)
 	require.NoError(t, err)
@@ -459,7 +459,7 @@ func TestCephClientOSDFallbackUsesSingleDeadline(t *testing.T) {
 			return delayedHTTPResponse(req, requestDelay, status, body)
 		}),
 	}
-	client, err := newCephClient(credentialfiletest.New(t), httpClient, web.RequestConfig{
+	client, err := newLocalCephClient(t, httpClient, web.RequestConfig{
 		URL: "https://ceph.example",
 	}, false, nil)
 	require.NoError(t, err)
@@ -494,7 +494,7 @@ func TestCephClientDiscoveryWaitHonorsContext(t *testing.T) {
 			}, nil
 		}),
 	}
-	client, err := newCephClient(credentialfiletest.New(t), httpClient, web.RequestConfig{
+	client, err := newLocalCephClient(t, httpClient, web.RequestConfig{
 		URL: "https://ceph.example",
 	}, false, nil)
 	require.NoError(t, err)
@@ -548,7 +548,7 @@ func TestCephClientLoginWaitHonorsContext(t *testing.T) {
 			}, nil
 		}),
 	}
-	client, err := newCephClient(credentialfiletest.New(t), httpClient, web.RequestConfig{
+	client, err := newLocalCephClient(t, httpClient, web.RequestConfig{
 		URL:      "https://ceph.example",
 		Username: "netdata",
 		Password: "test-password",
@@ -975,7 +975,7 @@ func TestCephClientRejectsManagedAuthenticationHeaders(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := newCephClient(credentialfiletest.New(t), &http.Client{}, web.RequestConfig{
+			_, err := newLocalCephClient(t, &http.Client{}, web.RequestConfig{
 				URL:     "https://ceph.example",
 				Headers: map[string]string{test.header: "secret"},
 			}, false, nil)
@@ -998,7 +998,7 @@ func TestCephClientPreservesEscapedPathSegments(t *testing.T) {
 			}, nil
 		}),
 	}
-	client, err := newCephClient(credentialfiletest.New(t), httpClient, web.RequestConfig{
+	client, err := newLocalCephClient(t, httpClient, web.RequestConfig{
 		URL: "https://ceph.example/dashboard",
 	}, false, nil)
 	require.NoError(t, err)
@@ -1032,7 +1032,7 @@ func newTestCephClient(
 	if configure != nil {
 		configure(&cfg)
 	}
-	client, err := newCephClient(credentialfiletest.New(t), &http.Client{}, cfg, notFollowRedirects, allowedRedirectOrigins)
+	client, err := newLocalCephClient(t, &http.Client{}, cfg, notFollowRedirects, allowedRedirectOrigins)
 	require.NoError(t, err)
 	return client
 }
@@ -1070,24 +1070,28 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return fn(req) }
 
-type tokenFileReaderFunc func(context.Context, string) ([]byte, error)
-
-func (f tokenFileReaderFunc) Read(ctx context.Context, path string) ([]byte, error) {
-	return f(ctx, path)
-}
-
 func TestCephClientBearerReadUsesOperationContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	files := tokenFileReaderFunc(func(got context.Context, path string) ([]byte, error) {
+	readFile := func(got context.Context, path string) ([]byte, error) {
 		assert.Equal(t, ctx, got)
 		assert.Equal(t, "token", path)
 		return nil, got.Err()
-	})
-	client, err := newCephClient(files, &http.Client{}, web.RequestConfig{
+	}
+	client, err := newCephClient(&http.Client{}, web.RequestConfig{
 		URL: "https://ceph.example", BearerTokenFile: "token",
 	}, false, nil)
 	require.NoError(t, err)
+	client.readFile = readFile
 	_, _, err = client.tokenForRequest(ctx, requireURL(t, "https://ceph.example"))
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func newLocalCephClient(t *testing.T, httpClient *http.Client, cfg web.RequestConfig, notFollowRedirects bool, origins []string) (*cephClient, error) {
+	t.Helper()
+	c, err := newCephClient(httpClient, cfg, notFollowRedirects, origins)
+	if c != nil {
+		c.readFile = credentialfiletest.New(t).Read
+	}
+	return c, err
 }

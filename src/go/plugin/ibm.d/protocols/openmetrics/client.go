@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
@@ -34,19 +32,19 @@ type Config struct {
 // Client fetches and parses OpenMetrics data from a single endpoint.
 type Client struct {
 	cfg        Config
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	request    web.RequestConfig
 
 	acceptHeader string
 }
 
 // NewClient constructs a client with a freshly created HTTP transport.
-func NewClient(ctx context.Context, cfg Config, files credentialfile.RegularReader) (*Client, error) {
+func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	if time.Duration(cfg.HTTPConfig.ClientConfig.Timeout) <= 0 {
 		cfg.HTTPConfig.ClientConfig.Timeout = confopt.Duration(10 * time.Second)
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig, files)
+	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: creating http client failed: %w", err)
 	}
@@ -54,8 +52,8 @@ func NewClient(ctx context.Context, cfg Config, files credentialfile.RegularRead
 	return NewClientWithHTTP(cfg, httpClient)
 }
 
-// NewClientWithHTTP constructs a client using the provided *web.HTTPClient instance (useful for tests).
-func NewClientWithHTTP(cfg Config, httpClient *web.HTTPClient) (*Client, error) {
+// NewClientWithHTTP constructs a client using the provided *http.Client instance (useful for tests).
+func NewClientWithHTTP(cfg Config, httpClient *http.Client) (*Client, error) {
 	if httpClient == nil {
 		return nil, errors.New("openmetrics protocol: http client is required")
 	}
@@ -90,7 +88,7 @@ func (c *Client) FetchSeries(ctx context.Context, sr selector.Selector) (prometh
 }
 
 func (c *Client) fetch(ctx context.Context) ([]byte, error) {
-	req, err := c.httpClient.NewRequest(ctx, c.request)
+	req, err := web.NewHTTPRequest(ctx, c.request)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: building request failed: %w", err)
 	}

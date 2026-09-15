@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -12,10 +13,6 @@ import (
 	"path"
 	"strconv"
 	"sync"
-
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -27,11 +24,8 @@ const (
 )
 
 // New creates a new PowerStore REST API client.
-func New(ctx context.Context,
-	client web.ClientConfig, request web.RequestConfig,
-	files credentialfile.RegularReader,
-) (*Client, error) {
-	httpClient, err := web.NewHTTPClient(ctx, client, files)
+func New(ctx context.Context, client web.ClientConfig, request web.RequestConfig) (*Client, error) {
+	httpClient, err := web.NewHTTPClient(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +46,7 @@ func New(ctx context.Context,
 // Client represents a Dell PowerStore REST API client.
 type Client struct {
 	Request    web.RequestConfig
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	csrf       *csrfToken
 }
 
@@ -238,7 +232,7 @@ func (c *Client) createPostRequest(urlPath string, body any) (web.RequestConfig,
 }
 
 func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := c.httpClient.NewRequest(ctx, req)
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error creating http request to %s: %v", req.URL, err)
 	}

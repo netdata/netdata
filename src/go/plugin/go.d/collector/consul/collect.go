@@ -3,11 +3,10 @@
 package consul
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -78,7 +77,7 @@ func (c *Collector) client(statusCodes ...int) *web.Client {
 }
 
 func (c *Collector) createRequest(ctx context.Context, urlPath string) (*http.Request, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPath)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create '%s' request: %w", urlPath, err)
 	}
