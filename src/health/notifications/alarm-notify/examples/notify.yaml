@@ -94,6 +94,9 @@ destinations:
     type: pagerduty
     api_version: 2
     integration_key: ${env:NOTIFY_PAGERDUTY_INTEGRATION_KEY}
+  opsgenie:
+    type: opsgenie
+    api_key: ${env:NOTIFY_OPSGENIE_API_KEY}
 routing:
   default: [local]
   roles:
@@ -114,3 +117,4 @@ routing:
     form_ops: [prowl, kavenegar]
     appliance_ops: [smseagle]
     pagerduty_ops: [pagerduty]
+    opsgenie_ops: [opsgenie]
