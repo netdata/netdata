@@ -863,6 +863,8 @@ routing:
 `api_url` is required and receives an appended `/alert`; include any API path prefix in the base. `api_key` is
 optional for servers without authentication; when set it uses `Authorization: Key ...`. Both fields accept whole
 environment/file references, resolved only for selected destinations. Keys must be printable ASCII without whitespace.
+Alerta's documented public demo API hosts (`api.alerta.io`, `api.alerta.dev`, `alerta-api.fly.dev`) require HTTPS.
+Custom and local servers may use HTTP. This check also applies after resolving an API URL reference.
 `environment` is a required literal. Alerta commonly allows `Production` and `Development`; custom environments
 must be permitted by the server's configuration. Use separate named destinations for multiple environments.
 

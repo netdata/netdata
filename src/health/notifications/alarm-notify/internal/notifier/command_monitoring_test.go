@@ -368,3 +368,49 @@ func TestRunDynatracePropertyLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestRunAlertaPublicAPIHTTPS(t *testing.T) {
+	for host := range map[string]struct{}{
+		"api.alerta.io": {}, "api.alerta.dev": {}, "alerta-api.fly.dev": {},
+	} {
+		for mode := range map[string]struct{}{"env": {}, "file": {}} {
+			t.Run(host+"/"+mode, func(t *testing.T) {
+				endpoint := " http://" + strings.ToUpper(host) + ".:80/api/\n"
+				t.Setenv("ALERTA_TEST_PUBLIC_API", endpoint)
+				reference := "${env:ALERTA_TEST_PUBLIC_API}"
+				if mode == "file" {
+					path := filepath.Join(t.TempDir(), "api-url")
+					require.NoError(t, os.WriteFile(path, []byte(endpoint), 0600))
+					reference = "${file:" + path + "}"
+				}
+				// A missing key also prevents a live request if URL validation regresses.
+				missingKey := "${file:" + filepath.Join(t.TempDir(), "missing-key") + "}"
+				config, err := yaml.Marshal(Config{Version: 1, Destinations: map[string]Destination{
+					"alerta": {Type: "alerta", APIURL: reference, APIKey: missingKey, Environment: "Production"},
+				}})
+				require.NoError(t, err)
+				path := writeConfig(t, string(config))
+				var stdout, stderr bytes.Buffer
+				require.Equal(
+					t,
+					0,
+					Run(context.Background(), []string{"validate", "--config", path}, nil, &stdout, &stderr),
+				)
+				stdout.Reset()
+				stderr.Reset()
+				code := Run(
+					context.Background(),
+					[]string{"send", "--config", path, "--destination", "alerta"},
+					strings.NewReader(validEvent),
+					&stdout,
+					&stderr,
+				)
+				assert.Equal(t, 1, code)
+				assert.Empty(t, stdout.String())
+				assert.Contains(t, stderr.String(), "requires HTTPS")
+				assert.NotContains(t, stderr.String(), "could not read secret file")
+				assert.NotContains(t, stderr.String(), host)
+			})
+		}
+	}
+}

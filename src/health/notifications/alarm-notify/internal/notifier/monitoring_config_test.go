@@ -140,6 +140,33 @@ func checkMonitoringConfig(t *testing.T, dst Destination, wantError string) {
 	assert.Equal(t, want, got)
 }
 
+func TestAlertaPublicAPIHTTPS(t *testing.T) {
+	for host := range map[string]struct{}{
+		"api.alerta.io": {}, "api.alerta.dev": {}, "alerta-api.fly.dev": {},
+	} {
+		for name, test := range map[string]struct{ endpoint, err string }{
+			"HTTP":             {"http://" + host, "requires HTTPS"},
+			"normalized HTTP":  {"http://" + strings.ToUpper(host) + ".:80/api/", "requires HTTPS"},
+			"HTTPS":            {"https://" + host + "/api/", ""},
+			"normalized HTTPS": {"https://" + strings.ToUpper(host) + ".:443/api/", ""},
+			"custom suffix":    {"http://" + host + ".example.com/api/", ""},
+		} {
+			t.Run(host+"/"+name, func(t *testing.T) {
+				checkMonitoringConfig(
+					t,
+					Destination{
+						Type:        "alerta",
+						APIURL:      test.endpoint,
+						APIKey:      "synthetic-key",
+						Environment: "Production",
+					},
+					test.err,
+				)
+			})
+		}
+	}
+}
+
 func TestMonitoringFieldIsolation(t *testing.T) {
 	fields := map[string]any{
 		"url": "https://example.com", "api_url": "https://example.com", "integration_key": "synthetic-key",

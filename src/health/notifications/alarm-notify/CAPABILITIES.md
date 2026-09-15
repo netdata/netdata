@@ -94,7 +94,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first thirteen increments cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
+The first thirteen implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
 Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta and Dynatrace.
 Related providers may share small PRs.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.

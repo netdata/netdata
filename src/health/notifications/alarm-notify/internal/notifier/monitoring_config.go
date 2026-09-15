@@ -67,7 +67,17 @@ func validateMonitoringField(provider, name, value string) error {
 		if value == "" {
 			return fmt.Errorf("%s api_url is required", provider)
 		}
-		return validateAPIBase(value, provider, "")
+		hosts := []string{""}
+		if provider == "alerta" {
+			// Public demo endpoints listed in Alerta's documentation; custom servers may use HTTP.
+			hosts = []string{"api.alerta.io", "api.alerta.dev", "alerta-api.fly.dev"}
+		}
+		for _, host := range hosts {
+			if err := validateAPIBase(value, provider, host); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	if provider == "alerta" && value == "" {
 		return nil // Alerta permits deployments without authentication.
