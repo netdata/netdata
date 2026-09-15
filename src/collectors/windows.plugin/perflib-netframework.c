@@ -250,8 +250,8 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRExceptionTotalCatchDepth.key = "Throw To Catch Depth / sec";
 
     p->NETFrameworkCLRInteropCOMCallableWrappers.key = "# of CCWs";
-    p->NETFrameworkCLRInteropMarshalling.key = "# of Stubs";
-    p->NETFrameworkCLRInteropStubsCreated.key = "# of marshalling";
+    p->NETFrameworkCLRInteropMarshalling.key = "# of marshalling";
+    p->NETFrameworkCLRInteropStubsCreated.key = "# of Stubs";
 
     p->NETFrameworkCLRJITMethods.key = "# of Methods Jitted";
     p->NETFrameworkCLRJITPercentTime.key = "% Time in Jit";
@@ -270,7 +270,7 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRLoadingClassLoadFailure.key = "Total # of Load Failures";
 
     p->NETFrameworkCLRMemoryAllocatedBytesPerSec.key = "Allocated Bytes/sec";
-    p->NETFrameworkCLRMemoryProcessId.key = "ID Process";
+    p->NETFrameworkCLRMemoryProcessId.key = "Process ID";
     p->NETFrameworkCLRMemoryFinalizationSurvivors.key = "Finalization Survivors";
     p->NETFrameworkCLRMemoryGen0HeapSize.key = "Gen 0 heap size";
     p->NETFrameworkCLRMemoryGen0PromotedBytesPerSec.key = "Gen 0 Promoted Bytes/Sec";
