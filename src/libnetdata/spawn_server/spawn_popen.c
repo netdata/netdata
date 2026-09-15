@@ -203,13 +203,18 @@ SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms,
     return SPAWN_TIMEDWAIT_EXITED;
 }
 
-int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {
+int spawn_popen_kill_ex(POPEN_INSTANCE *pi, int timeout_ms, SPAWN_KILL_OUTCOME *outcome) {
+    if(outcome) *outcome = SPAWN_KILL_UNKNOWN;
     if(!pi) return -1;
 
     spawn_popen_close_files(pi);
-    int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->si, timeout_ms);
+    int status = spawn_server_exec_kill_ex(netdata_main_spawn_server, pi->si, timeout_ms, outcome);
     freez(pi);
     return spawn_popen_status_rc(status);
+}
+
+int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {
+    return spawn_popen_kill_ex(pi, timeout_ms, NULL);
 }
 
 pid_t spawn_popen_pid(POPEN_INSTANCE *pi) {

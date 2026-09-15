@@ -352,7 +352,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     return item.instance;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms) {
+int spawn_server_exec_kill_ex(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms, SPAWN_KILL_OUTCOME *outcome) {
+    if(outcome) *outcome = SPAWN_KILL_UNKNOWN;
     if(!si) return -1;
 
     // close all pipe descriptors to force the child to exit
@@ -360,6 +361,15 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
     if (uv_process_kill(&si->process, SIGTERM)) {
+        // Most often the child is already gone (ESRCH) and the exit callback simply has not been
+        // delivered yet, so try a bounded wait before declaring its state unknown - an unnecessary
+        // UNKNOWN costs a caller far more than this wait does.
+        int status;
+        if(spawn_server_exec_timedwait(server, si, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED) {
+            if(outcome) *outcome = SPAWN_KILL_EXITED;
+            return status;
+        }
+
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_process_kill() failed");
         return -1;
     }
@@ -369,14 +379,23 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
     int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
     int status;
+    bool escalated = false;
     if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED) {
+        escalated = true;
         if(uv_process_kill(&si->process, SIGKILL))
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_process_kill(SIGKILL) failed");
     }
-    else
+    else {
+        if(outcome) *outcome = SPAWN_KILL_EXITED;
         return status;
+    }
 
-    return spawn_server_exec_wait(server, si);
+    {
+        // the wait is unbounded, so reaching its return confirms the child is gone
+        int rc = spawn_server_exec_wait(server, si);
+        if(outcome) *outcome = escalated ? SPAWN_KILL_FORCED_EXITED : SPAWN_KILL_EXITED;
+        return rc;
+    }
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms, int *status) {
