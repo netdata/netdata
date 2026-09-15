@@ -2,13 +2,18 @@
 """Compile and exercise the real nd-run helper with synthetic environments only."""
 
 import argparse
+from contextlib import contextmanager
+import errno
 import json
 import os
 from pathlib import Path
 import pwd
+import select
 import shlex
+import shutil
 import signal
 import subprocess
+import struct
 import sys
 import tempfile
 import unittest
@@ -27,6 +32,8 @@ def compile_binary(source, output, config):
     command = [OPTIONS.cc, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-g",
                *shlex.split(OPTIONS.cflags), "-I", str(config),
                "-I", str(ROOT / "src/collectors/utils"), str(source), "-o", str(output)]
+    if source.name == "nd-run.c":
+        command.append(str(ROOT / "src/collectors/utils/nd-file-reader.c"))
     if OPTIONS.capabilities:
         command.append("-lcap")
     print(shlex.join(command), file=sys.stderr)
@@ -128,7 +135,7 @@ class NdRunTests(unittest.TestCase):
                 result = self.invoke([*prefix, target, "argv", *arguments], env={"PATH": str(BUILD)})
                 self.success(result)
                 self.assertTrue(result.stdout == expected, "argument boundaries changed")
-        # Only argv[1] == --preserve-env is special; other leading dashes remain commands.
+        # Outside the named helper modes, leading dashes remain command names.
         for name in ("--", "--unknown"):
             (BUILD / name).symlink_to(PROBE)
             self.success(self.invoke([name, "argv"], env={"PATH": str(BUILD)}))
@@ -212,6 +219,218 @@ class NdRunTests(unittest.TestCase):
             self.check_identity(result, OPTIONS.user, True)
 
 
+class FileReaderTests(unittest.TestCase):
+    @contextmanager
+    def worker(self, launcher=None, *, command=None, credentials=None):
+        command = command or [str(HELPER), "--read-file-server-v1"]
+        if launcher:
+            command = [str(PROBE), launcher, *command]
+        child = subprocess.Popen(command, env={}, cwd=BUILD, stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0,
+                                 **(credentials or {}))
+        try:
+            hello = self.read_exact(child, 16)
+            self.assertEqual(hello[:8], b"NDFILE01")
+            self.path_max, self.chunk_max = struct.unpack("!II", hello[8:])
+            self.assertGreater(self.path_max, 0)
+            self.assertEqual(self.chunk_max, 32768)
+            yield child
+        finally:
+            child.stdin.close()
+            try:
+                child.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait(timeout=5)
+            child.stdout.close()
+            child.stderr.close()
+
+    def read_exact(self, child, size):
+        data = bytearray()
+        while len(data) < size:
+            ready, _, _ = select.select([child.stdout], [], [], 5)
+            self.assertTrue(ready, "reader response timed out")
+            part = os.read(child.stdout.fileno(), size - len(data))
+            self.assertTrue(part, "reader response was truncated")
+            data.extend(part)
+        return bytes(data)
+
+    def request(self, child, path, *, op=1, regular=True, limit=1 << 20):
+        path = os.fsencode(path)
+        if op == 2:
+            regular, limit = False, 0
+        packet = struct.pack("!IIQII", op, int(regular), limit, len(path), 0) + path
+        child.stdin.write(packet)
+        pieces = []
+        while True:
+            kind, length, code, number = struct.unpack("!IIII", self.read_exact(child, 16))
+            self.assertLessEqual(length, self.chunk_max)
+            payload = self.read_exact(child, length)
+            if kind == 1:
+                self.assertEqual((code, number), (0, 0))
+                pieces.append(payload)
+                continue
+            if kind == 3:
+                self.assertEqual((op, length, code, number), (2, 16, 0, 0))
+                return payload, code, number
+            self.assertEqual((kind, length), (2, 0))
+            return b"".join(pieces), code, number
+
+    def fixture(self, name, data=b"synthetic-token", mode=0o644):
+        path = BUILD / (self._testMethodName + "-" + name)
+        path.write_bytes(data)
+        path.chmod(mode)
+        return path
+
+    def test_read_rotation_symlinks_and_stat(self):
+        path = self.fixture("data", b"one\0two\n")
+        link = BUILD / "reader-token-link"
+        link.symlink_to(path)
+        with self.worker() as child:
+            data, code, number = self.request(child, link)
+            self.assertTrue(data == b"one\0two\n", "file bytes changed")
+            self.assertEqual((code, number), (0, 0))
+            replacement = self.fixture("replacement", b"rotated-token")
+            replacement.replace(path)
+            data, code, number = self.request(child, link)
+            self.assertTrue(data == b"rotated-token", "reader cached old bytes")
+            self.assertEqual((code, number), (0, 0))
+            info, code, number = self.request(child, path, op=2)
+            sec, ns = struct.unpack("!qq", info)
+            self.assertEqual(sec * 1000000000 + ns, path.stat().st_mtime_ns)
+            path.unlink()
+            self.assertEqual(self.request(child, link)[1:], (1, errno.ENOENT))
+
+    def test_regular_type_and_size_boundaries(self):
+        path = self.fixture("boundary", b"x" * (1 << 20))
+        fifo = BUILD / "reader-fifo"
+        os.mkfifo(fifo, 0o666)
+        with self.worker() as child:
+            data, code, number = self.request(child, path)
+            self.assertEqual((len(data), code, number), (1 << 20, 0, 0))
+            with path.open("ab") as file:
+                file.write(b"x")
+            self.assertEqual(self.request(child, path)[1:], (6, 0))
+            self.assertEqual(self.request(child, BUILD)[1:], (5, 0))
+            self.assertEqual(self.request(child, fifo)[1:], (5, 0))
+            self.assertEqual(self.request(child, "/dev/null")[1:], (5, 0))
+            data, code, number = self.request(child, path, regular=False, limit=0)
+            self.assertEqual((len(data), code, number), ((1 << 20) + 1, 0, 0))
+            self.assertEqual(self.request(child, "/dev/null", regular=False, limit=0), (b"", 0, 0))
+
+    def test_permission_errors_and_no_diagnostic_content(self):
+        path = self.fixture("denied", mode=0o600 if os.geteuid() == 0 else 0)
+        try:
+            with self.worker() as child:
+                data, code, number = self.request(child, path)
+                self.assertFalse(data)
+                self.assertEqual((code, number), (1, errno.EACCES))
+                self.assertEqual(self.request(child, b"")[1:], (1, errno.ENOENT))
+                child.stdin.close()
+                child.wait(timeout=5)
+                self.assertFalse(child.stderr.read(), "unexpected reader diagnostic")
+        finally:
+            path.chmod(0o600)
+
+    def test_malformed_requests_and_clean_eof(self):
+        for case in ("unknown-operation", "unknown-flags", "reserved", "nul", "long-path", "truncated"):
+            with self.subTest(case=case), self.worker() as child:
+                op, flags, length, reserved, path = 1, 1, 0, 0, b""
+                if case == "unknown-operation":
+                    op = 99
+                elif case == "unknown-flags":
+                    flags = 2
+                elif case == "reserved":
+                    reserved = 1
+                elif case == "nul":
+                    length, path = 1, b"\0"
+                elif case == "long-path":
+                    length = self.path_max
+                packet = struct.pack("!IIQII", op, flags, 1 << 20, length, reserved) + path
+                child.stdin.write(packet[:7] if case == "truncated" else packet)
+                child.stdin.close()
+                self.assertEqual(child.wait(timeout=5), 1)
+                self.assertFalse(child.stdout.read())
+                self.assertFalse(child.stderr.read())
+        with self.worker() as child:
+            child.stdin.close()
+            self.assertEqual(child.wait(timeout=5), 0)
+
+    def check_reduced_status(self, child):
+        data, code, number = self.request(child, "/proc/self/status")
+        self.assertEqual((code, number), (0, 0))
+        status = dict(line.split(b":", 1) for line in data.splitlines() if b":" in line)
+        for name in (b"CapEff", b"CapPrm", b"CapInh", b"CapAmb"):
+            self.assertEqual(int(status[name].strip(), 16), 0, name.decode())
+        account = pwd.getpwnam(OPTIONS.user)
+        self.assertEqual([int(v) for v in status[b"Uid"].split()], [account.pw_uid] * 4)
+        self.assertEqual([int(v) for v in status[b"Gid"].split()], [account.pw_gid] * 4)
+
+    def installed_parent(self, shape):
+        account = pwd.getpwnam(OPTIONS.user)
+        parent = BUILD / (self._testMethodName + "-parent")
+        shutil.copyfile(PROBE, parent)
+        parent.chmod(0o755)
+        if shape == "setuid":
+            parent.chmod(0o4755)
+        else:
+            # Linux VFS capability revision 2: effective flag, followed by the
+            # low/high permitted and inheritable words (all little-endian).
+            # Only this disposable copied probe receives CAP_DAC_OVERRIDE.
+            metadata = struct.pack("<IIIII", 0x02000001, 1 << 1, 0, 0, 0)
+            try:
+                os.setxattr(parent, "security.capability", metadata)
+            except OSError as error:
+                if error.errno in (errno.EPERM, errno.EACCES, errno.ENOTSUP, errno.EINVAL):
+                    self.skipTest("test filesystem or container does not permit synthetic file capabilities")
+                raise
+        credentials = dict(user=account.pw_uid, group=account.pw_gid,
+                           extra_groups=os.getgrouplist(account.pw_name, account.pw_gid))
+        path = self.fixture("root-only", mode=0o600)
+        # Feature detection also proves that this copied executable really gains
+        # read authority after exec from an ordinary real UID. No host files change.
+        try:
+            baseline = subprocess.run([str(parent), "read-file", str(path)], env={}, cwd=BUILD,
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5,
+                                      **credentials)
+        except PermissionError:
+            self.skipTest(f"container cannot execute the synthetic {shape} launch shape")
+        if baseline.returncode:
+            self.skipTest(f"test filesystem/container suppresses synthetic {shape} elevation")
+        self.assertTrue(baseline.stdout == b"synthetic-token", "elevated parent did not read the fixture")
+        command = [str(parent), "launch-checked-file", str(path), str(HELPER), "--read-file-server-v1"]
+        with self.worker(command=command, credentials=credentials) as child:
+            self.assertEqual(self.request(child, path), (b"", 1, errno.EACCES))
+            self.check_reduced_status(child)
+            child.stdin.close()
+            self.assertEqual(child.wait(timeout=5), 0)
+            report = dict(item.split(b"=", 1) for item in child.stderr.read().split())
+            self.assertEqual(int(report[b"parent_uid"]), account.pw_uid)
+            self.assertEqual(int(report[b"parent_euid"]), 0 if shape == "setuid" else account.pw_uid)
+            self.assertEqual(report[b"parent_readable"], b"1")
+            self.assertTrue(int(report[b"parent_cap_eff"], 16) & (1 << 1), "parent lacked CAP_DAC_OVERRIDE")
+
+    @unittest.skipUnless(sys.platform.startswith("linux") and os.geteuid() == 0, "Linux root setuid test")
+    def test_setuid_parent_file_authority_is_removed(self):
+        self.installed_parent("setuid")
+
+    @unittest.skipUnless(sys.platform.startswith("linux") and os.geteuid() == 0, "Linux root file-capability test")
+    def test_file_capability_parent_authority_is_removed(self):
+        self.installed_parent("file-capability")
+
+    @unittest.skipUnless(sys.platform.startswith("linux") and os.geteuid() == 0, "Linux root capability test")
+    def test_ambient_file_authority_is_removed_without_libcap(self):
+        path = self.fixture("root-only", mode=0o600)
+        # Prove that the synthetic launcher conveys actual read authority.
+        baseline = subprocess.run([str(PROBE), "launch-file-caps", str(PROBE), "read-file", str(path)],
+                                  env={}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+        self.assertEqual(baseline.returncode, 0)
+        self.assertTrue(baseline.stdout == b"synthetic-token", "capability baseline did not read the fixture")
+        with self.worker("launch-file-caps") as child:
+            self.assertEqual(self.request(child, path)[1:], (1, errno.EACCES))
+            self.check_reduced_status(child)
+
+
 def main():
     global OPTIONS, BUILD, HELPER, FALLBACK, PROBE
     parser = argparse.ArgumentParser(description=__doc__)
@@ -220,6 +439,7 @@ def main():
     parser.add_argument("--user", default="nobody", help="existing unprivileged target account")
     parser.add_argument("--capabilities", action="store_true", help="build with Linux libcap")
     parser.add_argument("--no-setres", action="store_true", help="exercise setuid/setgid portability path")
+    parser.add_argument("--go-tests", action="store_true", help="run Go client tests against the compiled helper")
     parser.add_argument("--source", type=Path, default=ROOT / "src/collectors/utils/nd-run.c")
     OPTIONS, remaining = parser.parse_known_args()
     if pwd.getpwnam(OPTIONS.user).pw_uid == 0:
@@ -235,7 +455,17 @@ def main():
         compile_binary(OPTIONS.source, FALLBACK, fallback_config)
         compile_binary(ROOT / "tests/nd-run/probe.c", PROBE, config)
         program = unittest.main(argv=[sys.argv[0], *remaining], exit=False)
-        return 0 if program.result.wasSuccessful() else 1
+        if not program.result.wasSuccessful():
+            return 1
+        if OPTIONS.go_tests:
+            command = ["go", "-C", str(ROOT / "src/go"), "test", "-race", "-count=1", "./pkg/credentialfile"]
+            print(shlex.join(command), file=sys.stderr)
+            env = dict(os.environ, NETDATA_TEST_ND_RUN=str(HELPER))
+            completed = subprocess.run(command, env=env)
+            if completed.returncode:
+                print(f"Go client tests failed in {Path.cwd()} with status {completed.returncode}", file=sys.stderr)
+            return completed.returncode
+        return 0
 
 
 if __name__ == "__main__":

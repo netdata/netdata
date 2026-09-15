@@ -5,16 +5,28 @@ on:
     paths:
       - '.github/workflows/nd-run-tests.yml'
       - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
       - 'tests/nd-run/**'
+      - 'src/go/pkg/credentialfile/**'
+      - 'src/go/pkg/safefile/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+      - 'CMakeLists.txt'
   push:
     branches:
       - master
     paths:
       - '.github/workflows/nd-run-tests.yml'
       - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
       - 'tests/nd-run/**'
+      - 'src/go/pkg/credentialfile/**'
+      - 'src/go/pkg/safefile/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+      - 'CMakeLists.txt'
 permissions:
   contents: read
 concurrency:
@@ -29,8 +41,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      - name: Unprivileged environment and execution tests
-        run: python3 tests/nd-run/test_nd_run.py -v
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: src/go/go.mod
+          cache-dependency-path: src/go/go.sum
+      - name: Unprivileged environment, file reader, and execution tests
+        run: python3 tests/nd-run/test_nd_run.py --go-tests -v
       - name: Address and undefined behavior sanitizers
         if: runner.os == 'Linux'
         run: python3 tests/nd-run/test_nd_run.py --cc clang --cflags='-fsanitize=address,undefined' -v
@@ -43,5 +59,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcap-dev
           sudo useradd --system --user-group nd-run-test
+          sudo env "PATH=$PATH" python3 tests/nd-run/test_nd_run.py --user nd-run-test --go-tests -v
           sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test --capabilities -v
           sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test --capabilities --no-setres -v
