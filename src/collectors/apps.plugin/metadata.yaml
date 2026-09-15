@@ -195,6 +195,36 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: calls
+            - name: app.ebpf_process_start
+              description: Processes started
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
+            - name: app.ebpf_thread_start
+              description: Threads started
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
+            - name: app.ebpf_task_exit
+              description: Tasks started exiting
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
+            - name: app.ebpf_task_released
+              description: Tasks released
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
+            - name: app.ebpf_task_error
+              description: Process or thread creation errors
+              unit: "calls/s"
+              chart_type: stacked
+              dimensions:
+                - name: calls
             - name: app.swap_usage
               description: Apps swap usage
               unit: MiB

@@ -896,6 +896,8 @@ int main(int argc, char **argv) {
             apps_ebpf_accumulate_dcstat();
         if (apps_ebpf_fd_is_available())
             apps_ebpf_accumulate_fd();
+        if (apps_ebpf_process_is_available())
+            apps_ebpf_accumulate_process();
 #endif
 
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);
