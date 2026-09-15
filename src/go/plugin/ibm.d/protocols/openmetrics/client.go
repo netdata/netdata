@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
@@ -31,6 +33,7 @@ type Config struct {
 
 // Client fetches and parses OpenMetrics data from a single endpoint.
 type Client struct {
+	files      credentialfile.RegularReader
 	cfg        Config
 	httpClient *http.Client
 	request    web.RequestConfig
@@ -39,21 +42,21 @@ type Client struct {
 }
 
 // NewClient constructs a client with a freshly created HTTP transport.
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(ctx context.Context, cfg Config, files credentialfile.RegularReader) (*Client, error) {
 	if time.Duration(cfg.HTTPConfig.ClientConfig.Timeout) <= 0 {
 		cfg.HTTPConfig.ClientConfig.Timeout = confopt.Duration(10 * time.Second)
 	}
 
-	httpClient, err := web.NewHTTPClient(cfg.HTTPConfig.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig, files)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: creating http client failed: %w", err)
 	}
 
-	return NewClientWithHTTP(cfg, httpClient)
+	return NewClientWithHTTP(cfg, httpClient, files)
 }
 
 // NewClientWithHTTP constructs a client using the provided *http.Client instance (useful for tests).
-func NewClientWithHTTP(cfg Config, httpClient *http.Client) (*Client, error) {
+func NewClientWithHTTP(cfg Config, httpClient *http.Client, files credentialfile.RegularReader) (*Client, error) {
 	if httpClient == nil {
 		return nil, errors.New("openmetrics protocol: http client is required")
 	}
@@ -69,6 +72,7 @@ func NewClientWithHTTP(cfg Config, httpClient *http.Client) (*Client, error) {
 	}
 
 	return &Client{
+		files:        files,
 		cfg:          cfg,
 		httpClient:   httpClient,
 		request:      cfg.HTTPConfig.RequestConfig.Copy(),
@@ -88,12 +92,11 @@ func (c *Client) FetchSeries(ctx context.Context, sr selector.Selector) (prometh
 }
 
 func (c *Client) fetch(ctx context.Context) ([]byte, error) {
-	req, err := web.NewHTTPRequest(c.request)
+	req, err := web.NewHTTPRequest(ctx, c.request, c.files)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: building request failed: %w", err)
 	}
 
-	req = req.WithContext(ctx)
 	req.Header.Set("Accept", c.acceptHeader)
 	// Prefer gzip for large payloads but fall back gracefully.
 	req.Header.Set("Accept-Encoding", "gzip")

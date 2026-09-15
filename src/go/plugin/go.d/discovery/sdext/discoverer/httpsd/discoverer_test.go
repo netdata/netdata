@@ -106,7 +106,7 @@ func TestNewDiscoverer(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			d, err := NewDiscoverer(tc.cfg)
+			d, err := newLocalDiscoverer(t, tc.cfg)
 
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -136,7 +136,7 @@ func TestDiscoverer_fetchTargetGroup(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{
 				URL:      srv.URL,
@@ -178,7 +178,7 @@ func TestDiscoverer_NotFollowRedirects(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 			ClientConfig:  web.ClientConfig{NotFollowRedirect: true},
@@ -208,7 +208,7 @@ func TestDiscoverer_BearerTokenFileReread(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{
 				URL:             srv.URL,
@@ -242,7 +242,7 @@ func TestDiscoverer_ResponseBodyLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},
@@ -261,7 +261,7 @@ func TestDiscoverer_ErrorUsesSanitizedURL(t *testing.T) {
 	defer srv.Close()
 
 	rawURL := strings.Replace(srv.URL, "http://", "http://user:pass@", 1) + "/path?token=secret#fragment"
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: rawURL},
 		},
@@ -285,7 +285,7 @@ func TestDiscoverer_DiscoverFailureDoesNotEmit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},
@@ -310,7 +310,7 @@ func TestDiscoverer_DiscoverEmptySuccessEmitsEmptyTargetGroup(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},
@@ -345,7 +345,7 @@ func TestDiscoverer_DiscoverPollsInterval(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	d, err := NewDiscoverer(Config{
+	d, err := newLocalDiscoverer(t, Config{
 		HTTPConfig: web.HTTPConfig{
 			RequestConfig: web.RequestConfig{URL: srv.URL},
 		},

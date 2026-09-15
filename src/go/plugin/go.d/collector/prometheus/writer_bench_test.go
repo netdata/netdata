@@ -38,7 +38,7 @@ func BenchmarkMetricFamilyWriter(b *testing.B) {
 	}))
 	defer srv.Close()
 
-	mfs, err := prompkg.New(srv.Client(), web.RequestConfig{URL: srv.URL}).Scrape()
+	mfs, err := prompkg.New(srv.Client(), web.RequestConfig{URL: srv.URL}, nil).Scrape()
 	if err != nil {
 		b.Fatal(err)
 	}

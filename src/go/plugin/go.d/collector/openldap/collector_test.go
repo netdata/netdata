@@ -9,6 +9,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/go-ldap/ldap/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,7 +81,7 @@ func TestCollector_Cleanup(t *testing.T) {
 		"after check": {
 			prepare: func() *Collector {
 				collr := New()
-				collr.newConn = func(Config) ldapConn { return prepareMockOk() }
+				collr.newConn = func(Config, credentialfile.RegularReader) ldapConn { return prepareMockOk() }
 				_ = collr.Check(context.Background())
 				return collr
 			},
@@ -87,7 +89,7 @@ func TestCollector_Cleanup(t *testing.T) {
 		"after collect": {
 			prepare: func() *Collector {
 				collr := New()
-				collr.newConn = func(Config) ldapConn { return prepareMockOk() }
+				collr.newConn = func(Config, credentialfile.RegularReader) ldapConn { return prepareMockOk() }
 				_ = collr.Collect(context.Background())
 				return collr
 			},
@@ -130,7 +132,7 @@ func TestCollector_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
 			mock := test.prepareMock()
-			collr.newConn = func(Config) ldapConn { return mock }
+			collr.newConn = func(Config, credentialfile.RegularReader) ldapConn { return mock }
 
 			if test.wantFail {
 				assert.Error(t, collr.Check(context.Background()))
@@ -194,7 +196,7 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
 			mock := test.prepareMock()
-			collr.newConn = func(Config) ldapConn { return mock }
+			collr.newConn = func(Config, credentialfile.RegularReader) ldapConn { return mock }
 
 			mx := collr.Collect(context.Background())
 
@@ -336,7 +338,7 @@ type mockOpenLDAPConn struct {
 	errOnSearch             bool
 }
 
-func (m *mockOpenLDAPConn) connect() error {
+func (m *mockOpenLDAPConn) connect(ctx context.Context) error {
 	if m.errOnConnect {
 		return errors.New("mock.connect() error")
 	}

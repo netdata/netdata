@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/performance"
@@ -63,7 +65,7 @@ type Client struct {
 	lazyMu   sync.Mutex
 }
 
-func newSoapClient(config Config) (*soap.Client, error) {
+func newSoapClient(ctx context.Context, config Config, files credentialfile.RegularReader) (*soap.Client, error) {
 	soapURL, err := soap.ParseURL(config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parse config option url for vSphere SOAP endpoint: %w", err)
@@ -74,7 +76,7 @@ func newSoapClient(config Config) (*soap.Client, error) {
 	soapURL.User = url.UserPassword(config.User, config.Password)
 	soapClient := soap.NewClient(soapURL, config.TLSConfig.InsecureSkipVerify)
 
-	tlsConfig, err := tlscfg.NewTLSConfig(config.TLSConfig)
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig, files)
 	if err != nil {
 		return nil, fmt.Errorf("build TLS configuration from tls_* options: %w", err)
 	}
@@ -82,8 +84,8 @@ func newSoapClient(config Config) (*soap.Client, error) {
 		soapClient.SetCertificate(tlsConfig.Certificates[0])
 	}
 	if config.TLSConfig.TLSCA != "" {
-		if err := soapClient.SetRootCAs(config.TLSConfig.TLSCA); err != nil {
-			return nil, fmt.Errorf("load tls_ca certificate bundle %q for vSphere SOAP client: %w", config.TLSConfig.TLSCA, err)
+		if t, ok := soapClient.Transport.(*http.Transport); ok {
+			t.TLSClientConfig.RootCAs = tlsConfig.RootCAs
 		}
 	}
 
@@ -109,9 +111,8 @@ func newPerformanceManager(client *vim25.Client) *performance.Manager {
 	return perfManager
 }
 
-func New(config Config) (*Client, error) {
-	ctx := context.Background()
-	soapClient, err := newSoapClient(config)
+func New(ctx context.Context, config Config, files credentialfile.RegularReader) (*Client, error) {
+	soapClient, err := newSoapClient(ctx, config, files)
 	if err != nil {
 		return nil, fmt.Errorf("initialize vSphere SOAP client: %w", err)
 	}

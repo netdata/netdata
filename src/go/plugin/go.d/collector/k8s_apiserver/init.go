@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -42,8 +44,8 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}
@@ -53,10 +55,10 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 		if srParseErr != nil {
 			c.Warningf("selector parse error (collecting all metrics): %v", srParseErr)
 		}
-		return prometheus.New(httpClient, c.RequestConfig), nil
+		return prometheus.New(httpClient, c.RequestConfig, c.CredentialFiles()), nil
 	}
 
-	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr), nil
+	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr, c.CredentialFiles()), nil
 }
 
 // Selector to filter only the metrics we need, reducing memory usage

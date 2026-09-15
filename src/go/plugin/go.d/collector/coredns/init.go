@@ -5,6 +5,8 @@ package coredns
 import (
 	"errors"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -31,10 +33,10 @@ func (c *Collector) initPerZoneMatcher() (matcher.Matcher, error) {
 	return c.PerZoneStats.Parse()
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}
-	return prometheus.New(client, c.RequestConfig), nil
+	return prometheus.New(client, c.RequestConfig, c.CredentialFiles()), nil
 }

@@ -67,5 +67,5 @@ func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Pr
 		return nil, err
 	}
 
-	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr), nil
+	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr, c.CredentialFiles()), nil
 }

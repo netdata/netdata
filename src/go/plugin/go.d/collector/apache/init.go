@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -20,6 +22,6 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 }

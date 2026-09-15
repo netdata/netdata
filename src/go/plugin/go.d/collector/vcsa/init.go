@@ -5,6 +5,8 @@ package vcsa
 import (
 	"errors"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vcsa/client"
 )
@@ -19,8 +21,8 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initHealthClient() (*client.Client, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initHealthClient(ctx context.Context) (*client.Client, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}

@@ -62,16 +62,16 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string           `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	Address            string           `yaml:"address" json:"address"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Username           string           `yaml:"username,omitempty" json:"username"`
-	Password           string           `yaml:"password,omitempty" json:"password"`
+	Address            string           `yaml:"address"                       json:"address"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
+	Username           string           `yaml:"username,omitempty"            json:"username"`
+	Password           string           `yaml:"password,omitempty"            json:"password"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
-	PingSamples        int             `yaml:"ping_samples" json:"ping_samples"`
-	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
+	PingSamples        int             `yaml:"ping_samples"                  json:"ping_samples"`
+	Functions          FunctionsConfig `yaml:"functions,omitempty"           json:"functions"`
 }
 
 type FunctionsConfig struct {
@@ -79,9 +79,9 @@ type FunctionsConfig struct {
 }
 
 type TopQueriesConfig struct {
-	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Disabled bool             `yaml:"disabled"          json:"disabled"`
 	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+	Limit    int              `yaml:"limit,omitempty"   json:"limit"`
 }
 
 func (c Config) topQueriesTimeout() time.Duration {
@@ -129,13 +129,13 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	rdb, err := c.initRedisClient()
+	rdb, err := c.initRedisClient(ctx)
 	if err != nil {
 		return fmt.Errorf("init redis client: %v", err)
 	}

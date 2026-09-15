@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -30,18 +32,18 @@ var statsCounters = map[string]bool{
 	"client_http.hit_kbytes_out": true,
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectCounters(mx); err != nil {
+	if err := c.collectCounters(ctx, mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectCounters(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServerStats)
+func (c *Collector) collectCounters(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStats, c.CredentialFiles())
 	if err != nil {
 		return fmt.Errorf("failed to create '%s' request: %w", urlPathServerStats, err)
 	}

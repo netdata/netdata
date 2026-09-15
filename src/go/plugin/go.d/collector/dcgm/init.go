@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -17,13 +19,13 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, fmt.Errorf("init HTTP client: %v", err)
 	}
 
 	req := c.RequestConfig.Copy()
 
-	return prometheus.New(httpClient, req), nil
+	return prometheus.New(httpClient, req, c.CredentialFiles()), nil
 }

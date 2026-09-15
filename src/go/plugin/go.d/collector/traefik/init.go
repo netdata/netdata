@@ -5,6 +5,8 @@ package traefik
 import (
 	"errors"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -17,13 +19,13 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}
 
-	prom := prometheus.NewWithSelector(httpClient, c.RequestConfig, sr)
+	prom := prometheus.NewWithSelector(httpClient, c.RequestConfig, sr, c.CredentialFiles())
 	return prom, nil
 }
 

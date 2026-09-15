@@ -179,6 +179,14 @@ Use this checklist when the changed package is involved.
   collector contract changes require explicit approval.
 - Registration behavior MUST be covered by tests when changed.
 
+Collector-owned credential readers are exposed by `Base.CredentialFiles()`. They
+start lazily and remain valid through the collector's `Cleanup`. Runtime and
+factory cleanup paths MUST call `collectorapi.CleanupCollector(ctx, collector)`
+to close the reader afterward, including failed initialization and temporary
+configuration probes. Tests MAY transfer an explicit reader with
+`Base.SetCredentialFiles` before `Init`; production MUST NOT replace the
+unprivileged reader with local filesystem access.
+
 ### jobruntime
 
 - Lifecycle semantics MUST be explicit: `Init`, `Check`, `Collect`, `Cleanup`,

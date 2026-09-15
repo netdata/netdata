@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"path/filepath"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -17,7 +19,7 @@ type (
 	// Prometheus is a helper for scrape and parse prometheus format metrics.
 	Prometheus interface {
 		// ScrapeSeries and parse prometheus format metrics
-		ScrapeSeries() (Series, error)
+		ScrapeSeries(ctx context.Context) (Series, error)
 		// Scrape is ScrapeContext with a background context (for callers that do
 		// not thread one).
 		Scrape() (MetricFamilies, error)
@@ -48,12 +50,14 @@ type (
 )
 
 // New creates a Prometheus instance.
-func New(client *http.Client, request web.RequestConfig) Prometheus {
-	return NewWithSelector(client, request, nil)
+func New(client *http.Client, request web.RequestConfig, files credentialfile.RegularReader) Prometheus {
+	return NewWithSelector(client, request, nil, files)
 }
 
 // NewWithSelector creates a Prometheus instance with the selector.
-func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector.Selector) Prometheus {
+func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector.Selector,
+	files credentialfile.RegularReader,
+) Prometheus {
 	p := &prometheus{
 		client: client,
 		buf:    bytes.NewBuffer(make([]byte, 0, 16000)),
@@ -63,7 +67,7 @@ func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector
 	if v, err := url.Parse(request.URL); err == nil && v.Scheme == "file" {
 		p.src = &fileFetcher{path: filepath.Join(v.Host, v.Path)}
 	} else {
-		p.src = &httpFetcher{client: client, request: request}
+		p.src = &httpFetcher{client: client, request: request, files: files}
 	}
 
 	return p
@@ -74,10 +78,10 @@ func (p *prometheus) HTTPClient() *http.Client {
 }
 
 // ScrapeSeries scrapes metrics, parses and sorts
-func (p *prometheus) ScrapeSeries() (Series, error) {
+func (p *prometheus) ScrapeSeries(ctx context.Context) (Series, error) {
 	p.buf.Reset()
 
-	if err := p.src.fetch(context.Background(), p.buf); err != nil {
+	if err := p.src.fetch(ctx, p.buf); err != nil {
 		return nil, err
 	}
 

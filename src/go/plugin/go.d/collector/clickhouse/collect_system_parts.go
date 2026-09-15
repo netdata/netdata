@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -33,8 +35,8 @@ type tableStats struct {
 	rows     int64
 }
 
-func (c *Collector) collectSystemParts(mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collectSystemParts(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
 	if err != nil {
 		return err
 	}

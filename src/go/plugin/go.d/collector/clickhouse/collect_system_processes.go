@@ -5,6 +5,8 @@ package clickhouse
 import (
 	"strconv"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -15,8 +17,8 @@ FROM
     system.processes FORMAT CSVWithNames
 `
 
-func (c *Collector) collectLongestRunningQueryTime(mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collectLongestRunningQueryTime(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
 	if err != nil {
 		return err
 	}

@@ -15,6 +15,9 @@ import (
 	"testing"
 	"time"
 
+	"context"
+
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfiletest"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +104,7 @@ func TestNewTLSConfig(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg, err := NewTLSConfig(tc.config(t))
+			cfg, err := NewTLSConfig(context.Background(), tc.config(t), credentialfiletest.New(t))
 
 			if len(tc.wantErrs) > 0 {
 				require.Error(t, err)

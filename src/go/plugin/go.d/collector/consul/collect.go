@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"slices"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -14,9 +16,9 @@ const (
 	precision = 1000
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if c.cfg == nil {
-		if err := c.collectConfiguration(); err != nil {
+		if err := c.collectConfiguration(ctx); err != nil {
 			return nil, err
 		}
 
@@ -25,7 +27,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	if err := c.collectChecks(mx); err != nil {
+	if err := c.collectChecks(ctx, mx); err != nil {
 		return nil, err
 	}
 
@@ -33,17 +35,19 @@ func (c *Collector) collect() (map[string]int64, error) {
 		if !c.isCloudManaged() {
 			c.addServerAutopilotChartsOnce.Do(c.addServerAutopilotHealthCharts)
 			// 'operator/autopilot/health' is disabled in Cloud managed (403: Operation is not allowed in managed Consul clusters)
-			if err := c.collectAutopilotHealth(mx); err != nil {
+			if err := c.collectAutopilotHealth(ctx, mx); err != nil {
 				return nil, err
 			}
 		}
-		if err := c.collectNetworkRTT(mx); err != nil {
+		if err := c.collectNetworkRTT(ctx, mx); err != nil {
 			return nil, err
 		}
 	}
 
 	if c.isTelemetryPrometheusEnabled() {
-		if err := c.collectMetricsPrometheus(mx); err != nil {
+		if err := c.collectMetricsPrometheus(ctx,
+
+			mx); err != nil {
 			return nil, err
 		}
 	}
@@ -73,8 +77,8 @@ func (c *Collector) client(statusCodes ...int) *web.Client {
 	})
 }
 
-func (c *Collector) createRequest(urlPath string) (*http.Request, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPath)
+func (c *Collector) createRequest(ctx context.Context, urlPath string) (*http.Request, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPath, c.CredentialFiles())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create '%s' request: %w", urlPath, err)
 	}

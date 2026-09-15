@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -18,24 +20,24 @@ const (
 	urlPathServers         = "/servers"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectMaxScaleGlobal(mx); err != nil {
+	if err := c.collectMaxScaleGlobal(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectMaxScaleThreads(mx); err != nil {
+	if err := c.collectMaxScaleThreads(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectServers(mx); err != nil {
+	if err := c.collectServers(ctx, mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectMaxScaleGlobal(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathMaxscale)
+func (c *Collector) collectMaxScaleGlobal(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathMaxscale, c.CredentialFiles())
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}
@@ -55,8 +57,8 @@ func (c *Collector) collectMaxScaleGlobal(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectMaxScaleThreads(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathMaxscaleThreads)
+func (c *Collector) collectMaxScaleThreads(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathMaxscaleThreads, c.CredentialFiles())
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}
@@ -91,8 +93,8 @@ func (c *Collector) collectMaxScaleThreads(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectServers(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServers)
+func (c *Collector) collectServers(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServers, c.CredentialFiles())
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %v", err)
 	}

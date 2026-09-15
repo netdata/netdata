@@ -2,6 +2,11 @@
 
 package web
 
+import (
+	"context"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+)
+
 func ExampleHTTPConfig_usage() {
 	// Just embed HTTPConfig into your module structure.
 	// It allows you to have both RequestConfig and ClientConfig fields in the module configuration file.
@@ -10,6 +15,8 @@ func ExampleHTTPConfig_usage() {
 	}
 
 	var m myModule
-	_, _ = NewHTTPRequest(m.RequestConfig)
-	_, _ = NewHTTPClient(m.ClientConfig)
+	files := credentialfile.New()
+	defer files.Close()
+	_, _ = NewHTTPRequest(context.Background(), m.RequestConfig, files)
+	_, _ = NewHTTPClient(context.Background(), m.ClientConfig, files)
 }

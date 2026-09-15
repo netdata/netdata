@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -18,14 +20,14 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 }
 
 const urlPathAgentMetrics = "/v1/agent/metrics"
 
-func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Prometheus, error) {
-	r, err := web.NewHTTPRequest(c.RequestConfig.Copy())
+func (c *Collector) initPrometheusClient(ctx context.Context, httpClient *http.Client) (prometheus.Prometheus, error) {
+	r, err := web.NewHTTPRequest(ctx, c.RequestConfig.Copy(), c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}
@@ -44,5 +46,5 @@ func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Pr
 		req.Headers["X-Consul-Token"] = c.ACLToken
 	}
 
-	return prometheus.New(httpClient, req), nil
+	return prometheus.New(httpClient, req, c.CredentialFiles()), nil
 }

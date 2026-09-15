@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}

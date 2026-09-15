@@ -5,22 +5,29 @@ package openldap
 import (
 	"net"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/go-ldap/ldap/v3"
+
+	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
 type ldapConn interface {
-	connect() error
+	connect(context.Context,
+
+	) error
 	disconnect() error
 	search(*ldap.SearchRequest) (*ldap.SearchResult, error)
 }
 
-func newLdapConn(cfg Config) ldapConn {
-	return &ldapClient{Config: cfg}
+func newLdapConn(cfg Config, files credentialfile.RegularReader) ldapConn {
+	return &ldapClient{Config: cfg, files: files}
 }
 
 type ldapClient struct {
+	files credentialfile.RegularReader
 	Config
 
 	conn *ldap.Conn
@@ -30,8 +37,8 @@ func (c *ldapClient) search(req *ldap.SearchRequest) (*ldap.SearchResult, error)
 	return c.conn.Search(req)
 }
 
-func (c *ldapClient) connect() error {
-	opts, err := c.connectOpts()
+func (c *ldapClient) connect(ctx context.Context) error {
+	opts, err := c.connectOpts(ctx)
 	if err != nil {
 		return err
 	}
@@ -56,14 +63,14 @@ func (c *ldapClient) connect() error {
 	return nil
 }
 
-func (c *ldapClient) connectOpts() ([]ldap.DialOpt, error) {
+func (c *ldapClient) connectOpts(ctx context.Context) ([]ldap.DialOpt, error) {
 	d := &net.Dialer{
 		Timeout: c.Timeout.Duration(),
 	}
 
 	opts := []ldap.DialOpt{ldap.DialWithDialer(d)}
 
-	tlsConf, err := tlscfg.NewTLSConfig(c.TLSConfig)
+	tlsConf, err := tlscfg.NewTLSConfig(ctx, c.TLSConfig, c.files)
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -17,12 +19,12 @@ func (c *Collector) verifyConfig() error {
 	return nil
 }
 
-func (c *Collector) initSupervisorClient() (supervisorClient, error) {
+func (c *Collector) initSupervisorClient(ctx context.Context) (supervisorClient, error) {
 	u, err := url.Parse(c.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parse 'url': %v (%s)", err, c.URL)
 	}
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %v", err)
 	}

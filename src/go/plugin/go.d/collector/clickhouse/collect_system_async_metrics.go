@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strconv"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -21,8 +23,8 @@ where
     OR metric LIKE 'ReplicasMaxAbsoluteDelay' FORMAT CSVWithNames
 `
 
-func (c *Collector) collectSystemAsyncMetrics(mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collectSystemAsyncMetrics(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
 	if err != nil {
 		return err
 	}

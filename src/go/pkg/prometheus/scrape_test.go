@@ -5,6 +5,7 @@ package prometheus
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -40,8 +41,8 @@ func TestPrometheus404(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	prom := New(http.DefaultClient, req)
-	res, err := prom.ScrapeSeries()
+	prom := New(http.DefaultClient, req, nil)
+	res, err := prom.ScrapeSeries(context.Background())
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
@@ -56,8 +57,8 @@ func TestPrometheusPlain(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	prom := New(http.DefaultClient, req)
-	res, err := prom.ScrapeSeries()
+	prom := New(http.DefaultClient, req, nil)
+	res, err := prom.ScrapeSeries(context.Background())
 
 	assert.NoError(t, err)
 	verifyTestData(t, res)
@@ -74,9 +75,9 @@ func TestPrometheusPlainWithSelector(t *testing.T) {
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	sr, err := selector.Parse("go_gc*")
 	require.NoError(t, err)
-	prom := NewWithSelector(http.DefaultClient, req, sr)
+	prom := NewWithSelector(http.DefaultClient, req, sr, nil)
 
-	res, err := prom.ScrapeSeries()
+	res, err := prom.ScrapeSeries(context.Background())
 	require.NoError(t, err)
 
 	for _, v := range res {
@@ -102,10 +103,10 @@ func TestPrometheusGzip(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	prom := New(http.DefaultClient, req)
+	prom := New(http.DefaultClient, req, nil)
 
 	for range 2 {
-		res, err := prom.ScrapeSeries()
+		res, err := prom.ScrapeSeries(context.Background())
 		assert.NoError(t, err)
 		verifyTestData(t, res)
 	}
@@ -114,18 +115,18 @@ func TestPrometheusGzip(t *testing.T) {
 func TestPrometheusReadFromFile(t *testing.T) {
 	req := web.RequestConfig{URL: "file://testdata/testdata.txt"}
 
-	prom := NewWithSelector(http.DefaultClient, req, nil)
+	prom := NewWithSelector(http.DefaultClient, req, nil, nil)
 
 	for range 2 {
-		res, err := prom.ScrapeSeries()
+		res, err := prom.ScrapeSeries(context.Background())
 		assert.NoError(t, err)
 		verifyTestData(t, res)
 	}
 
-	prom = New(http.DefaultClient, req)
+	prom = New(http.DefaultClient, req, nil)
 
 	for range 2 {
-		res, err := prom.ScrapeSeries()
+		res, err := prom.ScrapeSeries(context.Background())
 		assert.NoError(t, err)
 		verifyTestData(t, res)
 	}

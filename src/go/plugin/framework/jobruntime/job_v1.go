@@ -424,7 +424,7 @@ func (j *Job) disableAutoDetection() {
 }
 
 func (j *Job) cleanupModule() {
-	j.moduleCleanup.Do(func() { j.module.Cleanup(context.TODO()) })
+	j.moduleCleanup.Do(func() { collectorapi.CleanupCollector(context.TODO(), j.module) })
 }
 
 func (j *Job) Cleanup() {

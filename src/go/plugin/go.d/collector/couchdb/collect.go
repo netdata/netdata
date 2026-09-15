@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -28,8 +30,8 @@ const (
 	httpStatusCodePrefixLen = len(httpStatusCodePrefix)
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	ms := c.scrapeCouchDB()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	ms := c.scrapeCouchDB(ctx)
 	if ms.empty() {
 		return nil, nil
 	}
@@ -96,26 +98,32 @@ func (c *Collector) collectDBStats(collected map[string]int64, ms *cdbMetrics) {
 	}
 }
 
-func (c *Collector) scrapeCouchDB() *cdbMetrics {
+func (c *Collector) scrapeCouchDB(ctx context.Context) *cdbMetrics {
 	ms := &cdbMetrics{}
 	wg := &sync.WaitGroup{}
 
-	wg.Go(func() { c.scrapeNodeStats(ms) })
+	wg.Go(func() { c.scrapeNodeStats(ctx, ms) })
 
-	wg.Go(func() { c.scrapeSystemStats(ms) })
+	wg.Go(func() { c.scrapeSystemStats(ctx, ms) })
 
-	wg.Go(func() { c.scrapeActiveTasks(ms) })
+	wg.Go(func() { c.scrapeActiveTasks(ctx, ms) })
 
 	if len(c.databases) > 0 {
-		wg.Go(func() { c.scrapeDBStats(ms) })
+		wg.Go(func() { c.scrapeDBStats(ctx, ms) })
 	}
 
 	wg.Wait()
 	return ms
 }
 
-func (c *Collector) scrapeNodeStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, fmt.Sprintf(urlPathOverviewStats, c.Config.Node))
+func (c *Collector) scrapeNodeStats(ctx context.Context, ms *cdbMetrics) {
+	req, err := web.NewHTTPRequestWithPath(ctx,
+		c.RequestConfig, fmt.Sprintf(urlPathOverviewStats, c.Config.Node),
+		c.CredentialFiles())
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 
 	var stats cdbNodeStats
 
@@ -127,8 +135,14 @@ func (c *Collector) scrapeNodeStats(ms *cdbMetrics) {
 	ms.NodeStats = &stats
 }
 
-func (c *Collector) scrapeSystemStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, fmt.Sprintf(urlPathSystemStats, c.Config.Node))
+func (c *Collector) scrapeSystemStats(ctx context.Context, ms *cdbMetrics) {
+	req, err := web.NewHTTPRequestWithPath(ctx,
+		c.RequestConfig, fmt.Sprintf(urlPathSystemStats, c.Config.Node),
+		c.CredentialFiles())
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 
 	var stats cdbNodeSystem
 
@@ -140,8 +154,12 @@ func (c *Collector) scrapeSystemStats(ms *cdbMetrics) {
 	ms.NodeSystem = &stats
 }
 
-func (c *Collector) scrapeActiveTasks(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathActiveTasks)
+func (c *Collector) scrapeActiveTasks(ctx context.Context, ms *cdbMetrics) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathActiveTasks, c.CredentialFiles())
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 
 	var stats []cdbActiveTask
 
@@ -153,8 +171,12 @@ func (c *Collector) scrapeActiveTasks(ms *cdbMetrics) {
 	ms.ActiveTasks = stats
 }
 
-func (c *Collector) scrapeDBStats(ms *cdbMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathDatabases)
+func (c *Collector) scrapeDBStats(ctx context.Context, ms *cdbMetrics) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathDatabases, c.CredentialFiles())
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 	req.Method = http.MethodPost
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
@@ -195,8 +217,8 @@ func findMaxMQSize(MessageQueues map[string]any) int64 {
 	return int64(maxSize)
 }
 
-func (c *Collector) pingCouchDB() error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) pingCouchDB(ctx context.Context) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
 	if err != nil {
 		return err
 	}

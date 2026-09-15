@@ -89,9 +89,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	c.Config.HTTPConfig.RequestConfig.URL = metricsURL
 
-	client, err := openmetrics.NewClient(openmetrics.Config{
+	client, err := openmetrics.NewClient(ctx, openmetrics.Config{
 		HTTPConfig: c.Config.HTTPConfig,
-	})
+	}, c.CredentialFiles())
 	if err != nil {
 		return err
 	}

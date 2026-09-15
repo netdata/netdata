@@ -5,6 +5,8 @@ package dockerhub
 import (
 	"errors"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -18,10 +20,10 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initApiClient() (*apiClient, error) {
-	client, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initApiClient(ctx context.Context) (*apiClient, error) {
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}
-	return newAPIClient(client, c.RequestConfig), nil
+	return newAPIClient(client, c.RequestConfig, c.CredentialFiles()), nil
 }

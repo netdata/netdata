@@ -8,6 +8,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -42,13 +44,13 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string           `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	URL                string           `yaml:"url" json:"url"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Username           string           `yaml:"username" json:"username"`
-	Password           string           `yaml:"password" json:"password"`
+	URL                string           `yaml:"url"                           json:"url"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
+	Username           string           `yaml:"username"                      json:"username"`
+	Password           string           `yaml:"password"                      json:"password"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 
@@ -59,7 +61,7 @@ type Collector struct {
 	charts *collectorapi.Charts
 
 	conn    ldapConn
-	newConn func(Config) ldapConn
+	newConn func(Config, credentialfile.RegularReader) ldapConn
 }
 
 func (c *Collector) Configuration() any {
@@ -77,8 +79,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -94,8 +96,8 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 	}

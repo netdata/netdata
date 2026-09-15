@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strconv"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -13,8 +15,8 @@ const (
 	urlPathLocalStatistics = "/api/v1/servers/localhost/statistics"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	statistics, err := c.scrapeStatistics()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	statistics, err := c.scrapeStatistics(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +62,11 @@ func (c *Collector) collectStatistics(collected map[string]int64, statistics sta
 	}
 }
 
-func (c *Collector) scrapeStatistics() ([]statisticMetric, error) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathLocalStatistics)
+func (c *Collector) scrapeStatistics(ctx context.Context) ([]statisticMetric, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathLocalStatistics, c.CredentialFiles())
+	if err != nil {
+		return nil, err
+	}
 
 	var stats statisticMetrics
 	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {

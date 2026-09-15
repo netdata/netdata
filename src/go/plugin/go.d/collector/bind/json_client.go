@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -29,17 +33,18 @@ type jsonViewResolver struct {
 	CacheStats map[string]int64
 }
 
-func newJSONClient(client *http.Client, request web.RequestConfig) *jsonClient {
-	return &jsonClient{httpClient: client, request: request}
+func newJSONClient(client *http.Client, request web.RequestConfig, files credentialfile.RegularReader) *jsonClient {
+	return &jsonClient{files: files, httpClient: client, request: request}
 }
 
 type jsonClient struct {
+	files      credentialfile.RegularReader
 	httpClient *http.Client
 	request    web.RequestConfig
 }
 
-func (c jsonClient) serverStats() (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(c.request, "/server")
+func (c jsonClient) serverStats(ctx context.Context) (*serverStats, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.request, "/server", c.files)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}
