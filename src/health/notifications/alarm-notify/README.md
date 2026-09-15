@@ -1,14 +1,14 @@
 # Experimental Go notifier
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
-Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock and Fleep.
+Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert and SIGNL4.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
-Rocket.Chat/Flock/Fleep webhooks.
+Rocket.Chat/Flock/Fleep webhooks, and ilert/SIGNL4 incident events and recovery.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -32,7 +32,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         print(self.rfile.read(int(self.headers["Content-Length"])).decode(), flush=True)
-        self.send_response(201 if self.path.endswith(("/Messages.json", "/messages")) else 200)
+        status = 200
+        if self.path.endswith("/events"):
+            status = 202
+        elif self.path.endswith(("/Messages.json", "/messages", "/signl4")):
+            status = 201
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         if self.path.endswith("/message"):
@@ -88,13 +93,15 @@ Gotify requires `type: gotify`, `api_url` and `app_token`. ntfy requires `type: 
 optional authentication uses `access_token` or `username` with `password`.
 Rocket.Chat, Flock and Fleep require their respective `type` and a complete webhook `url`. Rocket.Chat accepts an
 optional `channel`; Fleep accepts an optional `sender`. These fields are rejected on other provider types.
+ilert requires `type: ilert` and `integration_key`, with an optional `api_url`. SIGNL4 requires `type: signl4` and
+a complete webhook `url`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
-MessageBird access keys, Gotify app tokens and ntfy credentials accept literal strings or a whole `${env:VARIABLE}`
+MessageBird access keys, Gotify app tokens, ntfy credentials and ilert integration keys accept literal strings or a whole `${env:VARIABLE}`
 or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
@@ -136,7 +143,8 @@ not claim an outcome for interrupted or unstarted deliveries.
 Deliveries use POST. Twilio and MessageBird use `application/x-www-form-urlencoded`; ntfy uses UTF-8 `text/plain`;
 the other providers use `application/json`.
 Generic webhooks may add `Authorization: Bearer ...`.
-Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. These providers make one attempt and
+Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. ilert accepts HTTP 202;
+SIGNL4 accepts HTTP 200, 201 or 202. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
 Gotify, ntfy and Rocket.Chat check bounded JSON acknowledgments; Telegram can retry rate limits as described below.
 Redirects are never followed.
@@ -725,6 +733,102 @@ Save it as `/tmp/notify-chat.yaml` and send a synthetic event:
 ```sh
 /tmp/alarm-notify send --config /tmp/notify-chat.yaml --role sysadmin < examples/event.json
 ```
+
+## ilert and SIGNL4 incident events
+
+These providers use `incident_id` to correlate WARNING/CRITICAL events with CLEAR recovery. Reuse the same ID for
+updates and recovery of an incident; separate incidents, including those on different nodes, need distinct IDs.
+No local history is required. WARNING and CRITICAL both create alert events; CLEAR sends a resolution event.
+
+### ilert
+
+Create an **API** alert source in ilert and use its integration key. This experimental provider uses the
+[Event API](https://docs.ilert.com/developer-docs/rest-api/api-reference/events), which requires different source
+setup from Bash's Netdata-specific webhook. A user API token or the existing Netdata-source webhook URL is not the
+credential for this destination.
+
+```yaml
+version: 1
+destinations:
+  ilert:
+    type: ilert
+    integration_key: ${env:NOTIFY_ILERT_INTEGRATION_KEY}
+routing:
+  roles:
+    oncall: [ilert]
+```
+
+`integration_key` accepts a literal or whole environment/file reference and must resolve to nonempty printable ASCII
+without whitespace. `api_url` is optional, supports the same references, and defaults to `https://api.ilert.com/api`.
+Custom HTTP(S) bases may include a proxy path prefix, but no query, fragment or embedded credentials. The official
+API host requires HTTPS. The notifier appends `/events`; include the `/api` prefix when using the official base.
+Other providers' fields are rejected. Only selected destinations resolve secrets.
+
+The payload sends `ALERT` for WARNING/CRITICAL and `RESOLVE` for CLEAR. `alertKey` is lowercase SHA-256 hex of the
+exact `incident_id`: ilert trims keys and compares them case-insensitively, so this encoding keeps IDs that differ
+only in case or surrounding whitespace distinct. The original ID and complete event remain in `customDetails`.
+The summary includes the node, current status and event summary; details include the current alert facts and status
+transition. An optional navigation URL becomes a `View alert` link. Numeric severity and priority overrides are
+unset; the API alert source controls those policies, and the Netdata status remains in the summary and event details.
+
+Delivery succeeds on HTTP 202. The body is closed without reading it. No redirects or retries are performed,
+including on rate limits or server errors.
+
+### SIGNL4
+
+Use a team webhook URL as described in SIGNL4's
+[HTTP documentation](https://support.signl4.com/hc/en-us/articles/9006097919005-HTTP-details):
+
+```yaml
+version: 1
+destinations:
+  signl4:
+    type: signl4
+    url: ${env:NOTIFY_SIGNL4_URL}
+routing:
+  roles:
+    oncall: [signl4]
+```
+
+The URL contains the team secret; it supports a literal or whole environment/file reference. Other providers'
+fields are rejected. Configure separate named URLs for different teams and use normal role fan-out to select them.
+
+`Title` contains the node, current status and summary. `Message` contains the summary, info, node, alert,
+status transition, optional chart/context/values/units, timestamp and navigation URL. `Severity` carries the current
+Netdata status, and `X-S4-SourceSystem` is `Netdata`. JSON encoding preserves quotes, newlines and Unicode.
+
+Following SIGNL4's
+[status mapping contract](https://support.signl4.com/hc/en-us/articles/9124452127773-Control-parameters-X-S4-parameters-Status-mapping-enrichment-filtering),
+`X-S4-ExternalID` is the exact `incident_id`, and `X-S4-Status` is `new` for WARNING/CRITICAL or `resolved` for CLEAR.
+This deliberately corrects Bash's per-event `unique_id`, which changes between an alert and its recovery.
+HTTP 200, 201 and 202 are accepted, as in Bash; response bodies are closed without reading them. There are no retries
+or redirects. Production Bash configuration and delivery remain unchanged.
+
+### Local incident delivery
+
+With the local receiver above, save this as `/tmp/notify-incidents.yaml`:
+
+```yaml
+version: 1
+destinations:
+  ilert_local:
+    type: ilert
+    integration_key: synthetic-key
+    api_url: http://127.0.0.1:18080/api
+  signl4_local:
+    type: signl4
+    url: http://127.0.0.1:18080/signl4
+routing:
+  roles:
+    oncall: [ilert_local, signl4_local]
+```
+
+```sh
+/tmp/alarm-notify send --config /tmp/notify-incidents.yaml --role oncall < examples/event.json
+```
+
+To exercise recovery, send another event with the same `incident_id`, `status: CLEAR` and the appropriate
+`previous_status`. ilert will reuse `alertKey`; SIGNL4 will reuse `X-S4-ExternalID`.
 
 ## Event document
 

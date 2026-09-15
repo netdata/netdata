@@ -55,6 +55,10 @@ func dispatch(
 			err = postJSON(ctx, dst, renderFlock(event), timeout)
 		case "fleep":
 			err = postJSON(ctx, dst, renderFleep(dst, event), timeout)
+		case "ilert":
+			err = sendIlert(ctx, dst, event, timeout)
+		case "signl4":
+			err = postJSON(ctx, dst, renderSIGNL4(event), timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}

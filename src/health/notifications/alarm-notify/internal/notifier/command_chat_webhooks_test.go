@@ -229,13 +229,19 @@ func TestRunChatWebhooks(t *testing.T) {
 	}
 }
 
-func TestChatWebhookStatusAcknowledgment(t *testing.T) {
-	for name, test := range map[string]struct{ provider string }{"Flock": {"flock"}, "Fleep": {"fleep"}} {
+func TestHTTPStatusAcknowledgment(t *testing.T) {
+	for name, test := range map[string]struct {
+		provider string
+		status   int
+	}{
+		"Flock": {"flock", 200}, "Fleep": {"fleep", 200}, "ilert": {"ilert", 202},
+		"SIGNL4 200": {"signl4", 200}, "SIGNL4 201": {"signl4", 201}, "SIGNL4 202": {"signl4", 202},
+	} {
 		t.Run(name, func(t *testing.T) {
 			cleanup, stopped := make(chan struct{}), make(chan struct{})
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.Copy(io.Discard, r.Body)
-				w.WriteHeader(200)
+				w.WriteHeader(test.status)
 				_, _ = io.WriteString(w, "synthetic-private-value")
 				w.(http.Flusher).Flush()
 				select {
@@ -246,10 +252,14 @@ func TestChatWebhookStatusAcknowledgment(t *testing.T) {
 			}))
 			defer server.Close()
 			defer close(cleanup)
+			dst := Destination{Type: test.provider, URL: server.URL}
+			if test.provider == "ilert" {
+				dst = Destination{Type: "ilert", APIURL: server.URL, IntegrationKey: "synthetic-key"}
+			}
 			cfg, err := yaml.Marshal(
 				Config{
 					Version:      1,
-					Destinations: map[string]Destination{"chat": {Type: test.provider, URL: server.URL}},
+					Destinations: map[string]Destination{"chat": dst},
 				},
 			)
 			require.NoError(t, err)
