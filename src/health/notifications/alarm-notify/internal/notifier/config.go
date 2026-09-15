@@ -29,6 +29,7 @@ type Destination struct {
 	URL             string         `yaml:"url,omitempty"`
 	Channel         string         `yaml:"channel,omitempty"`
 	Sender          string         `yaml:"sender,omitempty"`
+	IntegrationKey  string         `yaml:"integration_key,omitempty"`
 	BearerToken     string         `yaml:"bearer_token,omitempty"`
 	BotToken        string         `yaml:"bot_token,omitempty"`
 	AppToken        string         `yaml:"app_token,omitempty"`
@@ -100,6 +101,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "ilert" {
+		return dst.validateIlert()
+	}
+	if dst.IntegrationKey != "" {
+		return errors.New("integration_key requires type: ilert")
+	}
 	if dst.Type == "rocketchat" || dst.Type == "flock" || dst.Type == "fleep" {
 		return dst.validateChatWebhook()
 	}
@@ -142,15 +149,15 @@ func (dst Destination) validate() error {
 	if dst.Type == "telegram" {
 		return dst.validateTelegram()
 	}
-	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
+	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock or fleep; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert or signl4; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio or messagebird",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird or ilert",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {

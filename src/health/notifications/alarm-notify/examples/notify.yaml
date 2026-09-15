@@ -60,6 +60,12 @@ destinations:
     type: fleep
     url: ${env:NOTIFY_FLEEP_URL}
     sender: Netdata
+  ilert:
+    type: ilert
+    integration_key: ${env:NOTIFY_ILERT_INTEGRATION_KEY}
+  signl4:
+    type: signl4
+    url: ${env:NOTIFY_SIGNL4_URL}
 routing:
   default: [local]
   roles:
@@ -75,3 +81,4 @@ routing:
     messagebird_ops: [messagebird]
     push_ops: [gotify, ntfy]
     chat_webhooks: [rocketchat, flock, fleep]
+    incident_ops: [ilert, signl4]

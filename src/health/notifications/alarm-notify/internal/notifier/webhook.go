@@ -63,7 +63,9 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 	// Close without buffering or draining an arbitrary remote body.
 	defer response.Body.Close()
 	accepted := response.StatusCode == http.StatusOK ||
-		dst.Type == "webhook" && response.StatusCode >= 200 && response.StatusCode < 300
+		dst.Type == "webhook" && response.StatusCode >= 200 && response.StatusCode < 300 ||
+		dst.Type == "signl4" &&
+			(response.StatusCode == http.StatusCreated || response.StatusCode == http.StatusAccepted)
 	if !accepted {
 		return fmt.Errorf("%s returned HTTP %d", dst.Type, response.StatusCode)
 	}
