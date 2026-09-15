@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -54,7 +53,7 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 
 	nodeType string
 }

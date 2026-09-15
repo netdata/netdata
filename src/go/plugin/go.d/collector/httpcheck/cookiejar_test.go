@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,7 +84,7 @@ func TestReadCookieFilePreservesModificationTimeReload(t *testing.T) {
 	}
 	c := New()
 	c.CookieFile = "cookies"
-	c.httpClient = &http.Client{}
+	c.httpClient = web.WrapHTTPClient(&http.Client{}, files)
 	c.SetCredentialFiles(files)
 	cookieURL := &url.URL{Scheme: "http", Host: "www.example.com"}
 	require.NoError(t, c.readCookieFile(ctx))

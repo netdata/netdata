@@ -30,7 +30,6 @@ func New(ctx context.Context,
 	}
 
 	return &Client{
-		files:      files,
 		request:    request,
 		httpClient: httpClient,
 		digest:     digest,
@@ -39,9 +38,8 @@ func New(ctx context.Context,
 
 // Client represents a Dell PowerVault MCI API client.
 type Client struct {
-	files      credentialfile.RegularReader
 	request    web.RequestConfig
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 	digest     string // "sha256" or "md5"
 
 	mu         sync.Mutex // protects sessionKey reads/writes
@@ -285,7 +283,7 @@ func (c *Client) newSessionRequest(urlPath string) web.RequestConfig {
 }
 
 func (c *Client) doOK(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(ctx, req, c.files)
+	httpReq, err := c.httpClient.NewRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request to %s: %v", req.URL, err)
 	}

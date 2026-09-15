@@ -25,7 +25,7 @@ func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Promet
 		return nil, err
 	}
 
-	prom := prometheus.NewWithSelector(httpClient, c.RequestConfig, sr, c.CredentialFiles())
+	prom := prometheus.NewWithSelector(httpClient, c.RequestConfig, sr)
 	return prom, nil
 }
 

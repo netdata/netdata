@@ -30,7 +30,7 @@ func validateInputFile(path string) error {
 }
 
 func scrapeRawSamples(ctx context.Context, fileURL string) (prompkg.SampleBatch, error) {
-	client := prompkg.New(http.DefaultClient, web.RequestConfig{URL: fileURL}, nil)
+	client := prompkg.New(web.WrapHTTPClient(http.DefaultClient, nil), web.RequestConfig{URL: fileURL})
 	return client.ScrapeSamples(ctx)
 }
 

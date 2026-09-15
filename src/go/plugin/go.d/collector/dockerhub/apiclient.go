@@ -8,8 +8,6 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -24,13 +22,12 @@ type repository struct {
 	LastUpdated string `json:"last_updated"`
 }
 
-func newAPIClient(client *http.Client, request web.RequestConfig, files credentialfile.RegularReader) *apiClient {
-	return &apiClient{files: files, httpClient: client, request: request}
+func newAPIClient(client *web.HTTPClient, request web.RequestConfig) *apiClient {
+	return &apiClient{httpClient: client, request: request}
 }
 
 type apiClient struct {
-	files      credentialfile.RegularReader
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 	request    web.RequestConfig
 }
 
@@ -59,5 +56,5 @@ func (a apiClient) createRequest(ctx context.Context, urlPath string) (*http.Req
 	u.Path = path.Join(u.Path, urlPath)
 	req.URL = u.String()
 
-	return web.NewHTTPRequest(ctx, req, a.files)
+	return a.httpClient.NewRequest(ctx, req)
 }

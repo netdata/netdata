@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net/http"
 	"sync"
 	"time"
 
@@ -109,7 +108,7 @@ type Collector struct {
 	addClusterHealthChartsOnce *sync.Once
 	addClusterStatsChartsOnce  *sync.Once
 
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 
 	clusterName string
 	nodes       map[string]bool
@@ -123,7 +122,7 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	err := c.validateConfig(ctx)
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("check configuration: %v", err)
 	}

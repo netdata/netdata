@@ -43,7 +43,6 @@ func New(ctx context.Context,
 	httpClient.Jar = jar
 
 	return &Client{
-		files:      files,
 		Request:    request,
 		httpClient: httpClient,
 		csrf:       &csrfToken{},
@@ -52,9 +51,8 @@ func New(ctx context.Context,
 
 // Client represents a Dell PowerStore REST API client.
 type Client struct {
-	files      credentialfile.RegularReader
 	Request    web.RequestConfig
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 	csrf       *csrfToken
 }
 
@@ -240,7 +238,7 @@ func (c *Client) createPostRequest(urlPath string, body any) (web.RequestConfig,
 }
 
 func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(ctx, req, c.files)
+	httpReq, err := c.httpClient.NewRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error creating http request to %s: %v", req.URL, err)
 	}

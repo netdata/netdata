@@ -25,5 +25,5 @@ func (c *Collector) initApiClient(ctx context.Context) (*apiClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newAPIClient(client, c.RequestConfig, c.CredentialFiles()), nil
+	return newAPIClient(client, c.RequestConfig), nil
 }

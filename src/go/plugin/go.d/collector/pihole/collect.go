@@ -47,7 +47,7 @@ func (c *Collector) collectMetrics(ctx context.Context, mx map[string]int64) err
 		return errors.New("no auth session")
 	}
 
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIStatsSummary, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIStatsSummary)
 	if err != nil {
 		return err
 	}

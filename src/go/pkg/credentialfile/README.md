@@ -50,3 +50,10 @@ directory, including a root-owned mode-0600 denial fixture when run as root. The
 benchmark compares safefile with warm persistent 256-byte reads and reports
 allocations. Timings describe that machine and are not CI thresholds. Full setuid
 and Linux capability launch-shape validation belongs to the helper's C tests.
+
+HTTP consumers bind the reader once with `web.NewHTTPClient`; request methods receive the current context and config.
+The bound client borrows the reader, so closing idle HTTP connections leaves it usable until the job owner closes it.
+There is no bearer-token cache. `web.WrapHTTPClient` explicitly binds custom standard clients and test readers.
+
+TLS-only consumers use `tlscfg.NewTLSConfig` or `web.NewTransportClient`. These scope one reader across the complete
+CA/certificate/key construction and close it before returning; they retain no reader in the returned TLS/HTTP object.

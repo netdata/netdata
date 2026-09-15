@@ -54,13 +54,14 @@ func newDiscoverer(cfg Config, newFiles func() credentialfile.FileReader) (*Disc
 		return nil, err
 	}
 
+	files := newFiles()
 	d := &Discoverer{
 		Logger: logger.New().With(
 			slog.String("component", "service discovery"),
 			slog.String("discoverer", shortName),
 		),
-		client:   client,
-		files:    newFiles(),
+		client:   web.WrapHTTPClient(client.Client, files),
+		files:    files,
 		request:  cfg.RequestConfig,
 		interval: cfg.interval(),
 		parser:   responseParser{format: cfg.format()},
@@ -74,7 +75,7 @@ type Discoverer struct {
 	*logger.Logger
 	model.Base
 
-	client  *http.Client
+	client  *web.HTTPClient
 	files   credentialfile.FileReader
 	request web.RequestConfig
 
@@ -167,7 +168,7 @@ func (d *Discoverer) discover(ctx context.Context, in chan<- []model.TargetGroup
 func (d *Discoverer) fetchTargetGroup(ctx context.Context) (model.TargetGroup, error) {
 	ctx, cancel := context.WithTimeout(ctx, d.client.Timeout)
 	defer cancel()
-	req, err := web.NewHTTPRequest(ctx, d.request, d.files)
+	req, err := d.client.NewRequest(ctx, d.request)
 	if err != nil {
 		return nil, newFetchError(fetchPhaseRequest, fmt.Errorf("create HTTP request: %w", err))
 	}

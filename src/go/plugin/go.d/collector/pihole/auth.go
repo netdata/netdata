@@ -17,7 +17,7 @@ func (c *Collector) checkAuthSession(ctx context.Context) error {
 		return nil
 	}
 
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIAuth, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIAuth)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (c *Collector) getAuthSession(ctx context.Context) (*ftlAPIAuthResponse, er
 	cfg.Method = http.MethodPost
 	cfg.Body = string(bs)
 
-	req, err := web.NewHTTPRequestWithPath(ctx, cfg, urlPathAPIAuth, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, cfg, urlPathAPIAuth)
 	if err != nil {
 		return nil, err
 	}

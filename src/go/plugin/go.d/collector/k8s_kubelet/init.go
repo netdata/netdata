@@ -24,5 +24,5 @@ func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Promet
 		return nil, err
 	}
 
-	return prometheus.New(httpClient, c.RequestConfig, c.CredentialFiles()), nil
+	return prometheus.New(httpClient, c.RequestConfig), nil
 }

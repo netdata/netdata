@@ -47,9 +47,7 @@ func TestClientFetchSuccess(t *testing.T) {
 		}, nil
 	})
 
-	client, err := NewClientWithHTTP(Config{URL: "https://example.com/wasPerfTool/servlet/perfservlet", StatsType: "extended"}, httpClient,
-		nil,
-	)
+	client, err := NewClientWithHTTP(Config{URL: "https://example.com/wasPerfTool/servlet/perfservlet", StatsType: "extended"}, httpClient)
 	if err != nil {
 		t.Fatalf("NewClientWithHTTP failed: %v", err)
 	}
@@ -110,9 +108,7 @@ func TestClientFetchHTTPError(t *testing.T) {
 		}, nil
 	})
 
-	client, err := NewClientWithHTTP(Config{URL: "https://example.com/wasPerfTool/servlet/perfservlet"}, httpClient,
-		nil,
-	)
+	client, err := NewClientWithHTTP(Config{URL: "https://example.com/wasPerfTool/servlet/perfservlet"}, httpClient)
 	if err != nil {
 		t.Fatalf("NewClientWithHTTP failed: %v", err)
 	}
@@ -131,9 +127,7 @@ func TestClientFetchContextCancellation(t *testing.T) {
 		return nil, r.Context().Err()
 	})
 
-	client, err := NewClientWithHTTP(Config{URL: "https://example.com/wasPerfTool/servlet/perfservlet"}, httpClient,
-		nil,
-	)
+	client, err := NewClientWithHTTP(Config{URL: "https://example.com/wasPerfTool/servlet/perfservlet"}, httpClient)
 	if err != nil {
 		t.Fatalf("NewClientWithHTTP failed: %v", err)
 	}

@@ -67,7 +67,7 @@ func (c *Collector) collectServerStats(ctx context.Context, mx map[string]int64)
 }
 
 func (c *Collector) queryServerStats(ctx context.Context) (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStats, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return nil, err
 	}

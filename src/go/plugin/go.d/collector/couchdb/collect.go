@@ -117,9 +117,7 @@ func (c *Collector) scrapeCouchDB(ctx context.Context) *cdbMetrics {
 }
 
 func (c *Collector) scrapeNodeStats(ctx context.Context, ms *cdbMetrics) {
-	req, err := web.NewHTTPRequestWithPath(ctx,
-		c.RequestConfig, fmt.Sprintf(urlPathOverviewStats, c.Config.Node),
-		c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathOverviewStats, c.Config.Node))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -136,9 +134,7 @@ func (c *Collector) scrapeNodeStats(ctx context.Context, ms *cdbMetrics) {
 }
 
 func (c *Collector) scrapeSystemStats(ctx context.Context, ms *cdbMetrics) {
-	req, err := web.NewHTTPRequestWithPath(ctx,
-		c.RequestConfig, fmt.Sprintf(urlPathSystemStats, c.Config.Node),
-		c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathSystemStats, c.Config.Node))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -155,7 +151,7 @@ func (c *Collector) scrapeSystemStats(ctx context.Context, ms *cdbMetrics) {
 }
 
 func (c *Collector) scrapeActiveTasks(ctx context.Context, ms *cdbMetrics) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathActiveTasks, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathActiveTasks)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -172,7 +168,7 @@ func (c *Collector) scrapeActiveTasks(ctx context.Context, ms *cdbMetrics) {
 }
 
 func (c *Collector) scrapeDBStats(ctx context.Context, ms *cdbMetrics) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathDatabases, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathDatabases)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -218,7 +214,7 @@ func findMaxMQSize(MessageQueues map[string]any) int64 {
 }
 
 func (c *Collector) pingCouchDB(ctx context.Context) error {
-	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
+	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

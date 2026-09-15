@@ -4,7 +4,6 @@ package apache
 
 import (
 	"errors"
-	"net/http"
 	"strings"
 
 	"context"
@@ -22,6 +21,6 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+func (c *Collector) initHTTPClient(ctx context.Context) (*web.HTTPClient, error) {
 	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 }

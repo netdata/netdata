@@ -5,8 +5,9 @@ package bind
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
@@ -25,12 +26,12 @@ func (c *Collector) initPermitViewMatcher() (matcher.Matcher, error) {
 	return matcher.NewSimplePatternsMatcher(c.PermitView)
 }
 
-func (c *Collector) initBindApiClient(httpClient *http.Client) (bindAPIClient, error) {
+func (c *Collector) initBindApiClient(httpClient *web.HTTPClient) (bindAPIClient, error) {
 	switch {
 	case strings.HasSuffix(c.URL, "/xml/v3"): // BIND 9.9+
-		return newXML3Client(httpClient, c.RequestConfig, c.CredentialFiles()), nil
+		return newXML3Client(httpClient, c.RequestConfig), nil
 	case strings.HasSuffix(c.URL, "/json/v1"): // BIND 9.10+
-		return newJSONClient(httpClient, c.RequestConfig, c.CredentialFiles()), nil
+		return newJSONClient(httpClient, c.RequestConfig), nil
 	default:
 		return nil, fmt.Errorf("URL %s is wrong, supported endpoints: `/xml/v3`, `/json/v1`", c.URL)
 	}

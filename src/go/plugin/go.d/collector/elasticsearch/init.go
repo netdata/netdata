@@ -4,26 +4,30 @@ package elasticsearch
 
 import (
 	"errors"
-	"net/http"
 
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) validateConfig(ctx context.Context) error {
+func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("URL not set")
 	}
 	if !(c.DoNodeStats || c.DoClusterHealth || c.DoClusterStats || c.DoIndicesStats) {
 		return errors.New("all API calls are disabled")
 	}
-	if _, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles()); err != nil {
-		return err
-	}
 	return nil
 }
 
-func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
-	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+func (c *Collector) initHTTPClient(ctx context.Context) (*web.HTTPClient, error) {
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.NewRequest(ctx, c.RequestConfig); err != nil {
+		client.CloseIdleConnections()
+		return nil, err
+	}
+	return client, nil
 }

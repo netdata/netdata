@@ -77,7 +77,7 @@ func (g singleOwnerGate) release() {
 
 type cephClient struct {
 	files                  credentialfile.RegularReader
-	httpClient             *http.Client
+	httpClient             *web.HTTPClient
 	requestConfig          web.RequestConfig
 	configuredBase         *url.URL
 	notFollowRedirects     bool
@@ -124,7 +124,7 @@ func newCephClient(
 	}
 
 	c := &cephClient{
-		httpClient:             httpClient,
+		httpClient:             web.WrapHTTPClient(httpClient, files),
 		files:                  files,
 		requestConfig:          cfg.Copy(),
 		configuredBase:         base,
@@ -656,7 +656,7 @@ func (c *cephClient) request(
 		cfg.Body = string(body)
 	}
 
-	req, err := web.NewHTTPRequest(ctx, cfg, c.files)
+	req, err := c.httpClient.NewRequest(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

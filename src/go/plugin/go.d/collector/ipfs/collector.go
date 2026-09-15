@@ -60,7 +60,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 }
 
 func (c *Collector) Configuration() any {

@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//go:build unix
+
+package web
+
+import (
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"github.com/stretchr/testify/require"
+)
+
+// Use the actual helper to verify that scoped public constructors share one
+// child across CA/cert/key reads and release it on both success and failure.
+func TestCScopedTLSConstruction(t *testing.T) {
+	helper := os.Getenv("NETDATA_TEST_ND_RUN")
+	if helper == "" {
+		t.Skip("set NETDATA_TEST_ND_RUN to a prebuilt nd-run to test scoped TLS lifecycle")
+	}
+	helper, err := filepath.Abs(helper)
+	require.NoError(t, err)
+	dir, err := os.MkdirTemp("/tmp", "netdata-scoped-tls-test-")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, os.RemoveAll(dir)) })
+	require.NoError(t, os.Chmod(dir, 0755))
+	pidLog := filepath.Join(dir, "children")
+	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
+	script := "#!/bin/sh\nprintf '%s\\n' \"$$\" >> " + quote(pidLog) + "\nexec " + quote(helper) + " \"$@\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "nd-run"), []byte(script), 0755))
+	oldBinDir := buildinfo.NetdataBinDir
+	buildinfo.NetdataBinDir = dir
+	t.Cleanup(func() { buildinfo.NetdataBinDir = oldBinDir })
+
+	server := httptest.NewTLSServer(nil)
+	defer server.Close()
+	pair := server.TLS.Certificates[0]
+	cert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: pair.Certificate[0]})
+	keyDER, err := x509.MarshalPKCS8PrivateKey(pair.PrivateKey)
+	require.NoError(t, err)
+	key := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+	certPath, keyPath := filepath.Join(dir, "cert"), filepath.Join(dir, "key")
+	require.NoError(t, os.WriteFile(certPath, cert, 0644))
+	require.NoError(t, os.WriteFile(keyPath, key, 0644))
+	cfg := tlscfg.TLSConfig{TLSCA: certPath, TLSCert: certPath, TLSKey: keyPath}
+
+	constructors := map[string]func(tlscfg.TLSConfig) error{
+		"tls": func(cfg tlscfg.TLSConfig) error {
+			_, err := tlscfg.NewTLSConfig(context.Background(), cfg)
+			return err
+		},
+		"http": func(cfg tlscfg.TLSConfig) error {
+			client, err := NewTransportClient(context.Background(), ClientConfig{TLSConfig: cfg})
+			if client != nil {
+				client.CloseIdleConnections()
+			}
+			return err
+		},
+	}
+	for name, construct := range constructors {
+		t.Run(name, func(t *testing.T) {
+			for _, fail := range []bool{false, true} {
+				require.NoError(t, os.WriteFile(pidLog, nil, 0600))
+				input := cfg
+				if fail {
+					input.TLSKey = filepath.Join(dir, "missing-key")
+				}
+				err := construct(input)
+				if fail {
+					require.ErrorIs(t, err, os.ErrNotExist)
+				} else {
+					require.NoError(t, err)
+				}
+				logged, err := os.ReadFile(pidLog)
+				require.NoError(t, err)
+				pids := strings.Fields(string(logged))
+				require.Len(t, pids, 1, "all TLS files must use the same scoped child")
+				pid, err := strconv.Atoi(pids[0])
+				require.NoError(t, err)
+				require.Eventually(
+					t,
+					func() bool { return syscall.Kill(pid, 0) == syscall.ESRCH },
+					5*time.Second,
+					10*time.Millisecond,
+					"scoped constructor must close and reap its helper",
+				)
+			}
+		})
+	}
+}

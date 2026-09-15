@@ -87,7 +87,6 @@ func New(ctx context.Context,
 		return nil, err
 	}
 	return &Client{
-		files:      files,
 		Request:    request,
 		httpClient: httpClient,
 		token:      newToken(),
@@ -96,9 +95,8 @@ func New(ctx context.Context,
 
 // Client represents ScaleIO client.
 type Client struct {
-	files      credentialfile.RegularReader
 	Request    web.RequestConfig
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 	token      *token
 }
 
@@ -219,7 +217,7 @@ func (c *Client) createInstancesRequest() web.RequestConfig {
 }
 
 func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(ctx, req, c.files)
+	httpReq, err := c.httpClient.NewRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s: %v", req.URL, err)
 	}

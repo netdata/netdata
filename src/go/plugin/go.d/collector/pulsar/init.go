@@ -25,7 +25,7 @@ func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Promet
 		return nil, err
 	}
 
-	return prometheus.New(client, c.RequestConfig, c.CredentialFiles()), nil
+	return prometheus.New(client, c.RequestConfig), nil
 }
 
 func (c *Collector) initTopicFilerMatcher() (matcher.Matcher, error) {

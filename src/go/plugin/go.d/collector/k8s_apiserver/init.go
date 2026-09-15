@@ -55,10 +55,10 @@ func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Promet
 		if srParseErr != nil {
 			c.Warningf("selector parse error (collecting all metrics): %v", srParseErr)
 		}
-		return prometheus.New(httpClient, c.RequestConfig, c.CredentialFiles()), nil
+		return prometheus.New(httpClient, c.RequestConfig), nil
 	}
 
-	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr, c.CredentialFiles()), nil
+	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr), nil
 }
 
 // Selector to filter only the metrics we need, reducing memory usage

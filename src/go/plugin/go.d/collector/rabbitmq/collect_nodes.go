@@ -7,12 +7,11 @@ import (
 
 	"context"
 
-	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collectNodes(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPINodes, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPINodes)
 	if err != nil {
 		return fmt.Errorf("failed to create node stats request: %w", err)
 	}

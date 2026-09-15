@@ -86,7 +86,7 @@ func cleanName(name string) string {
 }
 
 func (c *Collector) queryServerStatus(ctx context.Context) (*serverStatusResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStatus, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathServerStatus)
 	if err != nil {
 		return nil, err
 	}

@@ -82,7 +82,7 @@ func (c *Collector) initClient(ctx context.Context) (err error) {
 	}
 
 	if useTLS {
-		if tlsCfg, err = tlscfg.NewTLSConfig(ctx, c.TLSConfig, c.CredentialFiles()); err != nil {
+		if tlsCfg, err = tlscfg.NewTLSConfig(ctx, c.TLSConfig); err != nil {
 			return err
 		}
 	}

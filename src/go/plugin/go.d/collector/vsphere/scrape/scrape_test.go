@@ -188,8 +188,7 @@ func newClient(t *testing.T, vCenterURL *url.URL) *client.Client {
 		Password:  "password",
 		Timeout:   time.Second * 3,
 		TLSConfig: tlscfg.TLSConfig{InsecureSkipVerify: true},
-	}, nil,
-	)
+	})
 	require.NoError(t, err)
 	return c
 }

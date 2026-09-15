@@ -32,7 +32,7 @@ func (c *Collector) initClient(ctx context.Context) error {
 		return nil
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewTransportClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %w", err)
 	}

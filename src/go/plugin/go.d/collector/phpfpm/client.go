@@ -6,12 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -56,13 +53,12 @@ type client interface {
 }
 
 type httpClient struct {
-	files  credentialfile.RegularReader
-	client *http.Client
+	client *web.HTTPClient
 	req    web.RequestConfig
 	dec    decoder
 }
 
-func newHTTPClient(c *http.Client, r web.RequestConfig, files credentialfile.RegularReader) (*httpClient, error) {
+func newHTTPClient(c *web.HTTPClient, r web.RequestConfig) (*httpClient, error) {
 	u, err := url.Parse(r.URL)
 	if err != nil {
 		return nil, err
@@ -73,7 +69,6 @@ func newHTTPClient(c *http.Client, r web.RequestConfig, files credentialfile.Reg
 		dec = decodeJSON
 	}
 	return &httpClient{
-		files:  files,
 		client: c,
 		req:    r,
 		dec:    dec,
@@ -81,7 +76,7 @@ func newHTTPClient(c *http.Client, r web.RequestConfig, files credentialfile.Reg
 }
 
 func (c *httpClient) getStatus(ctx context.Context) (*status, error) {
-	req, err := web.NewHTTPRequest(ctx, c.req, c.files)
+	req, err := c.client.NewRequest(ctx, c.req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}

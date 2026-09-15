@@ -63,7 +63,7 @@ func (c *Collector) collectStatistics(collected map[string]int64, statistics sta
 }
 
 func (c *Collector) scrapeStatistics(ctx context.Context) ([]statisticMetric, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathLocalStatistics, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathLocalStatistics)
 	if err != nil {
 		return nil, err
 	}

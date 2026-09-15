@@ -47,7 +47,7 @@ func (c *Collector) doSearchRequest(req *ldap.SearchRequest, fn func(*ldap.Entry
 }
 
 func (c *Collector) establishConn(ctx context.Context) (ldapConn, error) {
-	conn := c.newConn(c.Config, c.CredentialFiles())
+	conn := c.newConn(c.Config)
 
 	if err := conn.connect(ctx); err != nil {
 		return nil, err

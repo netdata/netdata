@@ -105,7 +105,7 @@ func (c *Collector) initClient(ctx context.Context) (*client.Client, error) {
 		Timeout:   c.Timeout.Duration(),
 		TLSConfig: c.ClientConfig.TLSConfig,
 	}
-	return client.New(ctx, config, c.CredentialFiles())
+	return client.New(ctx, config)
 }
 
 func (c *Collector) initDiscoverer(cli *client.Client) error {

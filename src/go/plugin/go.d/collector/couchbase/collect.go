@@ -111,7 +111,7 @@ func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 }
 
 func (c *Collector) scrapeCouchbase(ctx context.Context) (*cbMetrics, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathBucketsStats, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathBucketsStats)
 	if err != nil {
 		return nil, err
 	}

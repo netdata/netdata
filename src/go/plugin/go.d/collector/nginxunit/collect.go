@@ -32,7 +32,7 @@ type nuStatus struct {
 }
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatus, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request to '%s': %v", c.URL, err)
 	}

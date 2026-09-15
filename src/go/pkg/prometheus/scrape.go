@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -40,7 +38,7 @@ type (
 	}
 
 	prometheus struct {
-		client *http.Client
+		client *web.HTTPClient
 		src    fetcher
 
 		parser promTextParser
@@ -50,14 +48,12 @@ type (
 )
 
 // New creates a Prometheus instance.
-func New(client *http.Client, request web.RequestConfig, files credentialfile.RegularReader) Prometheus {
-	return NewWithSelector(client, request, nil, files)
+func New(client *web.HTTPClient, request web.RequestConfig) Prometheus {
+	return NewWithSelector(client, request, nil)
 }
 
 // NewWithSelector creates a Prometheus instance with the selector.
-func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector.Selector,
-	files credentialfile.RegularReader,
-) Prometheus {
+func NewWithSelector(client *web.HTTPClient, request web.RequestConfig, sr selector.Selector) Prometheus {
 	p := &prometheus{
 		client: client,
 		buf:    bytes.NewBuffer(make([]byte, 0, 16000)),
@@ -67,14 +63,17 @@ func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector
 	if v, err := url.Parse(request.URL); err == nil && v.Scheme == "file" {
 		p.src = &fileFetcher{path: filepath.Join(v.Host, v.Path)}
 	} else {
-		p.src = &httpFetcher{client: client, request: request, files: files}
+		p.src = &httpFetcher{client: client, request: request}
 	}
 
 	return p
 }
 
 func (p *prometheus) HTTPClient() *http.Client {
-	return p.client
+	if p.client == nil {
+		return nil
+	}
+	return p.client.Client
 }
 
 // ScrapeSeries scrapes metrics, parses and sorts

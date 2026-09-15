@@ -458,7 +458,8 @@ def main():
         if not program.result.wasSuccessful():
             return 1
         if OPTIONS.go_tests:
-            command = ["go", "-C", str(ROOT / "src/go"), "test", "-race", "-count=1", "./pkg/credentialfile"]
+            command = ["go", "-C", str(ROOT / "src/go"), "test", "-race", "-count=1",
+                       "./pkg/credentialfile", "./pkg/web"]
             print(shlex.join(command), file=sys.stderr)
             env = dict(os.environ, NETDATA_TEST_ND_RUN=str(HELPER))
             completed = subprocess.run(command, env=env)
