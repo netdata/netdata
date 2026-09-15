@@ -861,6 +861,13 @@ static void mount_points_refresh_with_ops(usec_t now_ut, const struct mount_poin
     bool cluster_ok = ops->scan_cluster_storage(paths);
 
     if (!volumes_ok || !cluster_ok) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_WARNING,
+            "PerflibStorage mount-point discovery failed (volumes: %s, ClusterStorage: %s); retaining the current registry",
+            volumes_ok ? "ok" : "failed",
+            cluster_ok ? "ok" : "failed");
+
         // Keep the old entries alongside discoveries made before the failure. This avoids freezing
         // unrelated additions, while the unsuccessful refresh flag prevents stale eviction.
         void *value;
