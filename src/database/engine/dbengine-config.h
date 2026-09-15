@@ -97,9 +97,10 @@ struct rrdeng_tier_config {
     size_t grouping;                            // points of tier 0 that make one point of this tier (1 for tier 0)
 };
 
-// Copy cfg into the engine, resolving the 0-means-default fields. Call it once, from one
-// thread, before the first rrdeng_init(); a second call with an equal configuration is a
-// no-op, with a different one it is fatal.
+// Copy cfg into the engine, resolving the 0-means-default fields (cpus, default_update_every_s,
+// libuv_worker_threads). Fatal when the libuv pool is not larger than the threads reserved for the
+// embedder. Call it once, from one thread, before the first rrdeng_init(); a second call with an
+// equal configuration is a no-op, with a different one it is fatal.
 void dbengine_init(const struct dbengine_config *cfg);
 
 #endif // NETDATA_DBENGINE_CONFIG_H
