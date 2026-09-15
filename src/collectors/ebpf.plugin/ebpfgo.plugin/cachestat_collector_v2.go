@@ -59,8 +59,9 @@ func NewCachestatCollector() *CachestatCollector {
 			CgroupsEnabled: false,
 			UpdateEvery:    cachestatDefaultUpdateEvery,
 		},
-		publisher: GetPublisher(),
-		state:     &cachestatGlobalState{},
+		publisher:   GetPublisher(),
+		state:       &cachestatGlobalState{},
+		sharedStore: GetAppsIntegration().Store(),
 	}
 }
 
@@ -143,8 +144,13 @@ func (c *CachestatCollector) Collect(ctx context.Context) error {
 	meter.Counter("hit").ObserveTotal(float64(publish.Hit))
 	meter.Counter("miss").ObserveTotal(float64(publish.Miss))
 
-	// Per-PID snapshot
-	if c.sharedStore != nil && (c.Config.AppsEnabled || c.Config.CgroupsEnabled) {
+	// Per-PID snapshot and SHM publication
+	if c.Config.AppsEnabled || c.Config.CgroupsEnabled {
+		if c.sharedStore == nil {
+			c.Warnf("apps/cgroups enabled but shared store not initialized")
+			return nil
+		}
+
 		apps, err := c.handle.Runtime.SnapshotApps(c.handle.MapsPerCore)
 		if err != nil {
 			c.Debugf("snapshot apps error: %v", err)
@@ -164,6 +170,16 @@ func (c *CachestatCollector) Collect(ctx context.Context) error {
 						c.sharedStore.RemoveCachestatPIDs(deadPIDs)
 					}
 				}
+			}
+		}
+
+		// Publish per-app/cgroup data to SHM for apps.plugin/cgroup.plugin
+		shmPub, err := GetAppsIntegration().PublisherSharedMemory()
+		if err != nil {
+			c.Debugf("failed to get SHM publisher: %v", err)
+		} else if shmPub != nil {
+			if err := c.sharedStore.Publish(shmPub, ebpfgoSHMFlagCachestat); err != nil {
+				c.Debugf("failed to publish to SHM: %v", err)
 			}
 		}
 	}

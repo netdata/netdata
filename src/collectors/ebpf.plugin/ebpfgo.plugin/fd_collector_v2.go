@@ -39,10 +39,11 @@ type FDConfig struct {
 
 type FDCollector struct {
 	collectorapi.Base
-	Config    FDConfig
-	handle    *FDLegacyHandle
-	state     *fdGlobalState
-	publisher *PublisherService
+	Config      FDConfig
+	handle      *FDLegacyHandle
+	state       *fdGlobalState
+	publisher   *PublisherService
+	sharedStore *ebpfSharedMemoryStore
 }
 
 func NewFDCollector() *FDCollector {
@@ -51,8 +52,9 @@ func NewFDCollector() *FDCollector {
 			Enabled:     true,
 			UpdateEvery: fdDefaultUpdateEvery,
 		},
-		publisher: GetPublisher(),
-		state:     &fdGlobalState{},
+		publisher:   GetPublisher(),
+		state:       &fdGlobalState{},
+		sharedStore: GetAppsIntegration().Store(),
 	}
 }
 
@@ -113,6 +115,32 @@ func (c *FDCollector) Collect(ctx context.Context) error {
 	meter.Counter("open").ObserveTotal(float64(snapshot.Open))
 	meter.Counter("close").ObserveTotal(float64(snapshot.Close))
 	meter.Counter("open_error").ObserveTotal(float64(snapshot.OpenErr))
+
+	// Per-PID snapshot and SHM publication
+	if c.Config.AppsEnabled || c.Config.CgroupsEnabled {
+		if c.sharedStore == nil {
+			c.Warnf("apps/cgroups enabled but shared store not initialized")
+			return nil
+		}
+
+		apps, err := c.handle.Runtime.SnapshotApps(c.handle.MapsPerCore)
+		if err != nil {
+			c.Debugf("snapshot apps error: %v", err)
+		} else {
+			// Update shared store with per-app/cgroup data
+			c.sharedStore.UpdateFDApps(apps)
+		}
+
+		// Publish per-app/cgroup data to SHM for apps.plugin/cgroup.plugin
+		shmPub, err := GetAppsIntegration().PublisherSharedMemory()
+		if err != nil {
+			c.Debugf("failed to get SHM publisher: %v", err)
+		} else if shmPub != nil {
+			if err := c.sharedStore.Publish(shmPub, ebpfgoSHMFlagFD); err != nil {
+				c.Debugf("failed to publish to SHM: %v", err)
+			}
+		}
+	}
 
 	return nil
 }

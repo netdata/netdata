@@ -39,10 +39,11 @@ type DCStatConfig struct {
 
 type DCStatCollector struct {
 	collectorapi.Base
-	Config    DCStatConfig
-	handle    *DCStatLegacyHandle
-	state     *dcstatGlobalState
-	publisher *PublisherService
+	Config      DCStatConfig
+	handle      *DCStatLegacyHandle
+	state       *dcstatGlobalState
+	publisher   *PublisherService
+	sharedStore *ebpfSharedMemoryStore
 }
 
 func NewDCStatCollector() *DCStatCollector {
@@ -51,8 +52,9 @@ func NewDCStatCollector() *DCStatCollector {
 			Enabled:     true,
 			UpdateEvery: dcstatDefaultUpdateEvery,
 		},
-		publisher: GetPublisher(),
-		state:     &dcstatGlobalState{},
+		publisher:   GetPublisher(),
+		state:       &dcstatGlobalState{},
+		sharedStore: GetAppsIntegration().Store(),
 	}
 }
 
@@ -128,11 +130,27 @@ func (c *DCStatCollector) Collect(ctx context.Context) error {
 	meter.Counter("cache_insertion").ObserveTotal(float64(publish.CacheInsertion))
 
 	if c.Config.AppsEnabled || c.Config.CgroupsEnabled {
+		if c.sharedStore == nil {
+			c.Warnf("apps/cgroups enabled but shared store not initialized")
+			return nil
+		}
+
 		apps, err := c.handle.Runtime.SnapshotApps(c.handle.MapsPerCore)
 		if err != nil {
 			c.Debugf("snapshot apps error: %v", err)
 		} else {
-			_ = apps
+			// Update shared store with per-app/cgroup data
+			c.sharedStore.UpdateDCStatApps(apps, c.handle.MapsPerCore)
+		}
+
+		// Publish per-app/cgroup data to SHM for apps.plugin/cgroup.plugin
+		shmPub, err := GetAppsIntegration().PublisherSharedMemory()
+		if err != nil {
+			c.Debugf("failed to get SHM publisher: %v", err)
+		} else if shmPub != nil {
+			if err := c.sharedStore.Publish(shmPub, ebpfgoSHMFlagDCstat); err != nil {
+				c.Debugf("failed to publish to SHM: %v", err)
+			}
 		}
 	}
 
