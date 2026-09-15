@@ -103,7 +103,7 @@ func TestReadConfig(t *testing.T) {
 			err:   "name must not be empty",
 		},
 		"unsupported provider": {
-			input: strings.Replace(validConfig, "webhook", "telegram", 1),
+			input: strings.Replace(validConfig, "webhook", "pushover", 1),
 			err:   "other providers are not implemented",
 		},
 		"second document": {

@@ -1,11 +1,12 @@
 # Experimental Go notifier
 
-This standalone Go module routes a JSON notification to named generic webhook, Slack, and Discord destinations.
+This standalone Go module routes a JSON notification to named generic webhook, Slack, Discord, and Telegram destinations.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
-The current increments provide explicit delivery, role-based routing, modern Slack app webhooks, and native Discord webhooks.
+The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
+and Telegram bot messages.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -30,7 +31,12 @@ class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         print(self.rfile.read(int(self.headers["Content-Length"])).decode(), flush=True)
         self.send_response(200)
+        self.send_header("Content-Type", "application/json")
         self.end_headers()
+        self.wfile.write(b'{"ok":true,"result":{"message_id":1}}')
+
+    def log_message(self, *args):
+        pass  # Avoid logging credential-bearing request paths.
 
 HTTPServer(("127.0.0.1", 18080), Receiver).serve_forever()
 PY
@@ -63,13 +69,16 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
   is requested. Invalid options/configuration/input, all selected deliveries failing, or command cancellation/timeout
   return `1`. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
 
-Configuration has `version: 1` and a `destinations` mapping. Each destination requires `type: webhook`, `type: slack`,
-or `type: discord` and `url`; `bearer_token` is optional for generic webhooks and rejected for Slack/Discord. Destination
-names are nonsecret identifiers. The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
+Configuration has `version: 1` and a `destinations` mapping. Webhook, Slack and Discord destinations require `type`
+and `url`; `bearer_token` is optional for generic webhooks and rejected for Slack/Discord. Telegram requires
+`type: telegram`, `bot_token` and `chat_id`, with the additional settings described below. Provider-specific settings
+are rejected on other provider types. Destination names are nonsecret identifiers.
+The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
-The URL and bearer token accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
+The URL, bearer token, Telegram bot token and Telegram API base accept literal strings or a whole `${env:VARIABLE}`
+or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -107,11 +116,11 @@ count. Partial failure returns `0` when another delivery succeeded, matching Bas
 the individual results to see failures. On interruption, counts cover results reported before cancellation and do
 not claim an outcome for interrupted or unstarted deliveries.
 
-Each delivery sends one POST with `Content-Type: application/json` and, when configured, `Authorization: Bearer ...`.
-Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. Redirects and other status codes fail;
-there are no application retries.
-Response bodies are closed without being buffered, logged, or interpreted. Errors do not echo config/input values,
-secret contents, or endpoint URLs.
+Deliveries use POST with `Content-Type: application/json`; generic webhooks may add `Authorization: Bearer ...`.
+Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. These three providers make one attempt and
+close response bodies without buffering or interpreting them. Telegram checks a bounded JSON acknowledgment and
+can retry rate limits as described below. Redirects are never followed. Errors do not echo config/input values,
+secret contents, response text, or endpoint URLs.
 
 ## Slack app webhooks
 
@@ -205,6 +214,77 @@ NOTIFY_DISCORD_URL=http://127.0.0.1:18080/discord /tmp/alarm-notify send \
 Tests use local receivers and complete JSON comparisons; they do not send to a Discord server or verify native
 Discord rendering. This experimental implementation does not complete the production Bash migration requested in
 [issue #23531](https://github.com/netdata/netdata/issues/23531).
+
+## Telegram bot messages
+
+Configure one chat and optional topic per named destination. Route to multiple names for multiple recipients;
+different names may share a bot token. Create the bot and obtain its token through Telegram's BotFather, and give
+the bot access to each target chat before using a real API endpoint.
+
+```yaml
+version: 1
+destinations:
+  telegram_ops:
+    type: telegram
+    bot_token: ${env:NOTIFY_TELEGRAM_TOKEN}
+    chat_id: '-100123'
+    message_thread_id: 7
+    retries_on_limit: 0
+routing:
+  roles:
+    sysadmin: [telegram_ops]
+```
+
+`chat_id` is a nonzero signed numeric ID or `@username`; quote it in YAML. `message_thread_id` is an optional positive
+integer for a topic. Bash's `CHAT_ID:TOPIC_ID` syntax becomes these two fields. `retries_on_limit` is an optional
+nonnegative integer counting additional attempts; it defaults to zero. Fractional values are rejected.
+Telegram destinations reject `url` and `bearer_token`.
+
+The optional `api_url` defaults to `https://api.telegram.org`. For a local Bot API server, supply an HTTP(S) base URL,
+optionally with a path prefix. It must not contain credentials, a query, or a fragment. The official Telegram API
+requires HTTPS. The notifier appends `/bot<TOKEN>/sendMessage`; do not include the token or method in `api_url`.
+Use an environment or file reference for `bot_token`. Selected secrets are resolved before delivery; unused bots
+need no local credentials when validating or sending to a different destination.
+
+Messages use escaped HTML with status emoji, summary, node/alert, status transition, chart/context, known values
+with units, timestamp, details and an optional event navigation link. Unknown values are omitted and zero remains
+visible. CLEAR messages are silent and link previews are disabled, preserving Bash's delivery settings.
+The [text limit](https://core.telegram.org/bots/api#sendmessage) is 4,096 Unicode characters after formatting;
+generated tags and HTML escapes do not consume visible characters. Oversized content fails the destination without
+truncating the alert. Richer cross-provider presentation remains pending in the capability inventory.
+
+Delivery succeeds only on HTTP 200 with a JSON `ok: true` acknowledgment. Responses are limited to 256 KiB and are
+never logged. Invalid, oversized, interrupted or negative acknowledgments fail the destination safely.
+Optional retries apply only to HTTP 429 with a valid negative acknowledgment. Transport failures, redirects and
+other HTTP errors are not retried.
+
+When retries are enabled, the notifier honors Telegram's
+[`retry_after`](https://core.telegram.org/bots/api#responseparameters), falling back to one second when absent.
+This intentionally corrects Bash's fixed one-second delay. A delay that cannot fit the remaining invocation timeout
+fails the destination immediately, allowing later targets to proceed while time remains. Retry waits are cancelable;
+all attempts and waits share the existing total deadline. The final destination result includes its retries in the
+same success/failure outcome.
+
+To inspect Telegram requests using the local receiver above, use a synthetic token and a local API base:
+
+```yaml
+version: 1
+destinations:
+  telegram_local:
+    type: telegram
+    api_url: http://127.0.0.1:18080
+    bot_token: '123:synthetic-token'
+    chat_id: '1'
+```
+
+Save as `telegram-local.yaml`, then run:
+
+```sh
+/tmp/alarm-notify send --config telegram-local.yaml --destination telegram_local < examples/event.json
+```
+
+Local tests verify requests, acknowledgments, retry timing and cancellation. They do not send to Telegram or verify
+native Telegram rendering. The production Bash notifier and its configuration are unchanged.
 
 ## Event document
 

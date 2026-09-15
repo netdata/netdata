@@ -16,6 +16,12 @@ destinations:
   discord:
     type: discord
     url: ${env:NOTIFY_DISCORD_URL}
+  telegram:
+    type: telegram
+    bot_token: ${env:NOTIFY_TELEGRAM_TOKEN}
+    chat_id: '-100123'
+    message_thread_id: 7
+    retries_on_limit: 0
 routing:
   default: [local]
   roles:
@@ -24,3 +30,4 @@ routing:
     muted: []
     chatops: [slack]
     discord_ops: [discord]
+    telegram_ops: [telegram]
