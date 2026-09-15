@@ -195,7 +195,15 @@ func TestRunRouting(t *testing.T) {
 }
 
 func TestRunFanoutCancellation(t *testing.T) {
-	for name, cancelExplicitly := range map[string]bool{"deadline": false, "cancellation": true} {
+	for name, test := range map[string]struct {
+		provider string
+		cancel   bool
+	}{
+		"webhook deadline": {provider: "webhook"}, "webhook cancellation": {provider: "webhook", cancel: true},
+		"rocketchat deadline": {provider: "rocketchat"}, "rocketchat cancellation": {provider: "rocketchat", cancel: true},
+		"flock deadline": {provider: "flock"}, "flock cancellation": {provider: "flock", cancel: true},
+		"fleep deadline": {provider: "fleep"}, "fleep cancellation": {provider: "fleep", cancel: true},
+	} {
 		t.Run(name, func(t *testing.T) {
 			started := make(chan struct{})
 			stopped := make(chan struct{})
@@ -225,12 +233,12 @@ func TestRunFanoutCancellation(t *testing.T) {
 			config := fmt.Sprintf(`version: 1
 destinations:
   first: {type: webhook, url: %q}
-  blocked: {type: webhook, url: %q}
+  blocked: {type: %s, url: %q}
   after: {type: webhook, url: %q}
 routing:
   roles:
     sysadmin: [first, blocked, after]
-`, server.URL+"/first", server.URL+"/blocked", server.URL+"/after")
+`, server.URL+"/first", test.provider, server.URL+"/blocked", server.URL+"/after")
 			path := writeConfig(t, config)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -244,7 +252,7 @@ routing:
 			case <-time.After(2 * time.Second):
 				t.Fatal("second destination was not attempted")
 			}
-			if cancelExplicitly {
+			if test.cancel {
 				cancel()
 			}
 			select {
@@ -261,7 +269,7 @@ routing:
 			assert.Empty(t, stdout.String())
 			assert.Contains(t, stderr.String(), `destination "first" sent`)
 			assert.Contains(t, stderr.String(), "1 succeeded")
-			if cancelExplicitly {
+			if test.cancel {
 				assert.Contains(t, stderr.String(), "notification canceled")
 			} else {
 				assert.Contains(t, stderr.String(), "notification timed out")

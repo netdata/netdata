@@ -49,6 +49,17 @@ destinations:
     type: ntfy
     url: ${env:NOTIFY_NTFY_URL}
     access_token: ${env:NOTIFY_NTFY_ACCESS_TOKEN}
+  rocketchat:
+    type: rocketchat
+    url: ${env:NOTIFY_ROCKETCHAT_URL}
+    channel: '#alerts'
+  flock:
+    type: flock
+    url: ${env:NOTIFY_FLOCK_URL}
+  fleep:
+    type: fleep
+    url: ${env:NOTIFY_FLEEP_URL}
+    sender: Netdata
 routing:
   default: [local]
   roles:
@@ -63,3 +74,4 @@ routing:
     twilio_ops: [twilio]
     messagebird_ops: [messagebird]
     push_ops: [gotify, ntfy]
+    chat_webhooks: [rocketchat, flock, fleep]

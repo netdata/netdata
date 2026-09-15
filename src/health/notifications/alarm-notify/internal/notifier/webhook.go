@@ -56,13 +56,14 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 	if err != nil {
 		return err
 	}
+	if dst.Type == "rocketchat" {
+		return readRocketChatResponse(response)
+	}
 	// These providers acknowledge delivery through HTTP status, not the response body.
 	// Close without buffering or draining an arbitrary remote body.
 	defer response.Body.Close()
-	accepted := response.StatusCode >= 200 && response.StatusCode < 300
-	if dst.Type == "slack" || dst.Type == "discord" {
-		accepted = response.StatusCode == http.StatusOK
-	}
+	accepted := response.StatusCode == http.StatusOK ||
+		dst.Type == "webhook" && response.StatusCode >= 200 && response.StatusCode < 300
 	if !accepted {
 		return fmt.Errorf("%s returned HTTP %d", dst.Type, response.StatusCode)
 	}

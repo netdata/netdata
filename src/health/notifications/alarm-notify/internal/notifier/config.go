@@ -27,6 +27,8 @@ type Routing struct {
 type Destination struct {
 	Type            string         `yaml:"type"`
 	URL             string         `yaml:"url,omitempty"`
+	Channel         string         `yaml:"channel,omitempty"`
+	Sender          string         `yaml:"sender,omitempty"`
 	BearerToken     string         `yaml:"bearer_token,omitempty"`
 	BotToken        string         `yaml:"bot_token,omitempty"`
 	AppToken        string         `yaml:"app_token,omitempty"`
@@ -98,6 +100,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "rocketchat" || dst.Type == "flock" || dst.Type == "fleep" {
+		return dst.validateChatWebhook()
+	}
+	if dst.Channel != "" || dst.Sender != "" {
+		return errors.New("channel requires type: rocketchat; sender requires type: fleep")
+	}
 	if dst.Type == "gotify" {
 		return dst.validateGotify()
 	}
@@ -136,7 +144,7 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify or ntfy; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock or fleep; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
