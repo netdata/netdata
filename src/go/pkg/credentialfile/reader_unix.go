@@ -43,7 +43,7 @@ type session struct {
 // New constructs a reader without starting a process. Call Close when its owner ends.
 func New() *Reader {
 	return newReader(func() *exec.Cmd {
-		return exec.Command(filepath.Join(buildinfo.NetdataBinDir, "nd-run"), "--read-file-server-v1")
+		return exec.Command(filepath.Join(buildinfo.NetdataBinDir, "nd-run"), "--file-reader")
 	})
 }
 func newReader(command func() *exec.Cmd) *Reader {

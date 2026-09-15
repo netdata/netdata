@@ -1,7 +1,7 @@
 # Configured credential file reader
 
 `Read(ctx, path)` and `ReadAll(ctx, path)` create, use and close a reader for one operation. Unix reads use the installed
-`buildinfo.NetdataBinDir/nd-run --read-file-server-v1` helper. There is no privileged fallback, process-global reader,
+`buildinfo.NetdataBinDir/nd-run --file-reader` helper. There is no privileged fallback, process-global reader,
 credential cache or worker pool. HTTP request helpers call this boundary internally only when a bearer file is set;
 requests without credential files create no reader or helper process.
 

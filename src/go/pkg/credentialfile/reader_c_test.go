@@ -37,7 +37,7 @@ func cHelperPath(t testing.TB) string {
 
 func cReader(t testing.TB, path string) *Reader {
 	t.Helper()
-	r := newReader(func() *exec.Cmd { return exec.Command(path, "--read-file-server-v1") })
+	r := newReader(func() *exec.Cmd { return exec.Command(path, "--file-reader") })
 	t.Cleanup(func() {
 		require.NoError(t, r.Close())
 		r.mu.Lock()
