@@ -3382,10 +3382,14 @@ if(ENABLE_PLUGIN_EBPF)
         set(EBPF_GO_LIBBPF_LIB_DIR lib64)
     endif()
 
-    set(EBPF_GO_CGO_CFLAGS "")
+    set(EBPF_CGO_CFLAGS "")
     foreach(include_dir IN LISTS NETDATA_LIBBPF_INCLUDE_DIRECTORIES)
-        string(APPEND EBPF_GO_CGO_CFLAGS " -I${include_dir}")
+        if(include_dir)
+            string(APPEND EBPF_CGO_CFLAGS " -I${include_dir}")
+        endif()
     endforeach()
+    string(STRIP "${EBPF_CGO_CFLAGS}" EBPF_CGO_CFLAGS)
+    set(EBPF_GO_CGO_CFLAGS "${EBPF_CGO_CFLAGS}")
     string(APPEND EBPF_GO_CGO_CFLAGS " -I${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin")
     string(APPEND EBPF_GO_CGO_CFLAGS " -I${ebpf-co-re_SOURCE_DIR}")
     string(STRIP "${EBPF_GO_CGO_CFLAGS}" EBPF_GO_CGO_CFLAGS)
@@ -3430,14 +3434,19 @@ if(ENABLE_PLUGIN_EBPF)
             # Source-install POC only; exclude native packages and static installers.
             file(GLOB_RECURSE EBPF_POC_PLUGIN_FILES CONFIGURE_DEPENDS
                     "${CMAKE_SOURCE_DIR}/src/go/*.go"
+                    "${CMAKE_SOURCE_DIR}/src/go/plugin/ebpf/*.c"
+                    "${CMAKE_SOURCE_DIR}/src/go/plugin/ebpf/*.h"
                     "${CMAKE_SOURCE_DIR}/src/go/plugin/ebpf/*.yaml"
                     "${CMAKE_SOURCE_DIR}/src/go/plugin/ebpf/*.json"
                     "${CMAKE_SOURCE_DIR}/src/go/plugin/framework/*.json"
                     "${CMAKE_SOURCE_DIR}/src/go/plugin/agent/*.json")
-            list(APPEND EBPF_POC_PLUGIN_FILES ${EBPF_GO_PLUGIN_FILES})
+            list(APPEND EBPF_POC_PLUGIN_FILES
+                    ${EBPF_GO_WORKSPACE_FILE}
+                    "${CMAKE_SOURCE_DIR}/src/go/go.mod"
+                    "${CMAKE_SOURCE_DIR}/src/go/go.sum")
 
-            # The CO-RE release archive stores skeleton headers under includes/.
-            set(EBPF_POC_CGO_CFLAGS "${EBPF_GO_CGO_CFLAGS} -I${ebpf-co-re_SOURCE_DIR}/includes")
+            # ExternalProject strips the archive's single top-level includes/ directory.
+            set(EBPF_POC_CGO_CFLAGS "${EBPF_CGO_CFLAGS} -I${ebpf-co-re_SOURCE_DIR}")
             add_custom_command(
                     OUTPUT "${CMAKE_BINARY_DIR}/ebpf-poc.plugin"
                     COMMAND "${CMAKE_COMMAND}" -E env

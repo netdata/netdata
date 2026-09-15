@@ -1,11 +1,11 @@
 # eBPF shared-framework POC
 
 This experimental executable runs one cachestat collector through the shared Go Agent, CollectorV2, `metrix`,
-`charttpl`/`chartengine`, and single-instance DynCfg. It reuses the existing C/libbpf backend. The old Go and C eBPF
-plugins remain available alongside it.
+`charttpl`/`chartengine`, and single-instance DynCfg. Its Go code and copied C/libbpf backend all live in `src/go`,
+within the shared Go module. The old Go and C eBPF plugins remain available alongside it.
 
-The live POC passed on Docker Desktop's Linux/arm64 VM on 2026-09-14. This is evidence that the architecture works
-for this collector, not a production migration or a claim of parity across all kernels and collectors.
+The self-contained POC passed on Docker Desktop's Linux/arm64 VM on 2026-09-15. This is evidence that the architecture
+works for this collector, not a production migration or a claim of parity across all kernels and collectors.
 
 ## Scope
 
@@ -67,12 +67,14 @@ docker run --rm --name netdata-ebpf-framework-poc-smoke \
   --privileged --network none netdata-ebpf-framework-poc:local
 ```
 
-The image builds the POC and runs its focused Go tests, then tests and builds the original Go eBPF plugin as a
-baseline check. It does not build the Netdata Agent. It downloads the CO-RE bundle using the version and SHA256
+The image builds the POC and runs its focused Go tests, including the copied native backend tests, with and without
+CO-RE skeleton headers. It also checks the CGO-disabled build. It does not build the Netdata Agent or need the old
+eBPF source tree. It downloads the CO-RE bundle using the version and SHA256
 pinned by `packaging/cmake/Modules/NetdataEBPFCORE.cmake`. The archive's skeleton headers are in `includes/`;
-`CGO_CFLAGS` must point there. Go build and module caches use BuildKit cache mounts.
+the Docker build points `CGO_CFLAGS` there. CMake's ExternalProject extraction removes that top-level directory,
+so the source installer uses the CO-RE source directory itself. Go build and module caches use BuildKit cache mounts.
 
-The Dockerfile-specific ignore file restricts the context to the two Go source trees. No repository credentials,
+The Dockerfile-specific ignore file restricts the context to `src/go`. No repository credentials,
 SOW memory or host filesystem mounts are needed. The smoke container uses its own temporary config, state and file
 workload. Privileged execution is needed to load BPF programs and inspect them with `bpftool`.
 
@@ -118,6 +120,9 @@ nonzero exit or timeout fails the smoke test. No global cache eviction or change
 Environment: Linux `6.12.76-linuxkit`, `aarch64`, Go 1.27.1, Debian trixie native libraries, repository-pinned CO-RE
 bundle `v1.7.0.2`.
 
+- Self-contained backend validation on 2026-09-15: Docker built from only `src/go`; native tests, live smoke and
+  source-installed `netdata`-user smoke passed. The Go module graph, binary build metadata and CMake target inputs
+  contain no dependency on the old eBPF source tree. CMake rebuilds after changes to the copied C source and header.
 - Native macOS focused tests with `-race` and `go vet`: passed (native eBPF is unavailable on macOS).
 - Linux/arm64 tagged tests with `-race`, without skeleton headers: passed; this checks the legacy-only build path.
 - Linux/arm64 tagged tests with `-race`, with skeleton headers: passed; `go vet` and plugin build passed.
@@ -161,12 +166,12 @@ call already in progress. The POC has no background loop and does not exercise `
 
 ## Handoff and limits
 
-- The C backend is imported directly from
-  `src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader` via a repository-local `go.mod` replacement. The original
-  module already depends on `src/go`; the Go module graph therefore has a cycle, while the package import graph
-  remains acyclic. This works in the tested builds and avoids copying or relocating the original implementation.
-  A production migration should choose the permanent shared backend location; this POC keeps the old tree intact.
-- The imported package compiles native code for the other existing eBPF modules too. Only cachestat is instantiated
+- The native backend is owned by `src/go/plugin/ebpf/internal/libbpfloader`. Its source and tests were copied from
+  `src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader`, together with `nd_alloc_shim.h`, at commit `2815808506`.
+  Copy changes are limited to the header's local include path, explicit Linux/CGO build constraints and Go formatting.
+  The POC has no import or module dependency on the old implementation. The original source remains unchanged for
+  comparison; these copies are an experimental migration boundary and are not automatically synchronized.
+- The copied package compiles native code for the other existing eBPF modules too. Only cachestat is instantiated
   and only four cachestat programs are loaded by this executable.
 - New collectors with shared memory, Functions, continuous event draining or different resource ownership need their
   own design. In particular, the old startup-only publisher election has not been ported or validated here.

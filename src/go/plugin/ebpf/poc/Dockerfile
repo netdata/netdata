@@ -13,24 +13,17 @@ RUN mkdir -p /opt/ebpf-core \
 
 WORKDIR /src/src/go
 COPY src/go/go.mod src/go/go.sum ./
-COPY src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod /src/src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
 COPY src/go ./
-COPY src/collectors/ebpf.plugin/ebpfgo.plugin /src/src/collectors/ebpf.plugin/ebpfgo.plugin
 
 ENV CGO_ENABLED=1 CGO_LDFLAGS="-lbpf -lelf -lz"
 # First compile the native backend without skeletons, matching its legacy-only build.
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -race -count=1 -tags netdata_ebpf_libbpf ./plugin/ebpf/... ./cmd/ebpfpocplugin
+    CGO_ENABLED=0 go test -count=1 -tags netdata_ebpf_libbpf ./plugin/ebpf/... ./cmd/ebpfpocplugin \
+    && go test -race -count=1 -tags 'netdata_ebpf_libbpf netdata_ebpf_test' ./plugin/ebpf/... ./cmd/ebpfpocplugin
 ENV CGO_CFLAGS="-I/opt/ebpf-core/includes"
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -race -count=1 -tags netdata_ebpf_libbpf ./plugin/ebpf/... ./cmd/ebpfpocplugin \
-    && go vet -tags netdata_ebpf_libbpf ./plugin/ebpf/... ./cmd/ebpfpocplugin \
+    go test -race -count=1 -tags 'netdata_ebpf_libbpf netdata_ebpf_test' ./plugin/ebpf/... ./cmd/ebpfpocplugin \
+    && go vet -tags 'netdata_ebpf_libbpf netdata_ebpf_test' ./plugin/ebpf/... ./cmd/ebpfpocplugin \
     && go build -tags netdata_ebpf_libbpf -o /usr/local/bin/ebpf-poc.plugin ./cmd/ebpfpocplugin
-
-# Keep the original executable buildable through the local module relationship.
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    cd ../collectors/ebpf.plugin/ebpfgo.plugin \
-    && go test -count=1 ./... \
-    && go build -tags netdata_ebpf_libbpf -o /tmp/ebpf-go-original.plugin .
 
 CMD ["python3", "plugin/ebpf/poc/smoke.py"]

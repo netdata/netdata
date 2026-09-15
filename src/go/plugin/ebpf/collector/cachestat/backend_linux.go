@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+	"github.com/netdata/netdata/go/plugins/plugin/ebpf/internal/libbpfloader"
 )
 
 func probeNative(ctx context.Context) (string, error) {
