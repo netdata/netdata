@@ -39,10 +39,10 @@ type DCStatConfig struct {
 
 type DCStatCollector struct {
 	collectorapi.Base
-	Config DCStatConfig
-	handle *DCStatLegacyHandle
-	state  *dcstatGlobalState
-	store  metrix.CollectorStore
+	Config    DCStatConfig
+	handle    *DCStatLegacyHandle
+	state     *dcstatGlobalState
+	publisher *PublisherService
 }
 
 func NewDCStatCollector() *DCStatCollector {
@@ -51,8 +51,8 @@ func NewDCStatCollector() *DCStatCollector {
 			Enabled:     true,
 			UpdateEvery: dcstatDefaultUpdateEvery,
 		},
-		store: metrix.NewCollectorStore(),
-		state: &dcstatGlobalState{},
+		publisher: GetPublisher(),
+		state:     &dcstatGlobalState{},
 	}
 }
 
@@ -121,7 +121,7 @@ func (c *DCStatCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	meter := c.store.Write().SnapshotMeter("")
+	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
 	meter.Counter("ratio").ObserveTotal(float64(publish.Ratio))
 	meter.Counter("getpage_vect").ObserveTotal(float64(publish.GetpageVect))
 	meter.Counter("getpage_nonvect").ObserveTotal(float64(publish.GetpageNonvect))
@@ -150,5 +150,5 @@ func (c *DCStatCollector) ChartTemplateYAML() string {
 }
 
 func (c *DCStatCollector) MetricStore() metrix.CollectorStore {
-	return c.store
+	return c.publisher.MetricStore()
 }

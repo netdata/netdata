@@ -47,7 +47,7 @@ type CachestatCollector struct {
 
 	handle      *CachestatLegacyHandle
 	state       *cachestatGlobalState
-	store       metrix.CollectorStore
+	publisher   *PublisherService
 	sharedStore *ebpfSharedMemoryStore
 }
 
@@ -59,8 +59,8 @@ func NewCachestatCollector() *CachestatCollector {
 			CgroupsEnabled: false,
 			UpdateEvery:    cachestatDefaultUpdateEvery,
 		},
-		store: metrix.NewCollectorStore(),
-		state: &cachestatGlobalState{},
+		publisher: GetPublisher(),
+		state:     &cachestatGlobalState{},
 	}
 }
 
@@ -136,8 +136,8 @@ func (c *CachestatCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	// Write metrics to store
-	meter := c.store.Write().SnapshotMeter("")
+	// Write metrics to publisher's store
+	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
 	meter.Gauge("ratio").Observe(float64(publish.Ratio))
 	meter.Counter("dirty").ObserveTotal(float64(publish.Dirty))
 	meter.Counter("hit").ObserveTotal(float64(publish.Hit))
@@ -182,5 +182,5 @@ func (c *CachestatCollector) ChartTemplateYAML() string {
 }
 
 func (c *CachestatCollector) MetricStore() metrix.CollectorStore {
-	return c.store
+	return c.publisher.MetricStore()
 }

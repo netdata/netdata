@@ -39,10 +39,10 @@ type FDConfig struct {
 
 type FDCollector struct {
 	collectorapi.Base
-	Config FDConfig
-	handle *FDLegacyHandle
-	state  *fdGlobalState
-	store  metrix.CollectorStore
+	Config    FDConfig
+	handle    *FDLegacyHandle
+	state     *fdGlobalState
+	publisher *PublisherService
 }
 
 func NewFDCollector() *FDCollector {
@@ -51,8 +51,8 @@ func NewFDCollector() *FDCollector {
 			Enabled:     true,
 			UpdateEvery: fdDefaultUpdateEvery,
 		},
-		store: metrix.NewCollectorStore(),
-		state: &fdGlobalState{},
+		publisher: GetPublisher(),
+		state:     &fdGlobalState{},
 	}
 }
 
@@ -109,7 +109,7 @@ func (c *FDCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	meter := c.store.Write().SnapshotMeter("")
+	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
 	meter.Counter("open").ObserveTotal(float64(snapshot.Open))
 	meter.Counter("close").ObserveTotal(float64(snapshot.Close))
 	meter.Counter("open_error").ObserveTotal(float64(snapshot.OpenErr))
@@ -128,5 +128,5 @@ func (c *FDCollector) ChartTemplateYAML() string {
 }
 
 func (c *FDCollector) MetricStore() metrix.CollectorStore {
-	return c.store
+	return c.publisher.MetricStore()
 }

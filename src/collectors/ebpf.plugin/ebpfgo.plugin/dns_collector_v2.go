@@ -37,9 +37,9 @@ type DNSConfig struct {
 
 type DNSCollector struct {
 	collectorapi.Base
-	Config DNSConfig
-	handle *DNSLegacyHandle
-	store  metrix.CollectorStore
+	Config    DNSConfig
+	handle    *DNSLegacyHandle
+	publisher *PublisherService
 }
 
 func NewDNSCollector() *DNSCollector {
@@ -48,7 +48,7 @@ func NewDNSCollector() *DNSCollector {
 			Enabled:     true,
 			UpdateEvery: dnsDefaultUpdateEvery,
 		},
-		store: metrix.NewCollectorStore(),
+		publisher: GetPublisher(),
 	}
 }
 
@@ -101,7 +101,7 @@ func (c *DNSCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	meter := c.store.Write().SnapshotMeter("")
+	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
 	meter.Counter("requests").ObserveTotal(float64(snapshot.Requests))
 	meter.Counter("responses").ObserveTotal(float64(snapshot.Responses))
 
@@ -119,5 +119,5 @@ func (c *DNSCollector) ChartTemplateYAML() string {
 }
 
 func (c *DNSCollector) MetricStore() metrix.CollectorStore {
-	return c.store
+	return c.publisher.MetricStore()
 }

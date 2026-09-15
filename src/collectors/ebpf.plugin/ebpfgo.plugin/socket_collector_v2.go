@@ -38,9 +38,9 @@ type SocketConfig struct {
 
 type SocketCollector struct {
 	collectorapi.Base
-	Config SocketConfig
-	handle *SocketLegacyHandle
-	store  metrix.CollectorStore
+	Config    SocketConfig
+	handle    *SocketLegacyHandle
+	publisher *PublisherService
 
 	// Function support (network-protocols)
 	fnStore *socketFunctionStore
@@ -52,7 +52,7 @@ func NewSocketCollector() *SocketCollector {
 			Enabled:     true,
 			UpdateEvery: socketDefaultUpdateEvery,
 		},
-		store: metrix.NewCollectorStore(),
+		publisher: GetPublisher(),
 	}
 }
 
@@ -109,7 +109,7 @@ func (c *SocketCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	meter := c.store.Write().SnapshotMeter("")
+	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
 	meter.Counter("ipv4_send").ObserveTotal(float64(snapshot.Ipv4Send))
 	meter.Counter("ipv4_recv").ObserveTotal(float64(snapshot.Ipv4Recv))
 	meter.Counter("ipv6_send").ObserveTotal(float64(snapshot.Ipv6Send))
@@ -139,7 +139,7 @@ func (c *SocketCollector) ChartTemplateYAML() string {
 }
 
 func (c *SocketCollector) MetricStore() metrix.CollectorStore {
-	return c.store
+	return c.publisher.MetricStore()
 }
 
 // Function support: network-protocols
