@@ -800,7 +800,8 @@ int netdata_main(int argc, char **argv) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
 
-                            // rrd_init() hands the engine its configuration, so the page cache is decided here
+                            // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
+                            // before this option can still override it
                             netdata_conf_dbengine.page_cache_mb = 128;
 
                             if(unittest_libs_init())
@@ -836,7 +837,8 @@ int netdata_main(int argc, char **argv) {
                             if (workers > 1024)
                                 workers = 1024;
 
-                            // rrd_init() hands the engine its configuration, so the page cache is decided here
+                            // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
+                            // before this option can still override it
                             if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
                                 page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
                             netdata_conf_dbengine.page_cache_mb = page_cache_mb;
