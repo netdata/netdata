@@ -59,9 +59,11 @@ jq -r '
   "PII pseudonymized  : \(.pii_obfuscated)",
   "secrets redacted   : \(.secrets_redacted)",
   "streaming key kept : \(if .streaming_api_key_redacted then "no" else "YES - verbatim in the collected stream config, by design" end)",
-  "raw SNMP evidence  : requested=\(.snmp_diagnostics.requested) status=\(.snmp_diagnostics.status) files=\(.snmp_diagnostics.files)"
+  "raw SNMP evidence  : " + (if .snmp_diagnostics == null then "not in this schema (pre-v2 bundle)" else "requested=\(.snmp_diagnostics.requested) status=\(.snmp_diagnostics.status) files=\(.snmp_diagnostics.files)" end)
 ' "$M"
-if [ "$(jq -r '.snmp_diagnostics.files' "$M")" != "0" ]; then
+# A pre-v2 bundle has no snmp_diagnostics object at all; treating a missing
+# count as non-zero would falsely claim the bundle carries unsanitized evidence.
+if [ "$(jq -r '.snmp_diagnostics.files // 0' "$M")" != "0" ]; then
     sb_warn "raw SNMP evidence present: UNSANITIZED. Handle privately; SNMP questions belong to triage-snmp-diagnostics."
 fi
 

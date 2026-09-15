@@ -63,6 +63,24 @@ sb_need() {
     command -v "$1" >/dev/null 2>&1 || sb_die "'$1' is required but not installed."
 }
 
+# Windows bundles produced under PowerShell 5.1 store zip entries with
+# backslash separators. The ZIP spec requires forward slashes, so unzip treats
+# each entry as one flat filename containing backslashes and the bundle tree
+# never materialises. Rebuild the tree so such a bundle is readable here.
+_sb_flatten_backslash_entries() {
+    local root="$1" f rel dest
+    while IFS= read -r -d '' f; do
+        rel="${f#"$root"/}"
+        case "$rel" in
+            *\\*) : ;;
+            *) continue ;;
+        esac
+        dest="${root}/${rel//\\//}"
+        mkdir -p "$(dirname "$dest")"
+        mv -f "$f" "$dest"
+    done < <(find "$root" -maxdepth 1 -type f -name '*\\*' -print0 2>/dev/null)
+}
+
 # Resolve a bundle argument to a directory containing MANIFEST.json.
 #
 # Accepts an already-extracted directory, or an archive which is extracted into
@@ -95,7 +113,8 @@ sb_resolve_bundle() {
             tar --zstd -xf "$input" -C "$tmp" 2>/dev/null \
                 || { sb_need zstd; zstd -dc "$input" | tar -xf - -C "$tmp"; } ;;
         *.tar.gz|*.tgz) sb_need tar; tar -xzf "$input" -C "$tmp" ;;
-        *.zip)          sb_need unzip; unzip -q "$input" -d "$tmp" ;;
+        *.zip)          sb_need unzip; unzip -q "$input" -d "$tmp" 2>/dev/null || true
+                        _sb_flatten_backslash_entries "$tmp" ;;
         *)              sb_die "unrecognized bundle format: ${input}" ;;
     esac
 
