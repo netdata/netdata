@@ -1220,9 +1220,10 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     if (NULL == ctx)
         return 1;
 
-    // no more periodic work for this tier from here on
-    __atomic_store_n(&ctx->atomic.active, false, __ATOMIC_RELEASE);
+    // no more periodic work for this tier from here on: the populated flag first, so that a rotation
+    // re-check already in flight on the event loop finds the gate closed before the tier goes inactive
     __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&ctx->atomic.active, false, __ATOMIC_RELEASE);
 
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
