@@ -459,8 +459,8 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         freez(query_threads[i]);
     }
     freez(query_threads);
-    // same teardown as generate_dbengine_dataset() above: rrdeng_exit() frees the
-    // ctx under unittest_running, so clear the host's pointer to it, and release
+    // same teardown as generate_dbengine_dataset() above: rrdeng_exit() frees a
+    // ctx that is not a multidb tier, so clear the host's pointer to it, and release
     // the host we created before the caller tears the shared libraries down
     rrd_wrlock();
     rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
