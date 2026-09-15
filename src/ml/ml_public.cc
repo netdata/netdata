@@ -710,6 +710,21 @@ void ml_fini() {
     if (!Cfg.enable_anomaly_detection || !ml_db)
         return;
 
+    // ml_db is the third database exposed to the shutdown lifetime problem, and the least
+    // obvious: an abandoned metadata worker reaches ml_dimension_load_models() through
+    // metadata_scan_host(), so it is still preparing statements against this handle.
+    //
+    // Deferring this call until after metadata_sync_shutdown() (see daemon-shutdown.c) is
+    // necessary but NOT sufficient: that drain is bounded and can abandon its workers, and
+    // then the ordering guarantees nothing. Honour the same latch as every other teardown
+    // entry point and leak the handle instead.
+    if (sqlite_teardown_is_unsafe()) {
+        nd_log_daemon(
+            NDLP_WARNING,
+            "SQL: skipping the ML database close - SQLite teardown is not safe on this shutdown path");
+        return;
+    }
+
     sql_close_database(ml_db, "ML");
     ml_db = NULL;
 }

@@ -180,28 +180,74 @@ void init_cmd_pool(CmdPool *pool, int size) {
     pool->head = 0;
     pool->tail = 0;
     pool->count = 0;
+    pool->closed = false;
+    pool->producers = 0;
 
     fatal_assert(0 == netdata_mutex_init(&pool->lock));
     fatal_assert(0 == netdata_cond_init(&pool->not_full));
+    fatal_assert(0 == netdata_cond_init(&pool->no_producers));
+}
+
+// Drops one producer reference. Caller holds pool->lock.
+static inline void cmd_pool_producer_left___while_locked(CmdPool *pool)
+{
+    if (pool->producers > 0 && --pool->producers == 0)
+        netdata_cond_broadcast(&pool->no_producers);
+}
+
+bool cmd_pool_producer_enter(CmdPool *pool)
+{
+    netdata_mutex_lock(&pool->lock);
+
+    if (pool->closed) {
+        netdata_mutex_unlock(&pool->lock);
+        return false;
+    }
+
+    pool->producers++;
+    netdata_mutex_unlock(&pool->lock);
+    return true;
+}
+
+void cmd_pool_producer_leave(CmdPool *pool)
+{
+    netdata_mutex_lock(&pool->lock);
+    cmd_pool_producer_left___while_locked(pool);
+    netdata_mutex_unlock(&pool->lock);
 }
 
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
 {
     netdata_mutex_lock(&pool->lock);
 
-    while (pool->count == pool->size) {
+    // counted for the whole call, so close_cmd_pool() cannot return - and the owner cannot go on to
+    // release the pool - while this producer is still inside, including while it is parked below
+    pool->producers++;
+
+    while (!pool->closed && pool->count == pool->size) {
         if (wait_on_full)
             netdata_cond_wait(&pool->not_full, &pool->lock);
         else {
+            cmd_pool_producer_left___while_locked(pool);
             netdata_mutex_unlock(&pool->lock); // No space, return
             return false;
         }
+    }
+
+    // Checked under the same lock as the insertion below, so a consumer that closes the pool and a
+    // producer that pushes cannot both believe they won: the command is either queued before the
+    // close, and the consumer drains it, or refused here and the caller knows not to wait for it.
+    if (pool->closed) {
+        cmd_pool_producer_left___while_locked(pool);
+        netdata_mutex_unlock(&pool->lock);
+        return false;
     }
 
     pool->buffer[pool->tail] = *cmd;
     pool->tail = (pool->tail + 1) % pool->size;
     pool->count++;
 
+    cmd_pool_producer_left___while_locked(pool);
     netdata_mutex_unlock(&pool->lock);
     return true;
 }
@@ -221,13 +267,67 @@ bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd) {
     return true;
 }
 
+void close_cmd_pool(CmdPool *pool) {
+    netdata_mutex_lock(&pool->lock);
+    pool->closed = true;
+
+    // wake every producer parked on a full pool so it re-checks and gives up
+    netdata_cond_broadcast(&pool->not_full);
+
+    // Then wait for them to actually leave. Waking a producer is not the same as it being gone: it
+    // still has to reacquire this mutex and return through it. release_cmd_pool() destroys the mutex
+    // and the conditions, so returning from here while one is mid-wakeup would destroy the very
+    // objects it is about to touch. After this loop the pool is closed for good and empty of
+    // producers, so no later push can arrive either.
+    while (pool->producers > 0)
+        netdata_cond_wait(&pool->no_producers, &pool->lock);
+
+    netdata_mutex_unlock(&pool->lock);
+}
+
+void destroy_cmd_pool(CmdPool *pool) {
+    netdata_mutex_destroy(&pool->lock);
+    netdata_cond_destroy(&pool->not_full);
+    netdata_cond_destroy(&pool->no_producers);
+}
+
 void release_cmd_pool(CmdPool *pool) {
+    netdata_mutex_lock(&pool->lock);
+
+    // Close before freeing, under the lock, even if the owner already called close_cmd_pool().
+    // This is what makes the buffer free safe: a producer that passed its owner's own "are we still
+    // running" check and was then descheduled arrives here afterwards, and it MUST find the pool
+    // refusing rather than a NULL buffer to write into. Owners that never call close_cmd_pool() at
+    // all (the metadata sync loop) depend entirely on this.
+    pool->closed = true;
+    netdata_cond_broadcast(&pool->not_full);
+
     if (pool->buffer) {
         free(pool->buffer);
         pool->buffer = NULL;
     }
-    netdata_mutex_destroy(&pool->lock);
-    netdata_cond_destroy(&pool->not_full);
+
+    // pop_cmd() indexes the buffer whenever count is non-zero, so the count has to go with it
+    pool->count = 0;
+    pool->head = 0;
+    pool->tail = 0;
+
+    netdata_mutex_unlock(&pool->lock);
+
+    // The lock and the conditions are deliberately NOT destroyed.
+    //
+    // close_cmd_pool() can account for producers that are inside the pool, but not for one that has
+    // decided to push and is still blocked acquiring pool->lock: it is not counted yet, so the close
+    // sees zero producers and returns, and destroying the mutex here would pull it out from under a
+    // thread that is about to lock it. Counting cannot fix that - taking the count needs the lock.
+    //
+    // Not destroying them costs nothing: both pools live inside process-lifetime statics
+    // (aclk_sync_config, meta_config), so these are embedded objects, not allocations. Keeping them
+    // valid is what lets the late producer above lock, see `closed`, and be turned away safely.
+    //
+    // A caller that CAN prove no producer remains - one that joined every producer thread - may
+    // follow this with destroy_cmd_pool(). Without that, the pool is not reusable: re-initializing
+    // one at the same address leaves the previous lock and conditions undestroyed.
 }
 
 /// Test
@@ -292,6 +392,11 @@ int test_cmd_pool_fifo()
         uv_thread_join(&consumer);
 
         release_cmd_pool(&pool);
+        // both threads are joined above, so nothing can still reach the pool: this is the one
+        // caller that may destroy the synchronization objects, and it MUST, because the next
+        // iteration initializes a pool at this same address
+        destroy_cmd_pool(&pool);
+
         if (args.failed) {
             fprintf(stderr, "Multithreaded FIFO test failed with %d errors.\n", args.failed);
             return 1;
