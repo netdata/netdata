@@ -8,12 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 )
+
+const notificationResponseLimit = 256 * 1024
 
 func sendWebhook(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
 	return postJSON(ctx, dst, event, timeout)
@@ -107,6 +110,20 @@ func notificationHTTPError(provider string, err error) error {
 	default:
 		return fmt.Errorf("%s transport failed; check connectivity, TLS, and proxy settings", provider)
 	}
+}
+
+func decodeNotificationResponse(provider string, body io.Reader, result any) error {
+	data, err := io.ReadAll(io.LimitReader(body, notificationResponseLimit+1))
+	if err != nil {
+		return notificationHTTPError(provider, err)
+	}
+	if len(data) > notificationResponseLimit {
+		return fmt.Errorf("%s response exceeds the 256 KiB limit", provider)
+	}
+	if err := json.Unmarshal(data, result); err != nil {
+		return fmt.Errorf("invalid %s response", provider)
+	}
+	return nil
 }
 
 func resolveSecret(ctx context.Context, value string) (string, error) {

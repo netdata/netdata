@@ -1,0 +1,9 @@
+{
+  "token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "user": "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUU",
+  "title": "node WARNING: summary",
+  "message": "<b>summary</b>\nNode: node\nAlert: alert\nStatus: WARNING",
+  "html": 1,
+  "priority": 0,
+  "timestamp": 1789387200
+}

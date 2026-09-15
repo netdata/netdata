@@ -5,7 +5,6 @@ package notifier
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -67,20 +66,7 @@ func validateTelegramToken(token string) error {
 }
 
 func validateTelegramAPI(endpoint string) error {
-	if endpoint == "" {
-		return nil // Use the official HTTPS endpoint.
-	}
-	if !validHTTPURL(endpoint, false) {
-		return errors.New("telegram api_url must be an absolute HTTP(S) base URL without user information or fragment")
-	}
-	u, _ := url.Parse(endpoint)
-	if u.RawQuery != "" || u.ForceQuery {
-		return errors.New("telegram api_url must not contain a query")
-	}
-	if strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), "api.telegram.org") && u.Scheme != "https" {
-		return errors.New("the official Telegram API requires HTTPS")
-	}
-	return nil
+	return validateAPIBase(endpoint, "telegram", "api.telegram.org")
 }
 
 func telegramEndpoint(base, token string) (string, error) {

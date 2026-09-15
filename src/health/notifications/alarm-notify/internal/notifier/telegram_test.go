@@ -174,8 +174,8 @@ func TestReadTelegramResponse(t *testing.T) {
 		"trailing document":      {status: 200, body: `{"ok":true} {}`, err: "invalid telegram response"},
 		"negative delay":         {status: 429, body: `{"ok":false,"parameters":{"retry_after":-1}}`, err: "invalid telegram retry delay"},
 		"delay integer overflow": {status: 429, body: `{"ok":false,"parameters":{"retry_after":9223372036854775808}}`, err: "invalid telegram response"},
-		"response boundary":      {status: 200, body: `{"ok":true}` + strings.Repeat(" ", telegramResponseLimit-len(`{"ok":true}`)), want: telegramResponse{OK: &ok}},
-		"oversized":              {status: 200, body: strings.Repeat(" ", telegramResponseLimit+1), err: "256 KiB limit"},
+		"response boundary":      {status: 200, body: `{"ok":true}` + strings.Repeat(" ", notificationResponseLimit-len(`{"ok":true}`)), want: telegramResponse{OK: &ok}},
+		"oversized":              {status: 200, body: strings.Repeat(" ", notificationResponseLimit+1), err: "256 KiB limit"},
 		"unexpected HTTP status": {status: 503, body: `synthetic-private-value`, err: "HTTP 503"},
 	} {
 		t.Run(name, func(t *testing.T) {

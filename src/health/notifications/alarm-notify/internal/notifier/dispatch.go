@@ -37,6 +37,8 @@ func dispatch(
 			err = sendDiscord(ctx, dst, event, timeout)
 		case "telegram":
 			err = sendTelegram(ctx, dst, event, timeout)
+		case "pushover":
+			err = sendPushover(ctx, dst, event, timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}

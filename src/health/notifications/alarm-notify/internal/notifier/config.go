@@ -29,6 +29,8 @@ type Destination struct {
 	URL             string         `yaml:"url,omitempty"`
 	BearerToken     string         `yaml:"bearer_token,omitempty"`
 	BotToken        string         `yaml:"bot_token,omitempty"`
+	AppToken        string         `yaml:"app_token,omitempty"`
+	UserKey         string         `yaml:"user_key,omitempty"`
 	ChatID          string         `yaml:"chat_id,omitempty"`
 	MessageThreadID *configInteger `yaml:"message_thread_id,omitempty"`
 	APIURL          string         `yaml:"api_url,omitempty"`
@@ -83,17 +85,25 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "pushover" {
+		return dst.validatePushover()
+	}
+	if dst.AppToken != "" || dst.UserKey != "" {
+		return errors.New("app_token and user_key require type: pushover")
+	}
 	if dst.Type == "telegram" {
 		return dst.validateTelegram()
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord or telegram; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram or pushover; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
-		return errors.New("bot_token, chat_id, message_thread_id, api_url and retries_on_limit require type: telegram")
+		return errors.New(
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram or pushover",
+		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
 		return fmt.Errorf("%s destinations authenticate through their URL; bearer_token is not supported", dst.Type)
@@ -158,4 +168,24 @@ func validHTTPURL(value string, allowFragment bool) bool {
 	u, err := url.Parse(value)
 	return err == nil && u.Hostname() != "" && u.Opaque == "" && u.User == nil &&
 		(allowFragment || u.Fragment == "") && (u.Scheme == "http" || u.Scheme == "https")
+}
+
+func validateAPIBase(endpoint, provider, officialHost string) error {
+	if endpoint == "" {
+		return nil // The provider uses its official HTTPS endpoint.
+	}
+	if !validHTTPURL(endpoint, false) {
+		return fmt.Errorf(
+			"%s api_url must be an absolute HTTP(S) base URL without user information or fragment",
+			provider,
+		)
+	}
+	u, _ := url.Parse(endpoint)
+	if u.RawQuery != "" || u.ForceQuery {
+		return fmt.Errorf("%s api_url must not contain a query", provider)
+	}
+	if strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), officialHost) && u.Scheme != "https" {
+		return fmt.Errorf("the official %s API requires HTTPS", provider)
+	}
+	return nil
 }

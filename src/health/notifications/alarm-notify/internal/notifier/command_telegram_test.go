@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -274,17 +273,25 @@ func TestRunTelegram(t *testing.T) {
 	}
 }
 
-func TestTelegramResponseCancellation(t *testing.T) {
-	for name, explicit := range map[string]bool{"cancel": true, "deadline": false} {
+func TestAcknowledgmentCancellation(t *testing.T) {
+	for name, test := range map[string]struct {
+		provider string
+		cancel   bool
+	}{
+		"telegram cancel":   {provider: "telegram", cancel: true},
+		"telegram deadline": {provider: "telegram"},
+		"pushover cancel":   {provider: "pushover", cancel: true},
+		"pushover deadline": {provider: "pushover"},
+	} {
 		t.Run(name, func(t *testing.T) {
 			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/bot123:synthetic-private-value/sendMessage":
+				case "/bot123:synthetic-private-value/sendMessage", "/1/messages.json":
 					_, _ = io.Copy(io.Discard, r.Body)
 					w.WriteHeader(200)
-					_, _ = io.WriteString(w, `{"ok":`)
+					_, _ = io.WriteString(w, `{`)
 					w.(http.Flusher).Flush()
 					close(started)
 					select {
@@ -300,18 +307,29 @@ func TestTelegramResponseCancellation(t *testing.T) {
 			}))
 			defer server.Close()
 			defer close(cleanup)
-			config := fmt.Sprintf(`version: 1
-destinations:
-  first: {type: webhook, url: %q}
-  blocked: {type: telegram, api_url: %q, bot_token: '123:synthetic-private-value', chat_id: '1'}
-  after: {type: webhook, url: %q}
-routing:
-  roles:
-    ops: [first, blocked, after]
-`, server.URL+"/first", server.URL, server.URL+"/after")
+			dst := Destination{
+				Type:     "telegram",
+				APIURL:   server.URL,
+				BotToken: "123:synthetic-private-value",
+				ChatID:   "1",
+			}
+			if test.provider == "pushover" {
+				dst = Destination{
+					Type:     "pushover",
+					APIURL:   server.URL,
+					AppToken: pushoverTestToken,
+					UserKey:  pushoverTestUser,
+				}
+			}
+			config, err := yaml.Marshal(Config{Version: 1, Destinations: map[string]Destination{
+				"first":   {Type: "webhook", URL: server.URL + "/first"},
+				"blocked": dst,
+				"after":   {Type: "webhook", URL: server.URL + "/after"},
+			}, Routing: Routing{Roles: map[string][]string{"ops": {"first", "blocked", "after"}}}})
+			require.NoError(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			path := writeConfig(t, config)
+			path := writeConfig(t, string(config))
 			var stdout, stderr bytes.Buffer
 			done := make(chan int, 1)
 			go func() {
@@ -320,9 +338,9 @@ routing:
 			select {
 			case <-started:
 			case <-time.After(2 * time.Second):
-				t.Fatal("Telegram request not started")
+				t.Fatal("provider request not started")
 			}
-			if explicit {
+			if test.cancel {
 				cancel()
 			}
 			select {

@@ -16,6 +16,8 @@ Telegram's optional retries honor the server's requested delay instead of Bash's
 - Native Discord webhooks with status-colored embeds, navigation, confirmed delivery and one URL per named destination.
 - Telegram bot messages with chat/topic routing, escaped HTML, silent recovery, disabled previews, custom API bases,
   JSON acknowledgments and optional rate-limit retries within the invocation deadline.
+- Pushover app/user or group delivery with status priorities, escaped HTML, safe shortening, navigation,
+  custom API bases and JSON acknowledgments.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -27,7 +29,7 @@ remote services remain available.
 | Provider | Bash function | Go migration |
 |---|---|---|
 | Email | `send_email` | Pending |
-| Pushover | `send_pushover` | Pending |
+| Pushover | `send_pushover` | Implemented with app/user or group keys, HTML, priorities, timestamp, navigation, safe shortening and acknowledgment checks |
 | Pushbullet | `send_pushbullet` | Pending |
 | Kafka HTTP bridge | `send_kafka` | Pending |
 | PagerDuty | `send_pd` | Pending |
@@ -65,14 +67,14 @@ remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord and Telegram content/link/status formatting implemented; other providers and richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URL settings, plus Telegram bot/chat/topic/API/retry settings implemented; remaining provider configuration pending |
-| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook, Slack, Discord and Telegram fan-out; provider subtarget details pending with providers |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram and Pushover content/link/status formatting implemented; other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs, Telegram bot/chat/topic/API/retry settings and Pushover app/user/API settings implemented; remaining provider configuration pending |
+| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook, Slack, Discord, Telegram and Pushover fan-out; provider subtarget details pending with providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first five increments cover the foundation, routing/fan-out, modern Slack app webhooks, native Discord, and Telegram.
+The first six increments cover the foundation, routing/fan-out, modern Slack app webhooks, Discord, Telegram and Pushover.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
 More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final
 architecture and broad refactoring are discussed after that working baseline exists.

@@ -4,21 +4,16 @@ package notifier
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
 )
 
-const (
-	telegramTextLimit     = 4096 // After parsing HTML: https://core.telegram.org/bots/api#sendmessage
-	telegramResponseLimit = 256 * 1024
-)
+const telegramTextLimit = 4096 // After parsing HTML: https://core.telegram.org/bots/api#sendmessage
 
 type telegramMessage struct {
 	ChatID              string              `json:"chat_id"`
@@ -135,15 +130,11 @@ func readTelegramResponse(response *http.Response) (telegramResponse, error) {
 	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusTooManyRequests {
 		return telegramResponse{}, fmt.Errorf("telegram returned HTTP %d", response.StatusCode)
 	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, telegramResponseLimit+1))
-	if err != nil {
-		return telegramResponse{}, notificationHTTPError("telegram", err)
-	}
-	if len(data) > telegramResponseLimit {
-		return telegramResponse{}, errors.New("telegram response exceeds the 256 KiB limit")
-	}
 	var result telegramResponse
-	if err := json.Unmarshal(data, &result); err != nil || result.OK == nil {
+	if err := decodeNotificationResponse("telegram", response.Body, &result); err != nil {
+		return telegramResponse{}, err
+	}
+	if result.OK == nil {
 		return telegramResponse{}, errors.New("invalid telegram response")
 	}
 	if result.Parameters.RetryAfter != nil && *result.Parameters.RetryAfter < 0 {

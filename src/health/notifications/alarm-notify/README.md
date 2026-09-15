@@ -1,12 +1,12 @@
 # Experimental Go notifier
 
-This standalone Go module routes a JSON notification to named generic webhook, Slack, Discord, and Telegram destinations.
+This standalone Go module routes a JSON notification to named webhook, Slack, Discord, Telegram and Pushover destinations.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
-and Telegram bot messages.
+Telegram bot messages, and Pushover notifications.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -33,7 +33,7 @@ class Receiver(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(b'{"ok":true,"result":{"message_id":1}}')
+        self.wfile.write(b'{"ok":true,"status":1,"result":{"message_id":1}}')
 
     def log_message(self, *args):
         pass  # Avoid logging credential-bearing request paths.
@@ -72,12 +72,13 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
 Configuration has `version: 1` and a `destinations` mapping. Webhook, Slack and Discord destinations require `type`
 and `url`; `bearer_token` is optional for generic webhooks and rejected for Slack/Discord. Telegram requires
 `type: telegram`, `bot_token` and `chat_id`, with the additional settings described below. Provider-specific settings
-are rejected on other provider types. Destination names are nonsecret identifiers.
+are rejected on other provider types. Pushover requires `type: pushover`, `app_token` and `user_key`.
+Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
-The URL, bearer token, Telegram bot token and Telegram API base accept literal strings or a whole `${env:VARIABLE}`
+URLs, bearer tokens, Telegram bot tokens and Pushover app/user keys accept literal strings or a whole `${env:VARIABLE}`
 or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
@@ -118,8 +119,8 @@ not claim an outcome for interrupted or unstarted deliveries.
 
 Deliveries use POST with `Content-Type: application/json`; generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. These three providers make one attempt and
-close response bodies without buffering or interpreting them. Telegram checks a bounded JSON acknowledgment and
-can retry rate limits as described below. Redirects are never followed. Errors do not echo config/input values,
+close response bodies without buffering or interpreting them. Telegram and Pushover check bounded JSON acknowledgments;
+Telegram can retry rate limits as described below. Redirects are never followed. Errors do not echo config/input values,
 secret contents, response text, or endpoint URLs.
 
 ## Slack app webhooks
@@ -285,6 +286,61 @@ Save as `telegram-local.yaml`, then run:
 
 Local tests verify requests, acknowledgments, retry timing and cancellation. They do not send to Telegram or verify
 native Telegram rendering. The production Bash notifier and its configuration are unchanged.
+
+## Pushover notifications
+
+Register a [Pushover application](https://pushover.net/api) and configure one user or group key per named destination.
+Routes can select several destinations, each with its own app token and recipient key:
+
+```yaml
+version: 1
+destinations:
+  pushover_ops:
+    type: pushover
+    app_token: ${env:NOTIFY_PUSHOVER_APP_TOKEN}
+    user_key: ${env:NOTIFY_PUSHOVER_USER_KEY}
+routing:
+  roles:
+    sysadmin: [pushover_ops]
+```
+
+Both keys contain 30 ASCII letters or digits. Environment and file references keep them out of configuration files;
+unused destinations need no local credentials. Other providers' credential, recipient and retry fields are rejected.
+An optional `api_url` accepts a literal or secret reference and defaults to `https://api.pushover.net`. A custom HTTP(S)
+base may include a path prefix but no credentials, query or fragment. The official service requires HTTPS.
+The notifier appends `/1/messages.json`.
+
+Messages include an escaped HTML summary and details, node/alert, status transition, chart/context, known values
+with units, the event timestamp and an optional navigation link. Priorities match Bash: CLEAR uses -1 (quiet),
+WARNING uses 0 (normal) and CRITICAL uses 1 (high). Unknown values are omitted; zero remains visible.
+
+Following Bash, titles longer than 250 characters and encoded messages longer than 1,024 characters are shortened
+with `...`. Shortening preserves Unicode, complete HTML entities and balanced generated tags. HTML markup and entities
+count toward the message budget. Supplementary URLs longer than 512 characters are omitted; the notification still
+sends. Richer shared presentation remains pending in the inventory.
+
+Delivery requires HTTP 200 and JSON `status: 1`, confirming acceptance into Pushover's queue. Acknowledgments are
+limited to 256 KiB; errors omit response text and credentials. There are no automatic retries, including on quota
+exhaustion or server errors. A failed destination allows later destinations to proceed within the invocation deadline.
+
+For a local demonstration with the receiver above, save this as `pushover-local.yaml`:
+
+```yaml
+version: 1
+destinations:
+  pushover_local:
+    type: pushover
+    api_url: http://127.0.0.1:18080
+    app_token: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    user_key: UUUUUUUUUUUUUUUUUUUUUUUUUUUUUU
+```
+
+```sh
+/tmp/alarm-notify send --config pushover-local.yaml --destination pushover_local < examples/event.json
+```
+
+Tests use synthetic keys and local receivers. They verify complete requests, acknowledgments, shortening and
+cancellation, without sending to Pushover or verifying native client rendering.
 
 ## Event document
 
