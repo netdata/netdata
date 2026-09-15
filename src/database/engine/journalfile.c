@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-// the default value is set in ND_PROFILE, not here
-time_t dbengine_journal_v2_unmount_time = 120;
-
 /* Careful to always call this before creating a new journal file */
 int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
@@ -352,9 +349,9 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
 void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
-    for(size_t tier = 0; tier < (size_t)nd_profile.storage_tiers;tier++) {
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct rrdengine_instance *ctx = multidb_ctx[tier];
-        if(!ctx) continue;
+        if(!rrdeng_ctx_is_active(ctx)) continue;
 
         struct rrdengine_datafile *datafile;
         if(netdata_rwlock_tryrdlock(&ctx->datafiles.rwlock) != 0)
@@ -383,7 +380,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
                     journalfile->v2.not_needed_since_s = now_s;
 
                 else if (
-                    dbengine_journal_v2_unmount_time && now_s - journalfile->v2.not_needed_since_s >= dbengine_journal_v2_unmount_time)
+                    dbengine_cfg.journal_v2_unmount_time_s && now_s - journalfile->v2.not_needed_since_s >= dbengine_cfg.journal_v2_unmount_time_s)
                     // enough time has passed since we last needed this journal
                     unmount = true;
             }
@@ -717,7 +714,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     char path[RRDENG_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, dbengine_use_direct_io);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, dbengine_cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -1114,7 +1111,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
     if (rc) return 1;
 
-    if (!db_engine_journal_check)
+    if (!dbengine_cfg.journal_integrity_check)
         return 0;
 
     rc = journalfile_check_v2_metric_list(data_start, journal_v2_file_size);
@@ -1453,7 +1450,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     // Initialize the journal file to be able to access the data
 
-    if (!db_engine_journal_check)
+    if (!dbengine_cfg.journal_integrity_check)
         journalfile->v2.flags |= JOURNALFILE_FLAG_METRIC_CRC_CHECK;
 
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
@@ -1861,7 +1858,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    fd = open_file_for_io(path, O_RDWR, &file, dbengine_use_direct_io);
+    fd = open_file_for_io(path, O_RDWR, &file, dbengine_cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
 

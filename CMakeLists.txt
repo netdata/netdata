@@ -1355,6 +1355,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/signals/signals.h
         src/libnetdata/runtime-paths/runtime-paths.c
         src/libnetdata/runtime-paths/runtime-paths.h
+        src/libnetdata/protected-access/protected-access.c
+        src/libnetdata/protected-access/protected-access.h
         src/libnetdata/os/machine_id.c
         src/libnetdata/os/machine_id.h
         src/libnetdata/os/process_memory.c
@@ -1519,8 +1521,6 @@ set(DAEMON_FILES
         src/daemon/status-file-dmi.h
         src/daemon/status-file-product.c
         src/daemon/status-file-product.h
-        src/daemon/protected-access.c
-        src/daemon/protected-access.h
 )
 
 set(DAEMON_SYSTEMD_WATCHER_FILES
@@ -1851,6 +1851,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
+        src/database/storage-engine-types.h
         src/database/ram/rrddim_mem.c
         src/database/ram/rrddim_mem.h
         src/database/sqlite/sqlite_metadata.c
@@ -1937,10 +1938,14 @@ if(ENABLE_DBENGINE)
             src/database/engine/mrg-load.c
             src/database/engine/pdc.c
             src/database/engine/pdc.h
-            src/database/engine/dbengine-unittest.c
-            src/database/engine/dbengine-stresstest.c
+            src/database/dbengine-unittest.c
+            src/database/dbengine-stresstest.c
             src/database/engine/dbengine-compression.c
             src/database/engine/dbengine-compression.h
+            src/database/engine/dbengine-config.c
+            src/database/engine/dbengine-config.h
+            src/database/engine/dbengine-workers.h
+            src/database/engine/dbengine-stats.h
     )
 endif()
 

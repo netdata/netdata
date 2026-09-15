@@ -3,12 +3,43 @@
 #ifndef NETDATA_RRDENGINE_H
 #define NETDATA_RRDENGINE_H
 
+// START HERE
+//
+// dbengine is netdata's tiered time-series store. Vocabulary used throughout this directory:
+//
+//   ctx (struct rrdengine_instance)   one tier of one database: a directory of datafiles and their journals;
+//                                     the daemon's tiers are multidb_ctx[]
+//   datafile / extent / page          on-disk container / a compressed group of pages / one metric's samples
+//   journalfile                       the per-datafile index of extents and metrics (v1 while writing, v2 when sealed)
+//   MRG, the metric registry          process-wide: every metric's uuid, section (its ctx) and retention (mrg.h)
+//   PGC, the page cache               process-wide caches shared by all ctxs (cache.h, pagecache.h)
+//   PDC, the page details control     the plan of one query: which pages, from cache or disk, in what order (pdc.h)
+//   the event loop (rrdeng_main)      the single libuv thread that owns datafile I/O, flushing and rotation
+//
+// The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable, hands it its
+// configuration and optional services through dbengine-config.h, and reads what the engine publishes
+// (statistics, worker job ids) through the engine's own headers. The engine includes nothing of the
+// daemon.
+
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "../rrd.h"
+#include "../storage-engine-types.h"
+#include "dbengine-config.h"
+#include "dbengine-workers.h"
+
+// the process-wide configuration, copied once by dbengine_init() and read-only afterwards
+extern struct dbengine_config dbengine_cfg;
+
+#define RRDENG_FD_BUDGET_PER_INSTANCE (50)
+
+extern size_t page_type_size[];
+extern size_t tier_page_size[];
+#define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
+bool dbengine_initialized(void);
+
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
 #include "datafile.h"
@@ -20,9 +51,6 @@
 #include "pdc.h"
 #include "page.h"
 
-#include "daemon/protected-access.h"
-
-extern unsigned rrdeng_pages_per_extent;
 
 #define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
 #define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)
@@ -54,7 +82,6 @@ struct rrdengine_instance;
 struct rrdeng_cmd;
 
 #define MAX_PAGES_PER_EXTENT (109) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
-#define DEFAULT_PAGES_PER_EXTENT (109)
 
 #define MAX_EXTENT_UNCOMPRESSED_SIZE (MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE))
 
@@ -78,12 +105,6 @@ static inline bool rrdeng_valid_extent_disk_size(size_t size) {
 
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
-
-typedef struct dbengine_tier_stats  {
-    RRDSET *st;
-    RRDDIM *rd_space;
-    RRDDIM *rd_time;
-} DBENGINE_TIER_STATS;
 
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
@@ -302,7 +323,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_CTX_QUIESCE,
     RRDENG_OPCODE_CTX_POPULATE_MRG,
     RRDENG_OPCODE_SHUTDOWN_EVLOOP,
-    RRDENG_OPCODE_PARALLEL_WEIGHT,
+    RRDENG_OPCODE_EXTERNAL_WORK,
     RRDENG_OPCODE_MRG_LOAD,
     RRDENG_OPCODE_CLEANUP,
 
@@ -406,18 +427,11 @@ extern struct rrdeng_global_stats global_stats;
 typedef struct tier_config_prototype {
     int tier;                                   // the tier of this ctx
     uint8_t page_type;                          // default page type for this context
+    size_t grouping;                            // points of tier 0 per point of this tier
     uint64_t max_disk_space;                    // the max disk space this ctx is allowed to use
     time_t max_retention_s;                     // The max retention in seconds
-    uint8_t disk_percentage;                    // percentage of metadata that contribute towards tier space used
     uint8_t global_compress_alg;                // the wanted compression algorithm
     char dbfiles_path[FILENAME_MAX + 1];
-
-    struct {
-        uint32_t uses;
-        bool enabled;
-        bool is_on_disk;
-        SPINLOCK spinlock;
-    } _internal;
 } TIER_CONFIG_PROTOTYPE;
 
 struct rrdengine_instance {
@@ -447,6 +461,8 @@ struct rrdengine_instance {
 
         PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
+        PAD64(bool) active;                                // set when rrdeng_init() succeeded, cleared by rrdeng_exit()
+        PAD64(bool) mrg_populated;                         // set when the metrics registry has been loaded from every journal
         PAD64(bool) migration_to_v2_running;
         PAD64(bool) now_deleting_files;
         PAD64(bool) needs_indexing;
@@ -469,6 +485,19 @@ struct rrdengine_instance {
 
     struct rrdengine_statistics stats;
 };
+
+// a tier that came up and has not been shut down; the event loop's periodic work covers exactly these
+static inline bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
+    return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
+}
+
+// Retention and indexing work wait until the registry has been loaded from every journal: rotating a
+// datafile before then would drop metrics the registry has not learned yet. The loader's own datafile references only
+// protect the files it is reading at that moment; this flag keeps rotation from starting at all.
+static inline bool rrdeng_ctx_is_mrg_populated(struct rrdengine_instance *ctx) {
+    return __atomic_load_n(&ctx->atomic.mrg_populated, __ATOMIC_ACQUIRE);
+}
+
 
 #define ctx_current_disk_space_get(ctx) __atomic_load_n(&(ctx)->atomic.current_disk_space, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_increase(ctx, size) __atomic_add_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
@@ -612,7 +641,6 @@ static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, uns
 
 bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
-void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
 void dbengine_event_loop(void *arg);
 
@@ -704,10 +732,7 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
-void rrdeng_calculate_tier_disk_space_percentage(void);
-uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
-void dbengine_shutdown();
+void dbengine_shutdown(void);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);

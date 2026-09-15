@@ -102,10 +102,13 @@ static void rrdeng_exit_background(void *ptr) {
     rrdeng_exit(ctx);
 }
 
+// the tier count in nd_profile is lowered when a tier fails to start, hiding any tier above it that did start;
+// the engine's own active flag is the truth about which tiers are up
 static void rrdeng_quiesce_all()
 {
-    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-        rrdeng_quiesce(multidb_ctx[tier]);
+    for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        if (rrdeng_ctx_is_active(multidb_ctx[tier]))
+            rrdeng_quiesce(multidb_ctx[tier]);
 }
 
 static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
@@ -115,7 +118,10 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         return;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
-    for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+    for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        if (!rrdeng_ctx_is_active(multidb_ctx[tier]))
+            continue;
+
         if (dirty_only)
             rrdeng_flush_dirty(multidb_ctx[tier]);
         else
@@ -133,8 +139,9 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         size_t count = 50;
         while (running && count) {
             running = 0;
-            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-                running += rrdeng_collectors_running(multidb_ctx[tier]);
+            for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+                if (rrdeng_ctx_is_active(multidb_ctx[tier]))
+                    running += rrdeng_collectors_running(multidb_ctx[tier]);
 
             if (running) {
                 nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
@@ -297,6 +304,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // status file records.
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
+#ifdef ENABLE_DBENGINE
+    // remembered before any tier exits (exiting clears the engine's active flag), for the exit and the finalize loops
+    bool dbengine_tier_up[RRD_STORAGE_TIERS];
+    for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        dbengine_tier_up[tier] = dbengine_enabled && rrdeng_ctx_is_active(multidb_ctx[tier]);
+#endif
+
     if (abnormal) {
         watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
@@ -315,17 +329,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             rrdeng_flush_everything_and_wait(true, true, false);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
-            ND_THREAD **th = callocz(nd_profile.storage_tiers, sizeof(*th));
-            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-                th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, rrdeng_exit_background, multidb_ctx[tier]);
+            ND_THREAD *th[RRD_STORAGE_TIERS] = { 0 };
+            for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+                if (dbengine_tier_up[tier])
+                    th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, rrdeng_exit_background, multidb_ctx[tier]);
 
-            // flush anything remaining again - just in case
-            rrdeng_flush_everything_and_wait(true, true, false);
-
-            for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
-                nd_thread_join(th[tier]);
-
-            freez(th);
+            for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+                if (th[tier])
+                    nd_thread_join(th[tier]);
 
             dbengine_shutdown();
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
@@ -468,8 +479,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
             metrics_referenced);
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        if(multidb_ctx[tier]) {
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        if(dbengine_tier_up[tier]) {
             fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
             finalize_rrd_files(multidb_ctx[tier]);
             memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));

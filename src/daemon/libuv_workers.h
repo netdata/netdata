@@ -3,47 +3,22 @@
 #ifndef NETDATA_EVENT_LOOP_H
 #define NETDATA_EVENT_LOOP_H
 
+#include "libnetdata/libnetdata.h"
+
+// job ids are indices into per-thread worker utilization tables that every user of the libuv threadpool
+// shares; the storage engine owns the first block, the daemon's own jobs follow it
+#ifdef ENABLE_DBENGINE
+#include "database/engine/dbengine-workers.h"
+#define UV_EVENT_JOB_FIRST RRDENG_WORKER_JOB_MAX
+#else
+#define UV_EVENT_JOB_FIRST 1
+#endif
+
 enum event_loop_job {
     UV_EVENT_JOB_NONE = 0,
 
-    // generic
-    UV_EVENT_WORKER_INIT,
-
-    // query related
-    UV_EVENT_DBENGINE_QUERY,
-    UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP,
-    UV_EVENT_DBENGINE_EXTENT_MMAP,
-    UV_EVENT_DBENGINE_EXTENT_DECOMPRESSION,
-    UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP,
-    UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION,
-    UV_EVENT_DBENGINE_EXTENT_PAGE_ALLOCATION,
     // Metrics calculation
-    UV_EVENT_WEIGHTS_CALCULATION,
-
-    // flushing related
-    UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE,
-    UV_EVENT_DBENGINE_EXTENT_WRITE,
-    UV_EVENT_DBENGINE_FLUSHED_TO_OPEN,
-
-    // datafile full
-    UV_EVENT_DBENGINE_JOURNAL_INDEX,
-
-    // db rotation related
-    UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT,
-    UV_EVENT_DBENGINE_DATAFILE_DELETE,
-    UV_EVENT_DBENGINE_FIND_ROTATED_METRICS, // find the metrics that are rotated
-    UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION, // find their remaining retention
-    UV_EVENT_DBENGINE_POPULATE_MRG, // update mrg
-
-    // other dbengine events
-    UV_EVENT_DBENGINE_EVICT_MAIN_CACHE,
-    UV_EVENT_DBENGINE_EVICT_OPEN_CACHE,
-    UV_EVENT_DBENGINE_EVICT_EXTENT_CACHE,
-    UV_EVENT_DBENGINE_BUFFERS_CLEANUP,
-    UV_EVENT_DBENGINE_FLUSH_DIRTY,
-    UV_EVENT_DBENGINE_QUIESCE,
-    UV_EVENT_DBENGINE_MRG_LOAD,
-    UV_EVENT_DBENGINE_SHUTDOWN,
+    UV_EVENT_WEIGHTS_CALCULATION = UV_EVENT_JOB_FIRST,
 
     // metadata
     UV_EVENT_HOST_CONTEXT_LOAD,
@@ -98,7 +73,13 @@ enum event_loop_job {
 
     // netdatacli
     UV_EVENT_SCHEDULE_CMD,
+
+    // terminator
+    UV_EVENT_JOB_MAX,
 };
+
+// the engine's block and the daemon's block share one per-thread table; an id added to either shifts the daemon's
+static_assert(UV_EVENT_JOB_MAX <= WORKER_UTILIZATION_MAX_JOB_TYPES, "libuv worker job ids exceed the worker utilization table");
 
 #define MAX_ACTIVE_WORKERS (256)
 
@@ -176,5 +157,18 @@ void release_cmd_pool(CmdPool *pool);
 // provable - every producer thread joined - and only if the pool's storage is to be reused.
 void destroy_cmd_pool(CmdPool *pool);
 int test_cmd_pool_fifo();
+
+// size of the libuv worker thread pool, resolved from netdata.conf at startup
+#if defined(ENV32BIT)
+#define MIN_LIBUV_WORKER_THREADS 8
+#define MAX_LIBUV_WORKER_THREADS 128
+#define RESERVED_LIBUV_WORKER_THREADS 3
+#else
+#define MIN_LIBUV_WORKER_THREADS 16
+#define MAX_LIBUV_WORKER_THREADS 1024
+#define RESERVED_LIBUV_WORKER_THREADS 6
+#endif
+
+extern int libuv_worker_threads;
 
 #endif //NETDATA_EVENT_LOOP_H

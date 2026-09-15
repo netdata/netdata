@@ -997,7 +997,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
 
 #ifdef ENABLE_DBENGINE
-    session_status.oom_protection = dbengine_out_of_memory_protection;
+    session_status.oom_protection = netdata_conf_dbengine.out_of_memory_protection_bytes;
 #else
     session_status.oom_protection = 0;
 #endif

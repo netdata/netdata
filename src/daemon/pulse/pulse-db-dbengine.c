@@ -658,7 +658,7 @@ void pulse_dbengine_do(bool extended) {
 
     mrg_stats_old = mrg_stats;
 
-    struct rrdeng_buffer_sizes dbmem = rrdeng_pulse_memory_sizes();
+    struct rrdeng_buffer_sizes dbmem = rrdeng_get_memory_sizes();
 
     int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 

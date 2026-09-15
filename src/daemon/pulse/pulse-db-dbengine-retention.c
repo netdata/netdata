@@ -2,7 +2,14 @@
 
 #include "pulse-db-dbengine-retention.h"
 #ifdef ENABLE_DBENGINE
+#include "database/rrd.h"
 #include "database/engine/rrdengineapi.h"
+
+typedef struct dbengine_tier_stats {
+    RRDSET *st;
+    RRDDIM *rd_space;
+    RRDDIM *rd_time;
+} DBENGINE_TIER_STATS;
 
 void dbengine_retention_statistics(bool extended __maybe_unused) {
 
@@ -10,8 +17,6 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
 
     if (!localhost)
         return;
-
-    rrdeng_calculate_tier_disk_space_percentage();
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;

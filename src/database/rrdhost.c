@@ -410,12 +410,11 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
             host->db[0].eng = storage_engine_get(host->db[0].mode);
             host->db[0].tier_grouping = get_tier_grouping(0);
 
-            ret = rrdeng_init(
-                (struct rrdengine_instance **)&host->db[0].si,
-                dbenginepath,
-                default_rrdeng_disk_quota_mb,
-                0,
-                0); // may fail here for legacy dbengine initialization
+            struct rrdeng_tier_config tc;
+            netdata_conf_dbengine_tier_config(0, &tc);
+            tc.dbfiles_path = dbenginepath;
+            tc.disk_space_mb = default_rrdeng_disk_quota_mb;
+            ret = rrdeng_init((struct rrdengine_instance **)&host->db[0].si, &tc);
 
             initialized = (ret == 0);
 

@@ -223,7 +223,7 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metri
     uint32_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
 
     if(!dt_s)
-        dt_s = nd_profile.update_every;
+        dt_s = dbengine_cfg.default_update_every_s;
 
     time_t previous_page_end_time_s = now_s - dt_s;
     bool first = true;
@@ -396,7 +396,7 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
     time_t now_s = wanted_start_time_s;
     time_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
     if(!dt_s)
-        dt_s = nd_profile.update_every;
+        dt_s = dbengine_cfg.default_update_every_s;
 
     size_t pages_pass2 = 0, pages_pass3 = 0;
     while((pd = pdc_find_page_for_time(
@@ -836,7 +836,7 @@ ALWAYS_INLINE void rrdeng_prep_wait(PDC *pdc) {
 
 ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
     if(worker)
-        worker_is_busy(UV_EVENT_DBENGINE_QUERY);
+        worker_is_busy(RRDENG_WORKER_JOB_QUERY);
 
     pdc->page_list_JudyL = get_page_list(pdc->ctx, pdc->metric,
                                                  pdc->start_time_s * USEC_PER_SEC,
@@ -1185,7 +1185,7 @@ void pgc_and_mrg_initialize(void)
 {
     main_mrg = mrg_create();
 
-    size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;
+    size_t target_cache_size = dbengine_cfg.page_cache_mb * 1024ULL * 1024ULL;
     size_t main_cache_size = (target_cache_size / 100) * 70;
     size_t open_cache_size = 0;
     size_t extent_cache_size = (target_cache_size / 100) * 30;
@@ -1195,13 +1195,13 @@ void pgc_and_mrg_initialize(void)
         main_cache_size = target_cache_size - extent_cache_size;
     }
 
-    extent_cache_size += (size_t)(default_rrdeng_extent_cache_mb * 1024ULL * 1024ULL);
+    extent_cache_size += dbengine_cfg.extent_cache_mb * 1024ULL * 1024ULL;
 
     main_cache = pgc_create(
             "MAIN_PGC",
             main_cache_size,
             main_cache_free_clean_page_callback,
-            (size_t) rrdeng_pages_per_extent,
+            (size_t) dbengine_cfg.pages_per_extent,
             main_cache_flush_dirty_page_init_callback,
             main_cache_flush_dirty_page_callback,
             2,
