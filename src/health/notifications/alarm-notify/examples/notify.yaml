@@ -90,6 +90,10 @@ destinations:
     access_token: ${env:NOTIFY_SMSEAGLE_ACCESS_TOKEN}
     recipients: ['+15005550009', '05005550009']
     message_type: sms
+  pagerduty:
+    type: pagerduty
+    api_version: 2
+    integration_key: ${env:NOTIFY_PAGERDUTY_INTEGRATION_KEY}
 routing:
   default: [local]
   roles:
@@ -109,3 +113,4 @@ routing:
     monitoring_ops: [alerta, dynatrace]
     form_ops: [prowl, kavenegar]
     appliance_ops: [smseagle]
+    pagerduty_ops: [pagerduty]

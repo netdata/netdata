@@ -1,7 +1,8 @@
 # Experimental Go notifier
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
-Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar and SMSEagle.
+Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
+SMSEagle and PagerDuty.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -9,7 +10,7 @@ The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
-Prowl push notifications, Kavenegar SMS and SMSEagle SMS/MMS and voice calls.
+Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, and PagerDuty v1/v2 incident events.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -36,7 +37,7 @@ class Receiver(BaseHTTPRequestHandler):
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
         print(body, flush=True)
         status = 200
-        if self.path.endswith("/events"):
+        if self.path.endswith(("/events", "/v2/enqueue")):
             status = 202
         elif self.path.endswith(("/Messages.json", "/messages", "/signl4", "/alert", "/api/v2/events/ingest")):
             status = 201
@@ -50,6 +51,9 @@ class Receiver(BaseHTTPRequestHandler):
                 {"status": "queued", "message": "OK", "number": number, "id": index}
                 for index, number in enumerate(recipients, 1)
             ]).encode())
+        elif self.path.endswith(("/generic/2010-04-15/create_event.json", "/v2/enqueue")):
+            key = "dedup_key" if self.path.endswith("/v2/enqueue") else "incident_key"
+            self.wfile.write(json.dumps({"status": "success", key: json.loads(body)[key]}).encode())
         elif self.path.endswith("/add"):
             self.wfile.write(b'<prowl><success code="200" remaining="999" resetdate="1234567890"/></prowl>')
         elif self.path.endswith("/sms/send.json"):
@@ -118,14 +122,17 @@ a complete webhook `url`. Alerta requires `type: alerta`, `api_url` and `environ
 Dynatrace requires `type: dynatrace`, `api_url`, `api_token` and `entity_selector`; `event_type` and `source` are optional.
 Prowl requires `type: prowl` and `api_key`; Kavenegar requires `type: kavenegar`, `api_key`, `sender` and `recipient`.
 Both accept an optional `api_url`. SMSEagle requires `type: smseagle`, `api_url`, `access_token` and a `recipients`
-array, with optional message/call settings described below. Destination names are nonsecret identifiers.
+array, with optional message/call settings described below.
+PagerDuty requires `type: pagerduty` and `integration_key`; `api_version` and `api_url` are optional.
+Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
-MessageBird access keys, Gotify app tokens, ntfy credentials, ilert integration keys, Alerta/Prowl/Kavenegar API keys and Dynatrace
-API tokens, plus SMSEagle access tokens, accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
+MessageBird access keys, Gotify app tokens, ntfy credentials, ilert/PagerDuty integration keys, Alerta/Prowl/Kavenegar
+API keys, Dynatrace API tokens and SMSEagle access tokens accept literal strings or a whole `${env:VARIABLE}` or
+`${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -170,7 +177,7 @@ Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. ilert accepts HTTP 202;
 SIGNL4 accepts HTTP 200, 201 or 202. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
-Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar and SMSEagle check bounded JSON acknowledgments;
+Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar, SMSEagle and PagerDuty check bounded JSON acknowledgments;
 Prowl checks a bounded XML acknowledgment. Telegram can retry rate limits as described below.
 Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
@@ -1174,6 +1181,81 @@ Save as `smseagle-local.yaml` and run:
 
 Repeat with WARNING, CRITICAL and CLEAR events to inspect each mode's payload. To inspect standard encoding, use
 GSM-compatible event text with no differing `previous_status`, so the message contains no transition arrow.
+
+## PagerDuty incidents
+
+Configure one named destination per integration key. Set `api_version` to match the integration's Events API version;
+it defaults to `1`, as in Bash. Both versions support WARNING/CRITICAL triggers and CLEAR resolves.
+Keys and API bases accept literal, environment or file references. v1 keys must contain 32 hexadecimal characters;
+v2 keys must contain 32 printable ASCII characters without whitespace, including ruleset keys.
+
+```yaml
+version: 1
+destinations:
+  pagerduty_v1:
+    type: pagerduty
+    integration_key: ${env:NOTIFY_PAGERDUTY_V1_KEY}
+  pagerduty_v2:
+    type: pagerduty
+    api_version: 2
+    integration_key: ${env:NOTIFY_PAGERDUTY_V2_KEY}
+routing:
+  roles:
+    pagerduty_ops: [pagerduty_v1, pagerduty_v2]
+```
+
+`api_url` defaults to `https://events.pagerduty.com`; EU accounts can use `https://events.eu.pagerduty.com`.
+Both official hosts require HTTPS. Custom bases can include a proxy path prefix and use HTTP for deliberate local
+delivery. The notifier appends `/generic/2010-04-15/create_event.json` for v1 or `/v2/enqueue` for v2.
+See PagerDuty's [Events API v1](https://developer.pagerduty.com/docs/events-api-v1/overview/),
+[Events API v2](https://developer.pagerduty.com/docs/events-api-v2/overview/) and
+[service regions](https://support.pagerduty.com/main/docs/service-regions).
+
+The caller must keep `incident_id` identical across the incident's WARNING, CRITICAL and CLEAR events, and use the
+same integration for recovery. Both APIs receive the lowercase hexadecimal SHA-256 digest of that opaque ID as
+their correlation key (`incident_key` in v1, `dedup_key` in v2). Changes to status, timestamp or event text do not
+change the key; distinct IDs produce distinct keys. This is an approved correction to Bash v2's per-event key,
+which could prevent a later CLEAR from matching its trigger. No local incident history or REST lookup is required.
+
+Both versions send a node/status/summary title and the complete native Event as details. Titles over 1024 Unicode
+characters are shortened with `...`; full text remains in details. v1 adds the Netdata client and optional navigation
+URL on triggers. v2 adds node as source, chart as class, timestamp with timezone, warning/critical/info severity,
+and an optional **View alert** link. v2 retains the payload on CLEAR so downstream routing can inspect the same fields.
+
+Requests over 512 KiB fail before sending without dropping event details. Success requires HTTP 200 for v1 or 202
+for v2, plus a JSON acknowledgment with `status: success` and the matching correlation key. Replies are bounded to
+256 KiB and the invocation deadline. There are no retries, redirects or incident-status polling. Success confirms
+API acceptance; PagerDuty's integration configuration and routing rules determine the resulting incident behavior.
+
+### Local PagerDuty exercise
+
+Use the receiver above with synthetic keys:
+
+```yaml
+version: 1
+destinations:
+  v1:
+    type: pagerduty
+    api_url: http://127.0.0.1:18080
+    integration_key: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  v2:
+    type: pagerduty
+    api_version: 2
+    api_url: http://127.0.0.1:18080
+    integration_key: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+routing:
+  roles:
+    pagerduty_ops: [v1, v2]
+```
+
+Save as `pagerduty-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config pagerduty-local.yaml --role pagerduty_ops < examples/event.json
+```
+
+Repeat with WARNING, CRITICAL and CLEAR events, keeping `incident_id` unchanged. The printed requests show matching
+keys across all three statuses. The local receiver checks the wire contract; it does not simulate PagerDuty incidents.
 
 ## Event document
 

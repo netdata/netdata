@@ -112,7 +112,11 @@ func TestSMSEagleFieldIsolation(t *testing.T) {
 				n := configInteger(1)
 				v.Set(reflect.ValueOf(&n))
 			}
-			checkFormConfig(t, dst, "fields for another provider")
+			wantErr := "fields for another provider"
+			if field.Name == "APIVersion" {
+				wantErr = "api_version requires type: pagerduty"
+			}
+			checkFormConfig(t, dst, wantErr)
 		})
 	}
 	for provider := range map[string]struct{}{"webhook": {}, "slack": {}, "discord": {}, "telegram": {}, "pushover": {}, "pushbullet": {}, "twilio": {}, "messagebird": {}, "gotify": {}, "ntfy": {}, "rocketchat": {}, "flock": {}, "fleep": {}, "ilert": {}, "signl4": {}, "alerta": {}, "dynatrace": {}, "prowl": {}, "kavenegar": {}} {

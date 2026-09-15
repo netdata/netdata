@@ -25,6 +25,7 @@ type Routing struct {
 }
 
 type Destination struct {
+	APIVersion      *configInteger `yaml:"api_version,omitempty"`
 	Recipients      []string       `yaml:"recipients,omitempty"`
 	MessageType     string         `yaml:"message_type,omitempty"`
 	CallDuration    *configInteger `yaml:"call_duration,omitempty"`
@@ -111,6 +112,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "pagerduty" {
+		return dst.validatePagerDuty()
+	}
+	if dst.APIVersion != nil {
+		return errors.New("api_version requires type: pagerduty")
+	}
 	if dst.Type == "smseagle" {
 		return dst.validateSMSEagle()
 	}
@@ -134,7 +141,7 @@ func (dst Destination) validate() error {
 		return dst.validateIlert()
 	}
 	if dst.IntegrationKey != "" {
-		return errors.New("integration_key requires type: ilert")
+		return errors.New("integration_key requires type: ilert or pagerduty")
 	}
 	if dst.Type == "rocketchat" || dst.Type == "flock" || dst.Type == "fleep" {
 		return dst.validateChatWebhook()
@@ -184,13 +191,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar or smseagle; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle or pagerduty; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl, kavenegar or smseagle",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl, kavenegar, smseagle or pagerduty",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
