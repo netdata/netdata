@@ -15,9 +15,7 @@ import (
 )
 
 type ldapConn interface {
-	connect(context.Context,
-
-	) error
+	connect(context.Context) error
 	disconnect() error
 	search(*ldap.SearchRequest) (*ldap.SearchResult, error)
 }
