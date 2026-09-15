@@ -79,9 +79,15 @@ fi
 # Absent key artifacts, each with the reason absence is ambiguous here.
 absent_json() {
     local win="" p reason
+    # A row ending in "/" names a directory: match any path under it. Testing a
+    # directory as an exact path never matches, so it would always report absent.
     while IFS='|' read -r p reason; do
         [ -n "$p" ] || continue
-        jq -e --arg p "$p" '.files[] | select(.path==$p)' "$M" >/dev/null 2>&1 && continue
+        if [ "${p%/}" != "$p" ]; then
+            jq -e --arg p "$p" 'any(.files[]; .path | startswith($p))' "$M" >/dev/null 2>&1 && continue
+        else
+            jq -e --arg p "$p" 'any(.files[]; .path == $p)' "$M" >/dev/null 2>&1 && continue
+        fi
         win="${win}$(jq -nc --arg p "$p" --arg r "$reason" '{artifact:$p, why_absence_is_ambiguous:$r}')"$'\n'
     done <<'ROWS'
 06-state/status-file.json|No crash record was found on disk. The host may never have written one; this is not evidence the agent never exited badly.
@@ -117,6 +123,11 @@ if [ -f "${B}/07-runtime/dyncfg-tree.json" ]; then
       )' "${B}/07-runtime/dyncfg-tree.json" 2>/dev/null || echo 'null')"
 fi
 
+# Which configuration the bundle carries, by name. The contents would blow the
+# budget, but knowing WHICH files exist tells the model what can still be asked
+# for - the first real run flagged this gap.
+CONFIG_INV="$(jq -c '[.files[].path | select(startswith("04-config/") or startswith("06-state/dyncfg/"))]' "$M")"
+
 TICKET_TEXT=""
 [ -n "$TICKET" ] && { [ -f "$TICKET" ] || sb_die "no such ticket file: $TICKET"; TICKET_TEXT="$(head -c 8000 "$TICKET")"; }
 
@@ -136,6 +147,8 @@ jq -n \
   --arg cloud_probe "$(grab 08-network/cloud-connectivity.txt 1500)" \
   --arg install "$(grab 02-install/install-type.txt 800)" \
   --arg perms "$(loglines 09-permissions/plugins-d.txt 30)" \
+  --arg effective_db "$(grep -aA12 '^\[db\]' "${B}/04-config/effective-netdata.conf" 2>/dev/null | head -c 1200 || true)" \
+  --argjson config_inventory "$CONFIG_INV" \
   --argjson jobs "$JOBS" \
   --argjson absent "$(absent_json)" \
   --argjson degraded "$(degraded_json)" \
@@ -158,6 +171,7 @@ jq -n \
      collector_jobs: $jobs,
      logs: {collector: $collector_log, daemon_namespace: $daemon_log, error: $error_log, windows_eventlog: $eventlog},
      system: {kernel_messages: $kernel, install_type: $install},
+     config: {files_present: $config_inventory, effective_db_section: $effective_db},
      network: {sockets: $sockets, cloud_probe: $cloud_probe},
      permissions: $perms,
      absent_key_artifacts: $absent,
