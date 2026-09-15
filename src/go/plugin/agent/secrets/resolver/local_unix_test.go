@@ -37,9 +37,29 @@ func TestFileRequiresUnprivilegedHelper(t *testing.T) {
 	assert.Equal(t, AtomicErrorProvider, providerErr.Kind)
 }
 
-func TestCommandPreservesEnvironmentWithoutUnprivilegedHelper(t *testing.T) {
+func TestCommandRequiresUnprivilegedHelper(t *testing.T) {
 	t.Setenv("NETDATA_TEST_CMD_AUTH", "synthetic-auth value=with spaces")
 	t.Cleanup(ndexec.SetRunnerPathsForTests(filepath.Join(t.TempDir(), "missing-nd-run"), ""))
+	resolver, err := NewDefaultAtomicResolver()
+	require.NoError(t, err)
+	value, err := resolver.Resolve(t.Context(), "${cmd:/usr/bin/printenv NETDATA_TEST_CMD_AUTH}", nil)
+	require.Error(t, err)
+	assert.Nil(t, value)
+	var providerErr *AtomicResolveError
+	require.ErrorAs(t, err, &providerErr)
+	assert.Equal(t, AtomicErrorProvider, providerErr.Kind)
+}
+
+func TestCommandPreservesEnvironmentThroughHelper(t *testing.T) {
+	t.Setenv("NETDATA_TEST_CMD_AUTH", "synthetic-auth value=with spaces")
+	helper := filepath.Join(t.TempDir(), "nd-run")
+	// Require the opt-in syntax before forwarding to the actual command.
+	require.NoError(t, os.WriteFile(helper, []byte(`#!/bin/sh
+[ "$1" = "--preserve-env" ] && [ "$2" = "--" ] || exit 64
+shift 2
+exec "$@"
+`), 0o700))
+	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 	resolver, err := NewDefaultAtomicResolver()
 	require.NoError(t, err)
 	value, err := resolver.Resolve(t.Context(), "${cmd:/usr/bin/printenv NETDATA_TEST_CMD_AUTH}", nil)
@@ -48,7 +68,7 @@ func TestCommandPreservesEnvironmentWithoutUnprivilegedHelper(t *testing.T) {
 }
 
 func TestLocalProvidersOutput(t *testing.T) {
-	useTestFileHelper(t)
+	useTestLocalHelper(t)
 	logger.Level.Set(slog.LevelDebug)
 	t.Cleanup(func() { logger.Level.Set(slog.LevelInfo) })
 
@@ -103,7 +123,7 @@ func TestLocalProvidersOutput(t *testing.T) {
 }
 
 func TestLocalProvidersBoundedOutput(t *testing.T) {
-	useTestFileHelper(t)
+	useTestLocalHelper(t)
 	for name, size := range map[string]int{
 		"exact limit": MaximumAtomicResolvedBytes,
 		"over limit":  MaximumAtomicResolvedBytes + 1,
@@ -133,21 +153,29 @@ func TestLocalProvidersBoundedOutput(t *testing.T) {
 	}
 }
 
-func TestFileDiscardsHelperOutputOnFailure(t *testing.T) {
+func TestLocalProvidersDiscardHelperOutputOnFailure(t *testing.T) {
 	helper := filepath.Join(t.TempDir(), "nd-run")
 	require.NoError(t, os.WriteFile(helper, []byte(
 		"#!/bin/sh\nprintf 'synthetic-stdout'\nprintf 'synthetic-stderr' >&2\nexit 73\n"), 0o700))
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 	resolver, err := NewDefaultAtomicResolver()
 	require.NoError(t, err)
-	value, err := resolver.Resolve(t.Context(), "${file:/unused}", nil)
-	require.Error(t, err)
-	assert.Nil(t, value)
-	assert.NotContains(t, err.Error(), "synthetic-stdout")
-	assert.NotContains(t, err.Error(), "synthetic-stderr")
+	for scheme, operand := range map[string]string{
+		"file": "/unused",
+		"cmd":  "/bin/echo direct-fallback",
+	} {
+		t.Run(scheme, func(t *testing.T) {
+			value, err := resolver.Resolve(t.Context(), "${"+scheme+":"+operand+"}", nil)
+			require.Error(t, err)
+			assert.Nil(t, value)
+			assert.NotContains(t, err.Error(), "synthetic-stdout")
+			assert.NotContains(t, err.Error(), "synthetic-stderr")
+		})
+	}
 }
 
 func TestCommandTimeout(t *testing.T) {
+	useTestLocalHelper(t)
 	value, err := resolveCmd(context.Background(), "/bin/sleep 30", "command reference", 50*time.Millisecond)
 	require.ErrorContains(t, err, "command timed out after 50ms")
 	assert.Empty(t, value)
@@ -163,7 +191,7 @@ func TestCommandDeadlineBeforeStart(t *testing.T) {
 }
 
 func TestFileOverflowStopsReader(t *testing.T) {
-	useTestFileHelper(t)
+	useTestLocalHelper(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	value, err := resolveFile(ctx, "/dev/zero", "file reference")
@@ -172,7 +200,7 @@ func TestFileOverflowStopsReader(t *testing.T) {
 }
 
 func TestFileDeadlineBeforeStart(t *testing.T) {
-	useTestFileHelper(t)
+	useTestLocalHelper(t)
 	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
 	defer cancel()
 	value, err := resolveFile(ctx, "/unused", "file reference")

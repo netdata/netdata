@@ -114,6 +114,8 @@ jobs:
                 "The command path must be absolute.",
                 "Arguments are split on whitespace. Netdata does not interpret shell quoting, pipes, redirects, or variable expansion unless you explicitly run a shell such as `/bin/sh -c`.",
                 "Netdata uses a 10-second timeout for command resolvers.",
+                "On Unix, commands run through `nd-run --preserve-env --` without the collector plugin's elevated privileges. Authentication and other application environment variables are preserved.",
+                "`nd-run` sets `USER`, `LOGNAME`, and `HOME` from the selected account, `SHELL` to `/bin/sh`, and `LC_ALL` to `C`. Commands that need a specific credentials or configuration directory must use their tool's explicit configuration option or environment variable.",
                 "Netdata trims leading and trailing whitespace from stdout and ignores stderr.",
             ],
         },
@@ -208,7 +210,7 @@ jobs:
         "Secretstore configuration values (such as tokens and client secrets) also support `${env:...}`, `${file:...}`, and `${cmd:...}` resolvers. Use them to avoid storing backend credentials in plain text. Note that `${store:...}` references are not supported inside secretstore configurations.",
         "Keep local secret material readable only by the `netdata` user, including token files, service account files, and any files used with `${file:...}`.",
         "Use `${cmd:...}` only with trusted local commands and absolute paths.",
-        "On Unix, local file resolution requires `nd-run`; Netdata does not fall back to privileged file access if the helper fails. The helper normally uses the `netdata` account, falls back to `nobody` if that account is absent, and retains the current user if an unprivileged process cannot switch accounts. On Windows, file resolution uses the collector process's existing permissions.",
+        "On Unix, local file and command resolution require `nd-run`; commands require a helper that supports `--preserve-env`. Netdata does not fall back to privileged file access or direct command execution if the helper fails. The helper normally uses the `netdata` account, falls back to `nobody` if that account is absent, and retains the current user if an unprivileged process cannot switch accounts. On Windows, file and command resolution use the collector process's existing permissions.",
     ],
     "troubleshooting": {
         "intro": [

@@ -47,6 +47,14 @@ func UnprivilegedCommandContext(ctx context.Context, binPath string, args ...str
 	return commandContext(ctx, defaultRunner.ndRunPath, argv...)
 }
 
+// UnprivilegedCommandContextWithPreservedEnv is UnprivilegedCommandContext with
+// application environment preservation enabled. nd-run still resets USER,
+// LOGNAME, HOME, SHELL and LC_ALL. An older or missing helper fails closed.
+func UnprivilegedCommandContextWithPreservedEnv(ctx context.Context, binPath string, args ...string) *exec.Cmd {
+	argv := append([]string{"--preserve-env", "--", binPath}, args...)
+	return commandContext(ctx, defaultRunner.ndRunPath, argv...)
+}
+
 // RunUnprivileged runs binPath via nd-run with a timeout.
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
 func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {

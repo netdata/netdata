@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func useTestFileHelper(t *testing.T) {
+func useTestLocalHelper(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		return
@@ -23,12 +23,18 @@ func useTestFileHelper(t *testing.T) {
 	helper := filepath.Join(t.TempDir(), "nd-run")
 	// Exercise real subprocess plumbing without requiring an installed nd-run
 	// or changing the test user's identity. Privilege dropping belongs to nd-run.
-	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o700))
+	require.NoError(t, os.WriteFile(helper, []byte(`#!/bin/sh
+if [ "$1" = "--preserve-env" ]; then
+    [ "$2" = "--" ] || exit 64
+    shift 2
+fi
+exec "$@"
+`), 0o700))
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 }
 
 func TestDefaultAtomicResolver(t *testing.T) {
-	useTestFileHelper(t)
+	useTestLocalHelper(t)
 	tests := map[string]struct {
 		input           func(t *testing.T) any
 		want            any
