@@ -480,9 +480,7 @@ func (f *Factory) buildV1(
 			))
 		}
 		if err != nil && module != nil {
-			cleanupErr := callFactoryModuleCleanup(ctx, func(ctx context.Context) {
-				module.Cleanup(ctx)
-			})
+			cleanupErr := callFactoryModuleCleanup(ctx, module.Cleanup)
 			if redactLifecycle {
 				cleanupErr = redactResolvedLifecycleError(cleanupErr)
 			}
@@ -557,9 +555,7 @@ func (f *Factory) buildV2(
 			))
 		}
 		if err != nil && module != nil {
-			cleanupErr := callFactoryModuleCleanup(ctx, func(ctx context.Context) {
-				module.Cleanup(ctx)
-			})
+			cleanupErr := callFactoryModuleCleanup(ctx, module.Cleanup)
 			if redactLifecycle {
 				cleanupErr = redactResolvedLifecycleError(cleanupErr)
 			}

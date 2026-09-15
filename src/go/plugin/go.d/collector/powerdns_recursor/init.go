@@ -11,23 +11,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func (c *Collector) validateConfig() error {
+func (c *Collector) validateConfig(ctx context.Context) error {
 	if c.URL == "" {
 		return errors.New("URL not set")
+	}
+	if _, err := web.NewHTTPRequest(ctx, c.RequestConfig); err != nil {
+		return err
 	}
 	return nil
 }
 
 func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
-	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := web.NewHTTPRequest(ctx, c.RequestConfig); err != nil {
-		client.CloseIdleConnections()
-		return nil, err
-	}
-	return client, nil
+	return web.NewHTTPClient(ctx, c.ClientConfig)
 }
 
 func (c *Collector) initCharts() (*collectorapi.Charts, error) {
