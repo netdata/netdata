@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -18,7 +19,7 @@ type gotifyMessage struct {
 }
 
 func (dst Destination) validateGotify() error {
-	if dst != (Destination{Type: dst.Type, APIURL: dst.APIURL, AppToken: dst.AppToken}) {
+	if !reflect.DeepEqual(dst, Destination{Type: dst.Type, APIURL: dst.APIURL, AppToken: dst.AppToken}) {
 		return errors.New("gotify destinations support api_url and app_token only")
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"app_token", dst.AppToken}} {

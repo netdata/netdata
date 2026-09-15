@@ -278,6 +278,7 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"smseagle cancel": {provider: "smseagle", cancel: true}, "smseagle deadline": {provider: "smseagle"},
 		"prowl cancel": {provider: "prowl", cancel: true}, "prowl deadline": {provider: "prowl"},
 		"kavenegar cancel": {provider: "kavenegar", cancel: true}, "kavenegar deadline": {provider: "kavenegar"},
 		"telegram cancel":      {provider: "telegram", cancel: true},
@@ -304,11 +305,19 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/add", "/synthetic-key/sms/send.json", "/bot123:synthetic-private-value/sendMessage",
+				case "/api/v2/messages/sms",
+					"/add",
+					"/synthetic-key/sms/send.json",
+					"/bot123:synthetic-private-value/sendMessage",
 					"/1/messages.json",
 					"/v2/pushes",
 					twilioTestPath,
-					messagebirdTestPath, "/message", "/topic", "/rocket-hook", "/alert", "/api/v2/events/ingest":
+					messagebirdTestPath,
+					"/message",
+					"/topic",
+					"/rocket-hook",
+					"/alert",
+					"/api/v2/events/ingest":
 					_, _ = io.Copy(io.Discard, r.Body)
 					if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath ||
 						r.URL.Path == "/api/v2/events/ingest" {
@@ -392,6 +401,10 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					APIToken:       "synthetic-key",
 					EntitySelector: "type(HOST)",
 				}
+			}
+			if test.provider == "smseagle" {
+				dst = smseagleTestDestination()
+				dst.APIURL = server.URL
 			}
 			if test.provider == "prowl" || test.provider == "kavenegar" {
 				dst = formTestDestination(test.provider)

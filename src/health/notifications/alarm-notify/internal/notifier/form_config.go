@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -19,7 +20,7 @@ func (dst Destination) validateFormProvider() error {
 			}
 		}
 	}
-	if dst != allowed {
+	if !reflect.DeepEqual(dst, allowed) {
 		return fmt.Errorf("%s destination contains fields for another provider", dst.Type)
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"api_key", dst.APIKey}} {

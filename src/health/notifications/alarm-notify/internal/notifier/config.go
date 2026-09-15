@@ -25,6 +25,10 @@ type Routing struct {
 }
 
 type Destination struct {
+	Recipients      []string       `yaml:"recipients,omitempty"`
+	MessageType     string         `yaml:"message_type,omitempty"`
+	CallDuration    *configInteger `yaml:"call_duration,omitempty"`
+	VoiceID         *configInteger `yaml:"voice_id,omitempty"`
 	Type            string         `yaml:"type"`
 	URL             string         `yaml:"url,omitempty"`
 	Channel         string         `yaml:"channel,omitempty"`
@@ -107,6 +111,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "smseagle" {
+		return dst.validateSMSEagle()
+	}
+	if dst.Recipients != nil || dst.MessageType != "" || dst.CallDuration != nil || dst.VoiceID != nil {
+		return errors.New("recipients, message_type, call_duration and voice_id require type: smseagle")
+	}
 	if dst.Type == "prowl" || dst.Type == "kavenegar" {
 		return dst.validateFormProvider()
 	}
@@ -159,7 +169,9 @@ func (dst Destination) validate() error {
 		return dst.validatePushbullet()
 	}
 	if dst.AccessToken != "" || dst.Email != "" || dst.ChannelTag != "" || dst.SourceDeviceID != "" {
-		return errors.New("access_token, email, channel_tag and source_device_id require type: pushbullet")
+		return errors.New(
+			"access_token, email, channel_tag and source_device_id require type: pushbullet; access_token also supports ntfy and smseagle",
+		)
 	}
 	if dst.Type == "pushover" {
 		return dst.validatePushover()
@@ -172,13 +184,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl or kavenegar; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar or smseagle; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl or kavenegar",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl, kavenegar or smseagle",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {

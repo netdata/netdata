@@ -199,6 +199,7 @@ func TestRunFanoutCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"smseagle deadline": {provider: "smseagle"}, "smseagle cancellation": {provider: "smseagle", cancel: true},
 		"prowl deadline": {provider: "prowl"}, "prowl cancellation": {provider: "prowl", cancel: true},
 		"kavenegar deadline": {provider: "kavenegar"}, "kavenegar cancellation": {provider: "kavenegar", cancel: true},
 		"webhook deadline": {provider: "webhook"}, "webhook cancellation": {provider: "webhook", cancel: true},
@@ -218,7 +219,7 @@ func TestRunFanoutCancellation(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.URL.Path {
-					case "/blocked/add",
+					case "/blocked/api/v2/messages/sms", "/blocked/add",
 						"/blocked/synthetic-key/sms/send.json",
 						"/blocked",
 						"/blocked/events",
@@ -251,6 +252,12 @@ func TestRunFanoutCancellation(t *testing.T) {
 			if test.provider == "dynatrace" {
 				blocked = fmt.Sprintf(
 					"type: dynatrace, api_url: %q, api_token: synthetic-key, entity_selector: type(HOST)",
+					server.URL+"/blocked",
+				)
+			}
+			if test.provider == "smseagle" {
+				blocked = fmt.Sprintf(
+					"type: smseagle, api_url: %q, access_token: synthetic-token, recipients: ['15005550009']",
 					server.URL+"/blocked",
 				)
 			}

@@ -107,13 +107,20 @@ func TestFormProviderFieldIsolation(t *testing.T) {
 			t.Run(provider+"/"+field.Name, func(t *testing.T) {
 				dst := base
 				v := reflect.ValueOf(&dst).Elem().Field(i)
-				if v.Kind() == reflect.String {
+				if v.Kind() == reflect.Slice {
+					v.Set(reflect.ValueOf([]string{"15005550009"}))
+				} else if v.Kind() == reflect.String {
 					v.SetString("synthetic-private-value")
 				} else {
 					n := configInteger(1)
 					v.Set(reflect.ValueOf(&n))
 				}
-				checkFormConfig(t, dst, "fields for another provider")
+				wantErr := "fields for another provider"
+				if field.Name == "Recipients" || field.Name == "MessageType" || field.Name == "CallDuration" ||
+					field.Name == "VoiceID" {
+					wantErr = "require type: smseagle"
+				}
+				checkFormConfig(t, dst, wantErr)
 			})
 		}
 	}

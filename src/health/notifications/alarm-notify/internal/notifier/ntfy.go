@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 	"unicode"
@@ -23,7 +24,7 @@ type ntfyAction struct {
 }
 
 func (dst Destination) validateNtfy() error {
-	if dst != (Destination{Type: dst.Type, URL: dst.URL, AccessToken: dst.AccessToken,
+	if !reflect.DeepEqual(dst, Destination{Type: dst.Type, URL: dst.URL, AccessToken: dst.AccessToken,
 		Username: dst.Username, Password: dst.Password}) {
 		return errors.New("ntfy destinations support url, access_token, username and password only")
 	}
