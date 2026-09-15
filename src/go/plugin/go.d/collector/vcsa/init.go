@@ -22,7 +22,7 @@ func (c *Collector) validateConfig() error {
 }
 
 func (c *Collector) initHealthClient(ctx context.Context) (*client.Client, error) {
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewTransportClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
