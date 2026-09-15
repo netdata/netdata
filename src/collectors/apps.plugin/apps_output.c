@@ -667,6 +667,16 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         dcstat_charts_announced = true;
     }
 
+    static bool process_charts_announced = false;
+    if (!process_charts_announced && apps_ebpf_process_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
+        for (w = root; w; w = w->next) {
+            if (!w->exposed) continue;
+            send_ebpf_charts_to_netdata(w, type, lbl_name, "tasks",
+                                        apps_process_charts, _countof(apps_process_charts), true);
+        }
+        process_charts_announced = true;
+    }
+
     /* fd needs two latches, not one.  The error charts are announced only while
      * the producer reports EBPFGO_SHM_FLAG_FD_ERRORS, and that bit can arrive
      * after the base charts were already announced — an operator switching

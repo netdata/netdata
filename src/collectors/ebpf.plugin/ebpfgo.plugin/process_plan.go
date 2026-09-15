@@ -9,7 +9,7 @@ const processDefaultBTFFile = "vmlinux"
 
 // processMaxBaseSelector is the highest SelectKernelName index for which a
 // base-flavor (no suffix) process object file is shipped.
-const processMaxBaseSelector = 9 // 5.16
+const processMaxBaseSelector = 11 // 6.12
 
 type ProcessLegacyConfig struct {
 	PluginsDir     string
@@ -120,6 +120,15 @@ func resolveProcessLegacyConfig() (ProcessLegacyConfig, error) {
 }
 
 func BuildProcessLegacyPlan(cfg ProcessLegacyConfig) LoadPlan {
+	flavor := cfg.ObjectFlavor
+	// The buffer and arena process objects expose global counters and events,
+	// but no tbl_pid_stats map. Apps/cgroups integration requires that map for
+	// per-PID snapshots, so select the base object whenever those consumers are
+	// enabled.
+	if cfg.AppsEnabled || cfg.CgroupsEnabled {
+		flavor = "legacy"
+	}
+
 	return buildKprobeLegacyPlan(kprobePlanRequest{
 		PluginsDir:      cfg.PluginsDir,
 		Kernels:         cfg.Kernels,
@@ -127,7 +136,7 @@ func BuildProcessLegacyPlan(cfg ProcessLegacyConfig) LoadPlan {
 		KernelVersion:   cfg.KernelVersion,
 		IsDebian:        cfg.IsDebian,
 		HasBTF:          cfg.HasBTF,
-		ObjectFlavor:    cfg.ObjectFlavor,
+		ObjectFlavor:    flavor,
 		Name:            "process",
 		MaxBaseSelector: processMaxBaseSelector,
 	})

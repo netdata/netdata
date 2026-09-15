@@ -97,6 +97,17 @@ func LoadProcessLegacy(cfg ProcessLegacyConfig) (*ProcessLegacyHandle, error) {
 		if loadErr == nil {
 			return handle, nil
 		}
+		// BTF availability does not guarantee that every trampoline target
+		// referenced by the object exists on the running kernel.  Retry the
+		// same object through its tracepoint/kprobe programs before moving on
+		// to another flavor or kernel selector.
+		if candidate.LoadMode == LoadCore {
+			legacy := candidate
+			legacy.LoadMode = LoadLegacy
+			if handle, legacyErr := tryLoadProcessPlan(cfg, legacy); legacyErr == nil {
+				return handle, nil
+			}
+		}
 		lastErr = loadErr
 		if i < len(plans)-1 {
 			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: process %s unavailable (%v), trying fallback\n", filepath.Base(candidate.ObjectPath), loadErr)
