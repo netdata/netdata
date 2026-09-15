@@ -2519,10 +2519,13 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
                 // The join did not prove the claimer stopped, so it may still hold `st` and may still
                 // be parked inside the hook. Leave BOTH alive - disarming clears the hook's chart
                 // pointer and rrdset_free() would be a use-after-free. A leaked chart in an already
-                // failing test is the cheap outcome here.
+                // failing test is the cheap outcome here. Return the same way the stress pass does
+                // below: continuing would run that pass against a live claimer and end in the
+                // accounting restore, which would overwrite whatever the claimer is still doing.
                 fprintf(stderr, "%s: could not join the claimer thread - leaving the chart and the hook alive\n",
                         __FUNCTION__);
-                rc = 1;
+                default_rrd_memory_mode = old_default_rrd_memory_mode;
+                return 1;
             }
             else {
                 rrdhost_receiver_replication_race_hook_disarm();
