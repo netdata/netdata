@@ -192,7 +192,7 @@ DBENGINE uses 150 bytes of memory for every metric for which retention is mainta
 ## Boundary with the rest of Netdata
 
 The engine is a component of the `netdata` binary, but its sources under `src/database/engine/` do not include or call
-anything of the daemon. Everything flows through the engine's own headers:
+anything of the daemon. What the engine needs from its embedder flows through the engine's own headers:
 
 - **Configuration** (`dbengine-config.h`): the embedder fills one `struct dbengine_config` and hands it to
   `dbengine_init()` once, before the first tier; each tier gets a `struct rrdeng_tier_config` through `rrdeng_init()`.
@@ -202,6 +202,9 @@ anything of the daemon. Everything flows through the engine's own headers:
 - **Published statistics** (`dbengine-stats.h`): the engine keeps its own counters and exposes snapshot getters, such as
   `rrdeng_get_cache_efficiency_stats()`, `rrdeng_get_gorilla_stats()` and `rrdeng_get_memory_sizes()` with
   `rrdeng_mem_name()`; the daemon's pulse subsystem reads them each cycle. The engine never pushes into daemon charts.
+  The page cache and metrics registry counters are not published this way yet: pulse calls `pgc_get_statistics()` and
+  `mrg_get_statistics()` on the engine's own `main_cache`, `open_cache`, `extent_cache` and `main_mrg`, reaching them
+  through the internal headers.
 - **Work** (`rrdengineapi.h`): the embedder can run a function on the engine's worker pool with `rrdeng_enq_work()`.
 - **Worker job ids** (`dbengine-workers.h`): the engine's jobs occupy the first block of the shared libuv pool's job
   id space; an embedder numbers its own jobs from `RRDENG_WORKER_JOB_MAX`. Pool-thread setup is
@@ -210,5 +213,10 @@ anything of the daemon. Everything flows through the engine's own headers:
   (`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through `RRDHOST`,
   `RRDSET` and `RRDDIM`.
 
-The daemon depends on the engine, not the other way round: it includes the engine's headers, reads
-`struct rrdengine_instance` where it needs to, and owns `netdata.conf` parsing, sqlite, streaming and the charts.
+The daemon depends on the engine, not the other way round, and owns `netdata.conf` parsing, sqlite, streaming and the
+charts. That direction is not sealed yet: the daemon also reaches past `rrdengineapi.h` into the engine's internals. It
+names the caches and the metrics registry directly (above), reads `multidb_ctx[tier]->config.max_retention_s` for the
+retention charts, and in `FSANITIZE_ADDRESS` builds destroys the caches and the registry itself at shutdown. Because
+`rrdengineapi.h` includes `rrdengine.h`, every translation unit that includes `database/rrd.h` sees the engine's
+internal types. Publishing the remaining counters, giving the engine instance an opaque handle and splitting the
+engine's public and private headers is separate work.
