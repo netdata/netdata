@@ -48,7 +48,9 @@ void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);
 void rrdeng_flush_all(struct rrdengine_instance *ctx);
 
-// after rrdeng_exit(): close the tier's datafiles (the embedder's final teardown)
+// after rrdeng_exit(), and only on a static multidb tier: close its datafiles (the embedder's
+// final teardown). rrdeng_exit() frees a context that rrdeng_init() allocated for its caller,
+// so such a context must not be passed here
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 
 // what the embedder reads about the tiers
