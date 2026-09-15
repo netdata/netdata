@@ -430,6 +430,7 @@ int netdata_main(int argc, char **argv) {
                         char* stresstest_string = "stresstest=";
 
                         if(strcmp(optarg, "pgd-tests") == 0) {
+                            netdata_conf_dbengine_apply();
                             return pgd_test(argc, argv);
                         }
 #endif

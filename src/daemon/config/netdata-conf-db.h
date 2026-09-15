@@ -17,13 +17,13 @@ extern struct dbengine_config netdata_conf_dbengine;
 // per-tier configuration for rrdeng_init(): tier, page type and grouping; the caller adds path, quota and retention
 void netdata_conf_dbengine_tier_config(size_t tier, struct rrdeng_tier_config *out);
 uint8_t netdata_conf_dbengine_page_type(size_t tier);
-#endif
 
 // dbengine tier sizing knobs, consumed by the daemon (tier setup, /api/v1/info, analytics, tests) - not by the engine
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
 extern bool new_dbengine_defaults;
 extern bool legacy_multihost_db_space;
+#endif
 
 extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;

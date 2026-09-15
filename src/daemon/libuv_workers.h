@@ -71,7 +71,13 @@ enum event_loop_job {
 
     // netdatacli
     UV_EVENT_SCHEDULE_CMD,
+
+    // terminator
+    UV_EVENT_JOB_MAX,
 };
+
+// the engine's block and the daemon's block share one per-thread table; an id added to either shifts the daemon's
+_Static_assert(UV_EVENT_JOB_MAX <= WORKER_UTILIZATION_MAX_JOB_TYPES, "libuv worker job ids exceed the worker utilization table");
 
 #define MAX_ACTIVE_WORKERS (256)
 
