@@ -1,0 +1,11 @@
+{
+  "eventType": "CUSTOM_INFO",
+  "title": "test-node WARNING: Temperature is high",
+  "entitySelector": "type(HOST),tag(\"netdata\")",
+  "properties": {
+    "dt.event.source": "Netdata Alarm",
+    "dt.event.description": "Temperature is high\nA quote: \"hot\"\nUnicode: θερμοκρασία\nNode: test-node\nAlert: test_alert\nStatus: CLEAR → WARNING\nChart: test.chart\nContext: test.context\nValue: 42.5 C\nPrevious value: 0 C\nTime: 2026-09-14T12:00:00Z\nhttps://example.com/alert?id=1&view=chart#details",
+    "netdata.incident_id": "test-incident",
+    "netdata.timestamp": "2026-09-14T12:00:00Z"
+  }
+}

@@ -66,6 +66,16 @@ destinations:
   signl4:
     type: signl4
     url: ${env:NOTIFY_SIGNL4_URL}
+  alerta:
+    type: alerta
+    api_url: ${env:NOTIFY_ALERTA_API_URL}
+    api_key: ${env:NOTIFY_ALERTA_API_KEY}
+    environment: Production
+  dynatrace:
+    type: dynatrace
+    api_url: ${env:NOTIFY_DYNATRACE_API_URL}
+    api_token: ${env:NOTIFY_DYNATRACE_API_TOKEN}
+    entity_selector: 'type(HOST),tag("netdata")'
 routing:
   default: [local]
   roles:
@@ -82,3 +92,4 @@ routing:
     push_ops: [gotify, ntfy]
     chat_webhooks: [rocketchat, flock, fleep]
     incident_ops: [ilert, signl4]
+    monitoring_ops: [alerta, dynatrace]

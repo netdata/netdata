@@ -30,6 +30,12 @@ type Destination struct {
 	Channel         string         `yaml:"channel,omitempty"`
 	Sender          string         `yaml:"sender,omitempty"`
 	IntegrationKey  string         `yaml:"integration_key,omitempty"`
+	APIKey          string         `yaml:"api_key,omitempty"`
+	Environment     string         `yaml:"environment,omitempty"`
+	APIToken        string         `yaml:"api_token,omitempty"`
+	EntitySelector  string         `yaml:"entity_selector,omitempty"`
+	EventType       string         `yaml:"event_type,omitempty"`
+	Source          string         `yaml:"source,omitempty"`
 	BearerToken     string         `yaml:"bearer_token,omitempty"`
 	BotToken        string         `yaml:"bot_token,omitempty"`
 	AppToken        string         `yaml:"app_token,omitempty"`
@@ -101,6 +107,16 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "alerta" || dst.Type == "dynatrace" {
+		return dst.validateMonitoring()
+	}
+	if dst.APIKey != "" || dst.Environment != "" || dst.APIToken != "" || dst.EntitySelector != "" ||
+		dst.EventType != "" ||
+		dst.Source != "" {
+		return errors.New(
+			"api_key and environment require type: alerta; api_token, entity_selector, event_type and source require type: dynatrace",
+		)
+	}
 	if dst.Type == "ilert" {
 		return dst.validateIlert()
 	}
@@ -151,13 +167,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert or signl4; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta or dynatrace; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird or ilert",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta or dynatrace",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
