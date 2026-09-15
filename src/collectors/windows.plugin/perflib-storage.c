@@ -393,11 +393,11 @@ static void volume_space_worker(void *ptr __maybe_unused)
         dfe_start_read(request, result)
         {
             struct volume_space_result value = {0};
-            value.success = volume_space(v_dfe.name, &value.total_bytes, &value.free_bytes);
+            value.success = volume_space(result_dfe.name, &value.total_bytes, &value.free_bytes);
             if (result->metadata) {
                 value.metadata_attempted = true;
                 struct logical_disk metadata = {0};
-                STRING *filesystem = getFileSystemType(&metadata, v_dfe.name);
+                STRING *filesystem = getFileSystemType(&metadata, result_dfe.name);
                 if (filesystem) {
                     value.metadata_success = true;
                     value.drive_type = metadata.DriveType;
@@ -407,7 +407,7 @@ static void volume_space_worker(void *ptr __maybe_unused)
                     string_freez(filesystem);
                 }
             }
-            dictionary_set(results, v_dfe.name, &value, sizeof(value));
+            dictionary_set(results, result_dfe.name, &value, sizeof(value));
         }
         dfe_done(result);
         dictionary_destroy(request);
@@ -438,13 +438,13 @@ static void volume_space_submit(DICTIONARY *extra_targets, usec_t now_ut)
     void *value;
     dfe_start_read(mountPoints, value)
     {
-        volume_space_add_target(request, v_dfe.name, now_ut);
+        volume_space_add_target(request, value_dfe.name, now_ut);
     }
     dfe_done(value);
 
     dfe_start_read(extra_targets, value)
     {
-        volume_space_add_target(request, v_dfe.name, now_ut);
+        volume_space_add_target(request, value_dfe.name, now_ut);
     }
     dfe_done(value);
 
@@ -1121,7 +1121,7 @@ static bool do_mount_points(DICTIONARY *results, int update_every, usec_t now_ut
     struct volume_space_result *result;
     dfe_start_read(results, result)
     {
-        const char *name = v_dfe.name;
+        const char *name = result_dfe.name;
 
         if (!result->success) {
             struct logical_disk *failed = dictionary_get(logicalDisks, name);
