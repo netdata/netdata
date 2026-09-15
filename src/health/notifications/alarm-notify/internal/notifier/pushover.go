@@ -85,7 +85,7 @@ func sendPushover(ctx context.Context, dst Destination, event Event, timeout tim
 	endpoint := strings.TrimRight(base, "/") + "/1/messages.json"
 	client := notificationHTTPClient(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(ctx, client, "pushover", endpoint, "", renderPushover(dst, event))
+	response, err := postNotificationJSON(ctx, client, "pushover", endpoint, nil, renderPushover(dst, event))
 	if err != nil {
 		return err
 	}

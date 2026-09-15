@@ -278,17 +278,19 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
-		"telegram cancel":   {provider: "telegram", cancel: true},
-		"telegram deadline": {provider: "telegram"},
-		"pushover cancel":   {provider: "pushover", cancel: true},
-		"pushover deadline": {provider: "pushover"},
+		"telegram cancel":     {provider: "telegram", cancel: true},
+		"telegram deadline":   {provider: "telegram"},
+		"pushover cancel":     {provider: "pushover", cancel: true},
+		"pushover deadline":   {provider: "pushover"},
+		"pushbullet cancel":   {provider: "pushbullet", cancel: true},
+		"pushbullet deadline": {provider: "pushbullet"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/bot123:synthetic-private-value/sendMessage", "/1/messages.json":
+				case "/bot123:synthetic-private-value/sendMessage", "/1/messages.json", "/v2/pushes":
 					_, _ = io.Copy(io.Discard, r.Body)
 					w.WriteHeader(200)
 					_, _ = io.WriteString(w, `{`)
@@ -319,6 +321,14 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					APIURL:   server.URL,
 					AppToken: pushoverTestToken,
 					UserKey:  pushoverTestUser,
+				}
+			}
+			if test.provider == "pushbullet" {
+				dst = Destination{
+					Type:        "pushbullet",
+					APIURL:      server.URL,
+					AccessToken: "synthetic-private-value",
+					Email:       "ops@example.com",
 				}
 			}
 			config, err := yaml.Marshal(Config{Version: 1, Destinations: map[string]Destination{

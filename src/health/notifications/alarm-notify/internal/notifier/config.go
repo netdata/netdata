@@ -31,6 +31,10 @@ type Destination struct {
 	BotToken        string         `yaml:"bot_token,omitempty"`
 	AppToken        string         `yaml:"app_token,omitempty"`
 	UserKey         string         `yaml:"user_key,omitempty"`
+	AccessToken     string         `yaml:"access_token,omitempty"`
+	Email           string         `yaml:"email,omitempty"`
+	ChannelTag      string         `yaml:"channel_tag,omitempty"`
+	SourceDeviceID  string         `yaml:"source_device_id,omitempty"`
 	ChatID          string         `yaml:"chat_id,omitempty"`
 	MessageThreadID *configInteger `yaml:"message_thread_id,omitempty"`
 	APIURL          string         `yaml:"api_url,omitempty"`
@@ -85,6 +89,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "pushbullet" {
+		return dst.validatePushbullet()
+	}
+	if dst.AccessToken != "" || dst.Email != "" || dst.ChannelTag != "" || dst.SourceDeviceID != "" {
+		return errors.New("access_token, email, channel_tag and source_device_id require type: pushbullet")
+	}
 	if dst.Type == "pushover" {
 		return dst.validatePushover()
 	}
@@ -96,13 +106,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram or pushover; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover or pushbullet; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram or pushover",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover or pushbullet",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {

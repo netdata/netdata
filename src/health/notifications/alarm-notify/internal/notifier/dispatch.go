@@ -39,6 +39,8 @@ func dispatch(
 			err = sendTelegram(ctx, dst, event, timeout)
 		case "pushover":
 			err = sendPushover(ctx, dst, event, timeout)
+		case "pushbullet":
+			err = sendPushbullet(ctx, dst, event, timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}

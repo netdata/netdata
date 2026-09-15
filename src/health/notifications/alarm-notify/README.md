@@ -1,12 +1,12 @@
 # Experimental Go notifier
 
-This standalone Go module routes a JSON notification to named webhook, Slack, Discord, Telegram and Pushover destinations.
+This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover and Pushbullet.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
-Telegram bot messages, and Pushover notifications.
+Telegram bot messages, and Pushover/Pushbullet notifications.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -33,7 +33,7 @@ class Receiver(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(b'{"ok":true,"status":1,"result":{"message_id":1}}')
+        self.wfile.write(b'{"ok":true,"status":1,"iden":"test-push","result":{"message_id":1}}')
 
     def log_message(self, *args):
         pass  # Avoid logging credential-bearing request paths.
@@ -73,13 +73,14 @@ Configuration has `version: 1` and a `destinations` mapping. Webhook, Slack and 
 and `url`; `bearer_token` is optional for generic webhooks and rejected for Slack/Discord. Telegram requires
 `type: telegram`, `bot_token` and `chat_id`, with the additional settings described below. Provider-specific settings
 are rejected on other provider types. Pushover requires `type: pushover`, `app_token` and `user_key`.
+Pushbullet requires `type: pushbullet`, `access_token`, and one `email` or `channel_tag`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
-URLs, bearer tokens, Telegram bot tokens and Pushover app/user keys accept literal strings or a whole `${env:VARIABLE}`
-or `${file:/absolute/path}` reference.
+URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys and Pushbullet access tokens accept literal strings
+or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -119,8 +120,8 @@ not claim an outcome for interrupted or unstarted deliveries.
 
 Deliveries use POST with `Content-Type: application/json`; generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. These three providers make one attempt and
-close response bodies without buffering or interpreting them. Telegram and Pushover check bounded JSON acknowledgments;
-Telegram can retry rate limits as described below. Redirects are never followed. Errors do not echo config/input values,
+close response bodies without buffering or interpreting them. Telegram, Pushover and Pushbullet check bounded JSON
+acknowledgments; Telegram can retry rate limits as described below. Redirects are never followed. Errors do not echo config/input values,
 secret contents, response text, or endpoint URLs.
 
 ## Slack app webhooks
@@ -341,6 +342,70 @@ destinations:
 
 Tests use synthetic keys and local receivers. They verify complete requests, acknowledgments, shortening and
 cancellation, without sending to Pushover or verifying native client rendering.
+
+## Pushbullet notifications
+
+Configure one email recipient or channel tag per named destination. Both modes preserve the Bash sender's
+capabilities; use multiple named destinations to reach several recipients. Obtain an access token through your
+Pushbullet account, and use an environment or file reference to keep it outside YAML:
+
+```yaml
+version: 1
+destinations:
+  pushbullet_ops:
+    type: pushbullet
+    access_token: ${env:NOTIFY_PUSHBULLET_TOKEN}
+    email: ops@example.com
+    source_device_id: test-source-device
+  pushbullet_channel:
+    type: pushbullet
+    access_token: ${env:NOTIFY_PUSHBULLET_TOKEN}
+    channel_tag: test-alerts
+routing:
+  roles:
+    sysadmin: [pushbullet_ops, pushbullet_channel]
+```
+
+Set exactly one recipient field. `email` is a single address without a display name. `channel_tag` is a tag without
+Bash's leading `#` or whitespace. The optional `source_device_id` identifies the sending device; omit the synthetic
+example value unless you replace it with your device's identifier. These three settings are literal strings.
+The token must be nonempty printable ASCII without whitespace. Other providers' settings are rejected.
+
+Pushbullet's [target rules](https://docs.pushbullet.com/#create-push) require ownership of a target channel.
+Email targets can receive an email from Pushbullet when they have no account or registered devices, matching the
+service behavior used by Bash. The notifier does not look up accounts or devices.
+
+Messages contain the summary/details, node/alert, status transition, chart/context, known values with units and
+timestamp. Text is preserved through JSON encoding without adding HTML or shortening it. An event `url` produces a
+native link push, as in Bash; without a URL, the notifier sends a note with the same content. Zero values remain visible.
+Richer shared presentation stays pending in the inventory.
+
+The optional `api_url` defaults to `https://api.pushbullet.com` and accepts a literal or secret reference. Custom
+HTTP(S) bases may have a path prefix but no credentials, query or fragment; the official service requires HTTPS.
+The notifier appends `/v2/pushes` and authenticates with the `Access-Token` header.
+
+Delivery requires HTTP 200 and a JSON acknowledgment containing a nonempty created-push `iden` without an error.
+Responses are limited to 256 KiB and never logged. There are no automatic retries, including rate-limit and server
+errors. Individual failures allow later destinations to proceed within the invocation deadline.
+
+To inspect a Pushbullet request using the receiver above, save this as `pushbullet-local.yaml`:
+
+```yaml
+version: 1
+destinations:
+  pushbullet_local:
+    type: pushbullet
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    channel_tag: test-alerts
+```
+
+```sh
+/tmp/alarm-notify send --config pushbullet-local.yaml --destination pushbullet_local < examples/event.json
+```
+
+Tests use synthetic tokens and local receivers to verify complete requests, recipient modes, acknowledgments,
+secret handling, failure isolation and cancellation. They do not send to Pushbullet or verify native client rendering.
 
 ## Event document
 
