@@ -41,7 +41,7 @@ func notificationFields(event Event) []notificationField {
 	return fields
 }
 
-func notificationPlainText(event Event) string {
+func notificationPlainText(event Event, includeURL bool) string {
 	lines := []string{event.Summary}
 	if event.Info != "" {
 		lines = append(lines, event.Info)
@@ -50,5 +50,8 @@ func notificationPlainText(event Event) string {
 		lines = append(lines, field.name+": "+field.value)
 	}
 	lines = append(lines, "Time: "+event.Timestamp.Format(time.RFC3339))
+	if includeURL && event.URL != "" {
+		lines = append(lines, event.URL)
+	}
 	return strings.Join(lines, "\n")
 }

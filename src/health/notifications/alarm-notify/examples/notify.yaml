@@ -36,6 +36,11 @@ destinations:
     auth_token: ${env:NOTIFY_TWILIO_AUTH_TOKEN}
     from: '+15005550006'
     to: '+15005550009'
+  messagebird:
+    type: messagebird
+    access_key: ${env:NOTIFY_MESSAGEBIRD_ACCESS_KEY}
+    originator: Netdata
+    recipient: '+15005550009'
 routing:
   default: [local]
   roles:
@@ -48,3 +53,4 @@ routing:
     pushover_ops: [pushover]
     pushbullet_ops: [pushbullet]
     twilio_ops: [twilio]
+    messagebird_ops: [messagebird]

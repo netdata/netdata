@@ -60,10 +60,7 @@ func validateTwilioField(name, value string) error {
 			return errors.New("twilio account_sid must be AC followed by 32 hexadecimal characters")
 		}
 	case "auth_token":
-		if value == "" || strings.Contains(value, "${") ||
-			strings.IndexFunc(value, func(r rune) bool { return r < 33 || r > 126 }) != -1 {
-			return errors.New("twilio auth_token must be nonempty printable ASCII without whitespace")
-		}
+		return validateToken(value, "twilio", "auth_token")
 	}
 	return nil
 }
@@ -103,11 +100,7 @@ func sendTwilio(ctx context.Context, dst Destination, event Event, timeout time.
 }
 
 func renderTwilio(dst Destination, event Event) url.Values {
-	body := notificationPlainText(event)
-	if event.URL != "" {
-		body += "\n" + event.URL
-	}
-	return url.Values{"From": {dst.From}, "To": {dst.To}, "Body": {body}}
+	return url.Values{"From": {dst.From}, "To": {dst.To}, "Body": {notificationPlainText(event, true)}}
 }
 
 func readTwilioResponse(response *http.Response) error {

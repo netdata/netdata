@@ -1,12 +1,13 @@
 # Experimental Go notifier
 
-This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet and Twilio.
+This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
+Twilio and MessageBird.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
-Telegram bot messages, Pushover/Pushbullet notifications and Twilio text messages.
+Telegram bot messages, Pushover/Pushbullet notifications and Twilio/MessageBird text messages.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -30,10 +31,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         print(self.rfile.read(int(self.headers["Content-Length"])).decode(), flush=True)
-        self.send_response(201 if self.path.endswith("/Messages.json") else 200)
+        self.send_response(201 if self.path.endswith(("/Messages.json", "/messages")) else 200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(b'{"ok":true,"status":1,"iden":"test-push","sid":"test-message","result":{"message_id":1}}')
+        self.wfile.write(
+            b'{"ok":true,"status":1,"iden":"test-push","sid":"test-message",'
+            b'"id":"test-message","result":{"message_id":1}}'
+        )
 
     def log_message(self, *args):
         pass  # Avoid logging credential-bearing request paths.
@@ -75,13 +79,14 @@ and `url`; `bearer_token` is optional for generic webhooks and rejected for Slac
 are rejected on other provider types. Pushover requires `type: pushover`, `app_token` and `user_key`.
 Pushbullet requires `type: pushbullet`, `access_token`, and one `email` or `channel_tag`.
 Twilio requires `type: twilio`, `account_sid`, `auth_token`, `from` and `to`.
+MessageBird requires `type: messagebird`, `access_key`, `originator` and `recipient`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
-URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens and Twilio account
-credentials accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
+URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials
+and MessageBird access keys accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -119,12 +124,13 @@ count. Partial failure returns `0` when another delivery succeeded, matching Bas
 the individual results to see failures. On interruption, counts cover results reported before cancellation and do
 not claim an outcome for interrupted or unstarted deliveries.
 
-Deliveries use POST. Twilio uses `application/x-www-form-urlencoded`; all other providers use `application/json`.
+Deliveries use POST. Twilio and MessageBird use `application/x-www-form-urlencoded`; all other providers use
+`application/json`.
 Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. These three providers make one attempt and
-close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet and Twilio check bounded JSON
-acknowledgments; Telegram can retry rate limits as described below. Redirects are never followed. Errors do not echo config/input values,
-secret contents, response text, or endpoint URLs.
+close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio and MessageBird
+check bounded JSON acknowledgments; Telegram can retry rate limits as described below. Redirects are never followed.
+Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
 
 ## Slack app webhooks
 
@@ -474,6 +480,69 @@ destinations:
 
 Tests use synthetic credentials and loopback receivers to verify complete forms, authentication, routing,
 acknowledgments and cancellation. They do not send live messages or verify handset delivery.
+
+## MessageBird SMS
+
+Configure an access key, originator and one recipient per named destination. Select several destinations through
+routing to send to multiple recipients:
+
+```yaml
+version: 1
+destinations:
+  messagebird_ops:
+    type: messagebird
+    access_key: ${env:NOTIFY_MESSAGEBIRD_ACCESS_KEY}
+    originator: Netdata
+    recipient: '+15005550009'
+routing:
+  roles:
+    sysadmin: [messagebird_ops]
+```
+
+Replace the example recipient with your phone number before using the real service. `recipient` is a literal
+MSISDN string: digits with an optional leading `+`. Quote it in YAML to preserve its spelling. Recipient lists
+and secret references are not accepted in this field; configure one named destination per recipient.
+
+`originator` is a literal sender number or sender ID. MessageBird also supports `inbox` for its Sticky VMN sender
+selection where available. The notifier preserves the originator and leaves service-specific validity checks to
+MessageBird; alphanumeric sender IDs have an API limit of 11 characters. The `access_key` accepts a literal or
+environment/file reference and must resolve to nonempty printable ASCII without whitespace. Other providers'
+settings are rejected.
+
+The optional `api_url` defaults to `https://rest.messagebird.com` and accepts a literal or secret reference. A custom
+HTTP(S) base may include a path prefix but no credentials, query or fragment; the official API requires HTTPS.
+The notifier appends `/messages`, sends form-encoded `originator`, `recipients`, `body` and `datacoding=auto`, and uses
+[AccessKey authentication](https://developers.messagebird.com/api/#authentication) with `Accept: application/json`.
+
+The plain-text body includes the summary/details, node/alert, status transition, available chart/context and values,
+timestamp and optional event URL. Zero values remain visible. Following Bash, `datacoding=auto` lets the
+[SMS API](https://developers.messagebird.com/api/sms-messaging/#send-outbound-sms) select GSM or Unicode encoding.
+Long SMS messages may be segmented and billed separately by the service. The notifier does not shorten, split,
+retry or poll messages; remote rejections fail the destination. Richer shared presentation stays pending.
+
+Success requires HTTP 201 and a nonempty created-message `id` in a JSON acknowledgment of at most 256 KiB. This
+confirms API creation, not handset delivery. Failures omit credentials, recipients, response text and URLs, and
+allow later destinations to proceed within the invocation deadline.
+
+For a local demonstration using the receiver above, save this as `messagebird-local.yaml`:
+
+```yaml
+version: 1
+destinations:
+  messagebird_local:
+    type: messagebird
+    api_url: http://127.0.0.1:18080
+    access_key: synthetic-key
+    originator: Netdata
+    recipient: '+15005550009'
+```
+
+```sh
+/tmp/alarm-notify send --config messagebird-local.yaml --destination messagebird_local < examples/event.json
+```
+
+Tests use synthetic keys and loopback receivers to verify complete forms, `datacoding=auto`, routing,
+acknowledgments and cancellation. They do not send live SMS or verify handset delivery.
 
 ## Event document
 
