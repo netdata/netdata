@@ -206,8 +206,9 @@ static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx
 {
     internal_fatal(rrdeng_main.tid != gettid_cached(), "check_and_schedule_db_rotation() can only be run from the event loop thread");
 
-    // neither indexing nor rotation before the registry has been loaded from every journal
-    if (!rrdeng_ctx_is_mrg_populated(ctx))
+    // neither indexing nor rotation before the registry has been loaded from every journal,
+    // nor once rrdeng_exit() has started taking the tier down
+    if (!rrdeng_ctx_is_active(ctx) || !rrdeng_ctx_is_mrg_populated(ctx))
         return;
 
     if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED)) {
@@ -2039,6 +2040,8 @@ static void *populate_mrg_tp_worker(
             // reference like it does for queries. The acquire fails only for a datafile already pending
             // deletion, whose retention is going away with it.
             if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_MRG_LOAD)) {
+                // mark it done, so the rescan below does not count it again
+                datafile->populate_mrg.populated = true;
                 spinlock_unlock(&datafile->populate_mrg.spinlock);
                 nd_log_daemon(NDLP_INFO, "DBENGINE: tier %d: skipping " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                                          " for MRG population, it is pending deletion",
