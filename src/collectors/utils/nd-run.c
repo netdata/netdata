@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "exec-signals.h"
+#include "nd-file-reader.h"
 
 #ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
@@ -186,6 +187,10 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    bool file_reader = strcmp(argv[1], "--read-file-server-v1") == 0;
+    if (file_reader && argc != 2)
+        fatal_msg("the private file reader mode does not accept arguments");
+
     bool preserve_env = strcmp(argv[1], "--preserve-env") == 0;
     int command = 1;
     if (preserve_env) {
@@ -251,6 +256,9 @@ int main(int argc, char *argv[]) {
     #ifdef HAVE_CAPABILITY
         clear_caps();
     #endif
+
+    if (file_reader)
+        return nd_file_reader_main();
 
     char **new_environ = build_environment(pw, preserve_env);
 

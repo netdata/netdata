@@ -5,21 +5,23 @@ package scaleio
 import (
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio/client"
 )
 
 const discoveryEvery = 5
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	c.runs += 1
 	if !c.lastDiscoveryOK || c.runs%discoveryEvery == 0 {
-		if err := c.discovery(); err != nil {
+		if err := c.discovery(ctx); err != nil {
 			return nil, err
 		}
 	}
 
-	stats, err := c.client.SelectedStatistics(query)
+	stats, err := c.client.SelectedStatistics(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -34,10 +36,10 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (c *Collector) discovery() error {
+func (c *Collector) discovery(ctx context.Context) error {
 	start := time.Now()
 	c.Debugf("starting discovery")
-	ins, err := c.client.Instances()
+	ins, err := c.client.Instances(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err

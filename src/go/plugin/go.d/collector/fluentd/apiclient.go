@@ -3,6 +3,7 @@
 package fluentd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -47,8 +48,8 @@ type apiClient struct {
 	request    web.RequestConfig
 }
 
-func (a apiClient) getPluginsInfo() (*pluginsInfo, error) {
-	req, err := a.createRequest(pluginsPath)
+func (a apiClient) getPluginsInfo(ctx context.Context) (*pluginsInfo, error) {
+	req, err := a.createRequest(ctx, pluginsPath)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating request : %v", err)
 	}
@@ -61,7 +62,7 @@ func (a apiClient) getPluginsInfo() (*pluginsInfo, error) {
 	return &info, nil
 }
 
-func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
+func (a apiClient) createRequest(ctx context.Context, urlPath string) (*http.Request, error) {
 	req := a.request.Copy()
 	u, err := url.Parse(req.URL)
 	if err != nil {
@@ -70,5 +71,5 @@ func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
 
 	u.Path = path.Join(u.Path, urlPath)
 	req.URL = u.String()
-	return web.NewHTTPRequest(req)
+	return web.NewHTTPRequest(ctx, req)
 }

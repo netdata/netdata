@@ -3,6 +3,7 @@
 package fluentd
 
 import (
+	"context"
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -25,8 +26,8 @@ func (c *Collector) initPermitPluginMatcher() (matcher.Matcher, error) {
 	return matcher.NewSimplePatternsMatcher(c.PermitPlugin)
 }
 
-func (c *Collector) initApiClient() (*apiClient, error) {
-	client, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initApiClient(ctx context.Context) (*apiClient, error) {
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}

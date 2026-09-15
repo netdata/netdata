@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"context"
+
 	"golang.org/x/net/html/charset"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -18,18 +20,18 @@ var (
 	urlQueryStatus = url.Values{"format": {"xml"}, "level": {"full"}}.Encode()
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectStatus(mx); err != nil {
+	if err := c.collectStatus(ctx, mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectStatus(mx map[string]int64) error {
-	status, err := c.fetchStatus()
+func (c *Collector) collectStatus(ctx context.Context, mx map[string]int64) error {
+	status, err := c.fetchStatus(ctx)
 	if err != nil {
 		return err
 	}
@@ -71,8 +73,8 @@ func (c *Collector) collectStatus(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) fetchStatus() (*monitStatus, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatus)
+func (c *Collector) fetchStatus(ctx context.Context) (*monitStatus, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, err
 	}

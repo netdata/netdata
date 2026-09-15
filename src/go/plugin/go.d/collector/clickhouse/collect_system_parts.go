@@ -3,6 +3,7 @@
 package clickhouse
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -33,8 +34,8 @@ type tableStats struct {
 	rows     int64
 }
 
-func (c *Collector) collectSystemParts(mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collectSystemParts(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

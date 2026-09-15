@@ -4,6 +4,7 @@ package apache
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -13,8 +14,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	status, err := c.scrapeStatus()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	status, err := c.scrapeStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -29,8 +30,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) scrapeStatus() (*serverStatus, error) {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) scrapeStatus(ctx context.Context) (*serverStatus, error) {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
