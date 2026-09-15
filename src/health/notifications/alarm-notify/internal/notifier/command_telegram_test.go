@@ -278,6 +278,8 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"pagerduty v1 deadline": {provider: "pagerduty-v1"}, "pagerduty v1 cancel": {provider: "pagerduty-v1", cancel: true},
+		"pagerduty v2 deadline": {provider: "pagerduty-v2"}, "pagerduty v2 cancel": {provider: "pagerduty-v2", cancel: true},
 		"smseagle cancel": {provider: "smseagle", cancel: true}, "smseagle deadline": {provider: "smseagle"},
 		"prowl cancel": {provider: "prowl", cancel: true}, "prowl deadline": {provider: "prowl"},
 		"kavenegar cancel": {provider: "kavenegar", cancel: true}, "kavenegar deadline": {provider: "kavenegar"},
@@ -305,7 +307,7 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/api/v2/messages/sms",
+				case "/generic/2010-04-15/create_event.json", "/v2/enqueue", "/api/v2/messages/sms",
 					"/add",
 					"/synthetic-key/sms/send.json",
 					"/bot123:synthetic-private-value/sendMessage",
@@ -319,7 +321,9 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					"/alert",
 					"/api/v2/events/ingest":
 					_, _ = io.Copy(io.Discard, r.Body)
-					if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath ||
+					if r.URL.Path == "/v2/enqueue" {
+						w.WriteHeader(202)
+					} else if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath ||
 						r.URL.Path == "/api/v2/events/ingest" {
 						w.WriteHeader(201)
 					} else {
@@ -401,6 +405,13 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					APIToken:       "synthetic-key",
 					EntitySelector: "type(HOST)",
 				}
+			}
+			if strings.HasPrefix(test.provider, "pagerduty-v") {
+				dst = pagerDutyTestDestination(1)
+				if test.provider == "pagerduty-v2" {
+					dst = pagerDutyTestDestination(2)
+				}
+				dst.APIURL = server.URL
 			}
 			if test.provider == "smseagle" {
 				dst = smseagleTestDestination()

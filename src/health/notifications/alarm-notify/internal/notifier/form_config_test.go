@@ -120,6 +120,9 @@ func TestFormProviderFieldIsolation(t *testing.T) {
 					field.Name == "VoiceID" {
 					wantErr = "require type: smseagle"
 				}
+				if field.Name == "APIVersion" {
+					wantErr = "api_version requires type: pagerduty"
+				}
 				checkFormConfig(t, dst, wantErr)
 			})
 		}

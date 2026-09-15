@@ -199,6 +199,8 @@ func TestRunFanoutCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"pagerduty v1 deadline": {provider: "pagerduty-v1"}, "pagerduty v1 cancel": {provider: "pagerduty-v1", cancel: true},
+		"pagerduty v2 deadline": {provider: "pagerduty-v2"}, "pagerduty v2 cancel": {provider: "pagerduty-v2", cancel: true},
 		"smseagle deadline": {provider: "smseagle"}, "smseagle cancellation": {provider: "smseagle", cancel: true},
 		"prowl deadline": {provider: "prowl"}, "prowl cancellation": {provider: "prowl", cancel: true},
 		"kavenegar deadline": {provider: "kavenegar"}, "kavenegar cancellation": {provider: "kavenegar", cancel: true},
@@ -219,7 +221,10 @@ func TestRunFanoutCancellation(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.URL.Path {
-					case "/blocked/api/v2/messages/sms", "/blocked/add",
+					case "/blocked/generic/2010-04-15/create_event.json",
+						"/blocked/v2/enqueue",
+						"/blocked/api/v2/messages/sms",
+						"/blocked/add",
 						"/blocked/synthetic-key/sms/send.json",
 						"/blocked",
 						"/blocked/events",
@@ -253,6 +258,14 @@ func TestRunFanoutCancellation(t *testing.T) {
 				blocked = fmt.Sprintf(
 					"type: dynatrace, api_url: %q, api_token: synthetic-key, entity_selector: type(HOST)",
 					server.URL+"/blocked",
+				)
+			}
+			if strings.HasPrefix(test.provider, "pagerduty-v") {
+				blocked = fmt.Sprintf(
+					"type: pagerduty, api_url: %q, integration_key: %q, api_version: %s",
+					server.URL+"/blocked",
+					pagerDutyTestKey,
+					strings.TrimPrefix(test.provider, "pagerduty-v"),
 				)
 			}
 			if test.provider == "smseagle" {

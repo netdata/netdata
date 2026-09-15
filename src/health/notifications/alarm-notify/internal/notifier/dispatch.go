@@ -61,6 +61,8 @@ func dispatch(
 			err = postJSON(ctx, dst, renderSIGNL4(event), timeout)
 		case "alerta":
 			err = sendAlerta(ctx, dst, event, timeout)
+		case "pagerduty":
+			err = sendPagerDuty(ctx, dst, event, timeout)
 		case "smseagle":
 			err = sendSMSEagle(ctx, dst, event, timeout)
 		case "prowl":
