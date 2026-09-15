@@ -309,6 +309,15 @@
 - Fix(go.d): report Function failures and honor finalizer context ([#23858](https://github.com/netdata/netdata/issues/23858))
 - Refactor(go.d): centralize one-shot task handshakes ([#23859](https://github.com/netdata/netdata/issues/23859))
 - Docs(agents): make delegation and review proportional to risk ([#23860](https://github.com/netdata/netdata/issues/23860))
+- Build(deps): bump go.mongodb.org/mongo-driver/v2 from 2.9.0 to 2.9.1 in /src/go ([#23863](https://github.com/netdata/netdata/issues/23863))
+- Hyper-V (Windows.plugin) ([#22119](https://github.com/netdata/netdata/issues/22119))
+- Docs(agents): require independent readiness review and default to validated local commits ([#23866](https://github.com/netdata/netdata/issues/23866))
+- Fix(go.d): read file secrets without elevated privileges ([#23865](https://github.com/netdata/netdata/issues/23865))
+- Fix SQLite lifetime races during agent shutdown ([#23844](https://github.com/netdata/netdata/issues/23844))
+- Feat(health): add experimental standalone Go notifier ([#23870](https://github.com/netdata/netdata/issues/23870))
+- Feat(health/alarm-notify): add role routing and webhook fan-out ([#23871](https://github.com/netdata/netdata/issues/23871))
+- Feat(nd-run): add opt-in environment preservation ([#23868](https://github.com/netdata/netdata/issues/23868))
+- Feat(health/alarm-notify): add modern Slack webhook notifications ([#23872](https://github.com/netdata/netdata/issues/23872))
 
 ## [2.11.0] - 2026-08-12
 
