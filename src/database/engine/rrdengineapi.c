@@ -136,6 +136,15 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create_by_id(STORAGE_INSTANCE *si, U
     if(mrg_metric_ctx(metric) != ctx)
         fatal("DBENGINE: mixed up db instances, asked for metric from %p, got from %p",
               ctx, mrg_metric_ctx(metric));
+
+    if(!uuid_eq(*uuidmap_uuid_ptr(id), *mrg_metric_uuid(main_mrg, metric))) {
+        char uuid1[UUID_STR_LEN + 1];
+        char uuid2[UUID_STR_LEN + 1];
+
+        uuid_unparse(*uuidmap_uuid_ptr(id), uuid1);
+        uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid2);
+        fatal("DBENGINE: uuids do not match, asked for metric '%s', but got metric '%s'", uuid1, uuid2);
+    }
 #endif
 
     return (STORAGE_METRIC_HANDLE *)metric;

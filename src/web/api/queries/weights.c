@@ -2574,7 +2574,6 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
     // Prepare thread data
     struct query_weights_thread_data *thread_data = mallocz(sizeof(struct query_weights_thread_data) * num_threads);
-    ND_THREAD **threads = mallocz(sizeof(ND_THREAD *) * num_threads);
 
     size_t current_host_idx = 0;
     for (size_t i = 0; i < num_threads; i++) {
@@ -2620,7 +2619,6 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
     // Cleanup
     freez(thread_data);
-    freez(threads);
     freez(qwd->hosts_array);
 
     return total_added;

@@ -341,8 +341,11 @@ void netdata_conf_dbengine_init(const char *hostname) {
     else if(!created_tiers)
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++)
-        rrdeng_readiness_wait(multidb_ctx[tier]);
+    // every tier that came up, including one above a tier that failed: the engine runs and rotates it,
+    // so its registry load is awaited like the others
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        if(rrdeng_ctx_is_active(multidb_ctx[tier]))
+            rrdeng_readiness_wait(multidb_ctx[tier]);
 
 
     dbengine_enabled = true;
