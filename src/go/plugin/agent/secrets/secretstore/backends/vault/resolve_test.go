@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfiletest"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/stretchr/testify/assert"
@@ -86,7 +86,7 @@ func TestParseResponse(t *testing.T) {
 func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 	s := &publishedStore{
 		runtime: &runtime{
-			readFile: credentialfiletest.New(t).Read,
+			readFile: testutil.New().Read,
 			httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusOK,
@@ -155,7 +155,7 @@ func TestPublishedStoreResolveUsesConfiguredRequestPath(t *testing.T) {
 			}
 			s := &publishedStore{
 				runtime: &runtime{
-					readFile:           credentialfiletest.New(t).Read,
+					readFile:           testutil.New().Read,
 					httpClient:         &http.Client{Transport: secure},
 					httpClientInsecure: &http.Client{Transport: insecure},
 				},
@@ -219,7 +219,7 @@ func TestPublishedStoreResolveUsesSafeTokenFile(t *testing.T) {
 			var requested bool
 			s := &publishedStore{
 				runtime: &runtime{
-					readFile: credentialfiletest.New(t).Read,
+					readFile: testutil.New().Read,
 					httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 						requested = true
 						gotToken = req.Header.Get("X-Vault-Token")
@@ -268,7 +268,7 @@ func TestPublishedStoreResolveRereadsTokenFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "token")
 	var tokens []string
 	s := &publishedStore{runtime: &runtime{
-		readFile: credentialfiletest.New(t).Read,
+		readFile: testutil.New().Read,
 		httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			tokens = append(tokens, req.Header.Get("X-Vault-Token"))
 			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(bytes.NewBufferString(`{"data":{"password":"value"}}`))}, nil

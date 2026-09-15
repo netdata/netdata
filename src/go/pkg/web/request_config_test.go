@@ -13,7 +13,7 @@ import (
 
 	"context"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfiletest"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/stretchr/testify/assert"
@@ -263,7 +263,7 @@ func TestNewHTTPRequest(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			httpReq, err := newHTTPRequest(context.Background(), test.req, credentialfiletest.New(t).Read)
+			httpReq, err := newHTTPRequest(context.Background(), test.req, testutil.New().Read)
 
 			if test.wantErr {
 				assert.Error(t, err)
@@ -318,7 +318,7 @@ func TestBearerTokenFileBounds(t *testing.T) {
 			req, err := newHTTPRequest(context.Background(), RequestConfig{
 				URL:             "http://example.com",
 				BearerTokenFile: tc.prepare(t),
-			}, credentialfiletest.New(t).Read)
+			}, testutil.New().Read)
 
 			if len(tc.wantErrs) > 0 {
 				require.Error(t, err)
@@ -341,7 +341,7 @@ func TestBearerTokenFileOutsideK8sSuppression(t *testing.T) {
 	req, err := newHTTPRequest(context.Background(), RequestConfig{
 		URL:             "http://example.com",
 		BearerTokenFile: "/var/run/secrets/netdata-test-missing-token",
-	}, credentialfiletest.New(t).Read)
+	}, testutil.New().Read)
 
 	require.NoError(t, err)
 	require.Empty(t, req.Header.Get("Authorization"))
@@ -453,7 +453,7 @@ func TestNewHTTPRequestWithPath(t *testing.T) {
 			// Store original headers count
 			originalHeadersCount := len(test.config.Headers)
 
-			req, err := newHTTPRequestWithPath(context.Background(), test.config, test.path, credentialfiletest.New(t).Read)
+			req, err := newHTTPRequestWithPath(context.Background(), test.config, test.path, testutil.New().Read)
 
 			if test.wantErr {
 				assert.Error(t, err)

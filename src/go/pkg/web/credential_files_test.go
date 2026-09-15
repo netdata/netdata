@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfiletest"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +35,7 @@ func TestRequestWithoutTokenDoesNotReadFiles(t *testing.T) {
 
 func TestBearerRequestReadsCurrentFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "token")
-	readFile := credentialfiletest.New(t).Read
+	readFile := testutil.New().Read
 	cfg := RequestConfig{URL: "http://localhost", BearerTokenFile: path}
 	for _, token := range []string{"synthetic-first", "synthetic-rotated"} {
 		require.NoError(t, os.WriteFile(path, []byte(token), 0600))
@@ -63,7 +63,7 @@ func TestRequestPreservesHeaderAndRedirectPolicy(t *testing.T) {
 		BearerTokenFile: path,
 		Headers:         map[string]string{"Authorization": "configured-header"},
 	}
-	req, err := newHTTPRequestWithPath(context.Background(), cfg, "/start", credentialfiletest.New(t).Read)
+	req, err := newHTTPRequestWithPath(context.Background(), cfg, "/start", testutil.New().Read)
 	require.NoError(t, err)
 	require.Equal(t, server.URL, cfg.URL)
 	resp, err := client.Do(req)

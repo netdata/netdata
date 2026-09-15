@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfiletest"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -1091,7 +1091,7 @@ func newLocalCephClient(t *testing.T, httpClient *http.Client, cfg web.RequestCo
 	t.Helper()
 	c, err := newCephClient(httpClient, cfg, notFollowRedirects, origins)
 	if c != nil {
-		c.readFile = credentialfiletest.New(t).Read
+		c.readFile = testutil.New().Read
 	}
 	return c, err
 }

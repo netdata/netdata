@@ -115,7 +115,8 @@ or parser fragments derived from credential input.
 
 Use scoped `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
 privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may use private stateless
-read seams and `credentialfiletest.New(t)` for synthetic fixtures; public APIs use the real scoped boundary.
+read seams and `testutil.New()` from `pkg/credentialfile/testutil` for synthetic fixtures; public APIs use the real
+scoped boundary.
 
 This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
 retain their existing behavior.

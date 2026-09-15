@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package credentialfiletest provides an explicitly local reader for unit tests.
+// Package testutil provides an explicitly local reader for unit tests.
 // Production callers must use credentialfile.Reader's authority boundary.
-package credentialfiletest
+package testutil
 
 import (
 	"context"
 	"io"
 	"os"
-	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
@@ -16,12 +15,10 @@ import (
 
 type localReader struct{}
 
-func New(t testing.TB) *localReader {
-	t.Helper()
-	r := &localReader{}
-	t.Cleanup(func() { _ = r.Close() })
-	return r
+func New() *localReader {
+	return &localReader{}
 }
+
 func (*localReader) Read(ctx context.Context, path string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

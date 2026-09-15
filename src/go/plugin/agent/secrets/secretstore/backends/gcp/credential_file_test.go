@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfiletest"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func TestServiceAccountFileRereadPreservesUnboundedInput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "service-account.json")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	local := credentialfiletest.New(t)
+	local := testutil.New()
 	reads := 0
 	s := &publishedStore{runtime: &runtime{
 		readFile: func(got context.Context, path string) ([]byte, error) {
@@ -69,7 +69,7 @@ func TestServiceAccountFileRereadPreservesUnboundedInput(t *testing.T) {
 func TestServiceAccountFileReadErrors(t *testing.T) {
 	t.Run("missing file", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "missing")
-		s := &publishedStore{runtime: &runtime{readFile: credentialfiletest.New(t).ReadAll}}
+		s := &publishedStore{runtime: &runtime{readFile: testutil.New().ReadAll}}
 		_, err := s.serviceAccountToken(t.Context(), path)
 		require.ErrorIs(t, err, os.ErrNotExist)
 	})
