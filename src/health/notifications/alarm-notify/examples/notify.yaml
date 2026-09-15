@@ -84,6 +84,12 @@ destinations:
     api_key: ${env:NOTIFY_KAVENEGAR_API_KEY}
     sender: '+15005550006'
     recipient: '+15005550009'
+  smseagle:
+    type: smseagle
+    api_url: ${env:NOTIFY_SMSEAGLE_API_URL}
+    access_token: ${env:NOTIFY_SMSEAGLE_ACCESS_TOKEN}
+    recipients: ['+15005550009', '05005550009']
+    message_type: sms
 routing:
   default: [local]
   roles:
@@ -102,3 +108,4 @@ routing:
     incident_ops: [ilert, signl4]
     monitoring_ops: [alerta, dynatrace]
     form_ops: [prowl, kavenegar]
+    appliance_ops: [smseagle]

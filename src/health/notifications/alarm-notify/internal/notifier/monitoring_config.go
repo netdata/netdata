@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode/utf8"
 )
@@ -32,7 +33,7 @@ func (dst Destination) validateMonitoring() error {
 			return errors.New("dynatrace source must be a nonempty literal of at most 4096 characters when set")
 		}
 	}
-	if dst != allowed {
+	if !reflect.DeepEqual(dst, allowed) {
 		return fmt.Errorf("%s destination contains fields for another provider", dst.Type)
 	}
 	for _, field := range dst.monitoringSecrets() {

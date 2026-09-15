@@ -5,6 +5,7 @@ package notifier
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
 )
@@ -26,7 +27,7 @@ func (dst Destination) validateChatWebhook() error {
 			return errors.New("fleep sender must be a nonempty literal name without controls")
 		}
 	}
-	if dst != allowed {
+	if !reflect.DeepEqual(dst, allowed) {
 		return fmt.Errorf("%s destination contains fields for another provider", dst.Type)
 	}
 	reference, err := secretReference(dst.URL)

@@ -1,14 +1,15 @@
 # Experimental Go notifier
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
-Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl and Kavenegar.
+Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar and SMSEagle.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
-Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events, Prowl push notifications and Kavenegar SMS.
+Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
+Prowl push notifications, Kavenegar SMS and SMSEagle SMS/MMS and voice calls.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -27,11 +28,13 @@ The send command needs a receiver. For a local demonstration, run this in a sepa
 
 ```sh
 python3 - <<'PY'
+import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
-        print(self.rfile.read(int(self.headers["Content-Length"])).decode(), flush=True)
+        body = self.rfile.read(int(self.headers["Content-Length"])).decode()
+        print(body, flush=True)
         status = 200
         if self.path.endswith("/events"):
             status = 202
@@ -40,7 +43,14 @@ class Receiver(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/xml" if self.path.endswith("/add") else "application/json")
         self.end_headers()
-        if self.path.endswith("/add"):
+        if self.path.endswith(("/api/v2/messages/sms", "/api/v2/messages/mms",
+                               "/api/v2/calls/ring", "/api/v2/calls/tts", "/api/v2/calls/tts_advanced")):
+            recipients = json.loads(body)["to"]
+            self.wfile.write(json.dumps([
+                {"status": "queued", "message": "OK", "number": number, "id": index}
+                for index, number in enumerate(recipients, 1)
+            ]).encode())
+        elif self.path.endswith("/add"):
             self.wfile.write(b'<prowl><success code="200" remaining="999" resetdate="1234567890"/></prowl>')
         elif self.path.endswith("/sms/send.json"):
             self.wfile.write(b'{"return":{"status":200},"entries":[{"messageid":1,"status":1}]}')
@@ -107,14 +117,15 @@ ilert requires `type: ilert` and `integration_key`, with an optional `api_url`. 
 a complete webhook `url`. Alerta requires `type: alerta`, `api_url` and `environment`, with an optional `api_key`.
 Dynatrace requires `type: dynatrace`, `api_url`, `api_token` and `entity_selector`; `event_type` and `source` are optional.
 Prowl requires `type: prowl` and `api_key`; Kavenegar requires `type: kavenegar`, `api_key`, `sender` and `recipient`.
-Both accept an optional `api_url`. Destination names are nonsecret identifiers.
+Both accept an optional `api_url`. SMSEagle requires `type: smseagle`, `api_url`, `access_token` and a `recipients`
+array, with optional message/call settings described below. Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
 MessageBird access keys, Gotify app tokens, ntfy credentials, ilert integration keys, Alerta/Prowl/Kavenegar API keys and Dynatrace
-API tokens accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
+API tokens, plus SMSEagle access tokens, accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -152,14 +163,15 @@ count. Partial failure returns `0` when another delivery succeeded, matching Bas
 the individual results to see failures. On interruption, counts cover results reported before cancellation and do
 not claim an outcome for interrupted or unstarted deliveries.
 
-Deliveries use POST. Twilio and MessageBird use `application/x-www-form-urlencoded`; ntfy uses UTF-8 `text/plain`;
+Deliveries use POST. Twilio, MessageBird, Prowl and Kavenegar use `application/x-www-form-urlencoded`;
+ntfy uses UTF-8 `text/plain`;
 the other providers use `application/json`.
 Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. ilert accepts HTTP 202;
 SIGNL4 accepts HTTP 200, 201 or 202. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
-Gotify, ntfy, Rocket.Chat, Alerta and Dynatrace check bounded JSON acknowledgments; Telegram can retry rate limits
-as described below.
+Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar and SMSEagle check bounded JSON acknowledgments;
+Prowl checks a bounded XML acknowledgment. Telegram can retry rate limits as described below.
 Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
 
@@ -1059,6 +1071,109 @@ Save as `form-local.yaml` and run:
 ```
 
 Repeat with WARNING, CRITICAL and CLEAR events to inspect the priority and status changes.
+
+## SMSEagle SMS, MMS and calls
+
+SMSEagle uses its [API v2](https://www.smseagle.eu/docs/apiv2/) on a device running firmware 5.0 or later:
+
+```yaml
+version: 1
+destinations:
+  smseagle:
+    type: smseagle
+    api_url: ${env:NOTIFY_SMSEAGLE_API_URL}
+    access_token: ${env:NOTIFY_SMSEAGLE_ACCESS_TOKEN}
+    recipients: ['+15005550009', '05005550009']
+    message_type: sms
+routing:
+  roles:
+    appliance_ops: [smseagle]
+```
+
+The numbers are synthetic examples. `recipients` is a nonempty array of quoted phone-number strings: digits with an
+optional leading `+`. Leading zeroes are preserved; exact duplicates and whitespace are rejected. Each selected
+named destination sends one request for its entire recipient list.
+
+`api_url` is the device base **before** `/api/v2`, optionally including a reverse-proxy prefix. There is no default.
+It accepts HTTP or HTTPS without credentials, query or fragment; HTTPS verifies certificates. Both `api_url` and
+`access_token` accept literal strings or whole environment/file references. Authentication uses the `Access-Token`
+header; the token must be nonempty printable ASCII without whitespace.
+
+| `message_type` | Appended endpoint | Content and options |
+|---|---|---|
+| `sms` (default) | `/api/v2/messages/sms` | Plain text, optional navigation URL and automatic encoding |
+| `mms` | `/api/v2/messages/mms` | Same text and encoding; text-only MMS, without attachments |
+| `ring` | `/api/v2/calls/ring` | Recipients and `call_duration` only |
+| `tts` | `/api/v2/calls/tts` | Plain text without navigation URL and `call_duration` |
+| `tts_advanced` | `/api/v2/calls/tts_advanced` | TTS content, `call_duration` and `voice_id` |
+
+`call_duration` is a positive integer of seconds, defaults to `10`, and is allowed only for call modes. `voice_id` is
+a positive integer, defaults to `1`, and is allowed only for advanced TTS. The device must provide the chosen voice.
+TTS text over the documented 960-character limit fails before sending; text is not silently truncated.
+
+SMS and MMS select `encoding: standard` when every character in the rendered message belongs to the GSM-7 default or
+extension alphabet, and `encoding: unicode` otherwise. This includes all event fields and the navigation URL. A status
+transition such as `CLEAR → WARNING` selects Unicode because of the arrow. Original text is preserved without
+transliteration or shortening; Unicode can increase SMS segment count. The appliance handles segmentation.
+Automatic selection is an approved change from Bash's implicit standard encoding; there is no manual encoding setting.
+
+All modes carry WARNING, CRITICAL and CLEAR using the current native event. Ring calls do not speak alert text.
+Success requires HTTP 200 and a JSON array with one result per recipient, each with `status: queued` and a positive
+`id`. A rejected, missing or partial batch fails that destination; another successful destination still gives the
+normal any-success invocation result. This confirms appliance queue acceptance, not final phone delivery. Replies
+are bounded to 256 KiB and the invocation deadline. There are no retries or delivery-status polling.
+
+### Local SMSEagle exercise
+
+Use the local receiver above with synthetic credentials and recipients:
+
+```yaml
+version: 1
+destinations:
+  sms:
+    type: smseagle
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    recipients: ['+15005550009', '05005550009']
+  mms:
+    type: smseagle
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    recipients: ['+15005550009']
+    message_type: mms
+  ring:
+    type: smseagle
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    recipients: ['+15005550009']
+    message_type: ring
+    call_duration: 15
+  tts:
+    type: smseagle
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    recipients: ['+15005550009']
+    message_type: tts
+  advanced:
+    type: smseagle
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    recipients: ['+15005550009']
+    message_type: tts_advanced
+    voice_id: 7
+routing:
+  roles:
+    appliance_ops: [sms, mms, ring, tts, advanced]
+```
+
+Save as `smseagle-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config smseagle-local.yaml --role appliance_ops < examples/event.json
+```
+
+Repeat with WARNING, CRITICAL and CLEAR events to inspect each mode's payload. To inspect standard encoding, use
+GSM-compatible event text with no differing `previous_status`, so the message contains no transition arrow.
 
 ## Event document
 
