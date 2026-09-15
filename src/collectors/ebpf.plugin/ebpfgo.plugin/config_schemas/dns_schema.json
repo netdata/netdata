@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "DNS eBPF Collector",
+  "description": "Collects DNS query statistics using eBPF probes",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable collector",
+      "description": "Enable or disable the DNS eBPF collector",
+      "default": true
+    },
+    "update_every": {
+      "type": "integer",
+      "title": "Update interval",
+      "description": "Data collection interval in seconds",
+      "default": 1,
+      "minimum": 1
+    }
+  },
+  "ui": {
+    "sections": [
+      {
+        "name": "Basic Settings",
+        "fields": ["enabled", "update_every"]
+      }
+    ]
+  }
+}
