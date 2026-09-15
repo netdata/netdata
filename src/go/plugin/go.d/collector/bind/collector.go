@@ -65,9 +65,7 @@ type (
 	}
 
 	bindAPIClient interface {
-		serverStats(context.Context,
-
-		) (*serverStats, error)
+		serverStats(context.Context) (*serverStats, error)
 	}
 )
 

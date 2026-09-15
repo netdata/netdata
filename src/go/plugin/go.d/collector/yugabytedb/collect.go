@@ -17,9 +17,7 @@ const (
 	srvTypeSQL     = "ysql"
 )
 
-func (c *Collector) collect(ctx context.Context,
-
-) (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mfs, err := c.prom.ScrapeContext(ctx)
 	if err != nil {
 		return nil, err

@@ -16,9 +16,7 @@ import (
 // Server state: https://www.envoyproxy.io/docs/envoy/latest/api-v3/admin/v3/server_info.proto#enum-admin-v3-serverinfo-state
 // Listener stats: https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/stats
 
-func (c *Collector) collect(ctx context.Context,
-
-) (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mfs, err := c.prom.ScrapeContext(ctx)
 	if err != nil {
 		return nil, err

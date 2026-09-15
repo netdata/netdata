@@ -8,9 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
-func (c *Collector) collect(ctx context.Context,
-
-) (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	pms, err := c.prom.ScrapeSeries(ctx)
 	if err != nil {
 		return nil, err

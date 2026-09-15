@@ -59,39 +59,17 @@ type (
 	}
 
 	healthClient interface {
-		Login(context.Context,
-
-		) error
-		Logout(context.Context,
-
-		) error
-		Ping(context.Context,
-
-		) error
-		ApplMgmt(context.Context,
-
-		) (string, error)
-		DatabaseStorage(context.Context,
-
-		) (string, error)
-		Load(context.Context,
-
-		) (string, error)
-		Mem(context.Context,
-
-		) (string, error)
-		SoftwarePackages(context.Context,
-
-		) (string, error)
-		Storage(context.Context,
-
-		) (string, error)
-		Swap(context.Context,
-
-		) (string, error)
-		System(context.Context,
-
-		) (string, error)
+		Login(context.Context) error
+		Logout(context.Context) error
+		Ping(context.Context) error
+		ApplMgmt(context.Context) (string, error)
+		DatabaseStorage(context.Context) (string, error)
+		Load(context.Context) (string, error)
+		Mem(context.Context) (string, error)
+		SoftwarePackages(context.Context) (string, error)
+		Storage(context.Context) (string, error)
+		Swap(context.Context) (string, error)
+		System(context.Context) (string, error)
 	}
 )
 

@@ -52,9 +52,7 @@ func (rd *requestDuration) UnmarshalJSON(b []byte) error {
 }
 
 type client interface {
-	getStatus(context.Context,
-
-	) (*status, error)
+	getStatus(context.Context) (*status, error)
 }
 
 type httpClient struct {
