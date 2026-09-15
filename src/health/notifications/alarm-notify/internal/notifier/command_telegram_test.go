@@ -292,6 +292,8 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		"gotify deadline":      {provider: "gotify"},
 		"ntfy cancel":          {provider: "ntfy", cancel: true},
 		"ntfy deadline":        {provider: "ntfy"},
+		"rocketchat cancel":    {provider: "rocketchat", cancel: true},
+		"rocketchat deadline":  {provider: "rocketchat"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
@@ -302,7 +304,7 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					"/1/messages.json",
 					"/v2/pushes",
 					twilioTestPath,
-					messagebirdTestPath, "/message", "/topic":
+					messagebirdTestPath, "/message", "/topic", "/rocket-hook":
 					_, _ = io.Copy(io.Discard, r.Body)
 					if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath {
 						w.WriteHeader(201)
@@ -371,6 +373,9 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			}
 			if test.provider == "ntfy" {
 				dst = Destination{Type: "ntfy", URL: server.URL + "/topic"}
+			}
+			if test.provider == "rocketchat" {
+				dst = Destination{Type: "rocketchat", URL: server.URL + "/rocket-hook"}
 			}
 			config, err := yaml.Marshal(Config{Version: 1, Destinations: map[string]Destination{
 				"first":   {Type: "webhook", URL: server.URL + "/first"},

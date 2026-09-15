@@ -49,6 +49,12 @@ func dispatch(
 			err = sendGotify(ctx, dst, event, timeout)
 		case "ntfy":
 			err = sendNtfy(ctx, dst, event, timeout)
+		case "rocketchat":
+			err = postJSON(ctx, dst, renderRocketChat(dst, event), timeout)
+		case "flock":
+			err = postJSON(ctx, dst, renderFlock(event), timeout)
+		case "fleep":
+			err = postJSON(ctx, dst, renderFleep(dst, event), timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}

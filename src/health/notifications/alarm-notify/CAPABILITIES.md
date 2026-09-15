@@ -5,6 +5,7 @@ implementation; it does not change the active Bash notifier. Existing functional
 and questionable behavior requires an explicit decision before being changed or dropped. The ineffective Discord
 channel-name field and repeated-request loop are omitted by explicit approval; real channel routing uses webhook URLs.
 Telegram's optional retries honor the server's requested delay instead of Bash's fixed one second, also by explicit approval.
+Flock's ineffective channel-name loop is also omitted by explicit approval; separate webhook URLs select its channels.
 HipChat is excluded from the Go migration by explicit approval following its
 [end of life](https://www.atlassian.com/partnerships/slack/faq); production Bash remains unchanged.
 
@@ -28,6 +29,8 @@ HipChat is excluded from the Go migration by explicit approval following its
   created-message acknowledgments; no automatic retries or shortening.
 - Gotify application-token messages and ntfy topic publishing with status priorities, ntfy tags/navigation,
   anonymous/Basic/token authentication, secret references and server acknowledgments.
+- Rocket.Chat webhooks with channel overrides, host alias, status attachments and JSON acknowledgment checks;
+  Flock channel webhooks with sender/status attachments; Fleep conversation webhooks with custom sender names.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -51,11 +54,11 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Telegram | `send_telegram` | Implemented with chats/topics, bot-token secrets, custom API bases, silent CLEAR, disabled previews and optional rate-limit retries; server-directed retry timing is an approved correction |
 | Microsoft Teams | `send_msteams` | Pending |
 | Slack | `send_slack` | Modern app webhooks implemented; legacy channel/user/username/icon overrides pending by explicit staged-delivery decision |
-| Rocket.Chat | `send_rocketchat` | Pending |
+| Rocket.Chat | `send_rocketchat` | Webhook URL, optional channel/user override, host alias, status attachments, alert facts/navigation and acknowledgment checks implemented; extended artwork/presentation pending |
 | Alerta | `send_alerta` | Pending |
-| Flock | `send_flock` | Pending |
+| Flock | `send_flock` | Channel webhook URLs, host sender name, status attachments and alert facts/navigation implemented; ineffective channel loop omitted by explicit decision; extended artwork/presentation pending |
 | Discord | `send_discord` | Native webhooks implemented; ineffective channel-name loop omitted by explicit decision; additional artwork/presentation pending |
-| Fleep | `send_fleep` | Pending |
+| Fleep | `send_fleep` | Conversation webhook URLs, custom sender and JSON message content implemented |
 | Prowl | `send_prowl` | Pending |
 | IRC | `send_irc` | Pending |
 | AWS SNS | `send_awssns` | Pending |
@@ -77,15 +80,15 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify and ntfy content/link/status formatting implemented; other providers and richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth settings implemented; remaining provider configuration pending |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock and Fleep content/link/status formatting implemented; other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth; Rocket.Chat URL/channel; Flock URL; Fleep URL/sender settings implemented; remaining provider configuration pending |
 | Results | Per-target failures and Bash's any-success invocation result | Implemented for all current Go providers; provider subtarget details pending with remaining providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first ten increments cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
-Pushbullet, Twilio, MessageBird, Gotify and ntfy. Related providers may share small PRs.
+The first eleven increments cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
+Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock and Fleep. Related providers may share small PRs.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
 More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final
 architecture and broad refactoring are discussed after that working baseline exists.

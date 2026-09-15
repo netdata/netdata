@@ -1,13 +1,14 @@
 # Experimental Go notifier
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
-Twilio, MessageBird, Gotify and ntfy.
+Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock and Fleep.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
-Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications and Twilio/MessageBird text messages.
+Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
+Rocket.Chat/Flock/Fleep webhooks.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -38,7 +39,7 @@ class Receiver(BaseHTTPRequestHandler):
             self.wfile.write(b'{"id":1,"appid":1}')
         else:
             self.wfile.write(
-                b'{"ok":true,"status":1,"iden":"test-push","sid":"test-message",'
+                b'{"ok":true,"success":true,"status":1,"iden":"test-push","sid":"test-message",'
                 b'"id":"test-message","event":"message","result":{"message_id":1}}'
             )
 
@@ -85,6 +86,8 @@ Twilio requires `type: twilio`, `account_sid`, `auth_token`, `from` and `to`.
 MessageBird requires `type: messagebird`, `access_key`, `originator` and `recipient`.
 Gotify requires `type: gotify`, `api_url` and `app_token`. ntfy requires `type: ntfy` and a full topic `url`;
 optional authentication uses `access_token` or `username` with `password`.
+Rocket.Chat, Flock and Fleep require their respective `type` and a complete webhook `url`. Rocket.Chat accepts an
+optional `channel`; Fleep accepts an optional `sender`. These fields are rejected on other provider types.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -133,9 +136,9 @@ not claim an outcome for interrupted or unstarted deliveries.
 Deliveries use POST. Twilio and MessageBird use `application/x-www-form-urlencoded`; ntfy uses UTF-8 `text/plain`;
 the other providers use `application/json`.
 Generic webhooks may add `Authorization: Bearer ...`.
-Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. These three providers make one attempt and
+Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
-Gotify and ntfy check bounded JSON acknowledgments; Telegram can retry rate limits as described below.
+Gotify, ntfy and Rocket.Chat check bounded JSON acknowledgments; Telegram can retry rate limits as described below.
 Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
 
@@ -639,6 +642,89 @@ Save as `push-local.yaml` and run:
 
 Tests use synthetic credentials and loopback receivers to check full payloads/headers, authentication,
 routing, safe failures and cancellation. They do not contact real push services or verify device notifications.
+
+## Rocket.Chat, Flock and Fleep webhooks
+
+These providers use complete incoming webhook URLs. Create the hook in the destination service, then configure
+named destinations and reuse the existing role routing:
+
+```yaml
+version: 1
+destinations:
+  rocket_ops:
+    type: rocketchat
+    url: ${env:NOTIFY_ROCKETCHAT_URL}
+    channel: '#alerts'
+  flock_ops:
+    type: flock
+    url: ${env:NOTIFY_FLOCK_URL}
+  fleep_ops:
+    type: fleep
+    url: ${env:NOTIFY_FLEEP_URL}
+    sender: Netdata
+routing:
+  roles:
+    sysadmin: [rocket_ops, flock_ops, fleep_ops]
+```
+
+Rocket.Chat's optional `channel` selects one `#channel` or `@user`. Enable **Allow to overwrite destination channel
+in body parameters** in the [incoming integration](https://docs.rocket.chat/docs/integrations) when using it.
+Omit `channel` to use the integration's configured destinations. For different overrides, define separate named
+destinations sharing the same URL. Channel names are literal, with no comma lists, whitespace or secret references.
+The notifier sends a host-derived alias, status/summary text and an attachment containing alert facts, timestamp,
+optional info and a navigation link. URL previews are disabled.
+
+Flock [binds each incoming webhook to its channel](https://support.flock.com/hc/en-us/articles/360006943354-Incoming-webhooks).
+Define a separate destination URL for each channel. The Go sender omits Bash's ineffective channel-name loop by
+explicit approval: it sends once per selected destination name. The payload uses a host-derived `sendAs` name,
+status/summary text and an attachment with the full alert description and optional navigation URL. Its message
+structure follows the [official Flock SDK](https://github.com/flockchat/pyflock).
+
+Rocket.Chat and Flock use yellow (`#f0ad4e`) for WARNING, red (`#d9534f`) for CRITICAL and green (`#5cb85c`) for CLEAR.
+Alert facts include node, alert name, status transition, available chart/context and current/previous values with
+units. Zero values remain present. Extended artwork/presentation remains tracked in the migration inventory.
+
+Fleep uses its [JSON webhook format](https://fleep.io/blog/integrations/webhooks/): `message` contains the alert
+description, facts, timestamp and optional navigation URL. Optional YAML `sender` maps to the webhook's `user`
+field; omit it to use the service's default sender. It is a literal name, permits spaces and Unicode, and rejects
+control characters and secret references.
+
+URLs accept literal, whole environment or whole absolute-file references and preserve query parameters.
+Authentication is carried by the webhook URL; separate token fields are rejected. JSON encoding preserves quotes,
+newlines and Unicode. Messages are sent whole, without automatic shortening or splitting; the service enforces its
+own size limits and formatting rules.
+
+All three require HTTP 200. Rocket.Chat also requires `success: true` in a JSON response of at most 256 KiB and
+rejects reported top-level or individual-room errors. Flock and Fleep acknowledge through HTTP status; their response
+bodies are closed without reading them. Errors omit endpoint URLs and response contents. There are no retries or
+redirects, and invocation cancellation/deadline still stops remaining deliveries after an earlier success.
+
+To use the local receiver above with all three providers:
+
+```yaml
+version: 1
+destinations:
+  rocket_local:
+    type: rocketchat
+    url: http://127.0.0.1:18080/rocket-hook
+    channel: '#test-alerts'
+  flock_local:
+    type: flock
+    url: http://127.0.0.1:18080/flock-hook
+  fleep_local:
+    type: fleep
+    url: http://127.0.0.1:18080/fleep-hook
+    sender: Netdata
+routing:
+  roles:
+    sysadmin: [rocket_local, flock_local, fleep_local]
+```
+
+Save it as `/tmp/notify-chat.yaml` and send a synthetic event:
+
+```sh
+/tmp/alarm-notify send --config /tmp/notify-chat.yaml --role sysadmin < examples/event.json
+```
 
 ## Event document
 
