@@ -1,14 +1,14 @@
 # Experimental Go notifier
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
-Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert and SIGNL4.
+Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta and Dynatrace.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
-Rocket.Chat/Flock/Fleep webhooks, and ilert/SIGNL4 incident events and recovery.
+Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, and Alerta/Dynatrace monitoring events.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -35,13 +35,19 @@ class Receiver(BaseHTTPRequestHandler):
         status = 200
         if self.path.endswith("/events"):
             status = 202
-        elif self.path.endswith(("/Messages.json", "/messages", "/signl4")):
+        elif self.path.endswith(("/Messages.json", "/messages", "/signl4", "/alert", "/api/v2/events/ingest")):
             status = 201
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         if self.path.endswith("/message"):
             self.wfile.write(b'{"id":1,"appid":1}')
+        elif self.path.endswith("/alert"):
+            self.wfile.write(b'{"status":"ok","id":"test-alert"}')
+        elif self.path.endswith("/api/v2/events/ingest"):
+            self.wfile.write(
+                b'{"reportCount":1,"eventIngestResults":[{"status":"OK","correlationId":"test-event"}]}'
+            )
         else:
             self.wfile.write(
                 b'{"ok":true,"success":true,"status":1,"iden":"test-push","sid":"test-message",'
@@ -94,15 +100,16 @@ optional authentication uses `access_token` or `username` with `password`.
 Rocket.Chat, Flock and Fleep require their respective `type` and a complete webhook `url`. Rocket.Chat accepts an
 optional `channel`; Fleep accepts an optional `sender`. These fields are rejected on other provider types.
 ilert requires `type: ilert` and `integration_key`, with an optional `api_url`. SIGNL4 requires `type: signl4` and
-a complete webhook `url`.
+a complete webhook `url`. Alerta requires `type: alerta`, `api_url` and `environment`, with an optional `api_key`.
+Dynatrace requires `type: dynatrace`, `api_url`, `api_token` and `entity_selector`; `event_type` and `source` are optional.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
-MessageBird access keys, Gotify app tokens, ntfy credentials and ilert integration keys accept literal strings or a whole `${env:VARIABLE}`
-or `${file:/absolute/path}` reference.
+MessageBird access keys, Gotify app tokens, ntfy credentials, ilert integration keys, Alerta API keys and Dynatrace
+API tokens accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -146,7 +153,8 @@ Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. ilert accepts HTTP 202;
 SIGNL4 accepts HTTP 200, 201 or 202. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
-Gotify, ntfy and Rocket.Chat check bounded JSON acknowledgments; Telegram can retry rate limits as described below.
+Gotify, ntfy, Rocket.Chat, Alerta and Dynatrace check bounded JSON acknowledgments; Telegram can retry rate limits
+as described below.
 Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
 
@@ -829,6 +837,129 @@ routing:
 
 To exercise recovery, send another event with the same `incident_id`, `status: CLEAR` and the appropriate
 `previous_status`. ilert will reuse `alertKey`; SIGNL4 will reuse `X-S4-ExternalID`.
+
+## Alerta and Dynatrace monitoring events
+
+Both API bases must be absolute HTTP(S) URLs without user information, queries or fragments, including empty `?`
+or `#` suffixes. Other providers' configuration fields are rejected.
+
+### Alerta
+
+Use the [Alerta API](https://docs.alerta.io/api/reference.html) base URL and one environment per named destination:
+
+```yaml
+version: 1
+destinations:
+  alerta:
+    type: alerta
+    api_url: ${env:NOTIFY_ALERTA_API_URL}
+    api_key: ${env:NOTIFY_ALERTA_API_KEY}
+    environment: Production
+routing:
+  roles:
+    monitoring: [alerta]
+```
+
+`api_url` is required and receives an appended `/alert`; include any API path prefix in the base. `api_key` is
+optional for servers without authentication; when set it uses `Authorization: Key ...`. Both fields accept whole
+environment/file references, resolved only for selected destinations. Keys must be printable ASCII without whitespace.
+Alerta's documented public demo API hosts (`api.alerta.io`, `api.alerta.dev`, `alerta-api.fly.dev`) require HTTPS.
+Custom and local servers may use HTTP. This check also applies after resolving an API URL reference.
+`environment` is a required literal. Alerta commonly allows `Production` and `Development`; custom environments
+must be permitted by the server's configuration. Use separate named destinations for multiple environments.
+
+WARNING, CRITICAL and CLEAR map to `warning`, `critical` and `cleared`. Alerta correlates by environment, resource
+and event. As in Bash, resource is the node and event is `chart.alert`; for charts starting with `httpcheck`, resource
+is the chart and event is the alert name. With no chart, event is the alert name. Keep these fields stable through
+recovery. Different nodes sharing an httpcheck chart therefore share that resource, preserving Bash behavior.
+
+Messages use service `Netdata`, group `Performance`, origin `netdata/<node>` and type `netdataAlarm`. Text includes
+summary, information, status/previous status, chart/context, values/units, timestamp and optional navigation. Attributes
+include alert/chart/context and an escaped navigation link. `createTime` uses UTC milliseconds; `rawData` contains the
+complete JSON Event, and a diagnostic tag carries `incident_id`. Legacy roles, source and alarm IDs need future Event
+extensions/adapters and are not fabricated from unrelated native fields.
+
+HTTP 200/201 require a JSON acknowledgment with `status: ok` and a nonempty `id`. HTTP 202 means suppressed, matching
+Bash's treatment of blackouts: it is reported separately in the destination error and does not count as delivery.
+If every selected destination is suppressed or fails, exit status is `1`; a successful other destination yields `0`.
+
+### Dynatrace
+
+This provider uses [Events API v2](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/events-v2/post-event).
+Create an API token with `events.ingest` permission and configure an explicit entity selector:
+
+```yaml
+version: 1
+destinations:
+  dynatrace:
+    type: dynatrace
+    api_url: ${env:NOTIFY_DYNATRACE_API_URL}
+    api_token: ${env:NOTIFY_DYNATRACE_API_TOKEN}
+    entity_selector: 'type(HOST),tag("netdata")'
+    event_type: CUSTOM_INFO
+    source: Netdata Alarm
+routing:
+  roles:
+    monitoring: [dynatrace]
+```
+
+`api_url` is the environment base: for example, `https://example.live.dynatrace.com` or
+`https://activegate.example.com:9999/e/environment`. The notifier appends `/api/v2/events/ingest` and uses
+`Authorization: Api-Token ...`. The API base and token accept whole environment/file references. A token must be
+nonempty printable ASCII without whitespace. This native setup replaces Bash's separate server/space/tag settings
+and v1 payload; it does not read those shell settings.
+
+`entity_selector` is a required literal of at most 2000 characters, sent unchanged. The server validates
+[selector syntax](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/entity-v2/entity-selector);
+use a HOST type/tag selector for Bash-style host targeting or an explicit entity ID. Tag/type selection normally
+covers entities active within the last 24 hours; entity-ID selection can reach older entities. Choose a selector
+that targets the intended hosts. The notifier does not interpolate the Event node into it.
+
+`event_type` defaults to `CUSTOM_INFO`; supported values are `AVAILABILITY_EVENT`, `CUSTOM_ALERT`, `CUSTOM_ANNOTATION`,
+`CUSTOM_CONFIGURATION`, `CUSTOM_DEPLOYMENT`, `CUSTOM_INFO`, `ERROR_EVENT`, `MARKED_FOR_TERMINATION`, `PERFORMANCE_EVENT`,
+`RESOURCE_CONTENTION_EVENT` and `WARNING`. `source` defaults to `Netdata Alarm` and maps to `dt.event.source`.
+Both settings are literals. The title carries node/status/summary; `dt.event.description` contains the same readable
+alert facts as Alerta, with `netdata.incident_id` and `netdata.timestamp` retaining identity and original time.
+Property values exceeding 4096 characters fail before HTTP delivery, without truncation.
+
+Every status uses the configured event type, including CLEAR. CLEAR describes recovery but **does not explicitly
+close an existing Dynatrace problem**. The notifier omits `startTime`, `endTime` and `timeout`, retaining Bash's
+use of ingestion time and Dynatrace's default lifecycle. The original Event timestamp is kept as a property.
+
+HTTP 201 requires a positive `reportCount` matching the number of `eventIngestResults`, with every result reporting
+`OK` and a nonempty `correlationId`. No matched entities, malformed results or a partial failure fail the destination;
+HTTP acceptance alone is insufficient. Both monitoring providers limit acknowledgment bodies to 256 KiB, make one
+attempt, follow no redirects and share the invocation deadline. Provider response text and credentials are not logged.
+
+### Local monitoring delivery
+
+Use the local receiver above with synthetic settings:
+
+```yaml
+version: 1
+destinations:
+  alerta_local:
+    type: alerta
+    api_url: http://127.0.0.1:18080/alerta
+    environment: Production
+  dynatrace_local:
+    type: dynatrace
+    api_url: http://127.0.0.1:18080/dynatrace
+    api_token: synthetic-token
+    entity_selector: 'type(HOST),tag("netdata")'
+routing:
+  roles:
+    monitoring: [alerta_local, dynatrace_local]
+```
+
+Save this as `monitoring-local.yaml`, then run:
+
+```sh
+/tmp/alarm-notify send --config monitoring-local.yaml --role monitoring < examples/event.json
+```
+
+Repeat with WARNING, CRITICAL and CLEAR events. Alerta keeps its correlation fields and changes severity; Dynatrace
+keeps its entity selector and configured type while updating descriptive status.
 
 ## Event document
 

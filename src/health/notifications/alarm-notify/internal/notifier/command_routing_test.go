@@ -205,6 +205,8 @@ func TestRunFanoutCancellation(t *testing.T) {
 		"fleep deadline": {provider: "fleep"}, "fleep cancellation": {provider: "fleep", cancel: true},
 		"ilert deadline": {provider: "ilert"}, "ilert cancellation": {provider: "ilert", cancel: true},
 		"signl4 deadline": {provider: "signl4"}, "signl4 cancellation": {provider: "signl4", cancel: true},
+		"alerta deadline": {provider: "alerta"}, "alerta cancellation": {provider: "alerta", cancel: true},
+		"dynatrace deadline": {provider: "dynatrace"}, "dynatrace cancellation": {provider: "dynatrace", cancel: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			started := make(chan struct{})
@@ -214,7 +216,7 @@ func TestRunFanoutCancellation(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.URL.Path {
-					case "/blocked", "/blocked/events":
+					case "/blocked", "/blocked/events", "/blocked/alert", "/blocked/api/v2/events/ingest":
 						_, _ = io.Copy(io.Discard, r.Body)
 						close(started)
 						select {
@@ -235,6 +237,15 @@ func TestRunFanoutCancellation(t *testing.T) {
 			blocked := fmt.Sprintf("type: %s, url: %q", test.provider, server.URL+"/blocked")
 			if test.provider == "ilert" {
 				blocked = fmt.Sprintf("type: ilert, api_url: %q, integration_key: synthetic-key", server.URL+"/blocked")
+			}
+			if test.provider == "alerta" {
+				blocked = fmt.Sprintf("type: alerta, api_url: %q, environment: Production", server.URL+"/blocked")
+			}
+			if test.provider == "dynatrace" {
+				blocked = fmt.Sprintf(
+					"type: dynatrace, api_url: %q, api_token: synthetic-key, entity_selector: type(HOST)",
+					server.URL+"/blocked",
+				)
 			}
 			config := fmt.Sprintf(`version: 1
 destinations:

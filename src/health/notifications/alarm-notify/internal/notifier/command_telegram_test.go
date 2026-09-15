@@ -294,6 +294,8 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		"ntfy deadline":        {provider: "ntfy"},
 		"rocketchat cancel":    {provider: "rocketchat", cancel: true},
 		"rocketchat deadline":  {provider: "rocketchat"},
+		"alerta cancel":        {provider: "alerta", cancel: true}, "alerta deadline": {provider: "alerta"},
+		"dynatrace cancel": {provider: "dynatrace", cancel: true}, "dynatrace deadline": {provider: "dynatrace"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
@@ -304,9 +306,10 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					"/1/messages.json",
 					"/v2/pushes",
 					twilioTestPath,
-					messagebirdTestPath, "/message", "/topic", "/rocket-hook":
+					messagebirdTestPath, "/message", "/topic", "/rocket-hook", "/alert", "/api/v2/events/ingest":
 					_, _ = io.Copy(io.Discard, r.Body)
-					if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath {
+					if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath ||
+						r.URL.Path == "/api/v2/events/ingest" {
 						w.WriteHeader(201)
 					} else {
 						w.WriteHeader(200)
@@ -376,6 +379,17 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			}
 			if test.provider == "rocketchat" {
 				dst = Destination{Type: "rocketchat", URL: server.URL + "/rocket-hook"}
+			}
+			if test.provider == "alerta" {
+				dst = Destination{Type: "alerta", APIURL: server.URL, Environment: "Production"}
+			}
+			if test.provider == "dynatrace" {
+				dst = Destination{
+					Type:           "dynatrace",
+					APIURL:         server.URL,
+					APIToken:       "synthetic-key",
+					EntitySelector: "type(HOST)",
+				}
 			}
 			config, err := yaml.Marshal(Config{Version: 1, Destinations: map[string]Destination{
 				"first":   {Type: "webhook", URL: server.URL + "/first"},
