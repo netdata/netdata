@@ -485,9 +485,10 @@ static inline bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
 }
 
-// Retention work must not start before the registry knows every metric the journals hold: rotation
-// would otherwise delete datafiles the loader is still reading, and the loader holds them only by pointer.
-static inline bool rrdeng_ctx_mrg_populated(struct rrdengine_instance *ctx) {
+// Retention work waits until the registry has been loaded from every journal: rotating a datafile before
+// then would drop metrics the registry has not learned yet. The loader's own datafile references only
+// protect the files it is reading at that moment; this flag keeps rotation from starting at all.
+static inline bool rrdeng_ctx_is_mrg_populated(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.mrg_populated, __ATOMIC_ACQUIRE);
 }
 

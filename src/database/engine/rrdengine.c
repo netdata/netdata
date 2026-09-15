@@ -206,6 +206,10 @@ static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx
 {
     internal_fatal(rrdeng_main.tid != gettid_cached(), "check_and_schedule_db_rotation() can only be run from the event loop thread");
 
+    // neither indexing nor rotation before the registry has been loaded from every journal
+    if (!rrdeng_ctx_is_mrg_populated(ctx))
+        return;
+
     if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED)) {
         if (ctx->datafiles.pending_index == false) {
             ctx->datafiles.pending_index = true;
@@ -2036,6 +2040,10 @@ static void *populate_mrg_tp_worker(
             // deletion, whose retention is going away with it.
             if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_MRG_LOAD)) {
                 spinlock_unlock(&datafile->populate_mrg.spinlock);
+                nd_log_daemon(NDLP_INFO, "DBENGINE: tier %d: skipping " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
+                                         " for MRG population, it is pending deletion",
+                              tier, datafile->tier, datafile->fileno);
+                total_datafiles--;
                 datafile = NULL;
                 continue;
             }
@@ -2495,7 +2503,7 @@ static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
 
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct rrdengine_instance *ctx = multidb_ctx[tier];
-        if (!rrdeng_ctx_is_active(ctx) || !rrdeng_ctx_mrg_populated(ctx))
+        if (!rrdeng_ctx_is_active(ctx))
             continue;
         check_and_schedule_db_rotation(ctx);
     }
