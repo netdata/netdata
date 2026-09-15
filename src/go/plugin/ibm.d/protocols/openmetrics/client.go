@@ -33,9 +33,8 @@ type Config struct {
 
 // Client fetches and parses OpenMetrics data from a single endpoint.
 type Client struct {
-	files      credentialfile.RegularReader
 	cfg        Config
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 	request    web.RequestConfig
 
 	acceptHeader string
@@ -52,11 +51,11 @@ func NewClient(ctx context.Context, cfg Config, files credentialfile.RegularRead
 		return nil, fmt.Errorf("openmetrics protocol: creating http client failed: %w", err)
 	}
 
-	return NewClientWithHTTP(cfg, httpClient, files)
+	return NewClientWithHTTP(cfg, httpClient)
 }
 
-// NewClientWithHTTP constructs a client using the provided *http.Client instance (useful for tests).
-func NewClientWithHTTP(cfg Config, httpClient *http.Client, files credentialfile.RegularReader) (*Client, error) {
+// NewClientWithHTTP constructs a client using the provided *web.HTTPClient instance (useful for tests).
+func NewClientWithHTTP(cfg Config, httpClient *web.HTTPClient) (*Client, error) {
 	if httpClient == nil {
 		return nil, errors.New("openmetrics protocol: http client is required")
 	}
@@ -72,7 +71,6 @@ func NewClientWithHTTP(cfg Config, httpClient *http.Client, files credentialfile
 	}
 
 	return &Client{
-		files:        files,
 		cfg:          cfg,
 		httpClient:   httpClient,
 		request:      cfg.HTTPConfig.RequestConfig.Copy(),
@@ -92,7 +90,7 @@ func (c *Client) FetchSeries(ctx context.Context, sr selector.Selector) (prometh
 }
 
 func (c *Client) fetch(ctx context.Context) ([]byte, error) {
-	req, err := web.NewHTTPRequest(ctx, c.request, c.files)
+	req, err := c.httpClient.NewRequest(ctx, c.request)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: building request failed: %w", err)
 	}

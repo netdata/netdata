@@ -25,7 +25,7 @@ func (c *Collector) initZookeeperFetcher(ctx context.Context) (fetcher, error) {
 	var err error
 
 	if c.UseTLS {
-		tlsConf, err = tlscfg.NewTLSConfig(ctx, c.TLSConfig, c.CredentialFiles())
+		tlsConf, err = tlscfg.NewTLSConfig(ctx, c.TLSConfig)
 		if err != nil {
 			return nil, fmt.Errorf("creating tls config : %v", err)
 		}

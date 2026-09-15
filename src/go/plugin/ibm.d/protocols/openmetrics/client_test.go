@@ -44,9 +44,7 @@ func TestFetchSeries(t *testing.T) {
 		}, nil
 	})
 
-	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, httpClient,
-		nil,
-	)
+	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, web.WrapHTTPClient(httpClient, nil))
 	if err != nil {
 		t.Fatalf("NewClientWithHTTP failed: %v", err)
 	}
@@ -98,9 +96,7 @@ func TestFetchSeriesGzip(t *testing.T) {
 		return resp, nil
 	})
 
-	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, httpClient,
-		nil,
-	)
+	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, web.WrapHTTPClient(httpClient, nil))
 	if err != nil {
 		t.Fatalf("NewClientWithHTTP failed: %v", err)
 	}
@@ -123,9 +119,7 @@ func TestFetchSeriesHTTPError(t *testing.T) {
 		}, nil
 	})
 
-	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, httpClient,
-		nil,
-	)
+	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, web.WrapHTTPClient(httpClient, nil))
 	if err != nil {
 		t.Fatalf("NewClientWithHTTP failed: %v", err)
 	}
@@ -141,9 +135,7 @@ func TestFetchSeriesCancellation(t *testing.T) {
 		return nil, r.Context().Err()
 	})
 
-	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, httpClient,
-		nil,
-	)
+	client, err := NewClientWithHTTP(Config{HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "https://example.com/metrics"}}}, web.WrapHTTPClient(httpClient, nil))
 	if err != nil {
 		t.Fatalf("NewClientWithHTTP failed: %v", err)
 	}

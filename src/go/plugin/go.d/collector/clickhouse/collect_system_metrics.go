@@ -7,8 +7,6 @@ import (
 	"strconv"
 
 	"context"
-
-	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const querySystemMetrics = `
@@ -20,7 +18,7 @@ FROM
 `
 
 func (c *Collector) collectSystemMetrics(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
+	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

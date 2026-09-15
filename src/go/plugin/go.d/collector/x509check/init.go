@@ -15,5 +15,5 @@ func (c *Collector) validateConfig() error {
 }
 
 func (c *Collector) initProvider(ctx context.Context) (provider, error) {
-	return newProvider(ctx, c.Config, c.CredentialFiles())
+	return newProvider(ctx, c.Config)
 }

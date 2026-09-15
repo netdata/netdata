@@ -5,8 +5,6 @@ package openldap
 import (
 	"net"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"github.com/go-ldap/ldap/v3"
 
 	"context"
@@ -20,12 +18,11 @@ type ldapConn interface {
 	search(*ldap.SearchRequest) (*ldap.SearchResult, error)
 }
 
-func newLdapConn(cfg Config, files credentialfile.RegularReader) ldapConn {
-	return &ldapClient{Config: cfg, files: files}
+func newLdapConn(cfg Config) ldapConn {
+	return &ldapClient{Config: cfg}
 }
 
 type ldapClient struct {
-	files credentialfile.RegularReader
 	Config
 
 	conn *ldap.Conn
@@ -68,7 +65,7 @@ func (c *ldapClient) connectOpts(ctx context.Context) ([]ldap.DialOpt, error) {
 
 	opts := []ldap.DialOpt{ldap.DialWithDialer(d)}
 
-	tlsConf, err := tlscfg.NewTLSConfig(ctx, c.TLSConfig, c.files)
+	tlsConf, err := tlscfg.NewTLSConfig(ctx, c.TLSConfig)
 	if err != nil {
 		return nil, err
 	}

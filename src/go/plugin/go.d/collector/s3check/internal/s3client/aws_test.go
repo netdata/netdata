@@ -76,8 +76,7 @@ func TestNewRoutesAssumeRoleAndS3ThroughConfiguredProxy(t *testing.T) {
 		PathStyle: true,
 		Timeout:   time.Second,
 		ProxyURL:  proxy.URL,
-	}, nil,
-	)
+	})
 	require.NoError(t, err)
 	defer client.CloseIdleConnections()
 

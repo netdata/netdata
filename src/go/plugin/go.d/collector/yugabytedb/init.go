@@ -3,7 +3,7 @@
 package yugabytedb
 
 import (
-	"net/http"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
@@ -31,7 +31,7 @@ const (
 	metricSqlNewConnTotal       = "yb_ysqlserver_new_connection_total"
 )
 
-func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Prometheus, error) {
+func (c *Collector) initPrometheusClient(httpClient *web.HTTPClient) (prometheus.Prometheus, error) {
 	// Frequently used metrics
 	// https://docs.yugabyte.com/preview/launch-and-manage/monitor-and-alert/metrics/#frequently-used-metrics
 
@@ -67,5 +67,5 @@ func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Pr
 		return nil, err
 	}
 
-	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr, c.CredentialFiles()), nil
+	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr), nil
 }

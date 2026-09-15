@@ -43,9 +43,9 @@ func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Promet
 		if c.pipelineObserver != nil {
 			sr = pipelineObservingSelector{next: sr, collector: c}
 		}
-		return prometheus.NewWithSelector(httpClient, req, sr, c.CredentialFiles()), nil
+		return prometheus.NewWithSelector(httpClient, req, sr), nil
 	}
-	return prometheus.New(httpClient, req, c.CredentialFiles()), nil
+	return prometheus.New(httpClient, req), nil
 }
 
 func compileFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {

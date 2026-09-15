@@ -47,8 +47,21 @@ type TLSConfig struct {
 	InsecureSkipVerify bool `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify"`
 }
 
-// NewTLSConfig creates a tls.Config, may be nil without an error if TLS is not configured.
-func NewTLSConfig(ctx context.Context, cfg TLSConfig, files credentialfile.RegularReader) (*tls.Config, error) {
+// NewTLSConfig loads TLS files with one scoped credential reader, closed before
+// returning. The result may be nil without an error if TLS is not configured.
+func NewTLSConfig(ctx context.Context, cfg TLSConfig) (*tls.Config, error) {
+	files := credentialfile.New()
+	defer files.Close()
+	return NewTLSConfigWithReader(ctx, cfg, files)
+}
+
+// NewTLSConfigWithReader loads TLS files using a borrowed reader. Its owner is
+// responsible for closing it after all users finish.
+func NewTLSConfigWithReader(
+	ctx context.Context,
+	cfg TLSConfig,
+	files credentialfile.RegularReader,
+) (*tls.Config, error) {
 	if cfg.TLSCA == "" && cfg.TLSKey == "" && cfg.TLSCert == "" && !cfg.InsecureSkipVerify {
 		return nil, nil
 	}

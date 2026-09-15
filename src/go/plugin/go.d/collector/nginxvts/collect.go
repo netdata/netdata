@@ -42,7 +42,7 @@ func (c *Collector) collectServerZones(collected map[string]any, ms *vtsMetrics)
 }
 
 func (c *Collector) scapeVTS(ctx context.Context) (*vtsMetrics, error) {
-	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
+	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, err
 	}

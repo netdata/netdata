@@ -32,7 +32,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) scrapeStatus(ctx context.Context) (*serverStatus, error) {
-	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
+	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -74,7 +74,7 @@ func (c *Collector) collectStatus(ctx context.Context, mx map[string]int64) erro
 }
 
 func (c *Collector) fetchStatus(ctx context.Context) (*monitStatus, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatus, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, err
 	}

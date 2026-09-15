@@ -44,7 +44,7 @@ func (c *Collector) updateCharts(pipelines map[string]pipelineStats) {
 }
 
 func (c *Collector) queryNodeStats(ctx context.Context) (*nodeStats, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathNodeStatsAPI, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathNodeStatsAPI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}

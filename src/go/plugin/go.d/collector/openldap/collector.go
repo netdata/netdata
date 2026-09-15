@@ -8,8 +8,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -61,7 +59,7 @@ type Collector struct {
 	charts *collectorapi.Charts
 
 	conn    ldapConn
-	newConn func(Config, credentialfile.RegularReader) ldapConn
+	newConn func(Config) ldapConn
 }
 
 func (c *Collector) Configuration() any {

@@ -34,7 +34,7 @@ func (c *Collector) initHTTPClient(ctx context.Context) (*httpClient, error) {
 
 	c.Debugf("using HTTP client: url='%s', timeout='%s'", c.URL, c.Timeout)
 
-	return newHTTPClient(cli, c.RequestConfig, c.CredentialFiles())
+	return newHTTPClient(cli, c.RequestConfig)
 }
 
 func (c *Collector) initSocketClient() (*socketClient, error) {

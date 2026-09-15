@@ -33,5 +33,5 @@ func (c *Collector) initApiClient(ctx context.Context) (*apiClient, error) {
 		return nil, err
 	}
 
-	return newAPIClient(client, c.RequestConfig, c.CredentialFiles()), nil
+	return newAPIClient(client, c.RequestConfig), nil
 }

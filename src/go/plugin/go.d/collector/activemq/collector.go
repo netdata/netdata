@@ -99,7 +99,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return fmt.Errorf("create http client: %v", err)
 	}
 
-	c.apiClient = newAPIClient(client, c.RequestConfig, c.Webadmin, c.CredentialFiles())
+	c.apiClient = newAPIClient(client, c.RequestConfig, c.Webadmin)
 
 	return nil
 }

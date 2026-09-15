@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -57,7 +56,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 }
 
 func (c *Collector) Configuration() any {
@@ -72,7 +71,7 @@ func (c *Collector) Cleanup(context.Context) {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	err := c.validateConfig(ctx)
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config: %v", err)
 	}

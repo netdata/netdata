@@ -99,7 +99,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		URL:        httpCfg.RequestConfig.URL,
 		StatsType:  cfg.PMIStatsType,
 		HTTPConfig: httpCfg,
-	}, c.CredentialFiles())
+	})
 	if err != nil {
 		return err
 	}

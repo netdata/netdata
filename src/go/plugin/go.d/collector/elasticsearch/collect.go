@@ -161,7 +161,7 @@ func (c *Collector) scrapeNodesStats(ctx context.Context, ms *esMetrics) {
 		p = urlPathLocalNodeStats
 	}
 
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, p, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, p)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -177,7 +177,7 @@ func (c *Collector) scrapeNodesStats(ctx context.Context, ms *esMetrics) {
 }
 
 func (c *Collector) scrapeClusterHealth(ctx context.Context, ms *esMetrics) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathClusterHealth, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathClusterHealth)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -193,7 +193,7 @@ func (c *Collector) scrapeClusterHealth(ctx context.Context, ms *esMetrics) {
 }
 
 func (c *Collector) scrapeClusterStats(ctx context.Context, ms *esMetrics) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathClusterStats, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathClusterStats)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -209,7 +209,7 @@ func (c *Collector) scrapeClusterStats(ctx context.Context, ms *esMetrics) {
 }
 
 func (c *Collector) scrapeLocalIndicesStats(ctx context.Context, ms *esMetrics) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathIndicesStats, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathIndicesStats)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -226,7 +226,7 @@ func (c *Collector) scrapeLocalIndicesStats(ctx context.Context, ms *esMetrics) 
 }
 
 func (c *Collector) getClusterName(ctx context.Context) (string, error) {
-	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
+	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return "", err
 	}

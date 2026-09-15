@@ -127,8 +127,7 @@ func TestNew_LogsOutOnContainerViewFailure(t *testing.T) {
 		Password:  "password",
 		Timeout:   time.Second * 3,
 		TLSConfig: tlscfg.TLSConfig{InsecureSkipVerify: true},
-	}, nil,
-	)
+	})
 	require.Nil(t, client)
 	require.ErrorContains(t, err, "create container view failed")
 
@@ -195,8 +194,7 @@ func newClient(t *testing.T, vCenterURL *url.URL) *Client {
 		Password:  "password",
 		Timeout:   time.Second * 3,
 		TLSConfig: tlscfg.TLSConfig{InsecureSkipVerify: true},
-	}, nil,
-	)
+	})
 	require.NoError(t, err)
 	return client
 }

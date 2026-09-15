@@ -50,7 +50,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) getClusterMeta(ctx context.Context) (id string, name string, err error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIWhoami, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIWhoami)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create whoami request: %w", err)
 	}
@@ -74,7 +74,7 @@ func (c *Collector) getClusterMeta(ctx context.Context) (id string, name string,
 		return "", "", nil
 	}
 
-	req, err = web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIDefinitions, c.CredentialFiles())
+	req, err = c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIDefinitions)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create definitions request: %w", err)
 	}

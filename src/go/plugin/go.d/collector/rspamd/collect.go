@@ -49,7 +49,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) queryRspamdStats(ctx context.Context) (*rspamdStats, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, "/stat", c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, "/stat")
 	if err != nil {
 		return nil, err
 	}

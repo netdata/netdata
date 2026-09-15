@@ -54,7 +54,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) getServerMeta(ctx context.Context) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathVarz, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathVarz)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (c *Collector) getServerMeta(ctx context.Context) error {
 }
 
 func (c *Collector) collectHealthz(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathHealthz, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathHealthz)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (c *Collector) collectHealthz(ctx context.Context, mx map[string]int64) err
 }
 
 func (c *Collector) collectVarz(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathVarz, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathVarz)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (c *Collector) collectVarz(ctx context.Context, mx map[string]int64) error 
 }
 
 func (c *Collector) collectAccstatz(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAccstatz, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAccstatz)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (c *Collector) collectAccstatz(ctx context.Context, mx map[string]int64) er
 }
 
 func (c *Collector) collectRoutez(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathRoutez, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathRoutez)
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func (c *Collector) collectRoutez(ctx context.Context, mx map[string]int64) erro
 }
 
 func (c *Collector) collectGatewayz(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathGatewayz, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathGatewayz)
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (c *Collector) collectGatewayz(ctx context.Context, mx map[string]int64) er
 }
 
 func (c *Collector) collectLeafz(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathLeafz, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathLeafz)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (c *Collector) collectLeafz(ctx context.Context, mx map[string]int64) error
 }
 
 func (c *Collector) collectJsz(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathJsz, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathJsz)
 	if err != nil {
 		return err
 	}

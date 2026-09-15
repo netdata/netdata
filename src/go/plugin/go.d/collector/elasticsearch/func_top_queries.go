@@ -139,10 +139,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	limit := f.router.collector.topQueriesLimit()
 
-	req, err := web.NewHTTPRequestWithPath(ctx,
-		f.router.collector.RequestConfig, "/_tasks",
-		f.router.collector.CredentialFiles(),
-	)
+	req, err := f.router.collector.httpClient.NewRequestWithPath(ctx, f.router.collector.RequestConfig, "/_tasks")
 	if err != nil {
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}

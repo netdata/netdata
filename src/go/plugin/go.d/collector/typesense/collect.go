@@ -56,7 +56,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathHealth, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathHealth)
 	if err != nil {
 		return fmt.Errorf("creating health request: %w", err)
 	}
@@ -90,7 +90,7 @@ func (c *Collector) collectStats(ctx context.Context, mx map[string]int64) error
 		return nil
 	}
 
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStats, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStats)
 	if err != nil {
 		return fmt.Errorf("creating stats request: %w", err)
 	}

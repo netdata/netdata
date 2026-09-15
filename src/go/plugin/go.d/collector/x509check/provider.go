@@ -13,8 +13,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
@@ -40,13 +38,13 @@ type fromSMTP struct {
 	timeout   time.Duration
 }
 
-func newProvider(ctx context.Context, config Config, files credentialfile.RegularReader) (provider, error) {
+func newProvider(ctx context.Context, config Config) (provider, error) {
 	sourceURL, err := url.Parse(config.Source)
 	if err != nil {
 		return nil, fmt.Errorf("source parse: %v", err)
 	}
 
-	tlsCfg, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig, files)
+	tlsCfg, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create tls config: %v", err)
 	}

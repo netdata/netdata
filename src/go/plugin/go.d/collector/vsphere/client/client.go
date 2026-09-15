@@ -4,14 +4,13 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/object"
@@ -65,7 +64,7 @@ type Client struct {
 	lazyMu   sync.Mutex
 }
 
-func newSoapClient(ctx context.Context, config Config, files credentialfile.RegularReader) (*soap.Client, error) {
+func newSoapClient(ctx context.Context, config Config) (*soap.Client, error) {
 	soapURL, err := soap.ParseURL(config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parse config option url for vSphere SOAP endpoint: %w", err)
@@ -76,18 +75,11 @@ func newSoapClient(ctx context.Context, config Config, files credentialfile.Regu
 	soapURL.User = url.UserPassword(config.User, config.Password)
 	soapClient := soap.NewClient(soapURL, config.TLSConfig.InsecureSkipVerify)
 
-	tlsConfig, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig, files)
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("build TLS configuration from tls_* options: %w", err)
 	}
-	if tlsConfig != nil && len(tlsConfig.Certificates) > 0 {
-		soapClient.SetCertificate(tlsConfig.Certificates[0])
-	}
-	if config.TLSConfig.TLSCA != "" {
-		if t, ok := soapClient.Transport.(*http.Transport); ok {
-			t.TLSClientConfig.RootCAs = tlsConfig.RootCAs
-		}
-	}
+	configureSoapTLS(soapClient, tlsConfig)
 
 	if t, ok := soapClient.Transport.(*http.Transport); ok {
 		t.MaxIdleConnsPerHost = maxIdleConnections
@@ -96,6 +88,17 @@ func newSoapClient(ctx context.Context, config Config, files credentialfile.Regu
 	soapClient.Timeout = config.Timeout
 
 	return soapClient, nil
+}
+
+func configureSoapTLS(soapClient *soap.Client, tlsConfig *tls.Config) {
+	if tlsConfig != nil && len(tlsConfig.Certificates) > 0 {
+		soapClient.SetCertificate(tlsConfig.Certificates[0])
+	}
+	if tlsConfig != nil && tlsConfig.RootCAs != nil {
+		if t, ok := soapClient.Transport.(*http.Transport); ok {
+			t.TLSClientConfig.RootCAs = tlsConfig.RootCAs
+		}
+	}
 }
 
 func newContainerView(ctx context.Context, client *govmomi.Client) (*view.ContainerView, error) {
@@ -111,8 +114,8 @@ func newPerformanceManager(client *vim25.Client) *performance.Manager {
 	return perfManager
 }
 
-func New(ctx context.Context, config Config, files credentialfile.RegularReader) (*Client, error) {
-	soapClient, err := newSoapClient(ctx, config, files)
+func New(ctx context.Context, config Config) (*Client, error) {
+	soapClient, err := newSoapClient(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("initialize vSphere SOAP client: %w", err)
 	}

@@ -30,7 +30,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) queryStatsService(ctx context.Context) (*statusServiceResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatusService, c.CredentialFiles())
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatusService)
 	if err != nil {
 		return nil, err
 	}

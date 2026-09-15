@@ -26,7 +26,7 @@ func (c *Collector) initRedisClient(ctx context.Context) (*redis.Client, error) 
 		return nil, err
 	}
 
-	tlsConfig, err := tlscfg.NewTLSConfig(ctx, c.TLSConfig, c.CredentialFiles())
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, c.TLSConfig)
 	if err != nil {
 		return nil, err
 	}

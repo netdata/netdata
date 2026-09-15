@@ -71,8 +71,9 @@ func (r RequestConfig) Copy() RequestConfig {
 
 var userAgent = fmt.Sprintf("Netdata %s.plugin/%s", executable.Name, buildinfo.Version)
 
-// NewHTTPRequest returns a new *http.Request given a RequestConfig configuration and an error if any.
-func NewHTTPRequest(ctx context.Context, cfg RequestConfig, files credentialfile.RegularReader) (*http.Request, error) {
+// NewRequest builds a request, reading configured bearer credentials with ctx on
+// every call. Configuration headers are applied after authentication.
+func (c *HTTPClient) NewRequest(ctx context.Context, cfg RequestConfig) (*http.Request, error) {
 	var body io.Reader
 	if cfg.Body != "" {
 		body = strings.NewReader(cfg.Body)
@@ -90,7 +91,7 @@ func NewHTTPRequest(ctx context.Context, cfg RequestConfig, files credentialfile
 
 	req.Header.Set("User-Agent", userAgent)
 
-	if err := setAuthentication(req, cfg, files); err != nil {
+	if err := setAuthentication(req, cfg, c.files); err != nil {
 		return nil, err
 	}
 
@@ -150,11 +151,8 @@ func isOptionalK8sTokenFileError(tokenFile string, insideK8s bool, err error) bo
 		errors.Is(err, fs.ErrNotExist)
 }
 
-// NewHTTPRequestWithPath creates a new HTTP request with the given path appended to the base URL.
-func NewHTTPRequestWithPath(ctx context.Context,
-	cfg RequestConfig, urlPath string,
-	files credentialfile.RegularReader,
-) (*http.Request, error) {
+// NewRequestWithPath appends a path to the base URL without changing cfg.
+func (c *HTTPClient) NewRequestWithPath(ctx context.Context, cfg RequestConfig, urlPath string) (*http.Request, error) {
 	// Make a copy to avoid modifying the original config
 	cfg = cfg.Copy()
 
@@ -165,7 +163,7 @@ func NewHTTPRequestWithPath(ctx context.Context,
 	}
 	cfg.URL = v
 
-	return NewHTTPRequest(ctx, cfg, files)
+	return c.NewRequest(ctx, cfg)
 }
 
 // URLQuery creates a URL-encoded query string from a single key-value pair.

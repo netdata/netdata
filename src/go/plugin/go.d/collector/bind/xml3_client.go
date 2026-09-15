@@ -4,9 +4,6 @@ package bind
 
 import (
 	"fmt"
-	"net/http"
-
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 
 	"context"
 
@@ -35,18 +32,17 @@ type xml3View struct {
 	CounterGroups []xml3CounterGroup `xml:"counters"`
 }
 
-func newXML3Client(client *http.Client, request web.RequestConfig, files credentialfile.RegularReader) *xml3Client {
-	return &xml3Client{files: files, httpClient: client, request: request}
+func newXML3Client(client *web.HTTPClient, request web.RequestConfig) *xml3Client {
+	return &xml3Client{httpClient: client, request: request}
 }
 
 type xml3Client struct {
-	files      credentialfile.RegularReader
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 	request    web.RequestConfig
 }
 
 func (c xml3Client) serverStats(ctx context.Context) (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(ctx, c.request, "/server", c.files)
+	req, err := c.httpClient.NewRequestWithPath(ctx, c.request, "/server")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}

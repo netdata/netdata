@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net/http"
 	"sync"
 	"time"
 
@@ -65,7 +64,7 @@ type Collector struct {
 	once   *sync.Once
 	charts *collectorapi.Charts
 
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 }
 
 func (c *Collector) Configuration() any {

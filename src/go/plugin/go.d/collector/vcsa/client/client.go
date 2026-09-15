@@ -47,9 +47,9 @@ func (s *sessionToken) get() string {
 	return s.id
 }
 
-func New(httpClient *http.Client, url, username, password string) *Client {
+func New(httpClient *web.HTTPClient, url, username, password string) *Client {
 	if httpClient == nil {
-		httpClient = &http.Client{}
+		httpClient = web.WrapHTTPClient(&http.Client{}, nil)
 	}
 	return &Client{
 		httpClient: httpClient,
@@ -61,7 +61,7 @@ func New(httpClient *http.Client, url, username, password string) *Client {
 }
 
 type Client struct {
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 
 	url      string
 	username string
@@ -173,7 +173,7 @@ func (c *Client) System(ctx context.Context) (string, error) {
 }
 
 func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(ctx, req, nil)
+	httpReq, err := c.httpClient.NewRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s : %v", req.URL, err)
 	}

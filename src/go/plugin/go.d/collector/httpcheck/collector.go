@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net/http"
 	"regexp"
 	"time"
 
@@ -68,7 +67,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 
 	acceptedStatuses  map[int]bool
 	reResponse        *regexp.Regexp

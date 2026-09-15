@@ -29,9 +29,12 @@ func TestSOAPUsesCAFromCredentialReader(t *testing.T) {
 	der, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
 	require.NoError(t, err)
 	files := certificateReader{pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}
-	cli, err := newSoapClient(context.Background(), Config{URL: "https://localhost/sdk", TLSConfig: tlscfg.TLSConfig{TLSCA: "synthetic-path-not-opened-by-sdk"}}, files)
+	tlsConfig, err := tlscfg.NewTLSConfigWithReader(context.Background(), tlscfg.TLSConfig{TLSCA: "synthetic-path-not-opened-by-sdk"}, files)
+	require.NoError(t, err)
+	cli, err := newSoapClient(context.Background(), Config{URL: "https://localhost/sdk"})
 	require.NoError(t, err)
 	t.Cleanup(cli.CloseIdleConnections)
+	configureSoapTLS(cli, tlsConfig)
 	transport, ok := cli.Transport.(*http.Transport)
 	require.True(t, ok)
 	require.NotNil(t, transport.TLSClientConfig.RootCAs)

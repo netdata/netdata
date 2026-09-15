@@ -4,7 +4,6 @@ package couchdb
 
 import (
 	"errors"
-	"net/http"
 
 	"context"
 
@@ -12,21 +11,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func (c *Collector) validateConfig(ctx context.Context) error {
+func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("URL not set")
 	}
 	if c.Node == "" {
 		return errors.New("'node' not set")
 	}
-	if _, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles()); err != nil {
-		return err
-	}
 	return nil
 }
 
-func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
-	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+func (c *Collector) initHTTPClient(ctx context.Context) (*web.HTTPClient, error) {
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.NewRequest(ctx, c.RequestConfig); err != nil {
+		client.CloseIdleConnections()
+		return nil, err
+	}
+	return client, nil
 }
 
 func (c *Collector) initCharts() (*Charts, error) {

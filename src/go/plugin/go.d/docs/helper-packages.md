@@ -76,8 +76,8 @@ Why:
 - `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
 - `web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())` applies timeout, TLS, proxy, redirect, and HTTP/2
   behavior consistently;
-- `web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())` and
-  `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path, c.CredentialFiles())` apply user agent,
+- `c.httpClient.NewRequest(ctx, c.RequestConfig)` and
+  `c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
 
 Pattern:
@@ -93,10 +93,20 @@ x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConf
 
 ### Configured credential and TLS files
 
-`web` and `tlscfg.NewTLSConfig(ctx, cfg, files)` accept an explicit `credentialfile.RegularReader`. Collectors pass
-`c.CredentialFiles()`, owned by `collectorapi.Base` and closed by runtime cleanup. Standalone clients receive the reader
-from their owner; they must not close a borrowed reader. An initialization-only standalone operation may instead create
-`credentialfile.New()` and defer its `Close()` before returning.
+Bind `c.CredentialFiles()` once with `web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())`. The returned
+`*web.HTTPClient` embeds a standard `*http.Client` and borrows the reader, owned by `collectorapi.Base` and closed by
+runtime cleanup. Its request methods take the current context and request configuration. `CloseIdleConnections` closes
+HTTP connections only. Prometheus and nested HTTP clients accept the bound client without a second reader argument.
+
+Use `web.WrapHTTPClient(rawClient, files)` to bind an existing transport or test client explicitly. The embedded
+`client.Client` remains available to consumers requiring `*http.Client`. Keep `web.DoHTTP(client)` response/parsing
+helpers per use; their `OnNokCode` callback is mutable.
+
+For initialization-only TLS, `tlscfg.NewTLSConfig(ctx, cfg)` and `web.NewTransportClient(ctx, cfg)` own one scoped reader
+across all CA/cert/key reads and close it before returning. The latter returns an ordinary `*http.Client` for SDK/RPC
+consumers that build their own requests. `tlscfg.NewTLSConfigWithReader(ctx, cfg, files)` is the borrowed-reader variant
+for an existing owner or explicit test injection. Never retain a bound client whose scoped reader has already closed.
+Specialized Ceph authentication and cookie `Stat`/`Open` retain their direct reader dependencies.
 
 On Unix the reader uses a persistent reduced-authority helper, started lazily when a file is used. Windows retains the
 service account's file authority. A configured file without an injected reader fails closed; helpers never fall back to
@@ -128,12 +138,12 @@ When:
 
 Why:
 
-- it reuses `web.RequestConfig` and `*http.Client`;
+- it reuses `web.RequestConfig` and the bound `*web.HTTPClient`;
 - it handles Prometheus text parsing and gzip responses;
 - selectors avoid parsing or processing metric families the collector will not use.
 
-Pass `c.CredentialFiles()` to `prometheus.New(client, request, files)` or
-`prometheus.NewWithSelector(client, request, selector, files)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
+Pass the bound client to `prometheus.New(client, request)` or
+`prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
 `ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
 
 Do not hand-roll text exposition parsing in a collector.

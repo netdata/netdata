@@ -41,7 +41,7 @@ func TestPrometheus404(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	prom := New(http.DefaultClient, req, nil)
+	prom := New(web.WrapHTTPClient(http.DefaultClient, nil), req)
 	res, err := prom.ScrapeSeries(context.Background())
 
 	assert.Error(t, err)
@@ -57,7 +57,7 @@ func TestPrometheusPlain(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	prom := New(http.DefaultClient, req, nil)
+	prom := New(web.WrapHTTPClient(http.DefaultClient, nil), req)
 	res, err := prom.ScrapeSeries(context.Background())
 
 	assert.NoError(t, err)
@@ -75,7 +75,7 @@ func TestPrometheusPlainWithSelector(t *testing.T) {
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	sr, err := selector.Parse("go_gc*")
 	require.NoError(t, err)
-	prom := NewWithSelector(http.DefaultClient, req, sr, nil)
+	prom := NewWithSelector(web.WrapHTTPClient(http.DefaultClient, nil), req, sr)
 
 	res, err := prom.ScrapeSeries(context.Background())
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func TestPrometheusGzip(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	prom := New(http.DefaultClient, req, nil)
+	prom := New(web.WrapHTTPClient(http.DefaultClient, nil), req)
 
 	for range 2 {
 		res, err := prom.ScrapeSeries(context.Background())
@@ -115,7 +115,7 @@ func TestPrometheusGzip(t *testing.T) {
 func TestPrometheusReadFromFile(t *testing.T) {
 	req := web.RequestConfig{URL: "file://testdata/testdata.txt"}
 
-	prom := NewWithSelector(http.DefaultClient, req, nil, nil)
+	prom := NewWithSelector(web.WrapHTTPClient(http.DefaultClient, nil), req, nil)
 
 	for range 2 {
 		res, err := prom.ScrapeSeries(context.Background())
@@ -123,7 +123,7 @@ func TestPrometheusReadFromFile(t *testing.T) {
 		verifyTestData(t, res)
 	}
 
-	prom = New(http.DefaultClient, req, nil)
+	prom = New(web.WrapHTTPClient(http.DefaultClient, nil), req)
 
 	for range 2 {
 		res, err := prom.ScrapeSeries(context.Background())

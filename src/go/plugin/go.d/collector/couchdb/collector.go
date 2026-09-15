@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
@@ -61,7 +60,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *http.Client
+	httpClient *web.HTTPClient
 
 	databases []string
 }
@@ -71,7 +70,7 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	err := c.validateConfig(ctx)
+	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("check configuration: %v", err)
 	}

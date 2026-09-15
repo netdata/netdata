@@ -200,7 +200,7 @@ func TestNewHTTPClient(t *testing.T) {
 			require.NotNil(t, client)
 
 			if test.validate != nil {
-				test.validate(t, client, test.config)
+				test.validate(t, client.Client, test.config)
 			}
 		})
 	}

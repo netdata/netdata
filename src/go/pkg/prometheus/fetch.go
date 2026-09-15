@@ -12,8 +12,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -45,8 +43,7 @@ func (f *fileFetcher) fetch(_ context.Context, w io.Writer) error {
 // httpFetcher scrapes the exposition text over HTTP, transparently decompressing
 // gzip responses. The gzip reader and its buffered source are reused across scrapes.
 type httpFetcher struct {
-	files   credentialfile.RegularReader
-	client  *http.Client
+	client  *web.HTTPClient
 	request web.RequestConfig
 
 	gzipr   *gzip.Reader
@@ -54,7 +51,7 @@ type httpFetcher struct {
 }
 
 func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
-	req, err := web.NewHTTPRequest(ctx, f.request, f.files)
+	req, err := f.client.NewRequest(ctx, f.request)
 	if err != nil {
 		return err
 	}

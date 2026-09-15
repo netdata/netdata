@@ -15,8 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -90,7 +88,7 @@ func TestCollector_Init(t *testing.T) {
 		"api client factory error": {
 			setup: func(c *Collector) {
 				c.APIKey = "key"
-				c.newAPIClient = func(context.Context, Config, credentialfile.RegularReader) (panosAPIClient, error) {
+				c.newAPIClient = func(context.Context, Config) (panosAPIClient, error) {
 					return nil, errors.New("factory failed")
 				}
 			},
@@ -179,7 +177,7 @@ func TestCollector_Init(t *testing.T) {
 				tc.setup(collr)
 			}
 			if !tc.keepFactory {
-				collr.newAPIClient = func(context.Context, Config, credentialfile.RegularReader) (panosAPIClient, error) {
+				collr.newAPIClient = func(context.Context, Config) (panosAPIClient, error) {
 					return &mockAPIClient{}, nil
 				}
 			}

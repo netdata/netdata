@@ -27,5 +27,5 @@ func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Promet
 
 	req := c.RequestConfig.Copy()
 
-	return prometheus.New(httpClient, req, c.CredentialFiles()), nil
+	return prometheus.New(httpClient, req), nil
 }

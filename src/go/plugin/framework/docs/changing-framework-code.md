@@ -185,7 +185,11 @@ factory cleanup paths MUST call `collectorapi.CleanupCollector(ctx, collector)`
 to close the reader afterward, including failed initialization and temporary
 configuration probes. Tests MAY transfer an explicit reader with
 `Base.SetCredentialFiles` before `Init`; production MUST NOT replace the
-unprivileged reader with local filesystem access.
+unprivileged reader with local filesystem access. Bind this borrowed reader once
+in `web.NewHTTPClient`; request methods then take the current context/config.
+Closing idle HTTP connections MUST NOT close the borrowed reader. Initialization-only
+TLS consumers SHOULD use scoped `tlscfg.NewTLSConfig` or `web.NewTransportClient`
+instead of retaining a job reader for work already finished.
 
 ### jobruntime
 
