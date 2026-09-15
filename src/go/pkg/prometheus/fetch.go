@@ -43,7 +43,7 @@ func (f *fileFetcher) fetch(_ context.Context, w io.Writer) error {
 // httpFetcher scrapes the exposition text over HTTP, transparently decompressing
 // gzip responses. The gzip reader and its buffered source are reused across scrapes.
 type httpFetcher struct {
-	client  *web.HTTPClient
+	client  *http.Client
 	request web.RequestConfig
 
 	gzipr   *gzip.Reader
@@ -51,7 +51,7 @@ type httpFetcher struct {
 }
 
 func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
-	req, err := f.client.NewRequest(ctx, f.request)
+	req, err := web.NewHTTPRequest(ctx, f.request)
 	if err != nil {
 		return err
 	}

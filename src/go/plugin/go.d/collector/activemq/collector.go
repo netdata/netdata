@@ -94,7 +94,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	c.topicsFilter = tf
 
-	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("create http client: %v", err)
 	}

@@ -3,11 +3,10 @@
 package tomcat
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strings"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -86,7 +85,7 @@ func cleanName(name string) string {
 }
 
 func (c *Collector) queryServerStatus(ctx context.Context) (*serverStatusResponse, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathServerStatus)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStatus)
 	if err != nil {
 		return nil, err
 	}

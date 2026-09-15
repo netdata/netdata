@@ -74,10 +74,10 @@ When:
 Why:
 
 - `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
-- `web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())` applies timeout, TLS, proxy, redirect, and HTTP/2
+- `web.NewHTTPClient(ctx, c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2
   behavior consistently;
-- `c.httpClient.NewRequest(ctx, c.RequestConfig)` and
-  `c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
+- `web.NewHTTPRequest(ctx, c.RequestConfig)` and
+  `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
 
 Pattern:
@@ -93,25 +93,19 @@ x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConf
 
 ### Configured credential and TLS files
 
-Bind `c.CredentialFiles()` once with `web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())`. The returned
-`*web.HTTPClient` embeds a standard `*http.Client` and borrows the reader, owned by `collectorapi.Base` and closed by
-runtime cleanup. Its request methods take the current context and request configuration. `CloseIdleConnections` closes
-HTTP connections only. Prometheus and nested HTTP clients accept the bound client without a second reader argument.
+HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
+`web.NewHTTPRequest(ctx, cfg)` and `web.NewHTTPRequestWithPath(ctx, cfg, path)` return standard requests. Callers do not
+pass or own a reader. Ordinary test/custom transports can be passed directly to clients and `web.DoHTTP`.
+Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` callback is mutable.
 
-Use `web.WrapHTTPClient(rawClient, files)` to bind an existing transport or test client explicitly. The embedded
-`client.Client` remains available to consumers requiring `*http.Client`. Keep `web.DoHTTP(client)` response/parsing
-helpers per use; their `OnNokCode` callback is mutable.
+When a bearer file is configured, each request creates and closes its own reduced-authority reader. Requests without a
+bearer file create no reader or helper process. `tlscfg.NewTLSConfig(ctx, cfg)` scopes one reader across all configured
+CA/cert/key files and closes it before returning. SDK/RPC HTTP consumers use the same `web.NewHTTPClient` constructor.
+Cookie collection scopes its reader across `Stat` and a conditional `Open`/parse; no process is retained between checks.
 
-For initialization-only TLS, `tlscfg.NewTLSConfig(ctx, cfg)` and `web.NewTransportClient(ctx, cfg)` own one scoped reader
-across all CA/cert/key reads and close it before returning. The latter returns an ordinary `*http.Client` for SDK/RPC
-consumers that build their own requests. `tlscfg.NewTLSConfigWithReader(ctx, cfg, files)` is the borrowed-reader variant
-for an existing owner or explicit test injection. Never retain a bound client whose scoped reader has already closed.
-Specialized Ceph authentication and cookie `Stat`/`Open` retain their direct reader dependencies.
-
-On Unix the reader uses a persistent reduced-authority helper, started lazily when a file is used. Windows retains the
-service account's file authority. A configured file without an injected reader fails closed; helpers never fall back to
-an elevated local read. Pass the current Init, collection or Function context before reading the file. Do not hide the
-reader in configuration or context, cache bearer contents, or create a reader for every request.
+On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
+fail closed and never fall back to elevated local reads. Pass the current Init, collection or Function context before
+reading a file. Do not retain reader state in a job, HTTP client, configuration or context, or cache bearer contents.
 
 Bearer tokens are read on every request. CA files, and certificate/key files when both are configured, retain the
 `safefile` contract: validate the opened object as regular, accept symlinks to regular files and read at most 1 MiB.
@@ -119,9 +113,9 @@ Bearer tokens are read on every request. CA files, and certificate/key files whe
 files retain per-collection `Stat`, reload on mtime changes and streaming parsing. Errors must not contain file contents
 or parser fragments derived from credential input.
 
-Use the explicit reader boundary for new configurable credential paths. `safefile` is descriptor validation, not a
-privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may explicitly inject
-`credentialfiletest.New(t)` for synthetic local fixtures; production code must use `credentialfile.Reader`.
+Use scoped `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
+privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may use private stateless
+read seams and `credentialfiletest.New(t)` for synthetic fixtures; public APIs use the real scoped boundary.
 
 This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
 retain their existing behavior.
@@ -138,11 +132,11 @@ When:
 
 Why:
 
-- it reuses `web.RequestConfig` and the bound `*web.HTTPClient`;
+- it reuses `web.RequestConfig` and `*http.Client`;
 - it handles Prometheus text parsing and gzip responses;
 - selectors avoid parsing or processing metric families the collector will not use.
 
-Pass the bound client to `prometheus.New(client, request)` or
+Pass the HTTP client to `prometheus.New(client, request)` or
 `prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
 `ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
 

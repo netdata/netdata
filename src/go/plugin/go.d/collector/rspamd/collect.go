@@ -3,9 +3,8 @@
 package rspamd
 
 import (
-	"fmt"
-
 	"context"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -49,7 +48,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) queryRspamdStats(ctx context.Context) (*rspamdStats, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, "/stat")
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, "/stat")
 	if err != nil {
 		return nil, err
 	}

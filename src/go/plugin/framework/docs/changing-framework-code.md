@@ -179,17 +179,11 @@ Use this checklist when the changed package is involved.
   collector contract changes require explicit approval.
 - Registration behavior MUST be covered by tests when changed.
 
-Collector-owned credential readers are exposed by `Base.CredentialFiles()`. They
-start lazily and remain valid through the collector's `Cleanup`. Runtime and
-factory cleanup paths MUST call `collectorapi.CleanupCollector(ctx, collector)`
-to close the reader afterward, including failed initialization and temporary
-configuration probes. Tests MAY transfer an explicit reader with
-`Base.SetCredentialFiles` before `Init`; production MUST NOT replace the
-unprivileged reader with local filesystem access. Bind this borrowed reader once
-in `web.NewHTTPClient`; request methods then take the current context/config.
-Closing idle HTTP connections MUST NOT close the borrowed reader. Initialization-only
-TLS consumers SHOULD use scoped `tlscfg.NewTLSConfig` or `web.NewTransportClient`
-instead of retaining a job reader for work already finished.
+Credential-file reads belong to the operation using them. Shared HTTP/TLS helpers
+MUST scope their reader internally; callers use ordinary HTTP objects and the current
+operation context. Base and job cleanup MUST NOT acquire credential-reader ownership.
+Use `credentialfile.Read`/`ReadAll`, or a scoped reader for one grouped TLS/cookie operation.
+Production MUST NOT replace the unprivileged boundary with local filesystem access.
 
 ### jobruntime
 

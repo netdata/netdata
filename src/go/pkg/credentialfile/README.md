@@ -1,10 +1,13 @@
 # Configured credential file reader
 
-`New()` creates a lazy reader with explicit ownership. Unix requests use the installed
-`buildinfo.NetdataBinDir/nd-run --read-file-server-v1` helper. There is no privileged
-fallback, process-global reader, credential cache, or worker pool. Close the reader
-when its collector/discovery owner ends. Package `Read` and `ReadAll` are scoped
-conveniences for isolated operations, such as native secret-store resolution.
+`Read(ctx, path)` and `ReadAll(ctx, path)` create, use and close a reader for one operation. Unix reads use the installed
+`buildinfo.NetdataBinDir/nd-run --read-file-server-v1` helper. There is no privileged fallback, process-global reader,
+credential cache or worker pool. HTTP request helpers call this boundary internally only when a bearer file is set;
+requests without credential files create no reader or helper process.
+
+Use `New()` with a deferred `Close()` inside a single operation that groups file access, such as loading a complete TLS
+CA/certificate/key configuration or checking and reloading a cookie file. Do not retain the reader in a job or client.
+Reader methods provide the following file policies:
 
 - `Read(ctx, path)` preserves safefile's regular-file and 1 MiB policy. No partial
   contents are returned after an error.
@@ -51,9 +54,7 @@ benchmark compares safefile with warm persistent 256-byte reads and reports
 allocations. Timings describe that machine and are not CI thresholds. Full setuid
 and Linux capability launch-shape validation belongs to the helper's C tests.
 
-HTTP consumers bind the reader once with `web.NewHTTPClient`; request methods receive the current context and config.
-The bound client borrows the reader, so closing idle HTTP connections leaves it usable until the job owner closes it.
-There is no bearer-token cache. `web.WrapHTTPClient` explicitly binds custom standard clients and test readers.
-
-TLS-only consumers use `tlscfg.NewTLSConfig` or `web.NewTransportClient`. These scope one reader across the complete
-CA/certificate/key construction and close it before returning; they retain no reader in the returned TLS/HTTP object.
+HTTP consumers use ordinary `web.NewHTTPClient(ctx, cfg)` and `web.NewHTTPRequest(ctx, cfg)` APIs. They receive standard
+HTTP objects and manage only HTTP connections. Bearer-token files are reread on every request. TLS construction scopes
+one reader across all configured files and closes it before returning; cookie loading retains its mtime cache while
+scoping the reader to each check/reload operation.

@@ -3,9 +3,8 @@
 package icecast
 
 import (
-	"fmt"
-
 	"context"
+	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -67,7 +66,7 @@ func (c *Collector) collectServerStats(ctx context.Context, mx map[string]int64)
 }
 
 func (c *Collector) queryServerStats(ctx context.Context) (*serverStats, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathServerStats)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return nil, err
 	}

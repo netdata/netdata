@@ -3,10 +3,9 @@
 package puppet
 
 import (
+	"context"
 	"fmt"
 	"net/url"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -30,7 +29,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) queryStatsService(ctx context.Context) (*statusServiceResponse, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatusService)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatusService)
 	if err != nil {
 		return nil, err
 	}

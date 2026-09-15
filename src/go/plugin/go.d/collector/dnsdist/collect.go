@@ -3,10 +3,9 @@
 package dnsdist
 
 import (
+	"context"
 	"maps"
 	"net/url"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -33,7 +32,7 @@ func (c *Collector) collectStatistic(collected map[string]int64, statistics *sta
 }
 
 func (c *Collector) scrapeStatistics(ctx context.Context) (*statisticMetrics, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathJSONStat)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathJSONStat)
 	if err != nil {
 		return nil, err
 	}

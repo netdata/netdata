@@ -107,7 +107,7 @@ func BenchmarkCollector(b *testing.B) {
 			}
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body.String())) }))
 			defer srv.Close()
-			mfs, err := prometheus.New(web.WrapHTTPClient(srv.Client(), nil), web.RequestConfig{
+			mfs, err := prometheus.New(srv.Client(), web.RequestConfig{
 				URL: srv.URL,
 			}).Scrape()
 			if err != nil {
@@ -327,7 +327,7 @@ func setStaticMetrics(t *testing.T, c *Collector, body string) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body)) }))
 	defer srv.Close()
-	mfs, err := prometheus.New(web.WrapHTTPClient(srv.Client(), nil), web.RequestConfig{
+	mfs, err := prometheus.New(srv.Client(), web.RequestConfig{
 		URL: srv.URL,
 	}).Scrape()
 	require.NoError(t, err)

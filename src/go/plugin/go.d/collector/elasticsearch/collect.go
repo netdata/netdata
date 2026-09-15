@@ -3,14 +3,13 @@
 package elasticsearch
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -161,7 +160,7 @@ func (c *Collector) scrapeNodesStats(ctx context.Context, ms *esMetrics) {
 		p = urlPathLocalNodeStats
 	}
 
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, p)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, p)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -177,7 +176,7 @@ func (c *Collector) scrapeNodesStats(ctx context.Context, ms *esMetrics) {
 }
 
 func (c *Collector) scrapeClusterHealth(ctx context.Context, ms *esMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathClusterHealth)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathClusterHealth)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -193,7 +192,7 @@ func (c *Collector) scrapeClusterHealth(ctx context.Context, ms *esMetrics) {
 }
 
 func (c *Collector) scrapeClusterStats(ctx context.Context, ms *esMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathClusterStats)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathClusterStats)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -209,7 +208,7 @@ func (c *Collector) scrapeClusterStats(ctx context.Context, ms *esMetrics) {
 }
 
 func (c *Collector) scrapeLocalIndicesStats(ctx context.Context, ms *esMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathIndicesStats)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathIndicesStats)
 	if err != nil {
 		c.Warning(err)
 		return
@@ -226,7 +225,7 @@ func (c *Collector) scrapeLocalIndicesStats(ctx context.Context, ms *esMetrics) 
 }
 
 func (c *Collector) getClusterName(ctx context.Context) (string, error) {
-	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return "", err
 	}

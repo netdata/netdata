@@ -283,7 +283,7 @@ func (ccm *constructedConfigModule) cleanup(ctx context.Context) error {
 		ccm.err = callJobLifecycle(
 			"config-module Cleanup",
 			func() error {
-				collectorapi.CleanupCollector(ctx, ccm.module)
+				ccm.module.Cleanup(ctx)
 				return nil
 			},
 		)

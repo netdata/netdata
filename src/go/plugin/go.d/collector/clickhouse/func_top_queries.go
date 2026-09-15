@@ -147,7 +147,7 @@ FROM system.columns
 WHERE database = 'system' AND table = 'query_log'
 FORMAT JSON`
 
-	req, err := f.router.collector.httpClient.NewRequest(ctx, f.router.collector.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, f.router.collector.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ LIMIT %d
 FORMAT JSON
 `, strings.Join(selectParts, ", "), groupKey, sortColumn, limit)
 
-	req, err := f.router.collector.httpClient.NewRequest(ctx, f.router.collector.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, f.router.collector.RequestConfig)
 	if err != nil {
 		return funcapi.ErrorResponse(500, "%v", err)
 	}

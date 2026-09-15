@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-
-	"context"
 
 	fcgiclient "github.com/kanocz/fcgi_client"
 )
@@ -53,12 +54,12 @@ type client interface {
 }
 
 type httpClient struct {
-	client *web.HTTPClient
+	client *http.Client
 	req    web.RequestConfig
 	dec    decoder
 }
 
-func newHTTPClient(c *web.HTTPClient, r web.RequestConfig) (*httpClient, error) {
+func newHTTPClient(c *http.Client, r web.RequestConfig) (*httpClient, error) {
 	u, err := url.Parse(r.URL)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func newHTTPClient(c *web.HTTPClient, r web.RequestConfig) (*httpClient, error) 
 }
 
 func (c *httpClient) getStatus(ctx context.Context) (*status, error) {
-	req, err := c.client.NewRequest(ctx, c.req)
+	req, err := web.NewHTTPRequest(ctx, c.req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}

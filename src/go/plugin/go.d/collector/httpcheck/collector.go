@@ -7,10 +7,12 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -41,6 +43,7 @@ func New() *Collector {
 		},
 
 		acceptedStatuses: make(map[int]bool),
+		newCookieReader:  func() cookieFileReader { return credentialfile.New() },
 	}
 }
 
@@ -67,12 +70,13 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	acceptedStatuses  map[int]bool
 	reResponse        *regexp.Regexp
 	headerMatch       []headerMatch
 	cookieFileModTime time.Time
+	newCookieReader   func() cookieFileReader
 
 	metrics metrics
 }

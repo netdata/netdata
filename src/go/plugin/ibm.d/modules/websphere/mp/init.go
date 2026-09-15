@@ -91,7 +91,7 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	client, err := openmetrics.NewClient(ctx, openmetrics.Config{
 		HTTPConfig: c.Config.HTTPConfig,
-	}, c.CredentialFiles())
+	})
 	if err != nil {
 		return err
 	}

@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"golang.org/x/net/html/charset"
-
 	"context"
+
+	"golang.org/x/net/html/charset"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -74,7 +74,7 @@ func (c *Collector) collectStatus(ctx context.Context, mx map[string]int64) erro
 }
 
 func (c *Collector) fetchStatus(ctx context.Context) (*monitStatus, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, err
 	}

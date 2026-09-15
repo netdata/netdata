@@ -76,8 +76,8 @@ func (g singleOwnerGate) release() {
 }
 
 type cephClient struct {
-	files                  credentialfile.RegularReader
-	httpClient             *web.HTTPClient
+	readFile               func(context.Context, string) ([]byte, error)
+	httpClient             *http.Client
 	requestConfig          web.RequestConfig
 	configuredBase         *url.URL
 	notFollowRedirects     bool
@@ -98,7 +98,6 @@ type cephClient struct {
 }
 
 func newCephClient(
-	files credentialfile.RegularReader,
 	httpClient *http.Client,
 	cfg web.RequestConfig,
 	notFollowRedirects bool,
@@ -124,8 +123,8 @@ func newCephClient(
 	}
 
 	c := &cephClient{
-		httpClient:             web.WrapHTTPClient(httpClient, files),
-		files:                  files,
+		httpClient:             httpClient,
+		readFile:               credentialfile.Read,
 		requestConfig:          cfg.Copy(),
 		configuredBase:         base,
 		notFollowRedirects:     notFollowRedirects,
@@ -559,7 +558,7 @@ func redirectedDashboardBase(current *url.URL, location, probePath string) (*url
 
 func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token string, managed bool, err error) {
 	if c.bearerTokenFile != "" {
-		bs, err := c.files.Read(ctx, c.bearerTokenFile)
+		bs, err := c.readFile(ctx, c.bearerTokenFile)
 		if err != nil {
 			return "", false, fmt.Errorf("read bearer token file: %w", err)
 		}
@@ -656,7 +655,7 @@ func (c *cephClient) request(
 		cfg.Body = string(body)
 	}
 
-	req, err := c.httpClient.NewRequest(ctx, cfg)
+	req, err := web.NewHTTPRequest(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

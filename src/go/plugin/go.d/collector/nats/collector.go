@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -59,7 +60,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	cache *cache
 
@@ -80,7 +81,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return errors.New("URL required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}

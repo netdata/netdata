@@ -3,10 +3,9 @@
 package powerdns_recursor
 
 import (
+	"context"
 	"errors"
 	"strconv"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -63,7 +62,7 @@ func (c *Collector) collectStatistics(collected map[string]int64, statistics sta
 }
 
 func (c *Collector) scrapeStatistics(ctx context.Context) ([]statisticMetric, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathLocalStatistics)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathLocalStatistics)
 	if err != nil {
 		return nil, err
 	}

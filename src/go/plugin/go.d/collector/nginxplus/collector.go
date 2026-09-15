@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -56,7 +57,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	apiVersion int64
 	endpoints  struct {
@@ -86,7 +87,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return errors.New("config: 'url' can not be empty'")
 	}
 
-	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}

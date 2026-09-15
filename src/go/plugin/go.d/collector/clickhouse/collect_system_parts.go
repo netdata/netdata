@@ -3,10 +3,11 @@
 package clickhouse
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
-	"context"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const querySystemParts = `
@@ -34,7 +35,7 @@ type tableStats struct {
 }
 
 func (c *Collector) collectSystemParts(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

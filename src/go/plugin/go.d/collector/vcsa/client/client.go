@@ -3,12 +3,11 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -52,7 +51,7 @@ func New(httpClient *http.Client, url, username, password string) *Client {
 		httpClient = &http.Client{}
 	}
 	return &Client{
-		httpClient: web.WrapHTTPClient(httpClient, nil),
+		httpClient: httpClient,
 		url:        url,
 		username:   username,
 		password:   password,
@@ -61,7 +60,7 @@ func New(httpClient *http.Client, url, username, password string) *Client {
 }
 
 type Client struct {
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	url      string
 	username string
@@ -173,7 +172,7 @@ func (c *Client) System(ctx context.Context) (string, error) {
 }
 
 func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := c.httpClient.NewRequest(ctx, req)
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s : %v", req.URL, err)
 	}

@@ -3,11 +3,10 @@
 package supervisord
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -24,7 +23,7 @@ func (c *Collector) initSupervisorClient(ctx context.Context) (supervisorClient,
 	if err != nil {
 		return nil, fmt.Errorf("parse 'url': %v (%s)", err, c.URL)
 	}
-	httpClient, err := web.NewTransportClient(ctx, c.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %v", err)
 	}

@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -60,7 +61,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	databases []string
 }

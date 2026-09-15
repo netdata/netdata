@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -57,7 +58,7 @@ type (
 
 		charts *Charts
 
-		httpClient *web.HTTPClient
+		httpClient *http.Client
 		bindAPIClient
 
 		permitView matcher.Matcher
@@ -85,7 +86,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.permitView = pvm
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("creating http client : %v", err)
 	}

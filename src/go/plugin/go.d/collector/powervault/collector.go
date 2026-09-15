@@ -111,7 +111,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return fmt.Errorf("config: auth_digest must be 'sha256' or 'md5', got %q", digest)
 	}
 
-	cli, err := client.New(ctx, c.ClientConfig, c.RequestConfig, digest, c.CredentialFiles())
+	cli, err := client.New(ctx, c.ClientConfig, c.RequestConfig, digest)
 	if err != nil {
 		return fmt.Errorf("error creating PowerVault client: %v", err)
 	}

@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,10 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -78,11 +75,8 @@ Relationships:
 */
 
 // New creates new ScaleIO client.
-func New(ctx context.Context,
-	client web.ClientConfig, request web.RequestConfig,
-	files credentialfile.RegularReader,
-) (*Client, error) {
-	httpClient, err := web.NewHTTPClient(ctx, client, files)
+func New(ctx context.Context, client web.ClientConfig, request web.RequestConfig) (*Client, error) {
+	httpClient, err := web.NewHTTPClient(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +90,7 @@ func New(ctx context.Context,
 // Client represents ScaleIO client.
 type Client struct {
 	Request    web.RequestConfig
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	token      *token
 }
 
@@ -217,7 +211,7 @@ func (c *Client) createInstancesRequest() web.RequestConfig {
 }
 
 func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := c.httpClient.NewRequest(ctx, req)
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s: %v", req.URL, err)
 	}

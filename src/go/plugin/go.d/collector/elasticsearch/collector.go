@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -108,7 +109,7 @@ type Collector struct {
 	addClusterHealthChartsOnce *sync.Once
 	addClusterStatsChartsOnce  *sync.Once
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	clusterName string
 	nodes       map[string]bool

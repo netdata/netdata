@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -57,7 +58,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	seenServices map[string]statusServiceCheck
 }
@@ -71,7 +72,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return fmt.Errorf("config: monit url is required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}

@@ -50,18 +50,19 @@ type TLSConfig struct {
 // NewTLSConfig loads TLS files with one scoped credential reader, closed before
 // returning. The result may be nil without an error if TLS is not configured.
 func NewTLSConfig(ctx context.Context, cfg TLSConfig) (*tls.Config, error) {
+	if cfg.TLSCA == "" && (cfg.TLSCert == "" || cfg.TLSKey == "") {
+		return newTLSConfig(ctx, cfg, nil)
+	}
 	files := credentialfile.New()
 	defer files.Close()
-	return NewTLSConfigWithReader(ctx, cfg, files)
+	return newTLSConfig(ctx, cfg, files)
 }
 
-// NewTLSConfigWithReader loads TLS files using a borrowed reader. Its owner is
-// responsible for closing it after all users finish.
-func NewTLSConfigWithReader(
-	ctx context.Context,
-	cfg TLSConfig,
-	files credentialfile.RegularReader,
-) (*tls.Config, error) {
+type fileReader interface {
+	Read(context.Context, string) ([]byte, error)
+}
+
+func newTLSConfig(ctx context.Context, cfg TLSConfig, files fileReader) (*tls.Config, error) {
 	if cfg.TLSCA == "" && cfg.TLSKey == "" && cfg.TLSCert == "" && !cfg.InsecureSkipVerify {
 		return nil, nil
 	}
@@ -90,7 +91,7 @@ func NewTLSConfigWithReader(
 	return tlsConfig, nil
 }
 
-func loadCertPool(ctx context.Context, certFiles []string, files credentialfile.RegularReader) (*x509.CertPool, error) {
+func loadCertPool(ctx context.Context, certFiles []string, files fileReader) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
 	for _, certFile := range certFiles {
 		pem, err := readFile(ctx, certFile, files)
@@ -106,7 +107,7 @@ func loadCertPool(ctx context.Context, certFiles []string, files credentialfile.
 
 func loadCertificate(ctx context.Context,
 	certFile, keyFile string,
-	files credentialfile.RegularReader,
+	files fileReader,
 ) (tls.Certificate, error) {
 	certPEM, err := readFile(ctx, certFile, files)
 	if err != nil {
@@ -128,7 +129,7 @@ func loadCertificate(ctx context.Context,
 func newFileError(err error) error {
 	return &fileError{err: err}
 }
-func readFile(ctx context.Context, path string, files credentialfile.RegularReader) ([]byte, error) {
+func readFile(ctx context.Context, path string, files fileReader) ([]byte, error) {
 	if files == nil {
 		return nil, fmt.Errorf("TLS file reader unavailable: %w", safefile.ErrFile)
 	}

@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -88,7 +89,7 @@ type Collector struct {
 	store   metrix.CollectorStore
 	metrics *collectorMetrics
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 	apiClient  *cephClient
 	funcRouter funcapi.MethodHandler
 
@@ -116,13 +117,13 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.osdMatcher = osdMatcher
 	c.poolMatcher = poolMatcher
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("create http client: %v", err)
 	}
 	c.httpClient = httpClient
 
-	apiClient, err := newCephClient(c.CredentialFiles(), httpClient.Client, c.RequestConfig, c.NotFollowRedirect, c.AllowedRedirectOrigins)
+	apiClient, err := newCephClient(httpClient, c.RequestConfig, c.NotFollowRedirect, c.AllowedRedirectOrigins)
 	if err != nil {
 		return fmt.Errorf("create Ceph client: %v", err)
 	}

@@ -3,12 +3,11 @@
 package nginxplus
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"sync"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -46,7 +45,7 @@ type nginxMetrics struct {
 }
 
 func (c *Collector) queryAPIVersion(ctx context.Context) (int64, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIVersions)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIVersions)
 	if err != nil {
 		return 0, err
 	}
@@ -64,7 +63,7 @@ func (c *Collector) queryAPIVersion(ctx context.Context) (int64, error) {
 }
 
 func (c *Collector) queryAvailableEndpoints(ctx context.Context) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIEndpointsRoot, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIEndpointsRoot, c.apiVersion))
 	if err != nil {
 		return err
 	}
@@ -95,7 +94,7 @@ func (c *Collector) queryAvailableEndpoints(ctx context.Context) error {
 
 	if hasHTTP {
 		endpoints = endpoints[:0]
-		req, err = c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIEndpointsHTTP, c.apiVersion))
+		req, err = web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIEndpointsHTTP, c.apiVersion))
 		if err != nil {
 			return err
 		}
@@ -123,7 +122,7 @@ func (c *Collector) queryAvailableEndpoints(ctx context.Context) error {
 
 	if hasStream {
 		endpoints = endpoints[:0]
-		req, err = c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIEndpointsStream, c.apiVersion))
+		req, err = web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIEndpointsStream, c.apiVersion))
 		if err != nil {
 			return err
 		}
@@ -177,7 +176,7 @@ func (c *Collector) queryMetrics(ctx context.Context) *nginxMetrics {
 }
 
 func (c *Collector) queryNginxInfo(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPINginx, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPINginx, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -195,7 +194,7 @@ func (c *Collector) queryNginxInfo(ctx context.Context, ms *nginxMetrics) {
 }
 
 func (c *Collector) queryConnections(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIConnections, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIConnections, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -213,7 +212,7 @@ func (c *Collector) queryConnections(ctx context.Context, ms *nginxMetrics) {
 }
 
 func (c *Collector) querySSL(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPISSL, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPISSL, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -231,7 +230,7 @@ func (c *Collector) querySSL(ctx context.Context, ms *nginxMetrics) {
 }
 
 func (c *Collector) queryHTTPRequests(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPRequests, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPRequests, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -249,7 +248,7 @@ func (c *Collector) queryHTTPRequests(ctx context.Context, ms *nginxMetrics) {
 }
 
 func (c *Collector) queryHTTPServerZones(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPServerZones, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPServerZones, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -267,7 +266,7 @@ func (c *Collector) queryHTTPServerZones(ctx context.Context, ms *nginxMetrics) 
 }
 
 func (c *Collector) queryHTTPLocationZones(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPLocationZones, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPLocationZones, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -285,7 +284,7 @@ func (c *Collector) queryHTTPLocationZones(ctx context.Context, ms *nginxMetrics
 }
 
 func (c *Collector) queryHTTPUpstreams(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPUpstreams, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPUpstreams, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -303,7 +302,7 @@ func (c *Collector) queryHTTPUpstreams(ctx context.Context, ms *nginxMetrics) {
 }
 
 func (c *Collector) queryHTTPCaches(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPCaches, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIHTTPCaches, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -321,7 +320,7 @@ func (c *Collector) queryHTTPCaches(ctx context.Context, ms *nginxMetrics) {
 }
 
 func (c *Collector) queryStreamServerZones(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIStreamServerZones, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIStreamServerZones, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -339,7 +338,7 @@ func (c *Collector) queryStreamServerZones(ctx context.Context, ms *nginxMetrics
 }
 
 func (c *Collector) queryStreamUpstreams(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIStreamUpstreams, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIStreamUpstreams, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return
@@ -357,7 +356,7 @@ func (c *Collector) queryStreamUpstreams(ctx context.Context, ms *nginxMetrics) 
 }
 
 func (c *Collector) queryResolvers(ctx context.Context, ms *nginxMetrics) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIResolvers, c.apiVersion))
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, fmt.Sprintf(urlPathAPIResolvers, c.apiVersion))
 	if err != nil {
 		c.Warning(err)
 		return

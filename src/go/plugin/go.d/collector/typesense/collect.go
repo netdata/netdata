@@ -3,13 +3,12 @@
 package typesense
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http"
 	"strings"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -56,7 +55,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 }
 
 func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathHealth)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathHealth)
 	if err != nil {
 		return fmt.Errorf("creating health request: %w", err)
 	}
@@ -90,7 +89,7 @@ func (c *Collector) collectStats(ctx context.Context, mx map[string]int64) error
 		return nil
 	}
 
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStats)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStats)
 	if err != nil {
 		return fmt.Errorf("creating stats request: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -13,15 +14,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"golang.org/x/net/publicsuffix"
 )
 
 // TODO: implement proper cookie auth support
 // relevant forum topic: https://community.netdata.cloud/t/howto-http-endpoint-collector-with-cookie-and-user-pass/3981/5?u=ilyam8
 
+type cookieFileReader interface {
+	Stat(context.Context, string) (time.Time, error)
+	Open(context.Context, string) (io.ReadCloser, error)
+	Close() error
+}
+
 // cookie file format: https://everything.curl.dev/http/cookies/fileformat.html
-func loadCookieJar(ctx context.Context, path string, files credentialfile.FileReader) (http.CookieJar, error) {
+func loadCookieJar(ctx context.Context, path string, files cookieFileReader) (http.CookieJar, error) {
 	file, err := files.Open(ctx, path)
 	if err != nil {
 		return nil, err

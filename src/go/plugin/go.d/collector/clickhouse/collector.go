@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -89,7 +90,7 @@ type (
 
 		charts *collectorapi.Charts
 
-		httpClient *web.HTTPClient
+		httpClient *http.Client
 
 		seenDisks    map[string]*seenDisk
 		seenDbTables map[string]*seenTable

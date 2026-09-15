@@ -3,16 +3,16 @@
 package rabbitmq
 
 import (
+	"context"
 	"fmt"
 	"maps"
 
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 func (c *Collector) collectOverview(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIOverview)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIOverview)
 	if err != nil {
 		return fmt.Errorf("failed to create overview stats request: %w", err)
 	}

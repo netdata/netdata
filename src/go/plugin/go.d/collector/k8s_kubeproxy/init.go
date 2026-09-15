@@ -3,9 +3,8 @@
 package k8s_kubeproxy
 
 import (
-	"errors"
-
 	"context"
+	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -19,7 +18,7 @@ func (c *Collector) validateConfig() error {
 }
 
 func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}

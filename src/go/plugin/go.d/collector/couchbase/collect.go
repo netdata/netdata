@@ -3,10 +3,9 @@
 package couchbase
 
 import (
+	"context"
 	"fmt"
 	"net/url"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -111,7 +110,7 @@ func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 }
 
 func (c *Collector) scrapeCouchbase(ctx context.Context) (*cbMetrics, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathBucketsStats)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathBucketsStats)
 	if err != nil {
 		return nil, err
 	}

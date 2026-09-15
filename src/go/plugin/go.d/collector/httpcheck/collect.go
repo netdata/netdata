@@ -27,7 +27,7 @@ const (
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
-	req, err := c.httpClient.NewRequest(ctx, c.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", c.RequestConfig.URL, err)
 	}
@@ -168,7 +168,10 @@ func (c *Collector) readCookieFile(ctx context.Context) error {
 		return nil
 	}
 
-	modTime, err := c.CredentialFiles().Stat(ctx, c.CookieFile)
+	files := c.newCookieReader()
+	defer files.Close()
+
+	modTime, err := files.Stat(ctx, c.CookieFile)
 	if err != nil {
 		return err
 	}
@@ -180,7 +183,7 @@ func (c *Collector) readCookieFile(ctx context.Context) error {
 
 	c.Debugf("reading cookie file '%s'", c.CookieFile)
 
-	jar, err := loadCookieJar(ctx, c.CookieFile, c.CredentialFiles())
+	jar, err := loadCookieJar(ctx, c.CookieFile, files)
 	if err != nil {
 		return err
 	}

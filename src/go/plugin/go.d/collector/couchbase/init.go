@@ -3,9 +3,9 @@
 package couchbase
 
 import (
-	"errors"
-
 	"context"
+	"errors"
+	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -25,12 +25,12 @@ func (c *Collector) initCharts() (*Charts, error) {
 	return bucketCharts.Copy(), nil
 }
 
-func (c *Collector) initHTTPClient(ctx context.Context) (*web.HTTPClient, error) {
-	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := client.NewRequest(ctx, c.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(ctx, c.RequestConfig); err != nil {
 		client.CloseIdleConnections()
 		return nil, err
 	}

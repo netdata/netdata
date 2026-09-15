@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -54,7 +55,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 }
 
 func (c *Collector) Configuration() any {
@@ -69,7 +70,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return fmt.Errorf("bad URL '%s', should ends in '?auto'", c.URL)
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %v", err)
 	}

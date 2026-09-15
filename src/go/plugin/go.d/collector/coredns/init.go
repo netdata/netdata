@@ -3,9 +3,8 @@
 package coredns
 
 import (
-	"errors"
-
 	"context"
+	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
@@ -34,7 +33,7 @@ func (c *Collector) initPerZoneMatcher() (matcher.Matcher, error) {
 }
 
 func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
-	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, err
 	}

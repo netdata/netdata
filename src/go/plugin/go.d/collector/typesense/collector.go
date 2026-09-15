@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -58,7 +59,7 @@ type Collector struct {
 	charts *collectorapi.Charts
 	once   sync.Once
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 
 	doStats bool
 }
@@ -72,7 +73,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return errors.New("configL: url not configured")
 	}
 
-	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %w", err)
 	}

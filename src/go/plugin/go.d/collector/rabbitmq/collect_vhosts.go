@@ -3,16 +3,16 @@
 package rabbitmq
 
 import (
+	"context"
 	"fmt"
 
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collectVhosts(ctx context.Context, mx map[string]int64) error {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathAPIVhosts)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIVhosts)
 	if err != nil {
 		return fmt.Errorf("failed to create vhosts stats request: %w", err)
 	}

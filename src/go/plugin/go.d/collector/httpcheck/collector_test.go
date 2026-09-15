@@ -151,7 +151,7 @@ func TestCollector_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr, cleanup := test.prepare()
-			collr.SetCredentialFiles(credentialfiletest.New(t))
+			collr.newCookieReader = func() cookieFileReader { return credentialfiletest.New(t) }
 			defer cleanup()
 
 			require.NoError(t, collr.Init(context.Background()))
@@ -457,7 +457,7 @@ func TestCollector_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr, cleanup := test.prepare()
-			collr.SetCredentialFiles(credentialfiletest.New(t))
+			collr.newCookieReader = func() cookieFileReader { return credentialfiletest.New(t) }
 			defer cleanup()
 
 			if test.update != nil {

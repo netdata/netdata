@@ -60,7 +60,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	httpClient *web.HTTPClient
+	httpClient *http.Client
 }
 
 func (c *Collector) Configuration() any {
@@ -72,7 +72,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return errors.New("url not set")
 	}
 
-	client, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+	client, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("http client init: %w", err)
 	}

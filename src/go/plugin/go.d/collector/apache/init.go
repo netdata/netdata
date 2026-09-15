@@ -3,10 +3,10 @@
 package apache
 
 import (
-	"errors"
-	"strings"
-
 	"context"
+	"errors"
+	"net/http"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -21,6 +21,6 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initHTTPClient(ctx context.Context) (*web.HTTPClient, error) {
-	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
+func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+	return web.NewHTTPClient(ctx, c.ClientConfig)
 }

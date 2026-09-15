@@ -3,12 +3,11 @@
 package nginxunit
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-
-	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -32,7 +31,7 @@ type nuStatus struct {
 }
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
-	req, err := c.httpClient.NewRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request to '%s': %v", c.URL, err)
 	}
