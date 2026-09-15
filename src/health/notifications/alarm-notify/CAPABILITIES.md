@@ -5,6 +5,8 @@ implementation; it does not change the active Bash notifier. Existing functional
 and questionable behavior requires an explicit decision before being changed or dropped. The ineffective Discord
 channel-name field and repeated-request loop are omitted by explicit approval; real channel routing uses webhook URLs.
 Telegram's optional retries honor the server's requested delay instead of Bash's fixed one second, also by explicit approval.
+HipChat is excluded from the Go migration by explicit approval following its
+[end of life](https://www.atlassian.com/partnerships/slack/faq); production Bash remains unchanged.
 
 ## Working increments
 
@@ -24,13 +26,15 @@ Telegram's optional retries honor the server's requested delay instead of Bash's
   acknowledgments, with no automatic retries or shortening.
 - MessageBird originator/recipient SMS with access-key secrets, automatic character encoding, custom API bases and
   created-message acknowledgments; no automatic retries or shortening.
+- Gotify application-token messages and ntfy topic publishing with status priorities, ntfy tags/navigation,
+  anonymous/Basic/token authentication, secret references and server acknowledgments.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
 
-All 31 `send_*` functions enter the baseline, including providers absent from integration metadata. Each provider's
-current API and Bash behavior must be checked when its implementation is scoped. This is not a claim that all legacy
-remote services remain available.
+All 31 `send_*` functions are accounted for, including providers absent from integration metadata. HipChat is
+explicitly excluded; each remaining provider's current API and Bash behavior must be checked when its implementation
+is scoped. This is not a claim that all legacy remote services remain available.
 
 | Provider | Bash function | Go migration |
 |---|---|---|
@@ -40,7 +44,7 @@ remote services remain available.
 | Kafka HTTP bridge | `send_kafka` | Pending |
 | PagerDuty | `send_pd` | Pending |
 | Twilio | `send_twilio` | Account/sender/recipient text delivery, form encoding, Basic auth, custom API bases and acknowledgment checks implemented |
-| HipChat | `send_hipchat` | Pending |
+| HipChat | `send_hipchat` | Excluded by explicit decision after service/product end of life; Bash retained |
 | MessageBird | `send_messagebird` | Originator/recipient SMS, AccessKey auth, automatic character encoding, custom API bases and acknowledgment checks implemented |
 | SMSEagle | `send_smseagle` | Pending |
 | Kavenegar | `send_kavenegar` | Pending |
@@ -60,8 +64,8 @@ remote services remain available.
 | SMS Server Tools 3 | `send_sms` | Pending |
 | Dynatrace | `send_dynatrace` | Pending |
 | Opsgenie | `send_opsgenie` | Pending |
-| Gotify | `send_gotify` | Pending |
-| ntfy | `send_ntfy` | Pending |
+| Gotify | `send_gotify` | Application-token auth, JSON messages, status priorities, custom API base and acknowledgment checks implemented |
+| ntfy | `send_ntfy` | Topic URLs, anonymous/Basic/token auth, text messages, priorities/tags/navigation and acknowledgment checks implemented |
 | ilert | `send_ilert` | Pending |
 | SIGNL4 | `send_signl4` | Pending |
 | Custom | `send_custom` / `custom_sender` | Pending |
@@ -73,15 +77,15 @@ remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio and MessageBird content/link/status formatting implemented; other providers and richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API settings implemented; remaining provider configuration pending |
-| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook, Slack, Discord, Telegram, Pushover, Pushbullet, Twilio and MessageBird fan-out; provider subtarget details pending with providers |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify and ntfy content/link/status formatting implemented; other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth settings implemented; remaining provider configuration pending |
+| Results | Per-target failures and Bash's any-success invocation result | Implemented for all current Go providers; provider subtarget details pending with remaining providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first nine increments cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
-Pushbullet, Twilio and MessageBird.
+The first ten increments cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
+Pushbullet, Twilio, MessageBird, Gotify and ntfy. Related providers may share small PRs.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
 More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final
 architecture and broad refactoring are discussed after that working baseline exists.

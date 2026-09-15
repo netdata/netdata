@@ -1,13 +1,13 @@
 # Experimental Go notifier
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
-Twilio and MessageBird.
+Twilio, MessageBird, Gotify and ntfy.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
-Telegram bot messages, Pushover/Pushbullet notifications and Twilio/MessageBird text messages.
+Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications and Twilio/MessageBird text messages.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -34,10 +34,13 @@ class Receiver(BaseHTTPRequestHandler):
         self.send_response(201 if self.path.endswith(("/Messages.json", "/messages")) else 200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(
-            b'{"ok":true,"status":1,"iden":"test-push","sid":"test-message",'
-            b'"id":"test-message","result":{"message_id":1}}'
-        )
+        if self.path.endswith("/message"):
+            self.wfile.write(b'{"id":1,"appid":1}')
+        else:
+            self.wfile.write(
+                b'{"ok":true,"status":1,"iden":"test-push","sid":"test-message",'
+                b'"id":"test-message","event":"message","result":{"message_id":1}}'
+            )
 
     def log_message(self, *args):
         pass  # Avoid logging credential-bearing request paths.
@@ -80,13 +83,16 @@ are rejected on other provider types. Pushover requires `type: pushover`, `app_t
 Pushbullet requires `type: pushbullet`, `access_token`, and one `email` or `channel_tag`.
 Twilio requires `type: twilio`, `account_sid`, `auth_token`, `from` and `to`.
 MessageBird requires `type: messagebird`, `access_key`, `originator` and `recipient`.
+Gotify requires `type: gotify`, `api_url` and `app_token`. ntfy requires `type: ntfy` and a full topic `url`;
+optional authentication uses `access_token` or `username` with `password`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
-URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials
-and MessageBird access keys accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
+URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
+MessageBird access keys, Gotify app tokens and ntfy credentials accept literal strings or a whole `${env:VARIABLE}`
+or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -124,12 +130,13 @@ count. Partial failure returns `0` when another delivery succeeded, matching Bas
 the individual results to see failures. On interruption, counts cover results reported before cancellation and do
 not claim an outcome for interrupted or unstarted deliveries.
 
-Deliveries use POST. Twilio and MessageBird use `application/x-www-form-urlencoded`; all other providers use
-`application/json`.
+Deliveries use POST. Twilio and MessageBird use `application/x-www-form-urlencoded`; ntfy uses UTF-8 `text/plain`;
+the other providers use `application/json`.
 Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. These three providers make one attempt and
-close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio and MessageBird
-check bounded JSON acknowledgments; Telegram can retry rate limits as described below. Redirects are never followed.
+close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
+Gotify and ntfy check bounded JSON acknowledgments; Telegram can retry rate limits as described below.
+Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
 
 ## Slack app webhooks
@@ -543,6 +550,95 @@ destinations:
 
 Tests use synthetic keys and loopback receivers to verify complete forms, `datacoding=auto`, routing,
 acknowledgments and cancellation. They do not send live SMS or verify handset delivery.
+
+## Gotify and ntfy
+
+These push services use the existing named destinations, role routing and secret references:
+
+```yaml
+version: 1
+destinations:
+  gotify_ops:
+    type: gotify
+    api_url: https://gotify.example.com
+    app_token: ${env:NOTIFY_GOTIFY_APP_TOKEN}
+  ntfy_ops:
+    type: ntfy
+    url: https://ntfy.example.com/alerts
+    access_token: ${env:NOTIFY_NTFY_ACCESS_TOKEN}
+routing:
+  roles:
+    sysadmin: [gotify_ops, ntfy_ops]
+```
+
+Gotify's `api_url` is required and may contain a reverse-proxy path prefix; it must not contain credentials,
+a query or fragment. The notifier appends `/message` and sends JSON `title`, `message` and `priority` using
+[application-token authentication](https://gotify.net/docs/pushmsg) in `X-Gotify-Key`.
+The title contains the node, status and summary. The body contains the summary/details, node/alert, status
+transition, available chart/context and values, timestamp and optional event URL.
+
+ntfy's `url` is the complete topic URL, including any reverse-proxy path prefix. It accepts deliberate URL query
+options; credentials and fragments are rejected. The body contains the same plain-text details, with navigation
+provided by a **View node** action when the event has a URL. Following Bash, activating this action clears the
+notification. Titles replace underscores in the alert name with spaces. The notifier uses ntfy's documented
+[text publishing, header encoding and action format](https://docs.ntfy.sh/publish/) to preserve Unicode and URL
+delimiters. It does not use the JSON publishing endpoint or shorten, split or retry messages; server limits and
+server handling of large messages still apply.
+
+| Event status | Gotify priority | ntfy priority | ntfy tag |
+|---|---|---|---|
+| WARNING | 4 | high | warning |
+| CRITICAL | 10 | urgent | red_circle |
+| CLEAR | 1 | default | white_check_mark |
+
+ntfy supports anonymous publishing when authentication fields are omitted. For HTTP Basic authentication, replace
+`access_token` with both `username` and `password`:
+
+```yaml
+version: 1
+destinations:
+  ntfy_basic:
+    type: ntfy
+    url: ${env:NOTIFY_NTFY_URL}
+    username: ${env:NOTIFY_NTFY_USERNAME}
+    password: ${env:NOTIFY_NTFY_PASSWORD}
+```
+
+Choose one authentication mode. Incomplete username/password pairs and mixing them with an access token fail
+validation. Usernames cannot contain colons, and Basic credentials cannot contain control characters. Gotify app
+tokens and ntfy access tokens must be printable ASCII without whitespace. All credentials and endpoints accept
+whole environment/file references; only selected destinations resolve them. Other providers' fields are rejected.
+
+Both providers require HTTP 200 and a JSON acknowledgment of at most 256 KiB. Gotify requires a positive numeric
+message `id`; ntfy requires a nonempty message `id` and `event: message`. This confirms server acceptance, not
+delivery to a phone. Errors omit credentials, endpoint URLs and response contents. Redirects are not followed,
+and the invocation deadline covers delivery and response reads.
+
+For a local demonstration with the receiver above, use:
+
+```yaml
+version: 1
+destinations:
+  gotify_local:
+    type: gotify
+    api_url: http://127.0.0.1:18080
+    app_token: synthetic-token
+  ntfy_local:
+    type: ntfy
+    url: http://127.0.0.1:18080/alerts
+routing:
+  roles:
+    sysadmin: [gotify_local, ntfy_local]
+```
+
+Save as `push-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config push-local.yaml --role sysadmin < examples/event.json
+```
+
+Tests use synthetic credentials and loopback receivers to check full payloads/headers, authentication,
+routing, safe failures and cancellation. They do not contact real push services or verify device notifications.
 
 ## Event document
 

@@ -201,7 +201,7 @@ func testURLProviderConfiguration(t *testing.T, provider string) {
 		"legacy username refused": {
 			url:   "https://example.com/slack",
 			extra: "    username: synthetic-private-value\n",
-			err:   "invalid YAML",
+			err:   "username and password require type: ntfy",
 		},
 		"legacy icon refused": {
 			url:   "https://example.com/slack",

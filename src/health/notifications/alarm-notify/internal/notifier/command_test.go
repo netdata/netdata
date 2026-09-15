@@ -120,7 +120,7 @@ func TestRunValidationAndErrors(t *testing.T) {
 		"invalid config": {args: []string{"validate"}, config: "[", code: 1, err: "invalid YAML"},
 		"unknown provider": {
 			args:   []string{"validate"},
-			config: strings.Replace(validConfig, "webhook", "gotify", 1),
+			config: strings.Replace(validConfig, "webhook", "unimplemented", 1),
 			code:   1,
 			err:    "not implemented yet",
 		},

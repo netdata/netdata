@@ -32,6 +32,8 @@ type Destination struct {
 	AppToken        string         `yaml:"app_token,omitempty"`
 	UserKey         string         `yaml:"user_key,omitempty"`
 	AccessToken     string         `yaml:"access_token,omitempty"`
+	Username        string         `yaml:"username,omitempty"`
+	Password        string         `yaml:"password,omitempty"`
 	Email           string         `yaml:"email,omitempty"`
 	ChannelTag      string         `yaml:"channel_tag,omitempty"`
 	SourceDeviceID  string         `yaml:"source_device_id,omitempty"`
@@ -96,6 +98,15 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "gotify" {
+		return dst.validateGotify()
+	}
+	if dst.Type == "ntfy" {
+		return dst.validateNtfy()
+	}
+	if dst.Username != "" || dst.Password != "" {
+		return errors.New("username and password require type: ntfy")
+	}
 	if dst.Type == "messagebird" {
 		return dst.validateMessageBird()
 	}
@@ -125,7 +136,7 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio or messagebird; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify or ntfy; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||

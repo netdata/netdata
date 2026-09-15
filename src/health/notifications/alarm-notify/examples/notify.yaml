@@ -41,6 +41,14 @@ destinations:
     access_key: ${env:NOTIFY_MESSAGEBIRD_ACCESS_KEY}
     originator: Netdata
     recipient: '+15005550009'
+  gotify:
+    type: gotify
+    api_url: ${env:NOTIFY_GOTIFY_API_URL}
+    app_token: ${env:NOTIFY_GOTIFY_APP_TOKEN}
+  ntfy:
+    type: ntfy
+    url: ${env:NOTIFY_NTFY_URL}
+    access_token: ${env:NOTIFY_NTFY_ACCESS_TOKEN}
 routing:
   default: [local]
   roles:
@@ -54,3 +62,4 @@ routing:
     pushbullet_ops: [pushbullet]
     twilio_ops: [twilio]
     messagebird_ops: [messagebird]
+    push_ops: [gotify, ntfy]
