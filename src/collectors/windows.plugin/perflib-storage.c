@@ -191,9 +191,10 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 }
 
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
-static DICTIONARY *mountPoints = NULL, *deviceMountPaths = NULL;
+static DICTIONARY *mountPoints = NULL, *deviceMountPaths = NULL, *mountPointVolumeIds = NULL;
 static DICTIONARY *excludedDeviceNames = NULL;
 static usec_t mountPointsRefreshedUT = 0;
+static bool mountPointsRefreshSucceeded = false;
 static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
 
 struct volume_space_result {
@@ -218,6 +219,7 @@ static DICTIONARY *volume_space_request = NULL;
 static DICTIONARY *volume_space_results = NULL;
 static bool volume_space_worker_stop = false;
 static ND_THREAD *volume_space_thread = NULL;
+static HANDLE volume_space_worker_handle = NULL;
 static bool storage_initialized = false;
 static DICTIONARY *volume_space_cycle_results = NULL;
 static DICTIONARY *volume_space_extra_targets = NULL;
@@ -231,6 +233,13 @@ static inline bool logical_disk_is_excluded(const char *mount_point)
 static void volume_space_worker(void *ptr);
 static STRING *getFileSystemType(struct logical_disk *d, const char *diskName);
 static bool logical_disk_metadata_due(const struct logical_disk *d, usec_t now_ut);
+
+static void volume_space_cancel_io(void *data __maybe_unused)
+{
+    HANDLE handle = volume_space_worker_handle;
+    if (handle)
+        CancelSynchronousIo(handle);
+}
 
 static void initialize(void)
 {
@@ -256,12 +265,15 @@ static void initialize(void)
 
     mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     deviceMountPaths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    mountPointVolumeIds = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     excludedDeviceNames = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
     netdata_mutex_init(&volume_space_mutex);
     netdata_cond_init(&volume_space_cond);
     volume_space_thread = nd_thread_create(
         "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_DEFAULT, volume_space_worker, NULL);
+    if (!volume_space_thread)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create the PerflibStorage volume-space worker");
     storage_initialized = true;
 }
 
@@ -283,6 +295,7 @@ static void initialize(void)
 #define MOUNT_POINTS_REFRESH_EVERY_UT (60 * USEC_PER_SEC)
 #define METADATA_RETRY_EVERY_UT (60 * USEC_PER_SEC)
 #define SPACE_FAILURE_GRACE_UT (3 * MOUNT_POINTS_REFRESH_EVERY_UT)
+#define VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS 5000
 
 // Canonical form of a mount path: no trailing backslash, so "C:\" and "C:" are the same instance.
 // path_size bounds the scan so a non-null-terminated buffer cannot run past the end of the array.
@@ -306,6 +319,58 @@ static void mount_points_choose_path(char *first_path, size_t first_path_size, c
     if (!*first_path || (path_is_drive && !first_is_drive) ||
         (path_is_drive == first_is_drive && strcasecmp(path, first_path) < 0))
         snprintfz(first_path, first_path_size, "%s", path);
+}
+
+static bool mount_points_has_volume_id(DICTIONARY *paths, const char *volume_id)
+{
+    if (!paths || !mountPointVolumeIds || !volume_id || !*volume_id)
+        return false;
+
+    bool found = false;
+    void *value;
+    dfe_start_read(paths, value)
+    {
+        const char *known_id = dictionary_get(mountPointVolumeIds, value_dfe.name);
+        if (known_id && !strcmp(known_id, volume_id))
+            found = true;
+    }
+    dfe_done(value);
+    return found;
+}
+
+static bool volume_id_to_utf8(const wchar_t *volume_guid, char *volume_id, size_t volume_id_size)
+{
+    bool truncated = false;
+    return utf16_to_utf8(volume_id, volume_id_size, volume_guid, -1, &truncated) > 0 && !truncated;
+}
+
+static bool volume_id_for_mount_path(const wchar_t *path, char *volume_id, size_t volume_id_size)
+{
+    wchar_t volume_name[MAX_PATH + 1];
+    if (GetVolumeNameForVolumeMountPointW(path, volume_name, _countof(volume_name)))
+        return volume_id_to_utf8(volume_name, volume_id, volume_id_size);
+
+    HANDLE handle = CreateFileW(
+        path,
+        0,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL,
+        OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS,
+        NULL);
+    if (handle == INVALID_HANDLE_VALUE)
+        return false;
+
+    wchar_t final_path[MAX_PATH + 1];
+    DWORD length = GetFinalPathNameByHandleW(handle, final_path, _countof(final_path), VOLUME_NAME_GUID);
+    CloseHandle(handle);
+    if (!length || length >= _countof(final_path))
+        return false;
+
+    wchar_t *separator = wcsstr(final_path + 4, L"\\");
+    if (separator)
+        *separator = L'\0';
+    return volume_id_to_utf8(final_path, volume_id, volume_id_size);
 }
 
 // Build the Win32 root path used to query a volume:
@@ -371,6 +436,15 @@ static void volume_space_worker(void *ptr __maybe_unused)
 
     DWORD previous_error_mode = 0;
     SetThreadErrorMode(SEM_FAILCRITICALERRORS, &previous_error_mode);
+    DuplicateHandle(
+        GetCurrentProcess(),
+        GetCurrentThread(),
+        GetCurrentProcess(),
+        &volume_space_worker_handle,
+        THREAD_ALL_ACCESS,
+        FALSE,
+        0);
+    nd_thread_register_canceller(volume_space_cancel_io, NULL);
 
     while (service_running(SERVICE_COLLECTORS)) {
         netdata_mutex_lock(&volume_space_mutex);
@@ -386,12 +460,15 @@ static void volume_space_worker(void *ptr __maybe_unused)
         volume_space_request = NULL;
         netdata_mutex_unlock(&volume_space_mutex);
 
-        DICTIONARY *results = dictionary_create_advanced(
-            DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
-
         struct volume_space_request *result;
         dfe_start_read(request, result)
         {
+            netdata_mutex_lock(&volume_space_mutex);
+            bool stopping = volume_space_worker_stop;
+            netdata_mutex_unlock(&volume_space_mutex);
+            if (stopping)
+                break;
+
             struct volume_space_result value = {0};
             value.success = volume_space(result_dfe.name, &value.total_bytes, &value.free_bytes);
             if (result->metadata) {
@@ -407,19 +484,23 @@ static void volume_space_worker(void *ptr __maybe_unused)
                     string_freez(filesystem);
                 }
             }
-            dictionary_set(results, result_dfe.name, &value, sizeof(value));
+            netdata_mutex_lock(&volume_space_mutex);
+            if (!volume_space_results)
+                volume_space_results = dictionary_create_advanced(
+                    DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+            dictionary_set(volume_space_results, result_dfe.name, &value, sizeof(value));
+            netdata_cond_broadcast(&volume_space_cond);
+            netdata_mutex_unlock(&volume_space_mutex);
         }
         dfe_done(result);
         dictionary_destroy(request);
-
-        netdata_mutex_lock(&volume_space_mutex);
-        dictionary_destroy(volume_space_results);
-        volume_space_results = results;
-        netdata_cond_broadcast(&volume_space_cond);
-        netdata_mutex_unlock(&volume_space_mutex);
     }
 
     SetThreadErrorMode(previous_error_mode, NULL);
+    if (volume_space_worker_handle) {
+        CloseHandle(volume_space_worker_handle);
+        volume_space_worker_handle = NULL;
+    }
     worker_unregister();
 }
 
@@ -434,6 +515,11 @@ static void volume_space_submit(DICTIONARY *extra_targets, usec_t now_ut)
 {
     DICTIONARY *request = dictionary_create_advanced(
         DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_request));
+
+    if (!volume_space_thread) {
+        dictionary_destroy(request);
+        return;
+    }
 
     void *value;
     dfe_start_read(mountPoints, value)
@@ -537,6 +623,12 @@ static bool mount_points_add_volume_paths(
 
     if (first_path && *first_path)
         dictionary_set(paths, first_path, NULL, 0);
+
+    if (first_path && *first_path && mountPointVolumeIds) {
+        char volume_id[MAX_PATH + 1];
+        if (volume_id_to_utf8(volumeGUID, volume_id, sizeof(volume_id)))
+            dictionary_set(mountPointVolumeIds, first_path, volume_id, strlen(volume_id) + 1);
+    }
 
     return true;
 }
@@ -693,19 +785,23 @@ static bool mount_points_scan_cluster_storage(DICTIONARY *paths)
             continue;
         snprintfz(path, sizeof(path), "%c:\\ClusterStorage\\%s", (char)windir[0], name);
 
-        if ((fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
-            fd.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT) {
-            wchar_t mount_path[ND_MOUNT_PATH_MAX];
-            int mount_path_len = swprintf(
-                mount_path, _countof(mount_path), L"%c:\\ClusterStorage\\%ls\\", windir[0], fd.cFileName);
-            wchar_t volume_name[MAX_PATH + 1];
-            if (mount_path_len < 0 || (size_t)mount_path_len >= _countof(mount_path) ||
-                !GetVolumeNameForVolumeMountPointW(mount_path, volume_name, _countof(volume_name)))
-                continue;
-        }
+        wchar_t mount_path[ND_MOUNT_PATH_MAX];
+        int mount_path_len = swprintf(
+            mount_path, _countof(mount_path), L"%c:\\ClusterStorage\\%ls\\", windir[0], fd.cFileName);
+        char volume_id[MAX_PATH + 1] = "";
+        bool volume_id_found = mount_path_len >= 0 && (size_t)mount_path_len < _countof(mount_path) &&
+                               volume_id_for_mount_path(mount_path, volume_id, sizeof(volume_id));
+        if (fd.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT && !volume_id_found)
+            continue;
 
-        if (!logical_disk_is_excluded(path))
+        if (volume_id_found && mount_points_has_volume_id(paths, volume_id))
+            continue;
+
+        if (!logical_disk_is_excluded(path)) {
             dictionary_set(paths, path, NULL, 0);
+            if (volume_id_found && mountPointVolumeIds)
+                dictionary_set(mountPointVolumeIds, path, volume_id, strlen(volume_id) + 1);
+        }
 
     } while (FindNextFileW(h, &fd));
 
@@ -753,25 +849,73 @@ static void mount_points_refresh_with_ops(usec_t now_ut, const struct mount_poin
     DICTIONARY *paths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     DICTIONARY *devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     DICTIONARY *excluded_devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *volume_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *previous_volume_ids = mountPointVolumeIds;
+    mountPointVolumeIds = volume_ids;
 
     // both scans must run: neither short-circuits the other
     bool volumes_ok = ops->scan_volumes(paths, devices, excluded_devices);
     bool cluster_ok = ops->scan_cluster_storage(paths);
 
     if (!volumes_ok || !cluster_ok) {
-        // a partially built snapshot is worse than a slightly stale one
-        dictionary_destroy(paths);
-        dictionary_destroy(devices);
-        dictionary_destroy(excluded_devices);
+        // Keep the old entries alongside discoveries made before the failure. This avoids freezing
+        // unrelated additions, while the unsuccessful refresh flag prevents stale eviction.
+        void *value;
+        if (mountPoints) {
+            dfe_start_read(mountPoints, value)
+            {
+                dictionary_set(paths, value_dfe.name, NULL, 0);
+            }
+            dfe_done(value);
+        }
+        if (deviceMountPaths) {
+            dfe_start_read(deviceMountPaths, value)
+            {
+                if (value)
+                    dictionary_set(devices, value_dfe.name, value, strlen(value) + 1);
+            }
+            dfe_done(value);
+        }
+        if (excludedDeviceNames) {
+            dfe_start_read(excludedDeviceNames, value)
+            {
+                if (value)
+                    dictionary_set(excluded_devices, value_dfe.name, value, strlen(value) + 1);
+            }
+            dfe_done(value);
+        }
+
+        void *volume_id;
+        if (mountPointVolumeIds) {
+            dfe_start_read(mountPointVolumeIds, volume_id)
+            {
+                if (volume_id)
+                    dictionary_set(volume_ids, volume_id_dfe.name, volume_id, strlen(volume_id) + 1);
+            }
+            dfe_done(volume_id);
+        }
+
+        dictionary_destroy(mountPoints);
+        dictionary_destroy(deviceMountPaths);
+        dictionary_destroy(excludedDeviceNames);
+        dictionary_destroy(previous_volume_ids);
+        mountPoints = paths;
+        deviceMountPaths = devices;
+        excludedDeviceNames = excluded_devices;
+        mountPointVolumeIds = volume_ids;
+        mountPointsRefreshSucceeded = false;
         return;
     }
 
     dictionary_destroy(mountPoints);
     dictionary_destroy(deviceMountPaths);
     dictionary_destroy(excludedDeviceNames);
+    dictionary_destroy(mountPointVolumeIds);
     mountPoints = paths;
     deviceMountPaths = devices;
     excludedDeviceNames = excluded_devices;
+    mountPointVolumeIds = volume_ids;
+    mountPointsRefreshSucceeded = true;
 }
 
 static void mount_points_refresh(usec_t now_ut)
@@ -886,7 +1030,7 @@ static const char *drive_type_to_str(UINT type)
 // "% Free Space" counter (free/total in MiB) is only the fallback for volumes they cannot open.
 typedef bool (*volume_space_fn)(const char *name, uint64_t *total_bytes, uint64_t *free_bytes);
 
-static void logical_disk_set_space_with_ops(
+static bool logical_disk_set_space_with_ops(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pi,
@@ -897,17 +1041,26 @@ static void logical_disk_set_space_with_ops(
     uint64_t total_bytes, free_bytes;
 
     if (!space(name, &total_bytes, &free_bytes)) {
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
-        d->divisor = 1024;
-        return;
+        if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree))
+            return false;
+
+        if (d->percentDiskFree.current.Data > UINT64_MAX / MEGA_FACTOR ||
+            d->percentDiskFree.current.Time > UINT64_MAX / MEGA_FACTOR)
+            return false;
+
+        d->percentDiskFree.current.Data *= MEGA_FACTOR;
+        d->percentDiskFree.current.Time *= MEGA_FACTOR;
+        d->divisor = GIGA_FACTOR;
+        return true;
     }
 
     d->divisor = GIGA_FACTOR;
     d->percentDiskFree.current.Data = (ULONGLONG)free_bytes;
     d->percentDiskFree.current.Time = (LONGLONG)total_bytes;
+    return true;
 }
 
-static void logical_disk_set_space(PERF_DATA_BLOCK *pDataBlock,
+static bool logical_disk_set_space(PERF_DATA_BLOCK *pDataBlock,
                                    PERF_OBJECT_TYPE *pObjectType,
                                    PERF_INSTANCE_DEFINITION *pi,
                                    struct logical_disk *d,
@@ -919,11 +1072,20 @@ static void logical_disk_set_space(PERF_DATA_BLOCK *pDataBlock,
         d->divisor = GIGA_FACTOR;
         d->percentDiskFree.current.Data = (ULONGLONG)result->free_bytes;
         d->percentDiskFree.current.Time = (LONGLONG)result->total_bytes;
-        return;
+        return true;
     }
 
-    perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
-    d->divisor = 1024;
+    if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree))
+        return false;
+
+    if (d->percentDiskFree.current.Data > UINT64_MAX / MEGA_FACTOR ||
+        d->percentDiskFree.current.Time > UINT64_MAX / MEGA_FACTOR)
+        return false;
+
+    d->percentDiskFree.current.Data *= MEGA_FACTOR;
+    d->percentDiskFree.current.Time *= MEGA_FACTOR;
+    d->divisor = GIGA_FACTOR;
+    return true;
 }
 
 static void logical_disk_path_chart_id(const char *name, char *buffer, size_t buffer_size)
@@ -1042,8 +1204,6 @@ static void logical_disk_collect_instance(
         return;
 
     struct logical_disk *d = dictionary_set(dict, resolved_name, NULL, sizeof(*d));
-    d->last_collected = now_ut;
-
     const struct volume_space_result *result =
         volume_space_cycle_results ? dictionary_get(volume_space_cycle_results, resolved_name) : NULL;
     if (result && result->success)
@@ -1052,7 +1212,10 @@ static void logical_disk_collect_instance(
     if (volume_space_extra_targets)
         dictionary_set(volume_space_extra_targets, resolved_name, NULL, 0);
 
-    logical_disk_set_space(pDataBlock, pObjectType, pi, d, resolved_name);
+    if (!logical_disk_set_space(pDataBlock, pObjectType, pi, d, resolved_name))
+        return;
+
+    d->last_collected = now_ut;
 
     // chart creation belongs to logical_disk_chart(), so both producers emit the same chart
     logical_disk_chart(d, resolved_name, update_every);
@@ -1103,11 +1266,16 @@ static bool logical_disk_collected_this_cycle(const struct logical_disk *d, usec
     return d && d->last_collected == now_ut;
 }
 
-static bool logical_disk_should_evict(const struct logical_disk *d, usec_t now_ut)
+static bool logical_disk_should_evict(const struct logical_disk *d, const char *name, usec_t now_ut)
 {
-    return d && d->last_collected < now_ut &&
-           (!d->space_failed_since ||
-            (now_ut >= d->space_failed_since && now_ut - d->space_failed_since >= SPACE_FAILURE_GRACE_UT));
+    if (!d || d->last_collected >= now_ut)
+        return false;
+
+    if (mountPoints && mount_points_contains(mountPoints, name))
+        return d->space_failed_since && now_ut >= d->space_failed_since &&
+               now_ut - d->space_failed_since >= SPACE_FAILURE_GRACE_UT;
+
+    return true;
 }
 
 // Volumes perflib does not list: Cluster Shared Volumes, and any volume mounted into a folder that
@@ -1160,7 +1328,7 @@ static void logical_disk_evict_stale(usec_t now_ut)
     struct logical_disk *d;
     dfe_start_write(logicalDisks, d)
     {
-        if (logical_disk_should_evict(d, now_ut))
+        if (logical_disk_should_evict(d, d_dfe.name, now_ut))
             dictionary_del(logicalDisks, d_dfe.name);
     }
     dfe_done(d);
@@ -1315,7 +1483,7 @@ static int logical_disk_unittest_run(
 }
 
 // The scan stubs deliberately populate before failing: a real enumeration can add several volumes
-// and then fail part way, and a partial snapshot must be discarded rather than swapped in.
+// and then fail part way, so the partial snapshot is merged without enabling stale eviction.
 static unsigned mount_points_unittest_volume_scans;
 static unsigned mount_points_unittest_csv_scans;
 
@@ -1454,6 +1622,7 @@ static int mount_points_unittest_run(void)
 {
     DICTIONARY *previous_paths = mountPoints;
     DICTIONARY *previous_devices = deviceMountPaths;
+    DICTIONARY *previous_volume_ids = mountPointVolumeIds;
     DICTIONARY *previous_excluded_devices = excludedDeviceNames;
     usec_t previous_refresh_ut = mountPointsRefreshedUT;
     usec_t now_ut = MOUNT_POINTS_REFRESH_EVERY_UT;
@@ -1461,6 +1630,7 @@ static int mount_points_unittest_run(void)
 
     mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     deviceMountPaths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    mountPointVolumeIds = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     excludedDeviceNames = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     mountPointsRefreshedUT = 0;
     mount_points_unittest_volume_scans = 0;
@@ -1475,9 +1645,9 @@ static int mount_points_unittest_run(void)
     now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
     mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_volumes_fail);
     errors += mount_points_unittest_expect(
-        "a failed volume scan must retain the previous registry", dictionary_entries(mountPoints) == 2);
+        "a failed volume scan must retain the previous registry", dictionary_entries(mountPoints) == 4);
     errors += mount_points_unittest_expect(
-        "a failed volume scan must not leak its partial results", !mount_points_unittest_has(mountPoints, "E:"));
+        "a failed volume scan must retain partial discoveries", mount_points_unittest_has(mountPoints, "E:"));
     errors += mount_points_unittest_expect(
         "a failed volume scan must retain the device map",
         dictionary_get(deviceMountPaths, "HarddiskVolume7") != NULL);
@@ -1485,11 +1655,11 @@ static int mount_points_unittest_run(void)
     now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
     mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_csv_fail);
     errors += mount_points_unittest_expect(
-        "a failed ClusterStorage scan must retain the previous registry",
+        "a failed ClusterStorage scan must retain the previous and partial registry",
         mount_points_unittest_has(mountPoints, "C:\\ClusterStorage\\Volume1"));
     errors += mount_points_unittest_expect(
-        "a failed ClusterStorage scan must not leak its partial results",
-        !mount_points_unittest_has(mountPoints, "C:\\ClusterStorage\\Volume2"));
+        "a failed ClusterStorage scan must retain partial discoveries",
+        mount_points_unittest_has(mountPoints, "C:\\ClusterStorage\\Volume2"));
 
     // a refresh inside the interval must not rescan at all, so an armed failure cannot be observed
     unsigned volume_scans_before_interval = mount_points_unittest_volume_scans;
@@ -1513,8 +1683,10 @@ static int mount_points_unittest_run(void)
 
     dictionary_destroy(mountPoints);
     dictionary_destroy(deviceMountPaths);
+    dictionary_destroy(mountPointVolumeIds);
     mountPoints = previous_paths;
     deviceMountPaths = previous_devices;
+    mountPointVolumeIds = previous_volume_ids;
     dictionary_destroy(excludedDeviceNames);
     excludedDeviceNames = previous_excluded_devices;
     mountPointsRefreshedUT = previous_refresh_ut;
@@ -1548,7 +1720,8 @@ static int mount_points_query_failure_unittest_run(void)
     dictionary_destroy(results);
     errors += mount_points_unittest_expect("the first failure is retained", disk->space_failed_since == 2);
     errors += mount_points_unittest_expect(
-        "a transient failure does not evict the volume", !logical_disk_should_evict(disk, 2));
+        "a transient failure does not evict the volume",
+        !logical_disk_should_evict(disk, "C:\\ClusterStorage\\Volume1", 2));
 
     results = dictionary_create_advanced(
         DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
@@ -1567,7 +1740,8 @@ static int mount_points_query_failure_unittest_run(void)
         do_mount_points(results, 1, 2 + SPACE_FAILURE_GRACE_UT));
     dictionary_destroy(results);
     errors += mount_points_unittest_expect(
-        "a persistent failure becomes evictable", logical_disk_should_evict(disk, 2 + SPACE_FAILURE_GRACE_UT));
+        "a persistent failure becomes evictable",
+        logical_disk_should_evict(disk, "C:\\ClusterStorage\\Volume1", 2 + SPACE_FAILURE_GRACE_UT));
 
     dictionary_destroy(mountPoints);
     dictionary_destroy(logicalDisks);
@@ -1945,14 +2119,14 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     }
 
     volume_space_submit(volume_space_extra_targets, now_ut);
-    bool mount_points_collected = do_mount_points(volume_space_cycle_results, update_every, now_ut);
+    do_mount_points(volume_space_cycle_results, update_every, now_ut);
     dictionary_destroy(volume_space_cycle_results);
     volume_space_cycle_results = NULL;
     dictionary_destroy(volume_space_extra_targets);
     volume_space_extra_targets = NULL;
-    // The mount-point producer covers every path-backed volume, including systems without a
-    // LogicalDisk PerfLib object. Its complete result is therefore sufficient for eviction.
-    if (mount_points_collected)
+    // Discovery, not the slow query batch, determines whether an instance disappeared. A blocked
+    // volume query must not prevent cleanup of a path removed from the current mount snapshot.
+    if (mountPointsRefreshSucceeded)
         logical_disk_evict_stale(now_ut);
 
     if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
@@ -1973,8 +2147,19 @@ void do_PerflibStorage_cleanup(void)
     volume_space_worker_stop = true;
     netdata_cond_broadcast(&volume_space_cond);
     netdata_mutex_unlock(&volume_space_mutex);
+    nd_thread_signal_cancel(volume_space_thread);
 
     if (volume_space_thread) {
+        HANDLE worker_handle = volume_space_worker_handle;
+        if (worker_handle && WaitForSingleObject(worker_handle, VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS) == WAIT_TIMEOUT) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "PerflibStorage volume-space worker did not stop within %u seconds; leaving its state intact",
+                VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS / 1000);
+            return;
+        }
+
         nd_thread_join(volume_space_thread);
         volume_space_thread = NULL;
     }
@@ -1997,6 +2182,8 @@ void do_PerflibStorage_cleanup(void)
     mountPoints = NULL;
     dictionary_destroy(deviceMountPaths);
     deviceMountPaths = NULL;
+    dictionary_destroy(mountPointVolumeIds);
+    mountPointVolumeIds = NULL;
     dictionary_destroy(excludedDeviceNames);
     excludedDeviceNames = NULL;
     simple_pattern_free(excluded_logical_disk_paths);
