@@ -220,6 +220,7 @@ static DICTIONARY *volume_space_results = NULL;
 static bool volume_space_worker_stop = false;
 static ND_THREAD *volume_space_thread = NULL;
 static HANDLE volume_space_worker_handle = NULL;
+static volatile LONG volume_space_worker_finished = 0;
 static bool storage_initialized = false;
 static DICTIONARY *volume_space_cycle_results = NULL;
 static DICTIONARY *volume_space_extra_targets = NULL;
@@ -270,6 +271,7 @@ static void initialize(void)
 
     netdata_mutex_init(&volume_space_mutex);
     netdata_cond_init(&volume_space_cond);
+    InterlockedExchange(&volume_space_worker_finished, 0);
     volume_space_thread = nd_thread_create(
         "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_DEFAULT, volume_space_worker, NULL);
     if (!volume_space_thread)
@@ -501,6 +503,7 @@ static void volume_space_worker(void *ptr __maybe_unused)
         CloseHandle(volume_space_worker_handle);
         volume_space_worker_handle = NULL;
     }
+    InterlockedExchange(&volume_space_worker_finished, 1);
     worker_unregister();
 }
 
@@ -2151,7 +2154,9 @@ void do_PerflibStorage_cleanup(void)
 
     if (volume_space_thread) {
         HANDLE worker_handle = volume_space_worker_handle;
-        if (worker_handle && WaitForSingleObject(worker_handle, VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS) == WAIT_TIMEOUT) {
+        DWORD wait_result = worker_handle ?
+            WaitForSingleObject(worker_handle, VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS) : WAIT_FAILED;
+        if (wait_result == WAIT_TIMEOUT) {
             nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
@@ -2160,7 +2165,38 @@ void do_PerflibStorage_cleanup(void)
             return;
         }
 
-        nd_thread_join(volume_space_thread);
+        if (wait_result == WAIT_FAILED && !InterlockedCompareExchange(&volume_space_worker_finished, 1, 1)) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot wait for the PerflibStorage volume-space worker; retaining its state");
+            return;
+        }
+
+        int join_result = nd_thread_join(volume_space_thread);
+        if (join_result) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot join the PerflibStorage volume-space worker (error: %d)",
+                join_result);
+
+            size_t retries = 0;
+            while (!InterlockedCompareExchange(&volume_space_worker_finished, 1, 1) &&
+                   retries < (size_t)VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS) {
+                Sleep(1);
+                retries++;
+            }
+
+            if (!InterlockedCompareExchange(&volume_space_worker_finished, 1, 1)) {
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "PerflibStorage volume-space worker is still running; retaining its state");
+                return;
+            }
+        }
+
         volume_space_thread = NULL;
     }
 
