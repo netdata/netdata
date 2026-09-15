@@ -672,5 +672,6 @@ For detailed configuration instructions for specific AI clients, see:
 - [OpenAI Codex CLI](/docs/netdata-ai/mcp/mcp-clients/codex-cli.md) - OpenAI's Codex CLI
 - [Crush](/docs/netdata-ai/mcp/mcp-clients/crush.md) - Charmbracelet's glamorous terminal AI
 - [OpenCode](/docs/netdata-ai/mcp/mcp-clients/opencode.md) - SST's terminal-based AI assistant
+- [Devin](/docs/netdata-ai/mcp/mcp-clients/devin.md) - Cognition's cloud-based autonomous AI software engineer
 
 Each guide includes specific transport support matrices and configuration examples optimized for that client.
