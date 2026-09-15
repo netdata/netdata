@@ -2486,10 +2486,12 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
             rrdset_free(st);        // nothing ever ran against it
         }
         else {
-            // Wait for it to park between its accounting increment and its flag publish. The budget is
-            // deliberately generous: CI runs this suite under ASAN in a Debug build, where a worker can
-            // be scheduled late, and a timeout here does not merely fail - it SKIPS the interleaving
-            // this test exists to pin, so a loaded machine would report a fault that is really lag.
+            // Wait for it to park between its accounting increment and its flag publish. A timeout is a
+            // hard failure, and deliberately so: a claimer that never parks leaves the interleaving
+            // this test exists to pin unexercised, and passing on a test that proved nothing is worse
+            // than failing. The budget is sized so that lag alone cannot reach it - the claimer does
+            // one atomic add before parking, and 60s is far past any scheduling delay a loaded CI
+            // runner produces under ASAN in a Debug build.
             bool parked = false;
             for(size_t i = 0; i < 60000 && !parked; i++) {
                 parked = rrdhost_receiver_replication_race_hook_is_waiting();
