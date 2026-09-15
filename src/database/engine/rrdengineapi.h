@@ -64,7 +64,8 @@ extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_G
 
 // work the embedder wants run on the engine's worker pool, next to the engine's own jobs. The caller owns the
 // request and its completion (init before, destroy after); the engine runs fn(data) on a worker and marks the
-// completion when it returns. fn is responsible for its own worker_is_busy() attribution.
+// completion when it returns. fn is responsible for its own worker_is_busy() attribution, including registering
+// the job names it reports: the pool threads register only the engine's own names.
 struct rrdeng_work_request {
     void (*fn)(void *data);
     void *data;

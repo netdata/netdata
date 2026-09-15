@@ -584,6 +584,8 @@ static inline void query_weights_set_interrupted(struct query_weights_data *qwd)
 // Worker thread function for parallel host processing
 static void query_weights_worker_thread(void *arg)
 {
+    // this runs on the engine's pool, whose threads know only the engine's job names
+    register_libuv_worker_jobs();
     worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
 
     struct query_weights_thread_data *thread_data = (struct query_weights_thread_data *)arg;
