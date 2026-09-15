@@ -39,6 +39,9 @@ type Destination struct {
 	AuthToken       string         `yaml:"auth_token,omitempty"`
 	From            string         `yaml:"from,omitempty"`
 	To              string         `yaml:"to,omitempty"`
+	AccessKey       string         `yaml:"access_key,omitempty"`
+	Originator      string         `yaml:"originator,omitempty"`
+	Recipient       string         `yaml:"recipient,omitempty"`
 	ChatID          string         `yaml:"chat_id,omitempty"`
 	MessageThreadID *configInteger `yaml:"message_thread_id,omitempty"`
 	APIURL          string         `yaml:"api_url,omitempty"`
@@ -93,6 +96,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "messagebird" {
+		return dst.validateMessageBird()
+	}
+	if dst.AccessKey != "" || dst.Originator != "" || dst.Recipient != "" {
+		return errors.New("access_key, originator and recipient require type: messagebird")
+	}
 	if dst.Type == "twilio" {
 		return dst.validateTwilio()
 	}
@@ -116,13 +125,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet or twilio; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio or messagebird; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet or twilio",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio or messagebird",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
@@ -147,6 +156,14 @@ func (dst Destination) validate() error {
 	}
 	if strings.ContainsAny(dst.BearerToken, "\r\n") {
 		return errors.New("destination.bearer_token must not contain line breaks")
+	}
+	return nil
+}
+
+func validateToken(value, provider, field string) error {
+	if value == "" || strings.Contains(value, "${") ||
+		strings.IndexFunc(value, func(r rune) bool { return r < 33 || r > 126 }) != -1 {
+		return fmt.Errorf("%s %s must be nonempty printable ASCII without whitespace", provider, field)
 	}
 	return nil
 }

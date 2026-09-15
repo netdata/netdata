@@ -278,23 +278,29 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
-		"telegram cancel":     {provider: "telegram", cancel: true},
-		"telegram deadline":   {provider: "telegram"},
-		"pushover cancel":     {provider: "pushover", cancel: true},
-		"pushover deadline":   {provider: "pushover"},
-		"pushbullet cancel":   {provider: "pushbullet", cancel: true},
-		"pushbullet deadline": {provider: "pushbullet"},
-		"twilio cancel":       {provider: "twilio", cancel: true},
-		"twilio deadline":     {provider: "twilio"},
+		"telegram cancel":      {provider: "telegram", cancel: true},
+		"telegram deadline":    {provider: "telegram"},
+		"pushover cancel":      {provider: "pushover", cancel: true},
+		"pushover deadline":    {provider: "pushover"},
+		"pushbullet cancel":    {provider: "pushbullet", cancel: true},
+		"pushbullet deadline":  {provider: "pushbullet"},
+		"twilio cancel":        {provider: "twilio", cancel: true},
+		"twilio deadline":      {provider: "twilio"},
+		"messagebird cancel":   {provider: "messagebird", cancel: true},
+		"messagebird deadline": {provider: "messagebird"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/bot123:synthetic-private-value/sendMessage", "/1/messages.json", "/v2/pushes", twilioTestPath:
+				case "/bot123:synthetic-private-value/sendMessage",
+					"/1/messages.json",
+					"/v2/pushes",
+					twilioTestPath,
+					messagebirdTestPath:
 					_, _ = io.Copy(io.Discard, r.Body)
-					if r.URL.Path == twilioTestPath {
+					if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath {
 						w.WriteHeader(201)
 					} else {
 						w.WriteHeader(200)
@@ -345,6 +351,15 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					AuthToken:  "synthetic-private-value",
 					From:       "+15005550006",
 					To:         "+15005550009",
+				}
+			}
+			if test.provider == "messagebird" {
+				dst = Destination{
+					Type:       "messagebird",
+					APIURL:     server.URL,
+					AccessKey:  "synthetic-private-value",
+					Originator: "Netdata",
+					Recipient:  "+15005550009",
 				}
 			}
 			config, err := yaml.Marshal(Config{Version: 1, Destinations: map[string]Destination{

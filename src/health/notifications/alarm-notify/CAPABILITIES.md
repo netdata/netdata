@@ -22,6 +22,8 @@ Telegram's optional retries honor the server's requested delay instead of Bash's
   custom API bases and created-push acknowledgments.
 - Twilio account SID/Auth Token, native sender/recipient fields, form-encoded text, custom API bases and created-message
   acknowledgments, with no automatic retries or shortening.
+- MessageBird originator/recipient SMS with access-key secrets, automatic character encoding, custom API bases and
+  created-message acknowledgments; no automatic retries or shortening.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -39,7 +41,7 @@ remote services remain available.
 | PagerDuty | `send_pd` | Pending |
 | Twilio | `send_twilio` | Account/sender/recipient text delivery, form encoding, Basic auth, custom API bases and acknowledgment checks implemented |
 | HipChat | `send_hipchat` | Pending |
-| MessageBird | `send_messagebird` | Pending |
+| MessageBird | `send_messagebird` | Originator/recipient SMS, AccessKey auth, automatic character encoding, custom API bases and acknowledgment checks implemented |
 | SMSEagle | `send_smseagle` | Pending |
 | Kavenegar | `send_kavenegar` | Pending |
 | Telegram | `send_telegram` | Implemented with chats/topics, bot-token secrets, custom API bases, silent CLEAR, disabled previews and optional rate-limit retries; server-directed retry timing is an approved correction |
@@ -71,15 +73,15 @@ remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet and Twilio content/link/status formatting implemented; other providers and richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API settings implemented; remaining provider configuration pending |
-| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook, Slack, Discord, Telegram, Pushover, Pushbullet and Twilio fan-out; provider subtarget details pending with providers |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio and MessageBird content/link/status formatting implemented; other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API settings implemented; remaining provider configuration pending |
+| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook, Slack, Discord, Telegram, Pushover, Pushbullet, Twilio and MessageBird fan-out; provider subtarget details pending with providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first eight increments cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
-Pushbullet and Twilio.
+The first nine increments cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
+Pushbullet, Twilio and MessageBird.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
 More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final
 architecture and broad refactoring are discussed after that working baseline exists.

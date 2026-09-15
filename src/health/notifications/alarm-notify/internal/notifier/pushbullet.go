@@ -74,11 +74,7 @@ func validatePushbulletField(name, value string) error {
 	if name == "api_url" {
 		return validateAPIBase(value, "pushbullet", "api.pushbullet.com")
 	}
-	if value == "" || strings.Contains(value, "${") ||
-		strings.IndexFunc(value, func(r rune) bool { return r < 33 || r > 126 }) != -1 {
-		return errors.New("pushbullet access_token must be nonempty printable ASCII without whitespace")
-	}
-	return nil
+	return validateToken(value, "pushbullet", "access_token")
 }
 
 func sendPushbullet(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
@@ -139,6 +135,6 @@ func renderPushbullet(dst Destination, event Event) pushbulletMessage {
 	if event.URL != "" {
 		message.Type, message.URL = "link", event.URL
 	}
-	message.Body = notificationPlainText(event)
+	message.Body = notificationPlainText(event, false)
 	return message
 }

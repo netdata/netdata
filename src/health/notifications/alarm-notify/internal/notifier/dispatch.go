@@ -43,6 +43,8 @@ func dispatch(
 			err = sendPushbullet(ctx, dst, event, timeout)
 		case "twilio":
 			err = sendTwilio(ctx, dst, event, timeout)
+		case "messagebird":
+			err = sendMessageBird(ctx, dst, event, timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}
