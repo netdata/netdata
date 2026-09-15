@@ -118,6 +118,9 @@ func (dst Destination) validate() error {
 	if dst.APIVersion != nil {
 		return errors.New("api_version requires type: pagerduty")
 	}
+	if dst.Type == "opsgenie" {
+		return dst.validateOpsgenie()
+	}
 	if dst.Type == "smseagle" {
 		return dst.validateSMSEagle()
 	}
@@ -134,7 +137,7 @@ func (dst Destination) validate() error {
 		dst.EventType != "" ||
 		dst.Source != "" {
 		return errors.New(
-			"api_key requires type: alerta, prowl or kavenegar; environment requires type: alerta; api_token, entity_selector, event_type and source require type: dynatrace",
+			"api_key requires type: alerta, prowl, kavenegar or opsgenie; environment requires type: alerta; api_token, entity_selector, event_type and source require type: dynatrace",
 		)
 	}
 	if dst.Type == "ilert" {
@@ -191,13 +194,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle or pagerduty; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty or opsgenie; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl, kavenegar, smseagle or pagerduty",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty or opsgenie",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {

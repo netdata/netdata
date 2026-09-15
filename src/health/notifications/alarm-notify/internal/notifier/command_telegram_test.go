@@ -278,6 +278,8 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"opsgenie create deadline": {provider: "opsgenie"}, "opsgenie create cancel": {provider: "opsgenie", cancel: true},
+		"opsgenie close deadline": {provider: "opsgenie-close"}, "opsgenie close cancel": {provider: "opsgenie-close", cancel: true},
 		"pagerduty v1 deadline": {provider: "pagerduty-v1"}, "pagerduty v1 cancel": {provider: "pagerduty-v1", cancel: true},
 		"pagerduty v2 deadline": {provider: "pagerduty-v2"}, "pagerduty v2 cancel": {provider: "pagerduty-v2", cancel: true},
 		"smseagle cancel": {provider: "smseagle", cancel: true}, "smseagle deadline": {provider: "smseagle"},
@@ -307,7 +309,8 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/generic/2010-04-15/create_event.json", "/v2/enqueue", "/api/v2/messages/sms",
+				case "/v2/alerts", "/v2/alerts/" + opsgenieTestAlias + "/close",
+					"/generic/2010-04-15/create_event.json", "/v2/enqueue", "/api/v2/messages/sms",
 					"/add",
 					"/synthetic-key/sms/send.json",
 					"/bot123:synthetic-private-value/sendMessage",
@@ -321,7 +324,7 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					"/alert",
 					"/api/v2/events/ingest":
 					_, _ = io.Copy(io.Discard, r.Body)
-					if r.URL.Path == "/v2/enqueue" {
+					if r.URL.Path == "/v2/enqueue" || strings.HasPrefix(r.URL.Path, "/v2/alerts") {
 						w.WriteHeader(202)
 					} else if r.URL.Path == twilioTestPath || r.URL.Path == messagebirdTestPath ||
 						r.URL.Path == "/api/v2/events/ingest" {
@@ -413,6 +416,10 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 				}
 				dst.APIURL = server.URL
 			}
+			if strings.HasPrefix(test.provider, "opsgenie") {
+				dst = opsgenieTestDestination()
+				dst.APIURL = server.URL
+			}
 			if test.provider == "smseagle" {
 				dst = smseagleTestDestination()
 				dst.APIURL = server.URL
@@ -433,8 +440,12 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			path := writeConfig(t, string(config))
 			var stdout, stderr bytes.Buffer
 			done := make(chan int, 1)
+			input := validEvent
+			if test.provider == "opsgenie-close" {
+				input = strings.ReplaceAll(input, "WARNING", "CLEAR")
+			}
 			go func() {
-				done <- Run(ctx, []string{"send", "--config", path, "--role", "ops", "--timeout", "500ms"}, strings.NewReader(validEvent), &stdout, &stderr)
+				done <- Run(ctx, []string{"send", "--config", path, "--role", "ops", "--timeout", "500ms"}, strings.NewReader(input), &stdout, &stderr)
 			}()
 			select {
 			case <-started:
