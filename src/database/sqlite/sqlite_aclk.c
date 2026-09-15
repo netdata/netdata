@@ -35,13 +35,27 @@ static void create_node_instance_result_job(const char *machine_guid, const char
     schedule_node_state_update(host, 1000);
 }
 
+// Lifecycle of the ACLK sync event loop, as seen by a thread that is NOT the loop.
+//
+// It exists because "the loop is not accepting commands" and "the loop owns no handles of mine" are
+// different questions, and destroy_aclk_config() needs the second one. The per-host node-update
+// uv_timer_t is registered by the loop and lives inside the host's aclk config, so a teardown that
+// frees the config while the loop still holds that handle corrupts the loop.
+typedef enum {
+    ACLK_SYNC_NEVER_STARTED = 0,  // zero value: no loop, so no host timer was ever registered
+    ACLK_SYNC_RUNNING,            // accepting and consuming commands
+    ACLK_SYNC_CLOSING,            // refusing commands, host timers may still be registered
+    ACLK_SYNC_HANDLES_CLOSED,     // uv_walk() done: no host timer is registered any more
+} ACLK_SYNC_PHASE;
+
 struct aclk_sync_config_s {
     ND_THREAD *thread;
     pid_t event_loop_tid; // atomic: the event loop publishes it, other threads compare against it
     uv_loop_t loop;
     uv_timer_t timer_req;
     uv_async_t async;
-    bool initialized;
+    ACLK_SYNC_PHASE phase;            // atomic
+    struct completion handles_closed; // released when phase reaches ACLK_SYNC_HANDLES_CLOSED
     bool shutdown_requested;
     mqtt_wss_client client;
     int aclk_queries_running;
@@ -64,12 +78,21 @@ static cmd_data_t aclk_database_deq_cmd(void)
 
 static bool aclk_database_enq_cmd(cmd_data_t *cmd, bool wait_on_full)
 {
-    if(unlikely(!__atomic_load_n(&aclk_sync_config.initialized, __ATOMIC_RELAXED)))
+    if(unlikely(__atomic_load_n(&aclk_sync_config.phase, __ATOMIC_ACQUIRE) != ACLK_SYNC_RUNNING))
+        return false;
+
+    // The notify is part of the enqueue, not an afterthought: uv_async_send() touches a handle the
+    // loop closes on its way out, so being counted as a producer only for the duration of push_cmd()
+    // would let the loop finish closing that handle while we are still between the two calls. The
+    // admission ref holds the pool - and with it the loop's teardown - open across both.
+    if (!cmd_pool_producer_enter(&aclk_sync_config.cmd_pool))
         return false;
 
     bool added = push_cmd(&aclk_sync_config.cmd_pool, (void *)cmd, wait_on_full);
     if (added)
         (void) uv_async_send(&aclk_sync_config.async);
+
+    cmd_pool_producer_leave(&aclk_sync_config.cmd_pool);
     return added;
 }
 
@@ -517,6 +540,35 @@ static void notify_timer_close_callback(uv_handle_t *handle)
     freez(data);
 }
 
+// Retires a host's node-update timer and answers `compl` once the handle has actually left libuv.
+//
+// Called from the live ACLK_CANCEL_NODE_UPDATE_TIMER handler and from the shutdown drain, which MUST
+// behave identically: destroy_aclk_config() frees the config - and with it the embedded uv_timer_t -
+// the moment its completion fires, so the completion may only be marked from the close callback,
+// never inline while the handle is still registered on the loop.
+//
+// Runs on the ACLK sync event loop thread only.
+static void aclk_cancel_node_update_timer(struct aclk_sync_cfg_t *cfg, void *payload, struct completion *compl)
+{
+    if (!cfg || !cfg->timer_initialized) {
+        // nothing registered on the loop: the waiter can go
+        if (compl)
+            completion_mark_complete(compl);
+        return;
+    }
+
+    if (uv_is_active((uv_handle_t *)&cfg->timer))
+        uv_timer_stop(&cfg->timer);
+
+    cfg->timer_initialized = false;
+
+    struct notify_timer_cb_data *timer_cb_data = mallocz(sizeof(*timer_cb_data));
+    timer_cb_data->payload = payload;
+    timer_cb_data->completion = compl;
+    cfg->timer.data = timer_cb_data;
+    uv_close((uv_handle_t *)&cfg->timer, notify_timer_close_callback);
+}
+
 static void node_update_timer_cb(uv_timer_t *handle)
 {
     struct aclk_sync_cfg_t *aclk_host_config = handle->data;
@@ -621,6 +673,24 @@ static void timer_cb(uv_timer_t *handle)
 #define ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS (15)
 #define CMD_POOL_SIZE (2048)
 
+// uv_close() completes in the loop pass after it is requested, so this only ever needs a couple of
+// iterations. The cap only bounds an impossible state - see the fatal() at its only use.
+#define ACLK_HANDLE_CLOSE_MAX_PASSES (100)
+
+static void aclk_count_open_handle(uv_handle_t *handle __maybe_unused, void *data)
+{
+    (*(size_t *)data)++;
+}
+
+// Whether any handle is still registered on the loop - including one that is mid-close, since
+// uv_walk() keeps visiting it until its close callback has run.
+static bool aclk_loop_has_open_handles(uv_loop_t *loop)
+{
+    size_t open_handles = 0;
+    uv_walk(loop, aclk_count_open_handle, &open_handles);
+    return open_handles > 0;
+}
+
 #define ACLK_JOBS_ARE_RUNNING                                                                                          \
     (config->aclk_queries_running || config->alert_push_running || config->aclk_batch_job_is_running)
 
@@ -666,8 +736,6 @@ static void aclk_synchronization_event_loop(void *arg)
     int query_thread_count = (int) netdata_conf_cloud_query_threads();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
 
-    struct notify_timer_cb_data *timer_cb_data;
-
     // This holds queries that need to be executed one by one
     struct judy_list_t *aclk_query_batch = NULL;
 
@@ -679,7 +747,7 @@ static void aclk_synchronization_event_loop(void *arg)
     worker_data_t  *worker;
 
     __atomic_store_n(&config->shutdown_requested, false, __ATOMIC_RELAXED);
-    config->initialized = true;
+    __atomic_store_n(&config->phase, ACLK_SYNC_RUNNING, __ATOMIC_RELEASE);
     completion_mark_complete(&config->start_stop_complete);
 
     while (likely(!__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))  {
@@ -790,19 +858,7 @@ static void aclk_synchronization_event_loop(void *arg)
                     host = cmd.param[0];
                     struct completion *compl = cmd.param[1];
                     aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-                    if (!aclk_host_config || !aclk_host_config->timer_initialized) {
-                        completion_mark_complete(compl);
-                        break;
-                    }
-                    if (uv_is_active((uv_handle_t *)&aclk_host_config->timer))
-                        uv_timer_stop(&aclk_host_config->timer);
-
-                    aclk_host_config->timer_initialized = false;
-                    timer_cb_data = mallocz(sizeof(*timer_cb_data));
-                    timer_cb_data->payload = host;
-                    timer_cb_data->completion = compl;
-                    aclk_host_config->timer.data = timer_cb_data;
-                    uv_close((uv_handle_t *)&aclk_host_config->timer, notify_timer_close_callback);
+                    aclk_cancel_node_update_timer(aclk_host_config, host, compl);
                     break;
 
                 case ACLK_DATABASE_NODE_UNREGISTER:
@@ -955,13 +1011,108 @@ static void aclk_synchronization_event_loop(void *arg)
 
         } while (opcode != ACLK_DATABASE_NOOP);
     }
-    config->initialized = false;
+
+    // Stop accepting commands, then answer what is still queued. A waiter that got its command in
+    // before the close is entitled to its completion - abandoning the queue here is what used to
+    // leave a host teardown blocked forever in destroy_aclk_config(). close_cmd_pool() makes the
+    // refusal and the insertion mutually exclusive, so after this point a producer either has a
+    // command we are about to drain, or was told no and is not waiting.
+    //
+    // CLOSING is published first, before the close, so a producer that IS refused can tell which
+    // refusal it got: from here it means "the loop may still own this host's timer", which
+    // destroy_aclk_config() has to wait out. It MUST NOT be read as "there is nothing of mine on the
+    // loop" - that assumption is what let a teardown free a config with its uv_timer_t registered.
+    __atomic_store_n(&config->phase, ACLK_SYNC_CLOSING, __ATOMIC_RELEASE);
+    close_cmd_pool(&config->cmd_pool);
+
+    {
+        cmd_data_t cmd;
+        size_t abandoned = 0;
+        while (pop_cmd(&config->cmd_pool, &cmd)) {
+            abandoned++;
+            // Every command whose producer waits on us MUST be completed here, or that producer
+            // blocks forever. Note the completion is in a different parameter for each.
+            switch (cmd.opcode) {
+                case ACLK_CANCEL_NODE_UPDATE_TIMER: {
+                    // destroy_aclk_config() is waiting, and it frees the host's config the moment we
+                    // complete it. Same helper as the live handler, so the completion is marked from
+                    // the close callback during the uv_run() below and the waiter only proceeds once
+                    // the embedded handle is off the loop.
+                    RRDHOST *dying = cmd.param[0];
+                    struct completion *compl = cmd.param[1];
+                    struct aclk_sync_cfg_t *cfg =
+                        dying ? __atomic_load_n(&dying->aclk_host_config, __ATOMIC_ACQUIRE) : NULL;
+
+                    aclk_cancel_node_update_timer(cfg, dying, compl);
+                    break;
+                }
+
+                case ACLK_MQTT_WSS_CLIENT_RESET:
+                    // aclk_mqtt_client_reset(): same state change as the live handler, in the same
+                    // order - the client is cleared before the waiter is released, so a waiter that
+                    // observes its completion never observes the stale client.
+                    __atomic_store_n(&config->client, NULL, __ATOMIC_RELEASE);
+                    if (cmd.param[0])
+                        completion_mark_complete((struct completion *)cmd.param[0]);
+                    break;
+
+                // The rest have no waiter, but they do own their payload: the live handlers consume
+                // it, so dropping the command here without the matching release leaks it. For a
+                // query that is worse than a leak - aclk_query_free() is also what signals
+                // query->sync_completion and returns the pooled slot, so skipping it strands a
+                // send_node_info_with_wait() caller for its full timeout.
+                case ACLK_QUERY_EXECUTE:
+                case ACLK_QUERY_BATCH_ADD:
+                    if (cmd.param[0])
+                        aclk_query_free((aclk_query_t *)cmd.param[0]);
+                    break;
+
+                case ACLK_DATABASE_PUSH_ALERT_CONFIG:
+                    freez(cmd.param[0]);
+                    freez(cmd.param[1]);
+                    break;
+
+                case ACLK_DATABASE_NODE_UNREGISTER:
+                    freez(cmd.param[0]);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        if (abandoned)
+            nd_log_daemon(NDLP_INFO, "ACLK: sync event loop stopped with %zu queued commands", abandoned);
+    }
 
     if (!uv_timer_stop(&config->timer_req))
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
     uv_walk(loop, libuv_close_callback, NULL);
+
+    // Run the loop until those closes have actually completed, then release every teardown that is
+    // blocked waiting to hear it. This MUST happen before the outstanding-jobs wait below: a caller
+    // parked in destroy_aclk_config() may be holding rrd_wrlock(), and worker jobs - which are what
+    // that wait is for - do not own host timers, so making the barrier wait for them would stall the
+    // whole agent behind a query for up to the watchdog timeout for no lifetime benefit.
+    //
+    // The wait for the walk to empty MUST NOT give up early and publish the barrier anyway: the
+    // waiters it releases free configs with an embedded uv_timer_t, so releasing them while libuv
+    // still owns a handle is exactly the corruption this barrier exists to prevent - a timeout would
+    // trade a hang for a use-after-free. The cap therefore ends the process rather than the wait, and
+    // is not reachable in practice: uv_walk() above requested a close on every handle, work requests
+    // are not handles, and one uv_run() pass drains the whole closing queue.
+    size_t handle_close_passes = 0;
+    while (aclk_loop_has_open_handles(loop)) {
+        if (unlikely(++handle_close_passes > ACLK_HANDLE_CLOSE_MAX_PASSES))
+            fatal("ACLK: libuv handles still open after %zu close passes", handle_close_passes - 1);
+
+        (void)uv_run(loop, UV_RUN_NOWAIT);
+    }
+
+    __atomic_store_n(&config->phase, ACLK_SYNC_HANDLES_CLOSED, __ATOMIC_RELEASE);
+    completion_mark_complete(&config->handles_closed);
 
     size_t shutdown_wait_iterations = 0;
     const size_t log_every_iterations = (10 * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
@@ -1027,6 +1178,11 @@ static void aclk_initialize_event_loop(void)
 {
     memset(&aclk_sync_config, 0, sizeof(aclk_sync_config));
     completion_init(&aclk_sync_config.start_stop_complete);
+
+    // One-shot barrier, many waiters: every host teardown refused during shutdown parks here until
+    // the loop has closed its handles. Initialized before the thread exists, so a waiter can never
+    // reach it uninitialized.
+    completion_init(&aclk_sync_config.handles_closed);
 
     init_worker_pool(&aclk_sync_config.worker_pool);
 
@@ -1232,7 +1388,18 @@ static inline bool queue_aclk_sync_cmd(enum aclk_database_opcode opcode, const v
     cmd.opcode = opcode;
     cmd.param[0] = (void *) param0;
     cmd.param[1] = (void *) param1;
-    return aclk_database_enq_cmd(&cmd, true);
+
+    // The event loop MUST NOT wait for queue capacity: it is the only consumer, so blocking on a full
+    // pool parks the thread that has to drain it, and nothing ever frees a slot. That matters more now
+    // that destroy_aclk_config() waits on this loop unboundedly while holding rrd_wrlock() - a loop
+    // parked on its own not_full condition would wedge the global rrd lock behind it.
+    //
+    // Reachable from here: node_update_timer_cb() and the ACLK_DATABASE_NODE_STATE fallback both call
+    // aclk_host_state_update_auto(), which enqueues a job. Every caller already handles a refusal by
+    // releasing whatever it owns, so dropping the command is safe where deadlocking is not.
+    bool wait_on_full = !aclk_sync_on_event_loop_thread();
+
+    return aclk_database_enq_cmd(&cmd, wait_on_full);
 }
 
 void aclk_synchronization_shutdown(void)
@@ -1355,23 +1522,63 @@ void unregister_node(const char *machine_guid)
     }
 }
 
+// Blocks until no per-host uv_timer_t can still be registered on the sync loop.
+//
+// Only CLOSING has to wait. NEVER_STARTED means the loop never ran, so it never registered a timer
+// for anybody; HANDLES_CLOSED means uv_walk() has already retired them. RUNNING cannot reach here:
+// a refusal means the pool was closed, which happens after the phase leaves RUNNING - and if it is
+// read stale the pool is closed anyway, so the next phase read resolves it.
+static void aclk_sync_wait_for_handles_closed(void)
+{
+    if (__atomic_load_n(&aclk_sync_config.phase, __ATOMIC_ACQUIRE) == ACLK_SYNC_CLOSING)
+        completion_wait_for(&aclk_sync_config.handles_closed);
+}
+
+// Waited for before the caller frees the host. The command pool is FIFO, so once the event loop
+// has run this cancel, every command queued earlier for this host has already been consumed - and
+// those commands carry a raw RRDHOST * (schedule_node_state_update(), aclk_queue_node_info()).
+// Without this barrier the loop would dereference the host after it was freed.
 void destroy_aclk_config(RRDHOST *host)
 {
     if (!host)
         return;
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-    if (!aclk_host_config)
-        return;
-
-    if(likely(__atomic_load_n(&aclk_sync_config.initialized, __ATOMIC_RELAXED))) {
+    // The drain is NOT conditional on this host having a config: a node-state command queued for a
+    // host whose config has not been created yet is exactly the case that used to skip it, and it
+    // is the command most likely to still be in the queue - the handler creates the config, so a
+    // NULL config means the loop has not consumed it.
+    //
+    // Never from the event loop itself: we would be waiting on the thread that has to run the
+    // command. No caller does this today - rrdhost_free_unlinked() and the nrpc unittest, where
+    // the loop is not running - so this is an invariant made explicit rather than a case to handle.
+    if(!aclk_sync_on_event_loop_thread()) {
         struct completion compl;
         completion_init(&compl);
 
+        // The wait MUST NOT be bounded. `compl` lives on this stack and the queued command holds a
+        // pointer to it, so returning early would let the loop complete a destroyed completion and
+        // dereference a host this caller is about to free - the very lifetime bug this barrier
+        // exists to prevent, and reachable whenever the loop is merely slow rather than gone.
+        //
+        // Waiting forever is safe because the loop answers everything it accepts: on the way out it
+        // closes the pool - making refusal and insertion mutually exclusive - and then completes
+        // any cancel still queued. The loop also never waits for queue capacity itself
+        // (queue_aclk_sync_cmd()), so it cannot park on its own full pool with this barrier behind it.
         if (queue_aclk_sync_cmd(ACLK_CANCEL_NODE_UPDATE_TIMER, (void *)host, (void *)&compl))
             completion_wait_for(&compl);
+        else
+            // Refused. That answers "my command will not run", NOT "the loop holds nothing of mine":
+            // the per-host uv_timer_t is registered by the loop, inside the config freed below, so a
+            // refusal issued while the loop is still closing its handles would free that timer out
+            // from under libuv. Wait for the point where that is provably no longer true.
+            aclk_sync_wait_for_handles_closed();
+
         completion_destroy(&compl);
     }
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
 
     struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_ACQUIRE);
     if (!old_aclk_host_config)
