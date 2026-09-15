@@ -2479,44 +2479,66 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
         claimer.thread = nd_thread_create("rcvrepl-race", NETDATA_THREAD_OPTION_DONT_LOG,
                                           receiver_replication_paused_claim_thread, &claimer);
 
-        // wait for it to park between its accounting increment and its flag publish
-        bool parked = false;
-        for(size_t i = 0; i < 5000 && !parked; i++) {
-            parked = rrdhost_receiver_replication_race_hook_is_waiting();
-            if(!parked) sleep_usec(1000);
-        }
-
-        if(!parked) {
-            fprintf(stderr, "%s: the claimer never reached the race window\n", __FUNCTION__);
+        if(!claimer.thread) {
+            fprintf(stderr, "%s: could not create the claimer thread\n", __FUNCTION__);
             rc = 1;
+            rrdhost_receiver_replication_race_hook_disarm();
+            rrdset_free(st);        // nothing ever ran against it
         }
         else {
-            // The claimer has incremented but not published. A release now must find no published
-            // IN_PROGRESS and therefore release nothing - it must NOT consume the in-flight claim.
-            RRDSET_FLAGS old = rrdhost_receiver_replication_release(st, 0);
-            if(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) {
-                fprintf(stderr, "%s: a release observed IN_PROGRESS while the claim had not published it\n",
+            // Wait for it to park between its accounting increment and its flag publish. The budget is
+            // deliberately generous: CI runs this suite under ASAN in a Debug build, where a worker can
+            // be scheduled late, and a timeout here does not merely fail - it SKIPS the interleaving
+            // this test exists to pin, so a loaded machine would report a fault that is really lag.
+            bool parked = false;
+            for(size_t i = 0; i < 60000 && !parked; i++) {
+                parked = rrdhost_receiver_replication_race_hook_is_waiting();
+                if(!parked) sleep_usec(1000);
+            }
+
+            if(!parked) {
+                fprintf(stderr, "%s: the claimer never reached the race window\n", __FUNCTION__);
+                rc = 1;
+            }
+            else {
+                // The claimer has incremented but not published. A release now must find no published
+                // IN_PROGRESS and therefore release nothing - it must NOT consume the in-flight claim.
+                RRDSET_FLAGS old = rrdhost_receiver_replication_release(st, 0);
+                if(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) {
+                    fprintf(stderr, "%s: a release observed IN_PROGRESS while the claim had not published it\n",
+                            __FUNCTION__);
+                    rc = 1;
+                }
+            }
+
+            rrdhost_receiver_replication_race_hook_release();
+
+            if(nd_thread_join(claimer.thread) != 0) {
+                // The join did not prove the claimer stopped, so it may still hold `st` and may still
+                // be parked inside the hook. Leave BOTH alive - disarming clears the hook's chart
+                // pointer and rrdset_free() would be a use-after-free. A leaked chart in an already
+                // failing test is the cheap outcome here.
+                fprintf(stderr, "%s: could not join the claimer thread - leaving the chart and the hook alive\n",
                         __FUNCTION__);
                 rc = 1;
             }
+            else {
+                rrdhost_receiver_replication_race_hook_disarm();
+
+                // The claimer published after our release, so the chart holds exactly one contribution.
+                // Release it and the counter must return to where it started - no leak, no double release.
+                rrdhost_receiver_replication_release(st, 0);
+
+                uint32_t after = rrdhost_receiver_replicating_charts(host);
+                if(after != before) {
+                    fprintf(stderr, "%s: after the deterministic race the counter is %u, expected %u\n",
+                            __FUNCTION__, after, before);
+                    rc = 1;
+                }
+
+                rrdset_free(st);
+            }
         }
-
-        rrdhost_receiver_replication_race_hook_release();
-        nd_thread_join(claimer.thread);
-        rrdhost_receiver_replication_race_hook_disarm();
-
-        // The claimer published after our release, so the chart holds exactly one contribution. Release
-        // it and the counter must return to where it started - no leak, and no double release.
-        rrdhost_receiver_replication_release(st, 0);
-
-        uint32_t after = rrdhost_receiver_replicating_charts(host);
-        if(after != before) {
-            fprintf(stderr, "%s: after the deterministic race the counter is %u, expected %u\n",
-                    __FUNCTION__, after, before);
-            rc = 1;
-        }
-
-        rrdset_free(st);
     }
 #else
     fprintf(stderr, "%s: deterministic part skipped (needs NETDATA_INTERNAL_CHECKS)\n", __FUNCTION__);
@@ -2547,17 +2569,39 @@ static int test_receiver_replication_ownership_under_concurrency(void) {
 #endif
 
         struct receiver_replication_race_thread t[threads_count];
+        size_t created = 0;
         for(size_t i = 0; i < threads_count; i++) {
             t[i] = (struct receiver_replication_race_thread){
                 .st = charts[i % charts_count], .iterations = iterations };
             t[i].thread = nd_thread_create("rcvrepl-stress", NETDATA_THREAD_OPTION_DONT_LOG,
                                            receiver_replication_claim_thread, &t[i]);
+            if(!t[i].thread) {
+                fprintf(stderr, "%s: could not create stress worker %zu of %zu\n",
+                        __FUNCTION__, i + 1, (size_t)threads_count);
+                rc = 1;
+                break;
+            }
+            created++;
         }
 
         size_t claims = 0;
-        for(size_t i = 0; i < threads_count; i++) {
-            nd_thread_join(t[i].thread);
+        bool all_joined = true;
+        for(size_t i = 0; i < created; i++) {
+            if(nd_thread_join(t[i].thread) != 0) {
+                fprintf(stderr, "%s: could not join stress worker %zu\n", __FUNCTION__, i + 1);
+                all_joined = false;
+                rc = 1;
+                continue;
+            }
             claims += t[i].claims;
+        }
+
+        if(!all_joined) {
+            // A worker may still be claiming and releasing against these charts: every assertion below
+            // would read a moving counter, and rrdset_free() would be a use-after-free. Leak the charts,
+            // and leave the host accounting alone - a live worker would fight the restore anyway.
+            default_rrd_memory_mode = old_default_rrd_memory_mode;
+            return 1;
         }
 
         // A LEAKED contribution leaves the counter high, and this catches it.
@@ -2999,8 +3043,9 @@ int run_all_mockup_tests(void)
     if(test_rrdset_rejects_invalid_update_every())
         return 1;
 
-    // These five cover one invariant between them, so run all five and report every failure
-    // rather than short-circuiting on the first - a partial result here is hard to read.
+    // These cover one invariant between them, so run them all and report every failure rather than
+    // short-circuiting on the first - a partial result here is hard to read. Deliberately no count
+    // in this comment: it went stale the first time a test was added.
     int receiver_replication_failures = 0;
     receiver_replication_failures += test_receiver_replication_released_on_chart_teardown();
     receiver_replication_failures += test_receiver_replication_counter_does_not_wrap();
