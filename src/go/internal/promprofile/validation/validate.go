@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -349,7 +350,7 @@ func validateStep(parent context.Context, s *validationSession, dumpPath string)
 				s.routes.observe(fact)
 			}
 		}
-		s.engine, err = newRouteEngine(s.templateYAML, emitTypeID, routeObserver)
+		s.engine, err = newRouteEngine(s.templateYAML, emitTypeID, routeObserver, chartengine.WithEnginePolicy(coll.EnginePolicy()))
 		if err != nil {
 			var planErr *routePlanError
 			errors.As(err, &planErr)
@@ -539,6 +540,16 @@ func validateStep(parent context.Context, s *validationSession, dumpPath string)
 	r.DimensionLosses = routeInspection.dimensionLosses
 	r.Collisions = routeInspection.collisions
 	r.InstanceLosses = routeInspection.instanceLosses
+	for _, context := range slices.Sorted(maps.Keys(routeSummary.contextLimits)) {
+		fact := routeSummary.contextLimits[context]
+		setting := "max_time_series"
+		if fact.Reason == chartengine.PlanRouteReasonContextMetricSeriesCap {
+			setting = "max_time_series_per_metric"
+		}
+		r.addWarning("context_series_limit", context,
+			fmt.Sprintf("context omitted: %s=%d, output series=%d, metric=%q", setting, fact.SeriesLimit, fact.SeriesCount, fact.MetricFamilyName),
+			"The complete context exceeds the existing limit. Other contexts are admitted independently; this context is retried each scrape.")
+	}
 
 	if r.Counts.SeriesAutogen != 0 {
 		path := ""

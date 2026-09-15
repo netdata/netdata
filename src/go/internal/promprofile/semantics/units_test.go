@@ -75,6 +75,27 @@ func TestCompileComponentUnitDerivesLifecycleDefaults(t *testing.T) {
 			unit:      "bytes/s",
 			scale:     newRationalScale(1, 1),
 		},
+		"current source mebibytes": {
+			component: testUnitComponent("current", "data", "mebibyte", "none", "cache_data"),
+			algorithm: "absolute",
+			rate:      "none",
+			unit:      "bytes",
+			scale:     newRationalScale(1<<20, 1),
+		},
+		"current source gibibytes": {
+			component: testUnitComponent("current", "data", "gibibyte", "none", "memory"),
+			algorithm: "absolute",
+			rate:      "none",
+			unit:      "bytes",
+			scale:     newRationalScale(1<<30, 1),
+		},
+		"cumulative bandwidth observations": {
+			component: testUnitComponent("cumulative", "data_rate", "gibibyte_per_second", "none", "transfer_speed"),
+			algorithm: "incremental",
+			rate:      "per_second",
+			unit:      "bytes/s²",
+			scale:     newRationalScale(1<<30, 1),
+		},
 		"current source rate per minute": {
 			component: testUnitComponent("current", "count", "one", "per_minute", "requests"),
 			algorithm: "absolute",

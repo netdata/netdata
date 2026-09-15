@@ -41,24 +41,30 @@ func (c *Collector) collect(ctx context.Context) error {
 	return nil
 }
 
-// check probes the endpoint and enforces the startup gates the V1 collector applied once:
-// the expected-prefix guard and the total time-series limit. Unlike V1 these are read-only
-// (V1 mutated Config to make them one-shot); they run only at Check, i.e. autodetection.
+// check probes the endpoint and expected prefix. Unprofiled jobs retain the startup
+// source limit; selected profiles apply the existing limits after chart aggregation.
 func (c *Collector) check(ctx context.Context) error {
 	candidate, mfs, typesBound, err := c.checkRuntimeCandidate(ctx)
 	if err != nil {
 		return err
 	}
-	if c.MaxTS > 0 {
+	profiled := len(candidate.profiles) > 0
+	if !profiled && c.MaxTS > 0 {
 		if n := calcMetrics(mfs); n > c.MaxTS {
 			return fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
 		}
 	}
+	// Profile rollups need the full source population. Their limits apply in the planner.
+	probe := *c.writer
+	probe.policy.maxTSPerMetric = c.MaxTSPerMetric
+	if profiled {
+		probe.policy.maxTSPerMetric = 0
+	}
 	var writable int
 	if typesBound {
-		writable = c.writer.countBoundWritable(mfs)
+		writable = probe.countBoundWritable(mfs)
 	} else {
-		writable = c.writer.countWritable(mfs)
+		writable = probe.countWritable(mfs)
 	}
 	if writable == 0 {
 		return fmt.Errorf("endpoint '%s' exposes no usable metrics", c.URL)
@@ -68,6 +74,7 @@ func (c *Collector) check(ctx context.Context) error {
 		return err
 	}
 	candidate.chartTemplate = tmpl
+	c.writer.policy.maxTSPerMetric = probe.policy.maxTSPerMetric
 	c.runtime = candidate
 	return nil
 }

@@ -72,6 +72,7 @@ type planRouteSummary struct {
 	resolvedTemplatesBySeries map[metrix.SeriesID]map[string]struct{}
 	ownersByChart             map[string]map[string]struct{}
 	acceptedBySeries          map[metrix.SeriesID][]chartengine.PlanRouteDiagnostic
+	contextLimits             map[string]chartengine.PlanRouteDiagnostic
 }
 
 func newPlanRouteSummary() *planRouteSummary {
@@ -81,6 +82,7 @@ func newPlanRouteSummary() *planRouteSummary {
 		resolvedTemplatesBySeries: make(map[metrix.SeriesID]map[string]struct{}),
 		ownersByChart:             make(map[string]map[string]struct{}),
 		acceptedBySeries:          make(map[metrix.SeriesID][]chartengine.PlanRouteDiagnostic),
+		contextLimits:             make(map[string]chartengine.PlanRouteDiagnostic),
 	}
 }
 
@@ -95,6 +97,10 @@ func (s *planRouteSummary) observe(fact chartengine.PlanRouteDiagnostic) {
 			template.droppedCharts[fact.ChartID] = struct{}{}
 		case chartengine.PlanRouteReasonDimensionCap:
 			template.droppedDimensions[planDimensionOutput{chartID: fact.ChartID, name: fact.DimensionName}] = struct{}{}
+		case chartengine.PlanRouteReasonContextSeriesCap, chartengine.PlanRouteReasonContextMetricSeriesCap:
+			template.droppedCharts[fact.ChartID] = struct{}{}
+			template.contextLimited = true
+			s.contextLimits[fact.Context] = fact
 		}
 		return
 	}
@@ -178,6 +184,7 @@ type planMissingInstanceKey struct {
 }
 
 type planTemplateDiagnostic struct {
+	contextLimited      bool
 	chartIDs            map[string]struct{}
 	instanceIdentities  map[chartengine.PlanInstanceIdentity]struct{}
 	dimensionIndexes    map[int]struct{}
@@ -245,7 +252,7 @@ func (s *planRouteSummary) inspectAuthoredCharts(refs []chartRef) planRouteInspe
 					renderedCharts++
 				}
 			}
-			if len(template.instanceIdentities) > renderedCharts {
+			if !template.contextLimited && len(template.instanceIdentities) > renderedCharts {
 				cause := "rendered_id_collapse"
 				if ref.chart.Lifecycle != nil &&
 					ref.chart.Lifecycle.MaxInstances > 0 &&
@@ -270,7 +277,7 @@ func (s *planRouteSummary) inspectAuthoredCharts(refs []chartRef) planRouteInspe
 				}
 				plannedDimensions++
 			}
-			if len(template.dimensionIdentities) > plannedDimensions {
+			if !template.contextLimited && len(template.dimensionIdentities) > plannedDimensions {
 				cause := "planner_dimension_omission"
 				if ref.chart.Lifecycle != nil &&
 					ref.chart.Lifecycle.Dimensions != nil &&

@@ -11,6 +11,8 @@ profile_coverage:
       - haproxy
     collector-go.d.plugin-prometheus-litellm:
       - litellm
+    collector-go.d.plugin-prometheus-sglang:
+      - sglang
     collector-go.d.plugin-prometheus-vllm:
       - vllm
 modules:
@@ -122,13 +124,13 @@ modules:
                 ```
 
             - name: max_time_series
-              description: Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed.
+              description: With a selected profile, limits rendered time series independently in each context after aggregation; an over-limit context is skipped whole. Without a profile, limits total time series after relabeling at startup. Set to 0 for no limit.
               default_value: 2000
               required: false
               group: Limits
 
             - name: max_time_series_per_metric
-              description: Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped.
+              description: With a selected profile, limits each metric family's rendered time series independently in each context; an over-limit context is skipped whole. Without a profile, skips final metric families exceeding this limit. Set to 0 for no limit.
               default_value: 200
               required: false
               group: Limits
@@ -5134,6 +5136,75 @@ modules:
                   - name: litellm
                     url: http://127.0.0.1:4000/metrics
                     expected_prefix: litellm_
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-prometheus-sglang
+      monitored_instance:
+        name: SGLang
+        link: https://docs.sglang.ai/advanced_features/observability.html
+        icon_filename: prometheus.svg
+        categories:
+          - data-collection.applications
+      keywords:
+        - sglang
+        - llm
+        - inference
+        - prometheus
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Monitor SGLang request and token throughput, latency, scheduling pressure, worker resources, cache transfers,
+          multimodal encoder activity, and HTTP routes.
+
+          Service and model summaries remain available independently of detailed worker, priority, and route charts.
+          The existing series limits apply separately to each context after aggregation. A context above its limit is
+          omitted completely and becomes eligible again when its cardinality falls. Custom request labels are aggregated
+          into the built-in SGLang identities. Model queue and pool-pressure summaries compare workers instead of summing
+          potentially replicated observations.
+        method_description: |
+          Netdata periodically scrapes the SGLang Prometheus `/metrics` endpoint and automatically selects the built-in
+          `sglang` profile. Optional charts appear when the corresponding serving role or feature exports metrics.
+      default_behavior:
+        auto_detection:
+          description: |
+            Configure a job for the SGLang metrics endpoint. The collector automatically selects the SGLang profile
+            when it finds `sglang:*` metrics.
+        limits:
+          description: |
+            By default, each context allows up to 2,000 rendered time series and up to 200 rendered time series from
+            one source metric family. These existing limits apply independently after aggregation. An oversized context
+            is omitted completely; other contexts remain eligible.
+        performance_impact:
+          description: |
+            Scraping and metric storage scale with the input population. Rollups and context limits reduce rendered
+            output; they do not bound the number of source samples read from SGLang.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Expose SGLang metrics
+            description: |
+              Enable `--enable-metrics` in the SGLang server configuration and make its `/metrics` endpoint reachable
+              from Netdata. See the [SGLang observability documentation](https://docs.sglang.ai/advanced_features/observability.html).
+      configuration:
+        <<: *prometheus_configuration
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: SGLang
+              folding:
+                enabled: false
+              description: Collect SGLang metrics with automatic profile selection.
+              config: |
+                jobs:
+                  - name: sglang
+                    url: http://127.0.0.1:30000/metrics
+                    expected_prefix: 'sglang:'
 
   - <<: *module
     meta:

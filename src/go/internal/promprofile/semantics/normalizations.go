@@ -813,12 +813,17 @@ func categoryCoverageBranches(definition Normalization, source SourceLabel) []st
 		return sortedMapKeys(branches)
 	}
 	for value := range definition.Exact {
+		if source.Domain.Kind == "unsigned_integer" && !labelValueMayMatch(source, value) {
+			continue
+		}
 		branches["exact:"+value] = struct{}{}
 	}
 	for _, valueRange := range definition.Ranges {
 		branches[fmt.Sprintf("range:%d-%d", *valueRange.Min, *valueRange.Max)] = struct{}{}
 	}
-	branches["malformed"] = struct{}{}
+	if source.Domain.Kind != "unsigned_integer" {
+		branches["malformed"] = struct{}{}
+	}
 	branches["unknown"] = struct{}{}
 	return sortedMapKeys(branches)
 }
@@ -853,13 +858,23 @@ func (c *semanticCompiler) validateFiniteAlias(node *compiledNormalization) erro
 
 func categoryOutputSchema(definition Normalization, source SourceLabel) SourceLabel {
 	values := make(map[string]struct{})
-	for _, value := range definition.Exact {
+	for key, value := range definition.Exact {
+		if source.Domain.Kind == "unsigned_integer" && !labelValueMayMatch(source, key) {
+			continue
+		}
 		values[value] = struct{}{}
 	}
 	for _, value := range definition.Ranges {
 		values[value.Value] = struct{}{}
 	}
-	for _, action := range []*CategoryAction{definition.Missing, definition.Malformed, definition.Unknown} {
+	actions := []*CategoryAction{definition.Missing, definition.Malformed, definition.Unknown}
+	if source.Domain.Kind == "unsigned_integer" {
+		actions = []*CategoryAction{definition.Unknown}
+		if source.Presence.keyMayBeAbsent() {
+			actions = append(actions, definition.Missing)
+		}
+	}
+	for _, action := range actions {
 		if action.Set != nil {
 			values[*action.Set] = struct{}{}
 		}
@@ -877,6 +892,9 @@ func categoryOutputSchema(definition Normalization, source SourceLabel) SourceLa
 
 func categoryOutputPresence(definition Normalization, source SourceLabel) LabelPresence {
 	presentAlwaysSets := definition.Malformed.Set != nil && definition.Unknown.Set != nil
+	if source.Domain.Kind == "unsigned_integer" {
+		presentAlwaysSets = definition.Unknown.Set != nil
+	}
 	if source.Domain.Kind == "closed" {
 		presentAlwaysSets = true
 		for _, value := range source.Domain.Values {

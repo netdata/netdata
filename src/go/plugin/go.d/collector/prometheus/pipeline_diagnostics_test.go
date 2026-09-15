@@ -16,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
@@ -243,9 +244,7 @@ ignored 1
 			len(fact.OutputLabels) == 1 && fact.OutputLabels[0] == (PipelineLabel{Name: "state", Value: "keep"})
 	})
 	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
-		return fact.Decision == PipelineWriterFamilyRejected &&
-			fact.Reason == PipelineReasonSeriesLimit &&
-			fact.MetricName == "app_many"
+		return fact.Decision == PipelineWriterSeriesAccepted && fact.Destination.Family == "app_many"
 	})
 	assertPipelineFact(t, facts, func(fact PipelineDiagnostic) bool {
 		return fact.Decision == PipelineWriterSeriesAccepted && fact.Destination.Family == "app_value"
@@ -258,6 +257,22 @@ ignored 1
 		assert.NotContains(t, fact.InputLabelNames, "keep")
 		assert.NotContains(t, fact.InputLabelNames, "drop")
 	}
+	var rejection *chartengine.PlanRouteDiagnostic
+	engine, err := chartengine.New(chartengine.WithEnginePolicy(collector.EnginePolicy()),
+		chartengine.WithPlanRouteDiagnosticObserver(func(fact chartengine.PlanRouteDiagnostic) {
+			if fact.Decision == chartengine.PlanRouteLifecycleRejected && fact.MetricFamilyName == "app_many" {
+				rejection = &fact
+			}
+		}))
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(collector.ChartTemplateYAML()), 1))
+	attempt, err := engine.PreparePlan(collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	require.NoError(t, attempt.Commit())
+	require.NotNil(t, rejection)
+	assert.Equal(t, chartengine.PlanRouteReasonContextMetricSeriesCap, rejection.Reason)
+	assert.Equal(t, 2, rejection.SeriesCount)
+	assert.Equal(t, 1, rejection.SeriesLimit)
 }
 
 func TestPipelineDiagnosticsDistinguishJobAndProfileRelabeling(t *testing.T) {

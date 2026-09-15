@@ -52,10 +52,11 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
                 'litellm': 101,
                 'process_runtime': 5,
                 'python_gc': 3,
+                'sglang': 295,
                 'vllm': 103,
             },
         )
-        self.assertEqual(sum(document['chart_count'] for document in self.catalog.values()), 994)
+        self.assertEqual(sum(document['chart_count'] for document in self.catalog.values()), 1289)
 
         expected_counts = {
             'ceph': (1780, 1786, 22),
@@ -64,6 +65,7 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
             'litellm': (130, 166, 11),
             'process_runtime': (5, 5, 1),
             'python_gc': (3, 3, 1),
+            'sglang': (253, 349, 6),
             'vllm': (129, 129, 15),
         }
         for profile, document in self.catalog.items():
@@ -113,6 +115,7 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
                 'collector-go.d.plugin-prometheus-haproxy',
                 'collector-go.d.plugin-prometheus-ceph',
                 'collector-go.d.plugin-prometheus-litellm',
+                'collector-go.d.plugin-prometheus-sglang',
                 'collector-go.d.plugin-prometheus-vllm',
             },
         )
