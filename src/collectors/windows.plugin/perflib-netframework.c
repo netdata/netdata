@@ -1662,7 +1662,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 value = 100.0 * (NETDATA_DOUBLE)p->NETFrameworkCLRMemoryTimeInGC.current.Data /
                         (NETDATA_DOUBLE)p->NETFrameworkCLRMemoryTimeInGC.current.Time;
 
-            rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time, (collected_number)(value * 10000));
+            rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time, (collected_number)value);
             rrdset_done(p->st_clrmemory_gc_time);
         }
 
