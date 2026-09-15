@@ -1147,6 +1147,7 @@ if ($ApiOk) {
     Save-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
     Save-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Save-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
+    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (running/failed), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
     Save-Api '07-runtime\ml-info.json' 'Machine learning status' '/api/v1/ml_info'
     Save-Api '07-runtime\self-cpu.csv' 'Netdata CPU last 10min (csv)' '/api/v1/data?chart=netdata.server_cpu&after=-600&points=60&format=csv'
     Save-Api '07-runtime\self-memory.csv' 'Netdata memory last 10min (csv)' '/api/v1/data?chart=netdata.memory&after=-600&points=60&format=csv'
@@ -1356,7 +1357,7 @@ SNMP diagnostics: $script:SnmpStatus ($script:SnmpFiles raw files; UNSANITIZED w
 READ ORDER FOR TRIAGE:
   SNMP issues         -> 06-state\snmp-diagnostics-status.txt, 06-state\snmp-diagnostics\
   crashes/won't start -> 06-state\status-file.json, 05-logs\eventlog-netdata.txt
-  collector issues    -> 04-config\go.d*, 05-logs\, 09-permissions\plugins-d.txt
+  collector issues    -> 07-runtime\dyncfg-tree.json (job states), 04-config\go.d*, 05-logs\, 09-permissions\plugins-d.txt
   streaming issues    -> 04-config\stream.conf, 07-runtime\node-instances.json, 01-system\clock-timesync.txt
   cloud/claiming      -> 06-state\claimed-id.txt, 07-runtime\aclk.json, 08-network\
   performance         -> 03-process\netdata-processes.txt, 06-state\db-disk-usage.txt
