@@ -41,6 +41,8 @@ func dispatch(
 			err = sendPushover(ctx, dst, event, timeout)
 		case "pushbullet":
 			err = sendPushbullet(ctx, dst, event, timeout)
+		case "twilio":
+			err = sendTwilio(ctx, dst, event, timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}

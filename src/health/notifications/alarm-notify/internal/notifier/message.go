@@ -2,7 +2,11 @@
 
 package notifier
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 type notificationField struct {
 	name  string
@@ -35,4 +39,16 @@ func notificationFields(event Event) []notificationField {
 		}
 	}
 	return fields
+}
+
+func notificationPlainText(event Event) string {
+	lines := []string{event.Summary}
+	if event.Info != "" {
+		lines = append(lines, event.Info)
+	}
+	for _, field := range notificationFields(event) {
+		lines = append(lines, field.name+": "+field.value)
+	}
+	lines = append(lines, "Time: "+event.Timestamp.Format(time.RFC3339))
+	return strings.Join(lines, "\n")
 }

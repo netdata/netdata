@@ -80,11 +80,21 @@ func postNotificationJSON(
 	if err != nil {
 		return nil, errors.New("could not encode notification")
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	return postNotification(ctx, client, provider, endpoint, "application/json", headers, bytes.NewReader(payload))
+}
+
+func postNotification(
+	ctx context.Context,
+	client *http.Client,
+	provider, endpoint, contentType string,
+	headers http.Header,
+	payload io.Reader,
+) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct %s request", provider)
 	}
-	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Type", contentType)
 	request.Header.Set("User-Agent", "netdata-alarm-notify")
 	for name, values := range headers {
 		for _, value := range values {

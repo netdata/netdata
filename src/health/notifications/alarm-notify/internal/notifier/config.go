@@ -35,6 +35,10 @@ type Destination struct {
 	Email           string         `yaml:"email,omitempty"`
 	ChannelTag      string         `yaml:"channel_tag,omitempty"`
 	SourceDeviceID  string         `yaml:"source_device_id,omitempty"`
+	AccountSID      string         `yaml:"account_sid,omitempty"`
+	AuthToken       string         `yaml:"auth_token,omitempty"`
+	From            string         `yaml:"from,omitempty"`
+	To              string         `yaml:"to,omitempty"`
 	ChatID          string         `yaml:"chat_id,omitempty"`
 	MessageThreadID *configInteger `yaml:"message_thread_id,omitempty"`
 	APIURL          string         `yaml:"api_url,omitempty"`
@@ -89,6 +93,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "twilio" {
+		return dst.validateTwilio()
+	}
+	if dst.AccountSID != "" || dst.AuthToken != "" || dst.From != "" || dst.To != "" {
+		return errors.New("account_sid, auth_token, from and to require type: twilio")
+	}
 	if dst.Type == "pushbullet" {
 		return dst.validatePushbullet()
 	}
@@ -106,13 +116,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover or pushbullet; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet or twilio; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover or pushbullet",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet or twilio",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
