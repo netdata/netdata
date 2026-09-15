@@ -231,7 +231,7 @@ class FileReaderTests(unittest.TestCase):
 
     def result(self, result, code=0, number=0, data=None):
         self.assertEqual(result.returncode, int(code != 0), "unexpected reader exit status")
-        self.assertEqual(result.stderr, f"NDFILE01 {code} {number}\n".encode(),
+        self.assertEqual(result.stderr, f"NDFILE {code} {number}\n".encode(),
                          "invalid terminal status")
         if data is not None:
             self.assertTrue(result.stdout == data, "reader bytes differ (content withheld)")
@@ -310,7 +310,7 @@ class FileReaderTests(unittest.TestCase):
                     output, status = child.communicate(timeout=5)
                     self.assertEqual(child.returncode, 0)
                     self.assertFalse(output)
-                    self.assertEqual(status, b"NDFILE01 0 0\n")
+                    self.assertEqual(status, b"NDFILE 0 0\n")
                 finally:
                     if child.poll() is None:
                         child.kill()
@@ -346,7 +346,7 @@ class FileReaderTests(unittest.TestCase):
             with self.subTest(arguments_count=len(arguments)):
                 result = self.invoke(["--file-reader", *arguments])
                 self.assertEqual(result.returncode, 1)
-                self.assertNotIn(b"NDFILE01", result.stderr)
+                self.assertNotIn(b"NDFILE", result.stderr)
                 self.assertNotIn(os.fsencode(path), result.stdout + result.stderr)
                 self.assertNotIn(b"private-marker", result.stdout + result.stderr)
 
@@ -359,7 +359,7 @@ class FileReaderTests(unittest.TestCase):
             try:
                 self.assertEqual(child.wait(timeout=5), 0)
                 self.assertTrue(child.stdout.read() == b"one-shot")
-                self.assertEqual(child.stderr.read(), b"NDFILE01 0 0\n")
+                self.assertEqual(child.stderr.read(), b"NDFILE 0 0\n")
             finally:
                 if child.poll() is None:
                     child.kill()
@@ -372,7 +372,7 @@ class FileReaderTests(unittest.TestCase):
             child.stdout.close()
             try:
                 self.assertEqual(child.wait(timeout=5), -signal.SIGPIPE)
-                self.assertNotIn(b"NDFILE01 0 0", child.stderr.read())
+                self.assertNotIn(b"NDFILE 0 0", child.stderr.read())
             finally:
                 if child.poll() is None:
                     child.kill()
@@ -400,7 +400,7 @@ class FileReaderTests(unittest.TestCase):
                 self.assertIsNone(child.poll())
                 child.terminate()  # Popen targets only the exact PID created above.
                 self.assertEqual(child.wait(timeout=5), -signal.SIGTERM)
-                self.assertNotIn(b"NDFILE01 0 0", child.stderr.read())
+                self.assertNotIn(b"NDFILE 0 0", child.stderr.read())
             finally:
                 if child.poll() is None:
                     child.kill()
@@ -451,7 +451,7 @@ class FileReaderTests(unittest.TestCase):
         result = self.read(path, helper=helper)
         self.assertEqual(result.returncode, 1)
         self.assertFalse(result.stdout)
-        self.assertNotIn(b"NDFILE01 0 0", result.stderr)
+        self.assertNotIn(b"NDFILE 0 0", result.stderr)
         self.assertNotIn(os.fsencode(path), result.stderr)
 
     def installed_parent(self, shape):

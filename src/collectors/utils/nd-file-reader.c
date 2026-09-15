@@ -57,7 +57,7 @@ static bool write_stdout(const void *data, size_t size) {
 }
 
 static int result(enum nd_file_result code, int error) {
-    if (fprintf(stderr, "NDFILE01 %u %d\n", (unsigned)code, error) < 0)
+    if (fprintf(stderr, "NDFILE %u %d\n", (unsigned)code, error) < 0)
         return EXIT_FAILURE;
     return code == ND_FILE_OK ? EXIT_SUCCESS : EXIT_FAILURE;
 }

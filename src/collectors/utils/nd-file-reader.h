@@ -10,7 +10,7 @@
 //   --file-reader read regular|stream <byte limit, 0 = unlimited> <path>
 //   --file-reader stat <path>
 // Read stdout is raw file data; stat stdout is signed Unix seconds and nanoseconds.
-// Stderr terminates with exactly "NDFILE01 <result> <errno>\n" for a file result.
+// Stderr terminates with exactly "NDFILE <result> <errno>\n" for a file result.
 // Accept data only after exit 0 and result OK/0. Discard buffered bytes on failure;
 // streaming consumers must report a failed terminal result instead of clean EOF.
 // Usage, privilege, signal and transport failures may have no valid result line.

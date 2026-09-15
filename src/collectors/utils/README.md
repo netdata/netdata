@@ -66,7 +66,7 @@ Read stdout contains raw file bytes with no framing. Stat follows symlinks and w
 seconds, a space, nanoseconds and a newline. File results use exactly one stderr line:
 
 ```text
-NDFILE01 <result> <errno>
+NDFILE <result> <errno>
 ```
 
 | Result | Meaning |
@@ -81,9 +81,9 @@ NDFILE01 <result> <errno>
 
 Native failures carry their numeric errno; success and file-policy failures carry zero. Exit status is zero only
 for success. Argument, startup, privilege-reduction, signal and output failures may exit without a valid result.
-Diagnostics never include file contents or parser fragments. `nd-file-reader.h` owns this private versioned contract.
+Diagnostics never include file contents or parser fragments. `nd-file-reader.h` owns this private contract.
 
-Consumers MUST require a successful process exit and exactly `NDFILE01 0 0` before accepting buffered data. On error,
+Consumers MUST require a successful process exit and exactly `NDFILE 0 0` before accepting buffered data. On error,
 discard any partial stdout. Streaming consumers may have already received bytes and MUST report terminal failure
 instead of clean EOF. A missing/malformed result or exit/result disagreement is a helper failure, not a missing file.
 Callers own cancellation and reaping: a blocked FIFO open/read requires terminating the specific child, not merely
