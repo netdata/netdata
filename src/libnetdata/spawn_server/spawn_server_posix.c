@@ -293,7 +293,8 @@ static bool spawn_server_defer_waitpid_cleanup(SPAWN_INSTANCE *si) {
     return true;
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms) {
+int spawn_server_exec_kill_ex(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, SPAWN_KILL_OUTCOME *outcome) {
+    if(outcome) *outcome = SPAWN_KILL_UNKNOWN;
     if (!si) return -1;
 
     if (kill(si->child_pid, SIGTERM))
@@ -306,7 +307,9 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout
     // the caller's timeout_ms is the SIGTERM grace; fall back to a default when not specified.
     int grace_ms = timeout_ms > 0 ? timeout_ms : SPAWN_KILL_DEFAULT_GRACE_MS;
     int status;
+    bool escalated = false;
     if(spawn_server_exec_timedwait(server, si, grace_ms, &status) != SPAWN_TIMEDWAIT_EXITED) {
+        escalated = true;
         if(kill(si->child_pid, SIGKILL) != 0)
             // a failed SIGKILL almost always means the child is already gone (ESRCH); the wait
             // below then returns immediately. SIGKILL is uncatchable, so it cannot be ignored by
@@ -315,20 +318,41 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "SPAWN PARENT: SIGKILL of pid %d failed: %s", si->child_pid, si->cmdline);
     }
-    else
+    else {
+        // exited within the grace period, on its own terms
+        if(outcome) *outcome = SPAWN_KILL_EXITED;
         return status;
+    }
 
-    if(spawn_server_exec_timedwait(server, si, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+    if(spawn_server_exec_timedwait(server, si, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED) {
+        // confirmed gone; "forced" here records that we entered the escalation, not that our
+        // signal is why it died - see SPAWN_KILL_FORCED_EXITED
+        if(outcome) *outcome = escalated ? SPAWN_KILL_FORCED_EXITED : SPAWN_KILL_EXITED;
         return status;
+    }
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - cleanup deferred",
            si->child_pid, si->request_id);
 
+    // handed to a detached reaper: the child's death is NOT confirmed here, so the entry default
+    // SPAWN_KILL_UNKNOWN stands
     if(spawn_server_defer_waitpid_cleanup(si))
         return -1;
 
-    return spawn_server_exec_wait(server, si);
+    {
+        // No reaper slot was free, so we wait for it ourselves. The wait is unbounded and reaps, but
+        // reaching its return is still not proof on its own: spawn_server_waitpid() answers -1 when
+        // waitpid() itself fails, having confirmed nothing. Claiming a confirmed exit there would
+        // let the caller start a replacement beside a child that may be alive, which is exactly
+        // what SPAWN_KILL_UNKNOWN exists to prevent - so only a real status counts.
+        int rc = spawn_server_exec_wait(server, si);
+
+        if(outcome && rc != -1)
+            *outcome = escalated ? SPAWN_KILL_FORCED_EXITED : SPAWN_KILL_EXITED;
+
+        return rc;
+    }
 }
 
 static int spawn_server_waitpid(SPAWN_INSTANCE *si) {

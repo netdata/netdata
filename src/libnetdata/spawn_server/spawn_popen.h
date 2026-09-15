@@ -27,6 +27,16 @@ int spawn_popen_wait(POPEN_INSTANCE *pi);
 //   valid and the caller must reclaim it with spawn_popen_kill(). Do NOT loop on ERROR.
 SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code);
 
+// Frees pi, and kills the child EXCEPT where it reports SPAWN_KILL_UNKNOWN: on those paths the
+// child may still be running even though pi is gone, so a caller must not start a replacement that
+// would duplicate its work. Use spawn_popen_kill_ex() when that matters - UNKNOWN is the one
+// outcome a caller should act on.
+//
+// Do NOT reach for it to find out WHY the child is dead. The returned code cannot say, and it fails
+// differently per platform: on POSIX a forced kill, a crash and an OOM kill all collapse to -1; on
+// Windows they separate, but a forced termination reports 0 - indistinguishable from a clean exit.
+// Neither can the EXITED/FORCED_EXITED split, which records only whether we escalated.
+int spawn_popen_kill_ex(POPEN_INSTANCE *pi, int timeout_ms, SPAWN_KILL_OUTCOME *outcome);
 int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms);
 
 pid_t spawn_popen_pid(POPEN_INSTANCE *pi);

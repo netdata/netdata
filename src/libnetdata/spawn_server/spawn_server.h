@@ -44,7 +44,52 @@ void spawn_server_destroy(SPAWN_SERVER *server);
 pid_t spawn_server_pid(SPAWN_SERVER *server);
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type);
+
+// How a kill sequence ended.
+//
+// The one thing here a caller may safely act on is SPAWN_KILL_UNKNOWN: whether the child is
+// actually gone. That is answerable, and getting it wrong means starting a replacement beside a
+// live process. The returned status cannot answer it - it collapses "we had to force it" together
+// with "it died of its own SIGSEGV" and, on some backends, with "we never confirmed it died at
+// all", and on Windows a forced termination is reported as a normal SIGTERM exit.
+//
+// The EXITED/FORCED_EXITED split is reporting, not provenance: see FORCED_EXITED below.
+typedef enum __attribute__((packed)) {
+    SPAWN_KILL_EXITED = 0,          // we did not escalate: the child went away within the grace.
+                                    // Not "untouched" - the backends send SIGTERM first, so this
+                                    // covers a child that exited because we asked it to.
+                                    // The status is normally the child's own, but a backend that
+                                    // could not read a usable one still reports EXITED with -1 (the
+                                    // nofork status channel can be truncated or malformed), so a
+                                    // caller MUST NOT treat -1 here as proof of an abnormal exit
+                                    // without corroboration
+    SPAWN_KILL_FORCED_EXITED = 1,   // the child did not go within the grace, so we escalated -
+                                    // SIGKILL, or the platform equivalent - and it is now confirmed
+                                    // gone.
+                                    //
+                                    // This says what WE did, not why the child died, and it is
+                                    // deliberately not more than that: an operator or the OOM
+                                    // killer sends the very same SIGKILL, so no test at this layer
+                                    // can tell our kill from a concurrent external one. Do NOT
+                                    // build policy on it as if it were causal - that inference is
+                                    // wrong often enough to matter. It is a reporting distinction:
+                                    // useful in a log line, not a basis for deciding a child's
+                                    // fate
+    SPAWN_KILL_UNKNOWN = 2,         // the child's death was NOT confirmed - it may still be running.
+                                    // A caller MUST NOT start a replacement that would write to the
+                                    // same state. The instance itself is still reclaimed by both
+                                    // backends that ship - nofork destroys it, Windows frees it
+                                    // through its wait - so UNKNOWN is about the PROCESS being
+                                    // unaccounted for, not the bookkeeping. Treat it as rare and
+                                    // report it
+} SPAWN_KILL_OUTCOME;
+
+// Kills the child and reclaims the instance - except on the SPAWN_KILL_UNKNOWN paths noted above,
+// where reclamation is best-effort. `outcome`, when not NULL, receives which of the three cases
+// happened. spawn_server_exec_kill() is the same call without that report.
+int spawn_server_exec_kill_ex(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, SPAWN_KILL_OUTCOME *outcome);
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms);
+
 int spawn_server_exec_wait(SPAWN_SERVER *server, SPAWN_INSTANCE *si);
 
 typedef enum __attribute__((packed)) {
