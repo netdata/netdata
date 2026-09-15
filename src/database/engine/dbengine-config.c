@@ -6,10 +6,6 @@
 struct dbengine_config dbengine_cfg = DBENGINE_CONFIG_DEFAULTS;
 static bool dbengine_cfg_initialized = false;
 
-void dbengine_config_defaults(struct dbengine_config *cfg) {
-    *cfg = (struct dbengine_config)DBENGINE_CONFIG_DEFAULTS;
-}
-
 static bool dbengine_config_equal(const struct dbengine_config *a, const struct dbengine_config *b) {
     return a->page_cache_mb == b->page_cache_mb &&
            a->extent_cache_mb == b->extent_cache_mb &&

@@ -201,8 +201,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
     netdata_conf_dbengine.direct_io = inicfg_get_boolean(&netdata_config, CONFIG_SECTION_DB, "dbengine use direct io", netdata_conf_dbengine.direct_io);
     netdata_conf_dbengine.journal_v2_unmount_time_s = inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_DB, "dbengine journal v2 unmount time", nd_profile.dbengine_journal_v2_unmount_time);
 
-    unsigned read_num = (unsigned)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
-    if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)
+    unsigned read_num = (unsigned)inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", DBENGINE_DEFAULT_PAGES_PER_EXTENT);
+    if (read_num > 0 && read_num <= DBENGINE_DEFAULT_PAGES_PER_EXTENT)
         netdata_conf_dbengine.pages_per_extent = read_num;
     else {
         nd_log(NDLS_DAEMON, NDLP_WARNING,

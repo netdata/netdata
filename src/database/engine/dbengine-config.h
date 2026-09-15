@@ -5,6 +5,9 @@
 
 #include "libnetdata/libnetdata.h"
 
+// Receives one metric the embedder already knows; passed to preload_metrics() by the engine.
+typedef void (*dbengine_preload_add_fn)(void *mrg, Word_t section, nd_uuid_t *uuid);
+
 // The storage engine's process-wide configuration.
 //
 // Whoever embeds the engine (the daemon; a test) fills one of these from its own sources and
@@ -39,14 +42,14 @@ struct dbengine_config {
 
     // services the embedder may provide; NULL = not provided
     void (*on_db_rotation)(void);               // a tier deleted its oldest datafile: retention just shrank
-    size_t (*preload_metrics)(void *mrg, void (*add)(void *mrg, Word_t section, nd_uuid_t *uuid));
+    size_t (*preload_metrics)(void *mrg, dbengine_preload_add_fn add);
                                                 // called once, when the metrics registry is created and before any
                                                 // tier loads its journals: feed every metric uuid the embedder already
                                                 // knows through add(), so the registry is populated in one pass instead
                                                 // of metric by metric as the journals are read; returns the count
 };
 
-#define DEFAULT_PAGES_PER_EXTENT (109)
+#define DBENGINE_DEFAULT_PAGES_PER_EXTENT (109)
 
 // the smallest libuv pool the engine assumes when the embedder does not say
 #if defined(ENV32BIT)
@@ -61,8 +64,8 @@ struct dbengine_config {
 #define DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB (32)
 #endif
 
-// The compiled defaults: the baseline a caller adjusts before dbengine_init(), and what the
-// engine runs with when nobody calls it (its own unit tests).
+// The compiled defaults: the baseline a caller adjusts before dbengine_init(), which resolves the
+// 0-means-default fields (cpus, libuv_worker_threads) to concrete values.
 #define DBENGINE_CONFIG_DEFAULTS {                              \
     .page_cache_mb = DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB,     \
     .extent_cache_mb = 0,                                       \
@@ -73,7 +76,7 @@ struct dbengine_config {
     .cpus = 0,                                                  \
     .arals_for_large_pages = false,                             \
     .direct_io = true,                                          \
-    .pages_per_extent = DEFAULT_PAGES_PER_EXTENT,               \
+    .pages_per_extent = DBENGINE_DEFAULT_PAGES_PER_EXTENT,      \
     .journal_integrity_check = false,                           \
     .journal_v2_unmount_time_s = 120,                           \
     .default_update_every_s = 1,                                \
@@ -93,8 +96,6 @@ struct rrdeng_tier_config {
                                                 // higher tiers hold aggregates and must use RRDENG_PAGE_TYPE_ARRAY_TIER1
     size_t grouping;                            // points of tier 0 that make one point of this tier (1 for tier 0)
 };
-
-void dbengine_config_defaults(struct dbengine_config *cfg);
 
 // Copy cfg into the engine, resolving the 0-means-default fields. Call it once, from one
 // thread, before the first rrdeng_init(); a second call with an equal configuration is a

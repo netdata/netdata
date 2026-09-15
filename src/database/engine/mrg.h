@@ -2,7 +2,7 @@
 #ifndef DBENGINE_METRIC_H
 #define DBENGINE_METRIC_H
 
-#include "../storage-engine-types.h"
+#include "libnetdata/libnetdata.h"
 
 typedef struct metric METRIC;
 typedef struct mrg MRG;
