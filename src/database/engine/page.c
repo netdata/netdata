@@ -240,8 +240,8 @@ static struct {
     PAD64(uint64_t) tier0_disk_original_bytes;
 } gorilla_stats = { 0 };
 
-// both run in the collection path of every collector thread and share one cacheline, so they are
-// counted only when the embedder charts them
+// both run in the collection path of every collector thread, all writing the same few counters,
+// so they are counted only when the embedder charts them
 static inline void gorilla_stats_hot_buffer_added(void) {
     if(!dbengine_cfg.compression_statistics)
         return;
