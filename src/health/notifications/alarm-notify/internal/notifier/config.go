@@ -25,9 +25,29 @@ type Routing struct {
 }
 
 type Destination struct {
-	Type        string `yaml:"type"`
-	URL         string `yaml:"url"`
-	BearerToken string `yaml:"bearer_token,omitempty"`
+	Type            string         `yaml:"type"`
+	URL             string         `yaml:"url,omitempty"`
+	BearerToken     string         `yaml:"bearer_token,omitempty"`
+	BotToken        string         `yaml:"bot_token,omitempty"`
+	ChatID          string         `yaml:"chat_id,omitempty"`
+	MessageThreadID *configInteger `yaml:"message_thread_id,omitempty"`
+	APIURL          string         `yaml:"api_url,omitempty"`
+	RetriesOnLimit  *configInteger `yaml:"retries_on_limit,omitempty"`
+}
+
+// YAML normally truncates floats assigned to integers, which could select the wrong topic.
+type configInteger int64
+
+func (value *configInteger) UnmarshalYAML(node *yaml.Node) error {
+	if node.Tag != "!!int" {
+		return errors.New("expected an integer")
+	}
+	var integer int64
+	if err := node.Decode(&integer); err != nil {
+		return err
+	}
+	*value = configInteger(integer)
+	return nil
 }
 
 func readConfig(r io.Reader) (Config, error) {
@@ -63,8 +83,17 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "telegram" {
+		return dst.validateTelegram()
+	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
-		return errors.New("destination.type must be webhook, slack or discord; other providers are not implemented yet")
+		return errors.New(
+			"destination.type must be webhook, slack, discord or telegram; other providers are not implemented yet",
+		)
+	}
+	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
+		dst.RetriesOnLimit != nil {
+		return errors.New("bot_token, chat_id, message_thread_id, api_url and retries_on_limit require type: telegram")
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
 		return fmt.Errorf("%s destinations authenticate through their URL; bearer_token is not supported", dst.Type)

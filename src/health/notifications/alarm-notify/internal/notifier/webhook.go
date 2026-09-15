@@ -43,37 +43,11 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 			return errors.New("destination.bearer_token must not contain line breaks")
 		}
 	}
-	payload, err := json.Marshal(message)
-	if err != nil {
-		return errors.New("could not encode notification")
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-	if err != nil {
-		return fmt.Errorf("could not construct %s request", dst.Type)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("User-Agent", "netdata-alarm-notify")
-	if token != "" {
-		request.Header.Set("Authorization", "Bearer "+token)
-	}
-	client := &http.Client{
-		Timeout:       timeout,
-		Transport:     http.DefaultTransport.(*http.Transport).Clone(),
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
-	}
+	client := notificationHTTPClient(timeout)
 	defer client.CloseIdleConnections()
-	response, err := client.Do(request)
+	response, err := postNotificationJSON(ctx, client, dst.Type, endpoint, token, message)
 	if err != nil {
-		// HTTP errors include the full URL; expose only a safe failure category.
-		var networkError net.Error
-		switch {
-		case errors.Is(err, context.Canceled):
-			return errors.New("notification canceled")
-		case errors.Is(err, context.DeadlineExceeded), errors.As(err, &networkError) && networkError.Timeout():
-			return errors.New("notification timed out")
-		default:
-			return fmt.Errorf("%s transport failed; check connectivity, TLS, and proxy settings", dst.Type)
-		}
+		return err
 	}
 	// These providers acknowledge delivery through HTTP status, not the response body.
 	// Close without buffering or draining an arbitrary remote body.
@@ -86,6 +60,53 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 		return fmt.Errorf("%s returned HTTP %d", dst.Type, response.StatusCode)
 	}
 	return nil
+}
+
+func postNotificationJSON(
+	ctx context.Context,
+	client *http.Client,
+	provider, endpoint, token string,
+	message any,
+) (*http.Response, error) {
+	payload, err := json.Marshal(message)
+	if err != nil {
+		return nil, errors.New("could not encode notification")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("could not construct %s request", provider)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("User-Agent", "netdata-alarm-notify")
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, notificationHTTPError(provider, err)
+	}
+	return response, nil
+}
+
+func notificationHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:       timeout,
+		Transport:     http.DefaultTransport.(*http.Transport).Clone(),
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+	}
+}
+
+func notificationHTTPError(provider string, err error) error {
+	// HTTP errors include the full URL; expose only a safe failure category.
+	var networkError net.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		return errors.New("notification canceled")
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &networkError) && networkError.Timeout():
+		return errors.New("notification timed out")
+	default:
+		return fmt.Errorf("%s transport failed; check connectivity, TLS, and proxy settings", provider)
+	}
 }
 
 func resolveSecret(ctx context.Context, value string) (string, error) {
