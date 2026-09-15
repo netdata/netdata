@@ -199,6 +199,8 @@ func TestRunFanoutCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"prowl deadline": {provider: "prowl"}, "prowl cancellation": {provider: "prowl", cancel: true},
+		"kavenegar deadline": {provider: "kavenegar"}, "kavenegar cancellation": {provider: "kavenegar", cancel: true},
 		"webhook deadline": {provider: "webhook"}, "webhook cancellation": {provider: "webhook", cancel: true},
 		"rocketchat deadline": {provider: "rocketchat"}, "rocketchat cancellation": {provider: "rocketchat", cancel: true},
 		"flock deadline": {provider: "flock"}, "flock cancellation": {provider: "flock", cancel: true},
@@ -216,7 +218,12 @@ func TestRunFanoutCancellation(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.URL.Path {
-					case "/blocked", "/blocked/events", "/blocked/alert", "/blocked/api/v2/events/ingest":
+					case "/blocked/add",
+						"/blocked/synthetic-key/sms/send.json",
+						"/blocked",
+						"/blocked/events",
+						"/blocked/alert",
+						"/blocked/api/v2/events/ingest":
 						_, _ = io.Copy(io.Discard, r.Body)
 						close(started)
 						select {
@@ -247,6 +254,16 @@ func TestRunFanoutCancellation(t *testing.T) {
 					server.URL+"/blocked",
 				)
 			}
+			if test.provider == "prowl" {
+				blocked = fmt.Sprintf("type: prowl, api_url: %q, api_key: %q", server.URL+"/blocked", prowlTestKey)
+			}
+			if test.provider == "kavenegar" {
+				blocked = fmt.Sprintf(
+					"type: kavenegar, api_url: %q, api_key: synthetic-key, sender: '12345', recipient: '15005550009'",
+					server.URL+"/blocked",
+				)
+			}
+
 			config := fmt.Sprintf(`version: 1
 destinations:
   first: {type: webhook, url: %q}

@@ -133,17 +133,25 @@ func notificationHTTPError(provider string, err error) error {
 }
 
 func decodeNotificationResponse(provider string, body io.Reader, result any) error {
-	data, err := io.ReadAll(io.LimitReader(body, notificationResponseLimit+1))
+	data, err := readNotificationResponse(provider, body)
 	if err != nil {
-		return notificationHTTPError(provider, err)
-	}
-	if len(data) > notificationResponseLimit {
-		return fmt.Errorf("%s response exceeds the 256 KiB limit", provider)
+		return err
 	}
 	if err := json.Unmarshal(data, result); err != nil {
 		return fmt.Errorf("invalid %s response", provider)
 	}
 	return nil
+}
+
+func readNotificationResponse(provider string, body io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(body, notificationResponseLimit+1))
+	if err != nil {
+		return nil, notificationHTTPError(provider, err)
+	}
+	if len(data) > notificationResponseLimit {
+		return nil, fmt.Errorf("%s response exceeds the 256 KiB limit", provider)
+	}
+	return data, nil
 }
 
 func resolveSecret(ctx context.Context, value string) (string, error) {
