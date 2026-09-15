@@ -97,6 +97,30 @@ func TestPushContent(t *testing.T) {
 	}
 }
 
+func TestNtfyLiteralMIMEHeaders(t *testing.T) {
+	for name, test := range map[string]struct{ node, alert, url string }{
+		"literal title":           {"=?UTF-8?B?SGVsbG8=?=", "test_alert", "https://example.com/alert"},
+		"long literal title":      {strings.Repeat("prefix ", 50) + "=?UTF-8?B?SGVsbG8=?=", "test_alert", "https://example.com/alert"},
+		"literal URL":             {"node", "alert", "https://example.com/?x==?UTF-8?B?Ig==?="},
+		"Unicode and literal URL": {"節点", "alert", "https://example.com/界?x==?UTF-8?B?Ig==?="},
+	} {
+		t.Run(name, func(t *testing.T) {
+			event := Event{Node: test.node, Alert: test.alert, Status: "WARNING", URL: test.url}
+			headers := renderNtfyHeaders(event)
+			decoder := new(mime.WordDecoder)
+			title, err := decoder.DecodeHeader(headers.Get("Title"))
+			require.NoError(t, err)
+			assert.Equal(t, test.node+": "+strings.ReplaceAll(test.alert, "_", " "), title)
+			// ntfy MIME-decodes the Actions header before parsing its JSON.
+			text, err := decoder.DecodeHeader(headers.Get("Actions"))
+			require.NoError(t, err)
+			var actions []ntfyAction
+			require.NoError(t, json.Unmarshal([]byte(text), &actions))
+			assert.Equal(t, []ntfyAction{{Action: "view", Label: "View node", URL: test.url, Clear: true}}, actions)
+		})
+	}
+}
+
 func TestReadPushResponse(t *testing.T) {
 	for provider, p := range map[string]struct {
 		read    func(*http.Response) error

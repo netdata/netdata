@@ -113,15 +113,31 @@ func renderNtfyHeaders(event Event) http.Header {
 		priority, tag = "urgent", "red_circle"
 	}
 	headers := http.Header{
-		"Title":    {mime.BEncoding.Encode("UTF-8", event.Node+": "+strings.ReplaceAll(event.Alert, "_", " "))},
+		"Title":    {encodeNtfyHeader(event.Node + ": " + strings.ReplaceAll(event.Alert, "_", " "))},
 		"Priority": {priority}, "Tags": {tag},
 	}
 	if event.URL != "" {
 		// JSON preserves delimiters inside URLs; ntfy also accepts it in the Actions header.
 		actions, _ := json.Marshal([]ntfyAction{{Action: "view", Label: "View node", URL: event.URL, Clear: true}})
-		headers.Set("Actions", string(actions))
+		headers.Set("Actions", encodeNtfyHeader(string(actions)))
 	}
 	return headers
+}
+
+func encodeNtfyHeader(value string) string {
+	encoded := mime.BEncoding.Encode("UTF-8", value)
+	if encoded != value || !strings.Contains(value, "=?") {
+		return encoded
+	}
+	// The MIME encoder leaves printable ASCII unchanged, but ntfy decodes literal encoded words too.
+	// This remaining ASCII case needs explicit encoding, with each word below the MIME 75-byte limit.
+	var words []string
+	for len(value) > 0 {
+		n := min(len(value), 45)
+		words = append(words, "=?UTF-8?B?"+base64.StdEncoding.EncodeToString([]byte(value[:n]))+"?=")
+		value = value[n:]
+	}
+	return strings.Join(words, " ")
 }
 
 func readNtfyResponse(response *http.Response) error {
