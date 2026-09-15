@@ -121,13 +121,14 @@ func TestNew_LogsOutOnContainerViewFailure(t *testing.T) {
 	}
 	defer func() { createContainerView = origCreateContainerView }()
 
-	client, err := New(Config{
+	client, err := New(context.Background(), Config{
 		URL:       srv.URL.String(),
 		User:      "admin",
 		Password:  "password",
 		Timeout:   time.Second * 3,
 		TLSConfig: tlscfg.TLSConfig{InsecureSkipVerify: true},
-	})
+	}, nil,
+	)
 	require.Nil(t, client)
 	require.ErrorContains(t, err, "create container view failed")
 
@@ -188,13 +189,14 @@ func prepareClient(t *testing.T) (client *Client, teardown func()) {
 }
 
 func newClient(t *testing.T, vCenterURL *url.URL) *Client {
-	client, err := New(Config{
+	client, err := New(context.Background(), Config{
 		URL:       vCenterURL.String(),
 		User:      "admin",
 		Password:  "password",
 		Timeout:   time.Second * 3,
 		TLSConfig: tlscfg.TLSConfig{InsecureSkipVerify: true},
-	})
+	}, nil,
+	)
 	require.NoError(t, err)
 	return client
 }

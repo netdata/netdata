@@ -26,7 +26,7 @@ func (c *Collector) buildEngine(
 	if err != nil {
 		return nil, fmt.Errorf("create ownership journal: %w", err)
 	}
-	source, err := c.newS3Client(ctx, config.Source.clientConfig())
+	source, err := c.newS3Client(ctx, config.Source.clientConfig(), c.CredentialFiles())
 	if err != nil {
 		return nil, fmt.Errorf("create source S3 client: %w", err)
 	}
@@ -50,7 +50,7 @@ func (c *Collector) buildEngine(
 		return engine, nil
 	}
 
-	destination, err := c.newS3Client(ctx, config.Destination.clientConfig())
+	destination, err := c.newS3Client(ctx, config.Destination.clientConfig(), c.CredentialFiles())
 	if err != nil {
 		source.CloseIdleConnections()
 		return nil, fmt.Errorf("create destination S3 client: %w", err)

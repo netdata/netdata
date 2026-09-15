@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -32,27 +34,28 @@ type Config struct {
 
 // Client handles HTTP transport and XML decoding for PMI snapshots.
 type Client struct {
+	files      credentialfile.RegularReader
 	cfg        Config
 	httpClient *http.Client
 	baseURL    string
 }
 
 // NewClient validates the configuration and prepares an HTTP client.
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(ctx context.Context, cfg Config, files credentialfile.RegularReader) (*Client, error) {
 	if time.Duration(cfg.HTTPConfig.ClientConfig.Timeout) <= 0 {
 		cfg.HTTPConfig.ClientConfig.Timeout = confopt.Duration(5 * time.Second)
 	}
 
-	httpClient, err := web.NewHTTPClient(cfg.HTTPConfig.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig, files)
 	if err != nil {
 		return nil, fmt.Errorf("pmi protocol: creating http client failed: %w", err)
 	}
 
-	return NewClientWithHTTP(cfg, httpClient)
+	return NewClientWithHTTP(cfg, httpClient, files)
 }
 
 // NewClientWithHTTP allows supplying a custom *http.Client, primarily for tests.
-func NewClientWithHTTP(cfg Config, httpClient *http.Client) (*Client, error) {
+func NewClientWithHTTP(cfg Config, httpClient *http.Client, files credentialfile.RegularReader) (*Client, error) {
 	if httpClient == nil {
 		return nil, errors.New("pmi protocol: http client is required")
 	}
@@ -63,6 +66,7 @@ func NewClientWithHTTP(cfg Config, httpClient *http.Client) (*Client, error) {
 	}
 
 	return &Client{
+		files:      files,
 		cfg:        normalizedCfg,
 		httpClient: httpClient,
 		baseURL:    baseURL,

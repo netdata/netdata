@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -16,8 +18,8 @@ var (
 	urlQueryStatusService = url.Values{"level": {"debug"}}.Encode()
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	stats, err := c.queryStatsService()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	stats, err := c.queryStatsService(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -27,8 +29,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) queryStatsService() (*statusServiceResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatusService)
+func (c *Collector) queryStatsService(ctx context.Context) (*statusServiceResponse, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatusService, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}

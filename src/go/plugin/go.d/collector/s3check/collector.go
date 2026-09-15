@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
@@ -55,7 +57,7 @@ func New() *Collector {
 	return c
 }
 
-type s3ClientFactory func(context.Context, s3client.Config) (s3client.Client, error)
+type s3ClientFactory func(context.Context, s3client.Config, credentialfile.RegularReader) (s3client.Client, error)
 
 type Collector struct {
 	collectorapi.Base

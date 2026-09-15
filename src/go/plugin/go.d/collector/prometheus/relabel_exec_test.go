@@ -323,7 +323,7 @@ func scrapeSamples(tb testing.TB, exposition string) prompkg.SampleBatch {
 		func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(exposition)) }))
 	tb.Cleanup(srv.Close)
 
-	batch, err := prompkg.New(srv.Client(), web.RequestConfig{URL: srv.URL}).ScrapeSamples(context.Background())
+	batch, err := prompkg.New(srv.Client(), web.RequestConfig{URL: srv.URL}, nil).ScrapeSamples(context.Background())
 	require.NoError(tb, err)
 	return batch
 }

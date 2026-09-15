@@ -4,8 +4,10 @@ package collectorapi
 
 import (
 	"context"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -94,6 +96,10 @@ type CollectorV2EnginePolicy interface {
 // Base is a helper struct. All modules should embed this struct.
 type Base struct {
 	*logger.Logger
+
+	filesMu     sync.Mutex
+	files       credentialfile.FileReader
+	filesClosed bool
 }
 
 func (b *Base) GetBase() *Base { return b }

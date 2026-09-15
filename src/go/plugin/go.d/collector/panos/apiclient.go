@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/PaloAltoNetworks/pango"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -41,13 +43,13 @@ type pangoAPIClient struct {
 	initialized bool
 }
 
-func newPangoAPIClient(cfg Config) (panosAPIClient, error) {
+func newPangoAPIClient(ctx context.Context, cfg Config, files credentialfile.RegularReader) (panosAPIClient, error) {
 	apiURL, err := parseAPIURL(cfg.URL)
 	if err != nil {
 		return nil, err
 	}
 
-	transport, err := newPangoTransport(cfg.ClientConfig)
+	transport, err := newPangoTransport(ctx, cfg.ClientConfig, files)
 	if err != nil {
 		return nil, err
 	}
@@ -250,8 +252,11 @@ func hasExplicitPort(host string) bool {
 	return strings.Count(host, ":") == 1
 }
 
-func newPangoTransport(cfg web.ClientConfig) (*http.Transport, error) {
-	client, err := web.NewHTTPClient(cfg)
+func newPangoTransport(ctx context.Context,
+	cfg web.ClientConfig,
+	files credentialfile.RegularReader,
+) (*http.Transport, error) {
+	client, err := web.NewHTTPClient(ctx, cfg, files)
 	if err != nil {
 		return nil, err
 	}

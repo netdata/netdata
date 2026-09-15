@@ -5,6 +5,8 @@ package envoy
 import (
 	"errors"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -16,11 +18,11 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}
 
-	return prometheus.New(httpClient, c.RequestConfig), nil
+	return prometheus.New(httpClient, c.RequestConfig, c.CredentialFiles()), nil
 }

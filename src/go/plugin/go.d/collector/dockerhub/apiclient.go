@@ -8,6 +8,10 @@ import (
 	"net/url"
 	"path"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -20,17 +24,18 @@ type repository struct {
 	LastUpdated string `json:"last_updated"`
 }
 
-func newAPIClient(client *http.Client, request web.RequestConfig) *apiClient {
-	return &apiClient{httpClient: client, request: request}
+func newAPIClient(client *http.Client, request web.RequestConfig, files credentialfile.RegularReader) *apiClient {
+	return &apiClient{files: files, httpClient: client, request: request}
 }
 
 type apiClient struct {
+	files      credentialfile.RegularReader
 	httpClient *http.Client
 	request    web.RequestConfig
 }
 
-func (a apiClient) getRepository(repoName string) (*repository, error) {
-	req, err := a.createRequest(repoName)
+func (a apiClient) getRepository(ctx context.Context, repoName string) (*repository, error) {
+	req, err := a.createRequest(ctx, repoName)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request : %v", err)
 	}
@@ -43,7 +48,7 @@ func (a apiClient) getRepository(repoName string) (*repository, error) {
 	return &repo, nil
 }
 
-func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
+func (a apiClient) createRequest(ctx context.Context, urlPath string) (*http.Request, error) {
 	req := a.request.Copy()
 
 	u, err := url.Parse(req.URL)
@@ -54,5 +59,5 @@ func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
 	u.Path = path.Join(u.Path, urlPath)
 	req.URL = u.String()
 
-	return web.NewHTTPRequest(req)
+	return web.NewHTTPRequest(ctx, req, a.files)
 }

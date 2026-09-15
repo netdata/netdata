@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -79,7 +81,7 @@ type Collector struct {
 	noBGPProbedAt  time.Time
 	bgpRouterNames map[string]string
 
-	newAPIClient        func(Config) (panosAPIClient, error)
+	newAPIClient        func(context.Context, Config, credentialfile.RegularReader) (panosAPIClient, error)
 	advancedBGPCommands []string
 	now                 func() time.Time
 }
@@ -88,12 +90,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return err
 	}
 
-	client, err := c.newAPIClient(c.Config)
+	client, err := c.newAPIClient(ctx, c.Config, c.CredentialFiles())
 	if err != nil {
 		return fmt.Errorf("init PAN-OS API client: %w", err)
 	}

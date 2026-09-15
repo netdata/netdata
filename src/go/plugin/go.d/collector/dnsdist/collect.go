@@ -6,6 +6,8 @@ import (
 	"maps"
 	"net/url"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -14,8 +16,8 @@ const (
 	urlPathJSONStat = "/jsonstat"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	statistics, err := c.scrapeStatistics()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	statistics, err := c.scrapeStatistics(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -30,8 +32,8 @@ func (c *Collector) collectStatistic(collected map[string]int64, statistics *sta
 	maps.Copy(collected, stm.ToMap(statistics))
 }
 
-func (c *Collector) scrapeStatistics() (*statisticMetrics, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathJSONStat)
+func (c *Collector) scrapeStatistics(ctx context.Context) (*statisticMetrics, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathJSONStat, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}

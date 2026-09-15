@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
@@ -25,7 +27,7 @@ func TestCollectorInitRequiresPersistedAgentIdentityBeforeClientCreation(t *test
 	c.Config = validConfig(contract.ModeLifecycle)
 	c.registryUniqueID = func() string { return "" }
 	created := false
-	c.newS3Client = func(context.Context, s3client.Config) (s3client.Client, error) {
+	c.newS3Client = func(context.Context, s3client.Config, credentialfile.RegularReader) (s3client.Client, error) {
 		created = true
 		return nil, errors.New("must not be called")
 	}
@@ -74,7 +76,7 @@ func TestCollectorClosesSourceWhenDestinationCreationFails(t *testing.T) {
 	c.registryUniqueID = func() string { return "agent-id" }
 	c.journalRoot = t.TempDir()
 	calls := 0
-	c.newS3Client = func(context.Context, s3client.Config) (s3client.Client, error) {
+	c.newS3Client = func(context.Context, s3client.Config, credentialfile.RegularReader) (s3client.Client, error) {
 		calls++
 		if calls == 1 {
 			return source, nil
@@ -197,7 +199,7 @@ func checkClient(versioning s3client.VersioningStatus) *testutil.S3 {
 
 func clientSequence(clients ...*testutil.S3) s3ClientFactory {
 	index := 0
-	return func(context.Context, s3client.Config) (s3client.Client, error) {
+	return func(context.Context, s3client.Config, credentialfile.RegularReader) (s3client.Client, error) {
 		if index >= len(clients) {
 			return nil, errors.New("unexpected S3 client creation")
 		}

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/safefile"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -76,6 +76,7 @@ func (g singleOwnerGate) release() {
 }
 
 type cephClient struct {
+	files                  credentialfile.RegularReader
 	httpClient             *http.Client
 	requestConfig          web.RequestConfig
 	configuredBase         *url.URL
@@ -97,6 +98,7 @@ type cephClient struct {
 }
 
 func newCephClient(
+	files credentialfile.RegularReader,
 	httpClient *http.Client,
 	cfg web.RequestConfig,
 	notFollowRedirects bool,
@@ -123,6 +125,7 @@ func newCephClient(
 
 	c := &cephClient{
 		httpClient:             httpClient,
+		files:                  files,
 		requestConfig:          cfg.Copy(),
 		configuredBase:         base,
 		notFollowRedirects:     notFollowRedirects,
@@ -556,7 +559,7 @@ func redirectedDashboardBase(current *url.URL, location, probePath string) (*url
 
 func (c *cephClient) tokenForRequest(ctx context.Context, base *url.URL) (token string, managed bool, err error) {
 	if c.bearerTokenFile != "" {
-		bs, err := safefile.Read(c.bearerTokenFile)
+		bs, err := c.files.Read(ctx, c.bearerTokenFile)
 		if err != nil {
 			return "", false, fmt.Errorf("read bearer token file: %w", err)
 		}
@@ -653,11 +656,10 @@ func (c *cephClient) request(
 		cfg.Body = string(body)
 	}
 
-	req, err := web.NewHTTPRequest(cfg)
+	req, err := web.NewHTTPRequest(ctx, cfg, c.files)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
 	if accept == "" {
 		accept = hdrAcceptVersion
 	}

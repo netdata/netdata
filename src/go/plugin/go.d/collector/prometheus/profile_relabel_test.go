@@ -800,7 +800,7 @@ type countingPrometheus struct {
 	sampleCalls int
 }
 
-func (p *countingPrometheus) ScrapeSeries() (prompkg.Series, error) { return nil, nil }
+func (p *countingPrometheus) ScrapeSeries(context.Context) (prompkg.Series, error) { return nil, nil }
 
 func (p *countingPrometheus) Scrape() (prompkg.MetricFamilies, error) {
 	return p.ScrapeContext(context.Background())

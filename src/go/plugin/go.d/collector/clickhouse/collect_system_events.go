@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strconv"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -17,8 +19,8 @@ FROM
     system.events FORMAT CSVWithNames
 `
 
-func (c *Collector) collectSystemEvents(mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collectSystemEvents(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles())
 	if err != nil {
 		return err
 	}

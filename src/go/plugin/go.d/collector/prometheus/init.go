@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -24,8 +26,8 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 	if err != nil {
 		return nil, fmt.Errorf("init HTTP client: %v", err)
 	}
@@ -41,9 +43,9 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 		if c.pipelineObserver != nil {
 			sr = pipelineObservingSelector{next: sr, collector: c}
 		}
-		return prometheus.NewWithSelector(httpClient, req, sr), nil
+		return prometheus.NewWithSelector(httpClient, req, sr, c.CredentialFiles()), nil
 	}
-	return prometheus.New(httpClient, req), nil
+	return prometheus.New(httpClient, req, c.CredentialFiles()), nil
 }
 
 func compileFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {

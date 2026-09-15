@@ -5,14 +5,16 @@ package logstash
 import (
 	"fmt"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const urlPathNodeStatsAPI = "/_node/stats"
 
-func (c *Collector) collect() (map[string]int64, error) {
-	stats, err := c.queryNodeStats()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	stats, err := c.queryNodeStats(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +43,8 @@ func (c *Collector) updateCharts(pipelines map[string]pipelineStats) {
 	}
 }
 
-func (c *Collector) queryNodeStats() (*nodeStats, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathNodeStatsAPI)
+func (c *Collector) queryNodeStats(ctx context.Context) (*nodeStats, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathNodeStatsAPI, c.CredentialFiles())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}

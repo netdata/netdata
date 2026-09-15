@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -24,15 +26,15 @@ func (c *Collector) initCharts() (*Charts, error) {
 	return bucketCharts.Copy(), nil
 }
 
-func (c *Collector) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initHTTPClient(ctx context.Context) (*http.Client, error) {
+	return web.NewHTTPClient(ctx, c.ClientConfig, c.CredentialFiles())
 }
 
-func (c *Collector) validateConfig() error {
+func (c *Collector) validateConfig(ctx context.Context) error {
 	if c.URL == "" {
 		return errors.New("URL not set")
 	}
-	if _, err := web.NewHTTPRequest(c.RequestConfig); err != nil {
+	if _, err := web.NewHTTPRequest(ctx, c.RequestConfig, c.CredentialFiles()); err != nil {
 		return err
 	}
 	return nil

@@ -530,7 +530,7 @@ func scrape(t *testing.T, exposition string) prompkg.MetricFamilies {
 	}))
 	t.Cleanup(srv.Close)
 
-	mfs, err := prompkg.New(srv.Client(), web.RequestConfig{URL: srv.URL}).Scrape()
+	mfs, err := prompkg.New(srv.Client(), web.RequestConfig{URL: srv.URL}, nil).Scrape()
 	require.NoError(t, err)
 	return mfs
 }

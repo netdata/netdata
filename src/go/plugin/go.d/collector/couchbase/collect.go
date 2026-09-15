@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -16,8 +18,8 @@ const (
 	precision = 1000
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	ms, err := c.scrapeCouchbase()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	ms, err := c.scrapeCouchbase(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error on scraping couchbase: %v", err)
 	}
@@ -108,8 +110,8 @@ func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 	chart.MarkNotCreated()
 }
 
-func (c *Collector) scrapeCouchbase() (*cbMetrics, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathBucketsStats)
+func (c *Collector) scrapeCouchbase(ctx context.Context) (*cbMetrics, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathBucketsStats, c.CredentialFiles())
 	if err != nil {
 		return nil, err
 	}

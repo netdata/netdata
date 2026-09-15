@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package client
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
+	"math/big"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"github.com/stretchr/testify/require"
+)
+
+type certificateReader struct{ pem []byte }
+
+func (r certificateReader) Read(context.Context, string) ([]byte, error) { return r.pem, nil }
+
+func TestSOAPUsesCAFromCredentialReader(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	cert := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: time.Now(), NotAfter: time.Now().Add(time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	der, err := x509.CreateCertificate(rand.Reader, cert, cert, &key.PublicKey, key)
+	require.NoError(t, err)
+	files := certificateReader{pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}
+	cli, err := newSoapClient(context.Background(), Config{URL: "https://localhost/sdk", TLSConfig: tlscfg.TLSConfig{TLSCA: "synthetic-path-not-opened-by-sdk"}}, files)
+	require.NoError(t, err)
+	t.Cleanup(cli.CloseIdleConnections)
+	transport, ok := cli.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, transport.TLSClientConfig.RootCAs)
+	parsed, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	_, err = parsed.Verify(x509.VerifyOptions{Roots: transport.TLSClientConfig.RootCAs})
+	require.NoError(t, err)
+}

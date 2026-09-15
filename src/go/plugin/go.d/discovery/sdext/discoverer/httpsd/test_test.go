@@ -41,7 +41,7 @@ func TestDiscovererTestUnsupportedMethodsDoNoOperationalWork(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			d, err := NewDiscoverer(Config{
+			d, err := newLocalDiscoverer(t, Config{
 				HTTPConfig: web.HTTPConfig{
 					RequestConfig: web.RequestConfig{
 						URL:             "http://127.0.0.1/discovery",
@@ -87,7 +87,7 @@ func TestDiscovererTestUsesConfiguredGETRequest(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			d, err := NewDiscoverer(Config{
+			d, err := newLocalDiscoverer(t, Config{
 				HTTPConfig: web.HTTPConfig{
 					RequestConfig: web.RequestConfig{
 						URL:             srv.URL,
@@ -142,7 +142,7 @@ func TestDiscovererTestPublicErrors(t *testing.T) {
 		"TLS file": {
 			run: func(t *testing.T) (error, []string) {
 				path := t.TempDir() + "/missing-ca"
-				_, err := NewDiscoverer(Config{
+				_, err := newLocalDiscoverer(t, Config{
 					HTTPConfig: web.HTTPConfig{
 						RequestConfig: web.RequestConfig{URL: "https://127.0.0.1/discovery"},
 						ClientConfig: web.ClientConfig{
@@ -384,7 +384,7 @@ func TestDiscovererTestHonorsCallerCancellation(t *testing.T) {
 
 func newTestDiscoverer(t *testing.T, cfg web.HTTPConfig) *Discoverer {
 	t.Helper()
-	d, err := NewDiscoverer(Config{HTTPConfig: cfg})
+	d, err := newLocalDiscoverer(t, Config{HTTPConfig: cfg})
 	require.NoError(t, err)
 	return d
 }
