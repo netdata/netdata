@@ -174,7 +174,8 @@ func validateAPIBase(endpoint, provider, officialHost string) error {
 	if endpoint == "" {
 		return nil // The provider uses its official HTTPS endpoint.
 	}
-	if !validHTTPURL(endpoint, false) {
+	// Even an empty fragment would capture the method appended to this base.
+	if !validHTTPURL(endpoint, false) || strings.Contains(endpoint, "#") {
 		return fmt.Errorf(
 			"%s api_url must be an absolute HTTP(S) base URL without user information or fragment",
 			provider,

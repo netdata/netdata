@@ -36,6 +36,7 @@ func TestSendPushover(t *testing.T) {
 		"nested secret rejected":                 {secret: "nested-app", err: "app_token must contain"},
 		"empty resolved user":                    {secret: "empty-user", err: "empty value"},
 		"invalid resolved API":                   {secret: "bad-api", err: "without user information"},
+		"resolved API empty fragment":            {secret: "fragment-api", err: "fragment"},
 		"shortens and sends":                     {calls: 1, explicit: true, oversized: true},
 		"unconfirmed":                            {calls: 1, status: 204, err: "HTTP 204"},
 		"redirect not followed":                  {calls: 1, status: 307, err: "HTTP 307"},
@@ -98,6 +99,8 @@ func TestSendPushover(t *testing.T) {
 					user = ""
 				case "bad-api":
 					api = "https://user:synthetic-private-value@example.com"
+				case "fragment-api":
+					api += "#"
 				}
 				for _, field := range []struct {
 					name, value string

@@ -123,13 +123,15 @@ func TestTelegramTextLimits(t *testing.T) {
 
 func TestTelegramEndpoint(t *testing.T) {
 	for name, test := range map[string]struct{ base, token, want, err string }{
-		"official":              {token: "123:synthetic-private-value", want: "https://api.telegram.org/bot123:synthetic-private-value/sendMessage"},
-		"local server prefix":   {base: "http://localhost:8081/proxy/", token: "123:synthetic-private-value", want: "http://localhost:8081/proxy/bot123:synthetic-private-value/sendMessage"},
-		"token path injection":  {token: "123:synthetic-private-value/other", err: "bot_token"},
-		"token query injection": {token: "123:synthetic-private-value?x", err: "bot_token"},
-		"query":                 {base: "https://example.com/?secret=synthetic-private-value", err: "query"},
-		"userinfo":              {base: "https://user:synthetic-private-value@example.com", err: "without user information"},
-		"official plaintext":    {base: "http://API.TELEGRAM.ORG./", err: "requires HTTPS"},
+		"official":               {token: "123:synthetic-private-value", want: "https://api.telegram.org/bot123:synthetic-private-value/sendMessage"},
+		"local server prefix":    {base: "http://localhost:8081/proxy/", token: "123:synthetic-private-value", want: "http://localhost:8081/proxy/bot123:synthetic-private-value/sendMessage"},
+		"token path injection":   {token: "123:synthetic-private-value/other", err: "bot_token"},
+		"token query injection":  {token: "123:synthetic-private-value?x", err: "bot_token"},
+		"query":                  {base: "https://example.com/?secret=synthetic-private-value", err: "query"},
+		"empty fragment":         {base: "https://example.com/#", token: "123:synthetic-private-value", err: "fragment"},
+		"encoded hash in prefix": {base: "http://localhost:8081/proxy%23/", token: "123:synthetic-private-value", want: "http://localhost:8081/proxy%23/bot123:synthetic-private-value/sendMessage"},
+		"userinfo":               {base: "https://user:synthetic-private-value@example.com", err: "without user information"},
+		"official plaintext":     {base: "http://API.TELEGRAM.ORG./", err: "requires HTTPS"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got, err := telegramEndpoint(test.base, test.token)

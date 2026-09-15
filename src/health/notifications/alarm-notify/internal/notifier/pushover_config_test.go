@@ -38,6 +38,7 @@ func TestPushoverConfiguration(t *testing.T) {
 		"relative API":         {changes: map[string]any{"api_url": "/proxy"}, err: "absolute HTTP(S)"},
 		"API query":            {changes: map[string]any{"api_url": "https://example.com/?token=synthetic-private-value"}, err: "query"},
 		"empty API query":      {changes: map[string]any{"api_url": "https://example.com/?"}, err: "query"},
+		"empty API fragment":   {changes: map[string]any{"api_url": "https://example.com/#"}, err: "fragment"},
 		"API credentials":      {changes: map[string]any{"api_url": "https://user:synthetic-private-value@example.com"}, err: "user information"},
 		"API fragment":         {changes: map[string]any{"api_url": "https://example.com/#synthetic-private-value"}, err: "fragment"},
 		"official plaintext":   {changes: map[string]any{"api_url": "http://API.PUSHOVER.NET./"}, err: "requires HTTPS"},
