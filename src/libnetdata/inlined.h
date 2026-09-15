@@ -758,6 +758,16 @@ static char *strsep_skip_consecutive_separators(char **ptr, char *s) {
     return (p);
 }
 
+// remove a leading UTF-8 BOM, in place; returns s
+// text editors on Windows prepend it when saving a config file as UTF-8
+ALWAYS_INLINE
+static char *remove_utf8_bom(char *s) {
+    if((uint8_t)s[0] == 0xEF && (uint8_t)s[1] == 0xBB && (uint8_t)s[2] == 0xBF)
+        memmove(s, &s[3], strlen(&s[3]) + 1);
+
+    return s;
+}
+
 // remove leading and trailing spaces; may return NULL
 ALWAYS_INLINE
 static char *trim(char *s) {

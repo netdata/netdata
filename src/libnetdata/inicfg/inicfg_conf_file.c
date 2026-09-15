@@ -189,6 +189,9 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
         buffer[CONFIG_FILE_LINE_MAX] = '\0';
         line++;
 
+        if(line == 1)
+            remove_utf8_bom(buffer);
+
         s = trim(buffer);
         if(!s || !*s || *s == '#') {
             netdata_log_debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
