@@ -74,7 +74,7 @@ func TestReadConfig(t *testing.T) {
 		},
 		"trailing comment": {input: validConfig + "# done\n", want: base},
 		"unknown field": {
-			input: validConfig + "    password: synthetic-private-value\n",
+			input: validConfig + "    unknown_setting: synthetic-private-value\n",
 			err:   "invalid YAML",
 		},
 		"wrong scalar type": {
@@ -103,7 +103,7 @@ func TestReadConfig(t *testing.T) {
 			err:   "name must not be empty",
 		},
 		"unsupported provider": {
-			input: strings.Replace(validConfig, "webhook", "gotify", 1),
+			input: strings.Replace(validConfig, "webhook", "unimplemented", 1),
 			err:   "other providers are not implemented",
 		},
 		"second document": {

@@ -45,6 +45,10 @@ func dispatch(
 			err = sendTwilio(ctx, dst, event, timeout)
 		case "messagebird":
 			err = sendMessageBird(ctx, dst, event, timeout)
+		case "gotify":
+			err = sendGotify(ctx, dst, event, timeout)
+		case "ntfy":
+			err = sendNtfy(ctx, dst, event, timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}
