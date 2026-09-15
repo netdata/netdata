@@ -11,8 +11,8 @@ import (
 // All collectors share a single ebpfSharedMemoryStore and SHM segment.
 // This service manages the lifecycle and coordination.
 type AppsIntegrationService struct {
-	mu       sync.RWMutex
-	store    *ebpfSharedMemoryStore
+	mu           sync.RWMutex
+	store        *ebpfSharedMemoryStore
 	shmPublisher *SharedPidMemoryPublisher
 	pidTableSize uint32
 	updateEvery  int
@@ -28,7 +28,7 @@ func GetAppsIntegration() *AppsIntegrationService {
 	appsOnce.Do(func() {
 		appsInstance = &AppsIntegrationService{
 			pidTableSize: defaultPidTableSize,
-			updateEvery: 1,
+			updateEvery:  1,
 		}
 	})
 	return appsInstance
@@ -74,7 +74,7 @@ func (a *AppsIntegrationService) Close() {
 	defer a.mu.Unlock()
 
 	if a.shmPublisher != nil {
-		_ = a.shmPublisher.Close()
+		a.shmPublisher.Close()
 		a.shmPublisher = nil
 	}
 }

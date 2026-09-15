@@ -31,8 +31,8 @@ func init() {
 }
 
 type CachestatConfig struct {
-	Vnode          string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery    int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode       string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 	// DynCfg fields (from config_schema.json)
 	Enabled        bool   `yaml:"enabled" json:"enabled"`
 	AppsEnabled    bool   `yaml:"apps" json:"apps"`
@@ -47,7 +47,7 @@ type CachestatCollector struct {
 
 	handle      *CachestatLegacyHandle
 	state       *cachestatGlobalState
-	publisher   *PublisherService
+	store       metrix.CollectorStore
 	sharedStore *ebpfSharedMemoryStore
 }
 
@@ -58,8 +58,9 @@ func NewCachestatCollector() *CachestatCollector {
 			AppsEnabled:    false,
 			CgroupsEnabled: false,
 			UpdateEvery:    cachestatDefaultUpdateEvery,
+			MapPerCore:     true,
 		},
-		publisher:   GetPublisher(),
+		store:       metrix.NewCollectorStore(),
 		state:       &cachestatGlobalState{},
 		sharedStore: GetAppsIntegration().Store(),
 	}
@@ -90,6 +91,7 @@ func (c *CachestatCollector) Init(ctx context.Context) error {
 		Enabled:        c.Config.Enabled,
 		AppsEnabled:    c.Config.AppsEnabled,
 		CgroupsEnabled: c.Config.CgroupsEnabled,
+		MapsPerCore:    c.Config.MapPerCore,
 		UpdateEvery:    c.Config.UpdateEvery,
 	})
 	if err != nil {
@@ -138,7 +140,7 @@ func (c *CachestatCollector) Collect(ctx context.Context) error {
 	}
 
 	// Write metrics to publisher's store
-	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
+	meter := c.store.Write().SnapshotMeter("")
 	meter.Gauge("ratio").Observe(float64(publish.Ratio))
 	meter.Counter("dirty").ObserveTotal(float64(publish.Dirty))
 	meter.Counter("hit").ObserveTotal(float64(publish.Hit))
@@ -147,7 +149,7 @@ func (c *CachestatCollector) Collect(ctx context.Context) error {
 	// Per-PID snapshot and SHM publication
 	if c.Config.AppsEnabled || c.Config.CgroupsEnabled {
 		if c.sharedStore == nil {
-			c.Warnf("apps/cgroups enabled but shared store not initialized")
+			c.Infof("apps/cgroups enabled but shared store not initialized")
 			return nil
 		}
 
@@ -198,5 +200,5 @@ func (c *CachestatCollector) ChartTemplateYAML() string {
 }
 
 func (c *CachestatCollector) MetricStore() metrix.CollectorStore {
-	return c.publisher.MetricStore()
+	return c.store
 }

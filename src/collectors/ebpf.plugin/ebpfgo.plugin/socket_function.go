@@ -1,8 +1,15 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
 
 const (
@@ -25,6 +32,45 @@ type socketFunctionStore struct {
 	publish     socketGlobalPublish
 	hasData     bool
 	updateEvery int
+}
+
+func parseMinimalFunctionLine(line string) (uid, name string) {
+	r := csv.NewReader(strings.NewReader(line))
+	r.Comma = ' '
+	r.LazyQuotes = true
+	parts, err := r.Read()
+	if err != nil || len(parts) < 5 || parts[0] != "FUNCTION" {
+		return "", ""
+	}
+	nameAndArgs := strings.SplitN(parts[3], " ", 2)
+	return parts[1], nameAndArgs[0]
+}
+
+func handleNetworkProtocols(api *netdataapi.API, fnStore *socketFunctionStore, uid string) {
+	p, hasData := fnStore.snapshot()
+	if !hasData {
+		sendFunctionError(api, uid, 503, "network-protocols: data not yet available")
+		return
+	}
+	expires := time.Now().Unix() + int64(fnStore.updateEvery)
+	payload, err := buildNetworkProtocolsJSON(p, fnStore.updateEvery, expires)
+	if err != nil {
+		sendFunctionError(api, uid, 500, fmt.Sprintf("json marshal error: %v", err))
+		return
+	}
+	pluginOutputMu.Lock()
+	api.FUNCRESULT(netdataapi.FunctionResult{UID: uid, Code: "200", ContentType: "application/json", ExpireTimestamp: strconv.FormatInt(expires, 10), Payload: payload})
+	pluginOutputMu.Unlock()
+}
+
+func sendFunctionError(api *netdataapi.API, uid string, code int, msg string) {
+	payload, _ := json.Marshal(struct {
+		Status  int    `json:"status"`
+		Message string `json:"message"`
+	}{code, msg})
+	pluginOutputMu.Lock()
+	api.FUNCRESULT(netdataapi.FunctionResult{UID: uid, Code: strconv.Itoa(code), ContentType: "application/json", ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10), Payload: string(payload)})
+	pluginOutputMu.Unlock()
 }
 
 func newSocketFunctionStore(updateEvery int) *socketFunctionStore {

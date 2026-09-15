@@ -23,6 +23,7 @@ func init() {
 		JobConfigSchema: dcstatConfigSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
+			Disabled:    true,
 		},
 		CreateV2: func() collectorapi.CollectorV2 { return NewDCStatCollector() },
 		Config:   func() any { return &DCStatConfig{} },
@@ -35,6 +36,7 @@ type DCStatConfig struct {
 	Enabled        bool   `yaml:"enabled" json:"enabled"`
 	AppsEnabled    bool   `yaml:"apps" json:"apps"`
 	CgroupsEnabled bool   `yaml:"cgroups" json:"cgroups"`
+	MapsPerCore    bool   `yaml:"per_core_stats" json:"per_core_stats"`
 }
 
 type DCStatCollector struct {
@@ -42,17 +44,18 @@ type DCStatCollector struct {
 	Config      DCStatConfig
 	handle      *DCStatLegacyHandle
 	state       *dcstatGlobalState
-	publisher   *PublisherService
+	store       metrix.CollectorStore
 	sharedStore *ebpfSharedMemoryStore
 }
 
 func NewDCStatCollector() *DCStatCollector {
 	return &DCStatCollector{
 		Config: DCStatConfig{
-			Enabled:     true,
+			Enabled:     false,
 			UpdateEvery: dcstatDefaultUpdateEvery,
+			MapsPerCore: true,
 		},
-		publisher:   GetPublisher(),
+		store:       metrix.NewCollectorStore(),
 		state:       &dcstatGlobalState{},
 		sharedStore: GetAppsIntegration().Store(),
 	}
@@ -68,6 +71,7 @@ func (c *DCStatCollector) Init(ctx context.Context) error {
 		c.Config.Enabled = true
 		c.Config.AppsEnabled = legacyCfg.AppsEnabled
 		c.Config.CgroupsEnabled = legacyCfg.CgroupsEnabled
+		c.Config.MapsPerCore = legacyCfg.MapsPerCore
 	}
 
 	if !c.Config.Enabled {
@@ -78,6 +82,7 @@ func (c *DCStatCollector) Init(ctx context.Context) error {
 		Enabled:        c.Config.Enabled,
 		AppsEnabled:    c.Config.AppsEnabled,
 		CgroupsEnabled: c.Config.CgroupsEnabled,
+		MapsPerCore:    c.Config.MapsPerCore,
 		UpdateEvery:    c.Config.UpdateEvery,
 	})
 	if err != nil {
@@ -112,10 +117,9 @@ func (c *DCStatCollector) Collect(ctx context.Context) error {
 	}
 
 	counters := dcstatGlobalCounters{
-		GetpageNonvectorAddr: snapshot.GetpageNonvectorAddr,
-		GetpageVectorAddr:    snapshot.GetpageVectorAddr,
-		Filemap_gfp_mask:     snapshot.Filemap_gfp_mask,
-		PageCacheInsertIon:   snapshot.PageCacheInsertIon,
+		Reference: snapshot.Reference,
+		Slow:      snapshot.Slow,
+		Miss:      snapshot.Miss,
 	}
 
 	publish, ok := c.state.Update(counters)
@@ -123,15 +127,15 @@ func (c *DCStatCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
-	meter.Counter("ratio").ObserveTotal(float64(publish.Ratio))
-	meter.Counter("getpage_vect").ObserveTotal(float64(publish.GetpageVect))
-	meter.Counter("getpage_nonvect").ObserveTotal(float64(publish.GetpageNonvect))
-	meter.Counter("cache_insertion").ObserveTotal(float64(publish.CacheInsertion))
+	meter := c.store.Write().SnapshotMeter("")
+	meter.Gauge("ratio").Observe(float64(publish.Ratio))
+	meter.Gauge("reference").Observe(float64(publish.Reference))
+	meter.Gauge("slow").Observe(float64(publish.Slow))
+	meter.Gauge("miss").Observe(float64(publish.Miss))
 
 	if c.Config.AppsEnabled || c.Config.CgroupsEnabled {
 		if c.sharedStore == nil {
-			c.Warnf("apps/cgroups enabled but shared store not initialized")
+			c.Infof("apps/cgroups enabled but shared store not initialized")
 			return nil
 		}
 
@@ -140,7 +144,7 @@ func (c *DCStatCollector) Collect(ctx context.Context) error {
 			c.Debugf("snapshot apps error: %v", err)
 		} else {
 			// Update shared store with per-app/cgroup data
-			c.sharedStore.UpdateDCStatApps(apps, c.handle.MapsPerCore)
+			c.sharedStore.UpdateDCStatApps(apps, uint32(c.Config.UpdateEvery))
 		}
 
 		// Publish per-app/cgroup data to SHM for apps.plugin/cgroup.plugin
@@ -148,7 +152,7 @@ func (c *DCStatCollector) Collect(ctx context.Context) error {
 		if err != nil {
 			c.Debugf("failed to get SHM publisher: %v", err)
 		} else if shmPub != nil {
-			if err := c.sharedStore.Publish(shmPub, ebpfgoSHMFlagDCstat); err != nil {
+			if err := c.sharedStore.Publish(shmPub, ebpfgoSHMFlagDCStat); err != nil {
 				c.Debugf("failed to publish to SHM: %v", err)
 			}
 		}
@@ -168,5 +172,5 @@ func (c *DCStatCollector) ChartTemplateYAML() string {
 }
 
 func (c *DCStatCollector) MetricStore() metrix.CollectorStore {
-	return c.publisher.MetricStore()
+	return c.store
 }

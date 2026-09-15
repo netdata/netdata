@@ -4,6 +4,12 @@
   "title": "Socket eBPF Collector",
   "description": "Collects network socket statistics using eBPF probes",
   "properties": {
+    "per_core_stats": {
+      "type": "boolean",
+      "title": "Per-core statistics",
+      "description": "Collect statistics per CPU core instead of aggregated",
+      "default": true
+    },
     "enabled": {
       "type": "boolean",
       "title": "Enable collector",
@@ -22,7 +28,7 @@
     "sections": [
       {
         "name": "Basic Settings",
-        "fields": ["enabled", "update_every"]
+        "fields": ["enabled", "update_every", "per_core_stats"]
       }
     ]
   }

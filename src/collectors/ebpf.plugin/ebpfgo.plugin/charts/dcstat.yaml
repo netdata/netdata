@@ -4,33 +4,31 @@ groups:
   - family: dcstat
     metrics:
       - ratio
-      - getpage_vect
-      - getpage_nonvect
-      - cache_insertion
+      - reference
+      - slow
+      - miss
     charts:
-      - id: dcstat_ratio
+      - id: dc_hit_ratio
         title: Directory cache ratio
-        context: disk.dcstat_ratio
+        context: filesystem.dc_hit_ratio
         units: "%"
         type: area
         dimensions:
           - selector: ratio
             name: ratio
-      - id: dcstat_getpage
-        title: Dcstat getpage calls
-        context: disk.dcstat_getpage
-        units: "ops/s"
+            algorithm: absolute
+      - id: dc_reference
+        title: Variables used to calculate hit ratio.
+        context: filesystem.dc_reference
+        units: files
         type: area
         dimensions:
-          - selector: getpage_vect
-            name: vect
-          - selector: getpage_nonvect
-            name: nonvect
-      - id: dcstat_cache_insertion
-        title: Dcstat cache insertions
-        context: disk.dcstat_cache_insertion
-        units: "ops/s"
-        type: area
-        dimensions:
-          - selector: cache_insertion
-            name: insertions
+          - selector: reference
+            name: reference
+            algorithm: absolute
+          - selector: slow
+            name: slow
+            algorithm: absolute
+          - selector: miss
+            name: miss
+            algorithm: absolute

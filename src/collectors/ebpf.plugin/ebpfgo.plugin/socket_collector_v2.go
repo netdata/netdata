@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -25,9 +26,12 @@ func init() {
 		JobConfigSchema: socketConfigSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
+			Disabled:    true,
 		},
-		CreateV2: func() collectorapi.CollectorV2 { return NewSocketCollector() },
-		Config:   func() any { return &SocketConfig{} },
+		CreateV2:        func() collectorapi.CollectorV2 { return NewSocketCollector() },
+		Config:          func() any { return &SocketConfig{} },
+		SharedFunctions: socketMethods,
+		MethodHandler:   socketFunctionHandler,
 	})
 }
 
@@ -35,14 +39,16 @@ type SocketConfig struct {
 	Vnode       string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 	Enabled     bool   `yaml:"enabled" json:"enabled"`
+	MapsPerCore bool   `yaml:"per_core_stats" json:"per_core_stats"`
 }
 
 type SocketCollector struct {
 	collectorapi.Base
-	Config    SocketConfig
-	handle    *SocketLegacyHandle
-	publisher *PublisherService
-	state     *socketGlobalState
+	Config      SocketConfig
+	handle      *SocketLegacyHandle
+	store       metrix.CollectorStore
+	state       *socketGlobalState
+	sharedStore *ebpfSharedMemoryStore
 
 	// Function support (network-protocols)
 	fnStore *socketFunctionStore
@@ -51,11 +57,13 @@ type SocketCollector struct {
 func NewSocketCollector() *SocketCollector {
 	return &SocketCollector{
 		Config: SocketConfig{
-			Enabled:     true,
+			Enabled:     false,
 			UpdateEvery: socketDefaultUpdateEvery,
+			MapsPerCore: true,
 		},
-		publisher: GetPublisher(),
-		state:     &socketGlobalState{},
+		store:       metrix.NewCollectorStore(),
+		state:       &socketGlobalState{},
+		sharedStore: GetAppsIntegration().Store(),
 	}
 }
 
@@ -76,6 +84,7 @@ func (c *SocketCollector) Init(ctx context.Context) error {
 	handle, err := LoadSocketLegacy(SocketLegacyConfig{
 		Enabled:     c.Config.Enabled,
 		UpdateEvery: c.Config.UpdateEvery,
+		MapsPerCore: c.Config.MapsPerCore,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to load socket: %v", err)
@@ -97,7 +106,7 @@ func (c *SocketCollector) Check(ctx context.Context) error {
 	if c.handle == nil || c.handle.Runtime == nil {
 		return errors.New("socket not initialized")
 	}
-	_, err := c.handle.Runtime.Snapshot()
+	_, err := c.handle.Runtime.Snapshot(c.Config.MapsPerCore)
 	return err
 }
 
@@ -106,7 +115,7 @@ func (c *SocketCollector) Collect(ctx context.Context) error {
 		return errors.New("socket not initialized")
 	}
 
-	snapshot, err := c.handle.Runtime.Snapshot()
+	snapshot, err := c.handle.Runtime.Snapshot(c.Config.MapsPerCore)
 	if err != nil {
 		c.Infof("snapshot error: %v", err)
 		return nil
@@ -118,30 +127,24 @@ func (c *SocketCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	// Write all metrics to the publisher store
-	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
-	meter.Counter("tcp_cleanup_rbuf").ObserveTotal(float64(publish.tcpDimReceivedCalls))
-	meter.Counter("tcp_cleanup_rbuf_err").ObserveTotal(float64(publish.tcpDimReceivedErr))
-	meter.Counter("tcp_sendmsg").ObserveTotal(float64(publish.tcpDimSentCalls))
-	meter.Counter("tcp_sendmsg_err").ObserveTotal(float64(publish.tcpDimSentErr))
-	meter.Counter("tcp_close").ObserveTotal(float64(publish.tcpCloseCalls))
-	meter.Counter("tcp_retransmit").ObserveTotal(float64(publish.tcpRetransmit))
-	meter.Counter("tcp_connect_v4").ObserveTotal(float64(publish.tcpV4Conn))
-	meter.Counter("tcp_connect_v6").ObserveTotal(float64(publish.tcpV6Conn))
-	meter.Counter("udp_recvmsg").ObserveTotal(float64(publish.udpRecvCalls))
-	meter.Counter("udp_sendmsg").ObserveTotal(float64(publish.udpSendCalls))
-	meter.Counter("udp_recvmsg_err").ObserveTotal(float64(publish.udpRecvErr))
-	meter.Counter("udp_sendmsg_err").ObserveTotal(float64(publish.udpSendErr))
-	meter.Counter("inbound_tcp").ObserveTotal(float64(publish.inboundTCP))
-	meter.Counter("inbound_udp").ObserveTotal(float64(publish.inboundUDP))
-	meter.Counter("tcp_bytes_sent").ObserveTotal(float64(publish.tcpBytesSent))
-	meter.Counter("tcp_bytes_received").ObserveTotal(float64(publish.tcpBytesReceived))
-	meter.Counter("udp_bytes_sent").ObserveTotal(float64(publish.udpBytesSent))
-	meter.Counter("udp_bytes_received").ObserveTotal(float64(publish.udpBytesReceived))
-
 	// Update function store with latest metrics for network-protocols function
 	if c.fnStore != nil {
 		c.fnStore.update(publish)
+	}
+
+	// Socket has no standalone charts; preserve its per-PID integration output.
+	if c.sharedStore != nil {
+		entries, err := c.handle.Runtime.SnapshotPerPID()
+		if err != nil {
+			c.sharedStore.MarkSocketInactive()
+			return nil
+		}
+		c.sharedStore.UpdateSocketApps(entries, uint32(c.Config.UpdateEvery))
+		if pub, err := GetAppsIntegration().PublisherSharedMemory(); err == nil {
+			if err := c.sharedStore.Publish(pub, ebpfgoSHMFlagSocket); err != nil {
+				c.Debugf("failed to publish socket SHM: %v", err)
+			}
+		}
 	}
 
 	return nil
@@ -154,12 +157,58 @@ func (c *SocketCollector) Cleanup(ctx context.Context) {
 }
 
 func (c *SocketCollector) ChartTemplateYAML() string {
-	return socketChartTemplateV2
+	return ""
 }
 
 func (c *SocketCollector) MetricStore() metrix.CollectorStore {
-	return c.publisher.MetricStore()
+	return c.store
 }
+
+func socketMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{{
+		ID:           socketFunctionName,
+		FunctionName: socketFunctionName,
+		Name:         "Network protocols",
+		UpdateEvery:  socketFunctionUpdateEvery,
+		Help:         socketFunctionHelp,
+		Tags:         socketFunctionTags,
+		RawRequest:   true,
+	}}
+}
+
+func socketFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*SocketCollector)
+	if !ok || c == nil {
+		return nil
+	}
+	return socketMethodHandler{collector: c}
+}
+
+type socketMethodHandler struct{ collector *SocketCollector }
+
+func (socketMethodHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
+	return nil, nil
+}
+
+func (socketMethodHandler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	return funcapi.ErrorResponse(400, "network-protocols requires a raw Function request")
+}
+
+func (socketMethodHandler) Cleanup(context.Context) {}
+
+func (h socketMethodHandler) HandleRaw(_ context.Context, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+	payload, err := h.collector.handleNetworkProtocolsFunction()
+	if err != nil {
+		return funcapi.UnavailableResponse(err.Error())
+	}
+	var response map[string]any
+	if err := json.Unmarshal([]byte(payload), &response); err != nil {
+		return funcapi.InternalErrorResponse("invalid network-protocols response: %v", err)
+	}
+	return funcapi.RawResponse(response)
+}
+
+var _ funcapi.RawMethodHandler = socketMethodHandler{}
 
 // Function support: network-protocols
 // These methods enable the socket collector to serve network-protocols function calls

@@ -23,6 +23,7 @@ func init() {
 		JobConfigSchema: dnsConfigSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
+			Disabled:    true,
 		},
 		CreateV2: func() collectorapi.CollectorV2 { return NewDNSCollector() },
 		Config:   func() any { return &DNSConfig{} },
@@ -37,9 +38,9 @@ type DNSConfig struct {
 
 type DNSCollector struct {
 	collectorapi.Base
-	Config    DNSConfig
-	handle    *DNSLegacyHandle
-	publisher *PublisherService
+	Config DNSConfig
+	handle *DNSLegacyHandle
+	store  metrix.CollectorStore
 
 	// Function support (dns-queries)
 	fnStore *dnsFunctionStore
@@ -48,11 +49,11 @@ type DNSCollector struct {
 func NewDNSCollector() *DNSCollector {
 	return &DNSCollector{
 		Config: DNSConfig{
-			Enabled:     true,
+			Enabled:     false,
 			UpdateEvery: dnsDefaultUpdateEvery,
 		},
-		publisher: GetPublisher(),
-		fnStore:   newDNSFunctionStore(),
+		store:   metrix.NewCollectorStore(),
+		fnStore: newDNSFunctionStore(),
 	}
 }
 
@@ -90,7 +91,7 @@ func (c *DNSCollector) Check(ctx context.Context) error {
 	if c.handle == nil || c.handle.Runtime == nil {
 		return errors.New("dns not initialized")
 	}
-	_, err := c.handle.Runtime.Snapshot()
+	_, err := c.handle.Runtime.FlowSnapshot()
 	return err
 }
 
@@ -99,15 +100,22 @@ func (c *DNSCollector) Collect(ctx context.Context) error {
 		return errors.New("dns not initialized")
 	}
 
-	snapshot, err := c.handle.Runtime.Snapshot()
+	flows, err := c.handle.Runtime.FlowSnapshot()
 	if err != nil {
 		c.Infof("snapshot error: %v", err)
 		return nil
 	}
 
-	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
-	meter.Counter("requests").ObserveTotal(float64(snapshot.Requests))
-	meter.Counter("responses").ObserveTotal(float64(snapshot.Responses))
+	meter := c.store.Write().SnapshotMeter("")
+	requests := len(flows)
+	responses := 0
+	for _, flow := range flows {
+		if !flow.TimedOut {
+			responses++
+		}
+	}
+	meter.Counter("requests").ObserveTotal(float64(requests))
+	meter.Counter("responses").ObserveTotal(float64(responses))
 
 	// Update function store for dns-queries function
 	if c.fnStore != nil {
@@ -128,5 +136,5 @@ func (c *DNSCollector) ChartTemplateYAML() string {
 }
 
 func (c *DNSCollector) MetricStore() metrix.CollectorStore {
-	return c.publisher.MetricStore()
+	return c.store
 }

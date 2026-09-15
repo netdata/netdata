@@ -23,6 +23,7 @@ func init() {
 		JobConfigSchema: fdConfigSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 1,
+			Disabled:    true,
 		},
 		CreateV2: func() collectorapi.CollectorV2 { return NewFDCollector() },
 		Config:   func() any { return &FDConfig{} },
@@ -35,25 +36,26 @@ type FDConfig struct {
 	Enabled        bool   `yaml:"enabled" json:"enabled"`
 	AppsEnabled    bool   `yaml:"apps" json:"apps"`
 	CgroupsEnabled bool   `yaml:"cgroups" json:"cgroups"`
+	ReportErrors   bool   `yaml:"report_errors" json:"report_errors"`
+	MapsPerCore    bool   `yaml:"per_core_stats" json:"per_core_stats"`
 }
 
 type FDCollector struct {
 	collectorapi.Base
 	Config      FDConfig
 	handle      *FDLegacyHandle
-	state       *fdGlobalState
-	publisher   *PublisherService
+	store       metrix.CollectorStore
 	sharedStore *ebpfSharedMemoryStore
 }
 
 func NewFDCollector() *FDCollector {
 	return &FDCollector{
 		Config: FDConfig{
-			Enabled:     true,
+			Enabled:     false,
 			UpdateEvery: fdDefaultUpdateEvery,
+			MapsPerCore: true,
 		},
-		publisher:   GetPublisher(),
-		state:       &fdGlobalState{},
+		store:       metrix.NewCollectorStore(),
 		sharedStore: GetAppsIntegration().Store(),
 	}
 }
@@ -68,6 +70,8 @@ func (c *FDCollector) Init(ctx context.Context) error {
 		c.Config.Enabled = true
 		c.Config.AppsEnabled = legacyCfg.AppsEnabled
 		c.Config.CgroupsEnabled = legacyCfg.CgroupsEnabled
+		c.Config.ReportErrors = legacyCfg.ReportErrors
+		c.Config.MapsPerCore = legacyCfg.MapsPerCore
 	}
 
 	if !c.Config.Enabled {
@@ -78,6 +82,8 @@ func (c *FDCollector) Init(ctx context.Context) error {
 		Enabled:        c.Config.Enabled,
 		AppsEnabled:    c.Config.AppsEnabled,
 		CgroupsEnabled: c.Config.CgroupsEnabled,
+		ReportErrors:   c.Config.ReportErrors,
+		MapsPerCore:    c.Config.MapsPerCore,
 		UpdateEvery:    c.Config.UpdateEvery,
 	})
 	if err != nil {
@@ -111,15 +117,18 @@ func (c *FDCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
-	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
-	meter.Counter("open").ObserveTotal(float64(snapshot.Open))
-	meter.Counter("close").ObserveTotal(float64(snapshot.Close))
-	meter.Counter("open_error").ObserveTotal(float64(snapshot.OpenErr))
+	meter := c.store.Write().SnapshotMeter("")
+	meter.Counter("open").ObserveTotal(float64(snapshot.OpenCall))
+	meter.Counter("close").ObserveTotal(float64(snapshot.CloseCall))
+	if c.Config.ReportErrors {
+		meter.Counter("open_error").ObserveTotal(float64(snapshot.OpenErr))
+		meter.Counter("close_error").ObserveTotal(float64(snapshot.CloseErr))
+	}
 
 	// Per-PID snapshot and SHM publication
 	if c.Config.AppsEnabled || c.Config.CgroupsEnabled {
 		if c.sharedStore == nil {
-			c.Warnf("apps/cgroups enabled but shared store not initialized")
+			c.Infof("apps/cgroups enabled but shared store not initialized")
 			return nil
 		}
 
@@ -128,7 +137,7 @@ func (c *FDCollector) Collect(ctx context.Context) error {
 			c.Debugf("snapshot apps error: %v", err)
 		} else {
 			// Update shared store with per-app/cgroup data
-			c.sharedStore.UpdateFDApps(apps)
+			c.sharedStore.UpdateFDApps(apps, c.Config.ReportErrors, uint32(c.Config.UpdateEvery))
 		}
 
 		// Publish per-app/cgroup data to SHM for apps.plugin/cgroup.plugin
@@ -156,5 +165,5 @@ func (c *FDCollector) ChartTemplateYAML() string {
 }
 
 func (c *FDCollector) MetricStore() metrix.CollectorStore {
-	return c.publisher.MetricStore()
+	return c.store
 }

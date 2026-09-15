@@ -6,28 +6,25 @@ groups:
       - open
       - close
       - open_error
+      - close_error
     charts:
-      - id: fd_open
-        title: File descriptor open calls
-        context: disk.fd_open
+      - id: file_descriptor
+        title: Open and close calls
+        context: filesystem.file_descriptor
         units: "ops/s"
         type: area
         dimensions:
           - selector: open
             name: open
-      - id: fd_close
-        title: File descriptor close calls
-        context: disk.fd_close
-        units: "ops/s"
-        type: area
-        dimensions:
           - selector: close
             name: close
-      - id: fd_open_error
-        title: File descriptor open errors
-        context: disk.fd_open_error
+      - id: file_error
+        title: Open fails
+        context: filesystem.file_error
         units: "ops/s"
         type: area
         dimensions:
           - selector: open_error
-            name: errors
+            name: open
+          - selector: close_error
+            name: close

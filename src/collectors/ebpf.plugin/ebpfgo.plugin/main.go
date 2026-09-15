@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
-	"runtime"
 	"strings"
 	"syscall"
 
@@ -86,15 +85,19 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	// Setup signal handling
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
-		<-sigCh
-		a.Infof("shutdown signal received")
-		cancel()
+		select {
+		case <-sigCh:
+			a.Infof("shutdown signal received")
+			cancel()
+		case <-ctx.Done():
+		}
 	}()
 
 	if err := a.RunContext(ctx); err != nil {

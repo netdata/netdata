@@ -4,6 +4,18 @@
   "title": "File Descriptor eBPF Collector",
   "description": "Collects file descriptor statistics using eBPF probes",
   "properties": {
+    "per_core_stats": {
+      "type": "boolean",
+      "title": "Per-core statistics",
+      "description": "Collect statistics per CPU core instead of aggregated",
+      "default": true
+    },
+    "report_errors": {
+      "type": "boolean",
+      "title": "Report errors",
+      "description": "Collect error-return charts for file descriptor operations",
+      "default": false
+    },
     "enabled": {
       "type": "boolean",
       "title": "Enable collector",
@@ -38,7 +50,7 @@
       },
       {
         "name": "Advanced",
-        "fields": ["apps", "cgroups"]
+        "fields": ["apps", "cgroups", "per_core_stats", "report_errors"]
       }
     ]
   }
