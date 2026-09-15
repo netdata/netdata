@@ -839,6 +839,58 @@ static void test_constant_input()
     }
 }
 
+// Test: prediction applies the anomaly threshold to a real model decision.
+static void test_dimension_predict_decision()
+{
+    fprintf(stderr, "  test_dimension_predict_decision...\n");
+
+    const unsigned old_diff_n = Cfg.diff_n;
+    const unsigned old_lag_n = Cfg.lag_n;
+    const double old_threshold = Cfg.dimension_anomaly_score_threshold;
+    const size_t old_suppression_window = Cfg.suppression_window;
+    const size_t old_suppression_threshold = Cfg.suppression_threshold;
+
+    Cfg.diff_n = 0;
+    Cfg.lag_n = 5;
+    Cfg.dimension_anomaly_score_threshold = 0.4;
+    Cfg.suppression_window = 100;
+    Cfg.suppression_threshold = 100;
+
+    ml_dimension_t dim = {};
+    dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
+    dim.ts = TRAINING_STATUS_TRAINED;
+    spinlock_init(&dim.slock);
+
+    ml_kmeans_inlined_t model;
+    for (int i = 0; i < 6; i++) {
+        model.cluster_centers[0](i) = 10.0;
+        model.cluster_centers[1](i) = 10.0;
+    }
+    model.min_dist = 0.0;
+    model.max_dist = 180.0;
+    dim.km_contexts.push_back(model);
+
+    // Warm the prediction ring, then verify a normal sample is not anomalous.
+    for (size_t i = 0; i < Cfg.lag_n + 1; i++)
+        ML_TEST_ASSERT(!ml_dimension_predict(&dim, 10.0, true), "normal warmup/sample should not be anomalous");
+
+    ML_TEST_ASSERT(ml_dimension_predict(&dim, 100.0, true), "anomalous sample should cross the configured threshold");
+
+    // The same score must change classification when only the threshold changes.
+    dim.cns.clear();
+    dim.cns_head = 0;
+    Cfg.dimension_anomaly_score_threshold = 0.6;
+    for (size_t i = 0; i < Cfg.lag_n + 1; i++)
+        ML_TEST_ASSERT(!ml_dimension_predict(&dim, 10.0, true), "threshold test warmup should not be anomalous");
+    ML_TEST_ASSERT(!ml_dimension_predict(&dim, 100.0, true), "raising threshold should classify the same score as normal");
+
+    Cfg.diff_n = old_diff_n;
+    Cfg.lag_n = old_lag_n;
+    Cfg.dimension_anomaly_score_threshold = old_threshold;
+    Cfg.suppression_window = old_suppression_window;
+    Cfg.suppression_threshold = old_suppression_threshold;
+}
+
 // Test: various parameter combinations produce correctly sized outputs
 static void test_parameter_combinations()
 {
@@ -1142,6 +1194,7 @@ extern "C" int ml_unittest()
     test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
+    test_dimension_predict_decision();
     test_parameter_combinations();
     test_kmeans_timestamp_roundtrip();
     test_kmeans_timestamp_rejection();
