@@ -240,11 +240,19 @@ static struct {
     PAD64(uint64_t) tier0_disk_original_bytes;
 } gorilla_stats = { 0 };
 
+// both run in the collection path of every collector thread and share one cacheline, so they are
+// counted only when the embedder charts them
 static inline void gorilla_stats_hot_buffer_added(void) {
+    if(!dbengine_cfg.compression_statistics)
+        return;
+
     __atomic_fetch_add(&gorilla_stats.hot_buffers_added, 1, __ATOMIC_RELAXED);
 }
 
 static inline void gorilla_stats_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t original) {
+    if(!dbengine_cfg.compression_statistics)
+        return;
+
     __atomic_fetch_add(&gorilla_stats.tier0_disk_actual_bytes, actual, __ATOMIC_RELAXED);
     __atomic_fetch_add(&gorilla_stats.tier0_disk_optimal_bytes, optimal, __ATOMIC_RELAXED);
     __atomic_fetch_add(&gorilla_stats.tier0_disk_original_bytes, original, __ATOMIC_RELAXED);

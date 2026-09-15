@@ -19,6 +19,7 @@ struct dbengine_config {
     bool use_all_ram_for_caches;                // [db] dbengine use all ram for caches
 
     bool cache_statistics;                      // keep per-cache statistics (the daemon's pulse setting)
+    bool compression_statistics;                // count gorilla buffers and tier-0 compression bytes (pulse extended)
 
     // sizing of partitions, evictors, flushers and metric-registry loaders
     size_t cpus;                                // 0 = detect the system's cpus
@@ -68,6 +69,7 @@ struct dbengine_config {
     .out_of_memory_protection_bytes = 0,                        \
     .use_all_ram_for_caches = false,                            \
     .cache_statistics = true,                                   \
+    .compression_statistics = false,                            \
     .cpus = 0,                                                  \
     .arals_for_large_pages = false,                             \
     .direct_io = true,                                          \
