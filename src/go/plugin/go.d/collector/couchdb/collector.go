@@ -71,7 +71,7 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	err := c.validateConfig()
+	err := c.validateConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("check configuration: %v", err)
 	}

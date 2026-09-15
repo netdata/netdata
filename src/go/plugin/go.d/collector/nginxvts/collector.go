@@ -72,7 +72,7 @@ func (c *Collector) Cleanup(context.Context) {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	err := c.validateConfig()
+	err := c.validateConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("config: %v", err)
 	}
