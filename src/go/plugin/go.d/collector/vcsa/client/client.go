@@ -47,12 +47,12 @@ func (s *sessionToken) get() string {
 	return s.id
 }
 
-func New(httpClient *web.HTTPClient, url, username, password string) *Client {
+func New(httpClient *http.Client, url, username, password string) *Client {
 	if httpClient == nil {
-		httpClient = web.WrapHTTPClient(&http.Client{}, nil)
+		httpClient = &http.Client{}
 	}
 	return &Client{
-		httpClient: httpClient,
+		httpClient: web.WrapHTTPClient(httpClient, nil),
 		url:        url,
 		username:   username,
 		password:   password,
