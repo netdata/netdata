@@ -1960,6 +1960,9 @@ static void *tier_mrg_load(
     mlt->datafile->populate_mrg.populated = true;
     spinlock_unlock(&mlt->datafile->populate_mrg.spinlock);
 
+    // last touch of the datafile: a pending deletion may free it right after this
+    datafile_release(mlt->datafile, DATAFILE_ACQUIRE_MRG_LOAD);
+
     __atomic_add_fetch(mlt->populated_datafiles, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(mlt->total, 1, __ATOMIC_RELEASE);
     freez(mlt);
@@ -1968,7 +1971,9 @@ static void *tier_mrg_load(
 }
 
 
-static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+static void after_populate_mrg(struct rrdengine_instance *ctx, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    __atomic_store_n(&ctx->atomic.mrg_populated, true, __ATOMIC_RELEASE);
+
     if (completion)
         completion_mark_complete(completion);
 }
@@ -2021,6 +2026,15 @@ static void *populate_mrg_tp_worker(
             }
 
             if(datafile->populate_mrg.populated) {
+                spinlock_unlock(&datafile->populate_mrg.spinlock);
+                datafile = NULL;
+                continue;
+            }
+
+            // hold the datafile until its journal has been loaded; datafile_delete() waits for this
+            // reference like it does for queries. The acquire fails only for a datafile already pending
+            // deletion, whose retention is going away with it.
+            if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_MRG_LOAD)) {
                 spinlock_unlock(&datafile->populate_mrg.spinlock);
                 datafile = NULL;
                 continue;
@@ -2481,7 +2495,7 @@ static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
 
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct rrdengine_instance *ctx = multidb_ctx[tier];
-        if (!rrdeng_ctx_is_active(ctx))
+        if (!rrdeng_ctx_is_active(ctx) || !rrdeng_ctx_mrg_populated(ctx))
             continue;
         check_and_schedule_db_rotation(ctx);
     }

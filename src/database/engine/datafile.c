@@ -169,7 +169,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
 
     if(!can_be_deleted)
         internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
-                             "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
+                             "(oc:%u, pd:%u, rt:%u, ix:%u, ml:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
                              "(scanned in %"PRIu64" usecs)",
                        df->fileno, datafile_ctx(df)->config.tier,
                        df->users.lockers,
@@ -177,6 +177,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
                        df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
                        df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
                        df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
+                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_MRG_LOAD],
                        writers_running,
                        flushed_to_open_running,
                        clean_pages_in_open_cache,

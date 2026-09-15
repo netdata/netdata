@@ -29,6 +29,7 @@ typedef enum __attribute__ ((__packed__)) {
     DATAFILE_ACQUIRE_PAGE_DETAILS,
     DATAFILE_ACQUIRE_RETENTION,
     DATAFILE_ACQUIRE_INDEXING,
+    DATAFILE_ACQUIRE_MRG_LOAD,                  // the metrics registry is being populated from its journal
 
     // terminator
     DATAFILE_ACQUIRE_MAX,
