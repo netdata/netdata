@@ -30,6 +30,12 @@ destinations:
     type: pushbullet
     access_token: ${env:NOTIFY_PUSHBULLET_TOKEN}
     channel_tag: test-alerts
+  twilio:
+    type: twilio
+    account_sid: ${env:NOTIFY_TWILIO_ACCOUNT_SID}
+    auth_token: ${env:NOTIFY_TWILIO_AUTH_TOKEN}
+    from: '+15005550006'
+    to: '+15005550009'
 routing:
   default: [local]
   roles:
@@ -41,3 +47,4 @@ routing:
     telegram_ops: [telegram]
     pushover_ops: [pushover]
     pushbullet_ops: [pushbullet]
+    twilio_ops: [twilio]

@@ -284,15 +284,21 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		"pushover deadline":   {provider: "pushover"},
 		"pushbullet cancel":   {provider: "pushbullet", cancel: true},
 		"pushbullet deadline": {provider: "pushbullet"},
+		"twilio cancel":       {provider: "twilio", cancel: true},
+		"twilio deadline":     {provider: "twilio"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case "/bot123:synthetic-private-value/sendMessage", "/1/messages.json", "/v2/pushes":
+				case "/bot123:synthetic-private-value/sendMessage", "/1/messages.json", "/v2/pushes", twilioTestPath:
 					_, _ = io.Copy(io.Discard, r.Body)
-					w.WriteHeader(200)
+					if r.URL.Path == twilioTestPath {
+						w.WriteHeader(201)
+					} else {
+						w.WriteHeader(200)
+					}
 					_, _ = io.WriteString(w, `{`)
 					w.(http.Flusher).Flush()
 					close(started)
@@ -329,6 +335,16 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 					APIURL:      server.URL,
 					AccessToken: "synthetic-private-value",
 					Email:       "ops@example.com",
+				}
+			}
+			if test.provider == "twilio" {
+				dst = Destination{
+					Type:       "twilio",
+					APIURL:     server.URL,
+					AccountSID: twilioTestSID,
+					AuthToken:  "synthetic-private-value",
+					From:       "+15005550006",
+					To:         "+15005550009",
 				}
 			}
 			config, err := yaml.Marshal(Config{Version: 1, Destinations: map[string]Destination{

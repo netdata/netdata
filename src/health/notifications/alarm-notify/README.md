@@ -1,12 +1,12 @@
 # Experimental Go notifier
 
-This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover and Pushbullet.
+This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet and Twilio.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
-Telegram bot messages, and Pushover/Pushbullet notifications.
+Telegram bot messages, Pushover/Pushbullet notifications and Twilio text messages.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -30,10 +30,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         print(self.rfile.read(int(self.headers["Content-Length"])).decode(), flush=True)
-        self.send_response(200)
+        self.send_response(201 if self.path.endswith("/Messages.json") else 200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(b'{"ok":true,"status":1,"iden":"test-push","result":{"message_id":1}}')
+        self.wfile.write(b'{"ok":true,"status":1,"iden":"test-push","sid":"test-message","result":{"message_id":1}}')
 
     def log_message(self, *args):
         pass  # Avoid logging credential-bearing request paths.
@@ -74,13 +74,14 @@ and `url`; `bearer_token` is optional for generic webhooks and rejected for Slac
 `type: telegram`, `bot_token` and `chat_id`, with the additional settings described below. Provider-specific settings
 are rejected on other provider types. Pushover requires `type: pushover`, `app_token` and `user_key`.
 Pushbullet requires `type: pushbullet`, `access_token`, and one `email` or `channel_tag`.
+Twilio requires `type: twilio`, `account_sid`, `auth_token`, `from` and `to`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
-URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys and Pushbullet access tokens accept literal strings
-or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
+URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens and Twilio account
+credentials accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
@@ -118,9 +119,10 @@ count. Partial failure returns `0` when another delivery succeeded, matching Bas
 the individual results to see failures. On interruption, counts cover results reported before cancellation and do
 not claim an outcome for interrupted or unstarted deliveries.
 
-Deliveries use POST with `Content-Type: application/json`; generic webhooks may add `Authorization: Bearer ...`.
+Deliveries use POST. Twilio uses `application/x-www-form-urlencoded`; all other providers use `application/json`.
+Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. These three providers make one attempt and
-close response bodies without buffering or interpreting them. Telegram, Pushover and Pushbullet check bounded JSON
+close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet and Twilio check bounded JSON
 acknowledgments; Telegram can retry rate limits as described below. Redirects are never followed. Errors do not echo config/input values,
 secret contents, response text, or endpoint URLs.
 
@@ -406,6 +408,72 @@ destinations:
 
 Tests use synthetic tokens and local receivers to verify complete requests, recipient modes, acknowledgments,
 secret handling, failure isolation and cancellation. They do not send to Pushbullet or verify native client rendering.
+
+## Twilio text messages
+
+Configure an account SID, Auth Token, sender and one recipient per named destination. Routes select several names
+for multiple recipients, preserving Bash's account-based text-message delivery:
+
+```yaml
+version: 1
+destinations:
+  twilio_ops:
+    type: twilio
+    account_sid: ${env:NOTIFY_TWILIO_ACCOUNT_SID}
+    auth_token: ${env:NOTIFY_TWILIO_AUTH_TOKEN}
+    from: '+15005550006'
+    to: '+15005550009'
+routing:
+  roles:
+    sysadmin: [twilio_ops]
+```
+
+Replace the synthetic numbers with your Twilio sender and recipient before using the real service. `from` and `to`
+are literal strings, not recipient lists. The sender may be a phone number, alphanumeric sender ID, short code or
+channel address; the recipient is a phone number or channel address supported by Twilio. The notifier preserves
+these values and leaves service-specific validity checks to Twilio. Quote numbers in YAML to preserve `+` and zeros.
+
+`account_sid` is `AC` followed by 32 hexadecimal characters. `auth_token` is nonempty printable ASCII without
+whitespace. Both accept environment/file references; validation checks their syntax without resolving unused
+credentials. Other providers' fields are rejected. This increment uses Bash's account SID/Auth Token
+[Basic authentication](https://www.twilio.com/docs/usage/requests-to-twilio#using-your-account-sid-and-auth-token).
+
+The optional `api_url` defaults to `https://api.twilio.com` and accepts a literal or secret reference. A custom
+HTTP(S) base may include a path prefix but no credentials, query or fragment; the official API requires HTTPS.
+The notifier appends `/2010-04-01/Accounts/<ACCOUNT_SID>/Messages.json` and sends form-encoded `From`, `To` and `Body`.
+
+The plain-text body includes summary/details, node/alert, status transition, available chart/context and values,
+timestamp and optional event URL. Zero values remain visible. Form encoding preserves Unicode, plus signs and
+other special characters. Like Bash, the notifier does not shorten, split or retry messages. Twilio's
+[Message API](https://www.twilio.com/docs/messaging/api/message-resource) limits bodies to 1,600 characters and can
+segment SMS into multiple charged messages; rejected requests fail the destination. Richer shared content remains
+pending in the inventory.
+
+Success requires HTTP 201 and a nonempty created-message `sid` in a JSON response of at most 256 KiB. This confirms
+API creation, not delivery to the recipient; the notifier does not poll delivery status. Redirects are refused and
+errors omit account credentials, phone numbers, response text and endpoint URLs. A failure allows later destinations
+to proceed within the invocation deadline.
+
+For a local demonstration with the receiver above, save this as `twilio-local.yaml`:
+
+```yaml
+version: 1
+destinations:
+  twilio_local:
+    type: twilio
+    api_url: http://127.0.0.1:18080
+    account_sid: AC00000000000000000000000000000000
+    auth_token: synthetic-token
+    from: '+15005550006'
+    to: '+15005550009'
+```
+
+```sh
+/tmp/alarm-notify send --config twilio-local.yaml --destination twilio_local < examples/event.json
+```
+
+Tests use synthetic credentials and loopback receivers to verify complete forms, authentication, routing,
+acknowledgments and cancellation. They do not send live messages or verify handset delivery.
 
 ## Event document
 

@@ -139,14 +139,6 @@ func renderPushbullet(dst Destination, event Event) pushbulletMessage {
 	if event.URL != "" {
 		message.Type, message.URL = "link", event.URL
 	}
-	lines := []string{event.Summary}
-	if event.Info != "" {
-		lines = append(lines, event.Info)
-	}
-	for _, field := range notificationFields(event) {
-		lines = append(lines, field.name+": "+field.value)
-	}
-	lines = append(lines, "Time: "+event.Timestamp.Format(time.RFC3339))
-	message.Body = strings.Join(lines, "\n")
+	message.Body = notificationPlainText(event)
 	return message
 }
