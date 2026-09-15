@@ -28,9 +28,8 @@ func (dst Destination) validateMessageBird() error {
 			"messagebird originator must be a nonempty literal sender without surrounding whitespace or controls",
 		)
 	}
-	digits := strings.TrimPrefix(dst.Recipient, "+")
-	if digits == "" || strings.IndexFunc(digits, func(r rune) bool { return r < '0' || r > '9' }) != -1 {
-		return errors.New("messagebird recipient must be one phone number using digits and an optional leading +")
+	if err := validatePhoneNumber(dst.Recipient, "messagebird", "recipient"); err != nil {
+		return err
 	}
 	for _, field := range []struct{ name, value string }{{"access_key", dst.AccessKey}, {"api_url", dst.APIURL}} {
 		reference, err := secretReference(field.value)

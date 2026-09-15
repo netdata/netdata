@@ -76,6 +76,14 @@ destinations:
     api_url: ${env:NOTIFY_DYNATRACE_API_URL}
     api_token: ${env:NOTIFY_DYNATRACE_API_TOKEN}
     entity_selector: 'type(HOST),tag("netdata")'
+  prowl:
+    type: prowl
+    api_key: ${env:NOTIFY_PROWL_API_KEY}
+  kavenegar:
+    type: kavenegar
+    api_key: ${env:NOTIFY_KAVENEGAR_API_KEY}
+    sender: '+15005550006'
+    recipient: '+15005550009'
 routing:
   default: [local]
   roles:
@@ -93,3 +101,4 @@ routing:
     chat_webhooks: [rocketchat, flock, fleep]
     incident_ops: [ilert, signl4]
     monitoring_ops: [alerta, dynatrace]
+    form_ops: [prowl, kavenegar]

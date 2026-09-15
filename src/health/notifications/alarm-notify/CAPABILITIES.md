@@ -38,6 +38,8 @@ HipChat is excluded from the Go migration by explicit approval following its
   content/navigation and selected-only credential resolution.
 - Alerta environments, correlation/severity, optional API-key auth and suppression handling; Dynatrace Events v2
   entity targeting, configurable type/source and per-event result checks.
+- Prowl push with batched keys, Bash priorities, navigation and XML acknowledgments; Kavenegar HTTPS SMS with
+  sender/recipient, intact native text and JSON API acceptance checks.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -57,7 +59,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | HipChat | `send_hipchat` | Excluded by explicit decision after service/product end of life; Bash retained |
 | MessageBird | `send_messagebird` | Originator/recipient SMS, AccessKey auth, automatic character encoding, custom API bases and acknowledgment checks implemented |
 | SMSEagle | `send_smseagle` | Pending |
-| Kavenegar | `send_kavenegar` | Pending |
+| Kavenegar | `send_kavenegar` | HTTPS v1 SMS, API-key secrets, sender/recipient, native plain text, custom API base and JSON acceptance checks implemented |
 | Telegram | `send_telegram` | Implemented with chats/topics, bot-token secrets, custom API bases, silent CLEAR, disabled previews and optional rate-limit retries; server-directed retry timing is an approved correction |
 | Microsoft Teams | `send_msteams` | Pending |
 | Slack | `send_slack` | Modern app webhooks implemented; legacy channel/user/username/icon overrides pending by explicit staged-delivery decision |
@@ -66,7 +68,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Flock | `send_flock` | Channel webhook URLs, host sender name, status attachments and alert facts/navigation implemented; ineffective channel loop omitted by explicit decision; extended artwork/presentation pending |
 | Discord | `send_discord` | Native webhooks implemented; ineffective channel-name loop omitted by explicit decision; additional artwork/presentation pending |
 | Fleep | `send_fleep` | Conversation webhook URLs, custom sender and JSON message content implemented |
-| Prowl | `send_prowl` | Pending |
+| Prowl | `send_prowl` | API-key batches, Bash priorities, native event/description/navigation, byte limits, custom API base and XML acknowledgments implemented |
 | IRC | `send_irc` | Pending |
 | AWS SNS | `send_awssns` | Pending |
 | Matrix | `send_matrix` | Pending |
@@ -94,8 +96,8 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first thirteen implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
-Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta and Dynatrace.
+The first fourteen implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
+Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl and Kavenegar.
 Related providers may share small PRs.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
 More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final

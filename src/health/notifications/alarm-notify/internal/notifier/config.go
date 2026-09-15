@@ -107,6 +107,9 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "prowl" || dst.Type == "kavenegar" {
+		return dst.validateFormProvider()
+	}
 	if dst.Type == "alerta" || dst.Type == "dynatrace" {
 		return dst.validateMonitoring()
 	}
@@ -114,7 +117,7 @@ func (dst Destination) validate() error {
 		dst.EventType != "" ||
 		dst.Source != "" {
 		return errors.New(
-			"api_key and environment require type: alerta; api_token, entity_selector, event_type and source require type: dynatrace",
+			"api_key requires type: alerta, prowl or kavenegar; environment requires type: alerta; api_token, entity_selector, event_type and source require type: dynatrace",
 		)
 	}
 	if dst.Type == "ilert" {
@@ -127,7 +130,7 @@ func (dst Destination) validate() error {
 		return dst.validateChatWebhook()
 	}
 	if dst.Channel != "" || dst.Sender != "" {
-		return errors.New("channel requires type: rocketchat; sender requires type: fleep")
+		return errors.New("channel requires type: rocketchat; sender requires type: fleep or kavenegar")
 	}
 	if dst.Type == "gotify" {
 		return dst.validateGotify()
@@ -142,7 +145,9 @@ func (dst Destination) validate() error {
 		return dst.validateMessageBird()
 	}
 	if dst.AccessKey != "" || dst.Originator != "" || dst.Recipient != "" {
-		return errors.New("access_key, originator and recipient require type: messagebird")
+		return errors.New(
+			"access_key and originator require type: messagebird; recipient requires type: messagebird or kavenegar",
+		)
 	}
 	if dst.Type == "twilio" {
 		return dst.validateTwilio()
@@ -167,13 +172,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta or dynatrace; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl or kavenegar; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta or dynatrace",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl or kavenegar",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
@@ -266,6 +271,14 @@ func validateAPIBase(endpoint, provider, officialHost string) error {
 	}
 	if strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), officialHost) && u.Scheme != "https" {
 		return fmt.Errorf("the official %s API requires HTTPS", provider)
+	}
+	return nil
+}
+
+func validatePhoneNumber(value, provider, field string) error {
+	digits := strings.TrimPrefix(value, "+")
+	if digits == "" || strings.IndexFunc(digits, func(r rune) bool { return r < '0' || r > '9' }) != -1 {
+		return fmt.Errorf("%s %s must be one phone number using digits and an optional leading +", provider, field)
 	}
 	return nil
 }

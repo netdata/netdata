@@ -61,6 +61,10 @@ func dispatch(
 			err = postJSON(ctx, dst, renderSIGNL4(event), timeout)
 		case "alerta":
 			err = sendAlerta(ctx, dst, event, timeout)
+		case "prowl":
+			err = sendProwl(ctx, dst, event, timeout)
+		case "kavenegar":
+			err = sendKavenegar(ctx, dst, event, timeout)
 		case "dynatrace":
 			err = sendDynatrace(ctx, dst, event, timeout)
 		default:

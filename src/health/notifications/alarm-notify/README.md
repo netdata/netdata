@@ -1,14 +1,14 @@
 # Experimental Go notifier
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
-Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta and Dynatrace.
+Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl and Kavenegar.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
-Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, and Alerta/Dynatrace monitoring events.
+Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events, Prowl push notifications and Kavenegar SMS.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -38,9 +38,13 @@ class Receiver(BaseHTTPRequestHandler):
         elif self.path.endswith(("/Messages.json", "/messages", "/signl4", "/alert", "/api/v2/events/ingest")):
             status = 201
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", "application/xml" if self.path.endswith("/add") else "application/json")
         self.end_headers()
-        if self.path.endswith("/message"):
+        if self.path.endswith("/add"):
+            self.wfile.write(b'<prowl><success code="200" remaining="999" resetdate="1234567890"/></prowl>')
+        elif self.path.endswith("/sms/send.json"):
+            self.wfile.write(b'{"return":{"status":200},"entries":[{"messageid":1,"status":1}]}')
+        elif self.path.endswith("/message"):
             self.wfile.write(b'{"id":1,"appid":1}')
         elif self.path.endswith("/alert"):
             self.wfile.write(b'{"status":"ok","id":"test-alert"}')
@@ -98,17 +102,18 @@ MessageBird requires `type: messagebird`, `access_key`, `originator` and `recipi
 Gotify requires `type: gotify`, `api_url` and `app_token`. ntfy requires `type: ntfy` and a full topic `url`;
 optional authentication uses `access_token` or `username` with `password`.
 Rocket.Chat, Flock and Fleep require their respective `type` and a complete webhook `url`. Rocket.Chat accepts an
-optional `channel`; Fleep accepts an optional `sender`. These fields are rejected on other provider types.
+optional `channel`; Fleep accepts an optional `sender`. Kavenegar also uses `sender` for its SMS number.
 ilert requires `type: ilert` and `integration_key`, with an optional `api_url`. SIGNL4 requires `type: signl4` and
 a complete webhook `url`. Alerta requires `type: alerta`, `api_url` and `environment`, with an optional `api_key`.
 Dynatrace requires `type: dynatrace`, `api_url`, `api_token` and `entity_selector`; `event_type` and `source` are optional.
-Destination names are nonsecret identifiers.
+Prowl requires `type: prowl` and `api_key`; Kavenegar requires `type: kavenegar`, `api_key`, `sender` and `recipient`.
+Both accept an optional `api_url`. Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
-MessageBird access keys, Gotify app tokens, ntfy credentials, ilert integration keys, Alerta API keys and Dynatrace
+MessageBird access keys, Gotify app tokens, ntfy credentials, ilert integration keys, Alerta/Prowl/Kavenegar API keys and Dynatrace
 API tokens accept literal strings or a whole `${env:VARIABLE}` or `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
@@ -960,6 +965,100 @@ Save this as `monitoring-local.yaml`, then run:
 
 Repeat with WARNING, CRITICAL and CLEAR events. Alerta keeps its correlation fields and changes severity; Dynatrace
 keeps its entity selector and configured type while updating descriptive status.
+
+## Prowl notifications
+
+Prowl uses its [Add API](https://www.prowlapp.com/api.php). A destination can hold one API key or a comma-separated
+batch of keys; each key must be exactly 40 hexadecimal characters. Keep the entire list in one secret value:
+
+```yaml
+version: 1
+destinations:
+  prowl:
+    type: prowl
+    api_key: ${env:NOTIFY_PROWL_API_KEY}
+routing:
+  roles:
+    push_ops: [prowl]
+```
+
+The request goes to `https://api.prowlapp.com/publicapi/add`. `api_url` overrides the base before `/add`; it accepts
+literal, environment or file references. The public API requires HTTPS; custom local/proxy bases may use HTTP.
+
+Each selected destination sends its complete key list in one request. Keys configured as separate named destinations
+produce separate requests. Prowl limits API calls by source IP (normally 1000/hour), so use a batch when recipients
+should always receive the same notification. Prowl can accept a batch when only some keys remain authorized; its
+acknowledgment does not report individual-key delivery results. There are no verification requests or automatic retries.
+
+Application is `Netdata`; priorities are WARNING `1`, CRITICAL `2`, and CLEAR `0`, matching Bash. The event title contains
+node, status and summary; the description carries the common plain-text event facts. The optional dashboard URL goes
+in Prowl's separate `url` field. Prowl's UTF-8 byte limits are enforced before sending: event 1024, description 10000,
+and URL 512 bytes. Oversized fields fail the destination with a safe error; the notifier does not silently shorten them.
+
+Success requires HTTP 200 and one XML `prowl/success` element with `code="200"`, with no error element. Malformed,
+trailing or oversized response data fails. Response reading is limited to 256 KiB and the invocation deadline.
+
+## Kavenegar SMS
+
+Kavenegar uses the [v1 SMS Send API](https://kavenegar.com/rest.html) over HTTPS:
+
+```yaml
+version: 1
+destinations:
+  kavenegar:
+    type: kavenegar
+    api_key: ${env:NOTIFY_KAVENEGAR_API_KEY}
+    sender: '+15005550006'
+    recipient: '+15005550009'
+routing:
+  roles:
+    sms_ops: [kavenegar]
+```
+
+The numbers above are synthetic examples; real delivery requires a sender assigned to the account and the intended
+recipient. `sender` and `recipient` are quoted literal strings of digits with an optional leading `+`; leading zeroes
+are preserved. Use separate named destinations and existing routing for multiple recipients.
+
+The default base is `https://api.kavenegar.com/v1`; the request appends an escaped API-key segment and `/sms/send.json`.
+`api_url` can override the base for a proxy or local receiver, including through an environment or file reference.
+The public endpoint requires HTTPS; custom bases may use HTTP. This replaces Bash's plaintext public request.
+`api_key` accepts a literal or one whole environment/file secret reference. Errors never include the key-bearing URL.
+
+The form contains `sender`, `receptor` and `message`. Messages contain common plain-text event facts and the optional
+navigation URL for WARNING, CRITICAL and CLEAR. Text is sent intact; Kavenegar handles SMS encoding and splitting.
+There are no automatic retries or delivery-status polling. Success means HTTP 200, JSON `return.status: 200`, and one
+entry with a positive `messageid`. This acknowledges API acceptance, not final delivery to the phone. Responses are
+limited to 256 KiB, respect the invocation deadline and are never logged.
+
+### Local Prowl and Kavenegar exercise
+
+Use only synthetic keys with the local receiver above, which prints request bodies:
+
+```yaml
+version: 1
+destinations:
+  prowl_local:
+    type: prowl
+    api_url: http://127.0.0.1:18080/prowl
+    api_key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  kavenegar_local:
+    type: kavenegar
+    api_url: http://127.0.0.1:18080/kavenegar/v1
+    api_key: synthetic-key
+    sender: '+15005550006'
+    recipient: '+15005550009'
+routing:
+  roles:
+    form_ops: [prowl_local, kavenegar_local]
+```
+
+Save as `form-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config form-local.yaml --role form_ops < examples/event.json
+```
+
+Repeat with WARNING, CRITICAL and CLEAR events to inspect the priority and status changes.
 
 ## Event document
 
