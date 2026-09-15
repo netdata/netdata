@@ -23,6 +23,7 @@ func TestDefaultAtomicResolverCancellationContainsCommandProcessGroup(t *testing
 	if !resolverContainmentSupported() {
 		t.Skip("process-group containment requires a Unix process model")
 	}
+	useTestLocalHelper(t)
 	directory := t.TempDir()
 	helper := filepath.Join(directory, "resolver-helper")
 	pidFile := filepath.Join(directory, "resolver-pids")

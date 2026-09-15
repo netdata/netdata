@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -22,21 +23,47 @@ func TestUnprivilegedCommandContext(t *testing.T) {
 		t.Skip("uses a Unix helper script")
 	}
 	helper := filepath.Join(t.TempDir(), "nd-run")
-	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0o700))
+	require.NoError(t, os.WriteFile(helper, []byte(`#!/bin/sh
+if [ "$1" = "--preserve-env" ]; then
+    [ "$2" = "--" ] || exit 64
+    shift 2
+fi
+exec "$@"
+`), 0o700))
 	t.Cleanup(SetRunnerPathsForTests(helper, ""))
 
-	for name, ctx := range map[string]context.Context{
-		"caller context": t.Context(),
-		"nil context":    nil,
+	for name, tc := range map[string]struct {
+		construct func(context.Context, string, ...string) *exec.Cmd
+		prefix    []string
+	}{
+		"minimal environment": {
+			construct: UnprivilegedCommandContext,
+		},
+		"preserved environment": {
+			construct: UnprivilegedCommandContextWithPreservedEnv,
+			prefix:    []string{"--preserve-env", "--"},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			cmd := UnprivilegedCommandContext(ctx, "/usr/bin/printf", "%s|", "a b", "$(exit 73)")
-			require.Nil(t, cmd.Process, "construction must not start a process")
-			assert.Equal(t, helper, cmd.Path)
-			var out bytes.Buffer
-			cmd.Stdout = &out
-			require.NoError(t, cmd.Run())
-			assert.Equal(t, "a b|$(exit 73)|", out.String())
+			for name, ctx := range map[string]context.Context{
+				"caller context": t.Context(),
+				"nil context":    nil,
+			} {
+				t.Run(name, func(t *testing.T) {
+					args := []string{"%s|", "a b", "$(exit 73)", "--preserve-env", "--", ""}
+					cmd := tc.construct(ctx, "/usr/bin/printf", args...)
+					require.Nil(t, cmd.Process, "construction must not start a process")
+					assert.Equal(t, helper, cmd.Path)
+					wantArgs := append([]string{helper}, tc.prefix...)
+					wantArgs = append(wantArgs, "/usr/bin/printf")
+					assert.Equal(t, append(wantArgs, args...), cmd.Args)
+					assert.Nil(t, cmd.Env, "inherit the caller environment for the helper")
+					var out bytes.Buffer
+					cmd.Stdout = &out
+					require.NoError(t, cmd.Run())
+					assert.Equal(t, "a b|$(exit 73)|--preserve-env|--||", out.String())
+				})
+			}
 		})
 	}
 }

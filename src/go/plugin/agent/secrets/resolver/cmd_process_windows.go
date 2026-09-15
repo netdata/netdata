@@ -4,6 +4,11 @@
 
 package secretresolver
 
-import "os/exec"
+import (
+	"context"
+	"os/exec"
+)
 
-func configureCommandProcessTree(*exec.Cmd) {}
+func secretCommandContext(ctx context.Context, binPath string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, binPath, args...)
+}

@@ -224,15 +224,19 @@ when execution needs a timeout. Construction does not log arguments or output. S
 and discard stderr: the Run APIs buffer stdout and include stderr snippets in errors, so they are unsuitable for
 secret output without caller-owned handling.
 
-On Unix, `nd-run` also replaces the child environment with a minimal environment. Custom variables, including
-authentication tokens, are not inherited; HOME, USER and LOGNAME come from the selected account. Supplying `Env`
-to a Go wrapper does not bypass this C helper policy. The helper selects the configured Netdata user (fallback
-`nobody`); an unprivileged caller that cannot switch users retains its current identity. Capability clearing is
-performed by the helper when built with capability support. Windows callers need an explicit platform path when
-this Unix privilege-drop behavior does not apply.
+On Unix, `nd-run` uses a minimal environment by default. Passing `Env` to a Run API changes the helper's input
+but does not enable preservation. Use `UnprivilegedCommandContextWithPreservedEnv` when the target requires inherited
+application variables, such as authentication tokens or explicit tool configuration. It invokes
+`nd-run --preserve-env -- command [args...]`; a missing helper or one without this option fails without direct fallback.
+Both constructors leave `Cmd.Env` unset to inherit the caller's environment; callers may set it explicitly before Start.
 
-The file secret provider uses this helper. The command secret provider retains direct execution because it needs
-inherited authentication variables; migrating it requires helper support for that environment contract first.
+Both modes replace USER, LOGNAME and HOME with the selected account's values, SHELL with `/bin/sh`, and LC_ALL with `C`.
+The helper selects the configured Netdata user (fallback `nobody`); an unprivileged caller that cannot switch users
+retains its current identity. Capability clearing is performed by the helper when built with capability support.
+Windows callers need an explicit platform path when this Unix privilege-drop behavior does not apply.
+
+The Unix file secret provider uses the default constructor; the command secret provider uses the preserving constructor.
+Both keep their own bounded output and secret-safe error handling. Windows providers retain direct execution.
 
 ## Log File Collectors
 

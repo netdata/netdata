@@ -33,8 +33,7 @@ func resolveCmd(ctx context.Context, cmdLine, original string, timeout time.Dura
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
-	configureCommandProcessTree(cmd)
+	cmd := secretCommandContext(ctx, parts[0], parts[1:]...)
 	out, err := runSecretCommand(cmd)
 	if err != nil {
 		if cmd.Process != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
