@@ -930,8 +930,8 @@ static void logical_disk_path_chart_id(const char *name, char *buffer, size_t bu
 {
     snprintfz(buffer, buffer_size, "%s", name);
     netdata_fix_chart_id(buffer);
-    size_t len = strlen(buffer);
-    XXH64_hash_t hash = XXH3_64bits(name, strlen(name));
+    size_t len = strnlen(buffer, buffer_size);
+    XXH64_hash_t hash = XXH3_64bits(name, strnlen(name, ND_MOUNT_PATH_MAX));
     snprintfz(buffer + len, buffer_size - len, "_%016llx", (unsigned long long)hash);
 }
 
