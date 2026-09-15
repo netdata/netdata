@@ -48,7 +48,11 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 	}
 	client := notificationHTTPClient(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(ctx, client, dst.Type, endpoint, token, message)
+	headers := http.Header{}
+	if token != "" {
+		headers.Set("Authorization", "Bearer "+token)
+	}
+	response, err := postNotificationJSON(ctx, client, dst.Type, endpoint, headers, message)
 	if err != nil {
 		return err
 	}
@@ -68,7 +72,8 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 func postNotificationJSON(
 	ctx context.Context,
 	client *http.Client,
-	provider, endpoint, token string,
+	provider, endpoint string,
+	headers http.Header,
 	message any,
 ) (*http.Response, error) {
 	payload, err := json.Marshal(message)
@@ -81,8 +86,10 @@ func postNotificationJSON(
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("User-Agent", "netdata-alarm-notify")
-	if token != "" {
-		request.Header.Set("Authorization", "Bearer "+token)
+	for name, values := range headers {
+		for _, value := range values {
+			request.Header.Add(name, value)
+		}
 	}
 	response, err := client.Do(request)
 	if err != nil {

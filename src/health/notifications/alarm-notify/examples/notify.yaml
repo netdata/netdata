@@ -26,6 +26,10 @@ destinations:
     type: pushover
     app_token: ${env:NOTIFY_PUSHOVER_APP_TOKEN}
     user_key: ${env:NOTIFY_PUSHOVER_USER_KEY}
+  pushbullet:
+    type: pushbullet
+    access_token: ${env:NOTIFY_PUSHBULLET_TOKEN}
+    channel_tag: test-alerts
 routing:
   default: [local]
   roles:
@@ -36,3 +40,4 @@ routing:
     discord_ops: [discord]
     telegram_ops: [telegram]
     pushover_ops: [pushover]
+    pushbullet_ops: [pushbullet]

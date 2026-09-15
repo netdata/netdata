@@ -97,7 +97,7 @@ func sendTelegram(ctx context.Context, dst Destination, event Event, timeout tim
 		retries = *dst.RetriesOnLimit
 	}
 	for {
-		response, err := postNotificationJSON(ctx, client, "telegram", endpoint, "", message)
+		response, err := postNotificationJSON(ctx, client, "telegram", endpoint, nil, message)
 		if err != nil {
 			return err
 		}
