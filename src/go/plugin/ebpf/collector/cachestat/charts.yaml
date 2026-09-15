@@ -1,0 +1,22 @@
+version: v1
+groups:
+  - family: page cache
+    metrics:
+      - cachestat.mark_page_accessed_total
+      - cachestat.mark_buffer_dirty_total
+      - cachestat.add_to_page_cache_lru_total
+      - cachestat.account_page_dirtied_total
+    charts:
+      - id: page_cache_events
+        title: Page Cache Kernel Events (eBPF POC)
+        context: ebpf_poc.page_cache_events
+        units: events/s
+        dimensions:
+          - selector: cachestat.mark_page_accessed_total
+            name: accessed
+          - selector: cachestat.mark_buffer_dirty_total
+            name: buffer_dirty
+          - selector: cachestat.add_to_page_cache_lru_total
+            name: added
+          - selector: cachestat.account_page_dirtied_total
+            name: account_dirtied
