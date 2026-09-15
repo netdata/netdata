@@ -53,7 +53,7 @@ Three properties this shape buys, each deliberate:
 | `--out <dir>` | output directory; defaults under the skill's audit directory |
 | `--pack-only` | build the evidence pack and stop - no model call, no credential needed |
 | `--min-confidence <0..1>` | gate threshold, default 0.5 |
-| `--selftest` | drive the credential path with a sentinel and assert it never reaches output |
+| `--selftest` | offline: drives the credential path with a sentinel and asserts it never reaches output, then asserts every gate rule including the cloud-route downgrade |
 
 Configuration comes from `<repo>/.env`; the keys are documented in `.agents/ENV.md`.
 
@@ -64,6 +64,10 @@ Three deterministic rules, applied to whatever the model returned:
 - **Confidence below the threshold** publishes nothing but an insufficient-evidence note.
 - **`unknown` classification** does the same.
 - **`snmp` classification** does the same and says the ticket belongs to another workflow.
+
+These rules and the correction below are asserted offline by `--selftest`. The downgrade in
+particular is a guard the model may never trigger on its own, so it is tested directly rather than
+assumed.
 
 One deterministic correction is applied before the gate. A bundle is an agent artifact: it carries
 the agent's own half of the cloud connection and nothing at all about the browser or the console. So

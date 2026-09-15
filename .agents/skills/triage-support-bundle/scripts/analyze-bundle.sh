@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
         --out)            OUT="${2:-}"; shift 2 ;;
         --min-confidence) MIN_CONF="${2:-}"; shift 2 ;;
         --pack-only)      PACK_ONLY=1; shift ;;
-        --selftest)       sb_selftest_no_token_leak; exit $? ;;
+        --selftest)       echo "credential:"; sb_selftest_no_token_leak; echo "gate:"; sb_selftest_gate; exit $? ;;
         -h|--help)        sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)               sb_die "unknown option: $1" ;;
         *)                INPUT="$1"; shift ;;
@@ -235,37 +235,8 @@ printf '%s' "$CLEAN" | jq -e '.' >/dev/null 2>&1 \
 
 HAS_TICKET=0; [ -n "$TICKET_TEXT" ] && HAS_TICKET=1
 
-VERDICT="$(printf '%s' "$CLEAN" | jq -c \
-  --argjson has_ticket "$HAS_TICKET" \
-  --argjson min "$MIN_CONF" \
-  --arg generated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --argjson bundle "$(jq -c '{tool_version, generated_utc, agent_running, agent_api_reachable}' "$M")" '
-  . as $m
-  | ($m.confidence // 0) as $c
-  # Routing to a cloud role rests on the reporter words. Without them it is not
-  # supportable, whatever the model claimed.
-  | (if ($has_ticket == 0) and ($m.route.role // "unknown" | startswith("cloud"))
-     then {role: "unknown", confidence: 0,
-           rationale: "downgraded: a cloud role needs the reporter symptom, and no ticket text was supplied"}
-     else $m.route end) as $route
-  | (if $c < $min then
-        {publish: false, reason: ("confidence " + ($c|tostring) + " is below the " + ($min|tostring) + " threshold")}
-     elif ($m.class // "unknown") == "unknown" then
-        {publish: false, reason: "classification is unknown"}
-     elif ($m.class // "") == "snmp" then
-        {publish: false, reason: "SNMP evidence is owned by a different workflow; route the ticket there"}
-     else {publish: true, reason: "confidence and classification meet the gate"} end) as $gate
-  | {schema: "netdata-bundle-triage/v1",
-     generated_utc: $generated,
-     bundle: $bundle,
-     classification: {class: $m.class, confidence: $c, summary: $m.summary},
-     route: $route,
-     tags: ($m.tags // []),
-     evidence: ($m.evidence // []),
-     missing_evidence: ($m.missing_evidence // []),
-     next_checks: ($m.next_checks // []),
-     gate: $gate,
-     note_markdown: $m.note_markdown}')"
+VERDICT="$(printf '%s' "$CLEAN" | sb_apply_gate "$HAS_TICKET" "$MIN_CONF" "$(jq -c '{tool_version, generated_utc, agent_running, agent_api_reachable}' "$M")")"
+
 
 printf '%s' "$VERDICT" | jq '.' > "${OUT}/verdict.json"
 

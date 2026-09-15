@@ -326,3 +326,92 @@ sb_selftest_no_token_leak() {
     fi
     return "$rc"
 }
+
+# --------------------------------------------------------------------------
+# Verdict gate
+# --------------------------------------------------------------------------
+
+# Apply the deterministic gate to a model reply read from stdin, emitting the
+# verdict document. The model classifies and drafts; this decides what may be
+# published, so it lives here where it can be regression-tested offline.
+#
+# Usage: printf '%s' "$model_json" | sb_apply_gate <has_ticket 0|1> <min_conf> <bundle_json>
+sb_apply_gate() {
+    local has_ticket="$1" min_conf="$2" bundle_json="$3"
+    jq -c \
+      --argjson has_ticket "$has_ticket" \
+      --argjson min "$min_conf" \
+      --arg generated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      --argjson bundle "$bundle_json" '
+      . as $m
+      | (($m.confidence // 0) | tonumber) as $c
+      # A cloud role rests on the reporter words. Without them the claim is not
+      # supportable, whatever the model asserted.
+      | (if ($has_ticket == 0) and (($m.route.role // "unknown") | startswith("cloud"))
+         then {role: "unknown", confidence: 0,
+               rationale: "downgraded: a cloud role needs the reporter symptom, and no ticket text was supplied"}
+         else ($m.route // {role: "unknown", confidence: 0, rationale: "model returned no route"}) end) as $route
+      | (if $c < $min then
+            {publish: false, reason: ("confidence " + ($c|tostring) + " is below the " + ($min|tostring) + " threshold")}
+         elif ($m.class // "unknown") == "unknown" then
+            {publish: false, reason: "classification is unknown"}
+         elif ($m.class // "") == "snmp" then
+            {publish: false, reason: "SNMP evidence is owned by a different workflow; route the ticket there"}
+         else {publish: true, reason: "confidence and classification meet the gate"} end) as $gate
+      | {schema: "netdata-bundle-triage/v1",
+         generated_utc: $generated,
+         bundle: $bundle,
+         classification: {class: ($m.class // "unknown"), confidence: $c, summary: ($m.summary // "")},
+         route: $route,
+         tags: ($m.tags // []),
+         evidence: ($m.evidence // []),
+         missing_evidence: ($m.missing_evidence // []),
+         next_checks: ($m.next_checks // []),
+         gate: $gate,
+         note_markdown: ($m.note_markdown // "")}'
+}
+
+# Offline regression test for the gate. The guard that matters most - refusing a
+# cloud route with no ticket text - is one the model may never trigger on its
+# own, so it is asserted directly rather than hoped for.
+sb_selftest_gate() {
+    local b='{"tool_version":"t","generated_utc":"g","agent_running":true,"agent_api_reachable":true}'
+    local fails=0 got
+
+    check() { # label, expected, actual
+        if [ "$2" = "$3" ]; then
+            echo -e "  ${SB_GREEN}PASS${SB_NC} $1"
+        else
+            echo -e "  ${SB_RED}FAIL${SB_NC} $1 (expected '$2', got '$3')" >&2; fails=$((fails+1))
+        fi
+    }
+
+    got="$(printf '%s' '{"class":"dashboard","confidence":0.9,"route":{"role":"cloud-frontend","confidence":0.8,"rationale":"x"}}' \
+           | sb_apply_gate 0 0.5 "$b" | jq -r '.route.role')"
+    check "cloud route downgraded when no ticket text" "unknown" "$got"
+
+    got="$(printf '%s' '{"class":"dashboard","confidence":0.9,"route":{"role":"cloud-frontend","confidence":0.8,"rationale":"x"}}' \
+           | sb_apply_gate 1 0.5 "$b" | jq -r '.route.role')"
+    check "cloud route kept when ticket text present" "cloud-frontend" "$got"
+
+    got="$(printf '%s' '{"class":"no-data","confidence":0.4,"route":{"role":"agent"}}' \
+           | sb_apply_gate 1 0.5 "$b" | jq -r '.gate.publish')"
+    check "low confidence blocks publication" "false" "$got"
+
+    got="$(printf '%s' '{"class":"unknown","confidence":0.95,"route":{"role":"agent"}}' \
+           | sb_apply_gate 1 0.5 "$b" | jq -r '.gate.publish')"
+    check "unknown class blocks publication" "false" "$got"
+
+    got="$(printf '%s' '{"class":"snmp","confidence":0.99,"route":{"role":"agent"}}' \
+           | sb_apply_gate 1 0.5 "$b" | jq -r '.gate.publish')"
+    check "snmp class blocks publication" "false" "$got"
+
+    got="$(printf '%s' '{"class":"crash","confidence":0.9,"route":{"role":"agent"}}' \
+           | sb_apply_gate 1 0.5 "$b" | jq -r '.gate.publish')"
+    check "clear agent-side finding publishes" "true" "$got"
+
+    got="$(printf '%s' '{"class":"crash","confidence":0.9}' | sb_apply_gate 1 0.5 "$b" | jq -r '.route.role')"
+    check "missing route defaults to unknown" "unknown" "$got"
+
+    [ "$fails" -eq 0 ]
+}
