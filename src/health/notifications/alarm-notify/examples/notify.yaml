@@ -13,6 +13,9 @@ destinations:
   slack:
     type: slack
     url: ${env:NOTIFY_SLACK_URL}
+  discord:
+    type: discord
+    url: ${env:NOTIFY_DISCORD_URL}
 routing:
   default: [local]
   roles:
@@ -20,3 +23,4 @@ routing:
     dba: [audit]
     muted: []
     chatops: [slack]
+    discord_ops: [discord]

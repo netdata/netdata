@@ -63,11 +63,11 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
-	if dst.Type != "webhook" && dst.Type != "slack" {
-		return errors.New("destination.type must be webhook or slack; other providers are not implemented yet")
+	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" {
+		return errors.New("destination.type must be webhook, slack or discord; other providers are not implemented yet")
 	}
-	if dst.Type == "slack" && dst.BearerToken != "" {
-		return errors.New("slack destinations authenticate through their URL; bearer_token is not supported")
+	if dst.Type != "webhook" && dst.BearerToken != "" {
+		return fmt.Errorf("%s destinations authenticate through their URL; bearer_token is not supported", dst.Type)
 	}
 	reference, err := secretReference(dst.URL)
 	if err != nil {
@@ -76,6 +76,11 @@ func (dst Destination) validate() error {
 	if !reference {
 		if err := validateURL(dst.URL); err != nil {
 			return err
+		}
+		if dst.Type == "discord" {
+			if _, err := discordEndpoint(dst.URL); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := secretReference(dst.BearerToken); err != nil {

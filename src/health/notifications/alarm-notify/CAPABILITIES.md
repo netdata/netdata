@@ -2,8 +2,8 @@
 
 The functional baseline is `../alarm-notify.sh.in` and `../health_alarm_notify.conf`. This inventory tracks a parallel
 implementation; it does not change the active Bash notifier. Existing functionality is implemented incrementally,
-and questionable behavior requires an explicit decision before being changed or dropped. No Bash feature has been
-approved for removal by this increment.
+and questionable behavior requires an explicit decision before being changed or dropped. The ineffective Discord
+channel-name field and repeated-request loop are omitted by explicit approval; real channel routing uses webhook URLs.
 
 ## Working increments
 
@@ -12,6 +12,7 @@ approved for removal by this increment.
 - Central role-to-destination routing, defaults for unmapped roles, explicit suppression, reserved roles, and
   deduplication by destination name. Sequential fan-out records individual results and preserves any-success exits.
 - Modern Slack app webhooks with status colors, plain-text alert content and an optional navigation link.
+- Native Discord webhooks with status-colored embeds, navigation, confirmed delivery and one URL per named destination.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -38,7 +39,7 @@ remote services remain available.
 | Rocket.Chat | `send_rocketchat` | Pending |
 | Alerta | `send_alerta` | Pending |
 | Flock | `send_flock` | Pending |
-| Discord | `send_discord` | Pending |
+| Discord | `send_discord` | Native webhooks implemented; ineffective channel-name loop omitted by explicit decision; additional artwork/presentation pending |
 | Fleep | `send_fleep` | Pending |
 | Prowl | `send_prowl` | Pending |
 | IRC | `send_irc` | Pending |
@@ -61,14 +62,14 @@ remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Modern Slack content/link/status formatting implemented; other providers and richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook and modern Slack URL settings implemented; remaining provider configuration pending |
-| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook and modern Slack fan-out; provider subtarget details pending with providers |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack and Discord content/link/status formatting implemented; other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URL settings implemented; remaining provider configuration pending |
+| Results | Per-target failures and Bash's any-success invocation result | Implemented for generic webhook, Slack and Discord fan-out; provider subtarget details pending with providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first three increments cover the foundation, routing/fan-out, and modern Slack app webhooks. Legacy Slack
+The first four increments cover the foundation, routing/fan-out, modern Slack app webhooks, and native Discord. Legacy Slack
 override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
 More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final
 architecture and broad refactoring are discussed after that working baseline exists.

@@ -1,10 +1,11 @@
 # Experimental Go notifier
 
-This standalone Go module routes a JSON notification to named generic webhook and Slack destinations. It has no imports
-from the existing `src/go` module. It is for local development and is not installed, packaged, or invoked by the Agent.
+This standalone Go module routes a JSON notification to named generic webhook, Slack, and Discord destinations.
+It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
+invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 
-The current increments provide explicit delivery, role-based routing, and modern Slack app webhooks.
+The current increments provide explicit delivery, role-based routing, modern Slack app webhooks, and native Discord webhooks.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -62,9 +63,9 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
   is requested. Invalid options/configuration/input, all selected deliveries failing, or command cancellation/timeout
   return `1`. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
 
-Configuration has `version: 1` and a `destinations` mapping. Each destination requires `type: webhook` or `type: slack`
-and `url`; `bearer_token` is optional for generic webhooks and rejected for Slack. Destination names are nonsecret
-identifiers. The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
+Configuration has `version: 1` and a `destinations` mapping. Each destination requires `type: webhook`, `type: slack`,
+or `type: discord` and `url`; `bearer_token` is optional for generic webhooks and rejected for Slack/Discord. Destination
+names are nonsecret identifiers. The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
 follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
@@ -107,8 +108,8 @@ the individual results to see failures. On interruption, counts cover results re
 not claim an outcome for interrupted or unstarted deliveries.
 
 Each delivery sends one POST with `Content-Type: application/json` and, when configured, `Authorization: Bearer ...`.
-Generic webhooks accept HTTP 200–299; Slack accepts HTTP 200. Redirects and other status codes fail; there are no
-application retries.
+Generic webhooks accept HTTP 200–299; Slack and Discord accept HTTP 200. Redirects and other status codes fail;
+there are no application retries.
 Response bodies are closed without being buffered, logged, or interpreted. Errors do not echo config/input values,
 secret contents, or endpoint URLs.
 
@@ -152,6 +153,58 @@ NOTIFY_SLACK_URL=http://127.0.0.1:18080/slack /tmp/alarm-notify send \
 
 Tests inspect complete Slack payloads and HTTP behavior using local receivers. They do not require or post to a live
 Slack workspace, so native Slack rendering is not part of the automated validation.
+
+## Discord webhooks
+
+Create a [Discord incoming webhook](https://docs.discord.com/developers/resources/webhook#execute-webhook) for each
+channel and configure its full native URL as a named destination:
+
+```yaml
+version: 1
+destinations:
+  discord_ops:
+    type: discord
+    url: ${env:NOTIFY_DISCORD_OPS_URL}
+  discord_database:
+    type: discord
+    url: ${env:NOTIFY_DISCORD_DATABASE_URL}
+routing:
+  roles:
+    sysadmin: [discord_ops]
+    dba: [discord_ops, discord_database]
+```
+
+`--role sysadmin --role dba` sends once to each destination. Use the native webhook URL without a `/slack` suffix.
+The URL contains credentials, so an environment or file reference is recommended. The channel belongs to the webhook.
+Bash's Discord sender loops over channel names, but Discord's Slack-compatible endpoint does not support its `channel`
+field. The Go implementation intentionally omits that ineffective field and loop; role routing selects actual webhook
+destinations. The active Bash notifier is unchanged.
+
+The notifier sets `wait=true` on the resolved URL to request server confirmation, preserving other query parameters
+such as `thread_id`. It replaces an existing `wait` value and rejects malformed query strings instead of silently
+losing parameters. HTTP 200 acknowledges delivery; HTTP 204 is unconfirmed and fails. There are no automatic retries.
+
+Messages contain a status-colored native embed with summary, details, node/alert, status transition, chart/context,
+known values with units, timestamp, and an optional title link from event `url`. Markdown control characters are
+escaped and `allowed_mentions` disables mentions. Missing or whitespace-only optional details are omitted; zero values
+remain visible. Sender names follow Bash's `netdata on NODE` pattern, shortened to 32 characters; the full node remains
+in the embed. Discord's configured webhook avatar is used. Additional artwork and presentation options remain pending.
+
+The [embed limits](https://docs.discord.com/developers/resources/message#embed-limits) are 256 characters for the title,
+4096 for details, 1024 per field value, and 6000 across the embed's displayed text. Counts include escape characters and
+field labels, after trimming surrounding whitespace. Oversized content fails that destination with a safe error;
+other selected destinations are still attempted. Alert content is not truncated.
+
+To inspect a Discord payload with the local receiver shown above:
+
+```sh
+NOTIFY_DISCORD_URL=http://127.0.0.1:18080/discord /tmp/alarm-notify send \
+  --config examples/notify.yaml --role discord_ops < examples/event.json
+```
+
+Tests use local receivers and complete JSON comparisons; they do not send to a Discord server or verify native
+Discord rendering. This experimental implementation does not complete the production Bash migration requested in
+[issue #23531](https://github.com/netdata/netdata/issues/23531).
 
 ## Event document
 

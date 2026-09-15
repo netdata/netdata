@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -61,39 +60,16 @@ func sendSlack(ctx context.Context, dst Destination, event Event, timeout time.D
 
 func renderSlack(event Event) (slackMessage, error) {
 	color := map[string]string{"WARNING": "warning", "CRITICAL": "danger", "CLEAR": "good"}[event.Status]
-	status := event.Status
-	if event.PreviousStatus != "" && event.PreviousStatus != event.Status {
-		status = event.PreviousStatus + " → " + event.Status
-	}
 	summary, err := slackPlainText(event.Status+": "+event.Summary, slackSectionLimit)
 	if err != nil {
 		return slackMessage{}, err
 	}
 	var blocks []slackBlock
-	values := []string{"Node\n" + event.Node, "Alert\n" + event.Alert, "Status\n" + status}
-	if event.Chart != "" {
-		values = append(values, "Chart\n"+event.Chart)
-	}
-	if event.Context != "" {
-		values = append(values, "Context\n"+event.Context)
-	}
-	for _, value := range []struct {
-		label string
-		value *float64
-	}{{"Value", event.Value}, {"Previous value", event.PreviousValue}} {
-		if value.value != nil {
-			formatted := strconv.FormatFloat(*value.value, 'g', -1, 64)
-			if event.Units != "" {
-				formatted += " " + event.Units
-			}
-			values = append(values, value.label+"\n"+formatted)
-		}
-	}
-	values = append(values, "Time\n"+event.Timestamp.Format(time.RFC3339))
+	values := append(notificationFields(event), notificationField{"Time", event.Timestamp.Format(time.RFC3339)})
 	fields := make([]slackText, 0, len(values)) // At most eight fields, below Slack's limit of ten.
 	fallback := []string{summary.Text}
 	for _, value := range values {
-		field, err := slackPlainText(value, slackFieldLimit)
+		field, err := slackPlainText(value.name+"\n"+value.value, slackFieldLimit)
 		if err != nil {
 			return slackMessage{}, err
 		}
