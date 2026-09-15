@@ -16,6 +16,7 @@ static bool dbengine_config_equal(const struct dbengine_config *a, const struct 
            a->out_of_memory_protection_bytes == b->out_of_memory_protection_bytes &&
            a->use_all_ram_for_caches == b->use_all_ram_for_caches &&
            a->cache_statistics == b->cache_statistics &&
+           a->compression_statistics == b->compression_statistics &&
            a->cpus == b->cpus &&
            a->arals_for_large_pages == b->arals_for_large_pages &&
            a->direct_io == b->direct_io &&
