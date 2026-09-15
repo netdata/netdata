@@ -59,7 +59,8 @@ summary alone; distinguish intended contract from what the checked implementatio
 - Go semantic validator (`topologyv1.ValidateDecodedData` on `data`, `topologyv1.ValidateDecodedResponse` on a whole
   envelope; both return an error, there is no warning level): actor and link reference bounds (evidence references
   only where the table type declares `source_evidence`), column-length equality with `rows`,
-  dictionary indexes, label-policy display types, search columns, the `ports.sources[]` rules except the
+  dictionary indexes, label-policy display types, search columns and label-key shape independently of optional actor
+  presentation, declared actor aggregation-scope memberships, the `ports.sources[]` rules except the
   `actor_table` carve-out below (and `show_bullets` is read untyped, so only the schema rejects a non-boolean),
   highlight-path column types (including that a `path_table` not under `data.tables.actor` is owned by `actor`, the
   one use the validator makes of `table_type.owner`), every overlay-refs convention rule except the id-pattern rule (schema-only), correlation rules

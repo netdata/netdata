@@ -292,7 +292,10 @@ Common actor identity columns:
 - `vsphere_moid`
 - `vsphere_inventory_path`
 
-Actor types define source-local identity and cross-source merge identity:
+Actor types define source-local identity and cross-source merge identity. The
+following actor-type excerpt is not a complete payload. The enclosing payload
+must declare the listed scope IDs in `types.aggregation_scopes`, provide the
+referenced actor columns, and define the referenced label and port tables:
 
 ```json
 {
@@ -355,7 +358,10 @@ fallback.
 Actor type `search` declares exactly what the graph search bar may index for
 that actor type. `search.columns[]` references actor-table scalar columns.
 `search.label_keys[]` references values in the actor label table, normally
-`actor_labels.key`. Set `search.enabled: false` for helper actors that should
+`actor_labels.key`. These keys are unique non-empty strings, not registry IDs;
+built-in keys such as `_hostname` and `_os` are valid. Search validation does not
+depend on the presence of optional actor presentation settings.
+Set `search.enabled: false` for helper actors that should
 not appear in graph search, such as synthetic segment or grouping actors. The
 UI must not traverse producer-specific `details`, `match`, `attributes`, or
 labels paths when rendering a v1 payload.
@@ -365,6 +371,10 @@ generic `segment` type. Each such type must declare its own identity, merge
 identity, presentation, modal sections, legend entry, and aggregation behavior.
 Consumers must use the declared type metadata and must not infer semantics from
 a type id that happens to contain `segment`, `subnet`, or `network`.
+
+Every actor-type `aggregation_scopes[]` entry must name a scope declared in
+`types.aggregation_scopes`. Omit the list or emit an empty list when the actor
+does not participate in a grouping scope; this does not remove it from the graph.
 
 ## Required Link Semantics
 
