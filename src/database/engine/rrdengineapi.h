@@ -66,6 +66,9 @@ extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_G
 // request and its completion (init before, destroy after); the engine runs fn(data) on a worker and marks the
 // completion when it returns. fn is responsible for its own worker_is_busy() attribution, including registering
 // the job names it reports: the pool threads register only the engine's own names.
+//
+// Precondition: at least one tier has been brought up with rrdeng_init(). The command queue this call uses exists
+// only once the engine has spawned; calling it on an agent without a dbengine tier dereferences NULL.
 struct rrdeng_work_request {
     void (*fn)(void *data);
     void *data;
