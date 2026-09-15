@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -41,6 +42,7 @@ type SocketCollector struct {
 	Config    SocketConfig
 	handle    *SocketLegacyHandle
 	publisher *PublisherService
+	state     *socketGlobalState
 
 	// Function support (network-protocols)
 	fnStore *socketFunctionStore
@@ -53,6 +55,7 @@ func NewSocketCollector() *SocketCollector {
 			UpdateEvery: socketDefaultUpdateEvery,
 		},
 		publisher: GetPublisher(),
+		state:     &socketGlobalState{},
 	}
 }
 
@@ -109,20 +112,36 @@ func (c *SocketCollector) Collect(ctx context.Context) error {
 		return nil
 	}
 
+	// Compute deltas from the snapshot using global state
+	publish, ok := c.state.Update(snapshot)
+	if !ok {
+		return nil
+	}
+
+	// Write all metrics to the publisher store
 	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
-	meter.Counter("ipv4_send").ObserveTotal(float64(snapshot.Ipv4Send))
-	meter.Counter("ipv4_recv").ObserveTotal(float64(snapshot.Ipv4Recv))
-	meter.Counter("ipv6_send").ObserveTotal(float64(snapshot.Ipv6Send))
-	meter.Counter("ipv6_recv").ObserveTotal(float64(snapshot.Ipv6Recv))
+	meter.Counter("tcp_cleanup_rbuf").ObserveTotal(float64(publish.tcpDimReceivedCalls))
+	meter.Counter("tcp_cleanup_rbuf_err").ObserveTotal(float64(publish.tcpDimReceivedErr))
+	meter.Counter("tcp_sendmsg").ObserveTotal(float64(publish.tcpDimSentCalls))
+	meter.Counter("tcp_sendmsg_err").ObserveTotal(float64(publish.tcpDimSentErr))
+	meter.Counter("tcp_close").ObserveTotal(float64(publish.tcpCloseCalls))
+	meter.Counter("tcp_retransmit").ObserveTotal(float64(publish.tcpRetransmit))
+	meter.Counter("tcp_connect_v4").ObserveTotal(float64(publish.tcpV4Conn))
+	meter.Counter("tcp_connect_v6").ObserveTotal(float64(publish.tcpV6Conn))
+	meter.Counter("udp_recvmsg").ObserveTotal(float64(publish.udpRecvCalls))
+	meter.Counter("udp_sendmsg").ObserveTotal(float64(publish.udpSendCalls))
+	meter.Counter("udp_recvmsg_err").ObserveTotal(float64(publish.udpRecvErr))
+	meter.Counter("udp_sendmsg_err").ObserveTotal(float64(publish.udpSendErr))
+	meter.Counter("inbound_tcp").ObserveTotal(float64(publish.inboundTCP))
+	meter.Counter("inbound_udp").ObserveTotal(float64(publish.inboundUDP))
+	meter.Counter("tcp_bytes_sent").ObserveTotal(float64(publish.tcpBytesSent))
+	meter.Counter("tcp_bytes_received").ObserveTotal(float64(publish.tcpBytesReceived))
+	meter.Counter("udp_bytes_sent").ObserveTotal(float64(publish.udpBytesSent))
+	meter.Counter("udp_bytes_received").ObserveTotal(float64(publish.udpBytesReceived))
 
 	// Update function store with latest metrics for network-protocols function
 	if c.fnStore != nil {
-		c.fnStore.update(socketGlobalPublish{
-			Ipv4Send: int64(snapshot.Ipv4Send),
-			Ipv4Recv: int64(snapshot.Ipv4Recv),
-			Ipv6Send: int64(snapshot.Ipv6Send),
-			Ipv6Recv: int64(snapshot.Ipv6Recv),
-		})
+		c.fnStore.update(publish)
 	}
 
 	return nil
@@ -146,8 +165,8 @@ func (c *SocketCollector) MetricStore() metrix.CollectorStore {
 // These methods enable the socket collector to serve network-protocols function calls
 // through the agent's function routing system.
 
-// handleNetworkProtocolsFunction serves the network-protocols function request
-// by returning the latest socket metrics collected.
+// handleNetworkProtocolsFunction serves the network-protocols function request.
+// Returns a JSON table response with TCP/UDP socket statistics.
 func (c *SocketCollector) handleNetworkProtocolsFunction() (string, error) {
 	if c.fnStore == nil {
 		return "", fmt.Errorf("function store not initialized")
@@ -158,18 +177,14 @@ func (c *SocketCollector) handleNetworkProtocolsFunction() (string, error) {
 		return "", fmt.Errorf("no data available yet")
 	}
 
-	// Format response as JSON
-	result := map[string]interface{}{
-		"ipv4_send": publish.Ipv4Send,
-		"ipv4_recv": publish.Ipv4Recv,
-		"ipv6_send": publish.Ipv6Send,
-		"ipv6_recv": publish.Ipv6Recv,
-	}
+	// Build the proper network-protocols JSON table response
+	now := time.Now().Unix()
+	expires := now + int64(c.Config.UpdateEvery)
 
-	data, err := json.Marshal(result)
+	payload, err := buildNetworkProtocolsJSON(publish, c.Config.UpdateEvery, expires)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %v", err)
 	}
 
-	return string(data), nil
+	return payload, nil
 }

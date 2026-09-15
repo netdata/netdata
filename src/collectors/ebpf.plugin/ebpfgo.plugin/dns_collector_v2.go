@@ -40,6 +40,9 @@ type DNSCollector struct {
 	Config    DNSConfig
 	handle    *DNSLegacyHandle
 	publisher *PublisherService
+
+	// Function support (dns-queries)
+	fnStore *dnsFunctionStore
 }
 
 func NewDNSCollector() *DNSCollector {
@@ -49,6 +52,7 @@ func NewDNSCollector() *DNSCollector {
 			UpdateEvery: dnsDefaultUpdateEvery,
 		},
 		publisher: GetPublisher(),
+		fnStore:   newDNSFunctionStore(),
 	}
 }
 
@@ -104,6 +108,11 @@ func (c *DNSCollector) Collect(ctx context.Context) error {
 	meter := c.publisher.MetricStore().Write().SnapshotMeter("")
 	meter.Counter("requests").ObserveTotal(float64(snapshot.Requests))
 	meter.Counter("responses").ObserveTotal(float64(snapshot.Responses))
+
+	// Update function store for dns-queries function
+	if c.fnStore != nil {
+		c.fnStore.update()
+	}
 
 	return nil
 }
