@@ -4,6 +4,10 @@
 #include "database/rrddim-collection.h"
 #include "daemon/unit_test_bridge.h"
 
+// The zero-page-cadence test below inspects the collect handle's current page, which only the engine's private
+// header describes. This is the one translation unit outside src/database/engine/ that includes it, on purpose.
+#include "database/engine/rrdengine.h"
+
 #ifdef ENABLE_DBENGINE
 
 #define CHARTS 64
@@ -716,7 +720,7 @@ int test_dbengine(void) {
     rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
     rrdeng_flush_all((struct rrdengine_instance *)host->db[0].si);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    dbengine_shutdown();
     rrd_wrunlock();
 
     return (int)(errors + value_errors + time_errors);

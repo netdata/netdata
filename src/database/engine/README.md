@@ -211,7 +211,8 @@ anything of the daemon. What the engine needs from its embedder flows through th
   `libuv_worker_thread_init()` in libnetdata.
 - **Tests**: `mrg-unittest.c` and `page_test.cc` live here and use engine headers only; the daemon-side tests
   (`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through `RRDHOST`,
-  `RRDSET` and `RRDDIM`.
+  `RRDSET` and `RRDDIM`. `dbengine-unittest.c` is, for now, the one translation unit outside this directory that
+  includes the private `rrdengine.h`: its zero-page-cadence test inspects the collect handle's current page.
 
 The daemon depends on the engine, not the other way round, and owns `netdata.conf` parsing, sqlite, streaming and the
 charts. That direction is not sealed yet: the daemon also reaches past `rrdengineapi.h` into the engine's internals. It
