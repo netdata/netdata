@@ -1022,11 +1022,6 @@ time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si) {
     return t;
 }
 
-size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
-}
-
 /*
  * Gathers Database Engine statistics.
  * Careful when modifying this function.

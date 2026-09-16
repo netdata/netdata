@@ -67,6 +67,11 @@ void finalize_rrd_files(struct rrdengine_instance *ctx);
 // what the embedder reads about the tiers
 size_t rrdeng_active_tiers(void);
 time_t rrdeng_max_retention_s(struct rrdengine_instance *ctx);   // the tier's configured time limit; 0 = none
+uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si);             // the tier's configured disk quota; 0 = none
+uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si);
+uint64_t rrdeng_metrics(STORAGE_INSTANCE *si);
+uint64_t rrdeng_samples(STORAGE_INSTANCE *si);
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si);          // 0 while the tier holds no data
 uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 
