@@ -466,26 +466,12 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     dictionary_print_still_allocated_stacktraces();
 
 #ifdef ENABLE_DBENGINE
-    // destroy the caches in reverse order (extent and open depend on main cache)
-    fprintf(stderr, "Destroying extent cache (PGC)...\n");
-    pgc_destroy(extent_cache, false);
-    fprintf(stderr, "Destroying open cache (PGC)...\n");
-    pgc_destroy(open_cache, false);
-    fprintf(stderr, "Destroying main cache (PGC)...\n");
-    pgc_destroy(main_cache, false);
-
-    fprintf(stderr, "Destroying metrics registry (MRG)...\n");
-    size_t metrics_referenced = mrg_destroy(main_mrg);
-    if(metrics_referenced)
-        fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
-            metrics_referenced);
-
-    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        if(dbengine_tier_up[tier]) {
-            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
-            finalize_rrd_files(multidb_ctx[tier]);
-            memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
-        }
+    // the engine's own teardown, only once the normal path above stopped every tier and the engine's loop;
+    // an abnormal exit skipped both, and destroying the caches under a live loop would be a second crash
+    if(!abnormal) {
+        size_t metrics_referenced = dbengine_destroy();
+        if(metrics_referenced)
+            fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n", metrics_referenced);
     }
 #endif
 

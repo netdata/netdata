@@ -1205,6 +1205,48 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
     return UV_EIO;
 }
 
+size_t dbengine_destroy(void) {
+    // the open and extent caches size themselves from the main cache's statistics, so they go first; pages
+    // carry METRIC pointers, so the registry goes after the caches; a tier's datafiles hold the open cache's
+    // references, so they are finalized after it. A global is cleared only when its object was freed: one
+    // with live references stays allocated (its destroy says so), and a late release must still find it.
+    if(extent_cache) {
+        fprintf(stderr, "Destroying extent cache (PGC)...\n");
+        if(pgc_destroy(extent_cache, false))
+            extent_cache = NULL;
+    }
+    if(open_cache) {
+        fprintf(stderr, "Destroying open cache (PGC)...\n");
+        if(pgc_destroy(open_cache, false))
+            open_cache = NULL;
+    }
+    if(main_cache) {
+        fprintf(stderr, "Destroying main cache (PGC)...\n");
+        if(pgc_destroy(main_cache, false))
+            main_cache = NULL;
+    }
+
+    size_t metrics_referenced = 0;
+    if(main_mrg) {
+        fprintf(stderr, "Destroying metrics registry (MRG)...\n");
+        metrics_referenced = mrg_destroy(main_mrg);
+        if(!metrics_referenced)
+            main_mrg = NULL;
+    }
+
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        struct rrdengine_instance *ctx = multidb_ctx[tier];
+        if(ctx->datafiles.JudyL) {
+            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+            finalize_rrd_files(ctx);
+        }
+        // back to the constructor's state: a tier that never came up is already there
+        initialize_single_ctx(ctx);
+    }
+
+    return metrics_referenced;
+}
+
 void dbengine_preload_release(void) {
     if(main_mrg)
         mrg_metric_prepopulate_cleanup(main_mrg);

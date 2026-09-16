@@ -728,6 +728,8 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 // --------------------------------------------------------------------------------------------------------------------
 // rrdeng_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
 uint64_t rrdeng_get_used_disk_space_unsafe(struct rrdengine_instance *ctx);
+// after rrdeng_exit(), on a static multidb tier only: close its datafiles
+void finalize_rrd_files(struct rrdengine_instance *ctx);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);

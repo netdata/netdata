@@ -2240,9 +2240,9 @@ void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
     flush_pages(cache, 0, section, true, true);
 }
 
-void pgc_destroy(PGC *cache, bool flush) {
+bool pgc_destroy(PGC *cache, bool flush) {
     if(!cache)
-        return;
+        return false;
 
     if(!flush) {
         cache->config.pgc_save_init_cb = NULL;
@@ -2264,8 +2264,10 @@ void pgc_destroy(PGC *cache, bool flush) {
     nd_thread_join(cache->evictor.thread);
     completion_destroy(&cache->evictor.completion);
 
-    if(PGC_REFERENCED_PAGES(cache))
+    if(PGC_REFERENCED_PAGES(cache)) {
         netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
+        return false;
+    }
     else {
         pointer_destroy_index(cache);
 
@@ -2284,6 +2286,7 @@ void pgc_destroy(PGC *cache, bool flush) {
         freez(cache->index);
         freez(cache);
     }
+    return true;
 }
 
 ALWAYS_INLINE PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {

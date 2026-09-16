@@ -140,12 +140,13 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
     if(can_be_deleted)
         return true;
 
-    if(should_evict_open_pages)
+    // during dbengine_destroy() the open cache may already be gone: then it holds no pages of this file
+    if(should_evict_open_pages && open_cache)
         pgc_open_evict_clean_pages_of_datafile(open_cache, df);
 
     usec_t time_to_scan_ut = now_monotonic_usec();
-    size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
-    size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
+    size_t clean_pages_in_open_cache = open_cache ? pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df) : 0;
+    size_t hot_pages_in_open_cache = open_cache ? pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df) : 0;
     time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
 
     spinlock_tracked_lock(&df->users.spinlock);

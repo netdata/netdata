@@ -59,10 +59,12 @@ void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);
 void rrdeng_flush_all(struct rrdengine_instance *ctx);
 
-// after rrdeng_exit(), and only on a static multidb tier: close its datafiles (the embedder's
-// final teardown). rrdeng_exit() frees a context that rrdeng_init() allocated for its caller,
-// so such a context must not be passed here
-void finalize_rrd_files(struct rrdengine_instance *ctx);
+// Tear down the engine's process-wide state, for an embedder that checks for leaks at exit: the caches, the
+// metrics registry, then every static tier's datafiles, in the order their dependencies allow. Only after every
+// tier's rrdeng_exit() and dbengine_shutdown(); never on an exit that skipped them (the loop is still running).
+// A cache or the registry with live references stays allocated and reachable. Returns the registry metrics
+// still referenced, 0 when everything was freed. Caller-allocated contexts are freed by rrdeng_exit() already.
+size_t dbengine_destroy(void);
 
 // what the embedder reads about the tiers
 size_t rrdeng_active_tiers(void);
