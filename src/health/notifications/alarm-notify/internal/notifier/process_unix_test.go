@@ -43,6 +43,9 @@ func TestMain(m *testing.M) {
 }
 
 func commandHelper(mode string) int {
+	if strings.HasPrefix(mode, "irc-") {
+		return ircCommandHelper(mode)
+	}
 	if mode == "parent" || mode == "early-parent" || mode == "child" {
 		conn, err := net.DialTimeout("tcp", os.Getenv("NOTIFIER_TEST_ADDRESS"), 5*time.Second)
 		if err != nil {
@@ -60,6 +63,7 @@ func commandHelper(mode string) int {
 		child := exec.Command(os.Args[0])
 		child.Env = append(os.Environ(), "NOTIFIER_TEST_COMMAND_HELPER=child")
 		child.Stdin = os.Stdin
+		child.Stdout = os.Stdout
 		if mode == "early-parent" {
 			if err := child.Start(); err != nil {
 				return 82
@@ -281,7 +285,10 @@ func TestRunCommandCancellation(t *testing.T) {
 		large     bool
 		earlyExit bool
 		email     bool
+		irc       bool
 	}{"cancel": {}, "timeout": {deadline: true}, "cancel blocked stdin copy": {large: true}, "early exit bounds inherited stdin": {large: true, earlyExit: true},
+		"irc early exit bounds inherited pipes": {irc: true, earlyExit: true},
+		"irc cancel":                            {irc: true}, "irc timeout": {irc: true, deadline: true},
 		"email cancel": {email: true}, "email timeout": {email: true, deadline: true}, "email blocked stdin": {email: true, large: true}} {
 		t.Run(name, func(t *testing.T) {
 			listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -289,6 +296,13 @@ func TestRunCommandCancellation(t *testing.T) {
 			defer listener.Close()
 			require.NoError(t, listener.(*net.TCPListener).SetDeadline(time.Now().Add(5*time.Second)))
 			dst, _ := testCommandDestination(t, "parent")
+			if test.irc {
+				dst.Type = "irc"
+				dst.Host = "irc.example.com"
+				dst.Nickname = "notify"
+				dst.Realname = "Netdata alerts"
+				dst.Channel = "#alerts"
+			}
 			if test.email {
 				dst.Type = "email"
 				dst.Recipients = []string{"root"}
@@ -339,7 +353,11 @@ func TestRunCommandCancellation(t *testing.T) {
 			assert.ErrorIs(t, syscall.Kill(pids[0], 0), syscall.ESRCH)
 			if test.earlyExit {
 				// This deliberately violates the foreground contract. Closing the owned socket releases the child.
-				assert.Contains(t, stderr.String(), "command input did not complete")
+				if test.irc {
+					assert.Contains(t, stderr.String(), "command protocol did not complete")
+				} else {
+					assert.Contains(t, stderr.String(), "command input did not complete")
+				}
 				return
 			}
 			for _, conn := range connections {

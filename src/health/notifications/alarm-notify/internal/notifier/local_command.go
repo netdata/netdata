@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 const commandDefaultPath = "/usr/local/bin:/usr/bin:/bin"
@@ -50,6 +52,17 @@ func (dst Destination) validateCommand() error {
 		return validatePhoneNumber(dst.To, "smstools3", "to")
 	}
 	return nil
+}
+
+func validCommandHost(host string) bool {
+	if strings.HasPrefix(host, "-") || strings.IndexFunc(host, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) != -1 {
+		return false
+	}
+	if addr, err := netip.ParseAddr(host); err == nil {
+		// ParseAddr accepts arbitrary zone text; apply the host character policy to it too.
+		host = addr.Zone()
+	}
+	return !strings.ContainsAny(host, ":/\\[]@?#%${}")
 }
 
 func validEnvironmentName(name string) bool {

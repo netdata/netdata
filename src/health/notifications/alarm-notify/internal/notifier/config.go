@@ -25,6 +25,8 @@ type Routing struct {
 }
 
 type Destination struct {
+	Nickname         string            `yaml:"nickname,omitempty"`
+	Realname         string            `yaml:"realname,omitempty"`
 	PlainTextOnly    *bool             `yaml:"plain_text_only,omitempty"`
 	Threading        *bool             `yaml:"threading,omitempty"`
 	SenderIP         string            `yaml:"sender_ip,omitempty"`
@@ -129,6 +131,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "irc" {
+		return dst.validateIRC()
+	}
+	if dst.Nickname != "" || dst.Realname != "" {
+		return errors.New("destination contains fields for another provider: nickname and realname require irc")
+	}
 	if dst.Type == "email" {
 		return dst.validateEmail()
 	}
@@ -252,7 +260,7 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command, smstools3, syslog, awssns, kafka or email; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command, smstools3, syslog, awssns, kafka, email or irc; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
