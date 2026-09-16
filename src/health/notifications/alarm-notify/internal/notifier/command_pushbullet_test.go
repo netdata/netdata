@@ -44,7 +44,7 @@ func TestSendPushbullet(t *testing.T) {
 		"missing acknowledgment":               {calls: 1, body: `{}`, err: "invalid pushbullet response"},
 		"invalid acknowledgment":               {calls: 1, body: `synthetic-private-value`, err: "invalid pushbullet response"},
 		"oversized acknowledgment":             {calls: 1, body: strings.Repeat(" ", notificationResponseLimit+1), err: "256 KiB"},
-		"explicit failure":                     {calls: 1, status: 403, explicit: true, code: 1, err: "all selected destinations failed"},
+		"explicit failure":                     {calls: 1, status: 403, explicit: true, code: 1, err: "all attempted destinations failed"},
 		"transport failure":                    {calls: 1, drop: true, err: "transport failed"},
 	} {
 		t.Run(name, func(t *testing.T) {

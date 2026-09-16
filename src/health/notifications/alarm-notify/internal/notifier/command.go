@@ -23,10 +23,11 @@ Usage:
 
 send reads one JSON event and delivers it to the selected destinations.
 Use either one explicit destination or roles resolved through YAML routing.
+Destination nowarn/noclear policies skip matching statuses before delivery.
 validate checks configuration without resolving secrets or sending requests.
 The positive timeout covers the whole invocation, including input reads.
-Exit status: 0 on any successful delivery, no selected destinations, validation, or help;
-1 on input/configuration errors, all deliveries failing, or command cancellation/timeout.
+Exit status: 0 on any successful delivery, no eligible destinations, validation, or help;
+1 on input/configuration errors, all attempted deliveries failing, or cancellation/timeout.
 `
 
 type commandUpdate struct {
@@ -114,7 +115,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		publish(commandUpdate{err: err})
 	}()
 	var err error
-	succeeded, failed := 0, 0
+	succeeded, failed, skipped := 0, 0, 0
 receive:
 	for {
 		select {
@@ -123,7 +124,10 @@ receive:
 				err = update.err
 				break receive
 			}
-			if update.delivery.err != nil {
+			if update.delivery.skipReason != "" {
+				skipped++
+				logger.Printf("destination %q skipped: %s", update.delivery.destination, update.delivery.skipReason)
+			} else if update.delivery.err != nil {
 				failed++
 				logger.Printf("destination %q failed: %s", update.delivery.destination, update.delivery.err)
 			} else {
@@ -139,7 +143,7 @@ receive:
 		err = ctx.Err()
 	}
 	if args[0] == "send" {
-		logger.Printf("delivery summary: %d succeeded, %d failed", succeeded, failed)
+		logger.Printf("delivery summary: %d succeeded, %d failed, %d skipped", succeeded, failed, skipped)
 	}
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {

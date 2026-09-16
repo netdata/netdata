@@ -40,7 +40,7 @@ func TestRunChatWebhooks(t *testing.T) {
 				"wrong success status": {status: 201, err: "HTTP 201"}, "empty success status": {status: 204, err: "HTTP 204"},
 				"unauthorized": {status: 401, err: "HTTP 401"}, "redirect refused": {status: 307, err: "HTTP 307"},
 				"no rate limit retry": {status: 429, err: "HTTP 429"}, "no server retry": {status: 503, err: "HTTP 503"},
-				"all fail":           {explicit: true, status: 403, err: "all selected destinations failed"},
+				"all fail":           {explicit: true, status: 403, err: "all attempted destinations failed"},
 				"transport":          {drop: true, err: "transport failed"},
 				"arbitrary response": {response: "synthetic-private-value"},
 			} {

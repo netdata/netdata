@@ -13,7 +13,7 @@ Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/Mes
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
 Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog,
-AWS SNS, Kafka HTTP bridges, email through sendmail and IRC through nc.
+AWS SNS, Kafka HTTP bridges, email through sendmail, IRC through nc and destination status filters.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -120,8 +120,8 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
   wildcards, or implicit role selection. They do not become fields in the webhook payload.
 - Both commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
   Deadline expiration, Ctrl-C, or SIGTERM stops the invocation. Run this developer tool as an ordinary user.
-- Exit status is `0` when at least one delivery succeeds, no destinations are selected, validation succeeds, or help
-  is requested. Invalid options/configuration/input, all selected deliveries failing, or command cancellation/timeout
+- Exit status is `0` when at least one delivery succeeds, no destinations are eligible, validation succeeds, or help
+  is requested. Invalid options/configuration/input, all attempted deliveries failing, or command cancellation/timeout
   return `1`. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
 
 Configuration has `version: 1` and a `destinations` mapping. Webhook, Slack and Discord destinations require `type`
@@ -165,7 +165,8 @@ and Opsgenie API keys, Dynatrace API tokens, SMSEagle/Matrix access tokens and c
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
-`validate` checks reference syntax only; `send` resolves and validates the selected destination before sending.
+`validate` checks reference syntax only; `send` resolves and validates eligible selected destinations before sending.
+Destinations skipped by status policy do not resolve secret references.
 
 ## Routing and delivery results
 
@@ -186,18 +187,66 @@ reserved roles `silent` and `disabled` select nothing and cannot have configured
 roles in the same invocation. With neither a matching role nor defaults, sending is a successful no-op.
 
 The selected destinations are the union across roles, preserving input-role and configured-list order. Each
-destination name is sent once. Different names remain distinct destinations even if they use the same URL. In the
+destination name is considered once. Different names remain distinct destinations even if they use the same URL. In the
 example, `--role sysadmin --role dba` sends to `local` and `audit` once each; an unknown role selects `local`.
 
-All configuration and event structure is validated before delivery. Selected destinations are then attempted
-sequentially; a secret-resolution, HTTP, or transport error does not stop the next destination. The total timeout
-still covers the whole invocation, so a slow destination can exhaust the remaining time. Cancellation stops the
+All configuration and event structure is validated before delivery, even for destinations that will be skipped.
+Eligible selected destinations are then attempted sequentially; a secret-resolution, HTTP, or transport error does
+not stop the next destination. The total timeout still covers the whole invocation, so a slow destination can exhaust
+the remaining time. Cancellation stops the
 invocation even after earlier successful deliveries; no further destinations are started once it is observed.
 
-Each completed delivery reports its quoted destination name and outcome to stderr, followed by a success/failure
-count. Partial failure returns `0` when another delivery succeeded, matching Bash's any-success behavior; inspect
-the individual results to see failures. On interruption, counts cover results reported before cancellation and do
-not claim an outcome for interrupted or unstarted deliveries.
+Each completed delivery reports its quoted destination name and outcome to stderr. Filtered destinations report
+`skipped: nowarn` or `skipped: noclear`. The final summary counts `succeeded`, `failed`, and `skipped` separately.
+Partial failure returns `0` when another delivery succeeded, matching Bash's any-success behavior; inspect the
+individual results to see failures. If all attempted deliveries fail, the command returns `1` even when other
+destinations were skipped. No selected destinations or all selected destinations skipped returns `0` after successful
+configuration/input validation. On interruption, counts cover results reported before cancellation and do not claim
+an outcome for interrupted or unstarted deliveries.
+
+### Destination status filters
+
+Optional `routing.policies` entries apply to named destinations for both `--destination` and `--role` sends, after
+selection and deduplication. They apply to every provider, including commands. Each entry must name a configured
+destination and contain only the optional boolean flags `nowarn` and `noclear`, both defaulting to `false`.
+Use YAML `true` or `false`; strings, null flags and unknown options are rejected. An empty mapping `{}` means no
+filters; a null policy entry is rejected.
+
+```yaml
+version: 1
+destinations:
+  critical_alerts:
+    type: webhook
+    url: http://127.0.0.1:18080/critical
+  audit:
+    type: webhook
+    url: http://127.0.0.1:18080/audit
+routing:
+  roles:
+    sysadmin: [critical_alerts, audit]
+  policies:
+    critical_alerts:
+      nowarn: true
+      noclear: true
+```
+
+| Policy | WARNING | CRITICAL | CLEAR |
+|---|---|---|---|
+| Omitted or both false | Send | Send | Send |
+| `nowarn: true` | Skip | Send | Send |
+| `noclear: true` | Send | Send | Skip |
+| Both true | Skip | Send | Skip |
+
+In the example, a WARNING sent to `sysadmin` reaches only `audit`; a CRITICAL reaches both destinations.
+A WARNING sent directly to `critical_alerts` is a successful no-op. Filtering happens before secret resolution,
+HTTP requests or subprocess startup, so skipped destinations do not require their referenced secrets to be available.
+A policy does not select its destination and does not affect other names pointing to the same endpoint.
+
+These filters use only the current status. They do not implement Bash's history-dependent `critical` modifier,
+which can also deliver later WARNING/CLEAR events after a CRITICAL. Global initial-CLEAR eligibility belongs to the
+producer before invocation; the notifier does not infer it from `previous_status`.
+
+### Transport results
 
 Deliveries use POST. Twilio, MessageBird, Prowl and Kavenegar use `application/x-www-form-urlencoded`;
 ntfy uses UTF-8 `text/plain`;
@@ -1940,8 +1989,9 @@ durations mean unknown and are omitted from the public Event JSON; explicit zero
 when supplied they also appear in webhook/custom-command input and Alerta/Opsgenie raw event details, and are available
 to SNS message templates. Other providers' duration presentation remains pending in the capability inventory.
 
-This increment does not infer initial-CLEAR eligibility or apply severity filters or critical-history policy. Those
-capabilities remain pending in the inventory. Add future internal-only event facts separately from this public
+Destination `nowarn`/`noclear` policies filter the current status as described above. The notifier does not infer
+initial-CLEAR eligibility; that decision belongs to the producer before invocation. History-dependent `critical`
+filtering remains pending in the inventory. Add future internal-only event facts separately from this public
 webhook document.
 
 ## Validation

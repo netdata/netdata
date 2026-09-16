@@ -162,7 +162,7 @@ func TestRunIncidentDelivery(t *testing.T) {
 						assert.Contains(t, stderr.String(), `destination "`+provider+`" sent`)
 					}
 					if failed && test.explicit {
-						assert.Contains(t, stderr.String(), "all selected destinations failed")
+						assert.Contains(t, stderr.String(), "all attempted destinations failed")
 					}
 					selected := []string{"ilert", "signl4", "archive"}
 					if test.explicit {

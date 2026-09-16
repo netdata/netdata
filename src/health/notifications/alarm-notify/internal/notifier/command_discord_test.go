@@ -55,13 +55,13 @@ func TestRunDiscord(t *testing.T) {
 			status:      403,
 			otherStatus: 503,
 			code:        1,
-			err:         "all selected destinations failed",
+			err:         "all attempted destinations failed",
 		},
 		"explicit failure": {
 			status:   403,
 			explicit: true,
 			code:     1,
-			err:      "all selected destinations failed",
+			err:      "all attempted destinations failed",
 		},
 		"provider limit does not block others": {oversized: true, skipDiscord: true, err: "1024-character embed limit"},
 	}

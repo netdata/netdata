@@ -40,7 +40,7 @@ func TestRunSlackAndWebhook(t *testing.T) {
 			slackStatus:   403,
 			webhookStatus: 503,
 			wantCode:      1,
-			wantError:     "all selected destinations failed",
+			wantError:     "all attempted destinations failed",
 		},
 		"environment URL": {slackStatus: 200, secretSource: "env"},
 		"file URL":        {slackStatus: 200, secretSource: "file"},

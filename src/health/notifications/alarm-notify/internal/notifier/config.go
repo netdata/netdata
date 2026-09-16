@@ -20,8 +20,9 @@ type Config struct {
 }
 
 type Routing struct {
-	Roles   map[string][]string `yaml:"roles,omitempty"`
-	Default []string            `yaml:"default,omitempty"`
+	Roles    map[string][]string           `yaml:"roles,omitempty"`
+	Default  []string                      `yaml:"default,omitempty"`
+	Policies map[string]*DestinationPolicy `yaml:"policies,omitempty"`
 }
 
 type Destination struct {

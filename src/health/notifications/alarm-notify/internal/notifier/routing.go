@@ -5,7 +5,51 @@ package notifier
 import (
 	"errors"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
+
+type DestinationPolicy struct {
+	NoWarn  bool `yaml:"nowarn,omitempty"`
+	NoClear bool `yaml:"noclear,omitempty"`
+}
+
+// Decode policy flags strictly: nulls and legacy yes/no strings are not booleans.
+func (policy *DestinationPolicy) UnmarshalYAML(node *yaml.Node) error {
+	var fields map[string]any
+	if err := node.Decode(&fields); err != nil {
+		return err
+	}
+	var decoded DestinationPolicy
+	for name, value := range fields {
+		enabled, ok := value.(bool)
+		if !ok {
+			return errors.New("routing policy flags must be booleans")
+		}
+		switch name {
+		case "nowarn":
+			decoded.NoWarn = enabled
+		case "noclear":
+			decoded.NoClear = enabled
+		default:
+			return errors.New("unknown routing policy flag")
+		}
+	}
+	*policy = decoded
+	return nil
+}
+
+func (policy *DestinationPolicy) skipReason(status string) string {
+	if policy != nil {
+		if status == "WARNING" && policy.NoWarn {
+			return "nowarn"
+		}
+		if status == "CLEAR" && policy.NoClear {
+			return "noclear"
+		}
+	}
+	return ""
+}
 
 func (cfg Config) validateRouting() error {
 	validateTargets := func(names []string) error {
@@ -33,6 +77,14 @@ func (cfg Config) validateRouting() error {
 		}
 		if err := validateTargets(names); err != nil {
 			return err
+		}
+	}
+	for name, policy := range cfg.Routing.Policies {
+		if err := validateTargets([]string{name}); err != nil {
+			return err
+		}
+		if policy == nil {
+			return errors.New("routing policy requires a mapping; use {} for no filters")
 		}
 	}
 	return nil

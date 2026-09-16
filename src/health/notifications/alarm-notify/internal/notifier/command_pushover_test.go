@@ -44,7 +44,7 @@ func TestSendPushover(t *testing.T) {
 		"server error not retried":               {calls: 1, status: 503, err: "HTTP 503"},
 		"API rejection":                          {calls: 1, body: `{"status":0,"errors":["synthetic-private-value"]}`, err: "API rejected"},
 		"invalid acknowledgment":                 {calls: 1, body: `synthetic-private-value`, err: "invalid pushover response"},
-		"explicit failure":                       {calls: 1, status: 403, explicit: true, code: 1, err: "all selected destinations failed"},
+		"explicit failure":                       {calls: 1, status: 403, explicit: true, code: 1, err: "all attempted destinations failed"},
 		"transport failure not retried":          {calls: 1, drop: true, err: "transport failed"},
 	} {
 		t.Run(name, func(t *testing.T) {
