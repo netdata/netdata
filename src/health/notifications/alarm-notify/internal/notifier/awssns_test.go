@@ -77,6 +77,39 @@ func TestSNSConfig(t *testing.T) {
 	}
 }
 
+func TestSNSPlatformApplicationNames(t *testing.T) {
+	for name, test := range map[string]struct {
+		application string
+		valid       bool
+	}{
+		"plain":                  {"app", true},
+		"period":                 {"app.v1", true},
+		"all allowed characters": {"App_1-v2.3", true},
+		"one character":          {".", true},
+		"256 characters":         {strings.Repeat("a", 253) + ".v1", true},
+		"empty":                  {"", false},
+		"257 characters":         {strings.Repeat("a", 257), false},
+		"slash":                  {"app/name", false},
+		"space":                  {"app name", false},
+		"unicode":                {"app.é", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dst := snsDestination(t)
+			dst.TargetARN = "arn:aws:sns:us-east-1:123456789012:endpoint/APNS/" + test.application + "/12345678-1234-1234-1234-123456789012"
+			message := "target_arn"
+			if test.valid {
+				message = ""
+			}
+			checkFormConfig(t, dst, message)
+		})
+	}
+	t.Run("topic periods remain invalid", func(t *testing.T) {
+		dst := snsDestination(t)
+		dst.TargetARN = testSNSARN + ".v1"
+		checkFormConfig(t, dst, "target_arn")
+	})
+}
+
 func TestSNSCredentialValues(t *testing.T) {
 	for name, test := range map[string]struct{ source, key, value string }{
 		"profile":        {"imds", "AWS_PROFILE", "synthetic-private-value"},

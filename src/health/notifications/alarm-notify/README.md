@@ -1648,7 +1648,9 @@ owned helper processes to inspect argv, environment and results without invoking
 `awssns` uses an explicitly configured [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/reference/sns/publish.html)
 executable on Linux or macOS. Use a current CLI v2 installation and grant its selected identity `sns:Publish` for the
 configured target. Each destination names a literal standard topic ARN or platform endpoint ARN; the region comes
-from that ARN. FIFO topics require additional publishing fields and are not supported by this adapter.
+from that ARN. Platform application names accept 1-256 ASCII letters, digits, underscores, hyphens or periods;
+periods are not allowed in standard topic names. FIFO topics require additional publishing fields and are not supported
+by this adapter.
 
 ```yaml
 version: 1

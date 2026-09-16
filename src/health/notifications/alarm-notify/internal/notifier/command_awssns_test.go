@@ -105,11 +105,12 @@ func TestRunSNS(t *testing.T) {
 		env                               map[string]string
 		code                              int
 	}{
-		"static warning":        {source: "static", region: "us-east-1", arn: testSNSARN, status: "WARNING", env: map[string]string{"AWS_ACCESS_KEY_ID": "key", "AWS_SECRET_ACCESS_KEY": "secret", "AWS_SESSION_TOKEN": "token"}},
-		"web identity critical": {source: "web_identity", region: "eu-west-1", arn: "arn:aws:sns:eu-west-1:123456789012:alerts", status: "CRITICAL", env: map[string]string{"AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/notifier", "AWS_WEB_IDENTITY_TOKEN_FILE": "/unread/token", "AWS_ROLE_SESSION_NAME": "notifier-test"}},
-		"ecs clear":             {source: "ecs", region: "us-east-1", arn: testSNSARN, status: "CLEAR", env: map[string]string{"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/credentials"}},
-		"imds":                  {source: "imds", region: "cn-north-1", arn: "arn:aws-cn:sns:cn-north-1:123456789012:alerts", status: "WARNING"},
-		"failure":               {source: "imds", region: "us-east-1", arn: testSNSARN, status: "WARNING", mode: "-fail", code: 1},
+		"static warning":              {source: "static", region: "us-east-1", arn: testSNSARN, status: "WARNING", env: map[string]string{"AWS_ACCESS_KEY_ID": "key", "AWS_SECRET_ACCESS_KEY": "secret", "AWS_SESSION_TOKEN": "token"}},
+		"web identity critical":       {source: "web_identity", region: "eu-west-1", arn: "arn:aws:sns:eu-west-1:123456789012:alerts", status: "CRITICAL", env: map[string]string{"AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/notifier", "AWS_WEB_IDENTITY_TOKEN_FILE": "/unread/token", "AWS_ROLE_SESSION_NAME": "notifier-test"}},
+		"ecs clear":                   {source: "ecs", region: "us-east-1", arn: testSNSARN, status: "CLEAR", env: map[string]string{"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/credentials"}},
+		"imds":                        {source: "imds", region: "cn-north-1", arn: "arn:aws-cn:sns:cn-north-1:123456789012:alerts", status: "WARNING"},
+		"dotted platform application": {source: "imds", region: "us-east-1", arn: "arn:aws:sns:us-east-1:123456789012:endpoint/APNS/app.v1/12345678-1234-1234-1234-123456789012", status: "WARNING"},
+		"failure":                     {source: "imds", region: "us-east-1", arn: testSNSARN, status: "WARNING", mode: "-fail", code: 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			for _, key := range []string{"HOME", "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE", "BOTO_CONFIG", "AWS_CREDENTIAL_FILE", "AWS_PROFILE", "AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_SNS", "AWS_DATA_PATH", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_CONTAINER_CREDENTIALS_FULL_URI", "AWS_EC2_METADATA_SERVICE_ENDPOINT", "HTTPS_PROXY", "PYTHONPATH"} {
