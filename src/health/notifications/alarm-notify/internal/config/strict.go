@@ -58,7 +58,7 @@ func checkFields(node *yaml.Node, schema reflect.Type, seen map[nodeSchema]bool)
 		collectFields(schema, fields)
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			name, value := node.Content[i], node.Content[i+1]
-			if name.Tag == "!!merge" {
+			if isMergeKey(name) {
 				if err := checkMerge(value, schema, seen); err != nil {
 					return err
 				}
@@ -78,7 +78,7 @@ func checkFields(node *yaml.Node, schema reflect.Type, seen map[nodeSchema]bool)
 		}
 	case reflect.Map:
 		for i := 0; i+1 < len(node.Content); i += 2 {
-			if node.Content[i].Tag == "!!merge" {
+			if isMergeKey(node.Content[i]) {
 				if err := checkMerge(node.Content[i+1], schema, seen); err != nil {
 					return err
 				}
@@ -138,4 +138,10 @@ func collectFields(schema reflect.Type, fields map[string]reflect.Type) {
 		}
 		fields[name] = field.Type
 	}
+}
+
+// Match yaml.v3's merge recognition: an explicit merge tag alone is not a merge.
+func isMergeKey(node *yaml.Node) bool {
+	return node.Kind == yaml.ScalarNode && node.Value == "<<" &&
+		(node.Tag == "" || node.Tag == "!" || node.ShortTag() == "!!merge")
 }
