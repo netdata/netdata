@@ -207,9 +207,10 @@ Real-use evidence:
 
 Reviewer findings:
 
-- <Review evidence required by AGENTS.md#review: reviewer, reviewed commit or identified working-tree state, covered
-  scope and interactions, findings and dispositions (or none), and remaining limitations. Explain why any reused
-  earlier review still covers the final state. Note Git operations not performed because unauthorized.>
+- <Assessment evidence required by AGENTS.md#review: chosen approach and why sufficient, assessed commit or identified
+  working-tree state, covered scope and interactions, findings and dispositions (or none), and remaining limitations.
+  Identify independent reviewers when used and explain why any reused earlier review still covers the final state.
+  Note Git operations not performed because unauthorized.>
 
 Same-failure scan:
 
