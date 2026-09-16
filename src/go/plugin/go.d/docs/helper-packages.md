@@ -21,7 +21,7 @@ already owns the behavior.
 | Duration and tri-state config option types | `src/go/pkg/confopt` |
 | HTTP request/client config | `src/go/pkg/web` |
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
-| Bounded configured-file reads | `src/go/pkg/safefile` |
+| Configured credential-file reads | `src/go/pkg/credentialfile` |
 | Prometheus exposition parsing | `src/go/pkg/prometheus` |
 | User selector/matcher grammar | `src/go/pkg/matcher` |
 | Collector logging and log limiting | `src/go/logger` |
@@ -74,8 +74,10 @@ When:
 Why:
 
 - `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
-- `web.NewHTTPClient(c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2 behavior consistently;
-- `web.NewHTTPRequest(c.RequestConfig)` and `web.NewHTTPRequestWithPath(c.RequestConfig, path)` apply user agent,
+- `web.NewHTTPClient(ctx, c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2
+  behavior consistently;
+- `web.NewHTTPRequest(ctx, c.RequestConfig)` and
+  `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
 
 Pattern:
@@ -91,12 +93,33 @@ x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConf
 
 ### Configured credential and TLS files
 
-`web` bearer-token files and `tlscfg` CA files use `src/go/pkg/safefile`; certificate and key files use it when both are
-configured. The helper opens the path once, verifies the opened object is a regular file, reads at most 1 MiB, and closes
-it. Symlinks to regular files are supported; non-regular objects and larger files are rejected.
+HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
+`web.NewHTTPRequest(ctx, cfg)` and `web.NewHTTPRequestWithPath(ctx, cfg, path)` return standard requests. Callers do not
+pass or own a reader. Ordinary test/custom transports can be passed directly to clients and `web.DoHTTP`.
+Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` callback is mutable.
 
-Use `safefile.Read` for new bounded credential or key-material paths that share this contract. Do not add a separate
-preflight followed by `os.ReadFile`: that checks a different filesystem object and leaves the production read unbounded.
+Each configured file operation uses its own reduced-authority helper on Unix. Requests without a bearer file start no
+helper process. `tlscfg.NewTLSConfig(ctx, cfg)` reads each configured CA/cert/key file independently. SDK/RPC HTTP consumers
+use the same `web.NewHTTPClient` constructor. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
+stream before returning. No helper process is retained between operations.
+
+On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
+fail closed and never fall back to elevated local reads. Pass the current Init, collection or Function context before
+reading a file. Do not retain reader state in a job, HTTP client, configuration or context, or cache bearer contents.
+
+Bearer tokens are read on every request. CA files, and certificate/key files when both are configured, retain the
+`safefile` contract: validate the opened object as regular, accept symlinks to regular files and read at most 1 MiB.
+`ReadAll` and streaming `Open` support existing unbounded input policies; they do not implicitly adopt that limit. Cookie
+files retain per-collection `Stat`, reload on mtime changes and streaming parsing. Errors must not contain file contents
+or parser fragments derived from credential input.
+
+Use `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
+privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may use private stateless
+read seams and `testutil.New()` from `pkg/credentialfile/testutil` for synthetic fixtures; public APIs use the real
+credential-file boundary.
+
+This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
+retain their existing behavior.
 
 ## Prometheus Endpoints
 
@@ -113,6 +136,10 @@ Why:
 - it reuses `web.RequestConfig` and `*http.Client`;
 - it handles Prometheus text parsing and gzip responses;
 - selectors avoid parsing or processing metric families the collector will not use.
+
+Pass the HTTP client to `prometheus.New(client, request)` or
+`prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
+`ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
 
 Do not hand-roll text exposition parsing in a collector.
 

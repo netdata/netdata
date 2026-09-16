@@ -59,29 +59,29 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string          `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int             `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string          `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int             `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int             `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
-	web.HTTPConfig     `yaml:",inline" json:""`
+	Functions          FunctionsConfig `yaml:"functions,omitempty"           json:"functions"`
+	web.HTTPConfig     `                yaml:",inline"                       json:""`
 }
 
 type FunctionsConfig struct {
-	DSN            string               `yaml:"dsn,omitempty" json:"dsn,omitempty"`
-	TopQueries     TopQueriesConfig     `yaml:"top_queries,omitempty" json:"top_queries"`
+	DSN            string               `yaml:"dsn,omitempty"             json:"dsn,omitempty"`
+	TopQueries     TopQueriesConfig     `yaml:"top_queries,omitempty"     json:"top_queries"`
 	RunningQueries RunningQueriesConfig `yaml:"running_queries,omitempty" json:"running_queries"`
 }
 
 type TopQueriesConfig struct {
-	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Disabled bool             `yaml:"disabled"          json:"disabled"`
 	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+	Limit    int              `yaml:"limit,omitempty"   json:"limit"`
 }
 
 type RunningQueriesConfig struct {
-	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Disabled bool             `yaml:"disabled"          json:"disabled"`
 	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+	Limit    int              `yaml:"limit,omitempty"   json:"limit"`
 }
 
 func (c Config) topQueriesTimeout() time.Duration {
@@ -132,12 +132,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if c.URL == "" {
 		return errors.New("yugabytedb URL required but not set")
 	}
 
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
@@ -154,8 +154,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -170,8 +170,8 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 	}

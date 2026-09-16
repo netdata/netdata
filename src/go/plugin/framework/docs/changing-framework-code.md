@@ -179,6 +179,12 @@ Use this checklist when the changed package is involved.
   collector contract changes require explicit approval.
 - Registration behavior MUST be covered by tests when changed.
 
+Credential-file reads belong to the operation using them. Shared HTTP/TLS helpers
+MUST handle file operations internally; callers use ordinary HTTP objects and the current
+operation context. Base and job cleanup MUST NOT acquire credential-reader ownership.
+Use package-level `credentialfile.Read`/`ReadAll`/`Stat`, or `Open` with the returned stream closed by its consumer.
+Production MUST NOT replace the unprivileged boundary with local filesystem access.
+
 ### jobruntime
 
 - Lifecycle semantics MUST be explicit: `Init`, `Check`, `Collect`, `Cleanup`,

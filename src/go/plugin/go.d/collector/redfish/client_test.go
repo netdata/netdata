@@ -1662,7 +1662,7 @@ func testConfig(rawURL, auth string) Config {
 
 func newTestProtocolClient(t *testing.T, cfg Config) *protocolClient {
 	t.Helper()
-	client, err := newHTTPClient(cfg)
+	client, err := newHTTPClient(t.Context(), cfg)
 	require.NoError(t, err)
 	t.Cleanup(client.CloseIdleConnections)
 	endpoint, err := newEndpointClient(cfg, client)

@@ -3,6 +3,7 @@
 package dcgm
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -183,7 +184,7 @@ func TestStockAlertContracts(t *testing.T) {
 func TestNVSwitchLinkMetadata(t *testing.T) {
 	body := "# TYPE DCGM_FI_DEV_NVSWITCH_LINK_FATAL_ERRORS gauge\nDCGM_FI_DEV_NVSWITCH_LINK_FATAL_ERRORS{nvlink=\"0\",nvswitch=\"switch0\"} 42\n"
 	c := collectorWithMetrics(t, body)
-	mx := c.Collect(nil)
+	mx := c.Collect(context.Background())
 	ch := chartByContext(c, "dcgm.nvlink.interconnect.nvswitch.link_sxid")
 	require.NotNil(t, ch)
 	require.NotEmpty(t, mx)

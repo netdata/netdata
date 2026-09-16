@@ -4,6 +4,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -63,7 +64,7 @@ type Client struct {
 	lazyMu   sync.Mutex
 }
 
-func newSoapClient(config Config) (*soap.Client, error) {
+func newSoapClient(ctx context.Context, config Config) (*soap.Client, error) {
 	soapURL, err := soap.ParseURL(config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parse config option url for vSphere SOAP endpoint: %w", err)
@@ -74,18 +75,11 @@ func newSoapClient(config Config) (*soap.Client, error) {
 	soapURL.User = url.UserPassword(config.User, config.Password)
 	soapClient := soap.NewClient(soapURL, config.TLSConfig.InsecureSkipVerify)
 
-	tlsConfig, err := tlscfg.NewTLSConfig(config.TLSConfig)
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("build TLS configuration from tls_* options: %w", err)
 	}
-	if tlsConfig != nil && len(tlsConfig.Certificates) > 0 {
-		soapClient.SetCertificate(tlsConfig.Certificates[0])
-	}
-	if config.TLSConfig.TLSCA != "" {
-		if err := soapClient.SetRootCAs(config.TLSConfig.TLSCA); err != nil {
-			return nil, fmt.Errorf("load tls_ca certificate bundle %q for vSphere SOAP client: %w", config.TLSConfig.TLSCA, err)
-		}
-	}
+	configureSoapTLS(soapClient, tlsConfig)
 
 	if t, ok := soapClient.Transport.(*http.Transport); ok {
 		t.MaxIdleConnsPerHost = maxIdleConnections
@@ -94,6 +88,17 @@ func newSoapClient(config Config) (*soap.Client, error) {
 	soapClient.Timeout = config.Timeout
 
 	return soapClient, nil
+}
+
+func configureSoapTLS(soapClient *soap.Client, tlsConfig *tls.Config) {
+	if tlsConfig != nil && len(tlsConfig.Certificates) > 0 {
+		soapClient.SetCertificate(tlsConfig.Certificates[0])
+	}
+	if tlsConfig != nil && tlsConfig.RootCAs != nil {
+		if t, ok := soapClient.Transport.(*http.Transport); ok {
+			t.TLSClientConfig.RootCAs = tlsConfig.RootCAs
+		}
+	}
 }
 
 func newContainerView(ctx context.Context, client *govmomi.Client) (*view.ContainerView, error) {
@@ -109,9 +114,8 @@ func newPerformanceManager(client *vim25.Client) *performance.Manager {
 	return perfManager
 }
 
-func New(config Config) (*Client, error) {
-	ctx := context.Background()
-	soapClient, err := newSoapClient(config)
+func New(ctx context.Context, config Config) (*Client, error) {
+	soapClient, err := newSoapClient(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("initialize vSphere SOAP client: %w", err)
 	}

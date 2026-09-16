@@ -86,7 +86,7 @@ func New() *Collector {
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	c.Config.applyDefaults()
 	if c.Name == "" {
 		return errors.New("config validation: job name is required")
@@ -106,7 +106,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.endpointKey = stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars)
 	var err error
-	c.httpClient, err = newHTTPClient(c.Config)
+	c.httpClient, err = newHTTPClient(ctx, c.Config)
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %w", err)
 	}

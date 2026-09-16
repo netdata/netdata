@@ -51,12 +51,10 @@ type httpFetcher struct {
 }
 
 func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
-	req, err := web.NewHTTPRequest(f.request)
+	req, err := web.NewHTTPRequest(ctx, f.request)
 	if err != nil {
 		return err
 	}
-	req = req.WithContext(ctx)
-
 	req.Header.Add("Accept", acceptHeader)
 	req.Header.Add("Accept-Encoding", "gzip")
 

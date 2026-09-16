@@ -88,7 +88,9 @@ type staticScraper struct {
 	families prometheus.MetricFamilies
 }
 
-func (s staticScraper) Scrape() (prometheus.MetricFamilies, error) { return s.families, nil }
+func (s staticScraper) ScrapeContext(context.Context) (prometheus.MetricFamilies, error) {
+	return s.families, nil
+}
 
 // Isolates per-cycle normalization and chart caching from HTTP and parsing.
 // Work and allocations should grow with the input series, not their history.
@@ -115,13 +117,13 @@ func BenchmarkCollector(b *testing.B) {
 			c.prom = staticScraper{
 				families: mfs,
 			}
-			if _, err := c.collect(); err != nil {
+			if _, err := c.collect(context.Background()); err != nil {
 				b.Fatal(err)
 			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := c.collect(); err != nil {
+				if _, err := c.collect(context.Background()); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -185,7 +187,7 @@ func TestCollector_CounterRatesAndFallback(t *testing.T) {
 		t.Run(step.name, func(t *testing.T) {
 			now = now.Add(step.advance)
 			setStaticMetrics(t, c, step.body)
-			mx, err := c.collect()
+			mx, err := c.collect(context.Background())
 			require.NoError(t, err)
 			got, ok := displayedDimension(c, mx, "dcgm.gpu.interconnect.total.throughput", "nvlink")
 			assert.Equal(t, step.present, ok)
