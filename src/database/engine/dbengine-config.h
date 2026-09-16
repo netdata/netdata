@@ -30,12 +30,12 @@ struct dbengine_config {
 
     // files
     bool direct_io;                             // [db] dbengine use direct io
-    unsigned pages_per_extent;                  // [db] dbengine pages per extent
+    unsigned pages_per_extent;                  // [db] dbengine pages per extent; 0 = default, > 109 is fatal
     bool journal_integrity_check;               // [db] dbengine enable journal integrity check
     time_t journal_v2_unmount_time_s;           // [db] dbengine journal v2 unmount time
 
     // runtime
-    time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1
+    time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1, < 0 is fatal
     int libuv_worker_threads;                   // size of the libuv thread pool the engine dispatches work into;
                                                 // 0 = DBENGINE_CONFIG_DEFAULT_WORKER_THREADS
     int reserved_libuv_worker_threads;          // pool threads the engine must leave free for the embedder's own work
@@ -98,9 +98,10 @@ struct rrdeng_tier_config {
 };
 
 // Copy cfg into the engine, resolving the 0-means-default fields (cpus, default_update_every_s,
-// libuv_worker_threads). Fatal when the libuv pool is not larger than the threads reserved for the
-// embedder. Call it once, from one thread, before the first rrdeng_init(); a second call with an
-// equal configuration is a no-op, with a different one it is fatal.
+// pages_per_extent, libuv_worker_threads). Fatal when the libuv pool is not larger than the threads
+// reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or when
+// default_update_every_s is negative. Call it once, from one thread, before the first rrdeng_init();
+// a second call with an equal configuration is a no-op, with a different one it is fatal.
 void dbengine_init(const struct dbengine_config *cfg);
 
 #endif // NETDATA_DBENGINE_CONFIG_H

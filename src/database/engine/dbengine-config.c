@@ -36,6 +36,19 @@ static void dbengine_config_resolve(struct dbengine_config *cfg) {
     if(!cfg->default_update_every_s)
         cfg->default_update_every_s = 1;
 
+    // the extent builder collects up to pages_per_extent descriptors into a MAX_PAGES_PER_EXTENT array
+    if(!cfg->pages_per_extent)
+        cfg->pages_per_extent = DBENGINE_DEFAULT_PAGES_PER_EXTENT;
+
+    if(cfg->pages_per_extent > MAX_PAGES_PER_EXTENT)
+        fatal("DBENGINE: %u pages per extent requested, the extent format allows at most %u",
+              cfg->pages_per_extent, (unsigned)MAX_PAGES_PER_EXTENT);
+
+    // a negative interval would turn into a huge unsigned granularity downstream
+    if(cfg->default_update_every_s < 0)
+        fatal("DBENGINE: a negative default update every (%lld s) makes no sense",
+              (long long)cfg->default_update_every_s);
+
     if(!cfg->libuv_worker_threads)
         cfg->libuv_worker_threads = DBENGINE_CONFIG_DEFAULT_WORKER_THREADS;
 
