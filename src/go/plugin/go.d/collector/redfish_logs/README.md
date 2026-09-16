@@ -1,1 +1,0 @@
-integrations/redfish_log_backend.md

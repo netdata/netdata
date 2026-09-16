@@ -27,13 +27,6 @@ type operationBudget struct {
 
 type operationBudgetContextKey struct{}
 
-type logPageBudget struct {
-	requests atomic.Int64
-	bytes    atomic.Int64
-}
-
-type logPageBudgetContextKey struct{}
-
 func withOperationBudget(ctx context.Context) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -90,31 +83,6 @@ func consumeCollectionMemberBudget(ctx context.Context, count int) error {
 		return consumeBudget(&budget.members, int64(count), maxCollectionMembers, "collection member work")
 	}
 	return nil
-}
-
-func withLogPageBudget(ctx context.Context) context.Context {
-	return context.WithValue(ctx, logPageBudgetContextKey{}, &logPageBudget{})
-}
-
-func consumeLogPageRequestBudget(ctx context.Context) error {
-	budget, _ := ctx.Value(logPageBudgetContextKey{}).(*logPageBudget)
-	if budget == nil {
-		return nil
-	}
-	return consumeBudget(&budget.requests, 1, maxLogRequestsPerPage, "LogEntry page request work")
-}
-
-func consumeLogPageBodyBudget(ctx context.Context, size int) error {
-	budget, _ := ctx.Value(logPageBudgetContextKey{}).(*logPageBudget)
-	if budget == nil {
-		return nil
-	}
-	return consumeBudget(
-		&budget.bytes,
-		int64(size),
-		maxLogResponseBytesCycle,
-		"LogEntry page response-body work",
-	)
 }
 
 type redfishURIMode uint8

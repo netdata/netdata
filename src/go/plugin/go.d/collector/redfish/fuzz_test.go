@@ -3,84 +3,10 @@
 package redfish
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/binary"
 	"encoding/json"
-	"hash/crc32"
 	"net/url"
 	"testing"
 )
-
-func FuzzDecodeCursor(f *testing.F) {
-	payload := cursorPayload{
-		EndpointKey:  "endpoint",
-		OriginDigest: "origin",
-		Sources: map[string]logSourceCursor{
-			testCursorSourceKey: {Mode: "full", Initialized: true},
-		},
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Add(body)
-	f.Add([]byte(`{"endpoint_key":"endpoint","origin_digest":"origin","sources":{}}`))
-	f.Add([]byte(`null`))
-	f.Add([]byte(`{`))
-
-	f.Fuzz(func(t *testing.T, body []byte) {
-		if len(body) > maxCursorPayload {
-			return
-		}
-		raw := cursorEnvelope(body)
-		decoded, err := decodeCursor(raw)
-		if err != nil {
-			return
-		}
-		encoded, err := encodeCursor(decoded)
-		if err != nil {
-			t.Fatalf("re-encode accepted cursor: %v", err)
-		}
-		if _, err := decodeCursor(encoded); err != nil {
-			t.Fatalf("decode re-encoded cursor: %v", err)
-		}
-	})
-}
-
-func FuzzDecodeCursorEnvelope(f *testing.F) {
-	payload := cursorPayload{
-		EndpointKey:  "endpoint",
-		OriginDigest: "origin",
-		Sources: map[string]logSourceCursor{
-			testCursorSourceKey: {Mode: "full", Initialized: true},
-		},
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Add(cursorEnvelope(body))
-	f.Add([]byte(cursorMagic))
-	f.Add([]byte{})
-
-	f.Fuzz(func(t *testing.T, raw []byte) {
-		if len(raw) > maxCursorPayload+cursorHeaderSize {
-			return
-		}
-		decoded, err := decodeCursor(raw)
-		if err != nil {
-			return
-		}
-		encoded, err := encodeCursor(decoded)
-		if err != nil {
-			t.Fatalf("re-encode accepted cursor envelope: %v", err)
-		}
-		if _, err := decodeCursor(encoded); err != nil {
-			t.Fatalf("decode re-encoded cursor envelope: %v", err)
-		}
-	})
-}
 
 func FuzzDecodeJSONBytes(f *testing.F) {
 	f.Add([]byte(`{"Reading":0,"Name":"sensor","Status":{"Health":"OK"}}`))
@@ -166,17 +92,4 @@ func FuzzResolveRedfishURI(f *testing.F) {
 			}
 		}
 	})
-}
-
-func cursorEnvelope(body []byte) []byte {
-	checksum := sha256.Sum256(body)
-	var result bytes.Buffer
-	result.WriteString(cursorMagic)
-	_ = binary.Write(&result, binary.BigEndian, cursorVersion)
-	_ = binary.Write(&result, binary.BigEndian, uint32(len(body)))
-	_ = binary.Write(&result, binary.BigEndian, uint64(0))
-	_ = binary.Write(&result, binary.BigEndian, crc32.ChecksumIEEE(result.Bytes()))
-	result.Write(checksum[:])
-	result.Write(body)
-	return result.Bytes()
 }

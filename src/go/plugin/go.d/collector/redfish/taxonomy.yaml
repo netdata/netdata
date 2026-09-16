@@ -44,8 +44,6 @@ placements:
         title: Redfish hardware metrics
         context_prefix:
           - redfish.
-        context_prefix_exclude:
-          - redfish.log_backend.
       - type: selector
         id: redfish-common-sensors
         title: Standard hardware sensor metrics

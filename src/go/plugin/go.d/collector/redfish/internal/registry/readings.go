@@ -37,25 +37,18 @@ var readingTypeSpecs = []ReadingTypeSpec{
 }
 
 var readingRoleSpecs = []ReadingRoleSpec{
-	{0, "input", ExposureOperationalReading, true},
-	{1, "average", ExposureOperationalReading, false},
-	{2, "lowest_interval", ExposureOperationalReading, false},
-	{3, "peak_interval", ExposureOperationalReading, false},
-	{4, "lowest_since_reset", ExposureOperationalReading, false},
-	{5, "peak_since_reset", ExposureOperationalReading, false},
-	{6, "reading_range_min", ExposureInventoryOnly, false},
-	{7, "reading_range_max", ExposureInventoryOnly, false},
-	{8, "minimum_allowable", ExposureInventoryOnly, false},
-	{9, "maximum_allowable", ExposureInventoryOnly, false},
-	{10, "adjusted_minimum_allowable", ExposureInventoryOnly, false},
-	{11, "adjusted_maximum_allowable", ExposureInventoryOnly, false},
+	{0, "input", true},
+	{1, "average", false},
+	{2, "lowest_interval", false},
+	{3, "peak_interval", false},
+	{4, "lowest_since_reset", false},
+	{5, "peak_since_reset", false},
 }
 
 type readingSurfaceTemplate struct {
 	Family         string
 	Units          string
 	Role           string
-	Exposure       Exposure
 	Primary        bool
 	AggregateKinds []Kind
 	Histogram      string
@@ -68,7 +61,7 @@ func auxiliaryReading(
 ) readingSurfaceTemplate {
 	return readingSurfaceTemplate{
 		Family: family, Units: units, Role: role,
-		Exposure: ExposureOperationalReading, Primary: false,
+		Primary:        false,
 		AggregateKinds: aggregateKinds, Histogram: histogram,
 	}
 }
@@ -80,7 +73,7 @@ func primaryReading(
 ) readingSurfaceTemplate {
 	return readingSurfaceTemplate{
 		Family: family, Units: units, Role: role,
-		Exposure: ExposureOperationalReading, Primary: true,
+		Primary:        true,
 		AggregateKinds: aggregateKinds, Histogram: histogram,
 	}
 }

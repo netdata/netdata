@@ -811,6 +811,15 @@ if ! cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
 
+# Source upgrades retain stock files no longer included in the install manifest.
+# Use the installed stock path, never a configured user directory or data path.
+for retired_redfish_config in go.d/redfish_logs.conf go.d/sd/redfish.conf; do
+  retired_redfish_path="${NETDATA_PREFIX}/usr/lib/netdata/conf.d/${retired_redfish_config}"
+  if [ -e "${retired_redfish_path}" ] || [ -L "${retired_redfish_path}" ]; then
+    run rm -f "${retired_redfish_path}"
+  fi
+done
+
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
 

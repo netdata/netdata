@@ -211,6 +211,15 @@ for x in usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin \
   fi
 done
 
+# Overlay upgrades retain stock files that newer archives no longer ship.
+# Remove retired Redfish optional-feature defaults, preserving user config and data.
+for x in usr/lib/netdata/conf.d/go.d/redfish_logs.conf \
+  usr/lib/netdata/conf.d/go.d/sd/redfish.conf; do
+  if [ -e "${NETDATA_PREFIX}/${x}" ] || [ -L "${NETDATA_PREFIX}/${x}" ]; then
+    run rm -f "${NETDATA_PREFIX}/${x}"
+  fi
+done
+
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"

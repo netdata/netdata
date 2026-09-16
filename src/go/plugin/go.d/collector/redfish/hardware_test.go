@@ -18,45 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalizeInventoryValueHonorsColumnType(t *testing.T) {
-	tests := map[string]struct {
-		value any
-		typ   registry.ColumnType
-		want  any
-	}{
-		"string":             {"value", registry.ColumnString, "value"},
-		"enum":               {"Ok", registry.ColumnEnum, "Ok"},
-		"boolean":            {true, registry.ColumnBoolean, true},
-		"integer":            {json.Number("42"), registry.ColumnInteger, int64(42)},
-		"float":              {json.Number("42.5"), registry.ColumnFloat, 42.5},
-		"reject string bool": {"true", registry.ColumnBoolean, nil},
-		"reject fraction":    {42.5, registry.ColumnInteger, nil},
-		"reject large float32 integer": {
-			float32(math.MaxFloat32), registry.ColumnInteger, nil,
-		},
-		"reject number text": {json.Number("42"), registry.ColumnString, nil},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := normalizeInventoryValue(test.value, test.typ, false); got != test.want {
-				t.Fatalf("normalizeInventoryValue() = %#v, want %#v", got, test.want)
-			}
-		})
-	}
-
-	if got := normalizeInventoryValue([]any{"a", "b"}, registry.ColumnString, true); got != `["a","b"]` {
-		t.Fatalf("structured array = %#v", got)
-	}
-	if got := normalizeInventoryValue(map[string]any{"a": true}, registry.ColumnString, true); got != `{"a":true}` {
-		t.Fatalf("structured object = %#v", got)
-	}
-	for _, value := range []any{"scalar", true, json.Number("1")} {
-		if got := normalizeInventoryValue(value, registry.ColumnString, true); got != nil {
-			t.Errorf("structured scalar %#v = %#v, want nil", value, got)
-		}
-	}
-}
-
 func TestAggregateLabelsEnforcePromotedLabelPolicy(t *testing.T) {
 	client := &protocolClient{origin: "https://bmc.example.test", endpointJob: "job"}
 	owner := placementTestNode("chassis", "owner", "/redfish/v1/Chassis/1", nil)
@@ -76,59 +37,6 @@ func TestAggregateLabelsEnforcePromotedLabelPolicy(t *testing.T) {
 	require.Empty(t, observationLabel(labels, "rollup_owner_name"))
 	require.Empty(t, observationLabel(labels, "aggregate_role"))
 	require.Empty(t, observationLabel(labels, "physical_context"))
-}
-
-func TestScaleInventoryValueRejectsOverflowNonFiniteAndFraction(t *testing.T) {
-	tests := map[string]struct {
-		value any
-		scale registry.Rational
-		want  any
-	}{
-		"integer":          {int64(2), registry.Rational{Num: 1024, Den: 1}, int64(2048)},
-		"integer fraction": {int64(1), registry.Rational{Num: 1, Den: 2}, nil},
-		"integer overflow": {int64(math.MaxInt64), registry.Rational{Num: 2, Den: 1}, nil},
-		"float":            {1.5, registry.Rational{Num: 2, Den: 1}, 3.0},
-		"float overflow":   {math.MaxFloat64, registry.Rational{Num: 2, Den: 1}, nil},
-		"unscaled":         {int64(7), registry.Rational{}, int64(7)},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := scaleInventoryValue(test.value, test.scale); got != test.want {
-				t.Fatalf("scaleInventoryValue() = %#v, want %#v", got, test.want)
-			}
-		})
-	}
-}
-
-func TestScaleInventoryNumberToIntegerIsExactAndBounded(t *testing.T) {
-	tests := map[string]struct {
-		value any
-		scale registry.Rational
-		want  any
-	}{
-		"fractional source with integral result": {
-			json.Number("1.5"), registry.Rational{Num: 1_000_000_000, Den: 1}, int64(1_500_000_000),
-		},
-		"fractional result": {
-			json.Number("0.0000000001"), registry.Rational{Num: 1_000_000_000, Den: 1}, nil,
-		},
-		"positive overflow": {
-			json.Number("9223372036854775807"), registry.Rational{Num: 1_000_000_000, Den: 1}, nil,
-		},
-		"negative overflow": {
-			json.Number("-9223372036854775808"), registry.Rational{Num: 1_000_000_000, Den: 1}, nil,
-		},
-		"non-finite float": {
-			math.Inf(1), registry.Rational{Num: 1_000_000_000, Den: 1}, nil,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := scaleInventoryNumberToInteger(test.value, test.scale); got != test.want {
-				t.Fatalf("scaleInventoryNumberToInteger() = %#v, want %#v", got, test.want)
-			}
-		})
-	}
 }
 
 func TestValidateReadingIdentitiesRejectsOnlyDifferentPreimages(t *testing.T) {
@@ -240,16 +148,17 @@ func TestMemoryThroughputUsesTopLevelBlockSize(t *testing.T) {
 		},
 	}
 
-	value, found := scalarValueByID(client.scalarValues(node, time.Now()), "memory_current_period_blocks_read")
-	if !found || !value.Valid {
-		t.Fatalf("memory throughput value = %+v present=%t", value, found)
-	}
-	if value.Inventory != float64(8192) {
-		t.Fatalf("memory throughput source total = %#v, want 8192 bytes", value.Inventory)
-	}
-	if value.MultiplierColumn != "memory_block_size_bytes" || value.MultiplierValue != float64(4096) {
-		t.Fatalf("memory throughput multiplier = %q/%#v, want memory_block_size_bytes/4096", value.MultiplierColumn, value.MultiplierValue)
-	}
+	at := time.Unix(100, 0)
+	value, found := scalarValueByID(client.scalarValues(node, at), "memory_current_period_blocks_read")
+	require.True(t, found)
+	require.True(t, value.Valid)
+	require.False(t, value.Emit)
+	node.Enrichment["memory_metrics"]["CurrentPeriod"].(map[string]any)["BlocksRead"] = json.Number("4")
+	value, found = scalarValueByID(client.scalarValues(node, at.Add(time.Second)), "memory_current_period_blocks_read")
+	require.True(t, found)
+	require.True(t, value.Emit)
+	require.Equal(t, float64(8192), value.Value)
+
 }
 
 func TestEveryRegistryScalarFieldHasRuntimeProducer(t *testing.T) {
@@ -268,7 +177,6 @@ func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *tes
 	descriptor := registry.FieldSpec{
 		ID:        "test_fallback",
 		Kind:      "processor",
-		Column:    "test_fallback",
 		Algorithm: registry.AlgorithmAbsolute,
 		Scale:     registry.Identity,
 		Candidates: []registry.SourceCandidate{
@@ -296,7 +204,7 @@ func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *tes
 		t.Fatalf("scalarValues() returned %d values, want 1", len(values))
 	}
 	got := values[0]
-	if got.Value != 42 || got.SelectedSource != "Fallback" {
+	if got.Value != 42 {
 		t.Fatalf("fallback value = %+v, want value 42 from Fallback", got)
 	}
 	if len(got.SourceFailures) != 1 ||
@@ -400,10 +308,9 @@ func TestEveryRegistryReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
 				Primary:        true,
 				ReadingScoped:  surface.AlarmMetric != "",
 				Health:         "OK",
-				Inventory:      make(map[string]any),
 			}
 			if fixed {
-				raw.Inventory["fixed_family"] = surface.Family
+				raw.FixedFamily = surface.Family
 			}
 			node := &graphNode{Kind: "sensor", Key: name}
 			switch surface.SemanticClass {
@@ -420,14 +327,13 @@ func TestEveryRegistryReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
 			}
 			if reading.Metric != surface.Metric ||
 				reading.Context != surface.Context ||
-				reading.Exposure != surface.Exposure ||
+
 				reading.AlarmMetric != surface.AlarmMetric ||
 				reading.AggregateSemantic != surface.AggregateMetric {
 				t.Fatalf(
-					"normalized surface = metric %q context %q exposure %q alarm %q aggregate %q; want %+v",
+					"normalized surface = metric %q context %q alarm %q aggregate %q; want %+v",
 					reading.Metric,
 					reading.Context,
-					reading.Exposure,
 					reading.AlarmMetric,
 					reading.AggregateSemantic,
 					surface,
@@ -786,114 +692,44 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 	require.Equal(t, "critical", readings[0].DerivedAlarm, "the excerpt can provide complementary thresholds")
 }
 
-func TestReadingInventoryProducesTypedRawAndNormalizedValues(t *testing.T) {
-	client := &protocolClient{}
-	node := &graphNode{
-		Kind: "sensor",
-		Key:  "sensor-key",
-		Data: map[string]any{
-			"ReadingType":               "PressurekPa",
-			"ReadingUnits":              "kPa",
-			"Reading":                   json.Number("12.5"),
-			"ReadingRangeMin":           json.Number("1"),
-			"ReadingRangeMax":           json.Number("20"),
-			"AverageReading":            json.Number("10"),
-			"ReadingAccuracy":           json.Number("0.1"),
-			"Calibration":               json.Number("0.2"),
-			"Accuracy":                  json.Number("1.5"),
-			"AveragingInterval":         "PT1M30S",
-			"AveragingIntervalAchieved": true,
-			"ReadingTime":               "2026-07-30T12:00:00Z",
-			"Implementation":            "PhysicalSensor",
-			"Thresholds": map[string]any{
-				"UpperCritical": map[string]any{
-					"Reading":            json.Number("18"),
-					"Activation":         "Increasing",
-					"DwellTime":          "PT5S",
-					"HysteresisDuration": "PT2S",
-					"HysteresisReading":  json.Number("0.5"),
-				},
-			},
-		},
-	}
-
-	readings := client.readingsForNode(node, time.Now())
-	if len(readings) == 0 {
-		t.Fatal("sensor reading is missing")
-	}
-	inventory := readings[0].Inventory
-	for key, want := range map[string]any{
-		"reading_range_min_source":                             float64(1),
-		"reading_range_min":                                    float64(1_000),
-		"reading_range_max_source":                             float64(20),
-		"reading_range_max":                                    float64(20_000),
-		"reading_average_source":                               float64(10),
-		"reading_average":                                      float64(10_000),
-		"reading_accuracy_source":                              float64(0.1),
-		"reading_accuracy":                                     float64(100),
-		"calibration_source":                                   float64(0.2),
-		"calibration":                                          float64(200),
-		"accuracy_percent":                                     float64(1.5),
-		"averaging_interval":                                   float64(90),
-		"averaging_interval_achieved":                          true,
-		"reading_time":                                         time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC).UnixMilli(),
-		"threshold_upper_critical_source":                      float64(18),
-		"threshold_upper_critical":                             float64(18_000),
-		"threshold_upper_critical_dwell_seconds":               float64(5),
-		"threshold_upper_critical_hysteresis_duration_seconds": float64(2),
-		"threshold_upper_critical_hysteresis_source":           float64(0.5),
-		"threshold_upper_critical_hysteresis":                  float64(500),
-	} {
-		if got := inventory[key]; got != want {
-			t.Errorf("%s = %#v, want %#v", key, got, want)
-		}
-	}
-	if _, ok := inventory["fixed_family"]; ok {
-		t.Fatal("internal fixed_family marker leaked into inventory")
-	}
-}
-
 func TestReadingAlarmFusionUsesSourceAbnormalPrecedence(t *testing.T) {
 	tests := map[string]struct {
 		source, derived string
 		wantState       string
-		wantSource      string
 	}{
 		"source warning is not elevated": {
-			source: "warning", derived: "critical", wantState: "warning", wantSource: "source",
+			source: "warning", derived: "critical", wantState: "warning",
 		},
 		"source critical is not elevated": {
-			source: "critical", derived: "emergency", wantState: "critical", wantSource: "source",
+			source: "critical", derived: "emergency", wantState: "critical",
 		},
 		"source clear can be elevated": {
-			source: "clear", derived: "critical", wantState: "critical", wantSource: "combined",
+			source: "clear", derived: "critical", wantState: "critical",
 		},
 		"source clear remains clear": {
-			source: "clear", derived: "clear", wantState: "clear", wantSource: "source",
+			source: "clear", derived: "clear", wantState: "clear",
 		},
 		"absent source uses derived": {
-			derived: "warning", wantState: "warning", wantSource: "derived",
+			derived: "warning", wantState: "warning",
 		},
 		"source abnormal survives derived clear": {
-			source: "warning", derived: "clear", wantState: "warning", wantSource: "source",
+			source: "warning", derived: "clear", wantState: "warning",
 		},
 		"source survives absent derived": {
-			source: "critical", wantState: "critical", wantSource: "source",
+			source: "critical", wantState: "critical",
 		},
 		"no usable result stays absent": {},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			state, source := fuseAlarm(test.source, test.derived)
-			if state != test.wantState || source != test.wantSource {
+			state := fuseAlarm(test.source, test.derived)
+			if state != test.wantState {
 				t.Fatalf(
-					"fuseAlarm(%q, %q) = (%q, %q), want (%q, %q)",
+					"fuseAlarm(%q, %q) = %q, want %q",
 					test.source,
 					test.derived,
 					state,
-					source,
 					test.wantState,
-					test.wantSource,
 				)
 			}
 		})
@@ -919,31 +755,26 @@ func TestReadingAlarmManualEvaluationPolicy(t *testing.T) {
 	disabled := normalizeReading(node, raw, false)
 	if disabled.SourceAlarm != "warning" ||
 		disabled.DerivedAlarm != "" ||
-		disabled.EffectiveAlarm != "warning" ||
-		disabled.EffectiveAlarmSource != "source" {
+		disabled.EffectiveAlarm != "warning" {
 		t.Fatalf("disabled manual evaluation = %+v", disabled)
 	}
 
 	enabled := normalizeReading(node, raw, true)
 	if enabled.SourceAlarm != "warning" ||
 		enabled.DerivedAlarm != "critical" ||
-		enabled.EffectiveAlarm != "warning" ||
-		enabled.EffectiveAlarmSource != "source" {
+		enabled.EffectiveAlarm != "warning" {
 		t.Fatalf("source-abnormal precedence = %+v", enabled)
 	}
 
 	raw.Health = "OK"
 	sourceClear := normalizeReading(node, raw, true)
-	if sourceClear.EffectiveAlarm != "critical" ||
-		sourceClear.EffectiveAlarmSource != "combined" ||
-		sourceClear.EffectiveAlarmReason != "threshold_upper_critical" {
+	if sourceClear.EffectiveAlarm != "critical" {
 		t.Fatalf("source-clear threshold fallback = %+v", sourceClear)
 	}
 
 	raw.Health = ""
 	sourceAbsent := normalizeReading(node, raw, true)
-	if sourceAbsent.EffectiveAlarm != "critical" ||
-		sourceAbsent.EffectiveAlarmSource != "derived" {
+	if sourceAbsent.EffectiveAlarm != "critical" {
 		t.Fatalf("source-absent threshold fallback = %+v", sourceAbsent)
 	}
 
@@ -952,8 +783,7 @@ func TestReadingAlarmManualEvaluationPolicy(t *testing.T) {
 	}
 	disabledThreshold := normalizeReading(node, raw, true)
 	if disabledThreshold.DerivedAlarm != "" ||
-		disabledThreshold.EffectiveAlarm != "" ||
-		disabledThreshold.EffectiveAlarmSource != "" {
+		disabledThreshold.EffectiveAlarm != "" {
 		t.Fatalf("disabled threshold handling = %+v", disabledThreshold)
 	}
 }
@@ -1042,65 +872,6 @@ func TestReadingAlarmEmitsEveryClosedRegistryStateWithoutFabricatingMissing(t *t
 	}
 }
 
-func TestInventoryReadingRowPreservesSourceDerivedAndEffectiveAlarmEvidence(t *testing.T) {
-	client := &protocolClient{
-		config: Config{
-			NodeMode: "local",
-		},
-	}
-	node := &graphNode{
-		Kind:             "sensor",
-		Key:              "sensor-key",
-		URI:              "/redfish/v1/Chassis/1/Sensors/Intake",
-		Data:             map[string]any{"Name": "Intake"},
-		AcquisitionState: "readable",
-		IdentityQuality:  "stable",
-		Complete:         true,
-		Doc: genericResource{
-			ID:   "Intake",
-			Name: "Intake",
-			Status: genericStatus{
-				Health: "OK",
-			},
-		},
-		SystemOwners: make(map[string]*graphNode),
-	}
-	reading := normalizedReading{
-		Key:                  "reading-key",
-		SourcePath:           "Sensor.Reading",
-		Family:               "temperature",
-		Units:                "Celsius",
-		Basis:                "zero",
-		Value:                80,
-		Valid:                true,
-		SourceAlarm:          "clear",
-		DerivedAlarm:         "critical",
-		EffectiveAlarm:       "critical",
-		EffectiveAlarmSource: "combined",
-		EffectiveAlarmReason: "threshold_upper_critical",
-	}
-
-	row := client.inventoryReadingRow(
-		node,
-		detailGate{Open: true, Complete: true, Count: 1},
-		time.Unix(100, 0).UTC(),
-		reading,
-	)
-	for key, want := range map[string]any{
-		"source_alarm_state":     "clear",
-		"derived_alarm_state":    "critical",
-		"effective_alarm_state":  "critical",
-		"effective_alarm_source": "combined",
-		"effective_alarm_reason": "threshold_upper_critical",
-		"severity":               "critical",
-		"severity_rank":          0,
-	} {
-		if got := row[key]; got != want {
-			t.Errorf("%s = %#v, want %#v", key, got, want)
-		}
-	}
-}
-
 func TestDerivedAlarmThresholdTruthMatrix(t *testing.T) {
 	thresholds := map[string]rawThreshold{
 		"lower_caution":  {Value: json.Number("10"), Activation: "Decreasing"},
@@ -1108,40 +879,37 @@ func TestDerivedAlarmThresholdTruthMatrix(t *testing.T) {
 		"upper_fatal":    {Value: json.Number("30"), Activation: "Increasing"},
 	}
 	tests := map[string]struct {
-		value      float64
-		wantState  string
-		wantReason string
+		value     float64
+		wantState string
 	}{
 		"strictly below lower": {
-			value: 9, wantState: "warning", wantReason: "threshold_lower_caution",
+			value: 9, wantState: "warning",
 		},
 		"equal lower is clear": {
-			value: 10, wantState: "clear", wantReason: "thresholds_clear",
+			value: 10, wantState: "clear",
 		},
 		"inside range is clear": {
-			value: 15, wantState: "clear", wantReason: "thresholds_clear",
+			value: 15, wantState: "clear",
 		},
 		"equal upper is clear": {
-			value: 20, wantState: "clear", wantReason: "thresholds_clear",
+			value: 20, wantState: "clear",
 		},
 		"above critical": {
-			value: 21, wantState: "critical", wantReason: "threshold_upper_critical",
+			value: 21, wantState: "critical",
 		},
 		"above fatal chooses worst": {
-			value: 31, wantState: "emergency", wantReason: "threshold_upper_fatal",
+			value: 31, wantState: "emergency",
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			state, reason := deriveAlarm(test.value, thresholds, 1)
-			if state != test.wantState || reason != test.wantReason {
+			state := deriveAlarm(test.value, thresholds, 1)
+			if state != test.wantState {
 				t.Fatalf(
-					"deriveAlarm(%v) = (%q, %q), want (%q, %q)",
+					"deriveAlarm(%v) = %q, want %q",
 					test.value,
 					state,
-					reason,
 					test.wantState,
-					test.wantReason,
 				)
 			}
 		})
@@ -1151,8 +919,8 @@ func TestDerivedAlarmThresholdTruthMatrix(t *testing.T) {
 		"upper_critical": {Value: "not-a-number", Activation: "Increasing"},
 		"lower_caution":  {Value: json.Number("10"), Activation: "Disabled"},
 	}
-	if state, reason := deriveAlarm(50, unusable, 1); state != "" || reason != "" {
-		t.Fatalf("unusable thresholds = (%q, %q), want no derived result", state, reason)
+	if state := deriveAlarm(50, unusable, 1); state != "" {
+		t.Fatalf("unusable thresholds = %q, want no derived result", state)
 	}
 }
 
@@ -1240,10 +1008,6 @@ func TestOversizedProtocolNumbersFailSoftWithoutRetainedBaselines(t *testing.T) 
 	for _, value := range []string{integer, fraction} {
 		_, _, ok := numericValue(json.Number(value))
 		require.False(t, ok)
-		require.Nil(t, scaleInventoryNumberToInteger(
-			json.Number(value),
-			registry.Rational{Num: 1, Den: 1},
-		))
 	}
 	_, _, ok := numericSourceValue("PT"+fraction+"S", registry.AlgorithmDurationPercent)
 	require.False(t, ok)
@@ -1276,11 +1040,11 @@ func TestRateEpochsDigestOversizedBMCValues(t *testing.T) {
 	require.NotEqual(t, managerFirst, managerSecond)
 
 	reading := normalizedReading{
-		SourcePath: "Reading",
-		Inventory:  map[string]any{"sensor_reset_time": first},
+		SourcePath:    "Reading",
+		DataSourceURI: &first,
 	}
 	readingFirst := readingRateEpoch(reading)
-	reading.Inventory["sensor_reset_time"] = second
+	reading.DataSourceURI = &second
 	readingSecond := readingRateEpoch(reading)
 	require.Len(t, readingFirst, digestHexChars)
 	require.Len(t, readingSecond, digestHexChars)
@@ -1533,9 +1297,7 @@ func TestPartialTopologyRetainsAtomicLogicalPlacementDecision(t *testing.T) {
 	client := &protocolClient{
 		logicalOwners: map[string]logicalPlacementSnapshot{
 			"sensor": {
-				OwnerKey:   "chassis",
-				Candidates: []string{"system-a", "system-b"},
-				Reason:     "related_item_ambiguous",
+				OwnerKey: "chassis",
 			},
 		},
 	}
@@ -1559,12 +1321,6 @@ func TestPartialTopologyRetainsAtomicLogicalPlacementDecision(t *testing.T) {
 	client.resolveGraphPlacement(graph)
 	if sensor.LogicalOwner != chassis {
 		t.Fatalf("logical owner = %#v, want retained chassis", sensor.LogicalOwner)
-	}
-	if got := strings.Join(sensor.LogicalCandidates, ","); got != "system-a,system-b" {
-		t.Fatalf("logical candidates = %q", got)
-	}
-	if sensor.LogicalReason != "related_item_ambiguous" {
-		t.Fatalf("logical reason = %q", sensor.LogicalReason)
 	}
 }
 
@@ -2294,4 +2050,54 @@ func derivedPowerCount(readings []normalizedReading) int {
 		}
 	}
 	return count
+}
+
+func TestReadingEpochMetadataPreservesSourcePresence(t *testing.T) {
+	const sourceTime = "2026-07-31T00:00:00Z"
+	const excerptTime = "2026-08-01T00:00:00Z"
+	for _, field := range []string{"SensorResetTime", "LifetimeStartDateTime"} {
+		for name, test := range map[string]struct {
+			value   any
+			present bool
+			want    string
+		}{
+			"missing uses excerpt":     {want: excerptTime},
+			"null stays unknown":       {present: true},
+			"wrong type stays unknown": {value: true, present: true},
+			"source wins":              {value: sourceTime, present: true, want: sourceTime},
+		} {
+			t.Run(field+"/"+name, func(t *testing.T) {
+				node := &graphNode{
+					Kind: "sensor", Key: "energy-sensor",
+					Data: map[string]any{
+						"ReadingType": "EnergyJoules", "ReadingUnits": "J",
+						"Reading": json.Number("10"),
+					},
+					SensorExcerpts: []sensorExcerptSource{{
+						Path: "EnergyJoules", Type: "EnergyJoules", Units: "J",
+						Data: map[string]any{"Reading": json.Number("10"), field: excerptTime},
+					}},
+				}
+				if test.present {
+					node.Data[field] = test.value
+				}
+				client := &protocolClient{}
+				client.hardwareState.initialize()
+				readings := client.readingsForNode(node, time.Unix(100, 0))
+				require.Len(t, readings, 1)
+				got := readings[0].SensorResetTime
+				if field == "LifetimeStartDateTime" {
+					got = readings[0].LifetimeStartDateTime
+				}
+				if test.want == "" {
+					require.Nil(t, got)
+				} else {
+					want, err := time.Parse(time.RFC3339, test.want)
+					require.NoError(t, err)
+					require.NotNil(t, got)
+					require.Equal(t, want.UnixMilli(), *got)
+				}
+			})
+		}
+	}
 }

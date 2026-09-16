@@ -3,7 +3,7 @@
 // Package registry is the closed executable Redfish monitoring contract.
 //
 // It intentionally depends only on the standard library. Runtime collection,
-// Function presentation, chart generation, and alert generation consume the
+// chart generation and alert generation consume the
 // same compiled declarations instead of maintaining parallel semantic tables.
 package registry
 
@@ -14,7 +14,6 @@ type (
 	MetricKind string
 	ChartType  string
 	ChartClass string
-	Exposure   string
 )
 
 const (
@@ -23,13 +22,6 @@ const (
 	AlgorithmDurationPercent Algorithm = "collector_duration_percent"
 	AlgorithmStateSet        Algorithm = "stateset"
 	AlgorithmFlags           Algorithm = "flags"
-	AlgorithmInventory       Algorithm = "inventory"
-)
-
-const (
-	ExposureInventoryOnly      Exposure = "inventory_only"
-	ExposureOperationalScalar  Exposure = "operational_scalar"
-	ExposureOperationalReading Exposure = "operational_reading"
 )
 
 const (
@@ -108,7 +100,6 @@ type SourceCandidate struct {
 	MultiplierDocument Document
 	MultiplierPath     string
 	MultiplierScale    Rational
-	MultiplierColumn   string
 }
 
 type SourceRequirement struct {
@@ -123,17 +114,14 @@ type FieldSpec struct {
 	Candidates       []SourceCandidate
 	EquivalenceProof string
 
-	Metric           string
-	Context          string
-	Role             string
-	Column           string
-	Title            string
-	Units            string
-	Scale            Rational
-	Algorithm        Algorithm
-	Float            bool
-	MixedColumnUnits bool
-	Exposure         Exposure
+	Metric    string
+	Context   string
+	Role      string
+	Title     string
+	Units     string
+	Scale     Rational
+	Algorithm Algorithm
+	Float     bool
 
 	Additive       bool
 	Histogram      string
@@ -150,7 +138,6 @@ type StateSpec struct {
 	Metric         string
 	Context        string
 	Title          string
-	Column         string
 	States         []string
 	BooleanFalse   string
 	BooleanTrue    string
@@ -161,7 +148,6 @@ type StateSpec struct {
 type FlagMemberSpec struct {
 	Path   string
 	Role   string
-	Column string
 	Invert bool
 }
 
@@ -214,50 +200,6 @@ type ChartSpec struct {
 	ExpireAfter    int
 }
 
-type ColumnType string
-
-const (
-	ColumnString    ColumnType = "string"
-	ColumnEnum      ColumnType = "enum"
-	ColumnInteger   ColumnType = "integer"
-	ColumnFloat     ColumnType = "float"
-	ColumnBoolean   ColumnType = "boolean"
-	ColumnTimestamp ColumnType = "timestamp"
-)
-
-type ColumnSpec struct {
-	Order      int
-	ID         string
-	Name       string
-	Tooltip    string
-	Type       ColumnType
-	Units      string
-	Scale      Rational
-	Visible    bool
-	Facet      bool
-	Sortable   bool
-	Structured bool
-	Sticky     bool
-	Unique     bool
-	Additive   bool
-	Members    map[string]struct{}
-}
-
-type InventoryFieldSpec struct {
-	Order      int
-	Kind       Kind
-	Expression string
-	Path       string
-	Column     string
-	SourceType ColumnType
-	Type       ColumnType
-	Units      string
-	Scale      Rational
-	Visible    bool
-	Facet      bool
-	Structured bool
-}
-
 type OperationalSpec struct {
 	Order          int
 	TopFamily      string
@@ -283,10 +225,9 @@ type ReadingTypeSpec struct {
 }
 
 type ReadingRoleSpec struct {
-	Order    int
-	ID       string
-	Exposure Exposure
-	Primary  bool
+	Order   int
+	ID      string
+	Primary bool
 }
 
 type ReadingSurfaceSpec struct {
@@ -302,7 +243,6 @@ type ReadingSurfaceSpec struct {
 	TopFamily         string
 	LeafFamily        string
 	Histogram         string
-	Exposure          Exposure
 	Primary           bool
 	AlarmMetric       string
 	AlarmContext      string
@@ -332,8 +272,6 @@ type Contract struct {
 	Status         []StatusSpec
 	States         []StateSpec
 	Flags          []FlagSetSpec
-	Columns        []ColumnSpec
-	Inventory      []InventoryFieldSpec
 	Operational    []OperationalSpec
 	ReadingTypes   []ReadingTypeSpec
 	ReadingRoles   []ReadingRoleSpec

@@ -3,9 +3,7 @@
 package redfish
 
 import (
-	"encoding/json"
 	"fmt"
-	"maps"
 	"math"
 	"math/big"
 	"regexp"
@@ -133,7 +131,7 @@ type aggregateSnapshot struct {
 func (c *protocolClient) hardwareSurface(
 	graph *resourceGraph,
 	observedAt time.Time,
-) ([]hardwareObservation, []map[string]any, error) {
+) ([]hardwareObservation, error) {
 	nodes := c.filterSelectedSystem(graph, graph.emittedNodes())
 	if graph.Complete {
 		c.pruneRateBaselines(nodes)
@@ -145,14 +143,14 @@ func (c *protocolClient) hardwareSurface(
 		}
 	}
 	if err := c.validateHostScopeIdentities(metricNodes); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	readings := make(map[string][]normalizedReading)
 	for _, node := range nodes {
 		readings[node.Key] = c.readingsForNode(node, observedAt)
 	}
 	if err := c.validateAndRegisterReadingIdentities(readings); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	evidence := graph.detailEvidence(metricNodes, readings)
 	gates, gateRetentionComplete := c.detailGatesWithinBudget(
@@ -167,11 +165,9 @@ func (c *protocolClient) hardwareSurface(
 	}
 
 	var observations []hardwareObservation
-	var rows []map[string]any
 	scalarsByNode := make(map[string][]scalarValue)
 	for _, node := range nodes {
 		gate := gateForNode(node, readings[node.Key], gates)
-		row := c.inventoryGraphRow(node, gate, observedAt, readings[node.Key])
 		values := c.scalarValues(node, observedAt)
 		if value, present, diagnostic := managerClockValue(node); present {
 			if diagnostic != "" {
@@ -182,31 +178,17 @@ func (c *protocolClient) hardwareSurface(
 			}
 		}
 		for _, value := range values {
-			row[value.Descriptor.Column] = value.Inventory
-			if value.Present && !value.Valid {
-				markInventoryProtocolError(row)
-			}
-			if value.Exact != "" {
-				row[value.Descriptor.Column+"_exact"] = value.Exact
-			}
-			if len(value.Descriptor.Candidates) > 1 && value.SelectedSource != "" {
-				row[value.Descriptor.Column+"_source"] = value.SelectedSource
-			}
-			if value.MultiplierColumn != "" {
-				row[value.MultiplierColumn] = value.MultiplierValue
-			}
 			for _, failure := range value.SourceFailures {
 				graph.addDiagnostic(failure)
 			}
 		}
-		flags := applyRegisteredFlags(row, node)
-		rows = append(rows, row)
+		flags := flagValues(node)
 		scalarsByNode[node.Key] = values
 
 		if c.metricPlacementReady(node) && detailAllowed(node, gate) {
 			observations = append(observations, c.statusObservations(node)...)
 			for _, value := range values {
-				if !value.Emit || value.Descriptor.Exposure != registry.ExposureOperationalScalar {
+				if !value.Emit {
 					continue
 				}
 				observations = append(observations, hardwareObservation{
@@ -220,12 +202,9 @@ func (c *protocolClient) hardwareSurface(
 		}
 		for _, reading := range readings[node.Key] {
 			graph.addDiagnostic(reading.SourceAlarmDiagnostic)
-			readingRow := c.inventoryReadingRow(node, gate, observedAt, reading)
-			rows = append(rows, readingRow)
 			if c.metricPlacementReady(node) &&
 				detailAllowed(node, gate) &&
-				(reading.Valid || reading.EffectiveAlarm != "") &&
-				reading.Exposure == registry.ExposureOperationalReading {
+				(reading.Valid || reading.EffectiveAlarm != "") {
 				observations = append(observations, c.readingObservations(node, reading)...)
 			}
 		}
@@ -242,11 +221,11 @@ func (c *protocolClient) hardwareSurface(
 			scalarsByNode,
 		)
 		if err != nil {
-			return observations, rows, err
+			return observations, err
 		}
 		observations = append(observations, aggregates...)
 	}
-	return observations, rows, nil
+	return observations, nil
 }
 
 func (c *protocolClient) metricPlacementReady(node *graphNode) bool {
@@ -310,12 +289,11 @@ func (c *protocolClient) pruneRateBaselines(nodes []*graphNode) {
 }
 
 type flagValue struct {
-	Set      registry.FlagSetSpec
-	Member   registry.FlagMemberSpec
-	Value    bool
-	Observed bool
-	Present  bool
-	Emit     bool
+	Set     registry.FlagSetSpec
+	Member  registry.FlagMemberSpec
+	Value   bool
+	Present bool
+	Emit    bool
 }
 
 func flagValues(node *graphNode) []flagValue {
@@ -340,28 +318,12 @@ func flagValues(node *graphNode) []flagValue {
 			}
 			values = append(values, flagValue{
 				Set: set, Member: member, Value: value,
-				Observed: present, Present: present && valid, Emit: present && valid,
+				Present: present && valid, Emit: present && valid,
 			})
 		}
 		result = append(result, values...)
 	}
 	return result
-}
-
-func applyRegisteredFlags(row map[string]any, node *graphNode) []flagValue {
-	values := flagValues(node)
-	for _, value := range values {
-		if !value.Observed {
-			continue
-		}
-		if value.Present {
-			row[value.Member.Column] = value.Value
-			continue
-		}
-		row[value.Member.Column] = nil
-		markInventoryProtocolError(row)
-	}
-	return values
 }
 
 func (c *protocolClient) flagObservations(node *graphNode, values []flagValue) []hardwareObservation {
@@ -383,17 +345,12 @@ func (c *protocolClient) flagObservations(node *graphNode, values []flagValue) [
 }
 
 type scalarValue struct {
-	Descriptor       registry.FieldSpec
-	Value            float64
-	Inventory        any
-	Exact            string
-	SelectedSource   string
-	SourceFailures   []string
-	MultiplierColumn string
-	MultiplierValue  float64
-	Present          bool
-	Valid            bool
-	Emit             bool
+	Descriptor     registry.FieldSpec
+	Value          float64
+	SourceFailures []string
+	Present        bool
+	Valid          bool
+	Emit           bool
 }
 
 func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarValue {
@@ -428,9 +385,8 @@ func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarVal
 				continue
 			}
 			candidate := scalarValue{
-				Descriptor:     descriptor,
-				SelectedSource: sourceName,
-				Present:        true,
+				Descriptor: descriptor,
+				Present:    true,
 			}
 			if raw == nil {
 				sourceFailures = append(sourceFailures, scalarSourceFailure(descriptor, sourceName, "property null"))
@@ -474,13 +430,10 @@ func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarVal
 					scale = registry.Identity
 				}
 				multiplier *= sourceMultiplier * float64(scale.Num) / float64(scale.Den)
-				candidate.MultiplierColumn = source.MultiplierColumn
-				candidate.MultiplierValue = sourceMultiplier * float64(scale.Num) / float64(scale.Den)
 			}
 			normalized := value * multiplier
 			candidate.Value = normalized
-			candidate.Inventory = normalized
-			candidate.Exact = exact
+
 			candidate.Valid = isFinite(normalized)
 			if !candidate.Valid {
 				sourceFailures = append(sourceFailures, scalarSourceFailure(descriptor, sourceName, "normalized value non-finite"))
@@ -569,7 +522,6 @@ func managerClockValue(node *graphNode) (scalarValue, bool, string) {
 	return scalarValue{
 		Descriptor: managerClockDescriptor,
 		Value:      offset,
-		Inventory:  offset,
 		Present:    true,
 		Valid:      true,
 		Emit:       true,
@@ -1188,7 +1140,7 @@ func (c *protocolClient) metricLabels(node *graphNode, reading *normalizedReadin
 			addLabel("system_name", system.Doc.Name)
 		}
 	}
-	addMetricInventoryLabels(addLabel, node)
+	addMetricResourceLabels(addLabel, node)
 	if reading != nil {
 		addLabel("reading_key", reading.Key)
 		addLabel("physical_context", reading.PhysicalContext)
@@ -1206,13 +1158,13 @@ func (c *protocolClient) metricLabels(node *graphNode, reading *normalizedReadin
 	return labels
 }
 
-func addMetricInventoryLabels(add func(string, string), node *graphNode) {
+func addMetricResourceLabels(add func(string, string), node *graphNode) {
 	if node == nil || node.Data == nil {
 		return
 	}
 	addPath := func(label string, paths ...string) {
 		for _, path := range paths {
-			value, ok := inventoryValueAt(node.Data, path)
+			value, ok := registeredValueAt(node.Data, path)
 			if !ok {
 				continue
 			}
@@ -1511,7 +1463,6 @@ func (c *protocolClient) aggregateObservations(
 		}
 		for _, value := range scalars[node.Key] {
 			if !value.Present ||
-				value.Descriptor.Exposure != registry.ExposureOperationalScalar ||
 				value.Descriptor.AggregateClass == "" {
 				continue
 			}
@@ -2489,257 +2440,6 @@ func (c *protocolClient) registerAggregateKey(registry map[string]string, preima
 	return nil
 }
 
-func (c *protocolClient) inventoryGraphRow(
-	node *graphNode,
-	gate detailGate,
-	observedAt time.Time,
-	readings []normalizedReading,
-) map[string]any {
-	hostURI, hostKey, hostName := "/redfish/v1/", resourceKey(c.origin, "service", "/redfish/v1/"), "Redfish Service"
-	if len(node.SystemOwners) == 1 {
-		for _, system := range node.SystemOwners {
-			hostURI, hostKey, hostName = system.URI, system.Key, system.Doc.Name
-		}
-	}
-	row := c.inventoryResourceRow(node, observedAt, inventoryHost{
-		uri: hostURI, key: hostKey, name: hostName,
-	})
-	row["acquisition_state"] = node.AcquisitionState
-	row["error_class"] = emptyToNil(node.ErrorClass)
-	row["identity_quality"] = node.IdentityQuality
-	row["source_container_uri"] = emptyToNil(node.SourceContainer)
-	row["source_property_path"] = emptyToNil(node.SourcePath)
-	if node.SourcePosition != nil {
-		row["source_position"] = *node.SourcePosition
-	}
-	if node.RollupOwner != nil {
-		row["rollup_owner_kind"] = node.RollupOwner.Kind
-		row["rollup_owner_key"] = node.RollupOwner.Key
-		row["rollup_owner_name"] = emptyToNil(node.RollupOwner.Doc.Name)
-		row["rollup_owner_uri"] = emptyToNil(node.RollupOwner.URI)
-	}
-	if node.LogicalOwner != nil {
-		row["logical_owner_key"] = node.LogicalOwner.Key
-		row["logical_owner_name"] = emptyToNil(node.LogicalOwner.Doc.Name)
-		row["logical_owner_uri"] = emptyToNil(node.LogicalOwner.URI)
-	}
-	row["logical_owner_reason"] = emptyToNil(node.LogicalReason)
-	if len(node.LogicalCandidates) > 0 {
-		if encoded, err := json.Marshal(node.LogicalCandidates); err == nil {
-			row["logical_owner_candidates"] = string(encoded)
-		}
-	}
-	row["component_family"] = componentFamily(node, readings)
-	row["detail_gate"] = map[bool]string{true: "open", false: "closed"}[gate.Open]
-	row["detail_component_count"] = gate.Count
-	row["detail_component_cap"] = dereferenceInt(c.config.Charts.MaxDetailedComponentsPerFamily)
-	row["source_schema_type"] = emptyToNil(node.Doc.ODataType)
-	row["source_schema"] = emptyToNil(node.Doc.ODataType)
-	row["source_model"] = node.SourceModel
-	row["source_models"] = compactJSONArray(node.SourceModels)
-	row["source_uris"] = compactJSONArray(node.SourceURIs)
-	row["response_content_type_state"] = emptyToNil(node.Response.ContentTypeState)
-	row["response_odata_version_state"] = emptyToNil(node.Response.ODataVersionState)
-	applyCommonInventory(row, node)
-	applyRegisteredInventory(row, node)
-	applyRegisteredStates(row, node)
-	return row
-}
-
-func compactJSONArray(values []string) any {
-	if len(values) == 0 {
-		return nil
-	}
-	encoded, err := json.Marshal(mergeStringSets(values))
-	if err != nil {
-		return nil
-	}
-	return string(encoded)
-}
-
-func applyCommonInventory(row map[string]any, node *graphNode) {
-	fields := []struct {
-		column string
-		path   string
-		typ    registry.ColumnType
-	}{
-		{"id", "Id", registry.ColumnString},
-		{"name", "Name", registry.ColumnString},
-		{"description", "Description", registry.ColumnString},
-		{"manufacturer", "Manufacturer", registry.ColumnString},
-		{"model", "Model", registry.ColumnString},
-		{"serial_number", "SerialNumber", registry.ColumnString},
-		{"part_number", "PartNumber", registry.ColumnString},
-		{"spare_part_number", "SparePartNumber", registry.ColumnString},
-		{"sku", "SKU", registry.ColumnString},
-		{"asset_tag", "AssetTag", registry.ColumnString},
-		{"firmware_version", "FirmwareVersion", registry.ColumnString},
-		{"uuid", "UUID", registry.ColumnString},
-		{"hot_pluggable", "HotPluggable", registry.ColumnBoolean},
-		{"replaceable", "Replaceable", registry.ColumnBoolean},
-		{"ready_to_remove", "ReadyToRemove", registry.ColumnBoolean},
-		{"location_indicator_active", "LocationIndicatorActive", registry.ColumnBoolean},
-		{"location_service_label", "Location.PartLocation.ServiceLabel", registry.ColumnString},
-		{"location_ordinal", "Location.PartLocation.LocationOrdinalValue", registry.ColumnInteger},
-		{"location_type", "Location.PartLocation.LocationType", registry.ColumnEnum},
-		{"location_orientation", "Location.PartLocation.Orientation", registry.ColumnEnum},
-		{"location_reference", "Location.PartLocation.Reference", registry.ColumnEnum},
-		{"location_part_context", "Location.PartLocationContext", registry.ColumnString},
-		{"location_rack", "Location.Placement.Rack", registry.ColumnString},
-		{"location_rack_offset", "Location.Placement.RackOffset", registry.ColumnInteger},
-		{"location_rack_offset_units", "Location.Placement.RackOffsetUnits", registry.ColumnEnum},
-		{"physical_context", "PhysicalContext", registry.ColumnEnum},
-		{"physical_subcontext", "PhysicalSubContext", registry.ColumnEnum},
-	}
-	for _, field := range fields {
-		if value, ok := inventoryValueAt(node.Data, field.path); ok {
-			row[field.column] = normalizeInventoryValue(value, field.typ, false)
-		}
-	}
-	if node.Kind == "drive" {
-		for _, field := range fields {
-			if !strings.HasPrefix(field.path, "Location.") {
-				continue
-			}
-			if value, ok := inventoryValueAt(node.Data, "Physical"+field.path); ok {
-				row[field.column] = normalizeInventoryValue(value, field.typ, false)
-			}
-		}
-	}
-	hardwareVersionPaths := map[string]string{
-		"assembly": "Version", "battery": "Version", "chassis": "Version",
-		"drive": "HardwareVersion", "manager": "Version", "power_supply": "Version",
-		"processor": "Version", "pump": "Version",
-	}
-	if path := hardwareVersionPaths[node.Kind]; path != "" {
-		if value, ok := inventoryValueAt(node.Data, path); ok {
-			row["hardware_version"] = normalizeInventoryValue(value, registry.ColumnString, false)
-		}
-	}
-}
-
-func applyRegisteredInventory(row map[string]any, node *graphNode) {
-	for _, field := range standardRegistry.Inventory {
-		if field.Kind != registry.Kind(node.Kind) {
-			continue
-		}
-		value, ok := inventoryValueAt(node.Data, field.Path)
-		if !ok {
-			continue
-		}
-		normalized := normalizeInventoryFieldValue(value, field)
-		row[field.Column] = normalized
-		if normalized == nil {
-			markInventoryProtocolError(row)
-		}
-	}
-}
-
-func normalizeInventoryFieldValue(value any, field registry.InventoryFieldSpec) any {
-	sourceType := field.SourceType
-	if sourceType == "" {
-		sourceType = field.Type
-	}
-	if sourceType == registry.ColumnFloat && field.Type == registry.ColumnInteger && !field.Structured {
-		return scaleInventoryNumberToInteger(value, field.Scale)
-	}
-	return scaleInventoryValue(normalizeInventoryValue(value, sourceType, field.Structured), field.Scale)
-}
-
-func scaleInventoryNumberToInteger(value any, scale registry.Rational) any {
-	if value == nil || scale.Num == 0 || scale.Den <= 0 {
-		return nil
-	}
-	var text string
-	switch current := value.(type) {
-	case json.Number:
-		text = current.String()
-	case float64:
-		if !isFinite(current) {
-			return nil
-		}
-		text = strconv.FormatFloat(current, 'g', -1, 64)
-	case float32:
-		if !isFinite(float64(current)) {
-			return nil
-		}
-		text = strconv.FormatFloat(float64(current), 'g', -1, 32)
-	default:
-		return nil
-	}
-	if !boundedProtocolNumber(text) {
-		return nil
-	}
-	valueRat, ok := new(big.Rat).SetString(text)
-	if !ok {
-		return nil
-	}
-	valueRat.Mul(valueRat, new(big.Rat).SetFrac(big.NewInt(scale.Num), big.NewInt(scale.Den)))
-	if !valueRat.IsInt() || !valueRat.Num().IsInt64() {
-		return nil
-	}
-	return valueRat.Num().Int64()
-}
-
-func applyRegisteredStates(row map[string]any, node *graphNode) {
-	for _, state := range standardRegistry.States {
-		if state.Kind != registry.Kind(node.Kind) {
-			continue
-		}
-		document := node.Data
-		if state.Document != "" {
-			document = findEnrichment(node, string(state.Document))
-		}
-		value, ok := registeredValueAt(document, state.Path)
-		if !ok {
-			continue
-		}
-		typ := registry.ColumnEnum
-		if state.BooleanFalse != "" || state.BooleanTrue != "" {
-			typ = registry.ColumnBoolean
-		}
-		normalized := normalizeInventoryValue(value, typ, false)
-		row[state.Column] = normalized
-		if normalized == nil {
-			markInventoryProtocolError(row)
-		}
-	}
-}
-
-func markInventoryProtocolError(row map[string]any) {
-	if row["error_class"] == nil {
-		row["error_class"] = "protocol"
-	}
-}
-
-func scaleInventoryValue(value any, scale registry.Rational) any {
-	if value == nil || scale.Num == 0 || scale.Den == 0 {
-		return value
-	}
-	switch current := value.(type) {
-	case int64:
-		numerator := new(big.Int).Mul(big.NewInt(current), big.NewInt(scale.Num))
-		quotient, remainder := new(big.Int), new(big.Int)
-		quotient.QuoRem(numerator, big.NewInt(scale.Den), remainder)
-		if remainder.Sign() != 0 || !quotient.IsInt64() {
-			return nil
-		}
-		return quotient.Int64()
-	case float64:
-		result := current * float64(scale.Num) / float64(scale.Den)
-		if !isFinite(result) {
-			return nil
-		}
-		return result
-	default:
-		return value
-	}
-}
-
-func inventoryValueAt(data map[string]any, path string) (any, bool) {
-	return registeredValueAt(data, path)
-}
-
 func registeredValueAt(data map[string]any, path string) (any, bool) {
 	if data == nil || path == "" {
 		return nil, false
@@ -2763,135 +2463,4 @@ func registeredValueAt(data map[string]any, path string) (any, bool) {
 		return value, ok
 	}
 	return jsonPath(data, path)
-}
-
-func normalizeInventoryValue(value any, typ registry.ColumnType, structured bool) any {
-	if value == nil {
-		return nil
-	}
-	if structured {
-		switch value.(type) {
-		case map[string]any, []any:
-		default:
-			return nil
-		}
-		raw, err := json.Marshal(value)
-		if err != nil {
-			return nil
-		}
-		return string(raw)
-	}
-	switch typ {
-	case registry.ColumnString, registry.ColumnEnum:
-		text, ok := value.(string)
-		if !ok {
-			return nil
-		}
-		return text
-	case registry.ColumnBoolean:
-		boolean, ok := value.(bool)
-		if !ok {
-			return nil
-		}
-		return boolean
-	case registry.ColumnTimestamp:
-		text, ok := value.(string)
-		if !ok {
-			return nil
-		}
-		parsed, err := time.Parse(time.RFC3339Nano, text)
-		if err != nil {
-			return nil
-		}
-		return parsed.UnixMilli()
-	case registry.ColumnInteger:
-		switch current := value.(type) {
-		case json.Number:
-			if !boundedProtocolNumber(current.String()) {
-				return nil
-			}
-			if integer, err := current.Int64(); err == nil {
-				return integer
-			}
-		case float64:
-			if !isFinite(current) || current != math.Trunc(current) ||
-				current < -float64(uint64(1)<<63) || current >= float64(uint64(1)<<63) {
-				return nil
-			}
-			return int64(current)
-		case float32:
-			value := float64(current)
-			if !isFinite(value) || value != math.Trunc(value) ||
-				value < -float64(uint64(1)<<63) || value >= float64(uint64(1)<<63) {
-				return nil
-			}
-			return int64(current)
-		}
-	case registry.ColumnFloat:
-		if _, number, ok := numericValue(value); ok {
-			return number
-		}
-	}
-	return nil
-}
-
-func (c *protocolClient) inventoryReadingRow(
-	node *graphNode,
-	gate detailGate,
-	observedAt time.Time,
-	reading normalizedReading,
-) map[string]any {
-	row := c.inventoryGraphRow(node, gate, observedAt, []normalizedReading{reading})
-	row["row_type"] = "reading"
-	row["reading_key"] = reading.Key
-	row["row_key"] = stableKey("netdata:redfish:inventory-row:v1", "reading\x00"+node.Key+"\x00"+reading.Key, 64)
-	row["reading_source_path"] = reading.SourcePath
-	row["reading_source_type"] = reading.SourceType
-	row["reading_source_units"] = reading.SourceUnits
-	row["reading_source_basis"] = reading.SourceBasis
-	row["reading_type"] = reading.Family
-	row["reading_units"] = reading.Units
-	row["reading_basis"] = reading.Basis
-	if reading.Valid {
-		row["reading_source_value"] = reading.SourceValue
-		row["reading_value"] = reading.Value
-	} else {
-		markInventoryProtocolError(row)
-	}
-	row["physical_context"] = emptyToNil(reading.PhysicalContext)
-	row["physical_subcontext"] = emptyToNil(reading.PhysicalSubcontext)
-	row["implementation_type"] = emptyToNil(reading.ImplementationType)
-	row["source_alarm_state"] = emptyToNil(reading.SourceAlarm)
-	row["derived_alarm_state"] = emptyToNil(reading.DerivedAlarm)
-	row["effective_alarm_state"] = emptyToNil(reading.EffectiveAlarm)
-	row["effective_alarm_source"] = emptyToNil(reading.EffectiveAlarmSource)
-	row["effective_alarm_reason"] = emptyToNil(reading.EffectiveAlarmReason)
-	if reading.RangeMin != nil {
-		row["reading_range_min"] = *reading.RangeMin
-	}
-	if reading.RangeMax != nil {
-		row["reading_range_max"] = *reading.RangeMax
-	}
-	maps.Copy(row, reading.Inventory)
-	severity, rank := readingSeverity(row["severity"].(string), reading.EffectiveAlarm)
-	row["severity"], row["severity_rank"] = severity, rank
-	row["sort_key"] = fmt.Sprintf("%d\x00%s\x00%s\x00%s", rank, node.Kind, strings.ToLower(node.Doc.Name), row["row_key"])
-	return row
-}
-
-func readingSeverity(resource, alarm string) (string, int) {
-	switch alarm {
-	case "critical", "emergency", "fault":
-		return "critical", 0
-	case "warning", "cap", "alarm":
-		return "warning", 1
-	}
-	switch resource {
-	case "critical":
-		return "critical", 0
-	case "warning":
-		return "warning", 1
-	default:
-		return "normal", 2
-	}
 }

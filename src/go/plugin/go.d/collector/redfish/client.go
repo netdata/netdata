@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfishruntime"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 )
@@ -85,31 +84,10 @@ type protocolClient struct {
 	fairnessCursor         map[string]int
 	expansionFallbackSeen  bool
 
-	logRuntime *redfishruntime.Runtime
-	logBackend string
-	logMatcher matcher.Matcher
-	cursor     *cursorCoordinator
-	logState   logProducerState
 	identities identityRegistry
 
 	diagnosticMu             sync.Mutex
 	pendingCompatibilityDiag map[string]struct{}
-}
-
-func (c *protocolClient) setEndpointJob(name string) {
-	c.endpointJob = name
-}
-
-func (c *protocolClient) setLogRoute(runtime *redfishruntime.Runtime, backend string) {
-	c.logRuntime = runtime
-	c.logBackend = backend
-	if c.config.Logs.enabled() {
-		c.cursor = newCursorCoordinator(
-			stableKey("netdata:redfish:endpoint:v1", c.origin, endpointKeyHexChars),
-			c.origin,
-			c.config.Logs.Cursor.OrphanRetention.Duration(),
-		)
-	}
 }
 
 type wireStats struct {
@@ -225,12 +203,9 @@ func newEndpointClient(cfg Config, client *http.Client) (endpointClient, error) 
 	for _, family := range collectionFamilies {
 		families[family] = family == "base" || familyMatcher.MatchString(family)
 	}
-	logMatcher, err := matcher.NewSimplePatternsMatcher(cfg.Logs.ServiceSelector)
-	if err != nil {
-		return nil, err
-	}
 	result := &protocolClient{
 		config:                 cfg,
+		endpointJob:            cfg.Name,
 		http:                   client,
 		root:                   root,
 		origin:                 origin,
@@ -247,10 +222,8 @@ func newEndpointClient(cfg Config, client *http.Client) (endpointClient, error) 
 		fairnessCursor:         make(map[string]int),
 		sem:                    make(chan struct{}, cfg.MaxConcurrentRequests),
 		families:               families,
-		logMatcher:             logMatcher,
 	}
 	result.hardwareState.initialize()
-	result.logState.initialize()
 	return result, nil
 }
 
@@ -340,7 +313,6 @@ func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) 
 			HTTPRequests: make(map[string]int),
 			Operations:   make(map[string]int),
 			Resources:    make(map[string]int),
-			LogServices:  make(map[string]int),
 		},
 	}
 	result.Diagnostics = append(result.Diagnostics, c.takeCompatibilityDiagnostics()...)
@@ -364,7 +336,7 @@ func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) 
 		return result, collectionErr
 	}
 	var hardwareErr error
-	result.Hardware, result.Inventory, hardwareErr = c.hardwareSurface(graph, result.ObservedAt)
+	result.Hardware, hardwareErr = c.hardwareSurface(graph, result.ObservedAt)
 	collectionErr = errors.Join(collectionErr, hardwareErr)
 	result.Complete = result.Complete && hardwareErr == nil
 	result.Diagnostics = append(result.Diagnostics, graph.finalDiagnostics()...)
@@ -378,23 +350,10 @@ func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) 
 	}
 	if identityIntegrityError(hardwareErr) {
 		result.Hardware = nil
-		result.Inventory = nil
 		result.Complete = false
 		c.finishCollectionResult(&result, graph, resources, membership["system"], stats, started)
 		return result, collectionErr
 	}
-	logObservations, logAdmission, logCounts, logDiagnostics, logErr := c.collectLogServices(
-		ctx,
-		graph,
-		result.ObservedAt,
-		stats,
-	)
-	result.Hardware = append(result.Hardware, logObservations...)
-	result.Metrics.LogsAdmission = logAdmission
-	result.Metrics.LogServices = logCounts
-	result.Diagnostics = append(result.Diagnostics, logDiagnostics...)
-	collectionErr = errors.Join(collectionErr, logErr)
-	result.Complete = result.Complete && logErr == nil
 	c.finishCollectionResult(&result, graph, resources, membership["system"], stats, started)
 	return result, collectionErr
 }
@@ -530,9 +489,6 @@ func (c *protocolClient) copyWireStats(metrics *cycleMetrics, stats *wireStats) 
 }
 
 func (c *protocolClient) Close(ctx context.Context) error {
-	if c.cursor != nil {
-		c.cursor.Close()
-	}
 	c.authMu.Lock()
 	sessions := append([]sessionHandle(nil), c.sessions...)
 	if c.sessionURI != "" && c.token != "" && len(sessions) == 0 {
@@ -2060,9 +2016,6 @@ func (c *protocolClient) doOnce(
 	if err := consumeRequestBudget(ctx); err != nil {
 		return nil, err
 	}
-	if err := consumeLogPageRequestBudget(ctx); err != nil {
-		return nil, err
-	}
 	sem, err := c.acquireRequest(ctx)
 	if err != nil {
 		return nil, err
@@ -2113,9 +2066,6 @@ func (c *protocolClient) doOnce(
 		stats.received += int64(len(payload))
 	}
 	if budgetErr := consumeBodyBudget(ctx, len(payload)); budgetErr != nil {
-		return nil, budgetErr
-	}
-	if budgetErr := consumeLogPageBodyBudget(ctx, len(payload)); budgetErr != nil {
 		return nil, budgetErr
 	}
 	if err != nil {
@@ -2379,4 +2329,18 @@ func selectedSystemFailureState(systemURI string, err error) string {
 		return "unreadable"
 	}
 	return "unknown"
+}
+
+func stringAt(data map[string]any, path string) string {
+	value, _ := stringValueAt(data, path)
+	return value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }

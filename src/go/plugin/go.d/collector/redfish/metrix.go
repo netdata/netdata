@@ -6,8 +6,6 @@ import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 var (
 	collectionStates     = []string{"success", "partial", "unavailable"}
-	logRouteStates       = []string{"disabled", "ready", "unavailable"}
-	logAdmissionStates   = []string{"disabled", "ready", "over_limit", "duplicate_owner", "unknown"}
 	selectedSystemStates = []string{"present", "unreadable", "absent", "unknown"}
 )
 
@@ -19,9 +17,6 @@ type collectorMetrics struct {
 	operations     map[string]metrix.SnapshotGaugeVec
 	traffic        metrix.SnapshotGaugeVec
 	resources      map[string]metrix.SnapshotGaugeVec
-	logsRoute      metrix.SnapshotStateSetVec
-	logsAdmission  metrix.SnapshotStateSetVec
-	logServices    map[string]metrix.SnapshotGaugeVec
 	selectedSystem metrix.SnapshotStateSetVec
 }
 
@@ -45,17 +40,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		operations: gaugeMap(vec, "collection_operations", "successful", "failed"),
 		traffic:    vec.Gauge("collection_traffic_received_bytes"),
 		resources:  gaugeMap(vec, "collection_resources", "discovered", "readable", "unreadable", "unknown"),
-		logsRoute: vec.StateSet(
-			"collection_logs_route",
-			metrix.WithStateSetMode(metrix.ModeEnum),
-			metrix.WithStateSetStates(logRouteStates...),
-		),
-		logsAdmission: vec.StateSet(
-			"collection_logs_admission",
-			metrix.WithStateSetMode(metrix.ModeEnum),
-			metrix.WithStateSetStates(logAdmissionStates...),
-		),
-		logServices: gaugeMap(vec, "collection_log_services", "discovered", "selected", "admitted", "limit"),
 		selectedSystem: vec.StateSet(
 			"collection_selected_system",
 			metrix.WithStateSetMode(metrix.ModeEnum),
@@ -80,9 +64,6 @@ type cycleMetrics struct {
 	Operations     map[string]int
 	ReceivedBytes  int64
 	Resources      map[string]int
-	LogsRoute      string
-	LogsAdmission  string
-	LogServices    map[string]int
 	SelectedSystem string
 }
 
@@ -97,13 +78,6 @@ func (m *collectorMetrics) observe(endpointKey, endpointJob string, cycle cycleM
 	observeGaugeMap(m.operations, labels, cycle.Operations)
 	m.traffic.WithLabelValues(labels...).Observe(float64(cycle.ReceivedBytes))
 	observeGaugeMap(m.resources, labels, cycle.Resources)
-	if cycle.LogsRoute != "" {
-		m.logsRoute.WithLabelValues(labels...).Enable(cycle.LogsRoute)
-	}
-	if cycle.LogsAdmission != "" {
-		m.logsAdmission.WithLabelValues(labels...).Enable(cycle.LogsAdmission)
-	}
-	observeGaugeMap(m.logServices, labels, cycle.LogServices)
 	if cycle.SelectedSystem != "" {
 		m.selectedSystem.WithLabelValues(labels...).Enable(cycle.SelectedSystem)
 	}

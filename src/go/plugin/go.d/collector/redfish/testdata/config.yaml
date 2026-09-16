@@ -1,3 +1,4 @@
+name: bmc
 vnode: existing-bmc
 update_every: 60
 autodetection_retry: 30
@@ -26,11 +27,3 @@ host_scope_overrides:
   - resource_uri: /redfish/v1/Systems/1
     guid: 8b1481d2-010a-5e68-b70f-1fe12b8d3c0d
     hostname: server-one
-logs:
-  enabled: true
-  backend: hardware
-  service_selector: "!AuditLog *"
-  max_services: 256
-  full_reconciliation_every: 1800
-  cursor:
-    orphan_retention: 2592000.0

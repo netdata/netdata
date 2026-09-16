@@ -75,9 +75,6 @@ func TestRenderHealth(t *testing.T) {
 		"on: system.hw.sensor.temperature.alarm",
 		"chart labels: _collect_module=redfish",
 		"on: redfish.collection.status",
-		"on: redfish.log_backend.state",
-		"on: redfish.log_service.ingestion_state",
-		"delay: up 30m down 5m multiplier 1.5 max 1h",
 	} {
 		if !strings.Contains(value, expected) {
 			t.Errorf("generated health manifest does not contain %q", expected)

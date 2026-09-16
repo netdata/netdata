@@ -133,9 +133,6 @@ groups:
           - aggregate_load_percentage_average
           - aggregate_load_percentage_maximum
           - aggregate_load_percentage_minimum
-          - aggregate_log_service_overflow_state_clear
-          - aggregate_log_service_overflow_state_overflow
-          - aggregate_log_service_overflow_state_unknown
           - aggregate_memory_health_flags_address_parity
           - aggregate_memory_health_flags_correctable_ecc
           - aggregate_memory_health_flags_data_loss
@@ -1041,29 +1038,13 @@ groups:
                 name: maximum
                 options:
                   float: true
-          - id: redfish_aggregate_log_service_overflow_state
-            title: Log Service Overflow State Counts
-            context: aggregate.log_service_overflow_state
-            units: components
-            algorithm: absolute
-            type: stacked
-            priority: 1300
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: aggregate_log_service_overflow_state_clear
-                name: clear
-              - selector: aggregate_log_service_overflow_state_overflow
-                name: overflow
-              - selector: aggregate_log_service_overflow_state_unknown
-                name: unknown
           - id: redfish_aggregate_memory_health_flags
             title: Memory Health Flags Counts
             context: aggregate.memory_health_flags
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1310
+            priority: 1300
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1089,7 +1070,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1320
+            priority: 1310
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1103,7 +1084,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1330
+            priority: 1320
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1123,7 +1104,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1340
+            priority: 1330
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1139,7 +1120,7 @@ groups:
             units: packets/s
             algorithm: absolute
             type: line
-            priority: 1350
+            priority: 1340
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1165,7 +1146,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1360
+            priority: 1350
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1187,7 +1168,7 @@ groups:
             units: components
             algorithm: absolute
             type: heatmap
-            priority: 1370
+            priority: 1360
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1221,7 +1202,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1380
+            priority: 1370
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1237,7 +1218,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1390
+            priority: 1380
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1259,7 +1240,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1400
+            priority: 1390
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1275,7 +1256,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1410
+            priority: 1400
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1297,7 +1278,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1420
+            priority: 1410
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1315,7 +1296,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1430
+            priority: 1420
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1333,7 +1314,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1440
+            priority: 1430
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1351,7 +1332,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1450
+            priority: 1440
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1389,7 +1370,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1460
+            priority: 1450
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1405,7 +1386,7 @@ groups:
             units: queues
             algorithm: absolute
             type: line
-            priority: 1470
+            priority: 1460
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1431,7 +1412,7 @@ groups:
             units: components
             algorithm: absolute
             type: heatmap
-            priority: 1480
+            priority: 1470
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1465,7 +1446,7 @@ groups:
             units: ratio
             algorithm: absolute
             type: line
-            priority: 1490
+            priority: 1480
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1487,7 +1468,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1500
+            priority: 1490
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1511,7 +1492,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1510
+            priority: 1500
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1533,7 +1514,7 @@ groups:
             units: requests/s
             algorithm: absolute
             type: line
-            priority: 1520
+            priority: 1510
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1559,7 +1540,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1530
+            priority: 1520
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1597,7 +1578,7 @@ groups:
             units: shutdowns/s
             algorithm: absolute
             type: line
-            priority: 1540
+            priority: 1530
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1623,7 +1604,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1550
+            priority: 1540
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1645,7 +1626,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1560
+            priority: 1550
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1663,7 +1644,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1570
+            priority: 1560
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1681,7 +1662,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1580
+            priority: 1570
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1719,7 +1700,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1590
+            priority: 1580
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1745,7 +1726,7 @@ groups:
             units: components
             algorithm: absolute
             type: heatmap
-            priority: 1600
+            priority: 1590
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1775,7 +1756,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1610
+            priority: 1600
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1797,7 +1778,7 @@ groups:
             units: transitions/s
             algorithm: absolute
             type: line
-            priority: 1620
+            priority: 1610
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1823,7 +1804,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1630
+            priority: 1620
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1845,7 +1826,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1640
+            priority: 1630
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1867,7 +1848,7 @@ groups:
             units: components
             algorithm: absolute
             type: stacked
-            priority: 1650
+            priority: 1640
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1885,7 +1866,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1660
+            priority: 1650
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1940,7 +1921,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1670
+            priority: 1660
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1956,7 +1937,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 1680
+            priority: 1670
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1974,7 +1955,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1690
+            priority: 1680
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -1992,7 +1973,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1700
+            priority: 1690
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2010,7 +1991,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1710
+            priority: 1700
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2028,7 +2009,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1720
+            priority: 1710
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2050,7 +2031,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1730
+            priority: 1720
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2121,7 +2102,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1740
+            priority: 1730
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2168,7 +2149,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1750
+            priority: 1740
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2227,7 +2208,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1760
+            priority: 1750
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2243,7 +2224,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 1770
+            priority: 1760
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2261,7 +2242,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1780
+            priority: 1770
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2277,7 +2258,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1790
+            priority: 1780
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2295,7 +2276,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1800
+            priority: 1790
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2313,7 +2294,7 @@ groups:
             units: members
             algorithm: absolute
             type: line
-            priority: 1810
+            priority: 1800
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2327,7 +2308,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1820
+            priority: 1810
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2349,7 +2330,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1830
+            priority: 1820
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2427,7 +2408,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1840
+            priority: 1830
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2443,7 +2424,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 1850
+            priority: 1840
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2461,7 +2442,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1860
+            priority: 1850
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2479,7 +2460,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1870
+            priority: 1860
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2497,7 +2478,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1880
+            priority: 1870
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2559,7 +2540,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1890
+            priority: 1880
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2609,7 +2590,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1940
+            priority: 1930
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2623,7 +2604,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1950
+            priority: 1940
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2641,7 +2622,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1960
+            priority: 1950
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2659,7 +2640,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1970
+            priority: 1960
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2697,7 +2678,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 1980
+            priority: 1970
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2711,7 +2692,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2000
+            priority: 1990
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2725,7 +2706,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2010
+            priority: 2000
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2743,7 +2724,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2020
+            priority: 2010
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2761,7 +2742,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2030
+            priority: 2020
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2799,7 +2780,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2040
+            priority: 2030
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2848,7 +2829,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1900
+            priority: 1890
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2864,7 +2845,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 1910
+            priority: 1900
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2882,7 +2863,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1920
+            priority: 1910
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2900,7 +2881,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1930
+            priority: 1920
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2918,7 +2899,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 1990
+            priority: 1980
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -2940,7 +2921,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2050
+            priority: 2040
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3018,7 +2999,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 2140
+            priority: 2130
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3129,7 +3110,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2060
+            priority: 2050
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3145,7 +3126,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2070
+            priority: 2060
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3159,7 +3140,7 @@ groups:
             units: MHz
             algorithm: absolute
             type: line
-            priority: 2080
+            priority: 2070
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3173,7 +3154,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2090
+            priority: 2080
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3191,7 +3172,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 2100
+            priority: 2090
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3217,7 +3198,7 @@ groups:
             units: ratio
             algorithm: absolute
             type: line
-            priority: 2110
+            priority: 2100
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3231,7 +3212,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2120
+            priority: 2110
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3249,7 +3230,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2130
+            priority: 2120
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3267,7 +3248,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2150
+            priority: 2140
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3289,7 +3270,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2160
+            priority: 2150
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3327,7 +3308,7 @@ groups:
             units: Celsius
             algorithm: absolute
             type: line
-            priority: 2170
+            priority: 2160
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3341,7 +3322,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2180
+            priority: 2170
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3359,7 +3340,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2190
+            priority: 2180
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3375,7 +3356,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2200
+            priority: 2190
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3417,7 +3398,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2210
+            priority: 2200
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3472,7 +3453,7 @@ groups:
             units: cycles/s
             algorithm: absolute
             type: line
-            priority: 2220
+            priority: 2210
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3494,7 +3475,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 2230
+            priority: 2220
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3520,7 +3501,7 @@ groups:
             units: instructions/cycle
             algorithm: absolute
             type: line
-            priority: 2240
+            priority: 2230
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3594,7 +3575,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2250
+            priority: 2240
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3610,7 +3591,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2260
+            priority: 2250
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3624,7 +3605,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2270
+            priority: 2260
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3638,7 +3619,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2280
+            priority: 2270
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3656,7 +3637,7 @@ groups:
             units: shutdowns/s
             algorithm: absolute
             type: line
-            priority: 2290
+            priority: 2280
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3670,7 +3651,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 2300
+            priority: 2290
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3696,7 +3677,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2310
+            priority: 2300
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3714,7 +3695,7 @@ groups:
             units: flags
             algorithm: absolute
             type: stacked
-            priority: 2320
+            priority: 2310
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3740,7 +3721,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2330
+            priority: 2320
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3758,7 +3739,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 2340
+            priority: 2330
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3776,7 +3757,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2350
+            priority: 2340
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3794,7 +3775,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2360
+            priority: 2350
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3867,7 +3848,7 @@ groups:
             units: grams/cubic-meter
             algorithm: absolute
             type: line
-            priority: 2370
+            priority: 2360
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3945,7 +3926,7 @@ groups:
             units: grams/cubic-meter
             algorithm: absolute
             type: line
-            priority: 2380
+            priority: 2370
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3967,7 +3948,7 @@ groups:
             units: cubic-meters/minute
             algorithm: absolute
             type: line
-            priority: 2390
+            priority: 2380
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -3989,7 +3970,7 @@ groups:
             units: meters
             algorithm: absolute
             type: line
-            priority: 2400
+            priority: 2390
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4011,7 +3992,7 @@ groups:
             units: meters/second2
             algorithm: absolute
             type: line
-            priority: 2410
+            priority: 2400
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4033,7 +4014,7 @@ groups:
             units: meters/second
             algorithm: absolute
             type: line
-            priority: 2420
+            priority: 2410
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4055,7 +4036,7 @@ groups:
             units: liters/minute
             algorithm: absolute
             type: line
-            priority: 2430
+            priority: 2420
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4077,7 +4058,7 @@ groups:
             units: pascals
             algorithm: absolute
             type: line
-            priority: 2440
+            priority: 2430
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4099,7 +4080,7 @@ groups:
             units: radians/second2
             algorithm: absolute
             type: line
-            priority: 2450
+            priority: 2440
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4121,7 +4102,7 @@ groups:
             units: radians
             algorithm: absolute
             type: line
-            priority: 2460
+            priority: 2450
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4143,7 +4124,7 @@ groups:
             units: RPM
             algorithm: absolute
             type: line
-            priority: 2470
+            priority: 2460
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4165,7 +4146,7 @@ groups:
             units: radians/second
             algorithm: absolute
             type: line
-            priority: 2480
+            priority: 2470
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4187,7 +4168,7 @@ groups:
             units: Celsius
             algorithm: absolute
             type: line
-            priority: 2490
+            priority: 2480
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4242,7 +4223,7 @@ groups:
             units: cubic-meters/minute
             algorithm: absolute
             type: line
-            priority: 2500
+            priority: 2490
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4289,7 +4270,7 @@ groups:
             units: meters
             algorithm: absolute
             type: line
-            priority: 2510
+            priority: 2500
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4336,7 +4317,7 @@ groups:
             units: pascals
             algorithm: absolute
             type: line
-            priority: 2520
+            priority: 2510
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4385,7 +4366,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2530
+            priority: 2520
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4409,7 +4390,7 @@ groups:
             units: pascals
             algorithm: absolute
             type: line
-            priority: 2540
+            priority: 2530
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4493,7 +4474,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2550
+            priority: 2540
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4509,7 +4490,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2560
+            priority: 2550
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4527,7 +4508,7 @@ groups:
             units: hertz
             algorithm: absolute
             type: line
-            priority: 2570
+            priority: 2560
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4549,7 +4530,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2580
+            priority: 2570
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4567,7 +4548,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2590
+            priority: 2580
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4585,7 +4566,7 @@ groups:
             units: meters/second2
             algorithm: absolute
             type: line
-            priority: 2600
+            priority: 2590
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4607,7 +4588,7 @@ groups:
             units: meters
             algorithm: absolute
             type: line
-            priority: 2610
+            priority: 2600
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4629,7 +4610,7 @@ groups:
             units: meters/second
             algorithm: absolute
             type: line
-            priority: 2620
+            priority: 2610
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4651,7 +4632,7 @@ groups:
             units: liters/minute
             algorithm: absolute
             type: line
-            priority: 2630
+            priority: 2620
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4673,7 +4654,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2640
+            priority: 2630
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4695,7 +4676,7 @@ groups:
             units: watts
             algorithm: absolute
             type: line
-            priority: 2650
+            priority: 2640
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4717,7 +4698,7 @@ groups:
             units: pascals
             algorithm: absolute
             type: line
-            priority: 2660
+            priority: 2650
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4739,7 +4720,7 @@ groups:
             units: radians/second2
             algorithm: absolute
             type: line
-            priority: 2670
+            priority: 2660
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4761,7 +4742,7 @@ groups:
             units: radians
             algorithm: absolute
             type: line
-            priority: 2680
+            priority: 2670
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4783,7 +4764,7 @@ groups:
             units: radians/second
             algorithm: absolute
             type: line
-            priority: 2690
+            priority: 2680
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4805,7 +4786,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2700
+            priority: 2690
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4843,7 +4824,7 @@ groups:
             units: Celsius
             algorithm: absolute
             type: line
-            priority: 2710
+            priority: 2700
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4865,7 +4846,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2720
+            priority: 2710
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4926,7 +4907,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2730
+            priority: 2720
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4942,7 +4923,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2740
+            priority: 2730
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4960,7 +4941,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2750
+            priority: 2740
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4978,7 +4959,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2760
+            priority: 2750
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -4996,7 +4977,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2770
+            priority: 2760
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5073,7 +5054,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2780
+            priority: 2770
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5089,7 +5070,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2790
+            priority: 2780
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5107,7 +5088,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2800
+            priority: 2790
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5125,7 +5106,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2810
+            priority: 2800
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5143,7 +5124,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2820
+            priority: 2810
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5220,7 +5201,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2830
+            priority: 2820
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5236,7 +5217,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2840
+            priority: 2830
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5254,7 +5235,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2850
+            priority: 2840
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5272,7 +5253,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2860
+            priority: 2850
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5290,7 +5271,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2870
+            priority: 2860
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5361,7 +5342,7 @@ groups:
             units: watts
             algorithm: absolute
             type: line
-            priority: 2880
+            priority: 2870
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5416,7 +5397,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2890
+            priority: 2880
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5432,7 +5413,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2900
+            priority: 2890
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5450,7 +5431,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2910
+            priority: 2900
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5468,7 +5449,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2920
+            priority: 2910
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5486,7 +5467,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2930
+            priority: 2920
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5504,7 +5485,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2940
+            priority: 2930
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5575,7 +5556,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2950
+            priority: 2940
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5624,7 +5605,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2960
+            priority: 2950
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5648,7 +5629,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 2970
+            priority: 2960
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5693,7 +5674,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 2980
+            priority: 2970
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5709,7 +5690,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 2990
+            priority: 2980
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5727,7 +5708,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3000
+            priority: 2990
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5745,7 +5726,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3010
+            priority: 3000
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5763,7 +5744,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3020
+            priority: 3010
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5841,7 +5822,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3030
+            priority: 3020
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5857,7 +5838,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 3040
+            priority: 3030
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5875,7 +5856,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3050
+            priority: 3040
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5897,7 +5878,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3060
+            priority: 3050
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5915,7 +5896,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3070
+            priority: 3060
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -5933,7 +5914,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3080
+            priority: 3070
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6002,7 +5983,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3090
+            priority: 3080
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6018,7 +5999,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 3100
+            priority: 3090
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6036,7 +6017,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3110
+            priority: 3100
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6054,7 +6035,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3120
+            priority: 3110
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6072,7 +6053,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3130
+            priority: 3120
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6143,7 +6124,7 @@ groups:
             units: meters/second2
             algorithm: absolute
             type: line
-            priority: 3140
+            priority: 3130
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6190,7 +6171,7 @@ groups:
             units: meters
             algorithm: absolute
             type: line
-            priority: 3150
+            priority: 3140
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6237,7 +6218,7 @@ groups:
             units: meters/second
             algorithm: absolute
             type: line
-            priority: 3160
+            priority: 3150
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6284,7 +6265,7 @@ groups:
             units: liters/minute
             algorithm: absolute
             type: line
-            priority: 3170
+            priority: 3160
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6331,7 +6312,7 @@ groups:
             units: meters
             algorithm: absolute
             type: line
-            priority: 3180
+            priority: 3170
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6378,7 +6359,7 @@ groups:
             units: pascals
             algorithm: absolute
             type: line
-            priority: 3190
+            priority: 3180
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6431,7 +6412,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3200
+            priority: 3190
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6447,7 +6428,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 3210
+            priority: 3200
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6465,7 +6446,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3220
+            priority: 3210
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6483,7 +6464,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3230
+            priority: 3220
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6501,7 +6482,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3240
+            priority: 3230
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6572,7 +6553,7 @@ groups:
             units: radians/second2
             algorithm: absolute
             type: line
-            priority: 3250
+            priority: 3240
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6619,7 +6600,7 @@ groups:
             units: radians
             algorithm: absolute
             type: line
-            priority: 3260
+            priority: 3250
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6666,7 +6647,7 @@ groups:
             units: RPM
             algorithm: absolute
             type: line
-            priority: 3270
+            priority: 3260
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6715,7 +6696,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3280
+            priority: 3270
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6739,7 +6720,7 @@ groups:
             units: RPM
             algorithm: absolute
             type: line
-            priority: 3290
+            priority: 3280
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6786,7 +6767,7 @@ groups:
             units: radians/second
             algorithm: absolute
             type: line
-            priority: 3300
+            priority: 3290
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6833,7 +6814,7 @@ groups:
             units: Celsius
             algorithm: absolute
             type: line
-            priority: 3310
+            priority: 3300
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6882,7 +6863,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3320
+            priority: 3310
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6906,7 +6887,7 @@ groups:
             units: Celsius
             algorithm: absolute
             type: line
-            priority: 3330
+            priority: 3320
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6951,7 +6932,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3340
+            priority: 3330
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6967,7 +6948,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 3350
+            priority: 3340
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -6985,7 +6966,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3360
+            priority: 3350
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7003,7 +6984,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3370
+            priority: 3360
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7021,7 +7002,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3380
+            priority: 3370
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7092,7 +7073,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 3390
+            priority: 3380
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7154,7 +7135,7 @@ groups:
             units: ampere-hours
             algorithm: absolute
             type: line
-            priority: 3400
+            priority: 3390
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7176,7 +7157,7 @@ groups:
             units: amperes
             algorithm: absolute
             type: line
-            priority: 3410
+            priority: 3400
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7198,7 +7179,7 @@ groups:
             units: hertz
             algorithm: absolute
             type: line
-            priority: 3420
+            priority: 3410
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7220,7 +7201,7 @@ groups:
             units: watts
             algorithm: absolute
             type: line
-            priority: 3430
+            priority: 3420
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7242,7 +7223,7 @@ groups:
             units: watt-hours
             algorithm: absolute
             type: line
-            priority: 3440
+            priority: 3430
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7264,7 +7245,7 @@ groups:
             units: volts
             algorithm: absolute
             type: line
-            priority: 3450
+            priority: 3440
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7319,7 +7300,7 @@ groups:
             units: joule-equivalent
             algorithm: absolute
             type: line
-            priority: 3460
+            priority: 3450
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7366,7 +7347,7 @@ groups:
             units: volt-amperes
             algorithm: absolute
             type: line
-            priority: 3470
+            priority: 3460
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7427,7 +7408,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3480
+            priority: 3470
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7443,7 +7424,7 @@ groups:
             units: ratio
             algorithm: absolute
             type: line
-            priority: 3490
+            priority: 3480
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7457,7 +7438,7 @@ groups:
             units: ampere-hours
             algorithm: absolute
             type: line
-            priority: 3500
+            priority: 3490
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7471,7 +7452,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3510
+            priority: 3500
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7489,7 +7470,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 3520
+            priority: 3510
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7507,7 +7488,7 @@ groups:
             units: ratio
             algorithm: absolute
             type: line
-            priority: 3530
+            priority: 3520
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7521,7 +7502,7 @@ groups:
             units: watt-hours
             algorithm: absolute
             type: line
-            priority: 3540
+            priority: 3530
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7535,7 +7516,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3550
+            priority: 3540
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7553,7 +7534,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3560
+            priority: 3550
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7571,7 +7552,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3570
+            priority: 3560
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7589,7 +7570,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3580
+            priority: 3570
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7607,7 +7588,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3590
+            priority: 3580
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7645,7 +7626,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3600
+            priority: 3590
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7716,7 +7697,7 @@ groups:
             units: ampere-hours
             algorithm: absolute
             type: line
-            priority: 3610
+            priority: 3600
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7763,7 +7744,7 @@ groups:
             units: ratio
             algorithm: absolute
             type: line
-            priority: 3620
+            priority: 3610
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7810,7 +7791,7 @@ groups:
             units: amperes
             algorithm: absolute
             type: line
-            priority: 3630
+            priority: 3620
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7860,7 +7841,7 @@ groups:
             units: amperes
             algorithm: absolute
             type: line
-            priority: 3640
+            priority: 3630
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7874,7 +7855,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3650
+            priority: 3640
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7898,7 +7879,7 @@ groups:
             units: amperes
             algorithm: absolute
             type: line
-            priority: 3660
+            priority: 3650
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7945,7 +7926,7 @@ groups:
             units: joules
             algorithm: absolute
             type: line
-            priority: 3670
+            priority: 3660
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -7994,7 +7975,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3680
+            priority: 3670
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8018,7 +7999,7 @@ groups:
             units: joules
             algorithm: absolute
             type: line
-            priority: 3690
+            priority: 3680
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8065,7 +8046,7 @@ groups:
             units: hertz
             algorithm: absolute
             type: line
-            priority: 3700
+            priority: 3690
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8112,7 +8093,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 3710
+            priority: 3700
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8159,7 +8140,7 @@ groups:
             units: degrees
             algorithm: absolute
             type: line
-            priority: 3720
+            priority: 3710
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8206,7 +8187,7 @@ groups:
             units: watts
             algorithm: absolute
             type: line
-            priority: 3730
+            priority: 3720
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8256,7 +8237,7 @@ groups:
             units: watts
             algorithm: absolute
             type: line
-            priority: 3740
+            priority: 3730
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8270,7 +8251,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3750
+            priority: 3740
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8294,7 +8275,7 @@ groups:
             units: watts
             algorithm: absolute
             type: line
-            priority: 3760
+            priority: 3750
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8341,7 +8322,7 @@ groups:
             units: ratio
             algorithm: absolute
             type: line
-            priority: 3770
+            priority: 3760
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8388,7 +8369,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3780
+            priority: 3770
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8404,7 +8385,7 @@ groups:
             units: watts
             algorithm: absolute
             type: line
-            priority: 3790
+            priority: 3780
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8422,7 +8403,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 3800
+            priority: 3790
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8440,7 +8421,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3810
+            priority: 3800
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8458,7 +8439,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3820
+            priority: 3810
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8476,7 +8457,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3830
+            priority: 3820
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8557,7 +8538,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3840
+            priority: 3830
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8573,7 +8554,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 3850
+            priority: 3840
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8591,7 +8572,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3860
+            priority: 3850
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8609,7 +8590,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3870
+            priority: 3860
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8627,7 +8608,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3880
+            priority: 3870
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8645,7 +8626,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3890
+            priority: 3880
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8663,7 +8644,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3900
+            priority: 3890
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8681,7 +8662,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3910
+            priority: 3900
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8719,7 +8700,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3920
+            priority: 3910
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8790,7 +8771,7 @@ groups:
             units: joule-equivalent
             algorithm: absolute
             type: line
-            priority: 3930
+            priority: 3920
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8837,7 +8818,7 @@ groups:
             units: vars
             algorithm: absolute
             type: line
-            priority: 3940
+            priority: 3930
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8884,7 +8865,7 @@ groups:
             units: watt-hours
             algorithm: absolute
             type: line
-            priority: 3950
+            priority: 3940
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8931,7 +8912,7 @@ groups:
             units: volts
             algorithm: absolute
             type: line
-            priority: 3960
+            priority: 3950
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8981,7 +8962,7 @@ groups:
             units: volts
             algorithm: absolute
             type: line
-            priority: 3970
+            priority: 3960
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -8995,7 +8976,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 3980
+            priority: 3970
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9019,7 +9000,7 @@ groups:
             units: volts
             algorithm: absolute
             type: line
-            priority: 3990
+            priority: 3980
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9112,7 +9093,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4000
+            priority: 3990
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9128,7 +9109,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4010
+            priority: 4000
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9146,7 +9127,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 4020
+            priority: 4010
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9176,7 +9157,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4030
+            priority: 4020
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9192,7 +9173,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4040
+            priority: 4030
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9210,7 +9191,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4050
+            priority: 4040
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9228,7 +9209,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4060
+            priority: 4050
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9246,7 +9227,7 @@ groups:
             units: bit/s
             algorithm: absolute
             type: line
-            priority: 4070
+            priority: 4060
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9260,7 +9241,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4080
+            priority: 4070
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9274,7 +9255,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4090
+            priority: 4080
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9288,7 +9269,7 @@ groups:
             units: commands/s
             algorithm: absolute
             type: line
-            priority: 4100
+            priority: 4090
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9306,7 +9287,7 @@ groups:
             units: flags
             algorithm: absolute
             type: stacked
-            priority: 4110
+            priority: 4100
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9332,7 +9313,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 4120
+            priority: 4110
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9350,7 +9331,7 @@ groups:
             units: events/s
             algorithm: absolute
             type: line
-            priority: 4130
+            priority: 4120
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9368,7 +9349,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4140
+            priority: 4130
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9386,7 +9367,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4150
+            priority: 4140
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9400,7 +9381,7 @@ groups:
             units: Celsius
             algorithm: absolute
             type: line
-            priority: 4160
+            priority: 4150
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9414,7 +9395,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4170
+            priority: 4160
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9440,7 +9421,7 @@ groups:
             units: transitions/s
             algorithm: absolute
             type: line
-            priority: 4180
+            priority: 4170
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9458,7 +9439,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4190
+            priority: 4180
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9472,7 +9453,7 @@ groups:
             units: commands
             algorithm: absolute
             type: line
-            priority: 4200
+            priority: 4190
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9484,7 +9465,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4210
+            priority: 4200
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9522,7 +9503,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4220
+            priority: 4210
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9587,7 +9568,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4230
+            priority: 4220
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9603,7 +9584,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4240
+            priority: 4230
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9621,7 +9602,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4250
+            priority: 4240
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9639,7 +9620,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4260
+            priority: 4250
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9657,7 +9638,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4270
+            priority: 4260
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9675,7 +9656,7 @@ groups:
             units: requests/s
             algorithm: absolute
             type: line
-            priority: 4280
+            priority: 4270
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9705,7 +9686,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4290
+            priority: 4280
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9743,7 +9724,7 @@ groups:
             units: changes/s
             algorithm: absolute
             type: line
-            priority: 4300
+            priority: 4290
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9831,7 +9812,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4310
+            priority: 4300
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9847,7 +9828,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4320
+            priority: 4310
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9865,7 +9846,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4330
+            priority: 4320
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9883,7 +9864,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4340
+            priority: 4330
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9921,7 +9902,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4350
+            priority: 4340
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9939,7 +9920,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 4360
+            priority: 4350
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9965,7 +9946,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4370
+            priority: 4360
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -9983,7 +9964,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4380
+            priority: 4370
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10001,7 +9982,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4390
+            priority: 4380
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10015,7 +9996,7 @@ groups:
             units: commands/s
             algorithm: absolute
             type: line
-            priority: 4400
+            priority: 4390
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10033,7 +10014,7 @@ groups:
             units: flags
             algorithm: absolute
             type: stacked
-            priority: 4410
+            priority: 4400
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10059,7 +10040,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 4420
+            priority: 4410
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10077,7 +10058,7 @@ groups:
             units: events/s
             algorithm: absolute
             type: line
-            priority: 4430
+            priority: 4420
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10095,7 +10076,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4440
+            priority: 4430
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10113,7 +10094,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4450
+            priority: 4440
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10127,7 +10108,7 @@ groups:
             units: Celsius
             algorithm: absolute
             type: line
-            priority: 4460
+            priority: 4450
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10141,7 +10122,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4470
+            priority: 4460
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10167,7 +10148,7 @@ groups:
             units: transitions/s
             algorithm: absolute
             type: line
-            priority: 4480
+            priority: 4470
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10185,7 +10166,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4490
+            priority: 4480
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10199,7 +10180,7 @@ groups:
             units: lanes
             algorithm: absolute
             type: line
-            priority: 4500
+            priority: 4490
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10211,7 +10192,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4510
+            priority: 4500
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10249,7 +10230,7 @@ groups:
             units: changes/s
             algorithm: absolute
             type: line
-            priority: 4520
+            priority: 4510
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10317,7 +10298,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4530
+            priority: 4520
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10333,7 +10314,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4540
+            priority: 4530
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10351,7 +10332,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 4550
+            priority: 4540
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10385,7 +10366,7 @@ groups:
             units: events/s
             algorithm: absolute
             type: line
-            priority: 4560
+            priority: 4550
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10403,7 +10384,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4570
+            priority: 4560
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10421,7 +10402,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4580
+            priority: 4570
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10439,7 +10420,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4590
+            priority: 4580
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10457,7 +10438,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4600
+            priority: 4590
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10479,7 +10460,7 @@ groups:
             units: requests/s
             algorithm: absolute
             type: line
-            priority: 4610
+            priority: 4600
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10509,7 +10490,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4620
+            priority: 4610
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10523,7 +10504,7 @@ groups:
             units: bytes
             algorithm: absolute
             type: line
-            priority: 4630
+            priority: 4620
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10539,7 +10520,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4640
+            priority: 4630
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10577,7 +10558,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4650
+            priority: 4640
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10633,7 +10614,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4660
+            priority: 4650
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10649,7 +10630,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4670
+            priority: 4660
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10667,7 +10648,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4680
+            priority: 4670
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10685,7 +10666,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4690
+            priority: 4680
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10703,7 +10684,7 @@ groups:
             units: bit/s
             algorithm: absolute
             type: line
-            priority: 4700
+            priority: 4690
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10717,7 +10698,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4710
+            priority: 4700
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10735,7 +10716,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4720
+            priority: 4710
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10820,7 +10801,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4730
+            priority: 4720
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10836,7 +10817,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4740
+            priority: 4730
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10854,7 +10835,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4750
+            priority: 4740
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10868,7 +10849,7 @@ groups:
             units: frames/s
             algorithm: absolute
             type: line
-            priority: 4760
+            priority: 4750
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10894,7 +10875,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4770
+            priority: 4760
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10912,7 +10893,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4780
+            priority: 4770
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10930,7 +10911,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4790
+            priority: 4780
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10948,7 +10929,7 @@ groups:
             units: frames/s
             algorithm: absolute
             type: line
-            priority: 4800
+            priority: 4790
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10966,7 +10947,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4810
+            priority: 4800
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -10984,7 +10965,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4820
+            priority: 4810
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11022,7 +11003,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4830
+            priority: 4820
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11088,7 +11069,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4840
+            priority: 4830
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11104,7 +11085,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4850
+            priority: 4840
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11122,7 +11103,7 @@ groups:
             units: frames/s
             algorithm: absolute
             type: line
-            priority: 4860
+            priority: 4850
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11156,7 +11137,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4870
+            priority: 4860
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11174,7 +11155,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4880
+            priority: 4870
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11192,7 +11173,7 @@ groups:
             units: percentage
             algorithm: absolute
             type: line
-            priority: 4890
+            priority: 4880
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11210,7 +11191,7 @@ groups:
             units: flags
             algorithm: absolute
             type: stacked
-            priority: 4900
+            priority: 4890
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11224,7 +11205,7 @@ groups:
             units: queues
             algorithm: absolute
             type: line
-            priority: 4910
+            priority: 4900
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11238,7 +11219,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4920
+            priority: 4910
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11276,7 +11257,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 4930
+            priority: 4920
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11328,7 +11309,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4940
+            priority: 4930
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11344,7 +11325,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 4950
+            priority: 4940
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11362,7 +11343,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4960
+            priority: 4950
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11380,7 +11361,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4970
+            priority: 4960
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11398,7 +11379,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4980
+            priority: 4970
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11473,7 +11454,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 4990
+            priority: 4980
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11489,7 +11470,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5000
+            priority: 4990
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11507,7 +11488,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5010
+            priority: 5000
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11525,7 +11506,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5020
+            priority: 5010
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11543,7 +11524,7 @@ groups:
             units: bit/s
             algorithm: absolute
             type: line
-            priority: 5030
+            priority: 5020
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11557,7 +11538,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5040
+            priority: 5030
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11577,7 +11558,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5050
+            priority: 5040
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11593,7 +11574,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5060
+            priority: 5050
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11671,7 +11652,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5070
+            priority: 5060
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11687,7 +11668,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5080
+            priority: 5070
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11705,7 +11686,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5090
+            priority: 5080
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11723,7 +11704,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5100
+            priority: 5090
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11741,7 +11722,7 @@ groups:
             units: lanes
             algorithm: absolute
             type: line
-            priority: 5110
+            priority: 5100
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11753,7 +11734,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5120
+            priority: 5110
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11825,7 +11806,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5130
+            priority: 5120
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11841,7 +11822,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5140
+            priority: 5130
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11859,7 +11840,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5150
+            priority: 5140
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11877,7 +11858,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5160
+            priority: 5150
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -11895,7 +11876,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5170
+            priority: 5160
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12020,7 +12001,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5180
+            priority: 5170
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12036,7 +12017,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5190
+            priority: 5180
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12054,7 +12035,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 5200
+            priority: 5190
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12072,7 +12053,7 @@ groups:
             units: frames/s
             algorithm: absolute
             type: line
-            priority: 5210
+            priority: 5200
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12114,7 +12095,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5220
+            priority: 5210
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12132,7 +12113,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5230
+            priority: 5220
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12150,7 +12131,7 @@ groups:
             units: bit/s
             algorithm: absolute
             type: line
-            priority: 5240
+            priority: 5230
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12164,7 +12145,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5250
+            priority: 5240
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12180,7 +12161,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5260
+            priority: 5250
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12202,7 +12183,7 @@ groups:
             units: lanes
             algorithm: absolute
             type: line
-            priority: 5270
+            priority: 5260
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12214,7 +12195,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 5280
+            priority: 5270
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12268,7 +12249,7 @@ groups:
             units: drops/s
             algorithm: absolute
             type: line
-            priority: 5290
+            priority: 5280
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12290,7 +12271,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 5300
+            priority: 5290
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12348,7 +12329,7 @@ groups:
             units: packets/s
             algorithm: absolute
             type: line
-            priority: 5310
+            priority: 5300
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12370,7 +12351,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 5320
+            priority: 5310
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12392,7 +12373,7 @@ groups:
             units: errors/s
             algorithm: absolute
             type: line
-            priority: 5330
+            priority: 5320
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12410,7 +12391,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 5340
+            priority: 5330
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12428,7 +12409,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5350
+            priority: 5340
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12444,7 +12425,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5360
+            priority: 5350
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12482,7 +12463,7 @@ groups:
             units: bytes/s
             algorithm: absolute
             type: line
-            priority: 5370
+            priority: 5360
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12533,7 +12514,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5380
+            priority: 5370
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12549,7 +12530,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5390
+            priority: 5380
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12567,7 +12548,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5400
+            priority: 5390
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12585,7 +12566,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5410
+            priority: 5400
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12603,7 +12584,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5420
+            priority: 5410
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12672,7 +12653,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5430
+            priority: 5420
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12688,7 +12669,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5440
+            priority: 5430
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12706,7 +12687,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5450
+            priority: 5440
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12724,7 +12705,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5460
+            priority: 5450
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12742,7 +12723,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5470
+            priority: 5460
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -12773,306 +12754,6 @@ groups:
               - selector: firmware_state{firmware_state="degraded"}
                 name: degraded
               - selector: firmware_state{firmware_state="unknown"}
-                name: unknown
-      - family: log_service
-        context_namespace: redfish
-        metrics:
-          - log_service_acquisition_state
-          - log_service_conditions_critical
-          - log_service_conditions_ok
-          - log_service_conditions_unknown
-          - log_service_conditions_warning
-          - log_service_full_reconciliation_age_seconds
-          - log_service_health
-          - log_service_health_rollup
-          - log_service_ingestion_state
-          - log_service_overflow_state
-          - log_service_pipeline_committed
-          - log_service_pipeline_duplicate_suppressed
-          - log_service_pipeline_failed
-          - log_service_pipeline_fetched
-          - log_service_poll_duration_seconds
-          - log_service_reconciliation_boundary_lost
-          - log_service_reconciliation_client_context_restarted
-          - log_service_reconciliation_client_context_unsupported
-          - log_service_reconciliation_completed
-          - log_service_reconciliation_etag_unreliable
-          - log_service_reconciliation_ordering_disqualified
-          - log_service_reconciliation_outside_tail_ambiguous
-          - log_service_reconciliation_outside_tail_recovered_exact
-          - log_service_scan_mode
-          - log_service_source_lag_seconds
-          - log_service_state
-        chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - system_key
-            - system_name
-            - resource_kind
-            - resource_name
-            - logical_owner_key
-            - logical_owner_name
-            - rollup_owner_kind
-            - rollup_owner_key
-            - rollup_owner_name
-            - component_family
-            - source_model
-            - log_service_id
-          instances:
-            by_labels:
-              - endpoint_key
-              - resource_key
-        charts:
-          - id: redfish_log_service_acquisition_state
-            title: Log Service Acquisition State
-            context: log_service.acquisition_state
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5480
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_acquisition_state{log_service_acquisition_state="readable"}
-                name: readable
-              - selector: log_service_acquisition_state{log_service_acquisition_state="unreadable"}
-                name: unreadable
-              - selector: log_service_acquisition_state{log_service_acquisition_state="unknown"}
-                name: unknown
-          - id: redfish_log_service_conditions
-            title: Log Service Conditions
-            context: log_service.conditions
-            units: conditions
-            algorithm: absolute
-            type: stacked
-            priority: 5490
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_conditions_ok
-                name: ok
-              - selector: log_service_conditions_warning
-                name: warning
-              - selector: log_service_conditions_critical
-                name: critical
-              - selector: log_service_conditions_unknown
-                name: unknown
-          - id: redfish_log_service_full_reconciliation_age
-            title: Redfish Log Service Full Reconciliation Age
-            context: log_service.full_reconciliation_age
-            units: seconds
-            algorithm: absolute
-            type: line
-            priority: 5500
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_full_reconciliation_age_seconds
-                name: duration
-                options:
-                  float: true
-          - id: redfish_log_service_health
-            title: Log Service Health
-            context: log_service.health
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5510
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_health{log_service_health="ok"}
-                name: ok
-              - selector: log_service_health{log_service_health="warning"}
-                name: warning
-              - selector: log_service_health{log_service_health="critical"}
-                name: critical
-              - selector: log_service_health{log_service_health="unknown"}
-                name: unknown
-          - id: redfish_log_service_health_rollup
-            title: Log Service Health Rollup
-            context: log_service.health_rollup
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5520
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_health_rollup{log_service_health_rollup="ok"}
-                name: ok
-              - selector: log_service_health_rollup{log_service_health_rollup="warning"}
-                name: warning
-              - selector: log_service_health_rollup{log_service_health_rollup="critical"}
-                name: critical
-              - selector: log_service_health_rollup{log_service_health_rollup="unknown"}
-                name: unknown
-          - id: redfish_log_service_ingestion_state
-            title: Redfish Log Service Ingestion State
-            context: log_service.ingestion_state
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5530
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_ingestion_state{log_service_ingestion_state="current"}
-                name: current
-              - selector: log_service_ingestion_state{log_service_ingestion_state="backfilling"}
-                name: backfilling
-              - selector: log_service_ingestion_state{log_service_ingestion_state="paused_backend"}
-                name: paused_backend
-              - selector: log_service_ingestion_state{log_service_ingestion_state="blocked_source"}
-                name: blocked_source
-              - selector: log_service_ingestion_state{log_service_ingestion_state="unknown"}
-                name: unknown
-          - id: redfish_log_service_overflow_state
-            title: Log Service Overflow State
-            context: log_service.overflow_state
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5540
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_overflow_state{log_service_overflow_state="clear"}
-                name: clear
-              - selector: log_service_overflow_state{log_service_overflow_state="overflow"}
-                name: overflow
-              - selector: log_service_overflow_state{log_service_overflow_state="unknown"}
-                name: unknown
-          - id: redfish_log_service_pipeline
-            title: Redfish Log Service Pipeline
-            context: log_service.pipeline
-            units: entries/s
-            algorithm: incremental
-            type: line
-            priority: 5550
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_pipeline_fetched
-                name: fetched
-              - selector: log_service_pipeline_committed
-                name: committed
-              - selector: log_service_pipeline_duplicate_suppressed
-                name: duplicate_suppressed
-              - selector: log_service_pipeline_failed
-                name: failed
-          - id: redfish_log_service_poll_duration
-            title: Redfish Log Service Poll Duration
-            context: log_service.poll_duration
-            units: seconds
-            algorithm: absolute
-            type: line
-            priority: 5560
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_poll_duration_seconds
-                name: duration
-                options:
-                  float: true
-          - id: redfish_log_service_reconciliation
-            title: Redfish Log Service Reconciliation Events
-            context: log_service.reconciliation
-            units: events/s
-            algorithm: incremental
-            type: line
-            priority: 5570
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_reconciliation_completed
-                name: completed
-              - selector: log_service_reconciliation_client_context_restarted
-                name: client_context_restarted
-              - selector: log_service_reconciliation_client_context_unsupported
-                name: client_context_unsupported
-              - selector: log_service_reconciliation_outside_tail_recovered_exact
-                name: outside_tail_recovered_exact
-              - selector: log_service_reconciliation_outside_tail_ambiguous
-                name: outside_tail_ambiguous
-              - selector: log_service_reconciliation_ordering_disqualified
-                name: ordering_disqualified
-              - selector: log_service_reconciliation_boundary_lost
-                name: boundary_lost
-              - selector: log_service_reconciliation_etag_unreliable
-                name: etag_unreliable
-          - id: redfish_log_service_scan_mode
-            title: Redfish Log Service Scan Mode
-            context: log_service.scan_mode
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5580
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_scan_mode{log_service_scan_mode="client_context"}
-                name: client_context
-              - selector: log_service_scan_mode{log_service_scan_mode="incremental"}
-                name: incremental
-              - selector: log_service_scan_mode{log_service_scan_mode="full"}
-                name: full
-              - selector: log_service_scan_mode{log_service_scan_mode="unordered"}
-                name: unordered
-              - selector: log_service_scan_mode{log_service_scan_mode="unknown"}
-                name: unknown
-          - id: redfish_log_service_source_lag
-            title: Redfish Log Service Source Lag
-            context: log_service.source_lag
-            units: seconds
-            algorithm: absolute
-            type: line
-            priority: 5590
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_source_lag_seconds
-                name: duration
-                options:
-                  float: true
-          - id: redfish_log_service_state
-            title: Log Service State
-            context: log_service.state
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5600
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: log_service_state{log_service_state="enabled"}
-                name: enabled
-              - selector: log_service_state{log_service_state="disabled"}
-                name: disabled
-              - selector: log_service_state{log_service_state="standby_offline"}
-                name: standby_offline
-              - selector: log_service_state{log_service_state="standby_spare"}
-                name: standby_spare
-              - selector: log_service_state{log_service_state="in_test"}
-                name: in_test
-              - selector: log_service_state{log_service_state="starting"}
-                name: starting
-              - selector: log_service_state{log_service_state="absent"}
-                name: absent
-              - selector: log_service_state{log_service_state="unavailable_offline"}
-                name: unavailable_offline
-              - selector: log_service_state{log_service_state="deferring"}
-                name: deferring
-              - selector: log_service_state{log_service_state="quiesced"}
-                name: quiesced
-              - selector: log_service_state{log_service_state="updating"}
-                name: updating
-              - selector: log_service_state{log_service_state="qualified"}
-                name: qualified
-              - selector: log_service_state{log_service_state="degraded"}
-                name: degraded
-              - selector: log_service_state{log_service_state="unknown"}
                 name: unknown
       - family: manager
         context_namespace: redfish
@@ -13113,7 +12794,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5610
+            priority: 5470
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13129,7 +12810,7 @@ groups:
             units: seconds
             algorithm: absolute
             type: line
-            priority: 5620
+            priority: 5480
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13143,7 +12824,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5630
+            priority: 5490
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13161,7 +12842,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5640
+            priority: 5500
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13179,7 +12860,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5650
+            priority: 5510
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13197,7 +12878,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5660
+            priority: 5520
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13219,7 +12900,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5670
+            priority: 5530
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13288,7 +12969,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5680
+            priority: 5540
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13304,7 +12985,7 @@ groups:
             units: conditions
             algorithm: absolute
             type: stacked
-            priority: 5690
+            priority: 5550
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13322,7 +13003,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5700
+            priority: 5560
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13340,7 +13021,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5710
+            priority: 5570
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13358,7 +13039,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5720
+            priority: 5580
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13406,12 +13087,6 @@ groups:
           - collection_http_requests_redirected
           - collection_http_requests_retried
           - collection_http_requests_started
-          - collection_log_services_admitted
-          - collection_log_services_discovered
-          - collection_log_services_limit
-          - collection_log_services_selected
-          - collection_logs_admission
-          - collection_logs_route
           - collection_operations_failed
           - collection_operations_successful
           - collection_resources_discovered
@@ -13434,7 +13109,7 @@ groups:
             units: seconds
             algorithm: absolute
             type: line
-            priority: 5760
+            priority: 5620
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13448,7 +13123,7 @@ groups:
             units: failures
             algorithm: absolute
             type: stacked
-            priority: 5770
+            priority: 5630
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13472,7 +13147,7 @@ groups:
             units: requests/cycle
             algorithm: absolute
             type: line
-            priority: 5780
+            priority: 5640
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13482,67 +13157,13 @@ groups:
                 name: retried
               - selector: collection_http_requests_redirected
                 name: redirected
-          - id: redfish_collection_log_services
-            title: Redfish Log Services
-            context: collection.log_services
-            units: services
-            algorithm: absolute
-            type: line
-            priority: 5790
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: collection_log_services_discovered
-                name: discovered
-              - selector: collection_log_services_selected
-                name: selected
-              - selector: collection_log_services_admitted
-                name: admitted
-              - selector: collection_log_services_limit
-                name: limit
-          - id: redfish_collection_logs_admission
-            title: Redfish Logs Admission
-            context: collection.logs_admission
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5800
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: collection_logs_admission{collection_logs_admission="disabled"}
-                name: disabled
-              - selector: collection_logs_admission{collection_logs_admission="ready"}
-                name: ready
-              - selector: collection_logs_admission{collection_logs_admission="over_limit"}
-                name: over_limit
-              - selector: collection_logs_admission{collection_logs_admission="duplicate_owner"}
-                name: duplicate_owner
-              - selector: collection_logs_admission{collection_logs_admission="unknown"}
-                name: unknown
-          - id: redfish_collection_logs_route
-            title: Redfish Logs Route
-            context: collection.logs_route
-            units: state
-            algorithm: absolute
-            type: stacked
-            priority: 5810
-            lifecycle:
-              expire_after_cycles: 5
-            dimensions:
-              - selector: collection_logs_route{collection_logs_route="disabled"}
-                name: disabled
-              - selector: collection_logs_route{collection_logs_route="ready"}
-                name: ready
-              - selector: collection_logs_route{collection_logs_route="unavailable"}
-                name: unavailable
           - id: redfish_collection_operations
             title: Redfish Collection Operations
             context: collection.operations
             units: operations/cycle
             algorithm: absolute
             type: stacked
-            priority: 5820
+            priority: 5650
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13556,7 +13177,7 @@ groups:
             units: resources
             algorithm: absolute
             type: line
-            priority: 5830
+            priority: 5660
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13574,7 +13195,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5840
+            priority: 5670
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13592,7 +13213,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5850
+            priority: 5680
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13608,7 +13229,7 @@ groups:
             units: bytes/cycle
             algorithm: absolute
             type: line
-            priority: 5860
+            priority: 5690
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13638,7 +13259,7 @@ groups:
             units: components
             algorithm: absolute
             type: line
-            priority: 5730
+            priority: 5590
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13652,7 +13273,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5740
+            priority: 5600
             lifecycle:
               expire_after_cycles: 5
             dimensions:
@@ -13666,7 +13287,7 @@ groups:
             units: state
             algorithm: absolute
             type: stacked
-            priority: 5750
+            priority: 5610
             lifecycle:
               expire_after_cycles: 5
             dimensions:

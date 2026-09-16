@@ -4,7 +4,6 @@ package redfish
 
 import (
 	"fmt"
-	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -19,14 +18,12 @@ type normalizedReading struct {
 	SourceType            string
 	SourceUnits           string
 	SourceBasis           string
-	SourceValue           float64
 	SourceExact           string
 	SourceScale           float64
 	Family                string
 	Units                 string
 	Basis                 string
 	Role                  string
-	Exposure              registry.Exposure
 	AggregateClass        string
 	Value                 float64
 	Valid                 bool
@@ -47,37 +44,37 @@ type normalizedReading struct {
 	SourceAlarmDiagnostic string
 	DerivedAlarm          string
 	EffectiveAlarm        string
-	EffectiveAlarmSource  string
-	EffectiveAlarmReason  string
-	Inventory             map[string]any
+	DataSourceURI         *string
+	SensorResetTime       *int64
+	LifetimeStartDateTime *int64
 }
 
 type rawReading struct {
-	Path               string
-	IdentitySource     string
-	Type               string
-	Units              string
-	Basis              string
-	Role               string
-	Value              any
-	Primary            bool
-	PhysicalContext    string
-	PhysicalSubcontext string
-	ImplementationType string
-	RangeMin           any
-	RangeMax           any
-	Thresholds         map[string]rawThreshold
-	Health             string
-	ReadingScoped      bool
-	Inventory          map[string]any
+	Path                  string
+	IdentitySource        string
+	Type                  string
+	Units                 string
+	Basis                 string
+	Role                  string
+	Value                 any
+	Primary               bool
+	PhysicalContext       string
+	PhysicalSubcontext    string
+	ImplementationType    string
+	RangeMin              any
+	RangeMax              any
+	Thresholds            map[string]rawThreshold
+	Health                string
+	ReadingScoped         bool
+	FixedFamily           string
+	DataSourceURI         *string
+	SensorResetTime       rawReadingTimestamp
+	LifetimeStartDateTime rawReadingTimestamp
 }
 
 type rawThreshold struct {
-	Value              any
-	Activation         string
-	DwellTime          any
-	HysteresisDuration any
-	HysteresisReading  any
+	Value      any
+	Activation string
 }
 
 var thresholdPaths = []struct {
@@ -138,12 +135,11 @@ func (c *protocolClient) derivedPowerReading(
 	derived.Units = "watts"
 	derived.Role = "energy_rate"
 	derived.Value = value
-	derived.SourceValue = 0
 	derived.SourceExact = ""
 	derived.Metric = surface.Metric
 	derived.AggregateSemantic = surface.AggregateMetric
 	derived.AggregateKinds = append([]registry.Kind(nil), surface.AggregateKinds...)
-	derived.Exposure = surface.Exposure
+
 	derived.Primary = surface.Primary
 	derived.AggregateClass = surface.AggregateClass
 	derived.AlarmMetric = ""
@@ -152,10 +148,7 @@ func (c *protocolClient) derivedPowerReading(
 	derived.SourceAlarm = ""
 	derived.DerivedAlarm = ""
 	derived.EffectiveAlarm = ""
-	derived.EffectiveAlarmSource = ""
-	derived.EffectiveAlarmReason = ""
 	derived.SourceAlarmDiagnostic = ""
-	derived.Inventory = map[string]any{"derived_from_reading_key": source.Key}
 	return derived, true
 }
 
@@ -169,38 +162,16 @@ func readingRateEpoch(source normalizedReading) string {
 		source.Units,
 		source.Basis,
 	}
-	for _, column := range []string{
-		"reading_data_source_uri",
-		"sensor_reset_time",
-		"lifetime_start_datetime",
-	} {
-		if value, ok := source.Inventory[column]; ok {
-			if text, ok := rateEpochPart(value); ok {
-				parts = append(parts, column, text)
-			}
-		}
+	if source.DataSourceURI != nil {
+		parts = append(parts, "reading_data_source_uri", *source.DataSourceURI)
+	}
+	if source.SensorResetTime != nil {
+		parts = append(parts, "sensor_reset_time", strconv.FormatInt(*source.SensorResetTime, 10))
+	}
+	if source.LifetimeStartDateTime != nil {
+		parts = append(parts, "lifetime_start_datetime", strconv.FormatInt(*source.LifetimeStartDateTime, 10))
 	}
 	return stableTupleDigest("netdata:redfish:reading-rate-epoch:v1", parts...)
-}
-
-func rateEpochPart(value any) (string, bool) {
-	switch value := value.(type) {
-	case string:
-		return value, true
-	case int:
-		return strconv.Itoa(value), true
-	case int64:
-		return strconv.FormatInt(value, 10), true
-	case uint64:
-		return strconv.FormatUint(value, 10), true
-	case float64:
-		if isFinite(value) {
-			return strconv.FormatFloat(value, 'g', -1, 64), true
-		}
-	case bool:
-		return strconv.FormatBool(value), true
-	}
-	return "", false
 }
 
 func (c *protocolClient) rawReadingsForNode(node *graphNode) []rawReading {
@@ -225,10 +196,13 @@ func (c *protocolClient) rawReadingsForNode(node *graphNode) []rawReading {
 	for index := range result {
 		source := &result[index]
 		source.IdentitySource = source.Path
-		rawURI, _ := source.Inventory["reading_data_source_uri"].(string)
+		rawURI := ""
+		if source.DataSourceURI != nil {
+			rawURI = *source.DataSourceURI
+		}
 		if canonical, ok := c.canonicalReadingDataSourceURI(node, rawURI); ok {
 			source.IdentitySource = canonical + "\x00" + source.Role
-			source.Inventory["reading_data_source_uri"] = canonical
+			source.DataSourceURI = &canonical
 		}
 	}
 	return result
@@ -243,24 +217,25 @@ func sensorExcerptReadings(source sensorExcerptSource) []rawReading {
 	subcontext, _ := stringValueAt(source.Data, "PhysicalSubContext")
 	implementation, _ := stringValueAt(source.Data, "Implementation")
 	health, _ := stringValueAt(source.Data, "Status.Health")
-	inventory := readingInventory(source.Data)
 	result := []rawReading{{
-		Path:               source.Path + ".Reading",
-		Type:               source.Type,
-		Units:              source.Units,
-		Basis:              "Zero",
-		Role:               "input",
-		Value:              value,
-		Primary:            true,
-		PhysicalContext:    physical,
-		PhysicalSubcontext: subcontext,
-		ImplementationType: implementation,
-		RangeMin:           source.Data["ReadingRangeMin"],
-		RangeMax:           source.Data["ReadingRangeMax"],
-		Thresholds:         extractThresholds(source.Data, "Thresholds"),
-		Health:             health,
-		ReadingScoped:      true,
-		Inventory:          inventory,
+		Path:                  source.Path + ".Reading",
+		Type:                  source.Type,
+		Units:                 source.Units,
+		Basis:                 "Zero",
+		Role:                  "input",
+		Value:                 value,
+		Primary:               true,
+		PhysicalContext:       physical,
+		PhysicalSubcontext:    subcontext,
+		ImplementationType:    implementation,
+		RangeMin:              source.Data["ReadingRangeMin"],
+		RangeMax:              source.Data["ReadingRangeMax"],
+		Thresholds:            extractThresholds(source.Data, "Thresholds"),
+		Health:                health,
+		ReadingScoped:         true,
+		DataSourceURI:         readingSourceURI(source.Data, "DataSourceUri"),
+		SensorResetTime:       readingSourceTimestamp(source.Data, "SensorResetTime"),
+		LifetimeStartDateTime: readingSourceTimestamp(source.Data, "LifetimeStartDateTime"),
 	}}
 	for _, auxiliary := range []struct {
 		Path, Type, Units, Family, Role string
@@ -287,7 +262,7 @@ func sensorExcerptReadings(source sensorExcerptSource) []rawReading {
 			PhysicalContext:    physical,
 			PhysicalSubcontext: subcontext,
 			ImplementationType: implementation,
-			Inventory:          map[string]any{"fixed_family": auxiliary.Family},
+			FixedFamily:        auxiliary.Family,
 		})
 	}
 	return result
@@ -296,10 +271,10 @@ func sensorExcerptReadings(source sensorExcerptSource) []rawReading {
 func mergeProvenSensorReadings(current, excerpts []rawReading) []rawReading {
 	for _, excerpt := range excerpts {
 		match := -1
-		excerptType, excerptOK := readingType(excerpt.Type, excerpt.Units, excerpt.Inventory)
+		excerptType, excerptOK := readingType(excerpt.Type, excerpt.Units, excerpt.FixedFamily)
 		for index := range current {
 			candidate := &current[index]
-			candidateType, candidateOK := readingType(candidate.Type, candidate.Units, candidate.Inventory)
+			candidateType, candidateOK := readingType(candidate.Type, candidate.Units, candidate.FixedFamily)
 			if excerptOK && candidateOK &&
 				excerptType.Family == candidateType.Family &&
 				excerpt.Role == candidate.Role &&
@@ -330,16 +305,14 @@ func mergeProvenSensorReadings(current, excerpts []rawReading) []rawReading {
 				target.Thresholds[role] = threshold
 			}
 		}
-		if target.Inventory == nil {
-			target.Inventory = make(map[string]any)
+		if target.FixedFamily == "" {
+			target.FixedFamily = excerpt.FixedFamily
 		}
-		for key, value := range excerpt.Inventory {
-			if key == "reading_data_source_uri" {
-				continue
-			}
-			if _, exists := target.Inventory[key]; !exists {
-				target.Inventory[key] = value
-			}
+		if !target.SensorResetTime.Present {
+			target.SensorResetTime = excerpt.SensorResetTime
+		}
+		if !target.LifetimeStartDateTime.Present {
+			target.LifetimeStartDateTime = excerpt.LifetimeStartDateTime
 		}
 	}
 	return current
@@ -381,22 +354,24 @@ func sensorRawReadings(data map[string]any) []rawReading {
 		return nil
 	}
 	result := []rawReading{{
-		Path:               "Sensor.Reading",
-		Type:               sourceType,
-		Units:              units,
-		Basis:              basis,
-		Role:               "input",
-		Value:              reading,
-		Primary:            true,
-		PhysicalContext:    physical,
-		PhysicalSubcontext: subcontext,
-		ImplementationType: implementation,
-		RangeMin:           rangeMin,
-		RangeMax:           rangeMax,
-		Thresholds:         thresholds,
-		Health:             health,
-		ReadingScoped:      true,
-		Inventory:          readingInventory(data),
+		Path:                  "Sensor.Reading",
+		Type:                  sourceType,
+		Units:                 units,
+		Basis:                 basis,
+		Role:                  "input",
+		Value:                 reading,
+		Primary:               true,
+		PhysicalContext:       physical,
+		PhysicalSubcontext:    subcontext,
+		ImplementationType:    implementation,
+		RangeMin:              rangeMin,
+		RangeMax:              rangeMax,
+		Thresholds:            thresholds,
+		Health:                health,
+		ReadingScoped:         true,
+		DataSourceURI:         readingSourceURI(data, "DataSourceUri"),
+		SensorResetTime:       readingSourceTimestamp(data, "SensorResetTime"),
+		LifetimeStartDateTime: readingSourceTimestamp(data, "LifetimeStartDateTime"),
 	}}
 	auxiliaries := []struct {
 		Path string
@@ -407,12 +382,6 @@ func sensorRawReadings(data map[string]any) []rawReading {
 		{"PeakIntervalReading", "peak_interval"},
 		{"LowestReading", "lowest_since_reset"},
 		{"PeakReading", "peak_since_reset"},
-		{"ReadingRangeMin", "reading_range_min"},
-		{"ReadingRangeMax", "reading_range_max"},
-		{"MinAllowableOperatingValue", "minimum_allowable"},
-		{"MaxAllowableOperatingValue", "maximum_allowable"},
-		{"AdjustedMinAllowableOperatingValue", "adjusted_minimum_allowable"},
-		{"AdjustedMaxAllowableOperatingValue", "adjusted_maximum_allowable"},
 	}
 	for _, auxiliary := range auxiliaries {
 		value, ok := valueAt(data, auxiliary.Path)
@@ -420,18 +389,20 @@ func sensorRawReadings(data map[string]any) []rawReading {
 			continue
 		}
 		result = append(result, rawReading{
-			Path:               "Sensor." + auxiliary.Path,
-			Type:               sourceType,
-			Units:              units,
-			Basis:              basis,
-			Role:               auxiliary.Role,
-			Value:              value,
-			PhysicalContext:    physical,
-			PhysicalSubcontext: subcontext,
-			ImplementationType: implementation,
-			RangeMin:           rangeMin,
-			RangeMax:           rangeMax,
-			Inventory:          readingInventory(data),
+			Path:                  "Sensor." + auxiliary.Path,
+			Type:                  sourceType,
+			Units:                 units,
+			Basis:                 basis,
+			Role:                  auxiliary.Role,
+			Value:                 value,
+			PhysicalContext:       physical,
+			PhysicalSubcontext:    subcontext,
+			ImplementationType:    implementation,
+			RangeMin:              rangeMin,
+			RangeMax:              rangeMax,
+			DataSourceURI:         readingSourceURI(data, "DataSourceUri"),
+			SensorResetTime:       readingSourceTimestamp(data, "SensorResetTime"),
+			LifetimeStartDateTime: readingSourceTimestamp(data, "LifetimeStartDateTime"),
 		})
 	}
 	result = append(result, sensorElectricalAuxiliaries(data, physical, subcontext, implementation)...)
@@ -473,7 +444,7 @@ func sensorElectricalAuxiliaries(data map[string]any, physical, subcontext, impl
 			PhysicalContext:    physical,
 			PhysicalSubcontext: subcontext,
 			ImplementationType: implementation,
-			Inventory:          map[string]any{"fixed_family": spec.Family},
+			FixedFamily:        spec.Family,
 		})
 	}
 	return result
@@ -534,18 +505,20 @@ func legacyReading(
 ) rawReading {
 	physical, _ := stringValueAt(node.Data, "PhysicalContext")
 	return rawReading{
-		Path:            node.SourceModel + "." + node.SourcePath,
-		Type:            sourceType,
-		Units:           units,
-		Basis:           "Zero",
-		Role:            role,
-		Value:           value,
-		Primary:         true,
-		PhysicalContext: physical,
-		Thresholds:      thresholds,
-		Health:          health,
-		ReadingScoped:   true,
-		Inventory:       readingInventory(node.Data),
+		Path:                  node.SourceModel + "." + node.SourcePath,
+		Type:                  sourceType,
+		Units:                 units,
+		Basis:                 "Zero",
+		Role:                  role,
+		Value:                 value,
+		Primary:               true,
+		PhysicalContext:       physical,
+		Thresholds:            thresholds,
+		Health:                health,
+		ReadingScoped:         true,
+		DataSourceURI:         readingSourceURI(node.Data, "DataSourceUri"),
+		SensorResetTime:       readingSourceTimestamp(node.Data, "SensorResetTime"),
+		LifetimeStartDateTime: readingSourceTimestamp(node.Data, "LifetimeStartDateTime"),
 	}
 }
 
@@ -593,25 +566,28 @@ func excerptReadings(node *graphNode) []rawReading {
 		physical, _ := stringValueAt(object, "PhysicalContext")
 		subcontext, _ := stringValueAt(object, "PhysicalSubContext")
 		implementation, _ := stringValueAt(object, "Implementation")
-		inventory := readingInventory(object)
+		fixedFamily := ""
 		if role == "stored_energy" {
-			inventory["fixed_family"] = "stored_energy"
+			fixedFamily = "stored_energy"
 		}
 		result = append(result, rawReading{
-			Path:               node.Kind + "." + sourcePath + ".Reading",
-			Type:               sourceType,
-			Units:              units,
-			Basis:              "Zero",
-			Role:               role,
-			Value:              value,
-			Primary:            true,
-			PhysicalContext:    physical,
-			PhysicalSubcontext: subcontext,
-			ImplementationType: implementation,
-			RangeMin:           object["ReadingRangeMin"],
-			RangeMax:           object["ReadingRangeMax"],
-			Thresholds:         extractThresholds(object, "Thresholds"),
-			Inventory:          inventory,
+			Path:                  node.Kind + "." + sourcePath + ".Reading",
+			Type:                  sourceType,
+			Units:                 units,
+			Basis:                 "Zero",
+			Role:                  role,
+			Value:                 value,
+			Primary:               true,
+			PhysicalContext:       physical,
+			PhysicalSubcontext:    subcontext,
+			ImplementationType:    implementation,
+			RangeMin:              object["ReadingRangeMin"],
+			RangeMax:              object["ReadingRangeMax"],
+			Thresholds:            extractThresholds(object, "Thresholds"),
+			FixedFamily:           fixedFamily,
+			DataSourceURI:         readingSourceURI(object, "DataSourceUri"),
+			SensorResetTime:       readingSourceTimestamp(object, "SensorResetTime"),
+			LifetimeStartDateTime: readingSourceTimestamp(object, "LifetimeStartDateTime"),
 		})
 		for _, auxiliary := range []struct {
 			Path, Type, Units, Family, Role string
@@ -633,7 +609,7 @@ func excerptReadings(node *graphNode) []rawReading {
 				Type: auxiliary.Type, Units: auxiliary.Units, Basis: "Zero", Role: auxiliary.Role,
 				Value: auxValue, PhysicalContext: physical, PhysicalSubcontext: subcontext,
 				ImplementationType: implementation,
-				Inventory:          map[string]any{"fixed_family": auxiliary.Family},
+				FixedFamily:        auxiliary.Family,
 			})
 		}
 	}
@@ -799,13 +775,12 @@ func normalizeReading(node *graphNode, raw rawReading, evaluate bool) normalized
 		PhysicalContext:    raw.PhysicalContext,
 		PhysicalSubcontext: raw.PhysicalSubcontext,
 		ImplementationType: raw.ImplementationType,
-		Inventory:          make(map[string]any),
 	}
 	if reading.Role == "" {
 		reading.Role = "input"
 	}
 	reading.Key = stableKey("netdata:redfish:reading:v1", node.Key+"\x00"+identitySource, 32)
-	spec, fixed := readingType(raw.Type, raw.Units, raw.Inventory)
+	spec, fixed := readingType(raw.Type, raw.Units, raw.FixedFamily)
 	if !fixed {
 		return reading
 	}
@@ -816,7 +791,9 @@ func normalizeReading(node *graphNode, raw rawReading, evaluate bool) normalized
 	reading.Family = spec.Family
 	reading.Units = spec.Units
 	reading.Basis = basis
-	reading.Inventory = normalizeReadingInventory(raw.Inventory, spec.Scale)
+	reading.DataSourceURI = raw.DataSourceURI
+	reading.SensorResetTime = readingTimestamp(raw.SensorResetTime)
+	reading.LifetimeStartDateTime = readingTimestamp(raw.LifetimeStartDateTime)
 	reading.SemanticSourceClass = readingSemanticClass(node, reading)
 	surface, ok := registry.MatchReadingSurface(
 		reading.Family,
@@ -832,7 +809,7 @@ func normalizeReading(node *graphNode, raw rawReading, evaluate bool) normalized
 	reading.AlarmMetric = surface.AlarmMetric
 	reading.AggregateSemantic = surface.AggregateMetric
 	reading.AggregateKinds = append([]registry.Kind(nil), surface.AggregateKinds...)
-	reading.Exposure = surface.Exposure
+
 	reading.Primary = reading.Primary && surface.Primary
 	reading.AggregateClass = surface.AggregateClass
 	reading.Histogram = surface.Histogram
@@ -855,17 +832,14 @@ func normalizeReading(node *graphNode, raw rawReading, evaluate bool) normalized
 			reading.SourceAlarm = healthAlarm(raw.Health)
 		}
 	}
-	maps.Copy(reading.Inventory, thresholdInventory(raw.Thresholds, rationalMultiplier(spec.Scale)))
 	exact, sourceValue, ok := numericValue(raw.Value)
 	if !ok {
-		reading.EffectiveAlarm, reading.EffectiveAlarmSource = fuseAlarm(reading.SourceAlarm, "")
+		reading.EffectiveAlarm = fuseAlarm(reading.SourceAlarm, "")
 		return reading
 	}
 	if reading.Family == "energy" {
-		reading.Inventory["reading_source_value_exact"] = exact
 		reading.SourceExact = exact
 	}
-	reading.SourceValue = sourceValue
 	reading.SourceScale = rationalMultiplier(spec.Scale)
 	reading.Value = scaleReadingValue(sourceValue, spec.Scale)
 	reading.Valid = isFinite(reading.Value)
@@ -891,19 +865,19 @@ func normalizeReading(node *graphNode, raw rawReading, evaluate bool) normalized
 		reading.Valid = false
 	}
 	if evaluate && reading.Valid {
-		reading.DerivedAlarm, reading.EffectiveAlarmReason = deriveAlarm(
+		reading.DerivedAlarm = deriveAlarm(
 			reading.Value,
 			raw.Thresholds,
 			rationalMultiplier(spec.Scale),
 		)
 	}
-	reading.EffectiveAlarm, reading.EffectiveAlarmSource = fuseAlarm(reading.SourceAlarm, reading.DerivedAlarm)
+	reading.EffectiveAlarm = fuseAlarm(reading.SourceAlarm, reading.DerivedAlarm)
 	return reading
 }
 
-func readingType(sourceType, units string, inventory map[string]any) (registry.ReadingTypeSpec, bool) {
-	if fixed, ok := inventory["fixed_family"].(string); ok {
-		if spec, ok := registry.MatchFixedReadingFamily(fixed, sourceType, units); ok {
+func readingType(sourceType, units, fixedFamily string) (registry.ReadingTypeSpec, bool) {
+	if fixedFamily != "" {
+		if spec, ok := registry.MatchFixedReadingFamily(fixedFamily, sourceType, units); ok {
 			return spec, true
 		}
 	}
@@ -977,11 +951,10 @@ func healthAlarm(value string) string {
 	}
 }
 
-func deriveAlarm(value float64, thresholds map[string]rawThreshold, multiplier float64) (string, string) {
+func deriveAlarm(value float64, thresholds map[string]rawThreshold, multiplier float64) string {
 	type candidate struct {
 		State string
 		Rank  int
-		Role  string
 	}
 	best := candidate{}
 	evaluated := false
@@ -1007,38 +980,35 @@ func deriveAlarm(value float64, thresholds map[string]rawThreshold, multiplier f
 			state, rank = "emergency", 3
 		}
 		if rank > best.Rank {
-			best = candidate{State: state, Rank: rank, Role: role}
+			best = candidate{State: state, Rank: rank}
 		}
 	}
 	if best.State == "" {
 		if evaluated {
-			return "clear", "thresholds_clear"
+			return "clear"
 		}
-		return "", ""
+		return ""
 	}
-	return best.State, "threshold_" + best.Role
+	return best.State
 }
 
-func fuseAlarm(source, derived string) (string, string) {
+func fuseAlarm(source, derived string) string {
 	// A valid abnormal BMC decision has precedence over current-value
 	// threshold evaluation. This preserves firmware dwell and hysteresis;
 	// evaluation is a fallback only when the source is clear or absent.
 	if alarmRank(source) > 0 {
-		return source, "source"
+		return source
 	}
 	if derived != "" && alarmRank(derived) > alarmRank(source) {
-		if source == "" {
-			return derived, "derived"
-		}
-		return derived, "combined"
+		return derived
 	}
 	if source != "" {
-		return source, "source"
+		return source
 	}
 	if derived != "" {
-		return derived, "derived"
+		return derived
 	}
-	return "", ""
+	return ""
 }
 
 func alarmRank(value string) int {
@@ -1067,13 +1037,8 @@ func extractThresholds(data map[string]any, base string) map[string]rawThreshold
 			continue
 		}
 		activation, _ := stringValueAt(data, prefix+".Activation")
-		dwellTime, _ := valueAt(data, prefix+".DwellTime")
-		hysteresisDuration, _ := valueAt(data, prefix+".HysteresisDuration")
-		hysteresisReading, _ := valueAt(data, prefix+".HysteresisReading")
 		result[threshold.Role] = rawThreshold{
 			Value: value, Activation: activation,
-			DwellTime: dwellTime, HysteresisDuration: hysteresisDuration,
-			HysteresisReading: hysteresisReading,
 		}
 	}
 	return result
@@ -1099,155 +1064,6 @@ func legacyThresholds(data map[string]any, suffix string) map[string]rawThreshol
 				result[item.Role] = rawThreshold{Value: value}
 				break
 			}
-		}
-	}
-	return result
-}
-
-func thresholdInventory(thresholds map[string]rawThreshold, multiplier float64) map[string]any {
-	result := make(map[string]any)
-	for role, threshold := range thresholds {
-		if exact, value, ok := numericValue(threshold.Value); ok {
-			result["threshold_"+role+"_source"] = value
-			result["threshold_"+role] = value * multiplier
-			_ = exact
-		}
-		if threshold.Activation != "" {
-			result["threshold_"+role+"_activation"] = threshold.Activation
-		}
-		if threshold.DwellTime != nil {
-			if _, seconds, ok := numericSourceValue(threshold.DwellTime, registry.AlgorithmDurationPercent); ok && seconds >= 0 {
-				result["threshold_"+role+"_dwell_seconds"] = seconds
-			}
-		}
-		if threshold.HysteresisDuration != nil {
-			if _, seconds, ok := numericSourceValue(threshold.HysteresisDuration, registry.AlgorithmDurationPercent); ok && seconds >= 0 {
-				result["threshold_"+role+"_hysteresis_duration_seconds"] = seconds
-			}
-		}
-		if threshold.HysteresisReading != nil {
-			if _, value, ok := numericValue(threshold.HysteresisReading); ok {
-				result["threshold_"+role+"_hysteresis_source"] = value
-				result["threshold_"+role+"_hysteresis"] = value * multiplier
-			}
-		}
-	}
-	return result
-}
-
-func readingInventory(data map[string]any) map[string]any {
-	result := make(map[string]any)
-	for _, field := range []struct {
-		Path   string
-		Column string
-	}{
-		{"ReadingTime", "reading_time"},
-		{"ReadingRangeMin", "reading_range_min_source"},
-		{"ReadingRangeMax", "reading_range_max_source"},
-		{"AverageReading", "reading_average_source"},
-		{"LowestIntervalReading", "reading_lowest_interval_source"},
-		{"PeakIntervalReading", "reading_peak_interval_source"},
-		{"LowestReading", "reading_lowest_source"},
-		{"PeakReading", "reading_peak_source"},
-		{"MinAllowableOperatingValue", "minimum_allowable_source"},
-		{"MaxAllowableOperatingValue", "maximum_allowable_source"},
-		{"AdjustedMinAllowableOperatingValue", "adjusted_minimum_allowable_source"},
-		{"AdjustedMaxAllowableOperatingValue", "adjusted_maximum_allowable_source"},
-		{"ReadingAccuracy", "reading_accuracy_source"},
-		{"Accuracy", "accuracy_percent"},
-		{"Precision", "precision"},
-		{"AveragingInterval", "averaging_interval"},
-		{"AveragingIntervalAchieved", "averaging_interval_achieved"},
-		{"SensorResetTime", "sensor_reset_time"},
-		{"LowestReadingTime", "lowest_reading_time"},
-		{"PeakReadingTime", "peak_reading_time"},
-		{"Calibration", "calibration_source"},
-		{"CalibrationTime", "calibration_time"},
-		{"ElectricalContext", "electrical_context"},
-		{"PhysicalContext", "physical_context"},
-		{"PhysicalSubContext", "physical_subcontext"},
-		{"Implementation", "implementation_type"},
-		{"VoltageType", "voltage_type"},
-		{"LifetimeReading", "lifetime_reading_source"},
-		{"LifetimeStartDateTime", "lifetime_start_datetime"},
-		{"DataSourceUri", "reading_data_source_uri"},
-	} {
-		if value, ok := valueAt(data, field.Path); ok {
-			result[field.Column] = value
-		}
-	}
-	return result
-}
-
-func normalizeReadingInventory(source map[string]any, scale registry.Rational) map[string]any {
-	result := make(map[string]any)
-	scaled := map[string]string{
-		"reading_range_min_source":          "reading_range_min",
-		"reading_range_max_source":          "reading_range_max",
-		"reading_average_source":            "reading_average",
-		"reading_lowest_interval_source":    "reading_lowest_interval",
-		"reading_peak_interval_source":      "reading_peak_interval",
-		"reading_lowest_source":             "reading_lowest",
-		"reading_peak_source":               "reading_peak",
-		"minimum_allowable_source":          "minimum_allowable",
-		"maximum_allowable_source":          "maximum_allowable",
-		"adjusted_minimum_allowable_source": "adjusted_minimum_allowable",
-		"adjusted_maximum_allowable_source": "adjusted_maximum_allowable",
-		"reading_accuracy_source":           "reading_accuracy",
-		"calibration_source":                "calibration",
-	}
-	for sourceColumn, normalizedColumn := range scaled {
-		raw, ok := source[sourceColumn]
-		if !ok {
-			continue
-		}
-		if _, value, ok := numericValue(raw); ok {
-			result[sourceColumn] = value
-			normalized := scaleReadingValue(value, scale)
-			if isFinite(normalized) {
-				result[normalizedColumn] = normalized
-			}
-		}
-	}
-	for _, column := range []string{
-		"accuracy_percent",
-		"precision",
-		"lifetime_reading_source",
-	} {
-		if _, value, ok := numericValue(source[column]); ok {
-			result[column] = value
-		}
-	}
-	if raw, ok := source["averaging_interval"]; ok {
-		if _, seconds, ok := numericSourceValue(raw, registry.AlgorithmDurationPercent); ok && seconds >= 0 {
-			result["averaging_interval"] = seconds
-		}
-	}
-	if value, ok := source["averaging_interval_achieved"].(bool); ok {
-		result["averaging_interval_achieved"] = value
-	}
-	for _, column := range []string{
-		"reading_time",
-		"sensor_reset_time",
-		"lowest_reading_time",
-		"peak_reading_time",
-		"calibration_time",
-		"lifetime_start_datetime",
-	} {
-		if value, ok := normalizedTimestamp(source[column]); ok {
-			result[column] = value
-		}
-	}
-	for _, column := range []string{
-		"implementation_type",
-		"electrical_context",
-		"physical_context",
-		"physical_subcontext",
-		"voltage_type",
-		"reading_data_source_uri",
-	} {
-		if value, ok := source[column].(string); ok {
-			result[column] = value
 		}
 	}
 	return result
@@ -1280,4 +1096,30 @@ func firstValue(data map[string]any, paths ...string) (any, bool) {
 
 func (r normalizedReading) String() string {
 	return fmt.Sprintf("%s/%s/%s", r.Family, r.Basis, r.Role)
+}
+
+type rawReadingTimestamp struct {
+	Value   string
+	Present bool
+}
+
+func readingSourceURI(data map[string]any, key string) *string {
+	value, ok := data[key].(string)
+	if !ok {
+		return nil
+	}
+	return &value
+}
+
+func readingSourceTimestamp(data map[string]any, key string) rawReadingTimestamp {
+	raw, present := data[key]
+	value, _ := raw.(string)
+	return rawReadingTimestamp{Value: value, Present: present}
+}
+
+func readingTimestamp(source rawReadingTimestamp) *int64 {
+	if value, ok := normalizedTimestamp(source.Value); ok {
+		return &value
+	}
+	return nil
 }

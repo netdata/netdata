@@ -89,12 +89,8 @@ type graphNode struct {
 	ErrorClass       string
 	Complete         bool
 	IdentityQuality  string
-	SourceContainer  string
 	SourcePath       string
-	SourcePosition   *int
 	SourceModel      string
-	SourceURIs       []string
-	SourceModels     []string
 	Response         responseMetadata
 	SensorExcerpts   []sensorExcerptSource
 
@@ -102,8 +98,6 @@ type graphNode struct {
 	RollupParents     map[string]*graphNode
 	RollupOwner       *graphNode
 	LogicalOwner      *graphNode
-	LogicalReason     string
-	LogicalCandidates []string
 	SystemOwners      map[string]*graphNode
 	PlacementComplete bool
 	TraversalDepth    int
@@ -163,9 +157,7 @@ type graphMembershipSnapshot struct {
 }
 
 type logicalPlacementSnapshot struct {
-	OwnerKey   string
-	Candidates []string
-	Reason     string
+	OwnerKey string
 }
 
 type graphFetchBroker struct {
@@ -272,8 +264,6 @@ func (c *protocolClient) collectResourceGraph(
 		Complete:         true,
 		IdentityQuality:  "addressable",
 		SourceModel:      "typed_resource",
-		SourceURIs:       []string{"/redfish/v1/"},
-		SourceModels:     []string{"typed_resource"},
 		Response:         root.Response,
 		Parents:          make(map[string]*graphNode),
 		RollupParents:    make(map[string]*graphNode),
@@ -299,8 +289,6 @@ func (c *protocolClient) collectResourceGraph(
 			Complete:         item.MembershipComplete,
 			IdentityQuality:  "addressable",
 			SourceModel:      "typed_resource",
-			SourceURIs:       nonEmptyStrings(item.URI),
-			SourceModels:     []string{"typed_resource"},
 			Response:         item.Response,
 			Parents:          map[string]*graphNode{service.Key: service},
 			RollupParents:    make(map[string]*graphNode),
@@ -894,14 +882,7 @@ func cloneGraphNodesStatic(nodes []*graphNode, unknown bool) []*graphNode {
 		node.SystemOwners = make(map[string]*graphNode)
 		node.RollupOwner = nil
 		node.LogicalOwner = nil
-		node.LogicalCandidates = append([]string(nil), source.LogicalCandidates...)
-		node.SourceURIs = append([]string(nil), source.SourceURIs...)
-		node.SourceModels = append([]string(nil), source.SourceModels...)
 		node.SensorExcerpts = cloneSensorExcerptSources(source.SensorExcerpts)
-		if source.SourcePosition != nil {
-			position := *source.SourcePosition
-			node.SourcePosition = &position
-		}
 		if unknown {
 			node.AcquisitionState = "unknown"
 			node.ErrorClass = "protocol"
@@ -941,14 +922,7 @@ func cloneGraphNode(source *graphNode, cloneData bool) *graphNode {
 	node.SystemOwners = make(map[string]*graphNode)
 	node.RollupOwner = nil
 	node.LogicalOwner = nil
-	node.LogicalCandidates = append([]string(nil), source.LogicalCandidates...)
-	node.SourceURIs = append([]string(nil), source.SourceURIs...)
-	node.SourceModels = append([]string(nil), source.SourceModels...)
 	node.SensorExcerpts = cloneSensorExcerptSources(source.SensorExcerpts)
-	if source.SourcePosition != nil {
-		position := *source.SourcePosition
-		node.SourcePosition = &position
-	}
 	return &node
 }
 
@@ -1053,8 +1027,6 @@ func (c *protocolClient) acquireRelationship(
 		for i, item := range items {
 			identity := firstNonEmpty(item.Locator, item.URI, fmt.Sprintf("position:%d", i))
 			result[rel.ChildKind+":"+identity] = item.Data
-			parent.SourceURIs = mergeStringSets(parent.SourceURIs, item.SourceURIs)
-			parent.SourceModels = mergeStringSets(parent.SourceModels, item.SourceModels)
 			parent.Response = mergeResponseMetadata(parent.Response, item.Response)
 		}
 		return nil, result, complete, err
@@ -1386,8 +1358,6 @@ func (c *protocolClient) fetchGraphCollectionMember(
 			Complete:         true,
 			IdentityQuality:  "addressable",
 			SourceModel:      model,
-			SourceURIs:       nonEmptyStrings(member.Ref.ODataID),
-			SourceModels:     nonEmptyStrings(model),
 			Response:         member.Response,
 			Parents:          make(map[string]*graphNode),
 			RollupParents:    make(map[string]*graphNode),
@@ -1408,8 +1378,6 @@ func (c *protocolClient) unreadableGraphNode(kind, uri string, err error) *graph
 		Complete:         true,
 		IdentityQuality:  "addressable",
 		SourceModel:      "typed_resource",
-		SourceURIs:       nonEmptyStrings(uri),
-		SourceModels:     []string{"typed_resource"},
 		Parents:          make(map[string]*graphNode),
 		RollupParents:    make(map[string]*graphNode),
 		SystemOwners:     make(map[string]*graphNode),
@@ -1500,8 +1468,6 @@ func (c *protocolClient) graphNodeFromResponse(
 		Complete:         true,
 		IdentityQuality:  "addressable",
 		SourceModel:      model,
-		SourceURIs:       nonEmptyStrings(uri),
-		SourceModels:     nonEmptyStrings(model),
 		Response:         metadataForResponse(response),
 		Parents:          make(map[string]*graphNode),
 		RollupParents:    make(map[string]*graphNode),
@@ -1527,7 +1493,6 @@ func (c *protocolClient) embeddedNode(
 	}
 	locator := ""
 	quality := "embedded"
-	var position *int
 	var provenanceErr error
 	if rawURI, ok := stringValue(data["DataSourceUri"]); ok {
 		base := c.root
@@ -1548,7 +1513,6 @@ func (c *protocolClient) embeddedNode(
 	}
 	if index >= 0 && id == "" && quality != "data_source_uri" {
 		quality = "positional"
-		position = new(index)
 	}
 	uri := ""
 	if quality == "data_source_uri" {
@@ -1570,12 +1534,8 @@ func (c *protocolClient) embeddedNode(
 		AcquisitionState: "readable",
 		Complete:         parent.Complete,
 		IdentityQuality:  quality,
-		SourceContainer:  containingResourceURI(parent),
 		SourcePath:       rel.Path,
-		SourcePosition:   position,
 		SourceModel:      "embedded_excerpt",
-		SourceURIs:       mergeStringSets(nonEmptyStrings(containingResourceURI(parent)), nonEmptyStrings(locator)),
-		SourceModels:     []string{"embedded_excerpt"},
 		Response:         parent.Response,
 		Parents:          map[string]*graphNode{parent.Key: parent},
 		RollupParents:    map[string]*graphNode{parent.Key: parent},
@@ -1641,8 +1601,7 @@ func mergeEquivalentGraphNode(existing, candidate *graphNode) {
 		existing.SourceModel = candidate.SourceModel
 		existing.Response = candidate.Response
 	}
-	existing.SourceURIs = mergeStringSets(existing.SourceURIs, candidate.SourceURIs)
-	existing.SourceModels = mergeStringSets(existing.SourceModels, candidate.SourceModels)
+
 	existing.SensorExcerpts = mergeSensorExcerptSources(
 		existing.SensorExcerpts,
 		candidate.SensorExcerpts,
@@ -1742,23 +1701,6 @@ func nonEmptyStrings(values ...string) []string {
 	return result
 }
 
-func mergeStringSets(sets ...[]string) []string {
-	unique := make(map[string]struct{})
-	for _, values := range sets {
-		for _, value := range values {
-			if value != "" {
-				unique[value] = struct{}{}
-			}
-		}
-	}
-	result := make([]string, 0, len(unique))
-	for value := range unique {
-		result = append(result, value)
-	}
-	sort.Strings(result)
-	return result
-}
-
 func embeddedLocator(container, path, id string, index int) string {
 	if id != "" {
 		return fmt.Sprintf("embedded:%s:%s:%s", container, path, id)
@@ -1825,7 +1767,6 @@ func (c *protocolClient) legacyComponents(
 				failures.Add(fmt.Errorf("%s member %d: %w", childRel.Path, index, err))
 			}
 			node.SourceModel = childRel.Source
-			node.SourceModels = mergeStringSets(node.SourceModels, nonEmptyStrings(childRel.Source))
 			nodes = append(nodes, node)
 			positions = append(positions, index)
 		}
@@ -2070,7 +2011,6 @@ func (c *protocolClient) sensorExcerptArrayNodes(
 			failures.Add(fmt.Errorf("%s member %d: %w", sourcePath, index, err))
 		}
 		node.SourceModel = "embedded_sensor_excerpt"
-		node.SourceModels = mergeStringSets(node.SourceModels, []string{"embedded_sensor_excerpt"})
 		node.SensorExcerpts = []sensorExcerptSource{{
 			Path: sourcePath, Type: spec.Type, Units: spec.Units, Data: cloneJSONMap(object),
 		}}
@@ -2086,7 +2026,6 @@ func (c *protocolClient) sensorExcerptArrayNodes(
 			if resolveErr == nil {
 				resourceURI := canonicalResourceURI(target)
 				if graph.findURI("sensor", resourceURI) != nil {
-					node.SourceURIs = mergeStringSets(node.SourceURIs, []string{node.Locator, resourceURI})
 					node.URI = resourceURI
 					node.Locator = resourceURI
 					node.Key = resourceKey(c.origin, node.Kind, resourceURI)
@@ -2155,10 +2094,8 @@ func (c *protocolClient) makeDuplicateEmbeddedIDsPositional(
 			position = positions[i]
 		}
 		node.IdentityQuality = "positional"
-		node.SourcePosition = new(position)
 		node.Locator = embeddedLocator(embeddedIdentityContainer(parent), rel.Path, "", position)
 		node.Key = resourceKey(c.origin, node.Kind, node.Locator)
-		node.SourceURIs = mergeStringSets(nonEmptyStrings(containingResourceURI(parent)), nonEmptyStrings(node.Locator))
 	}
 }
 
@@ -2280,7 +2217,7 @@ func (c *protocolClient) resolveGraphPlacement(graph *resourceGraph) {
 
 	for _, node := range graph.Nodes {
 		node.RollupOwner = chooseRollupOwner(node)
-		node.LogicalOwner, node.LogicalCandidates, node.LogicalReason = c.chooseLogicalOwner(node, graph)
+		node.LogicalOwner = c.chooseLogicalOwner(node, graph)
 	}
 
 	c.graphMu.Lock()
@@ -2294,8 +2231,6 @@ func (c *protocolClient) resolveGraphPlacement(graph *resourceGraph) {
 			if priorDecision, ok := c.logicalOwners[node.Key]; ok {
 				if prior := graph.findKey(priorDecision.OwnerKey); prior != nil {
 					node.LogicalOwner = prior
-					node.LogicalCandidates = append([]string(nil), priorDecision.Candidates...)
-					node.LogicalReason = priorDecision.Reason
 				}
 			}
 			continue
@@ -2308,9 +2243,7 @@ func (c *protocolClient) resolveGraphPlacement(graph *resourceGraph) {
 		c.systemOwners[node.Key] = ownerKeys
 		if node.LogicalOwner != nil {
 			c.logicalOwners[node.Key] = logicalPlacementSnapshot{
-				OwnerKey:   node.LogicalOwner.Key,
-				Candidates: append([]string(nil), node.LogicalCandidates...),
-				Reason:     node.LogicalReason,
+				OwnerKey: node.LogicalOwner.Key,
 			}
 		} else {
 			delete(c.logicalOwners, node.Key)
@@ -2378,7 +2311,7 @@ func rollupRank(child, parent string) int {
 func (c *protocolClient) chooseLogicalOwner(
 	node *graphNode,
 	graph *resourceGraph,
-) (*graphNode, []string, string) {
+) *graphNode {
 	structural := structuralLogicalOwner(node, graph)
 	candidateMap := make(map[string]*graphNode)
 	for _, uri := range c.canonicalLinkURIs(node.Data, "RelatedItem") {
@@ -2409,17 +2342,11 @@ func (c *protocolClient) chooseLogicalOwner(
 			}
 		}
 		if compatible {
-			return candidate, candidateKeys, "related_item_unique"
+			return candidate
 		}
-		return structural, candidateKeys, "related_item_incompatible"
+		return structural
 	}
-	if len(candidateKeys) > 1 {
-		return structural, candidateKeys, "related_item_ambiguous"
-	}
-	if structural != nil {
-		return structural, nil, "structural"
-	}
-	return nil, nil, "unresolved"
+	return structural
 }
 
 func structuralLogicalOwner(node *graphNode, graph *resourceGraph) *graphNode {

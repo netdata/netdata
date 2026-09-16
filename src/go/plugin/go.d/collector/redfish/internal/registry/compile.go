@@ -5,7 +5,6 @@ package registry
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -47,7 +46,6 @@ func compile() (Contract, error) {
 		Status:        cloneStatus(statusSpecs),
 		States:        cloneStates(stateSpecs),
 		Flags:         cloneFlags(flagSetSpecs),
-		Inventory:     slices.Clone(inventoryFieldSpecs),
 		Operational:   cloneOperational(operationalSpecs),
 		ReadingTypes:  cloneReadingTypes(readingTypeSpecs),
 		ReadingRoles:  slices.Clone(readingRoleSpecs),
@@ -72,10 +70,6 @@ func compile() (Contract, error) {
 		return Contract{}, err
 	}
 	if err := applyPresentationPolicy(&result); err != nil {
-		return Contract{}, err
-	}
-	result.Columns, err = compileColumns(result)
-	if err != nil {
 		return Contract{}, err
 	}
 	result.Charts, err = compileCharts(result)
@@ -120,7 +114,7 @@ func compileReadings(contract Contract) ([]ReadingSurfaceSpec, error) {
 					basis,
 					readingSurfaceTemplate{
 						Family: family, Units: unitsByFamily[family], Role: role.ID,
-						Exposure: role.Exposure, Primary: role.Primary,
+						Primary:        role.Primary,
 						AggregateKinds: []Kind{"chassis"},
 						Histogram:      histogramForReading(family, basis, role.ID),
 					},
@@ -160,7 +154,6 @@ func compileReadings(contract Contract) ([]ReadingSurfaceSpec, error) {
 		AggregateMetric:   "sensor_power_energy_rate",
 		AggregateKinds:    []Kind{"power_subsystem", "chassis", "system", "storage", "network_adapter", "network_interface"},
 		ComponentClass:    "reading",
-		Exposure:          ExposureOperationalReading,
 		Primary:           true,
 		DerivedFromEnergy: true,
 	})
@@ -239,7 +232,6 @@ func commonReadingSurface(
 		AggregateKinds:  []Kind{"chassis"},
 		ComponentClass:  "reading",
 		CommonContext:   true,
-		Exposure:        roleSpec.Exposure,
 		Primary:         roleSpec.Primary,
 	}, true, nil
 }
@@ -307,7 +299,6 @@ func genericReadingSurface(
 		AggregateMetric: "sensor_" + family + "_" + role,
 		AggregateKinds:  slices.Clone(template.AggregateKinds),
 		ComponentClass:  "reading",
-		Exposure:        template.Exposure,
 		Primary:         primary,
 	}, nil
 }
@@ -500,199 +491,6 @@ func basisTitle(value string) (string, error) {
 	}
 }
 
-func compileColumns(contract Contract) ([]ColumnSpec, error) {
-	result := commonColumns()
-	commonCount := len(result)
-	byID := make(map[string]int, len(result))
-	for index := range result {
-		byID[result[index].ID] = index
-	}
-	add := func(candidate ColumnSpec) error {
-		if index, ok := byID[candidate.ID]; ok {
-			current := &result[index]
-			if current.Type != candidate.Type {
-				if isNumericColumnType(current.Type) && isNumericColumnType(candidate.Type) {
-					current.Type = ColumnFloat
-				} else {
-					return fmt.Errorf(
-						"column %q has conflicting types %q and %q",
-						candidate.ID,
-						current.Type,
-						candidate.Type,
-					)
-				}
-			}
-			if current.Units != "" && candidate.Units != "" && current.Units != candidate.Units {
-				return fmt.Errorf(
-					"column %q has conflicting units %q and %q",
-					candidate.ID,
-					current.Units,
-					candidate.Units,
-				)
-			}
-			if current.Structured != candidate.Structured {
-				return fmt.Errorf(
-					"column %q has conflicting structured values %t and %t",
-					candidate.ID,
-					current.Structured,
-					candidate.Structured,
-				)
-			}
-			current.Visible = current.Visible || candidate.Visible
-			current.Facet = current.Facet || candidate.Facet
-			current.Structured = current.Structured || candidate.Structured
-			current.Additive = current.Additive || candidate.Additive
-			// Common columns describe every inventory row. A kind-specific field
-			// may enrich their presentation, but must not narrow their membership.
-			if index >= commonCount && len(candidate.Members) > 0 {
-				if current.Members == nil {
-					current.Members = make(map[string]struct{})
-				}
-				for member := range candidate.Members {
-					current.Members[member] = struct{}{}
-				}
-			}
-			if current.Units == "" {
-				current.Units = candidate.Units
-			}
-			return nil
-		}
-		candidate.Order = len(result)
-		result = append(result, candidate)
-		byID[candidate.ID] = len(result) - 1
-		return nil
-	}
-	for _, inventory := range contract.Inventory {
-		if err := add(ColumnSpec{
-			ID:         inventory.Column,
-			Name:       inventory.Column,
-			Tooltip:    inventory.Expression,
-			Type:       inventory.Type,
-			Units:      inventory.Units,
-			Visible:    inventory.Visible,
-			Facet:      inventory.Facet,
-			Sortable:   !inventory.Structured,
-			Structured: inventory.Structured,
-			Members:    map[string]struct{}{string(inventory.Kind): {}},
-		}); err != nil {
-			return nil, fmt.Errorf("inventory field %s.%s: %w", inventory.Kind, inventory.Path, err)
-		}
-	}
-	for _, field := range contract.Fields {
-		typ := ColumnInteger
-		if field.Float || field.Algorithm != AlgorithmAbsolute {
-			typ = ColumnFloat
-		}
-		columnUnits := field.Units
-		if field.MixedColumnUnits {
-			columnUnits = ""
-		}
-		if err := add(ColumnSpec{
-			ID:       field.Column,
-			Name:     field.Column,
-			Tooltip:  field.Title,
-			Type:     typ,
-			Units:    columnUnits,
-			Visible:  true,
-			Facet:    true,
-			Sortable: true,
-			Additive: field.Additive,
-			Members:  map[string]struct{}{string(field.Kind): {}},
-		}); err != nil {
-			return nil, fmt.Errorf("metric field %s.%s: %w", field.Kind, field.Column, err)
-		}
-		if field.Algorithm == AlgorithmRate || field.Algorithm == AlgorithmDurationPercent {
-			if err := add(ColumnSpec{
-				ID:       field.Column + "_exact",
-				Name:     field.Column + "_exact",
-				Tooltip:  field.Title + " exact source total",
-				Type:     ColumnString,
-				Visible:  false,
-				Sortable: true,
-				Members:  map[string]struct{}{string(field.Kind): {}},
-			}); err != nil {
-				return nil, fmt.Errorf("exact metric field %s.%s: %w", field.Kind, field.Column, err)
-			}
-		}
-		if len(field.Candidates) > 1 {
-			if err := add(ColumnSpec{
-				ID:       field.Column + "_source",
-				Name:     field.Column + "_source",
-				Tooltip:  field.Title + " selected source",
-				Type:     ColumnString,
-				Visible:  false,
-				Facet:    true,
-				Sortable: true,
-				Members:  map[string]struct{}{string(field.Kind): {}},
-			}); err != nil {
-				return nil, fmt.Errorf("metric source field %s.%s: %w", field.Kind, field.Column, err)
-			}
-		}
-		for _, candidate := range field.Candidates {
-			if candidate.MultiplierColumn == "" {
-				continue
-			}
-			if err := add(ColumnSpec{
-				ID:       candidate.MultiplierColumn,
-				Name:     candidate.MultiplierColumn,
-				Tooltip:  "Multiplier used to normalize " + field.Title,
-				Type:     ColumnInteger,
-				Units:    "bytes",
-				Visible:  false,
-				Facet:    true,
-				Sortable: true,
-				Members:  map[string]struct{}{string(field.Kind): {}},
-			}); err != nil {
-				return nil, fmt.Errorf("metric multiplier field %s.%s: %w", field.Kind, field.Column, err)
-			}
-		}
-	}
-	for _, state := range contract.States {
-		typ := ColumnEnum
-		if state.BooleanFalse != "" || state.BooleanTrue != "" {
-			typ = ColumnBoolean
-		}
-		if err := add(ColumnSpec{
-			ID:       state.Column,
-			Name:     state.Column,
-			Tooltip:  state.Title,
-			Type:     typ,
-			Visible:  true,
-			Facet:    true,
-			Sortable: true,
-			Members:  map[string]struct{}{string(state.Kind): {}},
-		}); err != nil {
-			return nil, fmt.Errorf("state field %s.%s: %w", state.Kind, state.Column, err)
-		}
-	}
-	for _, flags := range contract.Flags {
-		for _, member := range flags.Members {
-			if err := add(ColumnSpec{
-				ID:       member.Column,
-				Name:     member.Column,
-				Tooltip:  flags.Title + " " + member.Role,
-				Type:     ColumnBoolean,
-				Visible:  true,
-				Facet:    true,
-				Sortable: true,
-				Members:  map[string]struct{}{string(flags.Kind): {}},
-			}); err != nil {
-				return nil, fmt.Errorf("flag field %s.%s: %w", flags.Kind, member.Column, err)
-			}
-		}
-	}
-	for _, reading := range readingColumns(len(result)) {
-		if err := add(reading); err != nil {
-			return nil, fmt.Errorf("reading field %s: %w", reading.ID, err)
-		}
-	}
-	return result, nil
-}
-
-func isNumericColumnType(value ColumnType) bool {
-	return value == ColumnInteger || value == ColumnFloat
-}
-
 func compileCharts(contract Contract) ([]ChartSpec, error) {
 	var result []ChartSpec
 	for _, source := range contract.Operational {
@@ -722,9 +520,6 @@ func compileCharts(contract Contract) ([]ChartSpec, error) {
 			})
 		}
 		module := "redfish"
-		if source.LeafFamily == "log_backend" {
-			module = "redfish_logs"
-		}
 		result = append(result, ChartSpec{
 			Order:          source.Order,
 			Module:         module,
@@ -937,9 +732,6 @@ func promotedLabels(class string) []string {
 			"reading_basis", "reading_role", "reading_source", "semantic_source_class",
 			"implementation_type",
 		)
-	case "log_service":
-		result = append(result, resource...)
-		result = append(result, "log_service_id")
 	case "aggregate":
 		result = append(result,
 			"system_key", "system_name", "rollup_owner_kind", "rollup_owner_key",
@@ -954,21 +746,6 @@ func promotedLabels(class string) []string {
 	return uniqueStrings(result)
 }
 
-func operationalPromotedLabels(source OperationalSpec) []string {
-	switch source.LeafFamily {
-	case "log_backend":
-		return []string{"backend_name", "backend_key"}
-	case "log_service":
-		return promotedLabels("log_service")
-	default:
-		result := []string{"endpoint_job"}
-		if slices.Contains(source.InstanceLabels, "logical_owner_key") {
-			result = append(result, "logical_owner_name", "component_family")
-		}
-		return result
-	}
-}
-
 func sortCharts(charts []ChartSpec) {
 	classRank := map[ChartClass]int{
 		ClassOperational: 0, ClassResourceScalar: 1, ClassResourceCategorical: 2,
@@ -981,7 +758,7 @@ func sortCharts(charts []ChartSpec) {
 		"ethernet_interface", "network_interface", "network_port", "port", "pcie_device", "pcie_function",
 		"fan", "pump", "power_supply", "battery", "sensor", "redundancy", "thermal_subsystem",
 		"power_subsystem", "coolant_connector", "filter", "heater", "leak_detection",
-		"leak_detector_group", "leak_detector", "control", "firmware", "software", "assembly", "log_service",
+		"leak_detector_group", "leak_detector", "control", "firmware", "software", "assembly",
 	}
 	parentRank := make(map[string]int, len(parentOrder))
 	for i, value := range parentOrder {
@@ -1248,27 +1025,6 @@ func validate(contract Contract) error {
 	fieldIDs := make(map[string]struct{})
 	contexts := make(map[string]string)
 	metricContract := make(map[string]FieldSpec)
-	for _, inventory := range contract.Inventory {
-		if _, ok := kinds[inventory.Kind]; !ok {
-			errs = append(errs, fmt.Errorf("inventory field %q references unknown kind %q", inventory.Path, inventory.Kind))
-		}
-		if inventory.Path == "" || inventory.Column == "" || inventory.Type == "" {
-			errs = append(errs, fmt.Errorf("invalid inventory field declaration %#v", inventory))
-		}
-		if inventory.Scale.Num != 0 && inventory.Scale.Den <= 0 {
-			errs = append(errs, fmt.Errorf("inventory field %s.%s has invalid scale", inventory.Kind, inventory.Path))
-		}
-		if inventory.SourceType != "" &&
-			(inventory.SourceType != ColumnFloat || inventory.Type != ColumnInteger || inventory.Structured) {
-			errs = append(errs, fmt.Errorf(
-				"inventory field %s.%s has unsupported source/final type conversion %q -> %q",
-				inventory.Kind,
-				inventory.Path,
-				inventory.SourceType,
-				inventory.Type,
-			))
-		}
-	}
 	for _, field := range contract.Fields {
 		if _, ok := kinds[field.Kind]; !ok {
 			errs = append(errs, fmt.Errorf("field %q references unknown kind %q", field.ID, field.Kind))
@@ -1303,9 +1059,6 @@ func validate(contract Contract) error {
 	for _, state := range contract.States {
 		if _, ok := kinds[state.Kind]; !ok {
 			errs = append(errs, fmt.Errorf("state %q references unknown kind %q", state.Context, state.Kind))
-		}
-		if state.Column == "" {
-			errs = append(errs, fmt.Errorf("state %q has no Function column", state.Context))
 		}
 		validateAggregateOwners("state", state.Context, state.Kind, state.AggregateKinds)
 	}
@@ -1344,7 +1097,7 @@ func validate(contract Contract) error {
 		flagContexts[flags.Context] = flags.Metric
 		roles := make(map[string]struct{}, len(flags.Members))
 		for _, member := range flags.Members {
-			if member.Path == "" || member.Role == "" || member.Column == "" {
+			if member.Path == "" || member.Role == "" {
 				errs = append(errs, fmt.Errorf("invalid member in flag set %q", flags.Context))
 			}
 			if _, ok := roles[member.Role]; ok {
@@ -1352,13 +1105,6 @@ func validate(contract Contract) error {
 			}
 			roles[member.Role] = struct{}{}
 		}
-	}
-	columnContract := make(map[string]ColumnSpec)
-	for _, column := range contract.Columns {
-		if previous, ok := columnContract[column.ID]; ok {
-			errs = append(errs, fmt.Errorf("duplicate compiled column %q (%#v, %#v)", column.ID, previous, column))
-		}
-		columnContract[column.ID] = column
 	}
 	chartIDs := make(map[string]string)
 	chartContexts := make(map[string]string)
@@ -1444,14 +1190,9 @@ func declaredProducerMetrics(contract Contract) map[string]struct{} {
 		}
 	}
 	for _, field := range contract.Fields {
-		if field.Exposure == ExposureOperationalScalar {
-			add(field.Metric)
-		}
+		add(field.Metric)
 	}
 	for _, reading := range contract.Readings {
-		if reading.Exposure != ExposureOperationalReading {
-			continue
-		}
 		add(reading.Metric)
 		add(reading.AlarmMetric)
 	}
@@ -1555,8 +1296,6 @@ func cloneContract(source Contract) Contract {
 	source.States = cloneStates(source.States)
 	source.Flags = cloneFlags(source.Flags)
 	source.Charts = cloneCharts(source.Charts)
-	source.Columns = cloneColumns(source.Columns)
-	source.Inventory = slices.Clone(source.Inventory)
 	source.Operational = cloneOperational(source.Operational)
 	source.ReadingTypes = cloneReadingTypes(source.ReadingTypes)
 	source.ReadingRoles = slices.Clone(source.ReadingRoles)
@@ -1564,14 +1303,6 @@ func cloneContract(source Contract) Contract {
 	source.Histograms = cloneHistograms(source.Histograms)
 	source.SummaryClasses = slices.Clone(source.SummaryClasses)
 	return source
-}
-
-func cloneColumns(source []ColumnSpec) []ColumnSpec {
-	result := slices.Clone(source)
-	for index := range result {
-		result[index].Members = maps.Clone(result[index].Members)
-	}
-	return result
 }
 
 func cloneFields(source []FieldSpec) []FieldSpec {
@@ -1659,6 +1390,14 @@ func cloneHistograms(source []HistogramSpec) []HistogramSpec {
 				result[index].Buckets[bucket].UpperExclusive = &copy
 			}
 		}
+	}
+	return result
+}
+
+func operationalPromotedLabels(source OperationalSpec) []string {
+	result := []string{"endpoint_job"}
+	if slices.Contains(source.InstanceLabels, "logical_owner_key") {
+		result = append(result, "logical_owner_name", "component_family")
 	}
 	return result
 }

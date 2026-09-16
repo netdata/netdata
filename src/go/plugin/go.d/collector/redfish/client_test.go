@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfishruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,10 +40,10 @@ func TestProtocolClientBasicCheckAndCollect(t *testing.T) {
 	assert.True(t, result.Complete)
 	assert.Equal(t, "success", result.Metrics.Status)
 	assert.Equal(t, "present", result.Metrics.SelectedSystem)
-	assert.Len(t, result.Inventory, 4)
+	assert.NotEmpty(t, result.Hardware)
 	assert.Positive(t, result.Metrics.HTTPRequests["started"])
 
-	coverage := New(redfishruntime.New())
+	coverage := New()
 	managed, ok := metrix.AsCycleManagedStore(coverage.store)
 	require.True(t, ok)
 	cycle := managed.CycleController()
@@ -1371,18 +1370,19 @@ func TestProtocolClientRetainsLastCompleteMembershipWithoutReplayingCurrentState
 	second, err := client.Collect(context.Background())
 	require.Error(t, err)
 	assert.False(t, second.Complete)
-	var system map[string]any
-	for _, row := range second.Inventory {
-		if row["resource_kind"] == "system" {
-			system = row
-			break
+	assert.Equal(t, "partial", second.Metrics.Status)
+	assert.Positive(t, second.Metrics.Resources["unknown"])
+	foundSystem := false
+	for _, observation := range second.Hardware {
+		switch observation.Metric {
+		case "system_health", "system_state":
+			t.Errorf("failed membership replayed prior source state: %s=%s", observation.Metric, observation.State)
+		case "system_acquisition_state":
+			foundSystem = true
+			assert.Equal(t, "unknown", observation.State)
 		}
 	}
-	require.NotNil(t, system)
-	assert.Equal(t, "unknown", system["acquisition_state"])
-	assert.Equal(t, false, system["membership_complete"])
-	assert.Nil(t, system["health"])
-	assert.Nil(t, system["state"])
+	require.True(t, foundSystem)
 }
 
 type redfishTestServerConfig struct {

@@ -54,10 +54,9 @@ func TestDuplicateEmbeddedIDsMakeEveryMemberPositional(t *testing.T) {
 	})
 	require.True(t, complete)
 	require.Len(t, nodes, 2)
-	for index, node := range nodes {
+	for _, node := range nodes {
 		assert.Equal(t, "positional", node.IdentityQuality)
-		require.NotNil(t, node.SourcePosition)
-		assert.Equal(t, index, *node.SourcePosition)
+
 		assert.Contains(t, node.Locator, "position:")
 	}
 	assert.NotEqual(t, nodes[0].Locator, nodes[1].Locator)
@@ -267,7 +266,7 @@ func TestNestedEmbeddedIdentityUsesImmediateContainerAndResourceProvenance(t *te
 		0,
 	)
 	require.NoError(t, err)
-	assert.Equal(t, "/redfish/v1/Chassis/Fixture-1", provenance.SourceContainer)
+
 	assert.Equal(t, "/redfish/v1/Chassis/Fixture-1#/Reading", provenance.Locator)
 }
 
