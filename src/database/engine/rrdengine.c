@@ -52,6 +52,8 @@ struct rrdeng_main {
         struct {
             SPINLOCK spinlock;
 
+            bool accepting;                     // embedder work is taken; set when the event loop is spawned,
+                                                // cleared by dbengine_shutdown() before it queues the loop's exit
             size_t waiting;
             struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
             size_t executed_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
@@ -585,28 +587,56 @@ ALWAYS_INLINE void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STO
     spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 }
 
-ALWAYS_INLINE void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion,
-               enum storage_priority priority, enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb) {
-
-    priority = rrdeng_enq_cmd_map_opcode_to_priority(opcode, priority);
-
+static ALWAYS_INLINE struct rrdeng_cmd *rrdeng_cmd_alloc(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data,
+                                                         struct completion *completion, enum storage_priority priority,
+                                                         dequeue_callback_t dequeue_cb) {
     struct rrdeng_cmd *cmd = aral_mallocz(rrdeng_main.cmd_queue.ar);
     memset(cmd, 0, sizeof(struct rrdeng_cmd));
     cmd->ctx = ctx;
     cmd->opcode = opcode;
     cmd->data = data;
     cmd->completion = completion;
-    cmd->priority = priority;
+    cmd->priority = rrdeng_enq_cmd_map_opcode_to_priority(opcode, priority);
     cmd->dequeue_cb = dequeue_cb;
+    return cmd;
+}
 
+// Appends cmd and wakes the loop. With only_if_accepting, the acceptance check and the append happen under the
+// same lock, so a refusal is final: dbengine_shutdown() cannot slip in between them. Returns false on refusal,
+// leaving cmd untouched for the caller to free.
+static ALWAYS_INLINE bool rrdeng_cmd_append(struct rrdeng_cmd *cmd, enqueue_callback_t enqueue_cb, bool only_if_accepting) {
     spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority], cmd, queue.prev, queue.next);
+    if(only_if_accepting && !rrdeng_main.cmd_queue.unsafe.accepting) {
+        spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+        return false;
+    }
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[cmd->priority], cmd, queue.prev, queue.next);
     rrdeng_main.cmd_queue.unsafe.waiting++;
     if(enqueue_cb)
         enqueue_cb(cmd);
     spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     rrdeng_async_wakeup();
+    return true;
+}
+
+ALWAYS_INLINE void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion,
+               enum storage_priority priority, enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb) {
+    struct rrdeng_cmd *cmd = rrdeng_cmd_alloc(ctx, opcode, data, completion, priority, dequeue_cb);
+    rrdeng_cmd_append(cmd, enqueue_cb, false);
+}
+
+static void rrdeng_cmd_queue_set_accepting(bool accepting) {
+    spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    rrdeng_main.cmd_queue.unsafe.accepting = accepting;
+    spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+}
+
+bool rrdeng_work_available(void) {
+    spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    bool accepting = rrdeng_main.cmd_queue.unsafe.accepting;
+    spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    return accepting;
 }
 
 static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PRIORITY priority, STORAGE_PRIORITY max_priority) {
@@ -1114,8 +1144,16 @@ static void *external_work_worker(
     return NULL;
 }
 
-void rrdeng_enq_work(struct rrdeng_work_request *req) {
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EXTERNAL_WORK, req, &req->completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+bool rrdeng_enq_work(struct rrdeng_work_request *req) {
+    if(!rrdeng_work_available())
+        return false;   // never spawned, or already shut down: the queue's allocator may not even exist
+
+    struct rrdeng_cmd *cmd = rrdeng_cmd_alloc(NULL, RRDENG_OPCODE_EXTERNAL_WORK, req, &req->completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL);
+    if(!rrdeng_cmd_append(cmd, NULL, true)) {
+        aral_freez(rrdeng_main.cmd_queue.ar, cmd);
+        return false;
+    }
+    return true;
 }
 
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
@@ -2605,6 +2643,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &rrdeng_main);
         fatal_assert(0 != rrdeng_main.thread);
 
+        rrdeng_cmd_queue_set_accepting(true);
         spawned = true;
     }
 
@@ -2909,6 +2948,8 @@ void dbengine_event_loop(void* arg) {
 
 void dbengine_shutdown(void)
 {
+    // refuse embedder work first, so no request can be queued behind the loop's exit and left unanswered
+    rrdeng_cmd_queue_set_accepting(false);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     int rc = nd_thread_join(rrdeng_main.thread);

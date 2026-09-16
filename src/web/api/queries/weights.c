@@ -581,14 +581,10 @@ static inline void query_weights_set_interrupted(struct query_weights_data *qwd)
 }
 
 #ifdef ENABLE_DBENGINE
-// Worker thread function for parallel host processing
-static void query_weights_worker_thread(void *arg)
+// One worker's share of the parallel host processing. Runs on an engine pool thread normally; on the calling
+// thread when the engine refused the request, so it does no thread-level setup itself.
+static void query_weights_worker_body(struct query_weights_thread_data *thread_data)
 {
-    // this runs on the engine's pool, whose threads know only the engine's job names
-    register_libuv_worker_jobs();
-    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
-
-    struct query_weights_thread_data *thread_data = (struct query_weights_thread_data *)arg;
     struct query_weights_data *main_qwd = thread_data->main_qwd;
 
     // Initialize local statistics
@@ -694,6 +690,14 @@ static void query_weights_worker_thread(void *arg)
     }
 
     onewayalloc_destroy(local_qwd.query_owa);
+}
+
+// Pool entry point: the engine's threads know only the engine's job names
+static void query_weights_worker_thread(void *arg)
+{
+    register_libuv_worker_jobs();
+    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
+    query_weights_worker_body((struct query_weights_thread_data *)arg);
 }
 #endif
 
@@ -2562,8 +2566,9 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         num_threads = active_hosts;
     }
 
-    if (num_threads <= 1 || active_hosts <= 1) {
-        // Fall back to single-threaded processing
+    if (num_threads <= 1 || active_hosts <= 1 || !rrdeng_work_available()) {
+        // Fall back to single-threaded processing (also when there is no serving engine to run the workers:
+        // running them inline here would register the pool's job names on a web thread for every query)
         freez(qwd->hosts_array);
         return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
                                       weights_do_node_callback, qwd,
@@ -2591,7 +2596,12 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         thread_data[i].work.fn = query_weights_worker_thread;
         thread_data[i].work.data = &thread_data[i];
         completion_init(&thread_data[i].work.completion);
-        rrdeng_enq_work(&thread_data[i].work);
+        if (!rrdeng_enq_work(&thread_data[i].work)) {
+            // the engine stopped serving since the check above (shutdown race): do this share here, so the
+            // collection loop below stays uniform
+            query_weights_worker_body(&thread_data[i]);
+            completion_mark_complete(&thread_data[i].work.completion);
+        }
     }
 
     // Wait for all threads to complete

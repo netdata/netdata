@@ -87,14 +87,19 @@ extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_G
 // completion when it returns. fn is responsible for its own worker_is_busy() attribution, including registering
 // the job names it reports: the pool threads register only the engine's own names.
 //
-// Precondition: at least one tier has been brought up with rrdeng_init(). The command queue this call uses exists
-// only once the engine has spawned; calling it on an agent without a dbengine tier dereferences NULL.
+// The engine takes work only while it is serving: from the moment the first tier's rrdeng_init() spawned the
+// event loop until dbengine_shutdown() starts. Outside that window rrdeng_enq_work() returns false having done
+// nothing (no queueing, no wake-up, the completion is not touched), and the caller runs or drops the work itself;
+// rrdeng_work_available() answers the same question up front, for a caller that wants to plan a batch. The
+// answer can change between the two calls only in one direction, serving -> stopped, so a request accepted is
+// always completed. Only this entry point is gated; the engine's own commands are not.
 struct rrdeng_work_request {
     void (*fn)(void *data);
     void *data;
     struct completion completion;
 };
-void rrdeng_enq_work(struct rrdeng_work_request *req);
+bool rrdeng_enq_work(struct rrdeng_work_request *req);
+bool rrdeng_work_available(void);
 
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
 
