@@ -13,7 +13,8 @@
 # Reads only. Writes nothing into the bundle.
 
 _self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=./_lib.sh
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=.agents/skills/triage-support-bundle/scripts/_lib.sh
 . "${_self}/_lib.sh"
 
 INPUT=""

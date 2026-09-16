@@ -88,6 +88,8 @@ _sb_flatten_backslash_entries() {
 # when nothing was extracted, so the caller knows whether to clean up).
 sb_resolve_bundle() {
     local input="$1" tmp root
+    # These are this function's return values: the sourcing scripts read them.
+    # shellcheck disable=SC2034
     SB_BUNDLE_DIR=""
     SB_BUNDLE_TMP=""
 
@@ -95,11 +97,13 @@ sb_resolve_bundle() {
 
     if [ -d "$input" ]; then
         if [ -f "${input}/MANIFEST.json" ]; then
+            # shellcheck disable=SC2034
             SB_BUNDLE_DIR="$input"
         else
             # a directory holding a single extracted bundle
             root="$(find "$input" -maxdepth 2 -name MANIFEST.json -print -quit)"
             [ -n "$root" ] || sb_die "no MANIFEST.json under ${input}"
+            # shellcheck disable=SC2034
             SB_BUNDLE_DIR="$(dirname "$root")"
         fi
         return 0
@@ -120,6 +124,7 @@ sb_resolve_bundle() {
 
     root="$(find "$tmp" -maxdepth 3 -name MANIFEST.json -print -quit)"
     [ -n "$root" ] || sb_die "no MANIFEST.json inside ${input}"
+    # shellcheck disable=SC2034
     SB_BUNDLE_DIR="$(dirname "$root")"
 }
 
