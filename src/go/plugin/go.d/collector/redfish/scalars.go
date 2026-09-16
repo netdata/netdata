@@ -144,7 +144,7 @@ func findEnrichment(node *graphNode, kind string) map[string]any {
 			if found {
 				return nil
 			}
-			match = value
+			match = value.Data
 			found = true
 		}
 	}

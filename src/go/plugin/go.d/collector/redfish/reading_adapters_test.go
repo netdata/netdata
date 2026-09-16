@@ -64,10 +64,13 @@ func TestFixedExcerptMapPreservesValuePresenceAndContext(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			node := &graphNode{
 				Kind: "power_supply",
-				Enrichment: map[string]map[string]any{"power_supply_metrics": {
-					"PhysicalContext":     "Chassis",
-					"PolyPhasePowerWatts": map[string]any{"Line1ToNeutral": test.value, "VendorLine": json.Number("99")},
-				}},
+				Enrichment: map[string]enrichmentResource{"power_supply_metrics": {Data: map[string]any{
+					"PhysicalContext": "Chassis",
+					"PolyPhasePowerWatts": map[string]any{
+						"Line1ToNeutral": test.value,
+						"VendorLine":     json.Number("99"),
+					},
+				}}},
 			}
 			require.Equal(t, test.want, excerptReadings(node))
 		})
@@ -79,15 +82,96 @@ func TestFixedExcerptMapPreservesValuePresenceAndContext(t *testing.T) {
 func BenchmarkExcerptReadings(b *testing.B) {
 	node := &graphNode{
 		Kind: "power_supply",
-		Enrichment: map[string]map[string]any{"power_supply_metrics": {
+		Enrichment: map[string]enrichmentResource{"power_supply_metrics": {Data: map[string]any{
 			"InputPowerWatts": json.Number("100"), "OutputPowerWatts": json.Number("90"),
-			"PolyPhasePowerWatts": map[string]any{"Line1ToNeutral": json.Number("50"), "Line2ToNeutral": json.Number("50")},
-		}},
+			"PolyPhasePowerWatts": map[string]any{
+				"Line1ToNeutral": json.Number("50"),
+				"Line2ToNeutral": json.Number("50"),
+			},
+		}}},
 	}
 	b.ReportAllocs()
 	for b.Loop() {
 		if len(excerptReadings(node)) != 4 {
 			b.Fatal("readings missing")
+		}
+	}
+}
+
+func TestElectricalAuxiliaryIdentityUsesSourceURI(t *testing.T) {
+	client := fixtureClient()
+	keyFor := func(path, uri string, standalone bool) string {
+		data := map[string]any{"DataSourceUri": uri, "ApparentVA": json.Number("12")}
+		node := &graphNode{
+			Kind: "sensor",
+			Key:  "sensor",
+			URI:  "/redfish/v1/Sensors/Owner",
+			Data: data,
+		}
+		if !standalone {
+			node.SourceModel = "embedded_sensor_excerpt"
+			node.SensorExcerpts = []sensorExcerptSource{{Path: path, Data: data}}
+		}
+		readings := client.readingsForNode(node, time.Unix(10, 0))
+		require.Len(t, readings, 1)
+		require.Equal(t, float64(12), readings[0].Value)
+		return readings[0].Key
+	}
+	first := keyFor("SourceA", "/redfish/v1/Sensors/1", false)
+	require.Equal(t, first, keyFor("SourceB", "https://fixture.example/redfish/v1/Sensors/1", false))
+	require.Equal(t, first, keyFor("Sensor", "/redfish/v1/Sensors/1", true))
+	require.NotEqual(t, first, keyFor("SourceA", "/redfish/v1/Sensors/2", false))
+	require.NotEqual(t, keyFor("SourceA", "", false), keyFor("SourceB", "", false))
+}
+
+func TestElectricalAuxiliaryNonzeroNormalization(t *testing.T) {
+	// kVAh/kVARh convert to joule-equivalent by 1000 watts per kW * 3600 seconds per hour.
+	for name, standalone := range map[string]bool{"standalone": true, "excerpt": false} {
+		t.Run(name, func(t *testing.T) {
+			data := map[string]any{
+				"ApparentkVAh":  json.Number("1.5"),
+				"ReactivekVARh": json.Number("2"),
+				"PowerFactor":   json.Number("0.8"),
+				"SpeedRPM":      json.Number("1800"),
+			}
+			node := &graphNode{
+				Kind: "sensor",
+				Key:  "sensor",
+				Data: data,
+			}
+			if !standalone {
+				node.SourceModel = "embedded_sensor_excerpt"
+				node.SensorExcerpts = []sensorExcerptSource{{Path: "excerpt", Data: data}}
+			}
+			got := make(map[string]float64)
+			for _, reading := range fixtureClient().readingsForNode(node, time.Unix(10, 0)) {
+				require.True(t, reading.Valid)
+				got[reading.Role] = reading.Value
+			}
+			require.Equal(
+				t,
+				map[string]float64{
+					"apparent_kvah":  5400000,
+					"reactive_kvarh": 7200000,
+					"power_factor":   0.8,
+					"speed_rpm":      1800,
+				},
+				got,
+			)
+		})
+	}
+}
+
+func BenchmarkElectricalAuxiliaryReadings(b *testing.B) {
+	data := map[string]any{
+		"ApparentVA":    json.Number("12"),
+		"ReactiveVAR":   json.Number("3"),
+		"DataSourceUri": "/redfish/v1/Sensors/1",
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		if len(electricalAuxiliaryReadings(data, "Sensor", true, "", "", "")) != 2 {
+			b.Fatal("auxiliary readings missing")
 		}
 	}
 }

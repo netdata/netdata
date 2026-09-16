@@ -95,7 +95,7 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, "positional", redundancy[0].IdentityQuality)
 	require.Equal(t, "Synthetic Fan Group", redundancy[0].Doc.Name)
 	require.Equal(t, "OK", redundancy[0].Doc.Status.Health)
-	require.Contains(t, redundancy[0].Locator, ":position:0")
+	require.Equal(t, embeddedLocator(thermal.Locator, "FanRedundancy", "", 0), redundancy[0].Locator)
 	scalars := make(map[string]scalarValue)
 	for _, scalar := range client.scalarValues(redundancy[0], time.Now()) {
 		scalars[scalar.Descriptor.ID] = scalar
@@ -145,7 +145,7 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, "data_source_uri", detectors[0].IdentityQuality)
 	require.Equal(t, "/redfish/v1/Chassis/Synthetic/LeakDetectors/1", detectors[0].URI)
 	require.Equal(t, "positional", detectors[1].IdentityQuality)
-	require.Contains(t, detectors[1].Locator, ":position:1")
+	require.Equal(t, embeddedLocator(groups[0].Locator, "Detectors", "", 1), detectors[1].Locator)
 }
 
 func TestEmbeddedComponentsPublishValidSiblings(t *testing.T) {
@@ -255,11 +255,11 @@ func TestCompatibilityFixturesModernReadings(t *testing.T) {
 			node: &graphNode{
 				Kind: "thermal_subsystem",
 				Key:  "thermal-subsystem",
-				Enrichment: map[string]map[string]any{
-					"thermal_metrics:0": loadFixture(
+				Enrichment: map[string]enrichmentResource{
+					"thermal_metrics:0": {Data: loadFixture(
 						t,
 						"telegraf-hpe-modern-thermal-metrics.min.json",
-					),
+					)},
 				},
 			},
 			wantFamilies: map[string]int{"temperature": 1},
@@ -276,11 +276,11 @@ func TestCompatibilityFixturesModernReadings(t *testing.T) {
 			node: &graphNode{
 				Kind: "power_supply",
 				Key:  "power-supply",
-				Enrichment: map[string]map[string]any{
-					"power_supply_metrics:0": loadFixture(
+				Enrichment: map[string]enrichmentResource{
+					"power_supply_metrics:0": {Data: loadFixture(
 						t,
 						"telegraf-hpe-modern-power-supply-metrics.min.json",
-					),
+					)},
 				},
 			},
 			wantFamilies: map[string]int{

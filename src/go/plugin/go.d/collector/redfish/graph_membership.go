@@ -26,7 +26,7 @@ func graphMembershipKey(parentKey string, rel graphRelationship) string {
 	return parentKey + "\x00" + rel.Path + "\x00" + rel.ChildKind
 }
 
-func (c *protocolClient) finalizeGraphMembership(graph *resourceGraph) error {
+func (c *protocolClient) finalizeGraphMembership(graph *resourceGraph, traversalFinished bool) error {
 	if graph == nil {
 		return nil
 	}
@@ -45,18 +45,19 @@ func (c *protocolClient) finalizeGraphMembership(graph *resourceGraph) error {
 		return nil
 	}
 	// Unvisited branches retain identities only, so a failed read cannot replay measurements.
-	pending := make(map[string][]graphMembershipSnapshot)
+	pending := make(map[string][]string)
 	for key, snapshot := range c.graphMembership {
 		if !observed[key] {
-			pending[snapshot.ParentKey] = append(pending[snapshot.ParentKey], snapshot)
+			pending[snapshot.ParentKey] = append(pending[snapshot.ParentKey], key)
 		}
 	}
 	queue := append([]*graphNode(nil), graph.Nodes...)
 	for pos := 0; pos < len(queue); pos++ {
 		parent := queue[pos]
-		snapshots := pending[parent.Key]
+		keys := pending[parent.Key]
 		delete(pending, parent.Key)
-		for _, snapshot := range snapshots {
+		for _, key := range keys {
+			snapshot := c.graphMembership[key]
 			children := restoreGraphMembers(snapshot.Members)
 			for _, child := range children {
 				if err := graph.addChild(parent, child, &queue); err != nil {
@@ -64,6 +65,16 @@ func (c *protocolClient) finalizeGraphMembership(graph *resourceGraph) error {
 				}
 			}
 			graph.recordMembership(parent, snapshot.Relationship)
+		}
+	}
+	// Base discovery retains unknown roots, and incomplete relationships retain
+	// their members. After restoration, unreachable parents were therefore removed
+	// authoritatively. An aborted traversal cannot establish that proof.
+	if traversalFinished {
+		for _, keys := range pending {
+			for _, key := range keys {
+				delete(c.graphMembership, key)
+			}
 		}
 	}
 	return nil

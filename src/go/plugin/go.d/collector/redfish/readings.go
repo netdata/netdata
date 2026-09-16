@@ -39,6 +39,7 @@ type normalizedReading struct {
 }
 
 type rawReading struct {
+	SourceDocumentURI     string // Final document URI for relative DataSourceUri resolution.
 	Path                  string
 	IdentitySource        string
 	Type                  string
@@ -67,7 +68,8 @@ func (c *protocolClient) readingsForNode(node *graphNode, observedAt time.Time) 
 	for _, source := range raw {
 		reading := normalizeReading(node, source)
 		result = append(result, reading)
-		if reading.Valid && reading.Primary && reading.Family == "energy" && reading.SourceExact != "" {
+		if reading.Valid && reading.Primary && reading.Family == "energy" && reading.Basis == "zero" &&
+			reading.SourceExact != "" {
 			if derived, ok := c.derivedPowerReading(node, reading, observedAt); ok {
 				result = append(result, derived)
 			}
@@ -102,7 +104,8 @@ func (c *protocolClient) rawReadingsForNode(node *graphNode) []rawReading {
 		if source.DataSourceURI != nil {
 			rawURI = *source.DataSourceURI
 		}
-		if canonical, ok := c.canonicalReadingDataSourceURI(node, rawURI); ok {
+		baseURI := firstNonEmpty(source.SourceDocumentURI, node.URI)
+		if canonical, ok := c.canonicalReadingDataSourceURI(baseURI, rawURI); ok {
 			source.IdentitySource = canonical + "\x00" + source.Role
 			source.DataSourceURI = &canonical
 		}
@@ -160,13 +163,13 @@ func mergeProvenSensorReadings(current, excerpts []rawReading) []rawReading {
 	return current
 }
 
-func (c *protocolClient) canonicalReadingDataSourceURI(node *graphNode, raw string) (string, bool) {
+func (c *protocolClient) canonicalReadingDataSourceURI(baseURI, raw string) (string, bool) {
 	if raw == "" || c == nil || c.root == nil {
 		return "", false
 	}
 	base := c.root
-	if node != nil && node.URI != "" {
-		if target, err := c.resolveURI(c.root, node.URI, false); err == nil {
+	if baseURI != "" {
+		if target, err := c.resolveURI(c.root, baseURI, false); err == nil {
 			base = target
 		}
 	}

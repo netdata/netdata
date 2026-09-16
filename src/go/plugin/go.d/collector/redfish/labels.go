@@ -13,12 +13,12 @@ const promotedLabelLimit = 256
 func (c *protocolClient) metricLabels(node *graphNode, reading *normalizedReading) []metrix.Label {
 	labels := []metrix.Label{
 		{Key: "endpoint_key", Value: stableKey("netdata:redfish:endpoint:v1", c.origin, endpointKeyHexChars)},
+		{Key: "endpoint_job", Value: c.endpointJob},
 	}
 	addLabel := func(key, value string) {
 		labels = upsertLabel(labels, key, value)
 	}
 	addLabel("resource_key", node.Key)
-	addLabel("endpoint_job", c.endpointJob)
 	addLabel("resource_kind", node.Kind)
 	addLabel("resource_name", node.Doc.Name)
 	addLabel("source_model", node.SourceModel)

@@ -46,6 +46,7 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 	state := &redfishTestServer{}
 	var mu sync.Mutex
 	sessions := map[string]string{}
+	issuedSessions := map[string]string{}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if token := r.Header.Get("X-Auth-Token"); token != "" && cfg.expireSessionOnce != nil &&
 			cfg.expireSessionOnce.CompareAndSwap(true, false) {
@@ -98,6 +99,7 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 			mu.Lock()
 			sessionURI := fmt.Sprintf("/redfish/v1/SessionService/Sessions/%d", sessionID)
 			sessions[token] = sessionURI
+			issuedSessions[token] = sessionURI
 			state.activeSessions.Add(1)
 			mu.Unlock()
 			w.Header().Set("X-Auth-Token", token)
@@ -129,7 +131,7 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 			token := r.Header.Get("X-Auth-Token")
 			mu.Lock()
 			defer mu.Unlock()
-			if token == "" || sessions[token] != r.URL.Path {
+			if token == "" || issuedSessions[token] != r.URL.Path {
 				t.Errorf("session cleanup used the wrong token/session pair")
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
@@ -145,8 +147,10 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 			switch status {
 			case http.StatusOK, http.StatusNoContent, http.StatusUnauthorized, http.StatusNotFound, http.StatusGone:
 				// Unauthorized/gone injection models a session already expired on the BMC.
-				delete(sessions, token)
-				state.activeSessions.Add(-1)
+				if _, active := sessions[token]; active {
+					delete(sessions, token)
+					state.activeSessions.Add(-1)
+				}
 			}
 			w.WriteHeader(status)
 			return

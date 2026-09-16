@@ -113,13 +113,13 @@ func TestMemoryThroughputUsesTopLevelBlockSize(t *testing.T) {
 	client.hardwareState.initialize()
 	node := &graphNode{
 		Kind: "memory",
-		Enrichment: map[string]map[string]any{
-			"memory_metrics": {
+		Enrichment: map[string]enrichmentResource{
+			"memory_metrics": {Data: map[string]any{
 				"BlockSizeBytes": json.Number("4096"),
 				"CurrentPeriod": map[string]any{
 					"BlocksRead": json.Number("2"),
 				},
-			},
+			}},
 		},
 	}
 
@@ -128,7 +128,7 @@ func TestMemoryThroughputUsesTopLevelBlockSize(t *testing.T) {
 	require.True(t, found)
 	require.True(t, value.Valid)
 	require.False(t, value.Emit)
-	node.Enrichment["memory_metrics"]["CurrentPeriod"].(map[string]any)["BlocksRead"] = json.Number("4")
+	node.Enrichment["memory_metrics"].Data["CurrentPeriod"].(map[string]any)["BlocksRead"] = json.Number("4")
 	value, found = scalarValueByID(client.scalarValues(node, at.Add(time.Second)), "memory_current_period_blocks_read")
 	require.True(t, found)
 	require.True(t, value.Emit)
@@ -155,7 +155,9 @@ func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *tes
 		Data: map[string]any{
 			"ProcessorSummary": map[string]any{"Metrics": map[string]any{"BandwidthPercent": json.Number("42")}},
 		},
-		Enrichment: map[string]map[string]any{"processor_summary_metrics": {"BandwidthPercent": "not-a-number"}},
+		Enrichment: map[string]enrichmentResource{
+			"processor_summary_metrics": {Data: map[string]any{"BandwidthPercent": "not-a-number"}},
+		},
 	}
 
 	values := (&protocolClient{}).scalarValues(node, time.Now())
@@ -175,9 +177,9 @@ func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *tes
 
 func TestFindEnrichmentRejectsAmbiguousDocumentKind(t *testing.T) {
 	node := &graphNode{
-		Enrichment: map[string]map[string]any{
-			"memory_metrics:0": {"Reading": json.Number("1")},
-			"memory_metrics:1": {"Reading": json.Number("2")},
+		Enrichment: map[string]enrichmentResource{
+			"memory_metrics:0": {Data: map[string]any{"Reading": json.Number("1")}},
+			"memory_metrics:1": {Data: map[string]any{"Reading": json.Number("2")}},
 		},
 	}
 	require.Nil(t, findEnrichment(node, "memory_metrics"))
@@ -194,7 +196,7 @@ func TestEverySourceStateAndFlagHasRuntimeProducer(t *testing.T) {
 				Kind:       string(source.Kind),
 				Key:        source.Metric,
 				Data:       make(map[string]any),
-				Enrichment: make(map[string]map[string]any),
+				Enrichment: make(map[string]enrichmentResource),
 			}
 			document := sourceTestDocument(node, source.Document)
 			value := any(source.States[0])
@@ -220,7 +222,7 @@ func TestEverySourceStateAndFlagHasRuntimeProducer(t *testing.T) {
 				Kind:       string(set.Kind),
 				Key:        set.Metric,
 				Data:       make(map[string]any),
-				Enrichment: make(map[string]map[string]any),
+				Enrichment: make(map[string]enrichmentResource),
 			}
 			document := sourceTestDocument(node, set.Document)
 			for _, member := range set.Members {
@@ -337,7 +339,7 @@ func requireSourceDescriptorRuntimeValue(
 		Kind:       string(descriptor.Kind),
 		Key:        descriptor.ID,
 		Data:       make(map[string]any),
-		Enrichment: make(map[string]map[string]any),
+		Enrichment: make(map[string]enrichmentResource),
 	}
 	document := sourceTestDocument(node, source.Document)
 	for _, requirement := range source.Requires {
@@ -389,10 +391,12 @@ func sourceTestDocument(node *graphNode, document string) map[string]any {
 		return node.Data
 	}
 	key := string(document)
-	value := node.Enrichment[key]
+	value := node.Enrichment[key].Data
 	if value == nil {
 		value = make(map[string]any)
-		node.Enrichment[key] = value
+		node.Enrichment[key] = enrichmentResource{
+			Data: value,
+		}
 	}
 	return value
 }
@@ -848,14 +852,14 @@ func TestFlagObservationsDoNotFabricateMissingSiblingValues(t *testing.T) {
 	client := &protocolClient{}
 	node := &graphNode{
 		Kind: "memory",
-		Enrichment: map[string]map[string]any{
-			"memory_metrics:0": {
+		Enrichment: map[string]enrichmentResource{
+			"memory_metrics:0": {Data: map[string]any{
 				"HealthData": map[string]any{
 					"DataLossDetected":    true,
 					"LastShutdownSuccess": nil,
 					"PerformanceDegraded": "false",
 				},
-			},
+			}},
 		},
 	}
 

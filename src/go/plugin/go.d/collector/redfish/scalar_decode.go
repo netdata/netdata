@@ -102,14 +102,14 @@ func decodeScalarCandidate(node *graphNode, descriptor sourceField, source scala
 		document = findEnrichment(node, string(source.Document))
 	}
 	if document == nil {
-		return scalarCandidate{}, "document unavailable"
+		return scalarCandidate{}, ""
 	}
 	if !sourceRequirementsMatch(document, source.Requires) {
 		return scalarCandidate{}, ""
 	}
 	raw, present := registeredValueAt(document, source.Path)
 	if !present {
-		return scalarCandidate{}, "property absent"
+		return scalarCandidate{}, ""
 	}
 	candidate := scalarCandidate{
 		Present: true,

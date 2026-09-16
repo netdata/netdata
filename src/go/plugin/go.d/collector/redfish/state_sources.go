@@ -65,7 +65,7 @@ var additionalStateSources = []stateSource{
 	{Kind: "port", Path: "SignalDetected", Metric: "port_signal_detected", BooleanFalse: "clear", BooleanTrue: "detected", States: []string{"clear", "detected", "unknown"}},
 	{Kind: "power_supply", Path: "LineInputStatus", Metric: "power_supply_line_input_status", States: []string{"normal", "loss_of_input", "out_of_range", "unknown"}},
 	{Kind: "battery", Path: "ChargeState", Metric: "battery_charge_state", States: []string{"idle", "charging", "discharging", "unknown"}},
-	{Kind: "redundancy", Path: "Mode", Metric: "redundancy_mode", States: []string{"failover", "n_plus_m", "sharing", "sparing", "not_redundant", "unknown"}},
+	{Kind: "redundancy", Path: "RedundancyType", FallbackPath: "Mode", Metric: "redundancy_mode", States: []string{"failover", "n_plus_m", "sharing", "sparing", "not_redundant", "unknown"}},
 	{Kind: "redundancy", Path: "RedundancyEnabled", Metric: "redundancy_enabled", BooleanFalse: "disabled", BooleanTrue: "enabled", States: []string{"disabled", "enabled", "unknown"}},
 	{Kind: "leak_detector", Path: "DetectorState", Metric: "leak_detector_detector_state", States: []string{"ok", "warning", "critical", "unavailable", "absent", "unknown"}},
 	{Kind: "system", Path: "ProcessorSummary.Status.Health", Metric: "system_processor_summary_health", States: []string{"ok", "warning", "critical", "unknown"}},
@@ -139,6 +139,7 @@ type stateSource struct {
 	Kind         string
 	Document     string
 	Path         string
+	FallbackPath string
 	Metric       string
 	States       []string
 	BooleanFalse string

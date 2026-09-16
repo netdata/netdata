@@ -16,7 +16,7 @@ type graphNode struct {
 	Locator          string
 	Key              string
 	Data             map[string]any
-	Enrichment       map[string]map[string]any
+	Enrichment       map[string]enrichmentResource
 	Doc              genericResource
 	AcquisitionState string
 	IdentityQuality  string
@@ -26,6 +26,13 @@ type graphNode struct {
 	SensorExcerpts   []sensorExcerptSource
 
 	Parents map[string]*graphNode
+}
+
+// Enrichment values keep their document URI separate from the owning component.
+// Relative provenance belongs to the fetched document, not its graph parent.
+type enrichmentResource struct {
+	Data map[string]any
+	URI  string
 }
 
 type sensorExcerptSource struct {
@@ -88,7 +95,7 @@ func (c *protocolClient) collectResourceGraph(
 		if resultErr != nil {
 			graph.Complete = false
 		}
-		if err := c.finalizeGraphMembership(graph); err != nil {
+		if err := c.finalizeGraphMembership(graph, resultErr == nil); err != nil {
 			graph.Complete = false
 			resultErr = errors.Join(resultErr, err)
 		}
@@ -98,7 +105,8 @@ func (c *protocolClient) collectResourceGraph(
 	if err != nil {
 		return graph, err
 	}
-	visited := make(map[*graphNode]string)
+	type representation struct{ quality, source string }
+	visited := make(map[*graphNode]representation)
 	for pos := 0; pos < len(queue); pos++ {
 		if err := ctx.Err(); err != nil {
 			return graph, err
@@ -109,11 +117,12 @@ func (c *protocolClient) collectResourceGraph(
 			graph.Complete = false
 			continue // Restore unavailable descendants after all successful paths are walked.
 		}
-		if quality, ok := visited[parent]; ok && quality == parent.IdentityQuality {
+		current := representation{parent.IdentityQuality, parent.SourceModel}
+		if previous, ok := visited[parent]; ok && previous == current {
 			continue
 		}
 		// A later addressable representation may expose links absent from an excerpt.
-		visited[parent] = parent.IdentityQuality
+		visited[parent] = current
 		for _, rel := range relationshipsFor(parent.Kind) {
 			if !c.familyEnabled(rel.Family) {
 				continue
@@ -139,7 +148,7 @@ func (c *protocolClient) applyRelationship(
 ) error {
 	if len(acquired.enrichments) > 0 {
 		if parent.Enrichment == nil {
-			parent.Enrichment = make(map[string]map[string]any)
+			parent.Enrichment = make(map[string]enrichmentResource)
 		}
 		maps.Copy(parent.Enrichment, acquired.enrichments)
 		parent.Response = mergeResponseMetadata(parent.Response, acquired.response)
@@ -230,7 +239,7 @@ func (g *resourceGraph) add(node *graphNode) error {
 
 type acquiredRelationship struct {
 	children    []*graphNode
-	enrichments map[string]map[string]any
+	enrichments map[string]enrichmentResource
 	response    responseMetadata
 	complete    bool
 	err         error
@@ -260,11 +269,14 @@ func (c *protocolClient) acquireRelationship(
 
 	items, complete, err := c.acquireLinkedValues(ctx, rel, value, stats)
 	if rel.Mode == relationshipEnrichment {
-		result := make(map[string]map[string]any)
+		result := make(map[string]enrichmentResource)
 		var response responseMetadata
 		for i, item := range items {
 			identity := firstNonEmpty(item.Locator, item.URI, fmt.Sprintf("position:%d", i))
-			result[rel.ChildKind+":"+identity] = item.Data
+			result[rel.ChildKind+":"+identity] = enrichmentResource{
+				Data: item.Data,
+				URI:  item.URI,
+			}
 			response = mergeResponseMetadata(response, item.Response)
 		}
 		return acquiredRelationship{
@@ -304,13 +316,18 @@ func mergeEquivalentGraphNode(existing, candidate *graphNode) bool {
 	}
 	promoted := candidate.AcquisitionState == "readable" && candidate.Data != nil &&
 		(existing.AcquisitionState != "readable" || existing.Data == nil ||
-			(candidate.IdentityQuality == "addressable" && existing.IdentityQuality != "addressable"))
+			(candidate.IdentityQuality == "addressable" && existing.IdentityQuality != "addressable") ||
+			(candidate.SourceModel == "resource" && existing.SourceModel != "resource"))
 	if promoted {
 		existing.URI = candidate.URI
 		existing.Data = candidate.Data
 		existing.Doc = candidate.Doc
 		existing.AcquisitionState = candidate.AcquisitionState
-		existing.IdentityQuality = candidate.IdentityQuality
+		// Identity proof survives an excerpt supplying this cycle's data. SourceModel
+		// still selects the adapter and lets a later full resource take precedence.
+		if existing.IdentityQuality != "addressable" {
+			existing.IdentityQuality = candidate.IdentityQuality
+		}
 		existing.SourceModel = candidate.SourceModel
 		existing.SourcePath = candidate.SourcePath
 		existing.Response = candidate.Response

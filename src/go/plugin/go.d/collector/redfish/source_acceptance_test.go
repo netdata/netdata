@@ -154,7 +154,7 @@ func TestEverySourceScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
 				Kind:       string(descriptor.Kind),
 				Key:        descriptor.ID,
 				Data:       make(map[string]any),
-				Enrichment: make(map[string]map[string]any),
+				Enrichment: make(map[string]enrichmentResource),
 			}
 			if _, ok := scalarValueByID(client.scalarValues(absent, time.Unix(100, 0)), descriptor.ID); ok {
 				t.Fatal("absent source produced a scalar value")
@@ -186,7 +186,7 @@ func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T
 					Kind:       string(descriptor.Kind),
 					Key:        descriptor.ID,
 					Data:       make(map[string]any),
-					Enrichment: make(map[string]map[string]any),
+					Enrichment: make(map[string]enrichmentResource),
 				}
 				for index, source := range descriptor.Candidates {
 					document := sourceTestDocument(node, source.Document)
@@ -335,20 +335,22 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 		name       string
 		kind       string
 		data       map[string]any
-		enrichment map[string]map[string]any
+		enrichment map[string]enrichmentResource
 	}{
 		{
 			"ambiguous memory speed",
 			"memory",
 			map[string]any{"OperatingSpeedMhz": 3200},
-			map[string]map[string]any{"memory_metrics": {"OperatingSpeedMHz": 3200}},
+			map[string]enrichmentResource{"memory_metrics": {Data: map[string]any{"OperatingSpeedMHz": 3200}}},
 		},
 		{
 			"undefined processor bandwidth",
 			"processor",
 			nil,
-			map[string]map[string]any{
-				"processor_metrics": {"LocalMemoryBandwidthBytes": 1, "RemoteMemoryBandwidthBytes": 1},
+			map[string]enrichmentResource{
+				"processor_metrics": {
+					Data: map[string]any{"LocalMemoryBandwidthBytes": 1, "RemoteMemoryBandwidthBytes": 1},
+				},
 			},
 		},
 		{
@@ -376,11 +378,11 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 			"open processor cache arrays",
 			"processor",
 			nil,
-			map[string]map[string]any{
-				"processor_metrics": {
+			map[string]enrichmentResource{
+				"processor_metrics": {Data: map[string]any{
 					"Cache":             []any{map[string]any{"Level": 1}},
 					"CacheMetricsTotal": map[string]any{"HitRatio": 1},
-				},
+				}},
 			},
 		},
 		{
@@ -470,7 +472,7 @@ func scalarTestNode(descriptor sourceField, source scalarSource, value any) *gra
 		Kind:       string(descriptor.Kind),
 		Key:        descriptor.ID,
 		Data:       make(map[string]any),
-		Enrichment: make(map[string]map[string]any),
+		Enrichment: make(map[string]enrichmentResource),
 	}
 	document := sourceTestDocument(node, source.Document)
 	for _, requirement := range source.Requires {
@@ -538,9 +540,11 @@ func BenchmarkHardwareScalarValues(b *testing.B) {
 	client := &protocolClient{}
 	client.hardwareState.initialize()
 	node := &graphNode{
-		Kind:       "memory",
-		Key:        "dimm-1",
-		Enrichment: map[string]map[string]any{"memory_metrics": {"CapacityUtilizationPercent": json.Number("50")}},
+		Kind: "memory",
+		Key:  "dimm-1",
+		Enrichment: map[string]enrichmentResource{
+			"memory_metrics": {Data: map[string]any{"CapacityUtilizationPercent": json.Number("50")}},
+		},
 	}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

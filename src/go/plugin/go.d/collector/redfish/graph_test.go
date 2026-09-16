@@ -53,10 +53,9 @@ func TestDuplicateEmbeddedIDsMakeEveryMemberPositional(t *testing.T) {
 	})
 	require.True(t, complete)
 	require.Len(t, nodes, 2)
-	for _, node := range nodes {
+	for index, node := range nodes {
 		assert.Equal(t, "positional", node.IdentityQuality)
-
-		assert.Contains(t, node.Locator, "position:")
+		assert.Equal(t, embeddedLocator(parent.URI, "Fans", "", index), node.Locator)
 	}
 	assert.NotEqual(t, nodes[0].Locator, nodes[1].Locator)
 }
@@ -182,7 +181,7 @@ func TestEmbeddedSingletonLocatorDoesNotDependOnOptionalID(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, first.Locator, second.Locator)
-	assert.Contains(t, first.Locator, ":singleton")
+	assert.Equal(t, embeddedLocator(parent.URI, "Sensor", "", -1), first.Locator)
 }
 
 func TestNestedEmbeddedIdentityUsesImmediateContainerAndResourceProvenance(t *testing.T) {
@@ -304,7 +303,7 @@ func TestPartialGraphRestoresUnvisitedMembershipRecursively(t *testing.T) {
 		Members:      snapshotGraphMembers([]*graphNode{sensor}),
 	}
 
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	restoredProcessor := graph.findKey(processor.Key)
 	restoredSensor := graph.findKey(sensor.Key)
 	require.NotNil(t, restoredProcessor)
@@ -347,7 +346,7 @@ func TestPartialGraphRestoresReverseOrderedRetainedChainInOneWorklistPass(t *tes
 		parentKey = child.Key
 	}
 
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	require.Len(t, graph.Nodes, depth+1)
 	require.NotNil(t, graph.findKey(parentKey))
 }
@@ -382,7 +381,7 @@ func TestPartialGraphRetainedCycleWithoutRootTerminatesWithoutRestoration(t *tes
 		Members:      snapshotGraphMembers([]*graphNode{second}),
 	}
 
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	require.Len(t, graph.Nodes, 1)
 	require.Empty(t, graph.Slices)
 }
@@ -403,7 +402,7 @@ func TestCompleteGraphPrunesUnseenRetainedMembership(t *testing.T) {
 	graph := &resourceGraph{
 		Complete: true,
 	}
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	assert.Empty(t, client.graphMembership)
 }
 
@@ -580,4 +579,29 @@ func (g *resourceGraph) findKey(key string) *graphNode {
 		}
 	}
 	return nil
+}
+
+func TestEmbeddedLocatorSeparatesModesAndTupleBoundaries(t *testing.T) {
+	type location struct {
+		container, path, id string
+		index               int
+	}
+	for _, test := range []struct {
+		name        string
+		left, right location
+	}{
+		{"id versus position", location{"/redfish/v1/C", "Members", "position:0", 1}, location{"/redfish/v1/C", "Members", "", 0}},
+		{"id versus singleton", location{"/redfish/v1/C", "Members", "singleton", 0}, location{"/redfish/v1/C", "Members", "", -1}},
+		{"container boundary", location{"/redfish/v1/C:Members", "Members", "one", 0}, location{"/redfish/v1/C", "Members", "Members:one", 0}},
+		{"path boundary", location{"/redfish/v1/C", "Members:Sub", "one", 0}, location{"/redfish/v1/C", "Members", "Sub:one", 0}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			left, right := test.left, test.right
+			assert.NotEqual(
+				t,
+				embeddedLocator(left.container, left.path, left.id, left.index),
+				embeddedLocator(right.container, right.path, right.id, right.index),
+			)
+		})
+	}
 }

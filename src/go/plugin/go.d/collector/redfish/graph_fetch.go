@@ -84,9 +84,10 @@ func cloneGraphNode(source *graphNode) *graphNode {
 	}
 	node := *source
 	node.Doc.Status.Conditions = append([]genericCondition(nil), source.Doc.Status.Conditions...)
-	node.Enrichment = make(map[string]map[string]any, len(source.Enrichment))
+	node.Enrichment = make(map[string]enrichmentResource, len(source.Enrichment))
 	for key, value := range source.Enrichment {
-		node.Enrichment[key] = cloneJSONMap(value)
+		value.Data = cloneJSONMap(value.Data)
+		node.Enrichment[key] = value
 	}
 	node.Parents = make(map[string]*graphNode)
 	node.SensorExcerpts = cloneSensorExcerptSources(source.SensorExcerpts)

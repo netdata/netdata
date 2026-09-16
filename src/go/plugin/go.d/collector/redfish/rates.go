@@ -51,6 +51,11 @@ func (c *protocolClient) rateValue(
 	}
 	c.rateMu.Lock()
 	previous, exists := c.rateBaselines[key]
+	if exists && !at.After(previous.At) {
+		// A rejected observation cannot replace the last usable counter sample.
+		c.rateMu.Unlock()
+		return 0, false
+	}
 	c.rateBaselines[key] = rateBaseline{
 		Value:      new(big.Rat).Set(current),
 		At:         at,
@@ -59,7 +64,7 @@ func (c *protocolClient) rateValue(
 	}
 	c.rateMu.Unlock()
 	if !exists || previous.Epoch != epoch || previous.Multiplier != multiplier ||
-		!at.After(previous.At) || current.Cmp(previous.Value) < 0 {
+		current.Cmp(previous.Value) < 0 {
 		return 0, false
 	}
 	elapsed := at.Sub(previous.At).Seconds()

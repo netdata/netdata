@@ -225,8 +225,8 @@ func TestProtocolClientResponseGuards(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]http.HandlerFunc{
-		"wrong content type": func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "text/plain")
+		"invalid service root": func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{}`))
 		},
 		"trailing json": func(w http.ResponseWriter, _ *http.Request) {
@@ -272,4 +272,23 @@ func TestClassifiedErrorsDoNotDependOnMessageText(t *testing.T) {
 	} {
 		assert.Equal(t, test.class, classifyError(test.err))
 	}
+}
+
+func TestProtocolClientCheckAcceptsJSONWithIncompatibleContentType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("OData-Version", "4.0")
+		writeJSONBody(
+			w,
+			sourceTestResource("/redfish/v1/", "ServiceRoot", "Service", map[string]any{"RedfishVersion": "1.20.0"}),
+		)
+	}))
+	t.Cleanup(server.Close)
+	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
+	require.NoError(t, client.Check(t.Context()))
+	require.Equal(
+		t,
+		[]string{"Redfish compatibility: response Content-Type header is invalid"},
+		client.takeCompatibilityDiagnostics(),
+	)
 }

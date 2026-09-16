@@ -176,6 +176,9 @@ func (c *protocolClient) additionalStateObservations(
 			document = findEnrichment(node, source.Document)
 		}
 		raw, ok := jsonPath(document, source.Path)
+		if (!ok || raw == nil) && source.FallbackPath != "" {
+			raw, ok = jsonPath(document, source.FallbackPath)
+		}
 		if !ok || raw == nil {
 			continue
 		}
@@ -190,6 +193,13 @@ func (c *protocolClient) additionalStateObservations(
 				state = source.BooleanFalse
 			}
 		} else if value, ok := raw.(string); ok {
+			if source.Metric == "redundancy_mode" {
+				// Redundancy.v1 defines these spellings for legacy Mode and modern RedundancyType.
+				switch strings.TrimSpace(value) {
+				case "N+m", "NPlusM":
+					value = "n_plus_m"
+				}
+			}
 			state = normalizedEnum(value, source.States)
 		} else {
 			state = "unknown"
@@ -248,8 +258,16 @@ func conditionCountsForNode(node *graphNode) (conditionCounts, bool, bool) {
 	if !present || raw == nil {
 		return conditionCounts{}, false, false
 	}
-	if _, ok := raw.([]any); !ok {
+	conditions, ok := raw.([]any)
+	if !ok {
 		return conditionCounts{}, true, false
+	}
+	for _, condition := range conditions {
+		// Partial envelope decoding leaves zero-valued records for malformed members.
+		// Those are unreadable conditions, not evidence of a healthy empty list.
+		if _, ok := condition.(map[string]any); !ok {
+			return conditionCounts{}, true, false
+		}
 	}
 	return conditionCountsFrom(node.Doc.Status.Conditions), true, true
 }

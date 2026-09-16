@@ -5,6 +5,7 @@ package redfish
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -132,6 +133,11 @@ func (c *protocolClient) embeddedNode(
 		Parents:          map[string]*graphNode{parent.Key: parent},
 	}
 	node.Key = resourceKey(c.origin, node.Kind, locator)
+	if quality == "data_source_uri" {
+		// Reading adapters also consume provenance. Resolve it once against the
+		// containing document before the node is attached to its ownership parent.
+		node.Data["DataSourceUri"] = locator
+	}
 	return node, provenanceErr
 }
 
@@ -177,12 +183,12 @@ func containingResourceURI(node *graphNode) string {
 
 func embeddedLocator(container, path, id string, index int) string {
 	if id != "" {
-		return fmt.Sprintf("embedded:%s:%s:%s", container, path, id)
+		return "embedded:" + structuralTuple(container, path, "id", id)
 	}
 	if index >= 0 {
-		return fmt.Sprintf("embedded:%s:%s:position:%d", container, path, index)
+		return "embedded:" + structuralTuple(container, path, "position", strconv.Itoa(index))
 	}
-	return fmt.Sprintf("embedded:%s:%s:singleton", container, path)
+	return "embedded:" + structuralTuple(container, path, "singleton")
 }
 
 func (c *protocolClient) legacyComponents(
@@ -278,7 +284,7 @@ func (c *protocolClient) addEmbeddedEnrichmentComponents(
 	graph *resourceGraph,
 	parent *graphNode,
 	rel graphRelationship,
-	enrichments map[string]map[string]any,
+	enrichments map[string]enrichmentResource,
 	complete bool,
 	queue *[]*graphNode,
 ) error {
@@ -297,9 +303,9 @@ func (c *protocolClient) addEmbeddedEnrichmentComponents(
 		current := make([]*graphNode, 0)
 		sliceComplete := complete
 		for _, key := range enrichmentKeys {
-			data := enrichments[key]
-			identityParent := embeddedEnrichmentParent(parent, key)
-			nodes, ok := c.embeddedArrayNodes(identityParent, path, kind, data)
+			item := enrichments[key]
+			identityParent := embeddedEnrichmentParent(parent, key, item.URI)
+			nodes, ok := c.embeddedArrayNodes(identityParent, path, kind, item.Data)
 			current = append(current, nodes...)
 			sliceComplete = sliceComplete && ok
 		}
@@ -322,12 +328,13 @@ func (c *protocolClient) addEmbeddedEnrichmentComponents(
 		current := make([]*graphNode, 0)
 		sliceComplete := complete
 		for _, key := range enrichmentKeys {
-			identityParent := embeddedEnrichmentParent(parent, key)
+			item := enrichments[key]
+			identityParent := embeddedEnrichmentParent(parent, key, item.URI)
 			nodes, ok, err := c.sensorExcerptArrayNodes(
 				identityParent,
 				rel.Path+"."+spec.Path,
 				spec,
-				enrichments[key],
+				item.Data,
 			)
 			current = append(current, nodes...)
 			sliceComplete = sliceComplete && ok
@@ -352,9 +359,13 @@ func (c *protocolClient) addEmbeddedEnrichmentComponents(
 	return nil
 }
 
-func embeddedEnrichmentParent(parent *graphNode, source string) *graphNode {
+func embeddedEnrichmentParent(parent *graphNode, source, uri string) *graphNode {
 	copy := *parent
 	copy.Locator = embeddedLocator(embeddedIdentityContainer(parent), "enrichment", source, -1)
+	if uri != "" {
+		copy.URI = uri
+		copy.IdentityQuality = "addressable"
+	}
 	return &copy
 }
 

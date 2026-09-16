@@ -141,6 +141,7 @@ func electricalAuxiliaryReadings(
 		{"LoadPercent", "Percent", "%", "percentage", "load_percent", true},
 	}
 	var result []rawReading
+	dataSourceURI := readingSourceURI(data, "DataSourceUri")
 	for _, spec := range specs {
 		if spec.StandaloneOnly && !standalone {
 			continue
@@ -161,6 +162,7 @@ func electricalAuxiliaryReadings(
 			PhysicalSubcontext: subcontext,
 			ImplementationType: implementation,
 			FixedFamily:        spec.Family,
+			DataSourceURI:      dataSourceURI,
 		})
 	}
 	return result

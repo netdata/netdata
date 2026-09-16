@@ -138,21 +138,24 @@ func TestProtocolClientDoesNotCreateAnotherSessionUntilPendingCleanupSucceeds(t 
 
 func TestProtocolClientRetriesSessionCreationAfterPendingSessionIsAlreadyGone(t *testing.T) {
 	t.Parallel()
-
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		supportSession:              true,
-		malformedSessionBody:        true,
-		sessionDeleteStatusSequence: []int{http.StatusInternalServerError, http.StatusNotFound, http.StatusNoContent},
-	})
-	defer server.Close()
-
-	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
-	require.Error(t, client.initializeAuthentication(context.Background(), nil))
-	err := client.initializeAuthentication(context.Background(), nil)
-	require.Error(t, err)
-	require.NotContains(t, err.Error(), "retire unactivated Redfish session")
-	assert.Equal(t, int64(2), server.sessionCreates.Load())
-	assert.Equal(t, int64(3), server.sessionDeletes.Load())
+	for name, firstStatus := range map[string]int{"cleanup failed": http.StatusInternalServerError, "session expired": http.StatusUnauthorized} {
+		t.Run(name, func(t *testing.T) {
+			server := newRedfishTestServer(t, redfishTestServerConfig{
+				supportSession:              true,
+				malformedSessionBody:        true,
+				sessionDeleteStatusSequence: []int{firstStatus, http.StatusNotFound, http.StatusNoContent},
+			})
+			t.Cleanup(server.Close)
+			client := newTestProtocolClient(t, testConfig(server.URL, "session"))
+			require.Error(t, client.initializeAuthentication(t.Context(), nil))
+			err := client.initializeAuthentication(t.Context(), nil)
+			require.Error(t, err)
+			require.NotContains(t, err.Error(), "retire unactivated Redfish session")
+			assert.Equal(t, int64(2), server.sessionCreates.Load())
+			assert.Equal(t, int64(3), server.sessionDeletes.Load())
+			assert.Zero(t, server.activeSessions.Load())
+		})
+	}
 }
 
 func TestProtocolClientTriesEveryAdvertisedSessionPath(t *testing.T) {

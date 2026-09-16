@@ -14,7 +14,7 @@ type excerptReadingSource struct {
 }
 
 func excerptReadings(node *graphNode) []rawReading {
-	result := excerptDocumentReadings(nil, node.Kind, node.Data, []excerptReadingSource{
+	result := excerptDocumentReadings(nil, node.Kind, node.Data, "", []excerptReadingSource{
 		{"SpeedPercent", "Percent", "%", "speed", nil},
 		{"SecondarySpeedPercent", "Percent", "%", "speed", nil},
 		{"PowerWatts", "Power", "W", "power", nil},
@@ -36,7 +36,7 @@ func excerptReadings(node *graphNode) []rawReading {
 		{"Voltage", "Voltage", "V", "voltage", nil},
 		{"ReadingRPM", "Rotational", "{rev}/min", "speed", nil},
 	})
-	for kind, document := range node.Enrichment {
+	for kind, resource := range node.Enrichment {
 		var sources []excerptReadingSource
 		switch {
 		case strings.HasPrefix(kind, "processor_metrics"):
@@ -139,7 +139,7 @@ func excerptReadings(node *graphNode) []rawReading {
 				{"PowerWatts", "Power", "W", "power", nil},
 			}
 		}
-		result = excerptDocumentReadings(result, node.Kind, document, sources)
+		result = excerptDocumentReadings(result, node.Kind, resource.Data, resource.URI, sources)
 	}
 	return result
 }
@@ -148,6 +148,7 @@ func excerptDocumentReadings(
 	result []rawReading,
 	kind string,
 	document map[string]any,
+	sourceDocumentURI string,
 	sources []excerptReadingSource,
 ) []rawReading {
 	physical, _ := stringValueAt(document, "PhysicalContext")
@@ -158,7 +159,7 @@ func excerptDocumentReadings(
 		}
 		path := kind + "." + source.Path
 		if source.Keys == nil {
-			result = excerptValueReadings(result, raw, path, source, physical)
+			result = excerptValueReadings(result, raw, path, sourceDocumentURI, source, physical)
 			continue
 		}
 		object, ok := raw.(map[string]any)
@@ -168,7 +169,7 @@ func excerptDocumentReadings(
 		for _, key := range source.Keys {
 			// Fixed-map scalars carry no parent physical context.
 			if raw := object[key]; raw != nil {
-				result = excerptValueReadings(result, raw, path+"."+key, source, "")
+				result = excerptValueReadings(result, raw, path+"."+key, sourceDocumentURI, source, "")
 			}
 		}
 	}
@@ -178,7 +179,7 @@ func excerptDocumentReadings(
 func excerptValueReadings(
 	result []rawReading,
 	raw any,
-	path string,
+	path, sourceDocumentURI string,
 	source excerptReadingSource,
 	physical string,
 ) []rawReading {
@@ -208,6 +209,7 @@ func excerptValueReadings(
 	})
 	for index := range readings {
 		reading := &readings[index]
+		reading.SourceDocumentURI = sourceDocumentURI
 		if reading.Role == "input" {
 			reading.Role = source.Role
 			if source.Role == "stored_energy" {

@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
-func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) {
+func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, err error) {
 	started := time.Now()
 	stats := &wireStats{
 		failures: make(map[string]int),
 	}
-	result := collectionResult{
+	result = collectionResult{
 		ObservedAt: time.Now().UTC(),
 		Metrics: cycleMetrics{
 			Failures:     make(map[string]int),
@@ -24,8 +24,14 @@ func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) 
 		},
 	}
 	result.Diagnostics = append(result.Diagnostics, c.takeCompatibilityDiagnostics()...)
+	defer func() {
+		result.Diagnostics = appendUniqueDiagnostics(result.Diagnostics, responseCompatibilityDiagnostics(stats)...)
+		if diagnostic := c.takeExpansionFallbackDiagnostic(); diagnostic != "" {
+			result.Diagnostics = appendUniqueDiagnostics(result.Diagnostics, diagnostic)
+		}
+	}()
 
-	err := c.initializeAuthentication(ctx, stats)
+	err = c.initializeAuthentication(ctx, stats)
 	var root *serviceRootDocument
 	if err == nil {
 		root, err = c.fetchServiceRoot(ctx, true, stats)
@@ -51,9 +57,6 @@ func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) 
 	collectionErr = errors.Join(collectionErr, hardwareErr)
 	result.Complete = result.Complete && hardwareErr == nil
 	result.Diagnostics = append(result.Diagnostics, graph.finalDiagnostics()...)
-	if diagnostic := c.takeExpansionFallbackDiagnostic(); diagnostic != "" {
-		result.Diagnostics = append(result.Diagnostics, diagnostic)
-	}
 	if hardwareErr != nil {
 		result.Diagnostics = append(result.Diagnostics, boundedDiagnostic(
 			"Redfish metric surface: "+hardwareErr.Error(),
@@ -96,10 +99,6 @@ func (c *protocolClient) finishCollectionResult(
 	}
 	result.Metrics.Duration = time.Since(started).Seconds()
 	c.copyWireStats(&result.Metrics, stats)
-	result.Diagnostics = appendUniqueDiagnostics(
-		result.Diagnostics,
-		responseCompatibilityDiagnostics(stats)...,
-	)
 }
 
 func (c *protocolClient) copyWireStats(metrics *cycleMetrics, stats *wireStats) {
