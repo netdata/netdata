@@ -27,9 +27,12 @@ const maxLoggedDiagnostics = 256
 func init() {
 	collectorapi.Register("redfish", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults:        collectorapi.Defaults{UpdateEvery: defaultUpdateEvery, AutoDetectionRetry: 0},
-		CreateV2:        func() collectorapi.CollectorV2 { return New() },
-		Config:          func() any { return &Config{} },
+		Defaults: collectorapi.Defaults{
+			UpdateEvery:        defaultUpdateEvery,
+			AutoDetectionRetry: 0,
+		},
+		CreateV2: func() collectorapi.CollectorV2 { return New() },
+		Config:   func() any { return &Config{} },
 	})
 }
 
@@ -186,7 +189,9 @@ func (c *Collector) warnCollectionDiagnostics(diagnostics []string) {
 		if len(c.warnedDiagnostics) >= maxLoggedDiagnostics {
 			if !c.diagnosticOverflow {
 				c.diagnosticOverflow = true
-				c.Warningf("Redfish collection diagnostics exceeded the fixed logging bound; additional distinct diagnostics are suppressed")
+				c.Warningf(
+					"Redfish collection diagnostics exceeded the fixed logging bound; additional distinct diagnostics are suppressed",
+				)
 			}
 			continue
 		}

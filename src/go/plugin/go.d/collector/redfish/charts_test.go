@@ -79,7 +79,8 @@ func TestSourceHealthChartsAndRules(t *testing.T) {
 		require.False(t, strings.HasPrefix(context, "redfish.aggregate."), context)
 		require.False(t, strings.HasPrefix(context, "redfish.collection.detail_"), context)
 		require.NotEqual(t, "redfish.collection.selected_system", context)
-		if context != "redfish.reading.alarm" && !(strings.HasPrefix(context, "system.hw.sensor.") && strings.HasSuffix(context, ".alarm")) {
+		if context != "redfish.reading.alarm" &&
+			!(strings.HasPrefix(context, "system.hw.sensor.") && strings.HasSuffix(context, ".alarm")) {
 			continue
 		}
 		alarms++
