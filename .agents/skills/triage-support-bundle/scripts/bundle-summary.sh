@@ -87,7 +87,11 @@ if [ -n "$INCIDENT" ]; then
           || gdate -u -d "$1" +%s 2>/dev/null \
           || python3 -c 'import sys,datetime as d;t=sys.argv[1].replace("Z","+00:00");print(int(d.datetime.fromisoformat(t).timestamp()))' "$1" 2>/dev/null
     }
-    gi="$(to_epoch "$INCIDENT")"; gg="$(to_epoch "$GEN")"
+    # errexit would abort on the failing substitution and swallow the warning
+    # this branch exists to print.
+    gi=""; gg=""
+    gi="$(to_epoch "$INCIDENT" || true)"
+    gg="$(to_epoch "$GEN" || true)"
     if [ -n "$gi" ] && [ -n "$gg" ]; then
         delta=$(( gg - gi ))
         # Compare seconds, not truncated hours: an incident up to 59 minutes
@@ -141,6 +145,17 @@ check "08-network/netdata-sockets.txt"   "no socket inventory"
 
 hdr "Truncated, withheld, skipped"
 found=0
+# A capped file copy carries no in-body marker at all: the only signal is the
+# manifest origin. Report those first, or the section claims a clean bundle
+# while on-disk logs are silently incomplete.
+while IFS=$'\t' read -r p origin; do
+    [ -n "$p" ] || continue
+    printf '  %s%s%s\n      manifest origin: %s\n' "$SB_YELLOW" "$p" "$SB_NC" "$origin"
+    found=1
+done < <(jq -r '.files[]
+           | select(.kind == "file")
+           | select(.origin | test("line-aligned|symlink, withheld|reparse point - withheld"))
+           | "\(.path)\t\(.origin)"' "$M")
 while IFS= read -r p; do
     [ -n "$p" ] || continue
     f="${B}/${p}"

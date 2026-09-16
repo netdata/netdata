@@ -32,7 +32,7 @@ Resolve every absence through this list before concluding anything:
 | Cause | How you recognize it |
 |---|---|
 | Wrong platform | The row is marked POSIX-only or Windows-only below; check `tool_version` |
-| The agent's API was down | Everything in the runtime area is gone and a "was down" marker replaces it |
+| The agent's API was down | The API-backed runtime captures are gone and a "was down" marker replaces them. The binary-derived ones - build information and the build cache - are still there, because they run the binary rather than the API |
 | The producer no longer exists | The source was removed upstream; the map below flags these |
 | Global deadline | The body reads `SKIPPED: global deadline reached`, and the manifest `origin` is `skipped` |
 | Per-command timeout | Windows replaces the body with a timeout line. POSIX only shows a non-zero `# exit:` trailer, which is the wrapped command's own status - an ordinary command failure looks identical, so a non-zero trailer is not by itself evidence of a timeout |
@@ -122,7 +122,8 @@ compared against a parent's. Every other secret in it is still redacted.
 POSIX: the systemd journal for the unit, **and separately the netdata journal namespace** - on
 systemd installs the agent logs to its own namespace, so the unit journal alone shows almost nothing.
 Then the on-disk log files, the access log on a smaller cap, the updater journal, and coredump
-metadata. All journal captures are bounded by the run's log window and then tailed.
+metadata. Most journal captures are bounded by the run's log window and then tailed. The updater journal is
+the exception - it is tail-capped only, so it can carry events from outside the window.
 
 In a container the log files are symlinks to standard output, so no history exists on disk; the
 bundle writes a marker naming the command that retrieves it from the host instead. A marker is not
@@ -222,7 +223,8 @@ Tools are feature-detected and a missing one is reported rather than skipped - t
 tool is not installed by default on Debian and Ubuntu, so its absence is common and not a finding.
 
 Windows: access control lists with inheritance state, protected-ACL detection, integrity labels, and
-alternate data streams. A download-marker stream means a file was blocked on arrival; a protected
+alternate data streams. A download-marker stream records that the file arrived from another machine -
+provenance, not proof that Windows blocked it; a protected
 list means inheritance was disabled, a common post-restore breakage.
 
 Owner for what these privileges are supposed to be:

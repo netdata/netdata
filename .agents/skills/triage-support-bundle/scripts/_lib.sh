@@ -144,9 +144,19 @@ sb_resolve_bundle() {
     SB_BUNDLE_TMP=""
 
     [ -e "$input" ] || sb_die "no such bundle: ${input}"
+    # A FIFO or device passes -e and then blocks tar/unzip forever.
+    [ -d "$input" ] || [ -f "$input" ] \
+        || sb_die "not a regular file or directory: ${input}"
+    [ -d "$input" ] || [ -s "$input" ] || sb_die "empty bundle file: ${input}"
+    [ -r "$input" ] || sb_die "not readable: ${input}"
 
     if [ -d "$input" ]; then
-        if [ -f "${input}/MANIFEST.json" ]; then
+        # A symlinked manifest or artifact would send every later read outside
+        # the bundle. A real bundle contains no links, so refuse rather than follow.
+        if [ -n "$(find "$input" -maxdepth 3 -type l -print -quit 2>/dev/null)" ]; then
+            sb_die "bundle directory contains symlinks; refusing to follow them: ${input}"
+        fi
+        if [ -f "${input}/MANIFEST.json" ] && [ ! -h "${input}/MANIFEST.json" ]; then
             # shellcheck disable=SC2034
             SB_BUNDLE_DIR="$input"
         else
@@ -186,7 +196,9 @@ sb_resolve_bundle() {
         *)              _sb_resolve_fail "unrecognized bundle format: ${input}" ;;
     esac
 
-    root="$(find "$tmp" -maxdepth 3 -name MANIFEST.json -print -quit)"
+    # tar archives can carry links too; the zip path already sweeps them.
+    find "$tmp" -type l -exec rm -f {} + 2>/dev/null || true
+    root="$(find "$tmp" -maxdepth 3 -type f -name MANIFEST.json -print -quit)"
     [ -n "$root" ] || _sb_resolve_fail "no MANIFEST.json inside ${input}"
     # shellcheck disable=SC2034
     SB_BUNDLE_DIR="$(dirname "$root")"

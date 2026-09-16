@@ -5,7 +5,8 @@ description: Investigate a Netdata support bundle offline - the archive `netdata
 
 # Support bundle triage
 
-A support bundle is one host, one moment, sanitized. This skill turns a reported symptom into a
+A support bundle is one host, one collection run, sanitized. Collection is not atomic: files carry
+independent timestamps and can rotate while it runs, so artifacts are not a simultaneous snapshot. This skill turns a reported symptom into a
 supported conclusion about that host, or into a statement that the bundle cannot settle it. The
 bundle's own contents and rationale are owned by its two documents; what follows is the routing, the
 absence semantics, and the traps.
@@ -67,7 +68,7 @@ and never mentions alerts. Read it, then use this table.
 | Symptom | Start with | Guide |
 |---|---|---|
 | Alert did not fire, fires always, flaps, or notification never arrived | silencers, then the alert's own config and the health transition records | `./alerts.md` |
-| A chart, collector or job shows nothing | the dyncfg job states, then the collector log, then plugin capabilities | `./no-data.md` |
+| A chart, collector or job shows nothing | the dyncfg job states where the bundle carries them, then the collector log, then plugin capabilities | `./no-data.md` |
 | A specific collector fails, or service discovery finds nothing | the job's own state and its config, then the collector log | `./no-data.md` |
 | Agent will not start, died, restarted, or was killed | the daemon status file, then the kernel messages, then the logs | `./lifecycle.md` |
 | High CPU, memory, file descriptors, or disk I/O | per-thread CPU and the self-monitoring captures | `./lifecycle.md` |
