@@ -1147,14 +1147,20 @@ if ($ApiOk) {
     Save-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
     Save-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Save-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
-    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (running/failed/disabled/orphan/incomplete), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
+    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
     # /api/v3/info answers without any access check, so $ApiOk can be true while
     # this endpoint - behind the dyncfg ACL - refuses us, and Save-Api deletes the
     # file on failure leaving no trace at all. The bundle cannot authenticate:
     # bearer token FILENAMES are themselves live tokens and are never collected.
     $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
     if (-not (Test-Path $dyncfgPath)) {
-        $marker = '{"error":"dyncfg tree was not collected","hint":"the agent answered /api/v3/info but refused /api/v3/config; this is expected when the API is bearer-protected or the dyncfg ACL denies local reads. The bundle never collects bearer tokens, so it cannot authenticate. Ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
+        # Every Save-Api in this block returns early once the deadline is past,
+        # so 07-runtime may not exist yet and WriteAllText would throw.
+        $dyncfgDir = Split-Path $dyncfgPath -Parent
+        if (-not (Test-Path $dyncfgDir)) { New-Item -ItemType Directory -Path $dyncfgDir -Force | Out-Null }
+        # State what was observed, not a cause: a refusal, a timeout, a transport
+        # error and a deadline all reach this point identically.
+        $marker = '{"error":"dyncfg tree was not collected","hint":"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error, HTTP failure or an exceeded collection deadline is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
         Write-Utf8 $dyncfgPath $marker
         Add-Manifest '07-runtime\dyncfg-tree.json' 'file' 'generated' 'Collector job state was unavailable (see hint in the file)'
     }
