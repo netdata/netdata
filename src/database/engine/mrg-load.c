@@ -8,11 +8,11 @@ size_t acquired_metrics_counter = 0;
 size_t acquired_metrics_deleted = 0;
 
 ALWAYS_INLINE
-static void mrg_metric_prepopulate(void *mrg_ptr, Word_t section, nd_uuid_t *uuid) {
+static void mrg_metric_prepopulate(void *mrg_ptr, struct rrdengine_instance *ctx, nd_uuid_t *uuid) {
     MRG *mrg = mrg_ptr;
     MRG_ENTRY entry = {
         .uuid = uuid,
-        .section = section,
+        .section = (Word_t)ctx,    // the registry sections are the engine instances
         .first_time_s = 0,
         .last_time_s = 0,
         .latest_update_every_s = 0,

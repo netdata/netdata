@@ -5,8 +5,11 @@
 
 #include "libnetdata/libnetdata.h"
 
-// Receives one metric the embedder already knows; passed to preload_metrics() by the engine.
-typedef void (*dbengine_preload_add_fn)(void *mrg, Word_t section, nd_uuid_t *uuid);
+struct rrdengine_instance;
+
+// Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
+// the engine.
+typedef void (*dbengine_preload_add_fn)(void *mrg, struct rrdengine_instance *ctx, nd_uuid_t *uuid);
 
 // The storage engine's process-wide configuration.
 //
@@ -116,5 +119,10 @@ struct rrdeng_tier_config {
 // a second call with an equal configuration is a no-op, with a different one it is fatal.
 void dbengine_init(const struct dbengine_config *cfg);
 bool dbengine_initialized(void);
+
+// Release the references preload_metrics() left on the registry, once every tier has come up (after the last
+// rrdeng_readiness_wait()): until then they keep preloaded metrics from being evicted before their journals are
+// read. A no-op when there is no registry.
+void dbengine_preload_release(void);
 
 #endif // NETDATA_DBENGINE_CONFIG_H

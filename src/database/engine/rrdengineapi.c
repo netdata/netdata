@@ -1205,6 +1205,11 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
     return UV_EIO;
 }
 
+void dbengine_preload_release(void) {
+    if(main_mrg)
+        mrg_metric_prepopulate_cleanup(main_mrg);
+}
+
 bool rrdeng_get_cache_statistics(RRDENG_CACHE which, struct pgc_statistics *out) {
     PGC *cache = NULL;
     switch(which) {
