@@ -35,23 +35,10 @@ func cHelperPath(t testing.TB) string {
 	return path
 }
 
-func cReader(t testing.TB, path string) *Reader {
-	t.Helper()
-	r := newReader(func() *exec.Cmd { return exec.Command(path, "--file-reader") })
-	t.Cleanup(func() {
-		require.NoError(t, r.Close())
-		r.mu.Lock()
-		s := r.session
-		r.mu.Unlock()
-		if s != nil {
-			select {
-			case <-s.done:
-			case <-time.After(5 * time.Second):
-				t.Error("synthetic C helper did not exit after Close")
-			}
-		}
-	})
-	return r
+func cCommand(path string) commandFunc {
+	return func(args ...string) *exec.Cmd {
+		return exec.Command(path, append([]string{"--file-reader"}, args...)...)
+	}
 }
 
 func cFixtureDir(t testing.TB) string {
@@ -74,69 +61,66 @@ func cWrite(t testing.TB, path string, data []byte, mode os.FileMode) {
 func TestCReaderInteroperability(t *testing.T) {
 	helper := cHelperPath(t)
 	dir := cFixtureDir(t)
-	r := cReader(t, helper)
+	command := cCommand(helper)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	p := filepath.Join(dir, "credential")
+	p := filepath.Join(dir, "-credential with spaces")
 	first := []byte("synthetic-initial-value")
 	cWrite(t, p, first, 0644)
-	got, err := r.Read(ctx, p)
+	got, err := read(ctx, p, true, command)
 	require.NoError(t, err)
 	require.Equal(t, first, got)
-	initial := r.session
 	// Rotation replaces the inode, as projected secrets and atomic writers do.
 	replacement := filepath.Join(dir, "replacement")
 	rotated := []byte("synthetic-rotated-value")
 	cWrite(t, replacement, rotated, 0644)
 	require.NoError(t, os.Rename(replacement, p))
-	got, err = r.Read(ctx, p)
+	got, err = read(ctx, p, true, command)
 	require.NoError(t, err)
 	require.Equal(t, rotated, got)
-	require.Same(t, initial, r.session)
 	link := filepath.Join(dir, "link")
 	require.NoError(t, os.Symlink(p, link))
-	got, err = r.Read(ctx, link)
+	got, err = read(ctx, link, true, command)
 	require.NoError(t, err)
 	require.Equal(t, rotated, got)
 	info, err := os.Stat(p)
 	require.NoError(t, err)
-	mod, err := r.Stat(ctx, link)
+	mod, err := stat(ctx, link, command)
 	require.NoError(t, err)
 	require.True(t, info.ModTime().Equal(mod))
-	_, err = r.Read(ctx, filepath.Join(dir, "missing"))
+	_, err = read(ctx, filepath.Join(dir, "missing"), true, command)
 	require.ErrorIs(t, err, os.ErrNotExist)
-	_, err = r.Stat(ctx, filepath.Join(dir, "missing"))
+	_, err = stat(ctx, filepath.Join(dir, "missing"), command)
 	require.ErrorIs(t, err, os.ErrNotExist)
-	_, err = r.Read(ctx, "")
+	_, err = read(ctx, "", true, command)
 	require.ErrorIs(t, err, os.ErrNotExist)
-	_, err = r.Read(ctx, dir)
+	_, err = read(ctx, dir, true, command)
 	require.ErrorIs(t, err, safefile.ErrNotRegular)
 	fifo := filepath.Join(dir, "fifo")
 	require.NoError(t, syscall.Mkfifo(fifo, 0644))
-	_, err = r.Read(ctx, fifo)
+	_, err = read(ctx, fifo, true, command)
 	require.ErrorIs(t, err, safefile.ErrNotRegular)
 	large := bytes.Repeat([]byte("x"), int(safefile.MaxSize)+1)
 	cWrite(t, p, large, 0644)
-	got, err = r.Read(ctx, p)
+	got, err = read(ctx, p, true, command)
 	require.Nil(t, got)
 	require.ErrorIs(t, err, safefile.ErrTooLarge)
-	got, err = r.ReadAll(ctx, p)
+	got, err = read(ctx, p, false, command)
 	require.NoError(t, err)
 	require.Equal(t, large, got)
-	stream, err := r.Open(ctx, p)
+	stream, err := open(ctx, p, command, "read", "stream", "0", p)
 	require.NoError(t, err)
 	defer stream.Close()
 	got, err = io.ReadAll(stream)
 	require.NoError(t, err)
 	require.Equal(t, large, got)
 	require.NoError(t, stream.Close())
-	require.Same(t, initial, r.session)
 }
 
 func TestCReaderPermissionDenial(t *testing.T) {
 	helper := cHelperPath(t)
 	dir := cFixtureDir(t)
-	r := cReader(t, helper)
+	command := cCommand(helper)
 	p := filepath.Join(dir, "restricted")
 	private := []byte("SYNTHETIC_RESTRICTED_CONTENT")
 	mode := os.FileMode(0000)
@@ -152,7 +136,7 @@ func TestCReaderPermissionDenial(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	got, err := r.Read(ctx, p)
+	got, err := read(ctx, p, true, command)
 	require.Nil(t, got)
 	require.ErrorIs(t, err, os.ErrPermission)
 	require.ErrorIs(t, err, safefile.ErrFile)
@@ -162,29 +146,38 @@ func TestCReaderPermissionDenial(t *testing.T) {
 func TestCReaderBlockedFIFOCancellation(t *testing.T) {
 	helper := cHelperPath(t)
 	dir := cFixtureDir(t)
-	r := cReader(t, helper)
+	command := cCommand(helper)
 	fifo := filepath.Join(dir, "fifo")
 	require.NoError(t, syscall.Mkfifo(fifo, 0644))
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	stream, err := r.Open(ctx, fifo)
+	stream, err := open(ctx, fifo, command, "read", "stream", "0", fifo)
 	require.NoError(t, err)
 	_, err = io.ReadAll(stream)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.NoError(t, stream.Close())
+	waitReaped(t, stream)
 	p := filepath.Join(dir, "readable")
 	cWrite(t, p, []byte("after-cancellation"), 0644)
 	nextCtx, nextCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer nextCancel()
-	got, err := r.Read(nextCtx, p)
+	got, err := read(nextCtx, p, true, command)
 	require.NoError(t, err)
 	require.Equal(t, "after-cancellation", string(got))
-	// A second blocked stream verifies that Close interrupts actual C open(2).
-	stream, err = r.Open(nextCtx, fifo)
+	// Keep a writer open so the next stream blocks in read(2), after proving
+	// the helper opened the FIFO and delivered a byte.
+	writer, err := os.OpenFile(fifo, os.O_RDWR, 0)
+	require.NoError(t, err)
+	defer writer.Close()
+	stream, err = open(nextCtx, fifo, command, "read", "stream", "0", fifo)
+	require.NoError(t, err)
+	_, err = writer.Write([]byte("r"))
+	require.NoError(t, err)
+	_, err = io.ReadFull(stream, make([]byte, 1))
 	require.NoError(t, err)
 	done := make(chan error, 1)
 	go func() { _, err := io.ReadAll(stream); done <- err }()
-	require.NoError(t, r.Close())
+	require.NoError(t, stream.Close())
 	select {
 	case err := <-done:
 		require.Error(t, err)
@@ -192,11 +185,12 @@ func TestCReaderBlockedFIFOCancellation(t *testing.T) {
 		t.Fatal("Close did not interrupt FIFO read")
 	}
 	require.NoError(t, stream.Close())
+	waitReaped(t, stream)
 }
 
 // This is a machine-local cost comparison, not a timing CI gate. Both paths read
-// a synthetic 256-byte regular file without caching. Persistent setup is outside
-// the measured loop; each read remains O(path bytes + file bytes).
+// a synthetic 256-byte regular file without caching. The helper case includes
+// process startup and reaping per operation; each read is O(path bytes + file bytes).
 func BenchmarkCredentialRead256(b *testing.B) {
 	helper := cHelperPath(b)
 	dir := cFixtureDir(b)
@@ -212,16 +206,16 @@ func BenchmarkCredentialRead256(b *testing.B) {
 			}
 		}
 	})
-	b.Run("persistent", func(b *testing.B) {
-		r := cReader(b, helper)
+	b.Run("one-shot", func(b *testing.B) {
+		command := cCommand(helper)
 		ctx := context.Background()
-		got, err := r.Read(ctx, p)
+		got, err := read(ctx, p, true, command)
 		require.NoError(b, err)
 		require.Len(b, got, 256)
 		b.ReportAllocs()
 		b.SetBytes(256)
 		for b.Loop() {
-			got, err := r.Read(ctx, p)
+			got, err := read(ctx, p, true, command)
 			if err != nil || len(got) != 256 {
 				b.Fatalf("read failed: bytes=%d error=%v", len(got), err)
 			}

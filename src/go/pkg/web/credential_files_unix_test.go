@@ -22,17 +22,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Use the actual helper to verify that scoped public constructors share one
-// child across CA/cert/key reads and release it on both success and failure.
-func scopedHelperFixture(t *testing.T) (dir, pidLog string) {
+// Use the actual helper to verify public constructors launch and reap one child
+// per file operation on both success and failure.
+func oneShotHelperFixture(t *testing.T) (dir, pidLog string) {
 	t.Helper()
 	helper := os.Getenv("NETDATA_TEST_ND_RUN")
 	if helper == "" {
-		t.Skip("set NETDATA_TEST_ND_RUN to a prebuilt nd-run to test scoped TLS lifecycle")
+		t.Skip("set NETDATA_TEST_ND_RUN to a prebuilt nd-run to test one-shot file operations")
 	}
 	helper, err := filepath.Abs(helper)
 	require.NoError(t, err)
-	dir, err = os.MkdirTemp("/tmp", "netdata-scoped-tls-test-")
+	dir, err = os.MkdirTemp("/tmp", "netdata-oneshot-files-test-")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, os.RemoveAll(dir)) })
 	require.NoError(t, os.Chmod(dir, 0755))
@@ -47,8 +47,8 @@ func scopedHelperFixture(t *testing.T) (dir, pidLog string) {
 	return dir, pidLog
 }
 
-func TestCScopedTLSConstruction(t *testing.T) {
-	dir, pidLog := scopedHelperFixture(t)
+func TestCOneShotTLSConstruction(t *testing.T) {
+	dir, pidLog := oneShotHelperFixture(t)
 
 	server := httptest.NewTLSServer(nil)
 	defer server.Close()
@@ -92,16 +92,18 @@ func TestCScopedTLSConstruction(t *testing.T) {
 				logged, err := os.ReadFile(pidLog)
 				require.NoError(t, err)
 				pids := strings.Fields(string(logged))
-				require.Len(t, pids, 1, "all TLS files must use the same scoped child")
-				pid, err := strconv.Atoi(pids[0])
-				require.NoError(t, err)
-				require.Eventually(
-					t,
-					func() bool { return syscall.Kill(pid, 0) == syscall.ESRCH },
-					5*time.Second,
-					10*time.Millisecond,
-					"scoped constructor must close and reap its helper",
-				)
+				require.Len(t, pids, 3, "each TLS file must use a fresh child")
+				for _, text := range pids {
+					pid, err := strconv.Atoi(text)
+					require.NoError(t, err)
+					require.Eventually(
+						t,
+						func() bool { return syscall.Kill(pid, 0) == syscall.ESRCH },
+						5*time.Second,
+						10*time.Millisecond,
+						"constructor must reap each helper",
+					)
+				}
 			}
 		})
 	}
@@ -110,7 +112,7 @@ func TestCScopedTLSConstruction(t *testing.T) {
 // Public request helpers launch only for configured files and retire each
 // operation's child. Rotation, permission changes and deletion stay visible.
 func TestCImplicitBearerReads(t *testing.T) {
-	dir, pidLog := scopedHelperFixture(t)
+	dir, pidLog := oneShotHelperFixture(t)
 	client, err := NewHTTPClient(context.Background(), ClientConfig{})
 	require.NoError(t, err)
 	defer client.CloseIdleConnections()

@@ -25,8 +25,11 @@ func TestTLSReaderRequired(t *testing.T) {
 func TestTLSParserDoesNotDisclosePEMLabels(t *testing.T) {
 	const secret = "SYNTHETIC PRIVATE FILE CONTENT"
 	path := filepath.Join(t.TempDir(), "input.pem")
-	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: secret, Bytes: []byte("synthetic")}), 0600))
-	_, err := newTLSConfig(context.Background(), TLSConfig{TLSCert: path, TLSKey: path}, testutil.New())
+	require.NoError(
+		t,
+		os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: secret, Bytes: []byte("synthetic")}), 0600),
+	)
+	_, err := newTLSConfig(context.Background(), TLSConfig{TLSCert: path, TLSKey: path}, testutil.New().Read)
 	require.ErrorIs(t, err, ErrTLSFile)
 	require.NotContains(t, err.Error(), secret)
 }

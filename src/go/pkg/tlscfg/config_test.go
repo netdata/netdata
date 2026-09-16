@@ -104,7 +104,7 @@ func TestTLSConfig(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg, err := newTLSConfig(context.Background(), tc.config(t), testutil.New())
+			cfg, err := newTLSConfig(context.Background(), tc.config(t), testutil.New().Read)
 
 			if len(tc.wantErrs) > 0 {
 				require.Error(t, err)

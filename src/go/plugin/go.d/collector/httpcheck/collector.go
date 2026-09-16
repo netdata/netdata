@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"time"
@@ -43,24 +44,25 @@ func New() *Collector {
 		},
 
 		acceptedStatuses: make(map[int]bool),
-		newCookieReader:  func() cookieFileReader { return credentialfile.New() },
+		statCookieFile:   credentialfile.Stat,
+		openCookieFile:   credentialfile.Open,
 	}
 }
 
 type (
 	Config struct {
-		Vnode            string `yaml:"vnode,omitempty" json:"vnode"`
-		UpdateEvery      int    `yaml:"update_every,omitempty" json:"update_every"`
-		web.HTTPConfig   `yaml:",inline" json:""`
-		AcceptedStatuses []int               `yaml:"status_accepted" json:"status_accepted"`
+		Vnode            string `yaml:"vnode,omitempty"          json:"vnode"`
+		UpdateEvery      int    `yaml:"update_every,omitempty"   json:"update_every"`
+		web.HTTPConfig   `                    yaml:",inline"                  json:""`
+		AcceptedStatuses []int               `yaml:"status_accepted"          json:"status_accepted"`
 		ResponseMatch    string              `yaml:"response_match,omitempty" json:"response_match"`
-		CookieFile       string              `yaml:"cookie_file,omitempty" json:"cookie_file"`
-		HeaderMatch      []headerMatchConfig `yaml:"header_match,omitempty" json:"header_match"`
+		CookieFile       string              `yaml:"cookie_file,omitempty"    json:"cookie_file"`
+		HeaderMatch      []headerMatchConfig `yaml:"header_match,omitempty"   json:"header_match"`
 	}
 	headerMatchConfig struct {
 		Exclude bool   `yaml:"exclude" json:"exclude"`
-		Key     string `yaml:"key" json:"key"`
-		Value   string `yaml:"value" json:"value"`
+		Key     string `yaml:"key"     json:"key"`
+		Value   string `yaml:"value"   json:"value"`
 	}
 )
 
@@ -76,7 +78,8 @@ type Collector struct {
 	reResponse        *regexp.Regexp
 	headerMatch       []headerMatch
 	cookieFileModTime time.Time
-	newCookieReader   func() cookieFileReader
+	statCookieFile    func(context.Context, string) (time.Time, error)
+	openCookieFile    func(context.Context, string) (io.ReadCloser, error)
 
 	metrics metrics
 }

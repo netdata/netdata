@@ -1,30 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Package credentialfile reads explicitly configured credential files. On Unix,
-// each scoped Reader owns a lazy nd-run process with reduced authority.
+// each operation owns one nd-run process with reduced authority.
 // Windows retains reads under the service account.
 package credentialfile
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
-
-// Read performs one bounded regular-file read and closes its reader.
-func Read(ctx context.Context, path string) ([]byte, error) {
-	r := New()
-	defer r.Close()
-	return r.Read(ctx, path)
-}
-
-// ReadAll performs one unbounded read and closes its reader.
-func ReadAll(ctx context.Context, path string) ([]byte, error) {
-	r := New()
-	defer r.Close()
-	return r.ReadAll(ctx, path)
-}
 
 type fileError struct {
 	op, path string

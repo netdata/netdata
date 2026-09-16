@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Package testutil provides an explicitly local reader for unit tests.
-// Production callers must use credentialfile.Reader's authority boundary.
+// Production callers must use credentialfile's authority boundary.
 package testutil
 
 import (
@@ -47,4 +47,3 @@ func (*localReader) Stat(ctx context.Context, path string) (time.Time, error) {
 	}
 	return s.ModTime(), nil
 }
-func (*localReader) Close() error { return nil }

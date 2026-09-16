@@ -98,10 +98,10 @@ HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` r
 pass or own a reader. Ordinary test/custom transports can be passed directly to clients and `web.DoHTTP`.
 Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` callback is mutable.
 
-When a bearer file is configured, each request creates and closes its own reduced-authority reader. Requests without a
-bearer file create no reader or helper process. `tlscfg.NewTLSConfig(ctx, cfg)` scopes one reader across all configured
-CA/cert/key files and closes it before returning. SDK/RPC HTTP consumers use the same `web.NewHTTPClient` constructor.
-Cookie collection scopes its reader across `Stat` and a conditional `Open`/parse; no process is retained between checks.
+Each configured file operation uses its own reduced-authority helper on Unix. Requests without a bearer file start no
+helper process. `tlscfg.NewTLSConfig(ctx, cfg)` reads each configured CA/cert/key file independently. SDK/RPC HTTP consumers
+use the same `web.NewHTTPClient` constructor. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
+stream before returning. No helper process is retained between operations.
 
 On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
 fail closed and never fall back to elevated local reads. Pass the current Init, collection or Function context before
@@ -113,10 +113,10 @@ Bearer tokens are read on every request. CA files, and certificate/key files whe
 files retain per-collection `Stat`, reload on mtime changes and streaming parsing. Errors must not contain file contents
 or parser fragments derived from credential input.
 
-Use scoped `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
+Use `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
 privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may use private stateless
 read seams and `testutil.New()` from `pkg/credentialfile/testutil` for synthetic fixtures; public APIs use the real
-scoped boundary.
+credential-file boundary.
 
 This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
 retain their existing behavior.

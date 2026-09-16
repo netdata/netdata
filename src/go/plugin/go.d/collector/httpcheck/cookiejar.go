@@ -20,15 +20,13 @@ import (
 // TODO: implement proper cookie auth support
 // relevant forum topic: https://community.netdata.cloud/t/howto-http-endpoint-collector-with-cookie-and-user-pass/3981/5?u=ilyam8
 
-type cookieFileReader interface {
-	Stat(context.Context, string) (time.Time, error)
-	Open(context.Context, string) (io.ReadCloser, error)
-	Close() error
-}
-
 // cookie file format: https://everything.curl.dev/http/cookies/fileformat.html
-func loadCookieJar(ctx context.Context, path string, files cookieFileReader) (http.CookieJar, error) {
-	file, err := files.Open(ctx, path)
+func loadCookieJar(
+	ctx context.Context,
+	path string,
+	openFile func(context.Context, string) (io.ReadCloser, error),
+) (http.CookieJar, error) {
+	file, err := openFile(ctx, path)
 	if err != nil {
 		return nil, err
 	}

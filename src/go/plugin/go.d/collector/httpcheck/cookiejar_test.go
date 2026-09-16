@@ -37,9 +37,9 @@ func (r *cookieReader) Open(ctx context.Context, _ string) (io.ReadCloser, error
 		return nil, r.openErr
 	}
 	if r.stream != nil {
-		return io.NopCloser(r.stream), nil
+		return &cookieStream{Reader: r.stream, owner: r}, nil
 	}
-	return io.NopCloser(strings.NewReader(r.content)), nil
+	return &cookieStream{Reader: strings.NewReader(r.content), owner: r}, nil
 }
 
 func (r *cookieReader) Stat(ctx context.Context, _ string) (time.Time, error) {
@@ -59,7 +59,7 @@ func TestLoadCookieJarRejectsMalformedInputWithoutContents(t *testing.T) {
 	}
 	for name, content := range tests {
 		t.Run(name, func(t *testing.T) {
-			jar, err := loadCookieJar(context.Background(), "cookies", &cookieReader{content: content})
+			jar, err := loadCookieJar(context.Background(), "cookies", (&cookieReader{content: content}).Open)
 			require.Error(t, err)
 			assert.Nil(t, jar)
 			assert.NotContains(t, err.Error(), sentinel)
@@ -73,9 +73,16 @@ func (r cookieReadError) Read([]byte) (int, error) { return 0, r.err }
 
 func TestLoadCookieJarReturnsStreamError(t *testing.T) {
 	expected := errors.New("synthetic read failure")
-	jar, err := loadCookieJar(context.Background(), "cookies", &cookieReader{stream: cookieReadError{expected}})
+	files := &cookieReader{
+		stream: io.MultiReader(
+			strings.NewReader(".example.com TRUE / FALSE 0 session value\n"),
+			cookieReadError{expected},
+		),
+	}
+	jar, err := loadCookieJar(context.Background(), "cookies", files.Open)
 	require.ErrorIs(t, err, expected)
-	assert.Nil(t, jar)
+	assert.Nil(t, jar, "a valid cookie prefix must not hide a terminal helper failure")
+	assert.Equal(t, 1, files.closes)
 }
 
 func TestReadCookieFilePreservesModificationTimeReload(t *testing.T) {
@@ -88,48 +95,46 @@ func TestReadCookieFilePreservesModificationTimeReload(t *testing.T) {
 	c := New()
 	c.CookieFile = "cookies"
 	c.httpClient = &http.Client{}
-	var readers []*cookieReader
-	c.newCookieReader = func() cookieFileReader {
-		r := *files
-		readers = append(readers, &r)
-		return &r
-	}
+	c.statCookieFile = files.Stat
+	c.openCookieFile = files.Open
 	cookieURL := &url.URL{Scheme: "http", Host: "www.example.com"}
 	require.NoError(t, c.readCookieFile(ctx))
 	require.Len(t, c.httpClient.Jar.Cookies(cookieURL), 1)
 	assert.Equal(t, "first", c.httpClient.Jar.Cookies(cookieURL)[0].Value)
 	files.content = ".example.com TRUE / FALSE 0 session second\n"
 	require.NoError(t, c.readCookieFile(ctx))
-	require.Len(t, readers, 2)
-	assert.Equal(t, 1, readers[0].opens)
-	assert.Zero(t, readers[1].opens)
+	assert.Equal(t, 1, files.opens)
 	assert.Equal(t, "first", c.httpClient.Jar.Cookies(cookieURL)[0].Value)
 	files.modTime = files.modTime.Add(time.Second)
 	require.NoError(t, c.readCookieFile(ctx))
-	require.Len(t, readers, 3)
-	assert.Equal(t, 1, readers[2].opens)
+	assert.Equal(t, 2, files.opens)
 	assert.Equal(t, "second", c.httpClient.Jar.Cookies(cookieURL)[0].Value)
 	files.content = "invalid"
 	files.modTime = files.modTime.Add(time.Second)
 	require.Error(t, c.readCookieFile(ctx))
 	assert.Equal(t, "second", c.httpClient.Jar.Cookies(cookieURL)[0].Value)
 	assert.NotEqual(t, files.modTime, c.cookieFileModTime)
-	require.Len(t, readers, 4)
-	for _, r := range readers {
-		assert.Equal(t, 1, r.closes)
-	}
+	assert.Equal(t, 3, files.opens)
+	assert.Equal(t, files.opens, files.closes)
 }
 
 func TestLoadCookieJarDoesNotBoundTotalInput(t *testing.T) {
-	files := &cookieReader{content: strings.Repeat("# comment\n", 120000) + ".example.com TRUE / FALSE 0 session value\n"}
-	jar, err := loadCookieJar(context.Background(), "cookies", files)
+	files := &cookieReader{
+		content: strings.Repeat("# comment\n", 120000) + ".example.com TRUE / FALSE 0 session value\n",
+	}
+	jar, err := loadCookieJar(context.Background(), "cookies", files.Open)
 	require.NoError(t, err)
 	assert.Len(t, jar.Cookies(&url.URL{Scheme: "http", Host: "www.example.com"}), 1)
 }
 
-func (r *cookieReader) Close() error { r.closes++; return nil }
+type cookieStream struct {
+	io.Reader
+	owner *cookieReader
+}
 
-func TestReadCookieFileClosesReaderOnFileErrors(t *testing.T) {
+func (s *cookieStream) Close() error { s.owner.closes++; return nil }
+
+func TestReadCookieFileReturnsFileErrors(t *testing.T) {
 	failure := errors.New("synthetic file failure")
 	for _, mode := range []string{"stat", "open"} {
 		t.Run(mode, func(t *testing.T) {
@@ -141,9 +146,10 @@ func TestReadCookieFileClosesReaderOnFileErrors(t *testing.T) {
 			}
 			c := New()
 			c.CookieFile = "cookies"
-			c.newCookieReader = func() cookieFileReader { return files }
+			c.statCookieFile = files.Stat
+			c.openCookieFile = files.Open
 			require.ErrorIs(t, c.readCookieFile(t.Context()), failure)
-			assert.Equal(t, 1, files.closes)
+			assert.Zero(t, files.closes)
 			assert.True(t, c.cookieFileModTime.IsZero())
 		})
 	}

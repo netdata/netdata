@@ -168,10 +168,7 @@ func (c *Collector) readCookieFile(ctx context.Context) error {
 		return nil
 	}
 
-	files := c.newCookieReader()
-	defer files.Close()
-
-	modTime, err := files.Stat(ctx, c.CookieFile)
+	modTime, err := c.statCookieFile(ctx, c.CookieFile)
 	if err != nil {
 		return err
 	}
@@ -183,7 +180,7 @@ func (c *Collector) readCookieFile(ctx context.Context) error {
 
 	c.Debugf("reading cookie file '%s'", c.CookieFile)
 
-	jar, err := loadCookieJar(ctx, c.CookieFile, files)
+	jar, err := loadCookieJar(ctx, c.CookieFile, c.openCookieFile)
 	if err != nil {
 		return err
 	}

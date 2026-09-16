@@ -47,20 +47,13 @@ type TLSConfig struct {
 	InsecureSkipVerify bool `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify"`
 }
 
-// NewTLSConfig loads TLS files with one scoped credential reader, closed before
-// returning. The result may be nil without an error if TLS is not configured.
+// NewTLSConfig loads configured TLS files through the credential-file boundary.
+// The result may be nil without an error if TLS is not configured.
 func NewTLSConfig(ctx context.Context, cfg TLSConfig) (*tls.Config, error) {
-	if cfg.TLSCA == "" && (cfg.TLSCert == "" || cfg.TLSKey == "") {
-		return newTLSConfig(ctx, cfg, nil)
-	}
-	files := credentialfile.New()
-	defer files.Close()
-	return newTLSConfig(ctx, cfg, files)
+	return newTLSConfig(ctx, cfg, credentialfile.Read)
 }
 
-type fileReader interface {
-	Read(context.Context, string) ([]byte, error)
-}
+type fileReader func(context.Context, string) ([]byte, error)
 
 func newTLSConfig(ctx context.Context, cfg TLSConfig, files fileReader) (*tls.Config, error) {
 	if cfg.TLSCA == "" && cfg.TLSKey == "" && cfg.TLSCert == "" && !cfg.InsecureSkipVerify {
@@ -133,5 +126,5 @@ func readFile(ctx context.Context, path string, files fileReader) ([]byte, error
 	if files == nil {
 		return nil, fmt.Errorf("TLS file reader unavailable: %w", safefile.ErrFile)
 	}
-	return files.Read(ctx, path)
+	return files(ctx, path)
 }
