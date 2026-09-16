@@ -1170,6 +1170,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-item.h
         src/libnetdata/dictionary/dictionary-callbacks.h
         src/libnetdata/storage-point.h
+        src/libnetdata/storage-engine-types.h
         src/libnetdata/parsers/parsers.h
         src/libnetdata/parsers/duration.c
         src/libnetdata/parsers/duration-unittest.c
@@ -1851,7 +1852,6 @@ set(RRD_PLUGIN_FILES
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
-        src/database/storage-engine-types.h
         src/database/ram/rrddim_mem.c
         src/database/ram/rrddim_mem.h
         src/database/sqlite/sqlite_metadata.c

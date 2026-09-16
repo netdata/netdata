@@ -26,7 +26,6 @@
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "../storage-engine-types.h"
 #include "dbengine-config.h"
 #include "dbengine-workers.h"
 

@@ -6,8 +6,6 @@
 #include "libnetdata/libnetdata.h"
 #include "rrd-database-mode.h"
 
-#include "storage-engine-types.h"
-
 // the dbengine functions the dispatchers below call are declared by the engine, not here
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
