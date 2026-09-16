@@ -14,9 +14,11 @@
 #include <stdint.h>
 
 #include "exec-signals.h"
+#include "nd-file-reader.h"
 
-#ifdef HAVE_CAPABILITY
-#include <sys/capability.h>
+#ifdef __linux__
+#include <linux/capability.h>
+#include <sys/syscall.h>
 #endif
 
 #ifdef __APPLE__
@@ -47,7 +49,7 @@ void show_help() {
     fprintf(stdout, "Defaults to running the command as '%s', but will fall back to '%s' if '%s' is not found on the system.\n", NETDATA_USER, FALLBACK_USER, NETDATA_USER);
     fprintf(stdout, "\n");
     fprintf(stdout, "If it's not possible to switch users, the command will run as the current user instead.\n");
-    #ifdef HAVE_CAPABILITY
+    #ifdef __linux__
         fprintf(stdout, "\n");
         fprintf(stdout, "Regardless of whether it switched users, all capabilities will be dropped.\n");
     #endif
@@ -63,29 +65,72 @@ static _Noreturn void fatal_msg(const char *msg) {
     exit(EXIT_FAILURE);
 }
 
-#ifdef HAVE_CAPABILITY
-static void clear_caps() {
-    // Clear out all capabilities
-    //
-    // This does not require any special privileges since it is reducing
-    // the process’s privileges.
-    cap_t caps = cap_init();
-
-    if (caps == NULL) fatal("cap_init");
-
-    if (cap_clear(caps) == -1) {
-        cap_free(caps);
-        fatal("cap_clear");
-    }
-
-    if (cap_set_proc(caps) == -1) {
-        cap_free(caps);
-        fatal("cap_set_proc");
-    }
-
-    cap_free(caps);
-}
+static void clear_caps(void) {
+#ifdef __linux__
+    // File mode does not exec. Clear capabilities here for every mode, even
+    // without libcap; clearing inheritable/permitted also clears ambient caps.
+    struct __user_cap_header_struct header = { .version = _LINUX_CAPABILITY_VERSION_3, .pid = 0 };
+    struct __user_cap_data_struct caps[2] = {{0}, {0}};
+    if (syscall(SYS_capset, &header, caps) != 0 || syscall(SYS_capget, &header, caps) != 0)
+        fatal("capability reduction");
+    if (caps[0].effective || caps[0].permitted || caps[0].inheritable ||
+        caps[1].effective || caps[1].permitted || caps[1].inheritable)
+        fatal_msg("capabilities remain after privilege reduction");
 #endif
+}
+
+static int set_all_gids(gid_t gid) {
+#ifdef HAVE_SETRESGID
+    return setresgid(gid, gid, gid);
+#else
+    return setregid(gid, gid);
+#endif
+}
+
+static int set_all_uids(uid_t uid) {
+#ifdef HAVE_SETRESUID
+    return setresuid(uid, uid, uid);
+#else
+    return setreuid(uid, uid);
+#endif
+}
+
+static void drop_privileges(const struct passwd *pw) {
+    uid_t euid = geteuid();
+    bool switch_user = euid != pw->pw_uid;
+    uid_t uid = switch_user ? pw->pw_uid : euid;
+    gid_t gid = switch_user ? pw->pw_gid : getegid();
+
+    // Same-user execution retains OS-granted supplementary groups.
+    if (switch_user && initgroups(pw->pw_name, pw->pw_gid) != 0) {
+        if (euid == 0) {
+            if (setgroups(0, NULL) != 0)
+                fatal("setgroups");
+        } else if (errno != EPERM) {
+            fatal("initgroups");
+        }
+    }
+
+    // Normalize real/effective/saved IDs even for same-user execution and
+    // permitted nonroot fallback. Successful target changes need no second pass.
+    if (set_all_gids(gid) != 0) {
+        if (euid == 0 || errno != EPERM)
+            fatal("set group IDs");
+        gid = getegid();
+        if (set_all_gids(gid) != 0)
+            fatal("retain group IDs");
+    }
+    if (set_all_uids(uid) != 0) {
+        if (euid == 0 || errno != EPERM)
+            fatal("set user IDs");
+        uid = geteuid();
+        if (set_all_uids(uid) != 0)
+            fatal("retain user IDs");
+    }
+    if (getuid() != uid || geteuid() != uid || getgid() != gid || getegid() != gid)
+        fatal_msg("identity mismatch after privilege reduction");
+    clear_caps();
+}
 
 static void add_env_var(char **env, size_t *entries, const char *name, const char *value) {
     // Append "name=value" to the environment we are building for the child.
@@ -186,6 +231,11 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    bool file_reader = strcmp(argv[1], "--file-reader") == 0;
+    struct nd_file_request file_request;
+    if (file_reader && !nd_file_reader_parse(argc - 2, argv + 2, &file_request))
+        fatal_msg("usage: --file-reader read regular|stream <limit> <path>, or --file-reader stat <path>");
+
     bool preserve_env = strcmp(argv[1], "--preserve-env") == 0;
     int command = 1;
     if (preserve_env) {
@@ -193,8 +243,6 @@ int main(int argc, char *argv[]) {
             fatal_msg("usage: nd-run --preserve-env -- command [args...]");
         command = 3;
     }
-
-    uid_t euid = geteuid();
 
     struct passwd *pw = getpwnam(NETDATA_USER);
     if (!pw) {
@@ -205,52 +253,14 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (euid != pw->pw_uid) {
-        // Set supplementary groups for this user (must be done before dropping privs)
-        if (initgroups(pw->pw_name, pw->pw_gid) != 0) {
-            if (euid == 0) {
-                if (setgroups(0, NULL) != 0) {
-                    fatal("setgroups");
-                }
-            } else if (errno != EPERM) {
-                fatal("initgroups");
-            }
-        }
+    drop_privileges(pw);
+    if (file_reader && geteuid() == 0)
+        fatal_msg("file reader requires an unprivileged identity");
 
-        // Drop GID then UID. Prefer setres* when available to also drop saved IDs.
-        // Linux/BSD generally provide setresgid/setresuid; macOS does not.
-        #ifdef HAVE_SETRESGID
-            if (setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setresgid");
-                }
-            }
-        #else
-            if (setgid(pw->pw_gid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setgid");
-                }
-            }
-        #endif
-
-        #ifdef HAVE_SETRESUID
-            if (setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setresuid");
-                }
-            }
-        #else
-            if (setuid(pw->pw_uid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setuid");
-                }
-            }
-        #endif
-    }
-
-    #ifdef HAVE_CAPABILITY
-        clear_caps();
-    #endif
+    // SIG_IGN survives exec; the file reader also needs default SIGPIPE handling.
+    reset_signal_dispositions();
+    if (file_reader)
+        return nd_file_reader_run(&file_request);
 
     char **new_environ = build_environment(pw, preserve_env);
 
@@ -259,11 +269,6 @@ int main(int argc, char *argv[]) {
     // environment block it did not allocate. Reading it is fine - execvp()
     // itself reads PATH from it.
     environ = new_environ;
-
-    // Restore default signal dispositions before exec. SIG_IGN survives execve(), so an ignored
-    // signal in our caller is inherited by the command we run; netdata ignores SIGPIPE, and a
-    // command that gets EPIPE instead of dying keeps running after netdata closes its stdout.
-    reset_signal_dispositions();
 
     // Exec the requested command (replaces the current process on success)
     execvp(argv[command], &argv[command]);

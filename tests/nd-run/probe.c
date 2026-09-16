@@ -9,9 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef HAVE_CAPABILITY
-#include <sys/capability.h>
+#ifdef __linux__
+#include <linux/capability.h>
 #include <sys/prctl.h>
+#include <sys/syscall.h>
 #endif
 
 extern char **environ;
@@ -50,16 +51,12 @@ int main(int argc, char **argv) {
         int regain_uid = setuid(0);
         int regain_gid = setgid(0);
         printf("%d %d\n", regain_uid, regain_gid);
-#ifdef HAVE_CAPABILITY
-        cap_t caps = cap_get_proc();
-        if (!caps)
-            return 1;
-        cap_t empty = cap_init();
-        if (!empty)
-            return 1;
-        printf("caps_empty=%d\n", cap_compare(caps, empty) == 0);
-        cap_free(caps);
-        cap_free(empty);
+#ifdef __linux__
+        struct __user_cap_header_struct header = { .version = _LINUX_CAPABILITY_VERSION_3, .pid = 0 };
+        struct __user_cap_data_struct caps[2] = {{0}, {0}};
+        check(syscall(SYS_capget, &header, caps));
+        printf("caps_empty=%d\n", !(caps[0].effective | caps[0].permitted | caps[0].inheritable |
+                                    caps[1].effective | caps[1].permitted | caps[1].inheritable));
         printf("ambient=%d\n", prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_IS_SET, CAP_NET_BIND_SERVICE, 0, 0));
 #endif
     } else if (!strcmp(argv[1], "pid")) {
@@ -95,8 +92,52 @@ int main(int argc, char **argv) {
         };
         execve(argv[2], &argv[2], env);
         return 5;
-#ifdef HAVE_CAPABILITY
-    } else if (!strcmp(argv[1], "launch-caps") && argc > 2) {
+#ifdef __linux__
+    } else if (!strcmp(argv[1], "read-file") && argc == 3) {
+        FILE *file = fopen(argv[2], "rb");
+        if (!file)
+            return 1;
+        int ch;
+        while ((ch = fgetc(file)) != EOF)
+            putchar(ch);
+        int failed = ferror(file);
+        if (fclose(file) != 0)
+            failed = 1;
+        if (failed)
+            return 1;
+    } else if (!strcmp(argv[1], "launch-checked-file") && argc > 4) {
+        // This executable is a synthetic setuid/file-capability parent. Verify
+        // its authority before exec without exposing the fixture bytes.
+        FILE *file = fopen(argv[2], "rb");
+        if (!file)
+            return 1;
+        int ch = fgetc(file);
+        int failed = ch == EOF || ferror(file);
+        if (fclose(file) != 0)
+            failed = 1;
+        if (failed)
+            return 1;
+        struct __user_cap_header_struct header = { .version = _LINUX_CAPABILITY_VERSION_3, .pid = 0 };
+        struct __user_cap_data_struct caps[2] = {{0}, {0}};
+        check(syscall(SYS_capget, &header, caps));
+        fprintf(stderr, "parent_uid=%lu parent_euid=%lu parent_cap_eff=%x%08x parent_readable=1\n",
+                (unsigned long)getuid(), (unsigned long)geteuid(),
+                caps[1].effective, caps[0].effective);
+        if (fflush(stderr) != 0)
+            return 1;
+        execv(argv[3], &argv[3]);
+        return 5;
+    } else if (!strcmp(argv[1], "launch-real-root") && argc > 2) {
+        struct passwd *pw = getpwnam(NETDATA_USER);
+        if (!pw || pw->pw_uid == 0)
+            return 2;
+        check(initgroups(pw->pw_name, pw->pw_gid));
+        check(setresgid(0, pw->pw_gid, 0));
+        // Real root can regain effective root unless nd-run normalizes all IDs.
+        check(setresuid(0, pw->pw_uid, 0));
+        execv(argv[2], &argv[2]);
+        return 5;
+    } else if ((!strcmp(argv[1], "launch-caps") || !strcmp(argv[1], "launch-file-caps")) && argc > 2) {
         struct passwd *pw = getpwnam(NETDATA_USER);
         if (!pw || pw->pw_uid == 0)
             return 2;
@@ -104,15 +145,11 @@ int main(int argc, char **argv) {
         check(initgroups(pw->pw_name, pw->pw_gid));
         check(setgid(pw->pw_gid));
         check(setuid(pw->pw_uid));
-        cap_t caps = cap_init();
-        if (!caps)
-            return 1;
-        cap_value_t capability = CAP_NET_BIND_SERVICE;
-        check(cap_set_flag(caps, CAP_PERMITTED, 1, &capability, CAP_SET));
-        check(cap_set_flag(caps, CAP_EFFECTIVE, 1, &capability, CAP_SET));
-        check(cap_set_flag(caps, CAP_INHERITABLE, 1, &capability, CAP_SET));
-        check(cap_set_proc(caps));
-        cap_free(caps);
+        struct __user_cap_header_struct header = { .version = _LINUX_CAPABILITY_VERSION_3, .pid = 0 };
+        struct __user_cap_data_struct caps[2] = {{0}, {0}};
+        int capability = !strcmp(argv[1], "launch-file-caps") ? CAP_DAC_OVERRIDE : CAP_NET_BIND_SERVICE;
+        caps[0].effective = caps[0].permitted = caps[0].inheritable = 1U << capability;
+        check(syscall(SYS_capset, &header, caps));
         check(prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, capability, 0, 0));
         execv(argv[2], &argv[2]);
         return 5;
