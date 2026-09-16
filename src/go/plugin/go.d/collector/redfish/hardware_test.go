@@ -3,11 +3,9 @@
 package redfish
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -152,8 +150,11 @@ func TestEverySourceScalarFieldHasRuntimeProducer(t *testing.T) {
 
 func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *testing.T) {
 	node := &graphNode{
-		Kind: "system", Key: "system",
-		Data:       map[string]any{"ProcessorSummary": map[string]any{"Metrics": map[string]any{"BandwidthPercent": json.Number("42")}}},
+		Kind: "system",
+		Key:  "system",
+		Data: map[string]any{
+			"ProcessorSummary": map[string]any{"Metrics": map[string]any{"BandwidthPercent": json.Number("42")}},
+		},
 		Enrichment: map[string]map[string]any{"processor_summary_metrics": {"BandwidthPercent": "not-a-number"}},
 	}
 
@@ -173,10 +174,12 @@ func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *tes
 }
 
 func TestFindEnrichmentRejectsAmbiguousDocumentKind(t *testing.T) {
-	node := &graphNode{Enrichment: map[string]map[string]any{
-		"memory_metrics:0": {"Reading": json.Number("1")},
-		"memory_metrics:1": {"Reading": json.Number("2")},
-	}}
+	node := &graphNode{
+		Enrichment: map[string]map[string]any{
+			"memory_metrics:0": {"Reading": json.Number("1")},
+			"memory_metrics:1": {"Reading": json.Number("2")},
+		},
+	}
 	require.Nil(t, findEnrichment(node, "memory_metrics"))
 
 	delete(node.Enrichment, "memory_metrics:1")
@@ -270,7 +273,10 @@ func TestEverySourceReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
 			if fixed {
 				raw.FixedFamily = key.Family
 			}
-			node := &graphNode{Kind: "sensor", Key: name}
+			node := &graphNode{
+				Kind: "sensor",
+				Key:  name,
+			}
 			switch key.SemanticClass {
 			case "fan":
 				node.Kind = "fan"
@@ -283,14 +289,10 @@ func TestEverySourceReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
 			if !reading.Valid {
 				t.Fatalf("reading is invalid: %+v", reading)
 			}
-			if reading.Metric != surface.Metric ||
-				reading.Context != surface.Context ||
-
-				reading.AlarmMetric != surface.AlarmMetric {
+			if reading.Metric != surface.Metric || reading.AlarmMetric != surface.AlarmMetric {
 				t.Fatalf(
-					"normalized surface = metric %q context %q alarm %q; want %+v",
+					"normalized surface = metric %q alarm %q; want %+v",
 					reading.Metric,
-					reading.Context,
 					reading.AlarmMetric,
 					surface,
 				)
@@ -456,12 +458,12 @@ func TestNVMETemperatureArrayProducesDistinctReadings(t *testing.T) {
 		},
 	}
 	nodes, complete, err := client.sensorExcerptArrayNodes(
-		context.Background(),
-		&resourceGraph{},
 		parent,
 		"Metrics.NVMeSMART.TemperatureSensorsCelsius",
 		sensorExcerptArraySpec{
-			Path: "NVMeSMART.TemperatureSensorsCelsius", Type: "Temperature", Units: "Cel",
+			Path:          "NVMeSMART.TemperatureSensorsCelsius",
+			Type:          "Temperature",
+			Units:         "Cel",
 			ScalarMembers: true,
 		},
 		data,
@@ -492,7 +494,10 @@ func TestArrayReadingDataSourceURIStabilizesIdentityAcrossReorder(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := &protocolClient{root: root, origin: origin}
+	client := &protocolClient{
+		root:   root,
+		origin: origin,
+	}
 	parent := &graphNode{
 		Kind: "thermal_subsystem",
 		Key:  "thermal-key",
@@ -504,12 +509,12 @@ func TestArrayReadingDataSourceURIStabilizesIdentityAcrossReorder(t *testing.T) 
 			array[index] = values[index]
 		}
 		nodes, complete, err := client.sensorExcerptArrayNodes(
-			context.Background(),
-			&resourceGraph{},
 			parent,
 			"ThermalMetrics.TemperatureReadingsCelsius",
 			sensorExcerptArraySpec{
-				Path: "TemperatureReadingsCelsius", Type: "Temperature", Units: "Cel",
+				Path:  "TemperatureReadingsCelsius",
+				Type:  "Temperature",
+				Units: "Cel",
 			},
 			map[string]any{"TemperatureReadingsCelsius": array},
 		)
@@ -542,7 +547,10 @@ func TestArrayReadingDataSourceURIStabilizesIdentityAcrossReorder(t *testing.T) 
 func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 	root, origin, err := normalizeServiceRoot("https://bmc.example/redfish/v1/")
 	require.NoError(t, err)
-	client := &protocolClient{root: root, origin: origin}
+	client := &protocolClient{
+		root:   root,
+		origin: origin,
+	}
 	addressable := &graphNode{
 		Kind:             "sensor",
 		Key:              resourceKey(origin, "sensor", "/redfish/v1/Sensors/A"),
@@ -557,15 +565,24 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 			"ReadingUnits": "Cel",
 		},
 	}
-	graph := &resourceGraph{Nodes: []*graphNode{addressable}}
-	owner := &graphNode{Kind: "thermal_subsystem", Key: "thermal", URI: "/redfish/v1/ThermalSubsystem"}
+	graph := &resourceGraph{
+		ByIdentity: make(map[string]*graphNode),
+		KeySources: make(map[string]string),
+	}
+	addressable.Parents = make(map[string]*graphNode)
+	require.NoError(t, graph.add(addressable))
+	owner := &graphNode{
+		Kind: "thermal_subsystem",
+		Key:  "thermal",
+		URI:  "/redfish/v1/ThermalSubsystem",
+	}
 	nodes, complete, err := client.sensorExcerptArrayNodes(
-		context.Background(),
-		graph,
 		owner,
 		"ThermalMetrics.TemperatureReadingsCelsius",
 		sensorExcerptArraySpec{
-			Path: "TemperatureReadingsCelsius", Type: "Temperature", Units: "Cel",
+			Path:  "TemperatureReadingsCelsius",
+			Type:  "Temperature",
+			Units: "Cel",
 		},
 		map[string]any{
 			"TemperatureReadingsCelsius": []any{map[string]any{
@@ -578,9 +595,10 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, complete)
 	require.Len(t, nodes, 1)
-	require.Equal(t, addressable.Locator, nodes[0].Locator)
-
-	mergeEquivalentGraphNode(addressable, nodes[0])
+	require.NoError(t, graph.add(nodes[0]))
+	client.reconcileSensorExcerptIdentities(graph)
+	require.Len(t, graph.Nodes, 1)
+	require.Same(t, addressable, graph.Nodes[0])
 	readings := client.readingsForNode(addressable, time.Now())
 	require.Len(t, readings, 1)
 	require.Equal(t, float64(42), readings[0].Value, "the addressable Sensor reading has precedence")
@@ -588,7 +606,11 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 }
 
 func TestReadingSourceAlarmDiagnostics(t *testing.T) {
-	node := &graphNode{Kind: "sensor", Key: "sensor-key", URI: "/redfish/v1/Chassis/1/Sensors/1"}
+	node := &graphNode{
+		Kind: "sensor",
+		Key:  "sensor-key",
+		URI:  "/redfish/v1/Chassis/1/Sensors/1",
+	}
 	base := rawReading{
 		Path:          "Reading",
 		Type:          "Temperature",
@@ -615,7 +637,11 @@ func TestReadingSourceAlarmDiagnostics(t *testing.T) {
 				t.Fatalf("source alarm = %q, want %q", reading.SourceAlarm, test.wantAlarm)
 			}
 			if !strings.Contains(reading.SourceAlarmDiagnostic, test.wantDiagnostic) {
-				t.Fatalf("source alarm diagnostic = %q, want substring %q", reading.SourceAlarmDiagnostic, test.wantDiagnostic)
+				t.Fatalf(
+					"source alarm diagnostic = %q, want substring %q",
+					reading.SourceAlarmDiagnostic,
+					test.wantDiagnostic,
+				)
 			}
 		})
 	}
@@ -629,7 +655,11 @@ func TestReadingSourceAlarmDiagnostics(t *testing.T) {
 }
 
 func TestReadingSourceAlarmSurvivesInvalidNumericValue(t *testing.T) {
-	node := &graphNode{Kind: "sensor", Key: "sensor-key", URI: "/redfish/v1/Chassis/1/Sensors/1"}
+	node := &graphNode{
+		Kind: "sensor",
+		Key:  "sensor-key",
+		URI:  "/redfish/v1/Chassis/1/Sensors/1",
+	}
 	reading := normalizeReading(node, rawReading{
 		Path:          "Reading",
 		Type:          "Temperature",
@@ -650,21 +680,28 @@ func TestReadingSourceAlarmSurvivesInvalidNumericValue(t *testing.T) {
 
 func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T) {
 	client := &protocolClient{}
-	node := &graphNode{Kind: "sensor", Key: "sensor"}
+	node := &graphNode{
+		Kind: "sensor",
+		Key:  "sensor",
+	}
 	for _, state := range alarmStates {
 		reading := normalizedReading{
-			Key: "reading", Metric: "reading_temperature_zero_input",
+			Key:         "reading",
+			Metric:      "reading_temperature_zero_input",
 			AlarmMetric: "reading_temperature_zero_input_alarm",
-			Valid:       true, SourceAlarm: state,
+			Valid:       true,
+			SourceAlarm: state,
 		}
 		observation := observationByMetric(client.readingObservations(node, reading), reading.AlarmMetric)
-		if observation == nil || observation.State != state || !slices.Equal(observation.States, alarmStates) {
+		if observation == nil || observation.State != state {
 			t.Fatalf("alarm state %q observation = %#v", state, observation)
 		}
 	}
 	reading := normalizedReading{
-		Key: "reading", Metric: "reading_temperature_zero_input",
-		AlarmMetric: "reading_temperature_zero_input_alarm", Valid: true,
+		Key:         "reading",
+		Metric:      "reading_temperature_zero_input",
+		AlarmMetric: "reading_temperature_zero_input_alarm",
+		Valid:       true,
 	}
 	if observation := observationByMetric(client.readingObservations(node, reading), reading.AlarmMetric); observation != nil {
 		t.Fatalf("missing effective alarm fabricated observation %#v", observation)
@@ -698,7 +735,12 @@ func TestDerivedPowerResetsBaselineOnReadingSemanticChange(t *testing.T) {
 	node.Data["Reading"] = json.Number("370060")
 	postChange := client.readingsForNode(node, t0.Add(2*time.Minute))
 	if got := derivedPowerCount(postChange); got != 1 {
-		t.Fatalf("post-change sample derived power count = %d, want 1; readings=%#v baselines=%#v", got, postChange, client.rateBaselines)
+		t.Fatalf(
+			"post-change sample derived power count = %d, want 1; readings=%#v baselines=%#v",
+			got,
+			postChange,
+			client.rateBaselines,
+		)
 	}
 }
 
@@ -906,11 +948,20 @@ func TestConditionDeduplicationPreservesStructuralFieldBoundaries(t *testing.T) 
 
 func TestNormalizeReadingRejectsValueOutsideAdvertisedRange(t *testing.T) {
 	reading := normalizeReading(
-		&graphNode{Kind: "sensor", Key: "sensor-key"},
+		&graphNode{
+			Kind: "sensor",
+			Key:  "sensor-key",
+		},
 		rawReading{
-			Path: "Sensor.Reading", Type: "Temperature", Units: "Cel", Basis: "Zero",
-			Role: "input", Value: json.Number("101"), Primary: true,
-			RangeMin: json.Number("0"), RangeMax: json.Number("100"),
+			Path:     "Sensor.Reading",
+			Type:     "Temperature",
+			Units:    "Cel",
+			Basis:    "Zero",
+			Role:     "input",
+			Value:    json.Number("101"),
+			Primary:  true,
+			RangeMin: json.Number("0"),
+			RangeMax: json.Number("100"),
 		},
 	)
 	if reading.Valid {
@@ -966,7 +1017,8 @@ func TestReadingEpochMetadataPreservesSourcePresence(t *testing.T) {
 		} {
 			t.Run(field+"/"+name, func(t *testing.T) {
 				node := &graphNode{
-					Kind: "sensor", Key: "energy-sensor",
+					Kind: "sensor",
+					Key:  "energy-sensor",
 					Data: map[string]any{
 						"ReadingType": "EnergyJoules", "ReadingUnits": "J",
 						"Reading": json.Number("10"),

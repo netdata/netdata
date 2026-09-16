@@ -52,46 +52,6 @@ var sourceStatusByKind = map[string]statusDescriptor{
 	"assembly":                {true, false, false},
 }
 
-var componentFamilies = map[string]string{
-	"service":                 "service",
-	"system":                  "system",
-	"chassis":                 "chassis",
-	"manager":                 "manager",
-	"processor":               "processor",
-	"processor_core":          "processor_core",
-	"memory":                  "memory",
-	"storage":                 "storage",
-	"storage_controller":      "storage_controller",
-	"drive":                   "drive",
-	"volume":                  "volume",
-	"network_adapter":         "network_adapter",
-	"network_device_function": "network_device_function",
-	"ethernet_interface":      "ethernet_interface",
-	"network_interface":       "network_interface",
-	"network_port":            "network_port",
-	"port":                    "port",
-	"pcie_device":             "pcie_device",
-	"pcie_function":           "pcie_function",
-	"fan":                     "fan",
-	"pump":                    "pump",
-	"power_supply":            "power_supply",
-	"battery":                 "battery",
-	"sensor":                  "sensor",
-	"redundancy":              "redundancy",
-	"thermal_subsystem":       "thermal_subsystem",
-	"power_subsystem":         "power_subsystem",
-	"coolant_connector":       "coolant_connector",
-	"filter":                  "filter",
-	"heater":                  "heater",
-	"leak_detection":          "leak_detection",
-	"leak_detector_group":     "leak_detector_group",
-	"leak_detector":           "leak_detector",
-	"control":                 "control",
-	"firmware":                "firmware",
-	"software":                "software",
-	"assembly":                "assembly",
-}
-
 var additionalStateSources = []stateSource{
 	{Kind: "chassis", Path: "PhysicalSecurity.IntrusionSensor", Metric: "chassis_intrusion_state", States: []string{"normal", "hardware_intrusion", "tampering_detected", "unknown"}},
 	{Kind: "processor", Path: "Throttled", Metric: "processor_throttling_state", BooleanFalse: "clear", BooleanTrue: "throttled", States: []string{"clear", "throttled", "unknown"}},
@@ -174,3 +134,13 @@ var (
 	acquisitionStates = []string{"readable", "unreadable", "unknown"}
 	alarmStates       = []string{"clear", "warning", "critical"}
 )
+
+type stateSource struct {
+	Kind         string
+	Document     string
+	Path         string
+	Metric       string
+	States       []string
+	BooleanFalse string
+	BooleanTrue  string
+}
