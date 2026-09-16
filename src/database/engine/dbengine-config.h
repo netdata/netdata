@@ -30,7 +30,7 @@ struct dbengine_config {
 
     // files
     bool direct_io;                             // [db] dbengine use direct io
-    unsigned pages_per_extent;                  // [db] dbengine pages per extent; 0 = default, > 109 is fatal
+    unsigned pages_per_extent;                  // [db] dbengine pages per extent; 0 = default, > MAX_PAGES_PER_EXTENT is fatal
     bool journal_integrity_check;               // [db] dbengine enable journal integrity check
     time_t journal_v2_unmount_time_s;           // [db] dbengine journal v2 unmount time
 
