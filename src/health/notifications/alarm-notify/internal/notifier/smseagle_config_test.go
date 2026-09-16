@@ -113,8 +113,7 @@ func TestSMSEagleFieldIsolation(t *testing.T) {
 			} else if v.Kind() == reflect.String {
 				v.SetString("synthetic-private-value")
 			} else {
-				n := configInteger(1)
-				v.Set(reflect.ValueOf(&n))
+				v.Set(reflect.New(v.Type().Elem()))
 			}
 			wantErr := "fields for another provider"
 			if field.Name == "APIVersion" {

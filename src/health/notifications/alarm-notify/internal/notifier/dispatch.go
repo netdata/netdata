@@ -30,6 +30,8 @@ func dispatch(
 		dst := cfg.Destinations[name]
 		var err error
 		switch dst.Type {
+		case "email":
+			err = sendEmail(ctx, processes, dst, event)
 		case "kafka":
 			err = postJSON(ctx, dst, renderKafka(dst, event), timeout)
 		case "syslog":

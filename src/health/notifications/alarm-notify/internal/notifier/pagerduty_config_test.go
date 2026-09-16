@@ -95,8 +95,7 @@ func TestPagerDutyFieldIsolation(t *testing.T) {
 			case reflect.Slice:
 				v.Set(reflect.ValueOf([]string{"123"}))
 			default:
-				n := configInteger(1)
-				v.Set(reflect.ValueOf(&n))
+				v.Set(reflect.New(v.Type().Elem()))
 			}
 			checkFormConfig(t, dst, "fields for another provider")
 		})

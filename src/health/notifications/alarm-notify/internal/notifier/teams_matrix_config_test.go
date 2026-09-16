@@ -130,7 +130,7 @@ func TestTeamsMatrixFieldIsolation(t *testing.T) {
 				case reflect.Map:
 					v.Set(reflect.ValueOf(map[string]string{"warning": "x"}))
 				default:
-					v.Set(reflect.ValueOf(new(configInteger(1))))
+					v.Set(reflect.New(v.Type().Elem()))
 				}
 				checkFormConfig(t, dst, "fields for another provider")
 			})
