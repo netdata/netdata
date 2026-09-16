@@ -63,6 +63,8 @@ func dispatch(
 			err = sendAlerta(ctx, dst, event, timeout)
 		case "pagerduty":
 			err = sendPagerDuty(ctx, dst, event, timeout)
+		case "opsgenie":
+			err = sendOpsgenie(ctx, dst, event, timeout)
 		case "smseagle":
 			err = sendSMSEagle(ctx, dst, event, timeout)
 		case "prowl":

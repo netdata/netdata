@@ -199,6 +199,8 @@ func TestRunFanoutCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"opsgenie create deadline": {provider: "opsgenie"}, "opsgenie create cancel": {provider: "opsgenie", cancel: true},
+		"opsgenie close deadline": {provider: "opsgenie-close"}, "opsgenie close cancel": {provider: "opsgenie-close", cancel: true},
 		"pagerduty v1 deadline": {provider: "pagerduty-v1"}, "pagerduty v1 cancel": {provider: "pagerduty-v1", cancel: true},
 		"pagerduty v2 deadline": {provider: "pagerduty-v2"}, "pagerduty v2 cancel": {provider: "pagerduty-v2", cancel: true},
 		"smseagle deadline": {provider: "smseagle"}, "smseagle cancellation": {provider: "smseagle", cancel: true},
@@ -221,7 +223,8 @@ func TestRunFanoutCancellation(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.URL.Path {
-					case "/blocked/generic/2010-04-15/create_event.json",
+					case "/blocked/v2/alerts", "/blocked/v2/alerts/" + opsgenieTestAlias + "/close",
+						"/blocked/generic/2010-04-15/create_event.json",
 						"/blocked/v2/enqueue",
 						"/blocked/api/v2/messages/sms",
 						"/blocked/add",
@@ -268,6 +271,13 @@ func TestRunFanoutCancellation(t *testing.T) {
 					strings.TrimPrefix(test.provider, "pagerduty-v"),
 				)
 			}
+			if strings.HasPrefix(test.provider, "opsgenie") {
+				blocked = fmt.Sprintf(
+					"type: opsgenie, api_url: %q, api_key: %q",
+					server.URL+"/blocked",
+					opsgenieTestKey,
+				)
+			}
 			if test.provider == "smseagle" {
 				blocked = fmt.Sprintf(
 					"type: smseagle, api_url: %q, access_token: synthetic-token, recipients: ['15005550009']",
@@ -298,8 +308,12 @@ routing:
 			defer cancel()
 			var stdout, stderr bytes.Buffer
 			done := make(chan int, 1)
+			input := validEvent
+			if test.provider == "opsgenie-close" {
+				input = strings.ReplaceAll(input, "WARNING", "CLEAR")
+			}
 			go func() {
-				done <- Run(ctx, []string{"send", "--config", path, "--role", "sysadmin", "--timeout", "500ms"}, strings.NewReader(validEvent), &stdout, &stderr)
+				done <- Run(ctx, []string{"send", "--config", path, "--role", "sysadmin", "--timeout", "500ms"}, strings.NewReader(input), &stdout, &stderr)
 			}()
 			select {
 			case <-started:

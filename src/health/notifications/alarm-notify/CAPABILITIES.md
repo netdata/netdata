@@ -11,6 +11,7 @@ correcting Bash's changing per-event identity by explicit approval. Dynatrace us
 its configured event-type behavior is retained, including CLEAR without explicit problem closure.
 SMSEagle automatically selects GSM-7 or Unicode encoding for SMS/MMS by explicit approval, preserving the original text.
 PagerDuty uses stable incident identity in both API versions by explicit approval, correcting Bash v2's per-event key.
+Opsgenie uses Alert API v2 with an API Integration by explicit approval, retaining support while the service is available.
 HipChat is excluded from the Go migration by explicit approval following its
 [end of life](https://www.atlassian.com/partnerships/slack/faq); production Bash remains unchanged.
 
@@ -46,6 +47,8 @@ HipChat is excluded from the Go migration by explicit approval following its
   appliance API/token references and per-recipient queued acknowledgments.
 - PagerDuty Events API v1/v2 trigger/resolve events with stable correlation, integration-key secrets, custom API bases,
   native event details/navigation and matching JSON acknowledgments.
+- Opsgenie Alert API v2 create/close requests with Bash priorities, stable aliases, native content/navigation,
+  API-key/base references and asynchronous request-acceptance checks.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.
 
 ## Bash providers
@@ -81,7 +84,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Syslog | `send_syslog` | Pending |
 | SMS Server Tools 3 | `send_sms` | Pending |
 | Dynatrace | `send_dynatrace` | Approved Events API v2, API token/base, entity selector, configured event type/source, current alert content and per-event result checks implemented; CLEAR retains configured type without explicit problem closure |
-| Opsgenie | `send_opsgenie` | Pending |
+| Opsgenie | `send_opsgenie` | Approved Alert API v2/API Integration, P3/P1 creation and CLEAR closure by stable alias, API key/base references, native Event content and asynchronous acknowledgment checks implemented |
 | Gotify | `send_gotify` | Application-token auth, JSON messages, status priorities, custom API base and acknowledgment checks implemented |
 | ntfy | `send_ntfy` | Topic URLs, anonymous/Basic/token auth, text messages, priorities/tags/navigation and acknowledgment checks implemented |
 | ilert | `send_ilert` | Event API/API alert source, integration key/API base, ALERT/RESOLVE, stable encoded incident key, complete event details and navigation implemented; extended artwork/presentation pending |
@@ -95,16 +98,16 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar, SMSEagle and PagerDuty content/link/status formatting implemented; other providers and richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth; Rocket.Chat URL/channel; Flock URL; Fleep URL/sender; ilert integration key/API; SIGNL4 URL; Alerta API/key/environment; Dynatrace API/token/selector/type/source; Prowl API/key batch; Kavenegar API/key/sender/recipient; SMSEagle API/token/recipients/mode/duration/voice; PagerDuty integration key/API/version settings implemented; remaining provider configuration pending |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar, SMSEagle, PagerDuty and Opsgenie content/link/status formatting implemented; other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth; Rocket.Chat URL/channel; Flock URL; Fleep URL/sender; ilert integration key/API; SIGNL4 URL; Alerta API/key/environment; Dynatrace API/token/selector/type/source; Prowl API/key batch; Kavenegar API/key/sender/recipient; SMSEagle API/token/recipients/mode/duration/voice; PagerDuty integration key/API/version; Opsgenie API/key settings implemented; remaining provider configuration pending |
 | Results | Per-target failures and Bash's any-success invocation result | Implemented for all current Go providers; provider subtarget details pending with remaining providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first sixteen implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
+The first seventeen implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
 Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle and PagerDuty.
+SMSEagle, PagerDuty and Opsgenie.
 Related providers may share small PRs.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
 More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final

@@ -1,0 +1,5 @@
+{
+  "source": "test-node",
+  "user": "Netdata",
+  "note": "Temperature is high\nA quote: \"hot\"\nUnicode: θερμοκρασία\nNode: test-node\nAlert: test_alert\nStatus: CRITICAL → CLEAR\nChart: test.chart\nContext: test.context\nValue: 42.5 C\nPrevious value: 0 C\nTime: 2026-09-14T12:00:00Z\nhttps://example.com/alert?id=1&view=chart#details\n\nEvent: {\"version\":1,\"incident_id\":\"test-incident\",\"timestamp\":\"2026-09-14T12:00:00Z\",\"node\":\"test-node\",\"alert\":\"test_alert\",\"chart\":\"test.chart\",\"context\":\"test.context\",\"status\":\"CLEAR\",\"previous_status\":\"CRITICAL\",\"summary\":\"Temperature is high\",\"info\":\"A quote: \\\"hot\\\"\\nUnicode: θερμοκρασία\",\"value\":42.5,\"previous_value\":0,\"units\":\"C\",\"url\":\"https://example.com/alert?id=1\\u0026view=chart#details\"}"
+}

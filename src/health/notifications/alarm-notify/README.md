@@ -2,7 +2,7 @@
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle and PagerDuty.
+SMSEagle, PagerDuty and Opsgenie.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -10,7 +10,8 @@ The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
-Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, and PagerDuty v1/v2 incident events.
+Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
+and Opsgenie alert creation and closure.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -36,15 +37,20 @@ class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
         print(body, flush=True)
+        opsgenie = self.path.endswith("/v2/alerts") or (
+            "/v2/alerts/" in self.path and self.path.endswith("/close?identifierType=alias")
+        )
         status = 200
-        if self.path.endswith(("/events", "/v2/enqueue")):
+        if opsgenie or self.path.endswith(("/events", "/v2/enqueue")):
             status = 202
         elif self.path.endswith(("/Messages.json", "/messages", "/signl4", "/alert", "/api/v2/events/ingest")):
             status = 201
         self.send_response(status)
         self.send_header("Content-Type", "application/xml" if self.path.endswith("/add") else "application/json")
         self.end_headers()
-        if self.path.endswith(("/api/v2/messages/sms", "/api/v2/messages/mms",
+        if opsgenie:
+            self.wfile.write(b'{"result":"Request will be processed","requestId":"test-request"}')
+        elif self.path.endswith(("/api/v2/messages/sms", "/api/v2/messages/mms",
                                "/api/v2/calls/ring", "/api/v2/calls/tts", "/api/v2/calls/tts_advanced")):
             recipients = json.loads(body)["to"]
             self.wfile.write(json.dumps([
@@ -124,6 +130,7 @@ Prowl requires `type: prowl` and `api_key`; Kavenegar requires `type: kavenegar`
 Both accept an optional `api_url`. SMSEagle requires `type: smseagle`, `api_url`, `access_token` and a `recipients`
 array, with optional message/call settings described below.
 PagerDuty requires `type: pagerduty` and `integration_key`; `api_version` and `api_url` are optional.
+Opsgenie requires `type: opsgenie` and `api_key`, with an optional `api_url`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -131,7 +138,7 @@ follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
 MessageBird access keys, Gotify app tokens, ntfy credentials, ilert/PagerDuty integration keys, Alerta/Prowl/Kavenegar
-API keys, Dynatrace API tokens and SMSEagle access tokens accept literal strings or a whole `${env:VARIABLE}` or
+and Opsgenie API keys, Dynatrace API tokens and SMSEagle access tokens accept literal strings or a whole `${env:VARIABLE}` or
 `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
@@ -177,7 +184,7 @@ Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. ilert accepts HTTP 202;
 SIGNL4 accepts HTTP 200, 201 or 202. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
-Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar, SMSEagle and PagerDuty check bounded JSON acknowledgments;
+Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar, SMSEagle, PagerDuty and Opsgenie check bounded JSON acknowledgments;
 Prowl checks a bounded XML acknowledgment. Telegram can retry rate limits as described below.
 Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
@@ -1256,6 +1263,83 @@ Save as `pagerduty-local.yaml` and run:
 
 Repeat with WARNING, CRITICAL and CLEAR events, keeping `incident_id` unchanged. The printed requests show matching
 keys across all three statuses. The local receiver checks the wire contract; it does not simulate PagerDuty incidents.
+
+## Opsgenie alerts
+
+Use an Opsgenie **API Integration** that permits alert creation and closure, with responders configured in Opsgenie.
+This provider uses the [Alert API v2](https://docs.opsgenie.com/docs/alert-api), an approved change from Bash's
+Netdata-specific webhook. The integration key and service-side rules from that webhook are not automatically adapted.
+Opsgenie remains supported in this migration; its announced shutdown is
+[April 5, 2027](https://www.atlassian.com/licensing/opsgenie).
+
+```yaml
+version: 1
+destinations:
+  opsgenie_us:
+    type: opsgenie
+    api_key: ${env:NOTIFY_OPSGENIE_US_KEY}
+  opsgenie_eu:
+    type: opsgenie
+    api_url: https://api.eu.opsgenie.com
+    api_key: ${env:NOTIFY_OPSGENIE_EU_KEY}
+routing:
+  roles:
+    opsgenie_ops: [opsgenie_us, opsgenie_eu]
+```
+
+Configure one named destination per API integration. `api_key` and `api_url` accept literal, environment or file
+references. The key must be nonempty printable ASCII without whitespace and is sent in `Authorization: GenieKey ...`.
+`api_url` defaults to `https://api.opsgenie.com`; EU accounts use `https://api.eu.opsgenie.com`. Both official hosts
+require HTTPS. Custom bases may include a proxy prefix or use HTTP for deliberate local delivery.
+
+WARNING sends a create request with priority P3, CRITICAL sends one with P1, and CLEAR sends a close request.
+The alias is the lowercase hexadecimal SHA-256 digest of the caller's opaque `incident_id`. Keep that ID stable
+through WARNING, CRITICAL and CLEAR; changing timestamps or text does not change the alias. Separate incident IDs
+must identify separate incidents. Aliases can deduplicate across integrations in the same Opsgenie account;
+different destination names or keys do not create separate incident identities.
+
+Creation uses `/v2/alerts`; closure uses `/v2/alerts/<alias>/close?identifierType=alias`. The integration's permissions
+and rules determine final alert handling. The notifier neither creates integration settings nor looks up alert IDs.
+
+Create requests contain a node/status/summary title, the common plain-text alert content with navigation, node as
+`source`, alert name as `entity`, `user: Netdata`, and the complete native Event JSON as the string `details.event`.
+Close requests contain node, user, and a recovery note with the plain-text content and complete Event JSON.
+Unknown values remain null and zero values remain zero in that JSON.
+
+Titles are capped at 130 Unicode characters with `...`, preserving the full summary in description/details.
+Other limits fail the destination before sending without dropping content: source 100 characters, entity 512,
+description 15000, total details keys/values 8000, and recovery note 25000. Details/note counts include the serialized
+Event JSON and its escapes. The entity, description and details limits apply to creation; closure uses the note limit.
+
+Success requires HTTP 202 and a bounded JSON acknowledgment with `result: Request will be processed` and a nonempty
+`requestId`. It confirms asynchronous API acceptance, not completed creation or closure; it does not establish that
+an alias matched an existing alert. There are no retries, redirects or request-status polling. Replies are bounded
+to 256 KiB and the invocation deadline. Existing routing, any-success results and safe diagnostics apply.
+
+### Local Opsgenie exercise
+
+Use the receiver above with a synthetic key:
+
+```yaml
+version: 1
+destinations:
+  opsgenie:
+    type: opsgenie
+    api_url: http://127.0.0.1:18080
+    api_key: synthetic-opsgenie-key
+routing:
+  roles:
+    opsgenie_ops: [opsgenie]
+```
+
+Save as `opsgenie-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config opsgenie-local.yaml --role opsgenie_ops < examples/event.json
+```
+
+Repeat with WARNING, CRITICAL and CLEAR while retaining the same `incident_id`. The receiver prints the create and
+close bodies and returns synthetic acknowledgments; it does not create actual Opsgenie alerts.
 
 ## Event document
 
