@@ -328,6 +328,13 @@ void nd_thread_join_threads()
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
+        if(nti && nd_thread_status_check(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN)) {
+            // The creator owns this wrapper and must join it directly. Keep it out of the generic
+            // drain until that owner releases it.
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(retained, nti, prev, next);
+            continue;
+        }
+
         // nd_thread_join_internal() handles NULL and will skip list removal since we already did it
         // The atomic CAS in nd_thread_join_internal() still protects against direct callers racing with us
         bool wrapper_released = true;
@@ -616,4 +623,9 @@ int nd_thread_join(ND_THREAD *nti) {
         nd_thread_status_clear(nti, NETDATA_THREAD_STATUS_JOINED);
 
     return ret;
+}
+
+void nd_thread_set_manual_join(ND_THREAD *nti) {
+    if (nti)
+        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN);
 }
