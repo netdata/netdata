@@ -318,6 +318,21 @@
 - Feat(health/alarm-notify): add role routing and webhook fan-out ([#23871](https://github.com/netdata/netdata/issues/23871))
 - Feat(nd-run): add opt-in environment preservation ([#23868](https://github.com/netdata/netdata/issues/23868))
 - Feat(health/alarm-notify): add modern Slack webhook notifications ([#23872](https://github.com/netdata/netdata/issues/23872))
+- Aclk: make host teardown safe against queued commands ([#23864](https://github.com/netdata/netdata/issues/23864))
+- Feat(health/alarm-notify): add native Discord webhooks ([#23874](https://github.com/netdata/netdata/issues/23874))
+- Feat(health/alarm-notify): add Telegram bot notifications ([#23875](https://github.com/netdata/netdata/issues/23875))
+- Feat(health/alarm-notify): add Pushover ([#23876](https://github.com/netdata/netdata/issues/23876))
+- Feat(health/alarm-notify): add Pushbullet notifications ([#23877](https://github.com/netdata/netdata/issues/23877))
+- Feat(health/alarm-notify): add Twilio ([#23878](https://github.com/netdata/netdata/issues/23878))
+- Feat(health/alarm-notify): add MessageBird delivery ([#23880](https://github.com/netdata/netdata/issues/23880))
+- Fix(go.d/secrets): run command providers through nd-run ([#23879](https://github.com/netdata/netdata/issues/23879))
+- Feat(health/alarm-notify): add Gotify and ntfy delivery ([#23881](https://github.com/netdata/netdata/issues/23881))
+- Feat(health/alarm-notify): add Rocket.Chat, Flock and Fleep ([#23882](https://github.com/netdata/netdata/issues/23882))
+- Feat(health/alarm-notify): add ilert and SIGNL4 notifications ([#23883](https://github.com/netdata/netdata/issues/23883))
+- Feat(health/alarm-notify): add Alerta and Dynatrace notifications ([#23886](https://github.com/netdata/netdata/issues/23886))
+- Feat(health/alarm-notify): add Prowl and Kavenegar ([#23888](https://github.com/netdata/netdata/issues/23888))
+- Feat(health/alarm-notify): add SMSEagle SMS and voice notifications ([#23893](https://github.com/netdata/netdata/issues/23893))
+- Feat(health/alarm-notify): add PagerDuty ([#23897](https://github.com/netdata/netdata/issues/23897))
 
 ## [2.11.0] - 2026-08-12
 
