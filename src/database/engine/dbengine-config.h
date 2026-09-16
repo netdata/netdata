@@ -51,6 +51,18 @@ struct dbengine_config {
 
 #define DBENGINE_DEFAULT_PAGES_PER_EXTENT (109)
 
+// Page types. The value is the page-type byte of the on-disk format (rrddiskprotocol.h), so an
+// existing type is never renumbered; a new one takes the next value and raises the maximum.
+#define RRDENG_PAGE_TYPE_ARRAY_32BIT    (0)
+#define RRDENG_PAGE_TYPE_ARRAY_TIER1    (1)
+#define RRDENG_PAGE_TYPE_GORILLA_32BIT  (2)
+#define RRDENG_PAGE_TYPE_MAX            (2) // Maximum page type (inclusive)
+
+// the floors the engine enforces on a tier's settings, and the default it does not
+#define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
+#define RRDENG_MIN_DISK_SPACE_MB (25)
+#define RRDENG_DEFAULT_TIER_DISK_SPACE_MB (1024)
+
 // the smallest libuv pool the engine assumes when the embedder does not say
 #if defined(ENV32BIT)
 #define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (8)

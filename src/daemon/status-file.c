@@ -1047,7 +1047,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
             netdata_configured_cache_dir
         };
         
-        // Create patterns for different file types
+        // Create patterns for different file types. The dbengine pattern repeats the engine's
+        // DATAFILE_EXTENSION / WALFILE_EXTENSION* (datafile.h, journalfile.h) as a literal: this
+        // code also runs in builds without the engine, where there is no engine function to ask.
         SIMPLE_PATTERN *dbengine_pattern = simple_pattern_create("*dbengine*/*.ndf *dbengine*/*.njf*", " ", SIMPLE_PATTERN_EXACT, false);
         SIMPLE_PATTERN *sqlite_pattern = simple_pattern_create("*.db *.wal *.shm", " ", SIMPLE_PATTERN_EXACT, false);
         

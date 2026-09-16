@@ -373,6 +373,32 @@ static int scan_data_files_cmp(const void *a, const void *b)
     return strcmp(path1, path2);
 }
 
+// the one place a directory entry is recognised as a datafile: both the scan that loads a tier
+// and the embedder's probe (rrdeng_datafiles_present) must agree on what counts as persisted data
+static bool datafile_name_parse(const char *name, unsigned *tier, unsigned *fileno)
+{
+    return sscanf(name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, tier, fileno) == 2;
+}
+
+bool rrdeng_datafiles_present(const char *dbfiles_path)
+{
+    DIR *dir = opendir(dbfiles_path);
+    if (!dir)
+        return false;
+
+    bool present = false;
+    struct dirent *de;
+    while ((de = readdir(dir))) {
+        unsigned tier, fileno;
+        if (datafile_name_parse(de->d_name, &tier, &fileno)) {
+            present = true;
+            break;
+        }
+    }
+    closedir(dir);
+    return present;
+}
+
 /* Returns number of datafiles that were loaded or < 0 on error */
 static int scan_data_files(struct rrdengine_instance *ctx)
 {
@@ -398,10 +424,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     bool validate_files = true;
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
-        ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
-
         // This is a datafile
-        if (2 == ret) {
+        if (datafile_name_parse(dent.name, &tier, &fileno)) {
             datafile = datafile_alloc_and_init(ctx, tier, fileno);
             datafiles[matched_files++] = datafile;
             Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);

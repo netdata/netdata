@@ -6,11 +6,13 @@
 #include "rrdengine.h"
 #include "dbengine-stats.h"
 
-#define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
-#define RRDENG_MIN_DISK_SPACE_MB (25)
-#define RRDENG_DEFAULT_TIER_DISK_SPACE_MB (1024)
-
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
+
+// true when dbfiles_path holds at least one datafile named the way this engine names and scans
+// them. Reads the directory only, touches no engine state, so it can be called before any tier
+// is up (or on a build that never brings one up) to learn whether a previous run left data
+// behind; a directory that cannot be opened holds none.
+bool rrdeng_datafiles_present(const char *dbfiles_path);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
