@@ -3,7 +3,7 @@
 #define DBENGINE_CACHE_H
 
 #include "datafile.h"
-#include "dbengine-stats.h"
+#include "database/engine/include/dbengine/dbengine-stats.h"
 
 typedef struct pgc PGC;
 typedef struct pgc_page PGC_PAGE;

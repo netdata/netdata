@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "database/engine/rrddiskprotocol.h"
+#include "rrddiskprotocol.h"
 #include "rrdengine.h"
 #include "dbengine-compression.h"
 

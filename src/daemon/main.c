@@ -8,7 +8,9 @@
 #include "web/api/queries/backfill.h"
 #include "web/mcp/mcp.h"
 
-#include "database/engine/dbengine-tests.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/include/dbengine/dbengine-tests.h"
+#endif
 #include "database/rrdset-slots.h"
 #include <curl/curl.h>
 

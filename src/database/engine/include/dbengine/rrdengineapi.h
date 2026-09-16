@@ -4,8 +4,8 @@
 #define NETDATA_RRDENGINEAPI_H
 
 #include "libnetdata/libnetdata.h"
-#include "dbengine-config.h"
-#include "dbengine-stats.h"
+#include "database/engine/include/dbengine/dbengine-config.h"
+#include "database/engine/include/dbengine/dbengine-stats.h"
 
 // The engine's public API. Everything the daemon needs from the engine is declared here or in the other public
 // headers (dbengine-config.h, dbengine-stats.h, dbengine-workers.h, dbengine-tests.h); the rest of this directory

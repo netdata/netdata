@@ -3,7 +3,7 @@
 #include "pulse-db-dbengine-retention.h"
 #ifdef ENABLE_DBENGINE
 #include "database/rrd.h"
-#include "database/engine/rrdengineapi.h"
+#include "database/engine/include/dbengine/rrdengineapi.h"
 
 typedef struct dbengine_tier_stats {
     RRDSET *st;

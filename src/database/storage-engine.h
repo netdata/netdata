@@ -8,7 +8,7 @@
 
 // the dbengine functions the dispatchers below call are declared by the engine, not here
 #ifdef ENABLE_DBENGINE
-#include "database/engine/rrdengineapi.h"
+#include "database/engine/include/dbengine/rrdengineapi.h"
 #endif
 
 #define is_valid_backend(backend) ((backend) >= STORAGE_ENGINE_BACKEND_RRDDIM && (backend) <= STORAGE_ENGINE_BACKEND_DBENGINE)

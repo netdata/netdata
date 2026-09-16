@@ -193,8 +193,11 @@ DBENGINE uses 150 bytes of memory for every metric for which retention is mainta
 
 The engine is a component of the `netdata` binary, sealed in both directions. Its sources under
 `src/database/engine/` include or call nothing of the daemon, and the daemon sees the engine only through its public
-headers; `rrdengineapi.h` no longer includes the private `rrdengine.h`, so an engine instance is an opaque pointer
-outside this directory (the storage vtable's `STORAGE_INSTANCE` is that pointer). The public headers:
+headers under `include/dbengine/`, included from the source root as `database/engine/include/dbengine/<name>.h`;
+`rrdengineapi.h` does not include the private `rrdengine.h`, so an engine instance is an opaque pointer outside this
+directory (the storage vtable's `STORAGE_INSTANCE` is that pointer). The engine is built as its own static library
+target, `dbengine`, linked into `netdata`; the target declares no include directories, so the layout states the
+public surface and the build compiles the engine as one unit. The public headers:
 
 - **`rrdengineapi.h`**: the metric, collection and query operations behind the storage-engine vtable; the tier
   lifecycle (`rrdeng_init()`, `rrdeng_readiness_wait()`, `rrdeng_exit()`, `rrdeng_ctx_is_active()`,
@@ -225,4 +228,7 @@ includes the private `rrdengine.h`: its zero-page-cadence test inspects the coll
 
 The daemon depends on the engine, not the other way round, and owns `netdata.conf` parsing, sqlite, streaming and the
 charts. The seal is enforced by review, not by the build: libnetdata exports the whole `src/` tree as an include
-path, so a private engine header is still reachable from anywhere by its path.
+path, so a private engine header is still reachable from anywhere by its path, and the `dbengine` target is a
+statement of the boundary rather than a guard. Being a static archive, an engine object referenced only by its own
+constructors would be dropped from the link silently; every constructor today lives in an object that is also
+referenced by name, and a new one must too.

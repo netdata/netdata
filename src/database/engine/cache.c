@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cache.h"
-#include "dbengine-tests.h"
+#include "database/engine/include/dbengine/dbengine-tests.h"
 
 // relaxed atomics for the cache statistics; the engine keeps its own names for them
 #define pgc_atomic_add_fetch(variable, value) __atomic_add_fetch(variable, value, __ATOMIC_RELAXED)
