@@ -633,7 +633,8 @@ pub struct OverviewResult {
     pub status: StatusWire,
     /// Which population the grid covers: [`OVERVIEW_SCOPE_SELECTION`]
     /// when the request's `selections` were applied, else
-    /// [`OVERVIEW_SCOPE_WINDOW`] (no selections sent).
+    /// [`OVERVIEW_SCOPE_WINDOW`] (the selections constrain nothing:
+    /// none sent, or every value list empty).
     pub scope: &'static str,
     pub grid: OverviewGridWire,
     pub totals: OverviewTotals,
@@ -919,8 +920,9 @@ pub struct OverviewSection {
     /// [`OVERVIEW_SCOPE_SELECTION`] means the page's `selections` were
     /// applied (the grid bins the traces owning a stored row that
     /// matches them); [`OVERVIEW_SCOPE_WINDOW`] means they were NOT (the
-    /// page carried none, or carried a trace-level word stored rows
-    /// cannot answer). The duration bounds are NEVER applied to the
+    /// page's selections constrain nothing — none, or only empty value
+    /// lists — or carry a trace-level word stored rows cannot answer).
+    /// The duration bounds are NEVER applied to the
     /// grid, under either value: duration is the grid's own axis, so a
     /// cell click or the rail's minimum narrows the list beside the
     /// grid, not the grid. A consumer that captions the totals without
@@ -949,9 +951,13 @@ pub const OVERVIEW_SCOPE_WINDOW: &str = "window";
 /// window under the same `selections` as the page. Stored-row
 /// semantics, like every other number in the section: a trace is
 /// binned when ANY stored copy of one of its spans matches and starts
-/// inside the grid; the list, which dedups copies, can differ only in
-/// the contradicting-resend case the search engine documents. The
-/// duration bounds are not part of the scope (see the field's doc).
+/// inside the grid. The list beside it can differ at the edges: it
+/// dedups copies (the contradicting-resend case the search engine
+/// documents), it shows a trace whose envelope starts before the grid
+/// while the grid's bin-by-envelope-start rule drops it, and the grid's
+/// window is the page's aligned to whole buckets, so a match in the
+/// widened band bins a trace the page excludes. The duration bounds
+/// are not part of the scope (see the field's doc).
 pub const OVERVIEW_SCOPE_SELECTION: &str = "selection";
 
 /// One returned trace summary; ids in W3C lowercase hex.

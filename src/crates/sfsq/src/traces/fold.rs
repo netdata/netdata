@@ -108,7 +108,9 @@ pub(crate) struct MergedTrace {
 /// engine's phase-1 substrate) and the span-side evaluator for tails,
 /// both lowered from the SAME plan so the two source shapes cannot
 /// disagree. Matches are confined to spans STARTING in `window` — the
-/// search engine's rule — so the population is the one the list shows.
+/// search engine's rule — so the selected population is the search
+/// list's, up to the overview's own bin-by-envelope-start clipping
+/// (its module docs) and any window widening the caller applies.
 pub(crate) struct SpanFilter {
     plan: TracePlan,
     eval: EvalPredicate,
