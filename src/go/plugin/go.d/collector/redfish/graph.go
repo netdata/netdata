@@ -403,10 +403,13 @@ func (c *protocolClient) seedResourceGraph(
 	base []baseResource,
 ) ([]*graphNode, error) {
 	service := &graphNode{
-		Kind:             "service",
-		URI:              "/redfish/v1/",
-		Locator:          "/redfish/v1/",
-		Data:             serviceRootMap(root),
+		Kind:    "service",
+		URI:     "/redfish/v1/",
+		Locator: "/redfish/v1/",
+		Data:    serviceRootMap(root),
+		Doc: genericResource{
+			Name: root.Name,
+		},
 		AcquisitionState: "readable",
 		IdentityQuality:  "addressable",
 		SourceModel:      "resource",

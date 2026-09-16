@@ -44,3 +44,22 @@ func TestScalarFallbackOnlyDiagnosesPresentInvalidSources(t *testing.T) {
 		})
 	}
 }
+
+func TestScalarFallbackRetainsAllInvalidSourceDiagnostics(t *testing.T) {
+	node := &graphNode{
+		Kind: "system",
+		Key:  "system",
+		Data: map[string]any{"ProcessorSummary": map[string]any{"Metrics": map[string]any{"BandwidthPercent": false}}},
+		Enrichment: map[string]enrichmentResource{
+			"processor_summary_metrics": {Data: map[string]any{"BandwidthPercent": nil}},
+		},
+	}
+	values := (&protocolClient{}).scalarValues(node, time.Now())
+	require.Len(t, values, 1)
+	require.False(t, values[0].Valid)
+	require.False(t, values[0].Emit)
+	require.Equal(t, []string{
+		"Redfish compatibility: scalar system_processorsummary_metrics_bandwidthpercent preferred source processor_summary_metrics.BandwidthPercent: property null",
+		"Redfish compatibility: scalar system_processorsummary_metrics_bandwidthpercent preferred source ProcessorSummary.Metrics.BandwidthPercent: value malformed, unsupported, or non-finite",
+	}, values[0].SourceFailures)
+}

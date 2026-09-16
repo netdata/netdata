@@ -4,7 +4,6 @@ package redfish
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -768,30 +767,45 @@ func TestRateBaselineResetsWhenMultiplierChanges(t *testing.T) {
 }
 
 func TestOversizedProtocolNumbersFailSoftWithoutRetainedBaselines(t *testing.T) {
-	integer := strings.Repeat("0", 1<<20) + "1"
-	fraction := "0." + strings.Repeat("0", 1<<20) + "1"
+	integer := strings.Repeat("1", maxProtocolNumericTokenBytes+1)
+	fraction := "0." + strings.Repeat("0", maxProtocolNumericTokenBytes) + "1"
+	for name, value := range map[string]any{
+		"integer":            json.Number(integer),
+		"fraction":           json.Number(fraction),
+		"duration component": "PT" + fraction + "S",
+		"duration total":     "PT0." + strings.Repeat("0", maxProtocolDurationTokenBytes) + "1S",
+	} {
+		t.Run(name, func(t *testing.T) {
+			client := fixtureClient()
+			node := &graphNode{
+				Kind: "processor",
+				Key:  name,
+				Enrichment: map[string]enrichmentResource{
+					"processor_metrics": {Data: map[string]any{"PowerLimitThrottleDuration": value}},
+				},
+			}
+			values := client.scalarValues(node, time.Unix(10, 0))
+			require.Len(t, values, 1)
+			require.False(t, values[0].Valid)
+			require.False(t, values[0].Emit)
+			require.Len(t, values[0].SourceFailures, 1)
 
-	for _, value := range []string{integer, fraction} {
-		_, _, ok := numericValue(json.Number(value))
-		require.False(t, ok)
+			if _, numeric := value.(json.Number); numeric {
+				energy := &graphNode{
+					Kind: "sensor",
+					Key:  "energy",
+					Data: map[string]any{
+						"ReadingType": "EnergyJoules", "ReadingUnits": "J", "Reading": value,
+					},
+				}
+				readings := client.readingsForNode(energy, time.Unix(10, 0))
+				require.Len(t, readings, 1)
+				require.False(t, readings[0].Valid)
+				require.Empty(t, readings[0].SourceExact)
+			}
+			require.Empty(t, client.rateBaselines)
+		})
 	}
-	_, _, ok := numericSourceValue("PT"+fraction+"S", algorithmDurationPercent)
-	require.False(t, ok)
-
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	for index := range 1_000 {
-		_, emit := client.rateValue(
-			fmt.Sprintf("rotating-partial-resource-%d", index),
-			fraction,
-			1,
-			time.Unix(int64(index), 0),
-			algorithmRate,
-			"epoch",
-		)
-		require.False(t, emit)
-	}
-	require.Empty(t, client.rateBaselines)
 }
 
 func TestRateEpochsDigestOversizedBMCValues(t *testing.T) {

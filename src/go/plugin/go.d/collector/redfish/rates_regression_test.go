@@ -5,6 +5,7 @@ package redfish
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,4 +69,35 @@ func BenchmarkCounterRate(b *testing.B) {
 		index++
 		client.rateValue("counter", strconv.FormatInt(index, 10), 1, time.Unix(index, 0), algorithmRate, "epoch")
 	}
+}
+
+func TestDurationRatePreservesDecodedPrecision(t *testing.T) {
+	const id = "processor_processor_metrics_powerlimitthrottleduration"
+	var descriptor sourceField
+	for _, field := range scalarFields {
+		if field.ID == id {
+			descriptor = field
+			break
+		}
+	}
+	require.NotEmpty(t, descriptor.ID)
+	fraction := strings.Repeat("1", 126)
+	first, second := "PT0."+fraction+"S", "PT1."+fraction+"S"
+	exact, _, valid := numericSourceValue(first, algorithmDurationPercent)
+	require.True(t, valid)
+	require.Greater(t, len(exact), maxProtocolNumericTokenBytes)
+	client := fixtureClient()
+	node := scalarTestNode(descriptor, descriptor.Candidates[0], first)
+	at := time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)
+	initial := requireScalarValue(t, client, node, id, at)
+	require.False(t, initial.Emit)
+	setSourceTestPath(
+		sourceTestDocument(node, descriptor.Candidates[0].Document),
+		descriptor.Candidates[0].Path,
+		second,
+	)
+	next := requireScalarValue(t, client, node, id, at.Add(10*time.Second))
+	require.Empty(t, next.SourceFailures)
+	require.True(t, next.Emit, "a one-second duration increase over ten seconds must emit")
+	require.InDelta(t, 10.0, next.Value, 0.000001)
 }

@@ -96,3 +96,26 @@ func BenchmarkMetricLabels(b *testing.B) {
 		}
 	}
 }
+
+func TestDecodedCollectorPreservesServiceName(t *testing.T) {
+	const root = "/redfish/v1/"
+	docs := map[string]map[string]any{
+		root: sourceTestResource(root, "ServiceRoot", "Named BMC service", map[string]any{
+			"RedfishVersion": "1.20.0", "Systems": sourceTestLink(root + "Systems"),
+		}),
+		root + "Systems":   sourceTestCollection(root+"Systems", "ComputerSystem", root+"Systems/1"),
+		root + "Systems/1": sourceTestResource(root+"Systems/1", "ComputerSystem", "System", nil),
+	}
+	collector := sourceTestDecodedCollector(t, sourceTestServeDocuments(t, docs))
+	sourceTestCollectCycle(t, collector)
+	count := 0
+	collector.MetricStore().
+		Read(metrix.ReadFlatten()).
+		ForEachByName("service_acquisition_state", func(labels metrix.LabelView, value metrix.SampleValue) {
+			count++
+			name, ok := labels.Get("resource_name")
+			require.True(t, ok, "service metric must retain ServiceRoot.Name")
+			require.Equal(t, "Named BMC service", name)
+		})
+	require.Positive(t, count, "test must observe the service metric")
+}

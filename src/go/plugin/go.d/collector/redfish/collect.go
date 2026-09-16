@@ -48,6 +48,7 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 	result.Complete = baseComplete && baseErr == nil && graph.Complete && graphErr == nil
 	if identityIntegrityError(graphErr) {
 		result.Complete = false
+		result.Diagnostics = append(result.Diagnostics, graph.finalDiagnostics()...)
 		result.Diagnostics = append(result.Diagnostics, boundedDiagnostic(graphErr.Error()))
 		c.finishCollectionResult(&result, graph, stats, started)
 		return result, collectionErr

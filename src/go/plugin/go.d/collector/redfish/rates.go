@@ -42,9 +42,8 @@ func (c *protocolClient) rateValue(
 	algorithm scalarAlgorithm,
 	epoch string,
 ) (float64, bool) {
-	if !boundedProtocolNumber(exact) {
-		return 0, false
-	}
+	// Callers supply values from bounded numeric decoding. Duration conversion
+	// can produce a fraction longer than its source token.
 	current, ok := new(big.Rat).SetString(exact)
 	if !ok {
 		return 0, false

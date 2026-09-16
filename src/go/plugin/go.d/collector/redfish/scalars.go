@@ -4,7 +4,6 @@ package redfish
 
 import (
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -39,11 +38,10 @@ func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarVal
 				continue
 			}
 			candidate := scalarValue{
-				Descriptor:     descriptor,
-				Present:        true,
-				Value:          decoded.Value,
-				Valid:          decoded.Complete && failure == "",
-				SourceFailures: slices.Clone(sourceFailures),
+				Descriptor: descriptor,
+				Present:    true,
+				Value:      decoded.Value,
+				Valid:      decoded.Complete && failure == "",
 			}
 			if !decoded.Complete {
 				if !selected.Present {
@@ -62,6 +60,7 @@ func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarVal
 			break
 		}
 		if selected.Present {
+			selected.SourceFailures = sourceFailures
 			result = append(result, selected)
 		}
 	}
