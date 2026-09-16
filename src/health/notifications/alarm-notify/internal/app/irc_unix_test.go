@@ -19,6 +19,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/stretchr/testify/assert"
@@ -170,7 +172,7 @@ func TestRunIRC(t *testing.T) {
 			t.Setenv("NOTIFIER_TEST_AMBIENT_SECRET", "must-not-be-inherited")
 			t.Setenv("NOTIFIER_TEST_EXPLICIT_SECRET", "synthetic-private-value")
 			dst["env"].(map[string]string)["TOKEN"] = "${env:NOTIFIER_TEST_EXPLICIT_SECRET}"
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			if test.info != "" {
 				event.Info = test.info
 			}
@@ -255,7 +257,7 @@ func TestRunIRCSelection(t *testing.T) {
 				args = append(args, "--destination", "target")
 			}
 			var stdout, stderr bytes.Buffer
-			assert.Equal(t, test.code, Run(context.Background(), args, strings.NewReader(validEvent), &stdout, &stderr), stderr.String())
+			assert.Equal(t, test.code, Run(context.Background(), args, strings.NewReader(testutil.ValidEvent), &stdout, &stderr), stderr.String())
 			assert.Contains(t, stdout.String()+stderr.String(), test.message)
 			if test.calls == 0 {
 				_, err := os.Stat(capture)
@@ -277,7 +279,7 @@ func TestRunIRCBlockedPipes(t *testing.T) {
 	dst, capture := ircHelperDestination(t, "irc-flood-ping")
 	cfg := testConfig{Version: 1, Destinations: map[string]map[string]any{"target": dst}}
 	var stdout, stderr bytes.Buffer
-	require.Equal(t, 1, Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--destination", "target", "--timeout", "2s"}, strings.NewReader(validEvent), &stdout, &stderr))
+	require.Equal(t, 1, Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--destination", "target", "--timeout", "2s"}, strings.NewReader(testutil.ValidEvent), &stdout, &stderr))
 	assert.Contains(t, stderr.String(), "timed out")
 	captures := readCommandCaptures(t, capture)
 	require.NotEmpty(t, captures)

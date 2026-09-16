@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -102,7 +104,7 @@ routing:
     sysadmin: [chat, archive]
     dba: [chat]
 `, endpoint, server.URL+"/archive")
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			event.URL = "https://example.com/alert?id=1&view=chart#details"
 			if test.oversized {
 				event.Info = strings.Repeat("x", 3001)

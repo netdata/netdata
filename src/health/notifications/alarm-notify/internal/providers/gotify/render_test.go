@@ -20,12 +20,12 @@ import (
 
 func TestRenderPush(t *testing.T) {
 	for name, test := range map[string]struct {
-		status, previous, priority, tag string
-		gotifyPriority                  int
+		status, previous string
+		gotifyPriority   int
 	}{
-		"warning":  {"WARNING", "CLEAR", "high", "warning", 4},
-		"critical": {"CRITICAL", "CLEAR", "urgent", "red_circle", 10},
-		"clear":    {"CLEAR", "CRITICAL", "default", "white_check_mark", 1},
+		"warning":  {"WARNING", "CLEAR", 4},
+		"critical": {"CRITICAL", "CLEAR", 10},
+		"clear":    {"CLEAR", "CRITICAL", 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			event := testutil.ExpectedEvent()
@@ -73,62 +73,45 @@ func TestPushContent(t *testing.T) {
 }
 
 func TestReadPushResponse(t *testing.T) {
-	for provider, p := range map[string]struct {
-		read    func(*http.Response) error
-		success string
+	const success = `{"id":25,"appid":5,"message":"accepted"}`
+	cases := map[string]struct {
+		status    int
+		body, err string
 	}{
-		"gotify": {readGotifyResponse, `{"id":25,"appid":5,"message":"accepted"}`},
-	} {
-		t.Run(provider, func(t *testing.T) {
-			cases := map[string]struct {
-				status    int
-				body, err string
-			}{
-				"success": {200, p.success, ""}, "missing ID": {200, `{}`, "invalid"}, "null": {200, `null`, "invalid"},
-				"invalid JSON": {
-					200,
-					"synthetic-private-value",
-					"invalid",
-				}, "multiple documents": {200, p.success + `{}`, "invalid"},
-				"boundary":  {200, p.success + strings.Repeat(" ", httpclient.ResponseLimit-len(p.success)), ""},
-				"oversized": {200, strings.Repeat(" ", httpclient.ResponseLimit+1), "256 KiB"},
-				"HTTP error": {
-					403,
-					"synthetic-private-value",
-					"HTTP 403",
-				}, "wrong success": {201, p.success, "HTTP 201"},
-			}
-			if provider == "gotify" {
-				for name, body := range map[string]string{"zero ID": `{"id":0}`, "negative ID": `{"id":-1}`, "string ID": `{"id":"25"}`, "fraction ID": `{"id":1.2}`} {
-					cases[name] = struct {
-						status    int
-						body, err string
-					}{200, body, "invalid"}
-				}
+		"success": {200, success, ""}, "missing ID": {200, `{}`, "invalid"}, "null": {200, `null`, "invalid"},
+		"invalid JSON": {
+			200,
+			"synthetic-private-value",
+			"invalid",
+		}, "multiple documents": {200, success + `{}`, "invalid"},
+		"boundary":  {200, success + strings.Repeat(" ", httpclient.ResponseLimit-len(success)), ""},
+		"oversized": {200, strings.Repeat(" ", httpclient.ResponseLimit+1), "256 KiB"},
+		"HTTP error": {
+			403,
+			"synthetic-private-value",
+			"HTTP 403",
+		}, "wrong success": {201, success, "HTTP 201"},
+	}
+	for name, body := range map[string]string{"zero ID": `{"id":0}`, "negative ID": `{"id":-1}`, "string ID": `{"id":"25"}`, "fraction ID": `{"id":1.2}`} {
+		cases[name] = struct {
+			status    int
+			body, err string
+		}{200, body, "invalid"}
+	}
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			reader := strings.NewReader(test.body)
+			body := &testutil.TrackingBody{Reader: reader}
+			err := readGotifyResponse(&http.Response{StatusCode: test.status, Body: body})
+			if test.err == "" {
+				require.NoError(t, err)
 			} else {
-				for name, body := range map[string]string{"blank ID": `{"id":" ","event":"message"}`, "number ID": `{"id":1,"event":"message"}`, "wrong event": `{"id":"test","event":"open"}`, "missing event": `{"id":"test"}`} {
-					cases[name] = struct {
-						status    int
-						body, err string
-					}{200, body, "invalid"}
-				}
+				require.ErrorContains(t, err, test.err)
+				assert.NotContains(t, err.Error(), "synthetic-private-value")
 			}
-			for name, test := range cases {
-				t.Run(name, func(t *testing.T) {
-					reader := strings.NewReader(test.body)
-					body := &testutil.TrackingBody{Reader: reader}
-					err := p.read(&http.Response{StatusCode: test.status, Body: body})
-					if test.err == "" {
-						require.NoError(t, err)
-					} else {
-						require.ErrorContains(t, err, test.err)
-						assert.NotContains(t, err.Error(), "synthetic-private-value")
-					}
-					assert.True(t, body.Closed)
-					if test.status != 200 {
-						assert.Equal(t, len(test.body), reader.Len())
-					}
-				})
+			assert.True(t, body.Closed)
+			if test.status != 200 {
+				assert.Equal(t, len(test.body), reader.Len())
 			}
 		})
 	}

@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/command"
@@ -162,7 +164,7 @@ func TestRunLocalCommand(t *testing.T) {
 			dst["env"].(map[string]string)["TOKEN"] = "${env:NOTIFIER_TEST_EXPLICIT_SECRET}"
 			wantArgs := []string{"space argument", "$(literal)", "${env:LITERAL}", "", "line\nbreak"}
 			dst["args"] = wantArgs
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			event.Status = test.status
 			event.Duration, event.NonClearDuration = new(uint32(0)), new(uint32(123))
 			input, err := json.Marshal(event)
@@ -205,12 +207,12 @@ func TestRunCommandHelperPrecedence(t *testing.T) {
 			dst["args"] = []string{"sns", "publish", "literal argument"}
 			cfg := testConfig{Version: 1, Destinations: map[string]map[string]any{"target": dst}}
 			var stdout, stderr bytes.Buffer
-			code := Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--destination", "target"}, strings.NewReader(validEvent), &stdout, &stderr)
+			code := Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--destination", "target"}, strings.NewReader(testutil.ValidEvent), &stdout, &stderr)
 			require.Equal(t, test.code, code, stderr.String())
 			if test.mode == "fail" {
 				assert.Contains(t, stderr.String(), "exited with status 7")
 			}
-			input, err := json.Marshal(expectedEvent())
+			input, err := json.Marshal(testutil.ExpectedEvent())
 			require.NoError(t, err)
 			assert.Equal(t, []commandCapture{{
 				Args:  []string{"sns", "publish", "literal argument"},
@@ -269,7 +271,7 @@ func TestRunCommandSelectionAndFailures(t *testing.T) {
 						args = append(args, "--destination", "target")
 					}
 					var stdout, stderr bytes.Buffer
-					assert.Equal(t, test.code, Run(context.Background(), args, strings.NewReader(validEvent), &stdout, &stderr), stderr.String())
+					assert.Equal(t, test.code, Run(context.Background(), args, strings.NewReader(testutil.ValidEvent), &stdout, &stderr), stderr.String())
 					assert.Contains(t, stdout.String()+stderr.String(), test.message)
 					assert.NotContains(t, stdout.String()+stderr.String(), "synthetic-private-value")
 					if test.calls > 0 {
@@ -319,7 +321,7 @@ func TestRunCommandCancellation(t *testing.T) {
 			cfg := testConfig{Version: 1, Destinations: map[string]map[string]any{"target": dst}}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			if test.large {
 				event.Info = strings.Repeat("x", 2<<20)
 			}
@@ -386,7 +388,7 @@ func TestClosedCommandAdmission(t *testing.T) {
 	processes.CloseAndWait()
 	sender, err := command.New(command.Config{Executable: dst["executable"].(string), Env: dst["env"].(map[string]string)}, processes)
 	require.NoError(t, err)
-	require.ErrorIs(t, sender.Send(context.Background(), expectedEvent()), context.Canceled)
+	require.ErrorIs(t, sender.Send(context.Background(), testutil.ExpectedEvent()), context.Canceled)
 	_, err = os.Stat(capture)
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }

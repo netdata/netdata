@@ -44,3 +44,23 @@ func ExpectedEvent() notifyevent.Event {
 		Units:          "C",
 	}
 }
+
+// EventForStatus returns the full or minimal event used by status payload fixtures.
+func EventForStatus(status, variant string) notifyevent.Event {
+	event := ExpectedEvent()
+	if variant == "minimal" {
+		event = notifyevent.Event{
+			Version:    1,
+			IncidentID: "test-incident",
+			Timestamp:  event.Timestamp,
+			Node:       "node",
+			Alert:      "alert",
+			Summary:    "summary",
+		}
+	} else {
+		event.URL = "https://example.com/alert?id=1&view=chart#details"
+		event.PreviousStatus = map[string]string{"WARNING": "CLEAR", "CRITICAL": "WARNING", "CLEAR": "CRITICAL"}[status]
+	}
+	event.Status = status
+	return event
+}

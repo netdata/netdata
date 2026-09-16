@@ -4,11 +4,12 @@ package signl4
 
 import (
 	"encoding/json"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
@@ -16,10 +17,10 @@ import (
 )
 
 func TestRenderIncidentEvents(t *testing.T) {
-	for name, test := range map[string]struct{ status, previous, ilertType, signl4Status string }{
-		"warning":  {"WARNING", "CLEAR", "ALERT", "new"},
-		"critical": {"CRITICAL", "WARNING", "ALERT", "new"},
-		"clear":    {"CLEAR", "CRITICAL", "RESOLVE", "resolved"},
+	for name, test := range map[string]struct{ status, previous, signl4Status string }{
+		"warning":  {"WARNING", "CLEAR", "new"},
+		"critical": {"CRITICAL", "WARNING", "new"},
+		"clear":    {"CLEAR", "CRITICAL", "resolved"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			event := testutil.ExpectedEvent()
@@ -39,7 +40,6 @@ func TestRenderIncidentEvents(t *testing.T) {
 						`"previous_status": "CLEAR"`,
 						`"previous_status": "`+test.previous+`"`,
 					)
-					want = strings.ReplaceAll(want, `"ALERT"`, `"`+test.ilertType+`"`)
 					want = strings.ReplaceAll(want, `"new"`, `"`+test.signl4Status+`"`)
 					got, err := json.Marshal(p.message)
 					require.NoError(t, err)

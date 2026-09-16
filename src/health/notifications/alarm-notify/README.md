@@ -15,7 +15,8 @@ Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, Pager
 Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog,
 AWS SNS, Kafka HTTP bridges, email through sendmail, IRC through nc and destination status filters.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
-before production adoption. Shared mechanisms have separate packages; provider ownership is the next redesign step.
+before production adoption. Shared mechanisms have separate packages, and each provider owns its typed configuration
+and delivery implementation behind a common sender interface.
 
 ## Build and run
 

@@ -17,9 +17,9 @@ import (
 )
 
 func TestRenderChatWebhooks(t *testing.T) {
-	for name, test := range map[string]struct{ status, previous, color string }{
-		"warning": {"WARNING", "CLEAR", "#f0ad4e"}, "critical": {"CRITICAL", "CLEAR", "#d9534f"},
-		"clear": {"CLEAR", "CRITICAL", "#5cb85c"},
+	for name, test := range map[string]struct{ status, previous string }{
+		"warning": {"WARNING", "CLEAR"}, "critical": {"CRITICAL", "CLEAR"},
+		"clear": {"CLEAR", "CRITICAL"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			event := testutil.ExpectedEvent()
@@ -33,7 +33,6 @@ func TestRenderChatWebhooks(t *testing.T) {
 					require.NoError(t, err)
 					want := strings.ReplaceAll(string(fixture), "CLEAR → WARNING", test.previous+" → "+test.status)
 					want = strings.ReplaceAll(want, "WARNING:", test.status+":")
-					want = strings.ReplaceAll(want, "#f0ad4e", test.color)
 					got, err := json.Marshal(p.payload)
 					require.NoError(t, err)
 					assert.JSONEq(t, want, string(got))
@@ -44,9 +43,9 @@ func TestRenderChatWebhooks(t *testing.T) {
 }
 
 func TestChatWebhookContent(t *testing.T) {
-	for name, test := range map[string]struct{ node, alert, summary, sender, channel, url string }{
+	for name, test := range map[string]struct{ node, alert, summary, sender, url string }{
 		"minimal":            {node: "node", alert: "alert", summary: "summary"},
-		"Unicode and quotes": {node: "節点", alert: "alert's \"name\"", summary: "<b>a&b</b> *text*\n😀", sender: "監視 'bot'", channel: "@user", url: "https://example.com/a,b;c?x=\"quoted\"&y=1#fragment"},
+		"Unicode and quotes": {node: "節点", alert: "alert's \"name\"", summary: "<b>a&b</b> *text*\n😀", sender: "監視 'bot'", url: "https://example.com/a,b;c?x=\"quoted\"&y=1#fragment"},
 		"long content":       {node: "node", alert: "alert", summary: strings.Repeat("界😀", 3000)},
 	} {
 		t.Run(name, func(t *testing.T) {

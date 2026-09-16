@@ -44,9 +44,9 @@ func TestRenderChatWebhooks(t *testing.T) {
 }
 
 func TestChatWebhookContent(t *testing.T) {
-	for name, test := range map[string]struct{ node, alert, summary, sender, channel, url string }{
+	for name, test := range map[string]struct{ node, alert, summary, url string }{
 		"minimal":            {node: "node", alert: "alert", summary: "summary"},
-		"Unicode and quotes": {node: "節点", alert: "alert's \"name\"", summary: "<b>a&b</b> *text*\n😀", sender: "監視 'bot'", channel: "@user", url: "https://example.com/a,b;c?x=\"quoted\"&y=1#fragment"},
+		"Unicode and quotes": {node: "節点", alert: "alert's \"name\"", summary: "<b>a&b</b> *text*\n😀", url: "https://example.com/a,b;c?x=\"quoted\"&y=1#fragment"},
 		"long content":       {node: "node", alert: "alert", summary: strings.Repeat("界😀", 3000)},
 	} {
 		t.Run(name, func(t *testing.T) {

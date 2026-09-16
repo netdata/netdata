@@ -16,6 +16,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 
 	"github.com/stretchr/testify/assert"
@@ -82,7 +84,7 @@ func TestRunTeamsMatrix(t *testing.T) {
 					config, err := yaml.Marshal(cfg)
 					require.NoError(t, err)
 					path := writeConfig(t, string(config))
-					input, err := json.Marshal(teamsMatrixTestEvent(status, "full"))
+					input, err := json.Marshal(testutil.EventForStatus(status, "full"))
 					require.NoError(t, err)
 					transactions := map[string]struct{}{}
 					for repeat := 0; repeat < 2; repeat++ {
@@ -100,7 +102,7 @@ func TestRunTeamsMatrix(t *testing.T) {
 						require.Len(t, requests, 2)
 						for index := 0; index < 2; index++ {
 							got := <-requests
-							assert.JSONEq(t, teamsMatrixTestFixture(t, provider, status, "full"), got.Body)
+							assert.JSONEq(t, testutil.ReadStatusFixture(t, filepath.Join("..", "providers", provider, "testdata"), provider, status, "full"), got.Body)
 							got.Body = ""
 							want := request{
 								Method:      "POST",
@@ -160,7 +162,7 @@ func TestRunMatrixRoomEscaping(t *testing.T) {
 				Run(
 					context.Background(),
 					[]string{"send", "--config", writeConfig(t, string(config)), "--destination", "target"},
-					strings.NewReader(validEvent),
+					strings.NewReader(testutil.ValidEvent),
 					&stdout,
 					&stderr,
 				),
@@ -222,7 +224,7 @@ func TestRunTeamsMatrixFailures(t *testing.T) {
 					args[len(args)-2], args[len(args)-1] = "--role", "ops"
 				}
 				var stdout, stderr bytes.Buffer
-				code := Run(context.Background(), args, strings.NewReader(validEvent), &stdout, &stderr)
+				code := Run(context.Background(), args, strings.NewReader(testutil.ValidEvent), &stdout, &stderr)
 				if test.mixed || provider == "msteams" && name == "body" {
 					assert.Zero(t, code)
 				} else {
@@ -278,7 +280,7 @@ func TestRunTeamsMatrixResolvedSecrets(t *testing.T) {
 			code := Run(
 				context.Background(),
 				[]string{"send", "--config", writeConfig(t, string(config)), "--destination", "target"},
-				strings.NewReader(validEvent),
+				strings.NewReader(testutil.ValidEvent),
 				&stdout,
 				&stderr,
 			)

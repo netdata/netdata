@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/stretchr/testify/assert"
@@ -174,7 +176,7 @@ func TestRunRouting(t *testing.T) {
 			}
 			input := test.input
 			if input == "" {
-				input = validEvent
+				input = testutil.ValidEvent
 			}
 			var stdout, stderr bytes.Buffer
 			assert.Equal(
@@ -190,7 +192,7 @@ func TestRunRouting(t *testing.T) {
 			}
 			require.Len(t, requests, len(test.wantCalls))
 			for _, target := range test.wantCalls {
-				assert.Equal(t, received{destination: target, event: expectedEvent()}, <-requests)
+				assert.Equal(t, received{destination: target, event: testutil.ExpectedEvent()}, <-requests)
 			}
 		})
 	}
@@ -329,7 +331,7 @@ routing:
 			defer cancel()
 			var stdout, stderr bytes.Buffer
 			done := make(chan int, 1)
-			input := validEvent
+			input := testutil.ValidEvent
 			if test.provider == "opsgenie-close" {
 				input = strings.ReplaceAll(input, "WARNING", "CLEAR")
 			}
@@ -411,7 +413,7 @@ func TestRunQuotesDestinationNames(t *testing.T) {
 					"--destination",
 					destination,
 				},
-				strings.NewReader(validEvent),
+				strings.NewReader(testutil.ValidEvent),
 				&stdout,
 				&stderr,
 			)

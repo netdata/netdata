@@ -3,11 +3,8 @@
 package email
 
 import (
-	"bytes"
 	"io"
 	"mime"
-	"mime/multipart"
-	"mime/quotedprintable"
 	"net/mail"
 	"path/filepath"
 	"strings"
@@ -148,49 +145,6 @@ func TestEmailModeYAML(t *testing.T) {
 	}
 }
 
-type emailPart struct{ Kind, Body string }
-
-func parseEmail(t *testing.T, raw []byte) (mail.Header, []emailPart) {
-	t.Helper()
-	for _, line := range strings.Split(string(raw), "\r\n") {
-		require.LessOrEqual(t, len(line), 998, "wire line exceeds RFC 5322 limit")
-		require.NotContains(t, line, "\n", "bare LF")
-		require.NotContains(t, line, "\r", "bare CR")
-	}
-	message, err := mail.ReadMessage(bytes.NewReader(raw))
-	require.NoError(t, err)
-	kind, params, err := mime.ParseMediaType(message.Header.Get("Content-Type"))
-	require.NoError(t, err)
-	var parts []emailPart
-	readPart := func(kind string, params map[string]string, encoding string, body io.Reader) {
-		t.Helper()
-		require.Equal(t, map[string]string{"charset": "UTF-8"}, params)
-		require.Equal(t, "quoted-printable", encoding)
-		decoded, err := io.ReadAll(quotedprintable.NewReader(body))
-		require.NoError(t, err)
-		parts = append(parts, emailPart{kind, string(decoded)})
-	}
-	if kind == "multipart/alternative" {
-		require.Len(t, params, 1)
-		require.NotEmpty(t, params["boundary"])
-		reader := multipart.NewReader(message.Body, params["boundary"])
-		for {
-			part, err := reader.NextRawPart()
-			if err == io.EOF {
-				break
-			}
-			require.NoError(t, err)
-			kind, params, err := mime.ParseMediaType(part.Header.Get("Content-Type"))
-			require.NoError(t, err)
-			require.Len(t, part.Header, 2)
-			readPart(kind, params, part.Header.Get("Content-Transfer-Encoding"), part)
-		}
-	} else {
-		readPart(kind, params, message.Header.Get("Content-Transfer-Encoding"), message.Body)
-	}
-	return message.Header, parts
-}
-
 func TestRenderEmail(t *testing.T) {
 	for name, test := range map[string]struct {
 		status, wording string
@@ -211,7 +165,7 @@ func TestRenderEmail(t *testing.T) {
 			before := time.Now().UTC().Truncate(time.Second)
 			args, raw, err := renderEmail(dst, event)
 			require.NoError(t, err)
-			header, parts := parseEmail(t, raw)
+			header, parts := testutil.ParseEmail(t, raw)
 			date, err := header.Date()
 			require.NoError(t, err)
 			assert.WithinRange(t, date, before, time.Now().UTC())
@@ -248,13 +202,13 @@ func TestRenderEmail(t *testing.T) {
 				status = "CLEAR"
 			}
 			plain := "Temperature is high\r\nA quote: \"hot\"\r\nUnicode: θερμοκρασία\r\nNode: test-node\r\nAlert: test_alert\r\nStatus: " + status + "\r\nChart: test.chart\r\nContext: test.context\r\nValue: 42.5 C\r\nPrevious value: 0 C\r\nTime: 2026-09-14T12:00:00Z\r\nhttps://example.com/alert?a=1&b=2\r\nIncident ID: test-incident\r\nDuration: 0 seconds\r\nNon-clear duration: 123 seconds\r\n"
-			wantParts := []emailPart{{"text/plain", plain}}
+			wantParts := []testutil.EmailPart{{Kind: "text/plain", Body: plain}}
 			if test.plain {
 				wantHeaders["Content-Transfer-Encoding"] = []string{"quoted-printable"}
 				assert.Equal(t, "text/plain; charset=UTF-8", header.Get("Content-Type"))
 			} else {
 				htmlPlain := strings.ReplaceAll(strings.ReplaceAll(plain, "\"", "&#34;"), "&b=2", "&amp;b=2")
-				wantParts = append(wantParts, emailPart{"text/html", "<!DOCTYPE html><html><body><pre>" + strings.TrimSuffix(htmlPlain, "\r\n") + "</pre><p><a href=\"https://example.com/alert?a=1&amp;b=2\">View in Netdata</a></p></body></html>\r\n"})
+				wantParts = append(wantParts, testutil.EmailPart{Kind: "text/html", Body: "<!DOCTYPE html><html><body><pre>" + strings.TrimSuffix(htmlPlain, "\r\n") + "</pre><p><a href=\"https://example.com/alert?a=1&amp;b=2\">View in Netdata</a></p></body></html>\r\n"})
 			}
 			assert.Equal(t, wantHeaders, header)
 			assert.Equal(t, wantArgs, args)
@@ -278,7 +232,7 @@ func TestEmailEscapingAndLongLines(t *testing.T) {
 			dst := Config{Recipients: []string{"ops@example.com"}}
 			_, raw, err := renderEmail(dst, event)
 			require.NoError(t, err)
-			header, parts := parseEmail(t, raw)
+			header, parts := testutil.ParseEmail(t, raw)
 			subject, err := new(mime.WordDecoder).DecodeHeader(header.Get("Subject"))
 			require.NoError(t, err)
 			assert.Equal(t, text+" needs attention: test alert (test.chart)", subject)
@@ -295,7 +249,7 @@ func TestEmailEscapingAndLongLines(t *testing.T) {
 			dst := Config{Recipients: []string{display + " <ops@example.com>"}, From: display + " <notify@example.com>"}
 			_, raw, err := renderEmail(dst, testutil.ExpectedEvent())
 			require.NoError(t, err)
-			header, _ := parseEmail(t, raw)
+			header, _ := testutil.ParseEmail(t, raw)
 			for field, address := range map[string]string{"To": "ops@example.com", "From": "notify@example.com"} {
 				got, err := header.AddressList(field)
 				require.NoError(t, err)
@@ -310,7 +264,7 @@ func TestEmailThreadIdentity(t *testing.T) {
 	dst := Config{Recipients: []string{"root"}}
 	_, raw, err := renderEmail(dst, base)
 	require.NoError(t, err)
-	header, _ := parseEmail(t, raw)
+	header, _ := testutil.ParseEmail(t, raw)
 	for name, test := range map[string]struct {
 		change func(*notifyevent.Event)
 		same   bool
@@ -328,7 +282,7 @@ func TestEmailThreadIdentity(t *testing.T) {
 			}
 			_, raw, err := renderEmail(dst, event)
 			require.NoError(t, err)
-			got, _ := parseEmail(t, raw)
+			got, _ := testutil.ParseEmail(t, raw)
 			assert.NotEqual(t, header.Get("Message-ID"), got.Get("Message-ID"))
 			assert.Equal(t, test.same, header.Get("References") == got.Get("References"))
 		})
@@ -336,11 +290,11 @@ func TestEmailThreadIdentity(t *testing.T) {
 	base.Node, base.Chart, base.Alert = "a-b", "c", "d"
 	_, raw, err = renderEmail(dst, base)
 	require.NoError(t, err)
-	one, _ := parseEmail(t, raw)
+	one, _ := testutil.ParseEmail(t, raw)
 	base.Node, base.Chart = "a", "b-c"
 	_, raw, err = renderEmail(dst, base)
 	require.NoError(t, err)
-	two, _ := parseEmail(t, raw)
+	two, _ := testutil.ParseEmail(t, raw)
 	assert.NotEqual(t, one.Get("References"), two.Get("References"))
 }
 
@@ -360,12 +314,12 @@ func TestEmailOptionalContent(t *testing.T) {
 			}
 			_, raw, err := renderEmail(Config{Recipients: []string{"root"}, PlainTextOnly: new(true)}, event)
 			require.NoError(t, err)
-			header, parts := parseEmail(t, raw)
+			header, parts := testutil.ParseEmail(t, raw)
 			assert.Empty(t, header.Get("X-Netdata-Chart"))
 			subject, err := new(mime.WordDecoder).DecodeHeader(header.Get("Subject"))
 			require.NoError(t, err)
 			assert.Equal(t, "node recovered: alert", subject)
-			assert.Equal(t, []emailPart{{"text/plain", "Recovered\r\nNode: node\r\nAlert: alert\r\nStatus: CLEAR\r\nTime: 2026-09-16T12:00:00Z\r\nIncident ID: id\r\n" + test.extra}}, parts)
+			assert.Equal(t, []testutil.EmailPart{{Kind: "text/plain", Body: "Recovered\r\nNode: node\r\nAlert: alert\r\nStatus: CLEAR\r\nTime: 2026-09-16T12:00:00Z\r\nIncident ID: id\r\n" + test.extra}}, parts)
 		})
 	}
 }

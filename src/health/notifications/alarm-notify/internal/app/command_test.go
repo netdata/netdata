@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,7 +77,7 @@ func TestRunDelivery(t *testing.T) {
 				"${env:NOTIFIER_TEST_URL}",
 			) + "    bearer_token: '${env:NOTIFIER_TEST_TOKEN}'\n"
 			var stdout, stderr bytes.Buffer
-			input := strings.Replace(validEvent, "WARNING", test.status, 1)
+			input := strings.Replace(testutil.ValidEvent, "WARNING", test.status, 1)
 			code := Run(
 				context.Background(),
 				[]string{"send", "--config", writeConfig(t, cfg), "--destination", "dev"},
@@ -90,7 +92,7 @@ func TestRunDelivery(t *testing.T) {
 				assert.Contains(t, stderr.String(), fmt.Sprintf("HTTP %d", test.httpStatus))
 			}
 			require.EqualValues(t, 1, calls.Load(), "one request, without retries or redirects")
-			wantEvent := expectedEvent()
+			wantEvent := testutil.ExpectedEvent()
 			wantEvent.Status = test.status
 			assert.Equal(t, request{
 				Method:        "POST",
@@ -185,7 +187,7 @@ func TestRunValidationAndErrors(t *testing.T) {
 		"missing secret": {
 			args:   []string{"send", "--destination", "dev"},
 			config: configForURL("${env:NOTIFIER_TEST_MISSING}"),
-			input:  validEvent,
+			input:  testutil.ValidEvent,
 			code:   1,
 			err:    "environment variable is not set",
 		},
@@ -372,7 +374,7 @@ func TestRunNetworkFailures(t *testing.T) {
 						"--timeout",
 						"200ms",
 					},
-					strings.NewReader(validEvent),
+					strings.NewReader(testutil.ValidEvent),
 					&stdout,
 					&stderr,
 				),

@@ -2,9 +2,10 @@
 package ilert
 
 import (
+	"io"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 	"gopkg.in/yaml.v3"
-	"io"
 )
 
 func readConfig(r io.Reader) (testutil.Document[Config], error) {
@@ -20,10 +21,3 @@ func marshalConfig(doc testutil.Document[Config]) ([]byte, error) {
 	}
 	return yaml.Marshal(map[string]any{"version": doc.Version, "destinations": destinations})
 }
-
-type testBody struct {
-	io.Reader
-	closed bool
-}
-
-func (b *testBody) Close() error { b.closed = true; return nil }

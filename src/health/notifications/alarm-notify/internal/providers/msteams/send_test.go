@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +30,7 @@ func TestSendPayloadLimit(t *testing.T) {
 				defer server.Close()
 				dst := testDestination()
 				dst.URL = server.URL
-				event := teamsMatrixTestEvent("WARNING", "minimal")
+				event := testutil.EventForStatus("WARNING", "minimal")
 				event.Info = "x"
 				baseline, err := json.Marshal(renderMSTeams(dst, event))
 				require.NoError(t, err)
@@ -67,7 +69,7 @@ func TestConstructorOwnsStyleMaps(t *testing.T) {
 	sender, err := New(Config{URL: server.URL, Icons: icons, Colors: colors}, server.Client())
 	require.NoError(t, err)
 	icons["warning"], colors["warning"] = "changed", "654321"
-	require.NoError(t, sender.Send(context.Background(), teamsMatrixTestEvent("WARNING", "minimal")))
+	require.NoError(t, sender.Send(context.Background(), testutil.EventForStatus("WARNING", "minimal")))
 	require.Equal(t, "123456", received.ThemeColor)
 	require.Equal(t, "custom Alert WARNING from Netdata on node", received.Title)
 }

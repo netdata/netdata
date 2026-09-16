@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/awssns"
@@ -123,7 +125,7 @@ func TestRunSNS(t *testing.T) {
 			dst, capture := snsHelperDestination(t, test.mode)
 			dst["credential_source"], dst["env"], dst["target_arn"] = test.source, test.env, test.arn
 			dst["message_template"] = "file://{{info}}"
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			event.Status, event.Info = test.status, "{{node}} $(literal) θερμοκρασία\ntext"
 			input, err := json.Marshal(event)
 			require.NoError(t, err)
@@ -180,7 +182,7 @@ func TestRunSNSSelectionAndFailures(t *testing.T) {
 			dst, capture := snsHelperDestination(t, "")
 			bad := maps.Clone(dst)
 			bad["executable"] = filepath.Join(t.TempDir(), "synthetic-private-value")
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			switch test.mode {
 			case "validate", "unselected", "secret":
 				dst["credential_source"] = "static"
@@ -250,7 +252,7 @@ func TestRunSNSCancellation(t *testing.T) {
 			defer cancel()
 			var stdout, stderr bytes.Buffer
 			done := make(chan int, 1)
-			go func() { done <- Run(ctx, args, strings.NewReader(validEvent), &stdout, &stderr) }()
+			go func() { done <- Run(ctx, args, strings.NewReader(testutil.ValidEvent), &stdout, &stderr) }()
 			conn, err := listener.Accept()
 			require.NoError(t, err)
 			defer conn.Close()
@@ -283,7 +285,7 @@ func TestSNSClosedProcessAdmission(t *testing.T) {
 	dst, capture := snsHelperDestination(t, "")
 	sender, err := awssns.New(awssns.Config{Executable: dst["executable"].(string), TargetARN: dst["target_arn"].(string), CredentialSource: dst["credential_source"].(string)}, processes)
 	require.NoError(t, err)
-	require.ErrorIs(t, sender.Send(context.Background(), expectedEvent()), context.Canceled)
+	require.ErrorIs(t, sender.Send(context.Background(), testutil.ExpectedEvent()), context.Canceled)
 	_, err = os.Stat(capture)
 	assert.ErrorIs(t, err, os.ErrNotExist)
 	remaining, err := filepath.Glob(filepath.Join(dir, "alarm-notify-home-*"))

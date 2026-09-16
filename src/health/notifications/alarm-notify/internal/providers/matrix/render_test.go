@@ -6,56 +6,27 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 
-	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func teamsMatrixTestEvent(status, variant string) notifyevent.Event {
-	event := testutil.ExpectedEvent()
-	if variant == "minimal" {
-		event = notifyevent.Event{
-			Version:    1,
-			IncidentID: "test-incident",
-			Timestamp:  event.Timestamp,
-			Node:       "node",
-			Alert:      "alert",
-			Summary:    "summary",
-		}
-	} else {
-		event.URL = "https://example.com/alert?id=1&view=chart#details"
-		event.PreviousStatus = map[string]string{"WARNING": "CLEAR", "CRITICAL": "WARNING", "CLEAR": "CRITICAL"}[status]
-	}
-	event.Status = status
-	return event
-}
-
-func teamsMatrixTestFixture(t *testing.T, provider, status, variant string) string {
-	t.Helper()
-	data, err := os.ReadFile(fmt.Sprintf("testdata/%s-%s-%s.json", provider, strings.ToLower(status), variant))
-	require.NoError(t, err)
-	return string(data)
-}
 
 func TestRenderTeamsMatrix(t *testing.T) {
 	for provider := range map[string]struct{}{"matrix": {}} {
 		for status := range map[string]struct{}{"WARNING": {}, "CRITICAL": {}, "CLEAR": {}} {
 			for variant := range map[string]struct{}{"full": {}, "minimal": {}} {
 				t.Run(provider+"/"+status+"/"+variant, func(t *testing.T) {
-					event := teamsMatrixTestEvent(status, variant)
+					event := testutil.EventForStatus(status, variant)
 					message := renderMatrix(event)
 					data, err := json.Marshal(message)
 					require.NoError(t, err)
-					assert.JSONEq(t, teamsMatrixTestFixture(t, provider, status, variant), string(data))
+					assert.JSONEq(t, testutil.ReadStatusFixture(t, "testdata", provider, status, variant), string(data))
 				})
 			}
 		}
@@ -63,7 +34,7 @@ func TestRenderTeamsMatrix(t *testing.T) {
 }
 
 func TestTeamsMatrixEscaping(t *testing.T) {
-	event := teamsMatrixTestEvent("CLEAR", "minimal")
+	event := testutil.EventForStatus("CLEAR", "minimal")
 	event.Summary = "[x](bad) *hot* <b>&\"quote\"</b>\n# next \\ end"
 	event.URL = "https://example.com/a(b)<c>?q=\"x\"&y=1"
 	wantText := "✅ [x](bad) *hot* <b>&\"quote\"</b>\n# next \\ end\nNode: node\nAlert: alert\nStatus: CLEAR\nTime: 2026-09-14T12:00:00Z\nhttps://example.com/a(b)<c>?q=\"x\"&y=1"

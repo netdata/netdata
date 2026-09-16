@@ -5,7 +5,6 @@ package alerta
 import (
 	"encoding/json"
 	"errors"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 	"io"
 	"net/http"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
@@ -69,11 +70,11 @@ func assertMonitoringPayload(t *testing.T, provider, want, got string) {
 }
 
 func TestMonitoringContentAndTargeting(t *testing.T) {
-	for name, test := range map[string]struct{ chart, resource, alertEvent, environment, selector, source, eventType string }{
-		"minimal":          {resource: "節点", alertEvent: `alert "one"`, environment: "Production", selector: `type(HOST),tag("netdata")`, source: "Netdata Alarm", eventType: "CUSTOM_INFO"},
-		"regular chart":    {chart: "test.chart", resource: "節点", alertEvent: `test.chart.alert "one"`, environment: "Development", selector: `entityId("HOST-0123456789ABCDEF")`, source: "Source '😀'", eventType: "CUSTOM_ALERT"},
-		"httpcheck":        {chart: "httpcheck.example", resource: "httpcheck.example", alertEvent: `alert "one"`, environment: "Custom 東京", selector: "type(HOST)", source: "Netdata Alarm", eventType: "CUSTOM_DEPLOYMENT"},
-		"httpcheck prefix": {chart: "httpcheck_status", resource: "httpcheck_status", alertEvent: `alert "one"`, environment: "Production", selector: "type(HOST)", source: "Netdata Alarm", eventType: "WARNING"},
+	for name, test := range map[string]struct{ chart, resource, alertEvent, environment string }{
+		"minimal":          {resource: "節点", alertEvent: `alert "one"`, environment: "Production"},
+		"regular chart":    {chart: "test.chart", resource: "節点", alertEvent: `test.chart.alert "one"`, environment: "Development"},
+		"httpcheck":        {chart: "httpcheck.example", resource: "httpcheck.example", alertEvent: `alert "one"`, environment: "Custom 東京"},
+		"httpcheck prefix": {chart: "httpcheck_status", resource: "httpcheck_status", alertEvent: `alert "one"`, environment: "Production"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			for status := range map[string]struct{}{"WARNING": {}, "CRITICAL": {}, "CLEAR": {}} {

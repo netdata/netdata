@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 
@@ -149,7 +151,7 @@ func TestSendPushover(t *testing.T) {
 			}
 			config, err := yaml.Marshal(cfg)
 			require.NoError(t, err)
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			event.URL = "https://example.com/alert?id=1&view=chart#details"
 			if test.oversized {
 				event.Summary = strings.Repeat("😀", 1100)

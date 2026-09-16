@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 
 	"github.com/stretchr/testify/assert"
@@ -143,7 +145,7 @@ func TestRunChatWebhooks(t *testing.T) {
 					}
 					config, err := yaml.Marshal(cfg)
 					require.NoError(t, err)
-					event := expectedEvent()
+					event := testutil.ExpectedEvent()
 					event.URL = "https://example.com/alert?id=1&view=chart#details"
 					input, err := json.Marshal(event)
 					require.NoError(t, err)
@@ -275,7 +277,7 @@ func TestHTTPStatusAcknowledgment(t *testing.T) {
 			code := Run(
 				context.Background(),
 				[]string{"send", "--config", writeConfig(t, string(cfg)), "--destination", "chat", "--timeout", "2s"},
-				strings.NewReader(validEvent),
+				strings.NewReader(testutil.ValidEvent),
 				&stdout,
 				&stderr,
 			)

@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 
@@ -195,7 +197,7 @@ func TestRunTelegram(t *testing.T) {
 			}
 			config, err := yaml.Marshal(cfg)
 			require.NoError(t, err)
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			event.URL = "https://example.com/alert?id=1&view=chart#details"
 			if test.oversized {
 				event.Summary = strings.Repeat("x", 4097)
@@ -457,7 +459,7 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			path := writeConfig(t, string(config))
 			var stdout, stderr bytes.Buffer
 			done := make(chan int, 1)
-			input := validEvent
+			input := testutil.ValidEvent
 			if test.provider == "opsgenie-close" {
 				input = strings.ReplaceAll(input, "WARNING", "CLEAR")
 			}

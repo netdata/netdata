@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func TestEventDurations(t *testing.T) {
 			"string": {input: `"synthetic-private-value"`, err: true}, "array": {input: "[]", err: true},
 		} {
 			t.Run(field+"/"+name, func(t *testing.T) {
-				input := validEvent
+				input := testutil.ValidEvent
 				if test.input != "" {
 					input = strings.Replace(input, `"version": 1`, `"version": 1, "`+field+`": `+test.input, 1)
 				}
@@ -44,7 +45,7 @@ func TestEventDurations(t *testing.T) {
 					return
 				}
 				require.NoError(t, err)
-				want := expectedEvent()
+				want := testutil.ExpectedEvent()
 				if field == "duration" {
 					want.Duration = test.want
 				} else {
@@ -54,50 +55,13 @@ func TestEventDurations(t *testing.T) {
 				// Public Event consumers omit unknown durations and retain explicit zero.
 				encoded, err := json.Marshal(got)
 				require.NoError(t, err)
-				wantJSON := validEvent
+				wantJSON := testutil.ValidEvent
 				if test.want != nil {
 					wantJSON = input
 				}
 				assert.JSONEq(t, wantJSON, string(encoded))
 			})
 		}
-	}
-}
-
-const validEvent = `{
-  "version": 1,
-  "incident_id": "test-incident",
-  "timestamp": "2026-09-14T12:00:00Z",
-  "node": "test-node",
-  "alert": "test_alert",
-  "chart": "test.chart",
-  "context": "test.context",
-  "status": "WARNING",
-  "previous_status": "CLEAR",
-  "summary": "Temperature is high",
-  "info": "A quote: \"hot\"\nUnicode: θερμοκρασία",
-  "value": 42.5,
-  "previous_value": 0,
-  "units": "C"
-}`
-
-func expectedEvent() notifyevent.Event {
-	value, previous := 42.5, 0.0
-	return notifyevent.Event{
-		Version:        1,
-		IncidentID:     "test-incident",
-		Timestamp:      time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC),
-		Node:           "test-node",
-		Alert:          "test_alert",
-		Chart:          "test.chart",
-		Context:        "test.context",
-		Status:         "WARNING",
-		PreviousStatus: "CLEAR",
-		Summary:        "Temperature is high",
-		Info:           "A quote: \"hot\"\nUnicode: θερμοκρασία",
-		Value:          &value,
-		PreviousValue:  &previous,
-		Units:          "C",
 	}
 }
 
@@ -117,7 +81,7 @@ func TestReadEventURL(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			input := strings.Replace(validEvent, `"version": 1`, fmt.Sprintf(`"version": 1, "url": %q`, test.url), 1)
+			input := strings.Replace(testutil.ValidEvent, `"version": 1`, fmt.Sprintf(`"version": 1, "url": %q`, test.url), 1)
 			got, err := readEvent(strings.NewReader(input))
 			if !test.valid {
 				require.ErrorContains(t, err, "event url must be")
@@ -126,7 +90,7 @@ func TestReadEventURL(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			want := expectedEvent()
+			want := testutil.ExpectedEvent()
 			want.URL = test.url
 			assert.Equal(t, want, got)
 		})
@@ -134,17 +98,17 @@ func TestReadEventURL(t *testing.T) {
 }
 
 func TestReadEvent(t *testing.T) {
-	nullValues := expectedEvent()
+	nullValues := testutil.ExpectedEvent()
 	nullValues.Value, nullValues.PreviousValue = nil, nil
 	tests := map[string]struct {
 		input string
 		want  notifyevent.Event
 		err   string
 	}{
-		"complete event": {input: validEvent, want: expectedEvent()},
+		"complete event": {input: testutil.ValidEvent, want: testutil.ExpectedEvent()},
 		"unknown values": {
 			input: strings.ReplaceAll(
-				strings.Replace(validEvent, "42.5", "null", 1),
+				strings.Replace(testutil.ValidEvent, "42.5", "null", 1),
 				"\"previous_value\": 0",
 				"\"previous_value\": null",
 			),
@@ -152,37 +116,37 @@ func TestReadEvent(t *testing.T) {
 		},
 		"empty": {err: "invalid JSON"},
 		"unknown field": {
-			input: strings.Replace(validEvent, "\"units\"", "\"synthetic-private-value\"", 1),
+			input: strings.Replace(testutil.ValidEvent, "\"units\"", "\"synthetic-private-value\"", 1),
 			err:   "invalid JSON",
 		},
 		"invalid timestamp": {
-			input: strings.Replace(validEvent, "2026-09-14T12:00:00Z", "synthetic-private-value", 1),
+			input: strings.Replace(testutil.ValidEvent, "2026-09-14T12:00:00Z", "synthetic-private-value", 1),
 			err:   "invalid JSON",
 		},
-		"nonfinite number": {input: strings.Replace(validEvent, "42.5", "NaN", 1), err: "invalid JSON"},
-		"overflow number":  {input: strings.Replace(validEvent, "42.5", "1e999", 1), err: "invalid JSON"},
+		"nonfinite number": {input: strings.Replace(testutil.ValidEvent, "42.5", "NaN", 1), err: "invalid JSON"},
+		"overflow number":  {input: strings.Replace(testutil.ValidEvent, "42.5", "1e999", 1), err: "invalid JSON"},
 		"unknown version": {
-			input: strings.Replace(validEvent, "\"version\": 1", "\"version\": 2", 1),
+			input: strings.Replace(testutil.ValidEvent, "\"version\": 1", "\"version\": 2", 1),
 			err:   "version must be 1",
 		},
 		"missing identity": {
-			input: strings.Replace(validEvent, "test-incident", "", 1),
+			input: strings.Replace(testutil.ValidEvent, "test-incident", "", 1),
 			err:   "requires incident_id",
 		},
 		"missing summary": {
-			input: strings.Replace(validEvent, "Temperature is high", " ", 1),
+			input: strings.Replace(testutil.ValidEvent, "Temperature is high", " ", 1),
 			err:   "requires incident_id",
 		},
 		"unsupported status": {
-			input: strings.Replace(validEvent, "WARNING", "UNDEFINED", 1),
+			input: strings.Replace(testutil.ValidEvent, "WARNING", "UNDEFINED", 1),
 			err:   "status must be",
 		},
 		"unsupported previous status": {
-			input: strings.Replace(validEvent, "CLEAR", "synthetic-private-value", 1),
+			input: strings.Replace(testutil.ValidEvent, "CLEAR", "synthetic-private-value", 1),
 			err:   "previous_status",
 		},
-		"second event":     {input: validEvent + validEvent, err: "exactly one JSON event"},
-		"trailing garbage": {input: validEvent + " synthetic-private-value", err: "exactly one JSON event"},
+		"second event":     {input: testutil.ValidEvent + testutil.ValidEvent, err: "exactly one JSON event"},
+		"trailing garbage": {input: testutil.ValidEvent + " synthetic-private-value", err: "exactly one JSON event"},
 		"null":             {input: "null", err: "version must be 1"},
 	}
 	for name, test := range tests {

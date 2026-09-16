@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
@@ -67,12 +68,7 @@ func TestRenderFormProviders(t *testing.T) {
 
 				}
 				dst := formTestConfig(provider)
-				var got url.Values
-				var err error
-
-				got = renderKavenegar(dst, test.event)
-
-				require.NoError(t, err)
+				got := renderKavenegar(dst, test.event)
 				decoded, err := url.ParseQuery(got.Encode())
 				require.NoError(t, err)
 				assert.Equal(t, want, decoded)
@@ -131,7 +127,7 @@ func TestReadFormResponses(t *testing.T) {
 		}
 
 		for name, body := range map[string]string{
-			"API error":      `{"return":{"status":403,"message":"synthetic-private-value"},"entries":null}`,
+			"API error":      `{"return":{"status":403,"message":"synthetic-private-value"},"entries":[{"messageid":1}]}`,
 			"missing return": `{"entries":[{"messageid":1}]}`, "missing entries": `{"return":{"status":200}}`,
 			"empty entries": `{"return":{"status":200},"entries":[]}`, "null entry": `{"return":{"status":200},"entries":[null]}`,
 			"zero ID": `{"return":{"status":200},"entries":[{"messageid":0}]}`, "negative ID": `{"return":{"status":200},"entries":[{"messageid":-1}]}`,

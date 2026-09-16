@@ -74,6 +74,8 @@ func TestBuiltinConfigurationAndFieldIsolation(t *testing.T) {
 	destinations := validDestinations(t)
 	require.Len(t, registry, 31)
 	require.ElementsMatch(t, strings.Fields("webhook slack discord telegram pushover pushbullet twilio messagebird gotify ntfy rocketchat flock fleep ilert signl4 alerta dynatrace prowl kavenegar smseagle pagerduty opsgenie msteams matrix command smstools3 syslog awssns kafka email irc"), keys(registry))
+	require.ElementsMatch(t, keys(registry), keys(destinations), "destination fixtures must cover every provider")
+	require.ElementsMatch(t, keys(registry), keys(providerFields), "field inventory must cover every provider")
 	fields := map[string]bool{}
 	for _, names := range providerFields {
 		for _, name := range strings.Fields(names) {

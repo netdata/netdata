@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 
@@ -149,7 +151,7 @@ func TestSendPushbullet(t *testing.T) {
 			}
 			config, err := yaml.Marshal(cfg)
 			require.NoError(t, err)
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			if !test.note {
 				event.URL = "https://example.com/alert?id=1&view=chart#details"
 			}

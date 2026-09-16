@@ -7,31 +7,22 @@ import (
 	"testing"
 )
 
-func TestTeamsMatrixConfig(t *testing.T) {
-	for provider := range map[string]struct{}{"matrix": {}} {
-		for name, test := range map[string]struct{ field, value, err string }{
-			"defaults": {}, "local": {"endpoint", "http://localhost:8080/prefix/", ""},
-			"URL env": {"endpoint", "${env:UNREAD_CHAT_URL}", ""}, "URL file": {"endpoint", "${file:" + filepath.Join(t.TempDir(), "unread") + "}", ""},
-			"empty": {"endpoint", "", ""}, "relative": {"endpoint", "/synthetic-private-value", "absolute HTTP(S)"},
-			"fragment":      {"endpoint", "https://example.com/#fragment", "fragment"},
-			"userinfo":      {"endpoint", "https://user:synthetic-private-value@example.com", "user information"},
-			"relative file": {"endpoint", "${file:relative}", "absolute path"},
-		} {
-			t.Run(provider+"/"+name, func(t *testing.T) {
-				dst := testDestination()
-				if test.field == "endpoint" {
-					dst.APIURL = test.value
-				}
-				want := test.err
-				if name == "empty" {
-					want = "absolute HTTP(S)"
-					if provider == "matrix" {
-						want = "required"
-					}
-				}
-				checkFormConfig(t, dst, want)
-			})
-		}
+func TestMatrixConfig(t *testing.T) {
+	for name, test := range map[string]struct{ field, value, err string }{
+		"defaults": {}, "local": {"endpoint", "http://localhost:8080/prefix/", ""},
+		"URL env": {"endpoint", "${env:UNREAD_CHAT_URL}", ""}, "URL file": {"endpoint", "${file:" + filepath.Join(t.TempDir(), "unread") + "}", ""},
+		"empty": {"endpoint", "", "required"}, "relative": {"endpoint", "/synthetic-private-value", "absolute HTTP(S)"},
+		"fragment":      {"endpoint", "https://example.com/#fragment", "fragment"},
+		"userinfo":      {"endpoint", "https://user:synthetic-private-value@example.com", "user information"},
+		"relative file": {"endpoint", "${file:relative}", "absolute path"},
+	} {
+		t.Run("matrix/"+name, func(t *testing.T) {
+			dst := testDestination()
+			if test.field == "endpoint" {
+				dst.APIURL = test.value
+			}
+			checkFormConfig(t, dst, test.err)
+		})
 	}
 	for name, test := range map[string]struct{ field, value, err string }{
 		"opaque room": {"room_id", "!opaque/room+hash", ""}, "room metacharacters": {"room_id", "!room/?#%:example.org", ""},

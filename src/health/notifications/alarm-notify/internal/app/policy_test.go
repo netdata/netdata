@@ -111,7 +111,7 @@ func TestRunStatusPolicyMatrix(t *testing.T) {
 							data, err := yaml.Marshal(cfg)
 							require.NoError(t, err)
 							args := append([]string{"send", "--config", writeConfig(t, string(data))}, options...)
-							event := expectedEvent()
+							event := testutil.ExpectedEvent()
 							event.Status = status
 							// CLEAR eligibility remains the producer's responsibility, even without a previous state.
 							event.PreviousStatus = ""
@@ -178,7 +178,7 @@ func TestRunStatusPolicyResults(t *testing.T) {
 			require.NoError(t, err)
 			input := test.input
 			if input == "" {
-				input = validEvent
+				input = testutil.ValidEvent
 			}
 			var stdout, stderr bytes.Buffer
 			assert.Equal(t, test.code, Run(context.Background(), []string{"send", "--config", writeConfig(t, string(data)), "--role", "unknown"}, strings.NewReader(input), &stdout, &stderr))

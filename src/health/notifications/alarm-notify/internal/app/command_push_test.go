@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
@@ -168,7 +170,7 @@ func TestSendPush(t *testing.T) {
 					}
 					config, err := yaml.Marshal(cfg)
 					require.NoError(t, err)
-					event := expectedEvent()
+					event := testutil.ExpectedEvent()
 					event.URL = "https://example.com/alert?id=1&view=chart#details"
 					if test.content {
 						event.Node = "節点\r\nInjected: value"

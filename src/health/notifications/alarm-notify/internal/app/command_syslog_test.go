@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
@@ -56,7 +58,7 @@ func TestRunSyslog(t *testing.T) {
 				dst["args"] = []string{"--tcp"}
 				wantArgs = append(wantArgs, "-n", "logs.example.org", "-P", "1514", "--tcp")
 			}
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			event.Status = test.status
 			if test.change != nil {
 				test.change(dst, &event)
@@ -101,7 +103,7 @@ func TestRunSyslogIsolation(t *testing.T) {
 			local["type"] = "syslog"
 			cfg := testConfig{Version: 1, Destinations: map[string]map[string]any{"remote": remote, "local": local}, Routing: notifier.Routing{Roles: map[string][]string{"ops": {"remote", "local", "local"}}}}
 			var stdout, stderr bytes.Buffer
-			assert.Equal(t, test.code, Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--role", "ops"}, strings.NewReader(validEvent), &stdout, &stderr), stderr.String())
+			assert.Equal(t, test.code, Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--role", "ops"}, strings.NewReader(testutil.ValidEvent), &stdout, &stderr), stderr.String())
 			assert.Empty(t, stdout.String())
 			message := "netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"
 			for name, test := range map[string]struct {
@@ -151,7 +153,7 @@ func TestRunSyslogNoLaunch(t *testing.T) {
 			} else {
 				args = append(args, "--destination", "target")
 			}
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			if test.nul {
 				event.Node = "synthetic-private-value\x00"
 			}

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
+
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +44,7 @@ func TestRunCommandStatusPolicies(t *testing.T) {
 			}
 			cfg := testConfig{Version: 1, Destinations: map[string]map[string]any{"dev": dst},
 				Routing: notifier.Routing{Policies: map[string]*notifier.DestinationPolicy{"dev": {NoWarn: true, NoClear: true}}}}
-			event := expectedEvent()
+			event := testutil.ExpectedEvent()
 			event.Status = test.status
 			input, err := json.Marshal(event)
 			require.NoError(t, err)

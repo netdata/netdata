@@ -3,12 +3,16 @@
 package testutil
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"testing"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type Document[C any] struct {
@@ -39,4 +43,18 @@ func ReadConfig[C any](r io.Reader, provider string, validate func(C) error) (Do
 		result.Destinations[name] = sender.(*capturedConfig[C]).config
 	}
 	return result, nil
+}
+
+// CheckConfig checks the complete decoded configuration or a redacted failure.
+func CheckConfig[C any](t *testing.T, data []byte, want Document[C], wantErr string, read func(io.Reader) (Document[C], error)) {
+	t.Helper()
+	got, err := read(bytes.NewReader(data))
+	if wantErr != "" {
+		require.ErrorContains(t, err, wantErr)
+		assert.NotContains(t, err.Error(), "synthetic-private-value")
+		assert.Equal(t, Document[C]{}, got)
+	} else {
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+	}
 }
