@@ -490,9 +490,9 @@ static void volume_space_worker(void *ptr __maybe_unused)
             struct volume_space_request *request_value;
             dfe_start_write(volume_space_request, request_value)
             {
-                snprintfz(name, sizeof(name), "%s", request_dfe.name);
+                snprintfz(name, sizeof(name), "%s", request_value_dfe.name);
                 metadata = request_value->metadata;
-                dictionary_del(volume_space_request, request_dfe.name);
+                dictionary_del(volume_space_request, request_value_dfe.name);
                 have_target = true;
                 break;
             }
@@ -1019,7 +1019,7 @@ static void mount_points_refresh_with_ops(usec_t now_ut, const struct mount_poin
             dfe_start_read(previous_volume_ids, old_volume_id)
             {
                 if (old_volume_id && dictionary_get(failed_volume_ids, old_volume_id))
-                    dictionary_set(uncertain_paths, volume_id_dfe.name, NULL, 0);
+                    dictionary_set(uncertain_paths, old_volume_id_dfe.name, NULL, 0);
             }
             dfe_done(old_volume_id);
         }
