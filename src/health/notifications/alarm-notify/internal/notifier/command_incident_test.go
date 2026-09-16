@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -276,7 +277,7 @@ func TestRunIncidentLifecycle(t *testing.T) {
 			args := []string{"send", "--config", writeConfig(t, string(config)), "--role", "ops"}
 			// Separate invocations change all presentation facts; only incident_id supplies correlation.
 			for step, status := range []string{"WARNING", "CRITICAL", "CLEAR"} {
-				event := Event{
+				event := notifyevent.Event{
 					Version:    1,
 					IncidentID: test.id,
 					Timestamp:  expectedEvent().Timestamp.Add(time.Duration(step) * time.Minute),

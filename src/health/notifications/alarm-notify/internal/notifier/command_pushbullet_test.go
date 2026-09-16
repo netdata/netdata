@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -43,7 +44,7 @@ func TestSendPushbullet(t *testing.T) {
 		"API error":                            {calls: 1, body: `{"error":{"message":"synthetic-private-value"}}`, err: "API rejected"},
 		"missing acknowledgment":               {calls: 1, body: `{}`, err: "invalid pushbullet response"},
 		"invalid acknowledgment":               {calls: 1, body: `synthetic-private-value`, err: "invalid pushbullet response"},
-		"oversized acknowledgment":             {calls: 1, body: strings.Repeat(" ", notificationResponseLimit+1), err: "256 KiB"},
+		"oversized acknowledgment":             {calls: 1, body: strings.Repeat(" ", httpclient.ResponseLimit+1), err: "256 KiB"},
 		"explicit failure":                     {calls: 1, status: 403, explicit: true, code: 1, err: "all attempted destinations failed"},
 		"transport failure":                    {calls: 1, drop: true, err: "transport failed"},
 	} {

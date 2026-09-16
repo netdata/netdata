@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -135,14 +136,14 @@ func TestRunRouting(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			type received struct {
 				destination string
-				event       Event
+				event       notifyevent.Event
 				err         error
 			}
 			requests := make(chan received, 16)
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					target := strings.TrimPrefix(r.URL.Path, "/")
-					var event Event
+					var event notifyevent.Event
 					err := json.NewDecoder(r.Body).Decode(&event)
 					requests <- received{target, event, err}
 					status := test.statuses[target]

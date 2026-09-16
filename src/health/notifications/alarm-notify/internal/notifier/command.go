@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 )
 
 const usage = `Experimental Netdata notifier (not installed or used by the Agent).
@@ -85,10 +87,10 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return 1
 	}
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
-	processes := &commandProcesses{}
+	processes := &commandexec.Runner{}
 	defer func() {
 		cancel()
-		processes.closeAndWait()
+		processes.CloseAndWait()
 	}()
 	// Keep output on this goroutine so cancellation cannot race with a caller's writer.
 	updates := make(chan commandUpdate)
@@ -162,7 +164,7 @@ receive:
 
 func execute(
 	ctx context.Context,
-	processes *commandProcesses,
+	processes *commandexec.Runner,
 	configPath string,
 	validateOnly bool,
 	destination string,

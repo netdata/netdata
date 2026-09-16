@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +22,7 @@ func TestRenderSlack(t *testing.T) {
 	critical.Status = "CRITICAL"
 	recovery := full
 	recovery.Status, recovery.PreviousStatus = "CLEAR", "CRITICAL"
-	minimal := Event{
+	minimal := notifyevent.Event{
 		Version:    1,
 		IncidentID: "test",
 		Node:       "node",
@@ -33,7 +34,7 @@ func TestRenderSlack(t *testing.T) {
 	escaping := minimal
 	escaping.Summary = "<@USER> & <!here> *literal*"
 	tests := map[string]struct {
-		event        Event
+		event        notifyevent.Event
 		fixture      string
 		replacements []string
 	}{
@@ -69,7 +70,7 @@ func TestRenderSlack(t *testing.T) {
 }
 
 func TestRenderSlackLimits(t *testing.T) {
-	base := Event{
+	base := notifyevent.Event{
 		Node:      "node",
 		Alert:     "alert",
 		Status:    "WARNING",

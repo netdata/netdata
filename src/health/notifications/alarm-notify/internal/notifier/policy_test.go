@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -88,9 +89,9 @@ func TestRunStatusPolicyMatrix(t *testing.T) {
 						"roles":  {"--role", "sysadmin", "--role", "dba", "--role", "sysadmin"},
 					} {
 						t.Run(selection, func(t *testing.T) {
-							requests := make(chan Event, 4)
+							requests := make(chan notifyevent.Event, 4)
 							server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-								var event Event
+								var event notifyevent.Event
 								assert.NoError(t, json.NewDecoder(r.Body).Decode(&event))
 								requests <- event
 								w.WriteHeader(http.StatusNoContent)

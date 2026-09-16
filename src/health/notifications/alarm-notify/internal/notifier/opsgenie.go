@@ -13,6 +13,11 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const opsgenieDefaultAPI = "https://api.opsgenie.com"
@@ -22,7 +27,7 @@ func (dst Destination) validateOpsgenie() error {
 		return errors.New("opsgenie destination contains fields for another provider")
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"api_key", dst.APIKey}} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("opsgenie %s: %w", field.name, err)
 		}
@@ -69,7 +74,7 @@ func opsgenieAlias(id string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(id)))
 }
 
-func renderOpsgenie(event Event) (any, error) {
+func renderOpsgenie(event notifyevent.Event) (any, error) {
 	if utf8.RuneCountInString(event.Node) > 100 {
 		return nil, errors.New("opsgenie source exceeds the 100-character limit")
 	}
@@ -77,7 +82,7 @@ func renderOpsgenie(event Event) (any, error) {
 	if err != nil {
 		return nil, errors.New("could not encode opsgenie event")
 	}
-	text := notificationPlainText(event, true)
+	text := notifymsg.PlainText(event, true)
 	if event.Status == "CLEAR" {
 		message := opsgenieClose{Source: event.Node, User: "Netdata", Note: text + "\n\nEvent: " + string(data)}
 		if utf8.RuneCountInString(message.Note) > 25000 {
@@ -108,12 +113,12 @@ func renderOpsgenie(event Event) (any, error) {
 	}, nil
 }
 
-func sendOpsgenie(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendOpsgenie(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"api_key", &dst.APIKey}} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("opsgenie %s: %w", field.name, err)
 		}
@@ -134,9 +139,9 @@ func sendOpsgenie(ctx context.Context, dst Destination, event Event, timeout tim
 	if event.Status == "CLEAR" {
 		endpoint += "/" + opsgenieAlias(event.IncidentID) + "/close?identifierType=alias"
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(ctx, client, "opsgenie", endpoint,
+	response, err := httpclient.PostJSON(ctx, client, "opsgenie", endpoint,
 		http.Header{"Authorization": {"GenieKey " + dst.APIKey}, "Accept": {"application/json"}}, message)
 	if err != nil {
 		return err
@@ -153,7 +158,7 @@ func readOpsgenieResponse(response *http.Response) error {
 		Result    string `json:"result"`
 		RequestID string `json:"requestId"`
 	}
-	if err := decodeNotificationResponse("opsgenie", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("opsgenie", response.Body, &result); err != nil {
 		return err
 	}
 	if result.Result != "Request will be processed" || validateToken(result.RequestID, "opsgenie", "requestId") != nil {

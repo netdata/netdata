@@ -13,11 +13,15 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 const prowlDefaultAPI = "https://api.prowlapp.com/publicapi"
 
-func renderProwl(dst Destination, event Event) (url.Values, error) {
+func renderProwl(dst Destination, event notifyevent.Event) (url.Values, error) {
 	priority := "0"
 	switch event.Status {
 	case "WARNING":
@@ -28,7 +32,7 @@ func renderProwl(dst Destination, event Event) (url.Values, error) {
 	form := url.Values{
 		"apikey": {dst.APIKey}, "application": {"Netdata"}, "priority": {priority},
 		"event":       {event.Node + " " + event.Status + ": " + event.Summary},
-		"description": {notificationPlainText(event, false)}, "url": {event.URL},
+		"description": {notifymsg.PlainText(event, false)}, "url": {event.URL},
 	}
 	// Prowl documents UTF-8 byte limits, not character counts.
 	for _, field := range []struct {
@@ -42,7 +46,7 @@ func renderProwl(dst Destination, event Event) (url.Values, error) {
 	return form, nil
 }
 
-func sendProwl(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendProwl(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	if err := dst.resolveFormProvider(ctx); err != nil {
 		return err
 	}
@@ -54,9 +58,9 @@ func sendProwl(ctx context.Context, dst Destination, event Event, timeout time.D
 	if base == "" {
 		base = prowlDefaultAPI
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotification(
+	response, err := httpclient.Post(
 		ctx,
 		client,
 		"prowl",
@@ -76,7 +80,7 @@ func readProwlResponse(response *http.Response) error {
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("prowl returned HTTP %d", response.StatusCode)
 	}
-	data, err := readNotificationResponse("prowl", response.Body)
+	data, err := httpclient.ReadResponse("prowl", response.Body)
 	if err != nil {
 		return err
 	}

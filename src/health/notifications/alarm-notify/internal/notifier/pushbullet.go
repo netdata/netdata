@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const pushbulletDefaultAPI = "https://api.pushbullet.com"
@@ -51,7 +56,7 @@ func (dst Destination) validatePushbullet() error {
 	for _, field := range []struct{ name, value string }{
 		{"access_token", dst.AccessToken}, {"api_url", dst.APIURL},
 	} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("pushbullet %s: %w", field.name, err)
 		}
@@ -77,14 +82,14 @@ func validatePushbulletField(name, value string) error {
 	return validateToken(value, "pushbullet", "access_token")
 }
 
-func sendPushbullet(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendPushbullet(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{
 		{"access_token", &dst.AccessToken}, {"api_url", &dst.APIURL},
 	} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("pushbullet %s: %w", field.name, err)
 		}
@@ -98,10 +103,10 @@ func sendPushbullet(ctx context.Context, dst Destination, event Event, timeout t
 		base = pushbulletDefaultAPI
 	}
 	endpoint := strings.TrimRight(base, "/") + "/v2/pushes"
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
 	headers := http.Header{"Access-Token": {dst.AccessToken}}
-	response, err := postNotificationJSON(ctx, client, "pushbullet", endpoint, headers, renderPushbullet(dst, event))
+	response, err := httpclient.PostJSON(ctx, client, "pushbullet", endpoint, headers, renderPushbullet(dst, event))
 	if err != nil {
 		return err
 	}
@@ -117,7 +122,7 @@ func readPushbulletResponse(response *http.Response) error {
 		ID    string          `json:"iden"`
 		Error json.RawMessage `json:"error"`
 	}
-	if err := decodeNotificationResponse("pushbullet", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("pushbullet", response.Body, &result); err != nil {
 		return err
 	}
 	if len(result.Error) > 0 && string(result.Error) != "null" {
@@ -129,12 +134,12 @@ func readPushbulletResponse(response *http.Response) error {
 	return nil
 }
 
-func renderPushbullet(dst Destination, event Event) pushbulletMessage {
+func renderPushbullet(dst Destination, event notifyevent.Event) pushbulletMessage {
 	message := pushbulletMessage{Type: "note", Title: event.Node + " " + event.Status + ": " + event.Summary,
 		Email: dst.Email, ChannelTag: dst.ChannelTag, SourceDeviceID: dst.SourceDeviceID}
 	if event.URL != "" {
 		message.Type, message.URL = "link", event.URL
 	}
-	message.Body = notificationPlainText(event, false)
+	message.Body = notifymsg.PlainText(event, false)
 	return message
 }

@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 type rocketChatMessage struct {
@@ -32,15 +36,15 @@ type rocketChatField struct {
 	Short bool   `json:"short"`
 }
 
-func renderRocketChat(dst Destination, event Event) rocketChatMessage {
+func renderRocketChat(dst Destination, event notifyevent.Event) rocketChatMessage {
 	attachment := rocketChatAttachment{
 		Color: chatWebhookColor(event.Status), Title: event.Alert, TitleLink: event.URL,
 		Text: event.Info, Timestamp: event.Timestamp.Format(time.RFC3339),
 	}
-	for _, field := range notificationFields(event) {
+	for _, field := range notifymsg.Fields(event) {
 		attachment.Fields = append(
 			attachment.Fields,
-			rocketChatField{Title: field.name, Value: field.value, Short: true},
+			rocketChatField{Title: field.Name, Value: field.Value, Short: true},
 		)
 	}
 	return rocketChatMessage{
@@ -62,7 +66,7 @@ func readRocketChatResponse(response *http.Response) error {
 			Error string `json:"error"`
 		} `json:"responses"`
 	}
-	if err := decodeNotificationResponse("rocketchat", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("rocketchat", response.Body, &result); err != nil {
 		return err
 	}
 	if !result.Success || result.Error != "" {

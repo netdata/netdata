@@ -14,6 +14,11 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type ntfyAction struct {
@@ -37,7 +42,7 @@ func (dst Destination) validateNtfy() error {
 	for _, field := range []struct{ name, value string }{
 		{"url", dst.URL}, {"access_token", dst.AccessToken}, {"username", dst.Username}, {"password", dst.Password},
 	} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("ntfy %s: %w", field.name, err)
 		}
@@ -52,7 +57,7 @@ func (dst Destination) validateNtfy() error {
 
 func validateNtfyField(name, value string) error {
 	if name == "url" {
-		if !validHTTPURL(value, false) || strings.Contains(value, "#") {
+		if !httpclient.ValidURL(value, false) || strings.Contains(value, "#") {
 			return errors.New("ntfy url must be an absolute HTTP(S) topic URL without user information or fragment")
 		}
 		return nil
@@ -73,14 +78,14 @@ func validateNtfyField(name, value string) error {
 	return nil
 }
 
-func sendNtfy(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendNtfy(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{
 		{"url", &dst.URL}, {"access_token", &dst.AccessToken}, {"username", &dst.Username}, {"password", &dst.Password},
 	} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("ntfy %s: %w", field.name, err)
 		}
@@ -95,17 +100,17 @@ func sendNtfy(ctx context.Context, dst Destination, event Event, timeout time.Du
 	} else if dst.Username != "" {
 		headers.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(dst.Username+":"+dst.Password)))
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotification(ctx, client, "ntfy", dst.URL, "text/plain; charset=utf-8", headers,
-		strings.NewReader(notificationPlainText(event, false)))
+	response, err := httpclient.Post(ctx, client, "ntfy", dst.URL, "text/plain; charset=utf-8", headers,
+		strings.NewReader(notifymsg.PlainText(event, false)))
 	if err != nil {
 		return err
 	}
 	return readNtfyResponse(response)
 }
 
-func renderNtfyHeaders(event Event) http.Header {
+func renderNtfyHeaders(event notifyevent.Event) http.Header {
 	priority, tag := "default", "white_check_mark"
 	switch event.Status {
 	case "WARNING":
@@ -150,7 +155,7 @@ func readNtfyResponse(response *http.Response) error {
 		ID    string `json:"id"`
 		Event string `json:"event"`
 	}
-	if err := decodeNotificationResponse("ntfy", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("ntfy", response.Body, &result); err != nil {
 		return err
 	}
 	if strings.TrimSpace(result.ID) == "" || result.Event != "message" {

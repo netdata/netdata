@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +40,7 @@ func TestEventDurations(t *testing.T) {
 				if test.err {
 					require.ErrorContains(t, err, "invalid JSON event")
 					assert.NotContains(t, err.Error(), "synthetic-private-value")
-					assert.Equal(t, Event{}, got)
+					assert.Equal(t, notifyevent.Event{}, got)
 					return
 				}
 				require.NoError(t, err)
@@ -80,9 +81,9 @@ const validEvent = `{
   "units": "C"
 }`
 
-func expectedEvent() Event {
+func expectedEvent() notifyevent.Event {
 	value, previous := 42.5, 0.0
-	return Event{
+	return notifyevent.Event{
 		Version:        1,
 		IncidentID:     "test-incident",
 		Timestamp:      time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC),
@@ -120,7 +121,7 @@ func TestReadEventURL(t *testing.T) {
 			got, err := readEvent(strings.NewReader(input))
 			if !test.valid {
 				require.ErrorContains(t, err, "event url must be")
-				assert.Equal(t, Event{}, got)
+				assert.Equal(t, notifyevent.Event{}, got)
 				assert.NotContains(t, err.Error(), "synthetic-private-value")
 				return
 			}
@@ -137,7 +138,7 @@ func TestReadEvent(t *testing.T) {
 	nullValues.Value, nullValues.PreviousValue = nil, nil
 	tests := map[string]struct {
 		input string
-		want  Event
+		want  notifyevent.Event
 		err   string
 	}{
 		"complete event": {input: validEvent, want: expectedEvent()},
@@ -190,7 +191,7 @@ func TestReadEvent(t *testing.T) {
 			if test.err != "" {
 				require.ErrorContains(t, err, test.err)
 				assert.NotContains(t, err.Error(), "synthetic-private-value")
-				assert.Equal(t, Event{}, got)
+				assert.Equal(t, notifyevent.Event{}, got)
 				return
 			}
 			require.NoError(t, err)

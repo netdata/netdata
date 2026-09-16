@@ -15,6 +15,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +54,7 @@ func opsgenieTestFixture(t *testing.T, variant, status string) map[string]any {
 func TestRenderOpsgenie(t *testing.T) {
 	full := expectedEvent()
 	full.URL = "https://example.com/alert?id=1&view=chart#details"
-	minimal := Event{
+	minimal := notifyevent.Event{
 		Version:    1,
 		IncidentID: "test-incident",
 		Timestamp:  full.Timestamp,
@@ -127,7 +129,7 @@ func TestOpsgenieTitleLimits(t *testing.T) {
 			got := message.(opsgenieCreate)
 			assert.Equal(t, want, got.Message)
 			assert.True(t, utf8.ValidString(got.Message))
-			var details Event
+			var details notifyevent.Event
 			require.NoError(t, json.Unmarshal([]byte(got.Details["event"]), &details))
 			assert.Equal(t, event, details)
 		})
@@ -239,8 +241,8 @@ func TestReadOpsgenieResponse(t *testing.T) {
 		"wrong result":  {202, `{"result":"synthetic-private-value","requestId":"test"}`, "acknowledgment"},
 		"empty":         {202, "", "invalid"}, "null": {202, "null", "acknowledgment"}, "array": {202, "[]", "invalid"}, "object": {202, "{}", "acknowledgment"},
 		"malformed": {202, "synthetic-private-value", "invalid"}, "trailing": {202, opsgenieTestAck + opsgenieTestAck, "invalid"},
-		"body boundary": {202, opsgenieTestAck + strings.Repeat(" ", notificationResponseLimit-len(opsgenieTestAck)), ""},
-		"body over":     {202, opsgenieTestAck + strings.Repeat(" ", notificationResponseLimit-len(opsgenieTestAck)+1), "256 KiB"},
+		"body boundary": {202, opsgenieTestAck + strings.Repeat(" ", httpclient.ResponseLimit-len(opsgenieTestAck)), ""},
+		"body over":     {202, opsgenieTestAck + strings.Repeat(" ", httpclient.ResponseLimit-len(opsgenieTestAck)+1), "256 KiB"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			reader := strings.NewReader(test.body)

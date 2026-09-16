@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const pushoverDefaultAPI = "https://api.pushover.net"
@@ -38,7 +43,7 @@ func (dst Destination) validatePushover() error {
 	for _, field := range []struct{ name, value string }{
 		{"app_token", dst.AppToken}, {"user_key", dst.UserKey}, {"api_url", dst.APIURL},
 	} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("pushover %s: %w", field.name, err)
 		}
@@ -62,14 +67,14 @@ func validatePushoverField(name, value string) error {
 	return nil
 }
 
-func sendPushover(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendPushover(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{
 		{"app_token", &dst.AppToken}, {"user_key", &dst.UserKey}, {"api_url", &dst.APIURL},
 	} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("pushover %s: %w", field.name, err)
 		}
@@ -83,9 +88,9 @@ func sendPushover(ctx context.Context, dst Destination, event Event, timeout tim
 		base = pushoverDefaultAPI
 	}
 	endpoint := strings.TrimRight(base, "/") + "/1/messages.json"
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(ctx, client, "pushover", endpoint, nil, renderPushover(dst, event))
+	response, err := httpclient.PostJSON(ctx, client, "pushover", endpoint, nil, renderPushover(dst, event))
 	if err != nil {
 		return err
 	}
@@ -100,7 +105,7 @@ func readPushoverResponse(response *http.Response) error {
 	var result struct {
 		Status *int `json:"status"`
 	}
-	if err := decodeNotificationResponse("pushover", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("pushover", response.Body, &result); err != nil {
 		return err
 	}
 	if result.Status == nil {
@@ -112,7 +117,7 @@ func readPushoverResponse(response *http.Response) error {
 	return nil
 }
 
-func renderPushover(dst Destination, event Event) pushoverMessage {
+func renderPushover(dst Destination, event notifyevent.Event) pushoverMessage {
 	message := pushoverMessage{
 		Token: dst.AppToken, User: dst.UserKey, HTML: 1, Timestamp: event.Timestamp.Unix(),
 		Title: event.Node + " " + event.Status + ": " + event.Summary,
@@ -130,8 +135,8 @@ func renderPushover(dst Destination, event Event) pushoverMessage {
 	if event.Info != "" {
 		parts = append(parts, pushoverText{text: event.Info, tag: "i"})
 	}
-	for _, field := range notificationFields(event) {
-		parts = append(parts, pushoverText{text: field.name + ": " + field.value})
+	for _, field := range notifymsg.Fields(event) {
+		parts = append(parts, pushoverText{text: field.Name + ": " + field.Value})
 	}
 	message.Message = renderPushoverText(parts)
 	if event.URL != "" && utf8.RuneCountInString(event.URL) <= 512 {

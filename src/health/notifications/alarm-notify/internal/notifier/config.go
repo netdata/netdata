@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"path/filepath"
 	"strings"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 	"gopkg.in/yaml.v3"
 )
 
@@ -273,7 +274,7 @@ func (dst Destination) validate() error {
 	if dst.Type != "webhook" && dst.BearerToken != "" {
 		return fmt.Errorf("%s destinations authenticate through their URL; bearer_token is not supported", dst.Type)
 	}
-	reference, err := secretReference(dst.URL)
+	reference, err := secret.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
 	}
@@ -287,7 +288,7 @@ func (dst Destination) validate() error {
 			}
 		}
 	}
-	if _, err := secretReference(dst.BearerToken); err != nil {
+	if _, err := secret.IsReference(dst.BearerToken); err != nil {
 		return fmt.Errorf("destination.bearer_token: %w", err)
 	}
 	if strings.ContainsAny(dst.BearerToken, "\r\n") {
@@ -304,43 +305,11 @@ func validateToken(value, provider, field string) error {
 	return nil
 }
 
-// Secret references occupy the whole value; configuration validation performs no resolution.
-func secretReference(value string) (bool, error) {
-	if !strings.Contains(value, "${") {
-		return false, nil
-	}
-	scheme, operand, ok := strings.Cut(value, ":")
-	if !ok || !strings.HasSuffix(operand, "}") {
-		return false, errors.New("expected a whole env or file secret reference")
-	}
-	operand = strings.TrimSuffix(operand, "}")
-	if strings.TrimSpace(operand) == "" || strings.ContainsAny(operand, "{}") {
-		return false, errors.New("secret reference requires a nonempty operand without braces")
-	}
-	switch scheme {
-	case "${env":
-		return true, nil
-	case "${file":
-		if filepath.IsAbs(operand) {
-			return true, nil
-		}
-		return false, errors.New("file secret reference requires an absolute path")
-	default:
-		return false, errors.New("only whole env and file secret references are supported")
-	}
-}
-
 func validateURL(value string) error {
-	if !validHTTPURL(value, false) {
+	if !httpclient.ValidURL(value, false) {
 		return errors.New("destination.url must be an absolute HTTP(S) URL without user information or fragment")
 	}
 	return nil
-}
-
-func validHTTPURL(value string, allowFragment bool) bool {
-	u, err := url.Parse(value)
-	return err == nil && u.Hostname() != "" && u.Opaque == "" && u.User == nil &&
-		(allowFragment || u.Fragment == "") && (u.Scheme == "http" || u.Scheme == "https")
 }
 
 func validateAPIBase(endpoint, provider, officialHost string) error {
@@ -348,7 +317,7 @@ func validateAPIBase(endpoint, provider, officialHost string) error {
 		return nil // The provider uses its official HTTPS endpoint.
 	}
 	// Even an empty fragment would capture the method appended to this base.
-	if !validHTTPURL(endpoint, false) || strings.Contains(endpoint, "#") {
+	if !httpclient.ValidURL(endpoint, false) || strings.Contains(endpoint, "#") {
 		return fmt.Errorf(
 			"%s api_url must be an absolute HTTP(S) base URL without user information or fragment",
 			provider,

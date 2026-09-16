@@ -2,11 +2,16 @@
 
 package notifier
 
+import (
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+)
+
 type fleepMessage struct {
 	Message string `json:"message"`
 	User    string `json:"user,omitempty"`
 }
 
-func renderFleep(dst Destination, event Event) fleepMessage {
-	return fleepMessage{Message: notificationPlainText(event, true), User: dst.Sender}
+func renderFleep(dst Destination, event notifyevent.Event) fleepMessage {
+	return fleepMessage{Message: notifymsg.PlainText(event, true), User: dst.Sender}
 }

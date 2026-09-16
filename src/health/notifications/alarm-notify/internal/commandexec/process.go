@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package notifier
+package commandexec
 
 import (
 	"context"
@@ -13,34 +13,39 @@ import (
 	"time"
 )
 
-// Only admitted subprocess calls delay Run's return, never blocked input or HTTP reads.
-type commandProcesses struct {
+// Runner owns admitted subprocesses and their cleanup. Its zero value is ready to use.
+// A Runner must not be copied after first use.
+type Runner struct {
 	mu     sync.Mutex
 	closed bool
 	wg     sync.WaitGroup
 }
 
-func (p *commandProcesses) closeAndWait() {
+// CloseAndWait rejects new calls and waits for all admitted subprocess cleanup.
+// It does not cancel running commands; callers must cancel their contexts.
+func (p *Runner) CloseAndWait() {
 	p.mu.Lock()
 	p.closed = true
 	p.mu.Unlock()
 	p.wg.Wait()
 }
 
-func (p *commandProcesses) run(ctx context.Context, executable string, args, env []string, input io.Reader) error {
-	return p.runCommand(ctx, executable, args, env, input, false)
+// Run executes a foreground command and discards its output.
+func (p *Runner) Run(ctx context.Context, executable string, args, env []string, input io.Reader) error {
+	return p.runProcess(ctx, executable, args, env, input, false, nil)
 }
 
-func (p *commandProcesses) runCommand(ctx context.Context, executable string, args, env []string, input io.Reader, privateHome bool) (result error) {
-	return p.runProcess(ctx, executable, args, env, input, privateHome, nil)
+// RunWithPrivateHome executes a command with a temporary HOME removed before return.
+func (p *Runner) RunWithPrivateHome(ctx context.Context, executable string, args, env []string, input io.Reader) error {
+	return p.runProcess(ctx, executable, args, env, input, true, nil)
 }
 
-// Sessions own a foreground protocol exchange; both directions close before admission is released.
-func (p *commandProcesses) runSession(ctx context.Context, executable string, args, env []string, exchange func(io.Reader, io.WriteCloser) error) error {
+// RunSession owns a foreground protocol exchange; both directions close before admission is released.
+func (p *Runner) RunSession(ctx context.Context, executable string, args, env []string, exchange func(io.Reader, io.WriteCloser) error) error {
 	return p.runProcess(ctx, executable, args, env, nil, false, exchange)
 }
 
-func (p *commandProcesses) runProcess(ctx context.Context, executable string, args, env []string, input io.Reader, privateHome bool, exchange func(io.Reader, io.WriteCloser) error) (result error) {
+func (p *Runner) runProcess(ctx context.Context, executable string, args, env []string, input io.Reader, privateHome bool, exchange func(io.Reader, io.WriteCloser) error) (result error) {
 	p.mu.Lock()
 	if err := ctx.Err(); err != nil {
 		p.mu.Unlock()
@@ -88,7 +93,7 @@ func (p *commandProcesses) runProcess(ctx context.Context, executable string, ar
 		if err != nil {
 			return errors.New("could not create private command home")
 		}
-		// Remove credential caches before the admitted call releases Run's shutdown wait.
+		// Remove credential caches before the admitted call releases CloseAndWait.
 		defer func() {
 			if err := os.RemoveAll(home); err != nil {
 				result = errors.Join(result, errors.New("could not remove private command home"))

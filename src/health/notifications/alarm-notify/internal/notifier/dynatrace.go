@@ -10,6 +10,10 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 type dynatraceEvent struct {
@@ -19,7 +23,7 @@ type dynatraceEvent struct {
 	Properties     map[string]string `json:"properties"`
 }
 
-func renderDynatrace(dst Destination, event Event) (dynatraceEvent, error) {
+func renderDynatrace(dst Destination, event notifyevent.Event) (dynatraceEvent, error) {
 	eventType, source := dst.EventType, dst.Source
 	if eventType == "" {
 		eventType = "CUSTOM_INFO"
@@ -31,7 +35,7 @@ func renderDynatrace(dst Destination, event Event) (dynatraceEvent, error) {
 		EventType: eventType, Title: event.Node + " " + event.Status + ": " + event.Summary,
 		EntitySelector: dst.EntitySelector,
 		Properties: map[string]string{
-			"dt.event.source": source, "dt.event.description": notificationPlainText(event, true),
+			"dt.event.source": source, "dt.event.description": notifymsg.PlainText(event, true),
 			"netdata.incident_id": event.IncidentID, "netdata.timestamp": event.Timestamp.Format(time.RFC3339Nano),
 		},
 	}
@@ -43,7 +47,7 @@ func renderDynatrace(dst Destination, event Event) (dynatraceEvent, error) {
 	return message, nil
 }
 
-func sendDynatrace(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendDynatrace(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	if err := dst.resolveMonitoring(ctx); err != nil {
 		return err
 	}
@@ -51,9 +55,9 @@ func sendDynatrace(ctx context.Context, dst Destination, event Event, timeout ti
 	if err != nil {
 		return err
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(
+	response, err := httpclient.PostJSON(
 		ctx,
 		client,
 		"dynatrace",
@@ -79,7 +83,7 @@ func readDynatraceResponse(response *http.Response) error {
 			CorrelationID string `json:"correlationId"`
 		} `json:"eventIngestResults"`
 	}
-	if err := decodeNotificationResponse("dynatrace", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("dynatrace", response.Body, &result); err != nil {
 		return err
 	}
 	if result.ReportCount <= 0 || result.ReportCount != len(result.Results) {

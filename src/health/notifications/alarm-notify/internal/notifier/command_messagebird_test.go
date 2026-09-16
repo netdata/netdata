@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -43,7 +44,7 @@ func TestSendMessageBird(t *testing.T) {
 		"server error not retried":             {calls: 1, status: 503, err: "HTTP 503"},
 		"missing acknowledgment":               {calls: 1, body: `{}`, err: "invalid messagebird response"},
 		"invalid acknowledgment":               {calls: 1, body: `synthetic-private-value`, err: "invalid messagebird response"},
-		"oversized acknowledgment":             {calls: 1, body: strings.Repeat(" ", notificationResponseLimit+1), err: "256 KiB"},
+		"oversized acknowledgment":             {calls: 1, body: strings.Repeat(" ", httpclient.ResponseLimit+1), err: "256 KiB"},
 		"explicit failure":                     {calls: 1, status: 401, explicit: true, code: 1, err: "all attempted destinations failed"},
 		"transport failure":                    {calls: 1, drop: true, err: "transport failed"},
 	} {

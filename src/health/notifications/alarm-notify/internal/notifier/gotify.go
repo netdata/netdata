@@ -10,6 +10,11 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type gotifyMessage struct {
@@ -23,7 +28,7 @@ func (dst Destination) validateGotify() error {
 		return errors.New("gotify destinations support api_url and app_token only")
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"app_token", dst.AppToken}} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("gotify %s: %w", field.name, err)
 		}
@@ -46,14 +51,14 @@ func validateGotifyField(name, value string) error {
 	return validateToken(value, "gotify", "app_token")
 }
 
-func sendGotify(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendGotify(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{
 		{"api_url", &dst.APIURL}, {"app_token", &dst.AppToken},
 	} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("gotify %s: %w", field.name, err)
 		}
@@ -62,9 +67,9 @@ func sendGotify(ctx context.Context, dst Destination, event Event, timeout time.
 		}
 		*field.value = value
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(ctx, client, "gotify", strings.TrimRight(dst.APIURL, "/")+"/message",
+	response, err := httpclient.PostJSON(ctx, client, "gotify", strings.TrimRight(dst.APIURL, "/")+"/message",
 		http.Header{"X-Gotify-Key": {dst.AppToken}}, renderGotify(event))
 	if err != nil {
 		return err
@@ -72,7 +77,7 @@ func sendGotify(ctx context.Context, dst Destination, event Event, timeout time.
 	return readGotifyResponse(response)
 }
 
-func renderGotify(event Event) gotifyMessage {
+func renderGotify(event notifyevent.Event) gotifyMessage {
 	priority := 1
 	switch event.Status {
 	case "WARNING":
@@ -81,7 +86,7 @@ func renderGotify(event Event) gotifyMessage {
 		priority = 10
 	}
 	return gotifyMessage{Title: event.Node + " " + event.Status + ": " + event.Summary,
-		Message: notificationPlainText(event, true), Priority: priority}
+		Message: notifymsg.PlainText(event, true), Priority: priority}
 }
 
 func readGotifyResponse(response *http.Response) error {
@@ -92,7 +97,7 @@ func readGotifyResponse(response *http.Response) error {
 	var result struct {
 		ID uint64 `json:"id"`
 	}
-	if err := decodeNotificationResponse("gotify", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("gotify", response.Body, &result); err != nil {
 		return err
 	}
 	if result.ID == 0 {

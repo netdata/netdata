@@ -6,6 +6,9 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 )
 
 type deliveryResult struct {
@@ -16,10 +19,10 @@ type deliveryResult struct {
 
 func dispatch(
 	ctx context.Context,
-	processes *commandProcesses,
+	processes *commandexec.Runner,
 	cfg Config,
 	destinations []string,
-	event Event,
+	event notifyevent.Event,
 	timeout time.Duration,
 	report func(deliveryResult),
 ) error {

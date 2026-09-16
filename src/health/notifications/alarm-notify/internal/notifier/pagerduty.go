@@ -15,6 +15,10 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const (
@@ -45,7 +49,7 @@ func (dst Destination) validatePagerDuty() error {
 		return errors.New("pagerduty api_version must be 1 or 2")
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"integration_key", dst.IntegrationKey}} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("pagerduty %s: %w", field.name, err)
 		}
@@ -82,13 +86,13 @@ func validatePagerDutyField(version int64, name, value string) error {
 }
 
 type pagerDutyV1Event struct {
-	ServiceKey  string `json:"service_key"`
-	EventType   string `json:"event_type"`
-	IncidentKey string `json:"incident_key"`
-	Description string `json:"description"`
-	Details     Event  `json:"details"`
-	Client      string `json:"client,omitempty"`
-	ClientURL   string `json:"client_url,omitempty"`
+	ServiceKey  string            `json:"service_key"`
+	EventType   string            `json:"event_type"`
+	IncidentKey string            `json:"incident_key"`
+	Description string            `json:"description"`
+	Details     notifyevent.Event `json:"details"`
+	Client      string            `json:"client,omitempty"`
+	ClientURL   string            `json:"client_url,omitempty"`
 }
 
 type pagerDutyV2Event struct {
@@ -100,12 +104,12 @@ type pagerDutyV2Event struct {
 }
 
 type pagerDutyPayload struct {
-	Summary       string    `json:"summary"`
-	Source        string    `json:"source"`
-	Severity      string    `json:"severity"`
-	Timestamp     time.Time `json:"timestamp"`
-	Class         string    `json:"class,omitempty"`
-	CustomDetails Event     `json:"custom_details"`
+	Summary       string            `json:"summary"`
+	Source        string            `json:"source"`
+	Severity      string            `json:"severity"`
+	Timestamp     time.Time         `json:"timestamp"`
+	Class         string            `json:"class,omitempty"`
+	CustomDetails notifyevent.Event `json:"custom_details"`
 }
 
 type pagerDutyLink struct {
@@ -118,7 +122,7 @@ func pagerDutyIncidentKey(id string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(id)))
 }
 
-func renderPagerDuty(dst Destination, event Event) any {
+func renderPagerDuty(dst Destination, event notifyevent.Event) any {
 	action, severity := "trigger", "warning"
 	if event.Status == "CRITICAL" {
 		severity = "critical"
@@ -162,13 +166,13 @@ func renderPagerDuty(dst Destination, event Event) any {
 	return message
 }
 
-func sendPagerDuty(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendPagerDuty(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	version := dst.pagerDutyVersion()
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"integration_key", &dst.IntegrationKey}} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("pagerduty %s: %w", field.name, err)
 		}
@@ -192,9 +196,9 @@ func sendPagerDuty(ctx context.Context, dst Destination, event Event, timeout ti
 	if version == 2 {
 		path = pagerDutyV2Path
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotification(ctx, client, "pagerduty", strings.TrimRight(base, "/")+path, "application/json",
+	response, err := httpclient.Post(ctx, client, "pagerduty", strings.TrimRight(base, "/")+path, "application/json",
 		http.Header{"Accept": {"application/json"}}, bytes.NewReader(data))
 	if err != nil {
 		return err
@@ -216,7 +220,7 @@ func readPagerDutyResponse(response *http.Response, version int64, key string) e
 		IncidentKey string `json:"incident_key"`
 		DedupKey    string `json:"dedup_key"`
 	}
-	if err := decodeNotificationResponse("pagerduty", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("pagerduty", response.Body, &result); err != nil {
 		return err
 	}
 	ackKey := result.IncidentKey

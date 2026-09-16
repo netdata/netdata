@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -194,24 +195,24 @@ func TestSNSFieldIsolation(t *testing.T) {
 
 func TestRenderSNS(t *testing.T) {
 	for name, test := range map[string]struct {
-		change                          func(*Event)
+		change                          func(*notifyevent.Event)
 		template, subject, message, err string
 	}{
 		"warning":            {subject: "test-node needs attention - test alert - test.chart", message: "WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"},
-		"critical":           {change: func(e *Event) { e.Status = "CRITICAL" }, subject: "test-node is critical - test alert - test.chart", message: "CRITICAL on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"},
-		"clear zero":         {change: func(e *Event) { e.Status = "CLEAR"; e.Value = new(float64(0)) }, subject: "test-node recovered - test alert - test.chart", message: "CLEAR on test-node at 2026-09-14T12:00:00Z: test.chart 0 C"},
-		"minimal":            {change: func(e *Event) { e.Chart, e.Units = "", ""; e.Value = nil }, subject: "test-node needs attention - test alert", message: "WARNING on test-node at 2026-09-14T12:00:00Z:"},
-		"raw value":          {change: func(e *Event) { e.Units = "" }, subject: "test-node needs attention - test alert - test.chart", message: "WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5"},
+		"critical":           {change: func(e *notifyevent.Event) { e.Status = "CRITICAL" }, subject: "test-node is critical - test alert - test.chart", message: "CRITICAL on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"},
+		"clear zero":         {change: func(e *notifyevent.Event) { e.Status = "CLEAR"; e.Value = new(float64(0)) }, subject: "test-node recovered - test alert - test.chart", message: "CLEAR on test-node at 2026-09-14T12:00:00Z: test.chart 0 C"},
+		"minimal":            {change: func(e *notifyevent.Event) { e.Chart, e.Units = "", ""; e.Value = nil }, subject: "test-node needs attention - test alert", message: "WARNING on test-node at 2026-09-14T12:00:00Z:"},
+		"raw value":          {change: func(e *notifyevent.Event) { e.Units = "" }, subject: "test-node needs attention - test alert - test.chart", message: "WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5"},
 		"template":           {template: "{{status}} {{node}}\n{{summary}}: {{value_string}}", subject: "test-node needs attention - test alert - test.chart", message: "WARNING test-node\nTemperature is high: 42.5 C"},
-		"literal input":      {template: "file://{{info}}", change: func(e *Event) { e.Info = "{{node}} $(literal) ${env:LITERAL}" }, subject: "test-node needs attention - test alert - test.chart", message: "file://{{node}} $(literal) ${env:LITERAL}"},
-		"max message":        {template: "{{info}}", change: func(e *Event) { e.Info = strings.Repeat("é", snsMessageLimit/2) }, subject: "test-node needs attention - test alert - test.chart", message: strings.Repeat("é", snsMessageLimit/2)},
-		"oversize expansion": {template: "{{info}}{{info}}", change: func(e *Event) { e.Info = strings.Repeat("é", snsMessageLimit/2) }, err: "exceeds"},
-		"empty expansion":    {template: "{{info}}", change: func(e *Event) { e.Info = "" }, err: "nonempty"},
-		"invalid UTF8":       {template: "{{info}}", change: func(e *Event) { e.Info = "\xff" }, err: "UTF-8"},
-		"subject newline":    {change: func(e *Event) { e.Chart += "\n" }, err: "subject"},
-		"subject NUL":        {change: func(e *Event) { e.Node += "\x00" }, err: "subject"},
-		"subject separator":  {change: func(e *Event) { e.Alert += "\u2028" }, err: "subject"},
-		"subject too long":   {change: func(e *Event) { e.Node = strings.Repeat("n", 100) }, err: "under 100"},
+		"literal input":      {template: "file://{{info}}", change: func(e *notifyevent.Event) { e.Info = "{{node}} $(literal) ${env:LITERAL}" }, subject: "test-node needs attention - test alert - test.chart", message: "file://{{node}} $(literal) ${env:LITERAL}"},
+		"max message":        {template: "{{info}}", change: func(e *notifyevent.Event) { e.Info = strings.Repeat("é", snsMessageLimit/2) }, subject: "test-node needs attention - test alert - test.chart", message: strings.Repeat("é", snsMessageLimit/2)},
+		"oversize expansion": {template: "{{info}}{{info}}", change: func(e *notifyevent.Event) { e.Info = strings.Repeat("é", snsMessageLimit/2) }, err: "exceeds"},
+		"empty expansion":    {template: "{{info}}", change: func(e *notifyevent.Event) { e.Info = "" }, err: "nonempty"},
+		"invalid UTF8":       {template: "{{info}}", change: func(e *notifyevent.Event) { e.Info = "\xff" }, err: "UTF-8"},
+		"subject newline":    {change: func(e *notifyevent.Event) { e.Chart += "\n" }, err: "subject"},
+		"subject NUL":        {change: func(e *notifyevent.Event) { e.Node += "\x00" }, err: "subject"},
+		"subject separator":  {change: func(e *notifyevent.Event) { e.Alert += "\u2028" }, err: "subject"},
+		"subject too long":   {change: func(e *notifyevent.Event) { e.Node = strings.Repeat("n", 100) }, err: "under 100"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			event := expectedEvent()
@@ -254,7 +255,7 @@ func TestSNSTemplateFields(t *testing.T) {
 			assert.Equal(t, test.want, got)
 		})
 	}
-	fields = snsFields(Event{})
+	fields = snsFields(notifyevent.Event{})
 	for _, key := range []string{"value", "previous_value", "value_string", "previous_value_string", "duration", "non_clear_duration"} {
 		assert.Empty(t, fields[key])
 	}

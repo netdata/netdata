@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +52,7 @@ func TestRunDelivery(t *testing.T) {
 				Authorization string
 				ContentType   string
 				UserAgent     string
-				Event         Event
+				Event         notifyevent.Event
 				Err           error
 			}
 			requests := make(chan request, 2)
@@ -59,7 +60,7 @@ func TestRunDelivery(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					calls.Add(1)
-					var event Event
+					var event notifyevent.Event
 					err := json.NewDecoder(r.Body).Decode(&event)
 					requests <- request{r.Method, r.URL.RequestURI(), r.Header.Get("Authorization"), r.Header.Get("Content-Type"), r.UserAgent(), event, err}
 					w.Header().Set("Location", "/unexpected-redirect-target")

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -104,28 +105,28 @@ func TestSyslogFieldIsolation(t *testing.T) {
 func TestRenderSyslog(t *testing.T) {
 	for name, test := range map[string]struct {
 		dst    Destination
-		change func(*Event)
+		change func(*notifyevent.Event)
 		want   []string
 		err    string
 	}{
 		"warning":                     {want: []string{"-p", "local6.warning", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
-		"critical":                    {change: func(e *Event) { e.Status = "CRITICAL" }, want: []string{"-p", "local6.crit", "--", "netdata CRITICAL on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
-		"clear retains current value": {change: func(e *Event) { e.Status = "CLEAR" }, want: []string{"-p", "local6.info", "--", "netdata CLEAR on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
+		"critical":                    {change: func(e *notifyevent.Event) { e.Status = "CRITICAL" }, want: []string{"-p", "local6.crit", "--", "netdata CRITICAL on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
+		"clear retains current value": {change: func(e *notifyevent.Event) { e.Status = "CLEAR" }, want: []string{"-p", "local6.info", "--", "netdata CLEAR on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
 		"overrides":                   {dst: Destination{Facility: "daemon", Level: "notice", Prefix: "Alert", Host: "2001:db8::1", Port: new(configInteger(1514)), Args: []string{"--tcp", "--rfc3164"}}, want: []string{"-p", "daemon.notice", "-n", "2001:db8::1", "-P", "1514", "--tcp", "--rfc3164", "--", "Alert WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
 		"remote default port":         {dst: Destination{Host: "logs.example.org"}, want: []string{"-p", "local6.warning", "-n", "logs.example.org", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
 		"leading option text":         {dst: Destination{Prefix: "--file=/synthetic-path"}, want: []string{"-p", "local6.warning", "--", "--file=/synthetic-path WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
-		"missing chart and value":     {change: func(e *Event) { e.Chart, e.Value = "", nil }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z:"}},
-		"zero no units":               {change: func(e *Event) { e.Value, e.Units = new(float64), "" }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 0"}},
-		"Unicode":                     {change: func(e *Event) { e.Node = "κόμβος" }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on κόμβος at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
+		"missing chart and value":     {change: func(e *notifyevent.Event) { e.Chart, e.Value = "", nil }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z:"}},
+		"zero no units":               {change: func(e *notifyevent.Event) { e.Value, e.Units = new(float64), "" }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 0"}},
+		"Unicode":                     {change: func(e *notifyevent.Event) { e.Node = "κόμβος" }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on κόμβος at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
 		"prefix controls":             {dst: Destination{Prefix: "alert\x01\a\b\t\n\v\f\r\x1b\x1f\x7f"}, want: []string{"-p", "local6.warning", "--", `alert\x01\a\b\t\n\v\f\r\x1b\x1f\x7f WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C`}},
-		"node newline and escape":     {change: func(e *Event) { e.Node = "node\n<134>forged\x1b[31m" }, want: []string{"-p", "local6.warning", "--", `netdata WARNING on node\n<134>forged\x1b[31m at 2026-09-14T12:00:00Z: test.chart 42.5 C`}},
-		"chart C1 controls":           {change: func(e *Event) { e.Chart = "chart\u0080\u0085\u009b\u009f" }, want: []string{"-p", "local6.warning", "--", `netdata WARNING on test-node at 2026-09-14T12:00:00Z: chart\u0080\u0085\u009b\u009f 42.5 C`}},
-		"units line separators":       {change: func(e *Event) { e.Units = "C\u2028\u2029" }, want: []string{"-p", "local6.warning", "--", `netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C\u2028\u2029`}},
+		"node newline and escape":     {change: func(e *notifyevent.Event) { e.Node = "node\n<134>forged\x1b[31m" }, want: []string{"-p", "local6.warning", "--", `netdata WARNING on node\n<134>forged\x1b[31m at 2026-09-14T12:00:00Z: test.chart 42.5 C`}},
+		"chart C1 controls":           {change: func(e *notifyevent.Event) { e.Chart = "chart\u0080\u0085\u009b\u009f" }, want: []string{"-p", "local6.warning", "--", `netdata WARNING on test-node at 2026-09-14T12:00:00Z: chart\u0080\u0085\u009b\u009f 42.5 C`}},
+		"units line separators":       {change: func(e *notifyevent.Event) { e.Units = "C\u2028\u2029" }, want: []string{"-p", "local6.warning", "--", `netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C\u2028\u2029`}},
 		"literal punctuation":         {dst: Destination{Prefix: `alert\n "quoted" 'text'`}, want: []string{"-p", "local6.warning", "--", `alert\n "quoted" 'text' WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C`}},
-		"node NUL":                    {change: func(e *Event) { e.Node = "node\x00" }, err: "syslog message must not contain NUL"},
-		"chart NUL":                   {change: func(e *Event) { e.Chart = "chart\x00" }, err: "syslog message must not contain NUL"},
-		"units NUL":                   {change: func(e *Event) { e.Units = "C\x00" }, err: "syslog message must not contain NUL"},
-		"unused info NUL":             {change: func(e *Event) { e.Info = "info\x00" }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
+		"node NUL":                    {change: func(e *notifyevent.Event) { e.Node = "node\x00" }, err: "syslog message must not contain NUL"},
+		"chart NUL":                   {change: func(e *notifyevent.Event) { e.Chart = "chart\x00" }, err: "syslog message must not contain NUL"},
+		"units NUL":                   {change: func(e *notifyevent.Event) { e.Units = "C\x00" }, err: "syslog message must not contain NUL"},
+		"unused info NUL":             {change: func(e *notifyevent.Event) { e.Info = "info\x00" }, want: []string{"-p", "local6.warning", "--", "netdata WARNING on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			event := expectedEvent()

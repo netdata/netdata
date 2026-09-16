@@ -2,6 +2,11 @@
 
 package notifier
 
+import (
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+)
+
 type flockMessage struct {
 	SendAs      flockSender       `json:"sendAs"`
 	Text        string            `json:"text"`
@@ -19,12 +24,12 @@ type flockAttachment struct {
 	URL         string `json:"url,omitempty"`
 }
 
-func renderFlock(event Event) flockMessage {
+func renderFlock(event notifyevent.Event) flockMessage {
 	return flockMessage{
 		SendAs: flockSender{Name: "netdata on " + event.Node},
 		Text:   event.Node + " " + event.Status + ": " + event.Summary,
 		Attachments: []flockAttachment{{
-			Title: event.Alert, Description: notificationPlainText(event, false),
+			Title: event.Alert, Description: notifymsg.PlainText(event, false),
 			Color: chatWebhookColor(event.Status), URL: event.URL,
 		}},
 	}

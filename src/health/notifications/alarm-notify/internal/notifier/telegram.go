@@ -11,6 +11,11 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const telegramTextLimit = 4096 // After parsing HTML: https://core.telegram.org/bots/api#sendmessage
@@ -36,7 +41,7 @@ type telegramResponse struct {
 	} `json:"parameters"`
 }
 
-func renderTelegram(dst Destination, event Event) (telegramMessage, error) {
+func renderTelegram(dst Destination, event notifyevent.Event) (telegramMessage, error) {
 	emoji := "⚠️"
 	switch event.Status {
 	case "CRITICAL":
@@ -47,10 +52,10 @@ func renderTelegram(dst Destination, event Event) (telegramMessage, error) {
 	title := event.Status + ": " + event.Summary
 	plain := []string{emoji + " " + title}
 	formatted := []string{emoji + " <b>" + html.EscapeString(title) + "</b>"}
-	fields := append(notificationFields(event), notificationField{"Time", event.Timestamp.Format(time.RFC3339)})
+	fields := append(notifymsg.Fields(event), notifymsg.Field{Name: "Time", Value: event.Timestamp.Format(time.RFC3339)})
 	for _, field := range fields {
-		plain = append(plain, field.name+": "+field.value)
-		formatted = append(formatted, "<b>"+field.name+":</b> "+html.EscapeString(field.value))
+		plain = append(plain, field.Name+": "+field.Value)
+		formatted = append(formatted, "<b>"+field.Name+":</b> "+html.EscapeString(field.Value))
 	}
 	if event.Info != "" {
 		plain = append(plain, event.Info)
@@ -71,18 +76,18 @@ func renderTelegram(dst Destination, event Event) (telegramMessage, error) {
 	}, nil
 }
 
-func sendTelegram(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendTelegram(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	message, err := renderTelegram(dst, event)
 	if err != nil {
 		return err
 	}
-	token, err := resolveSecret(ctx, dst.BotToken)
+	token, err := secret.Resolve(ctx, dst.BotToken)
 	if err != nil {
 		return fmt.Errorf("telegram bot_token: %w", err)
 	}
-	base, err := resolveSecret(ctx, dst.APIURL)
+	base, err := secret.Resolve(ctx, dst.APIURL)
 	if err != nil {
 		return fmt.Errorf("telegram api_url: %w", err)
 	}
@@ -90,14 +95,14 @@ func sendTelegram(ctx context.Context, dst Destination, event Event, timeout tim
 	if err != nil {
 		return err
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
 	retries := configInteger(0)
 	if dst.RetriesOnLimit != nil {
 		retries = *dst.RetriesOnLimit
 	}
 	for {
-		response, err := postNotificationJSON(ctx, client, "telegram", endpoint, nil, message)
+		response, err := httpclient.PostJSON(ctx, client, "telegram", endpoint, nil, message)
 		if err != nil {
 			return err
 		}
@@ -131,7 +136,7 @@ func readTelegramResponse(response *http.Response) (telegramResponse, error) {
 		return telegramResponse{}, fmt.Errorf("telegram returned HTTP %d", response.StatusCode)
 	}
 	var result telegramResponse
-	if err := decodeNotificationResponse("telegram", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("telegram", response.Body, &result); err != nil {
 		return telegramResponse{}, err
 	}
 	if result.OK == nil {
@@ -145,7 +150,7 @@ func readTelegramResponse(response *http.Response) (telegramResponse, error) {
 
 func waitTelegramRetry(ctx context.Context, seconds int64) error {
 	if err := ctx.Err(); err != nil {
-		return notificationHTTPError("telegram", err)
+		return httpclient.SafeError("telegram", err)
 	}
 	if seconds < 0 {
 		return errors.New("invalid telegram retry delay")
@@ -162,10 +167,10 @@ func waitTelegramRetry(ctx context.Context, seconds int64) error {
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
-		return notificationHTTPError("telegram", ctx.Err())
+		return httpclient.SafeError("telegram", ctx.Err())
 	case <-timer.C:
 		if err := ctx.Err(); err != nil {
-			return notificationHTTPError("telegram", err)
+			return httpclient.SafeError("telegram", err)
 		}
 		return nil
 	}

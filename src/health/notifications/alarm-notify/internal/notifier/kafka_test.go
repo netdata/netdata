@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,21 +90,23 @@ const kafkaFullJSON = `{
 
 func TestRenderKafka(t *testing.T) {
 	for name, test := range map[string]struct {
-		change func(*Event)
+		change func(*notifyevent.Event)
 		fields map[string]any
 	}{
 		"complete": {},
-		"critical": {change: func(e *Event) { e.Status, e.PreviousStatus = "CRITICAL", "WARNING" }, fields: map[string]any{"status": "CRITICAL", "old_status": "WARNING"}},
-		"clear":    {change: func(e *Event) { e.Status, e.PreviousStatus = "CLEAR", "CRITICAL" }, fields: map[string]any{"status": "CLEAR", "old_status": "CRITICAL"}},
-		"missing facts": {change: func(e *Event) {
+		"critical": {change: func(e *notifyevent.Event) { e.Status, e.PreviousStatus = "CRITICAL", "WARNING" }, fields: map[string]any{"status": "CRITICAL", "old_status": "WARNING"}},
+		"clear":    {change: func(e *notifyevent.Event) { e.Status, e.PreviousStatus = "CLEAR", "CRITICAL" }, fields: map[string]any{"status": "CLEAR", "old_status": "CRITICAL"}},
+		"missing facts": {change: func(e *notifyevent.Event) {
 			e.Chart, e.PreviousStatus, e.Units, e.Info = "", "", "", ""
 			e.Value, e.PreviousValue, e.Duration, e.NonClearDuration = nil, nil, nil, nil
 		}, fields: map[string]any{"chart": "", "old_status": "", "units": "", "info": "", "value": nil, "old_value": nil, "duration": nil, "non_clear_duration": nil}},
-		"maximum seconds": {change: func(e *Event) { e.Duration, e.NonClearDuration = new(uint32(4294967295)), new(uint32(4294967295)) }, fields: map[string]any{"duration": uint32(4294967295), "non_clear_duration": uint32(4294967295)}},
-		"timezone and subsecond": {change: func(e *Event) {
+		"maximum seconds": {change: func(e *notifyevent.Event) {
+			e.Duration, e.NonClearDuration = new(uint32(4294967295)), new(uint32(4294967295))
+		}, fields: map[string]any{"duration": uint32(4294967295), "non_clear_duration": uint32(4294967295)}},
+		"timezone and subsecond": {change: func(e *notifyevent.Event) {
 			e.Timestamp = time.Date(2026, 9, 14, 15, 0, 0, 999999999, time.FixedZone("offset", 10800))
 		}},
-		"escaped fields": {change: func(e *Event) {
+		"escaped fields": {change: func(e *notifyevent.Event) {
 			e.Alert, e.Chart, e.Info, e.Units = "alert\"\\\n", "chart\t\x00", "<tag>& Καλημέρα\r\n", "\u2028"
 		}, fields: map[string]any{"name": "alert\"\\\n", "chart": "chart\t\x00", "info": "<tag>& Καλημέρα\r\n", "units": "\u2028"}},
 	} {

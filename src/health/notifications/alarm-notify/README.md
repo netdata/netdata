@@ -15,7 +15,7 @@ Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, Pager
 Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog,
 AWS SNS, Kafka HTTP bridges, email through sendmail, IRC through nc and destination status filters.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
-before production adoption; final redesign follows the working functional baseline.
+before production adoption. Shared mechanisms have separate packages; provider ownership is the next redesign step.
 
 ## Build and run
 
@@ -1993,6 +1993,33 @@ Destination `nowarn`/`noclear` policies filter the current status as described a
 initial-CLEAR eligibility; that decision belongs to the producer before invocation. History-dependent `critical`
 filtering remains pending in the inventory. Add future internal-only event facts separately from this public
 webhook document.
+
+## Internal packages
+
+All packages belong to this standalone module. Shared packages do not import `internal/notifier` or depend on
+provider types.
+
+| Package | Ownership |
+|---|---|
+| `internal/event` | Public notification data and JSON field tags; internal-only routing facts belong separately |
+| `internal/message` | Unescaped common fields, plain text and control escaping; providers own presentation |
+| `internal/secret` | Whole-value reference syntax and lazy environment/file resolution |
+| `internal/httpclient` | Request construction, client settings, safe errors and bounded response reads |
+| `internal/commandexec` | Foreground processes, interactive sessions, platform support and cleanup |
+| `internal/notifier` | Current CLI/input/configuration, routing, policies and provider implementations |
+
+Providers call shared packages directly. HTTP status acceptance, response acknowledgment, endpoint rules and retries
+remain provider decisions. Callers close HTTP response bodies and idle connections. Shared secret validation performs
+no reads; resolution happens only when an eligible destination sends.
+
+The invocation owns a `commandexec.Runner`. Cancel the invocation context before calling `CloseAndWait`, which rejects
+new child work and waits for admitted work to finish cleanup. The runner owns process-group cancellation, session I/O
+and private command homes. Blocked caller-owned input or secret-file reads are outside that shutdown wait.
+
+The next redesign step moves every provider into its own package with typed configuration and a common delivery
+interface, separating application orchestration from provider ownership. No legacy adapter or second dispatch path
+is introduced for that transition. Existing payload fixtures and CLI/provider integration tests stay with their
+behavior owners; shared-package tests cover their mechanisms directly.
 
 ## Validation
 

@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const telegramDefaultAPI = "https://api.telegram.org"
@@ -43,7 +45,7 @@ func (dst Destination) validateTelegram() error {
 		{"bot_token", dst.BotToken, validateTelegramToken},
 		{"api_url", dst.APIURL, validateTelegramAPI},
 	} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("telegram %s: %w", field.name, err)
 		}

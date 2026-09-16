@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +51,7 @@ func TestChatWebhookContent(t *testing.T) {
 		"long content":       {node: "node", alert: "alert", summary: strings.Repeat("界😀", 3000)},
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{
+			event := notifyevent.Event{
 				Node:      test.node,
 				Alert:     test.alert,
 				Summary:   test.summary,
@@ -121,8 +123,8 @@ func TestReadRocketChatResponse(t *testing.T) {
 		"room failure":            {200, `{"success":true,"responses":[{"message":{}},{"error":"synthetic-private-value"}]}`, "every destination room"},
 		"wrong type":              {200, `{"success":"true"}`, "invalid"}, "invalid JSON": {200, "synthetic-private-value", "invalid"},
 		"multiple documents": {200, success + `{}`, "invalid"}, "empty": {200, "", "invalid"},
-		"boundary":     {200, success + strings.Repeat(" ", notificationResponseLimit-len(success)), ""},
-		"oversized":    {200, strings.Repeat(" ", notificationResponseLimit+1), "256 KiB"},
+		"boundary":     {200, success + strings.Repeat(" ", httpclient.ResponseLimit-len(success)), ""},
+		"oversized":    {200, strings.Repeat(" ", httpclient.ResponseLimit+1), "256 KiB"},
 		"HTTP failure": {403, "synthetic-private-value", "HTTP 403"}, "wrong success": {201, success, "HTTP 201"},
 	} {
 		t.Run(name, func(t *testing.T) {

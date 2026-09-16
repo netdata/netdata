@@ -2,7 +2,7 @@
 
 //go:build linux || darwin
 
-package notifier
+package commandexec
 
 import (
 	"errors"

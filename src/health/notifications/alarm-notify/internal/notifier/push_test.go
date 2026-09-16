@@ -11,6 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,7 +59,7 @@ func TestPushContent(t *testing.T) {
 		"long message":                {"node", "alert", strings.Repeat("界😀", 3000), ""},
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{
+			event := notifyevent.Event{
 				Node:      test.node,
 				Alert:     test.alert,
 				Summary:   test.summary,
@@ -92,7 +95,7 @@ func TestPushContent(t *testing.T) {
 				want.Set("Actions", headers.Get("Actions"))
 			}
 			assert.Equal(t, want, headers)
-			assert.Equal(t, text, notificationPlainText(event, false))
+			assert.Equal(t, text, notifymsg.PlainText(event, false))
 		})
 	}
 }
@@ -105,7 +108,7 @@ func TestNtfyLiteralMIMEHeaders(t *testing.T) {
 		"Unicode and literal URL": {"節点", "alert", "https://example.com/界?x==?UTF-8?B?Ig==?="},
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{Node: test.node, Alert: test.alert, Status: "WARNING", URL: test.url}
+			event := notifyevent.Event{Node: test.node, Alert: test.alert, Status: "WARNING", URL: test.url}
 			headers := renderNtfyHeaders(event)
 			decoder := new(mime.WordDecoder)
 			title, err := decoder.DecodeHeader(headers.Get("Title"))
@@ -140,8 +143,8 @@ func TestReadPushResponse(t *testing.T) {
 					"synthetic-private-value",
 					"invalid",
 				}, "multiple documents": {200, p.success + `{}`, "invalid"},
-				"boundary":  {200, p.success + strings.Repeat(" ", notificationResponseLimit-len(p.success)), ""},
-				"oversized": {200, strings.Repeat(" ", notificationResponseLimit+1), "256 KiB"},
+				"boundary":  {200, p.success + strings.Repeat(" ", httpclient.ResponseLimit-len(p.success)), ""},
+				"oversized": {200, strings.Repeat(" ", httpclient.ResponseLimit+1), "256 KiB"},
 				"HTTP error": {
 					403,
 					"synthetic-private-value",

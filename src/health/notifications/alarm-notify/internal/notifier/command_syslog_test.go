@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +24,7 @@ func TestRunSyslog(t *testing.T) {
 		remote       bool
 		code         int
 		priority     string
-		change       func(*Destination, *Event)
+		change       func(*Destination, *notifyevent.Event)
 		message      string
 	}{
 		"warning":         {status: "WARNING", priority: "local6.warning"},
@@ -33,7 +34,7 @@ func TestRunSyslog(t *testing.T) {
 		"failure":         {status: "WARNING", mode: "fail", code: 1, priority: "local6.warning"},
 		"escaped controls": {
 			status: "WARNING", priority: "local6.warning",
-			change: func(dst *Destination, event *Event) {
+			change: func(dst *Destination, event *notifyevent.Event) {
 				dst.Prefix = "alert\n"
 				event.Node, event.Chart, event.Units = "node\x1b[31m", "chart\r", "C\u0085\u2028\u2029"
 			},

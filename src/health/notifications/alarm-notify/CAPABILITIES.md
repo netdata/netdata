@@ -148,5 +148,6 @@ SMSEagle, PagerDuty, Opsgenie, Teams, Matrix, custom commands, SMS Server Tools 
 email, IRC and stateless destination filters. Windows command delivery remains a later platform increment; configuration validation and the existing HTTP providers still compile for Windows.
 Related providers may share small PRs.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
-More small PRs follow until the functional baseline and explicitly approved exceptions are complete. Final
-architecture and broad refactoring are discussed after that working baseline exists.
+The internal redesign now precedes the remaining functional increments. Shared event, formatting, secret, HTTP and
+process mechanisms have separate packages; the next step gives all providers typed configuration and package ownership.
+This cleanup preserves the implemented functionality. Remaining capabilities stay pending until delivered or explicitly excluded.

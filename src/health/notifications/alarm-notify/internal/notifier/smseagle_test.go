@@ -12,6 +12,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,11 +65,11 @@ func TestRenderSMSEagle(t *testing.T) {
 	clear.Status, clear.PreviousStatus = "CLEAR", "CRITICAL"
 	for mode, method := range map[string]string{"": "messages/sms", "sms": "messages/sms", "mms": "messages/mms", "ring": "calls/ring", "tts": "calls/tts", "tts_advanced": "calls/tts_advanced"} {
 		for name, test := range map[string]struct {
-			event   Event
+			event   notifyevent.Event
 			variant string
 		}{
 			"warning": {full, "full"}, "critical": {critical, "full"}, "clear": {clear, "full"},
-			"minimal": {Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}, "minimal"},
+			"minimal": {notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}, "minimal"},
 		} {
 			t.Run(mode+"/"+name, func(t *testing.T) {
 				dst := smseagleTestDestination()
@@ -100,7 +102,7 @@ func TestSMSEagleEncoding(t *testing.T) {
 	}
 	for field := range map[string]struct{}{"node": {}, "url": {}, "transition": {}} {
 		t.Run("whole message/"+field, func(t *testing.T) {
-			event := Event{
+			event := notifyevent.Event{
 				Node:      "node",
 				Alert:     "alert",
 				Summary:   "summary",
@@ -130,7 +132,7 @@ func TestSMSEagleTTSLimitsAndOptions(t *testing.T) {
 		}{"boundary": {"x", 960}, "over": {"x", 961}, "Unicode boundary": {"界", 960}, "Unicode over": {"界", 961}} {
 			t.Run(mode+"/"+name, func(t *testing.T) {
 				const suffix = "\nNode: node\nAlert: alert\nStatus: WARNING\nTime: 2026-09-14T12:00:00Z"
-				event := Event{
+				event := notifyevent.Event{
 					Node:      "node",
 					Alert:     "alert",
 					Status:    "WARNING",
@@ -197,8 +199,8 @@ func TestReadSMSEagleResponse(t *testing.T) {
 		"missing status":    {200, `[{"id":1},{"id":2}]`, "queued 0 of 2"},
 		"trailing data":     {200, smseagleTestResponse + "synthetic-private-value", "invalid"},
 		"second document":   {200, smseagleTestResponse + smseagleTestResponse, "invalid"},
-		"limit":             {200, smseagleTestResponse + strings.Repeat(" ", notificationResponseLimit-len(smseagleTestResponse)), ""},
-		"over limit":        {200, smseagleTestResponse + strings.Repeat(" ", notificationResponseLimit-len(smseagleTestResponse)+1), "256 KiB"},
+		"limit":             {200, smseagleTestResponse + strings.Repeat(" ", httpclient.ResponseLimit-len(smseagleTestResponse)), ""},
+		"over limit":        {200, smseagleTestResponse + strings.Repeat(" ", httpclient.ResponseLimit-len(smseagleTestResponse)+1), "256 KiB"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			reader := strings.NewReader(test.body)

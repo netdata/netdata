@@ -12,14 +12,16 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func teamsMatrixTestEvent(status, variant string) Event {
+func teamsMatrixTestEvent(status, variant string) notifyevent.Event {
 	event := expectedEvent()
 	if variant == "minimal" {
-		event = Event{
+		event = notifyevent.Event{
 			Version:    1,
 			IncidentID: "test-incident",
 			Timestamp:  event.Timestamp,
@@ -128,7 +130,7 @@ func TestReadMatrixResponse(t *testing.T) {
 		"wrong sigil": {200, `{"event_id":"!room"}`, "acknowledgment"}, "whitespace": {200, `{"event_id":"$id\n"}`, "acknowledgment"}, "wrong type": {200, `{"event_id":1}`, "invalid"},
 		"error": {200, `{"event_id":"$id","error":"synthetic-private-value"}`, "acknowledgment"}, "error code": {200, `{"event_id":"$id","errcode":"M_UNKNOWN"}`, "acknowledgment"},
 		"empty": {200, "", "invalid"}, "null": {200, "null", "acknowledgment"}, "array": {200, "[]", "invalid"}, "malformed": {200, "synthetic-private-value", "invalid"}, "trailing": {200, ack + ack, "invalid"},
-		"boundary": {200, ack + strings.Repeat(" ", notificationResponseLimit-len(ack)), ""}, "over": {200, ack + strings.Repeat(" ", notificationResponseLimit-len(ack)+1), "256 KiB"},
+		"boundary": {200, ack + strings.Repeat(" ", httpclient.ResponseLimit-len(ack)), ""}, "over": {200, ack + strings.Repeat(" ", httpclient.ResponseLimit-len(ack)+1), "256 KiB"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			reader := strings.NewReader(test.body)

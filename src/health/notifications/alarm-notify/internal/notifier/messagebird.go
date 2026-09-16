@@ -11,6 +11,11 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const messagebirdDefaultAPI = "https://rest.messagebird.com"
@@ -32,7 +37,7 @@ func (dst Destination) validateMessageBird() error {
 		return err
 	}
 	for _, field := range []struct{ name, value string }{{"access_key", dst.AccessKey}, {"api_url", dst.APIURL}} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("messagebird %s: %w", field.name, err)
 		}
@@ -52,14 +57,14 @@ func validateMessageBirdField(name, value string) error {
 	return validateToken(value, "messagebird", "access_key")
 }
 
-func sendMessageBird(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendMessageBird(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{
 		{"access_key", &dst.AccessKey}, {"api_url", &dst.APIURL},
 	} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("messagebird %s: %w", field.name, err)
 		}
@@ -73,10 +78,10 @@ func sendMessageBird(ctx context.Context, dst Destination, event Event, timeout 
 		base = messagebirdDefaultAPI
 	}
 	endpoint := strings.TrimRight(base, "/") + "/messages"
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
 	headers := http.Header{"Authorization": {"AccessKey " + dst.AccessKey}, "Accept": {"application/json"}}
-	response, err := postNotification(
+	response, err := httpclient.Post(
 		ctx,
 		client,
 		"messagebird",
@@ -91,9 +96,9 @@ func sendMessageBird(ctx context.Context, dst Destination, event Event, timeout 
 	return readMessageBirdResponse(response)
 }
 
-func renderMessageBird(dst Destination, event Event) url.Values {
+func renderMessageBird(dst Destination, event notifyevent.Event) url.Values {
 	return url.Values{"originator": {dst.Originator}, "recipients": {dst.Recipient},
-		"body": {notificationPlainText(event, true)}, "datacoding": {"auto"}}
+		"body": {notifymsg.PlainText(event, true)}, "datacoding": {"auto"}}
 }
 
 func readMessageBirdResponse(response *http.Response) error {
@@ -104,7 +109,7 @@ func readMessageBirdResponse(response *http.Response) error {
 	var result struct {
 		ID string `json:"id"`
 	}
-	if err := decodeNotificationResponse("messagebird", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("messagebird", response.Body, &result); err != nil {
 		return err
 	}
 	if strings.TrimSpace(result.ID) == "" {

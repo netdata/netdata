@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,7 +79,7 @@ func TestMonitoringContentAndTargeting(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for status := range map[string]struct{}{"WARNING": {}, "CRITICAL": {}, "CLEAR": {}} {
 				t.Run(status, func(t *testing.T) {
-					event := Event{
+					event := notifyevent.Event{
 						Version:    1,
 						IncidentID: " ID:😀 ",
 						Node:       "節点",

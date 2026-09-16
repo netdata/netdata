@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -356,14 +357,14 @@ func TestEmailThreadIdentity(t *testing.T) {
 	require.NoError(t, err)
 	header, _ := parseEmail(t, raw)
 	for name, test := range map[string]struct {
-		change func(*Event)
+		change func(*notifyevent.Event)
 		same   bool
 	}{
 		"repeat":                  {same: true},
-		"new incident and status": {change: func(e *Event) { e.IncidentID = "other"; e.Status = "CLEAR" }, same: true},
-		"node":                    {change: func(e *Event) { e.Node += "other" }},
-		"chart":                   {change: func(e *Event) { e.Chart = "" }},
-		"alert":                   {change: func(e *Event) { e.Alert += "other" }},
+		"new incident and status": {change: func(e *notifyevent.Event) { e.IncidentID = "other"; e.Status = "CLEAR" }, same: true},
+		"node":                    {change: func(e *notifyevent.Event) { e.Node += "other" }},
+		"chart":                   {change: func(e *notifyevent.Event) { e.Chart = "" }},
+		"alert":                   {change: func(e *notifyevent.Event) { e.Alert += "other" }},
 	} {
 		t.Run(name, func(t *testing.T) {
 			event := base
@@ -390,15 +391,15 @@ func TestEmailThreadIdentity(t *testing.T) {
 
 func TestEmailOptionalContent(t *testing.T) {
 	for name, test := range map[string]struct {
-		change func(*Event)
+		change func(*notifyevent.Event)
 		extra  string
 	}{
 		"omitted":                    {},
-		"zero duration":              {change: func(e *Event) { e.Duration = new(uint32(0)) }, extra: "Duration: 0 seconds\r\n"},
-		"maximum non-clear duration": {change: func(e *Event) { e.NonClearDuration = new(uint32(4294967295)) }, extra: "Non-clear duration: 4294967295 seconds\r\n"},
+		"zero duration":              {change: func(e *notifyevent.Event) { e.Duration = new(uint32(0)) }, extra: "Duration: 0 seconds\r\n"},
+		"maximum non-clear duration": {change: func(e *notifyevent.Event) { e.NonClearDuration = new(uint32(4294967295)) }, extra: "Non-clear duration: 4294967295 seconds\r\n"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{Version: 1, IncidentID: "id", Timestamp: time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC), Node: "node", Alert: "alert", Status: "CLEAR", Summary: "Recovered"}
+			event := notifyevent.Event{Version: 1, IncidentID: "id", Timestamp: time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC), Node: "node", Alert: "alert", Status: "CLEAR", Summary: "Recovered"}
 			if test.change != nil {
 				test.change(&event)
 			}

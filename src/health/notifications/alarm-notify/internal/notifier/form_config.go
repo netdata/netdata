@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 func (dst Destination) validateFormProvider() error {
@@ -24,7 +26,7 @@ func (dst Destination) validateFormProvider() error {
 		return fmt.Errorf("%s destination contains fields for another provider", dst.Type)
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"api_key", dst.APIKey}} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("%s %s: %w", dst.Type, field.name, err)
 		}
@@ -65,7 +67,7 @@ func (dst *Destination) resolveFormProvider(ctx context.Context) error {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"api_key", &dst.APIKey}} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("%s %s: %w", dst.Type, field.name, err)
 		}

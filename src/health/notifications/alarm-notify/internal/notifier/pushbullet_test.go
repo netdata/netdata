@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,10 +22,10 @@ func TestRenderPushbullet(t *testing.T) {
 	critical, clear := full, full
 	critical.Status = "CRITICAL"
 	clear.Status, clear.PreviousStatus = "CLEAR", "CRITICAL"
-	minimal := Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
+	minimal := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
 	dst := Destination{Email: "ops@example.com", SourceDeviceID: "test-source-device"}
 	for name, test := range map[string]struct {
-		event        Event
+		event        notifyevent.Event
 		dst          Destination
 		fixture      string
 		replacements []string
@@ -48,7 +50,7 @@ func TestPushbulletPlainText(t *testing.T) {
 		"JSON characters": "<b>\"quoted\" & 'text'</b>\\\n😀", "long Unicode": strings.Repeat("界😀", 3000),
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{
+			event := notifyevent.Event{
 				Node:      "node",
 				Alert:     "alert",
 				Status:    "WARNING",
@@ -83,8 +85,8 @@ func TestReadPushbulletResponse(t *testing.T) {
 		"invalid JSON":  {status: 200, body: "synthetic-private-value", err: "invalid pushbullet response"},
 		"trailing JSON": {status: 200, body: success + `{}`, err: "invalid pushbullet response"},
 		"error object":  {status: 200, body: `{"iden":"test-push","error":{"message":"synthetic-private-value"}}`, err: "API rejected"},
-		"size boundary": {status: 200, body: success + strings.Repeat(" ", notificationResponseLimit-len(success))},
-		"oversized":     {status: 200, body: success + strings.Repeat(" ", notificationResponseLimit), err: "256 KiB"},
+		"size boundary": {status: 200, body: success + strings.Repeat(" ", httpclient.ResponseLimit-len(success))},
+		"oversized":     {status: 200, body: success + strings.Repeat(" ", httpclient.ResponseLimit), err: "256 KiB"},
 		"HTTP error":    {status: 400, body: "synthetic-private-value", err: "HTTP 400"},
 		"unconfirmed":   {status: 204, err: "HTTP 204"},
 	} {

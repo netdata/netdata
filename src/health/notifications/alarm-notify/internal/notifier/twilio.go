@@ -13,6 +13,11 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const twilioDefaultAPI = "https://api.twilio.com"
@@ -38,7 +43,7 @@ func (dst Destination) validateTwilio() error {
 	for _, field := range []struct{ name, value string }{
 		{"account_sid", dst.AccountSID}, {"auth_token", dst.AuthToken}, {"api_url", dst.APIURL},
 	} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("twilio %s: %w", field.name, err)
 		}
@@ -65,14 +70,14 @@ func validateTwilioField(name, value string) error {
 	return nil
 }
 
-func sendTwilio(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendTwilio(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{
 		{"account_sid", &dst.AccountSID}, {"auth_token", &dst.AuthToken}, {"api_url", &dst.APIURL},
 	} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("twilio %s: %w", field.name, err)
 		}
@@ -86,12 +91,12 @@ func sendTwilio(ctx context.Context, dst Destination, event Event, timeout time.
 		base = twilioDefaultAPI
 	}
 	endpoint := strings.TrimRight(base, "/") + "/2010-04-01/Accounts/" + dst.AccountSID + "/Messages.json"
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
 	headers := http.Header{
 		"Authorization": {"Basic " + base64.StdEncoding.EncodeToString([]byte(dst.AccountSID+":"+dst.AuthToken))},
 	}
-	response, err := postNotification(ctx, client, "twilio", endpoint, "application/x-www-form-urlencoded", headers,
+	response, err := httpclient.Post(ctx, client, "twilio", endpoint, "application/x-www-form-urlencoded", headers,
 		strings.NewReader(renderTwilio(dst, event).Encode()))
 	if err != nil {
 		return err
@@ -99,8 +104,8 @@ func sendTwilio(ctx context.Context, dst Destination, event Event, timeout time.
 	return readTwilioResponse(response)
 }
 
-func renderTwilio(dst Destination, event Event) url.Values {
-	return url.Values{"From": {dst.From}, "To": {dst.To}, "Body": {notificationPlainText(event, true)}}
+func renderTwilio(dst Destination, event notifyevent.Event) url.Values {
+	return url.Values{"From": {dst.From}, "To": {dst.To}, "Body": {notifymsg.PlainText(event, true)}}
 }
 
 func readTwilioResponse(response *http.Response) error {
@@ -111,7 +116,7 @@ func readTwilioResponse(response *http.Response) error {
 	var result struct {
 		SID string `json:"sid"`
 	}
-	if err := decodeNotificationResponse("twilio", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("twilio", response.Body, &result); err != nil {
 		return err
 	}
 	if strings.TrimSpace(result.SID) == "" {

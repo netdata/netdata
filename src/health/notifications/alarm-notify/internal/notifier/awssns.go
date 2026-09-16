@@ -19,6 +19,10 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const snsMessageLimit = 262144
@@ -50,7 +54,7 @@ func (dst Destination) validateAWSSNS() error {
 	if err := validateSNSCredentials(dst.CredentialSource, dst.Env, true); err != nil {
 		return err
 	}
-	_, err := renderSNSTemplate(dst.MessageTemplate, snsFields(Event{}))
+	_, err := renderSNSTemplate(dst.MessageTemplate, snsFields(notifyevent.Event{}))
 	return err
 }
 
@@ -84,7 +88,7 @@ func validateSNSCredentials(source string, env map[string]string, references boo
 			return errors.New("awssns env contains a variable outside the selected credential_source")
 		}
 		if references {
-			ref, err := secretReference(value)
+			ref, err := secret.IsReference(value)
 			if err != nil {
 				return fmt.Errorf("awssns env: %w", err)
 			}
@@ -122,7 +126,7 @@ func validateSNSCredentials(source string, env map[string]string, references boo
 	return nil
 }
 
-func snsFields(event Event) map[string]string {
+func snsFields(event notifyevent.Event) map[string]string {
 	duration := func(seconds *uint32) string {
 		if seconds == nil {
 			return ""
@@ -208,7 +212,7 @@ func renderSNSTemplate(template string, fields map[string]string) (string, error
 	return result.String(), nil
 }
 
-func renderSNS(dst Destination, event Event) (snsPublish, error) {
+func renderSNS(dst Destination, event notifyevent.Event) (snsPublish, error) {
 	fields := snsFields(event)
 	subject := event.Node + " " + fields["status_message"] + " - " + strings.ReplaceAll(event.Alert, "_", " ")
 	if event.Chart != "" {
@@ -242,7 +246,7 @@ func renderSNS(dst Destination, event Event) (snsPublish, error) {
 func snsEnvironment(ctx context.Context, dst Destination, region string) ([]string, error) {
 	credentials := make(map[string]string, len(dst.Env))
 	for key, raw := range dst.Env {
-		value, err := resolveSecret(ctx, raw)
+		value, err := secret.Resolve(ctx, raw)
 		if err != nil {
 			return nil, fmt.Errorf("awssns env: %w", err)
 		}
@@ -272,7 +276,7 @@ func snsEnvironment(ctx context.Context, dst Destination, region string) ([]stri
 	return env, nil
 }
 
-func sendAWSSNS(ctx context.Context, processes *commandProcesses, dst Destination, event Event) error {
+func sendAWSSNS(ctx context.Context, processes *commandexec.Runner, dst Destination, event notifyevent.Event) error {
 	request, err := renderSNS(dst, event)
 	if err != nil {
 		return err
@@ -288,5 +292,5 @@ func sendAWSSNS(ctx context.Context, processes *commandProcesses, dst Destinatio
 	}
 	args := []string{"sns", "publish", "--region", region, "--cli-input-json", "file:///dev/stdin",
 		"--no-cli-pager", "--no-cli-auto-prompt", "--output", "json"}
-	return processes.runCommand(ctx, dst.Executable, args, env, bytes.NewReader(append(data, '\n')), true)
+	return processes.RunWithPrivateHome(ctx, dst.Executable, args, env, bytes.NewReader(append(data, '\n')))
 }

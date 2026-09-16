@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,11 +51,11 @@ func TestRenderFormProviders(t *testing.T) {
 	clear.Status, clear.PreviousStatus = "CLEAR", "CRITICAL"
 	for provider := range map[string]struct{}{"prowl": {}, "kavenegar": {}} {
 		for name, test := range map[string]struct {
-			event   Event
+			event   notifyevent.Event
 			variant string
 		}{
 			"warning": {full, "full"}, "critical": {critical, "full"}, "clear": {clear, "full"},
-			"minimal": {Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}, "minimal"},
+			"minimal": {notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}, "minimal"},
 		} {
 			t.Run(provider+"/"+name, func(t *testing.T) {
 				want := formTestFixture(t, provider, test.variant)
@@ -96,7 +98,7 @@ func TestRenderFormProviders(t *testing.T) {
 func TestFormTextEncoding(t *testing.T) {
 	for provider := range map[string]struct{}{"prowl": {}, "kavenegar": {}} {
 		t.Run(provider, func(t *testing.T) {
-			event := Event{
+			event := notifyevent.Event{
 				Node:      "node",
 				Alert:     "alert",
 				Status:    "WARNING",
@@ -132,7 +134,7 @@ func TestProwlByteLimits(t *testing.T) {
 	for field, limit := range map[string]int{"event": 1024, "description": 10000, "url": 512} {
 		for name, extra := range map[string]int{"boundary": 0, "too long": 1} {
 			t.Run(field+"/"+name, func(t *testing.T) {
-				event := Event{
+				event := notifyevent.Event{
 					Node:      "node",
 					Alert:     "alert",
 					Status:    "WARNING",
@@ -187,8 +189,8 @@ func TestReadFormResponses(t *testing.T) {
 				204,
 				"",
 				"HTTP 204",
-			}, "limit": {200, success + strings.Repeat(" ", notificationResponseLimit-len(success)), ""},
-			"over limit": {200, success + strings.Repeat(" ", notificationResponseLimit-len(success)+1), "256 KiB"},
+			}, "limit": {200, success + strings.Repeat(" ", httpclient.ResponseLimit-len(success)), ""},
+			"over limit": {200, success + strings.Repeat(" ", httpclient.ResponseLimit-len(success)+1), "256 KiB"},
 		}
 		if provider == "prowl" {
 			for name, body := range map[string]string{
@@ -281,7 +283,7 @@ var _ io.Reader = formErrorReader{}
 
 func TestKavenegarLongText(t *testing.T) {
 	text := strings.Repeat("فارسی 界😀 & +\n", 2000)
-	event := Event{
+	event := notifyevent.Event{
 		Node:      "node",
 		Alert:     "alert",
 		Status:    "WARNING",

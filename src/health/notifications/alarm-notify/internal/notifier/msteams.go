@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const msTeamsPayloadLimit = 28 * 1024
@@ -34,7 +39,7 @@ func (dst Destination) validateMSTeams() error {
 			}
 		}
 	}
-	reference, err := secretReference(dst.URL)
+	reference, err := secret.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("msteams url: %w", err)
 	}
@@ -52,7 +57,7 @@ type msTeamsMessage struct {
 	Text       string `json:"text"`
 }
 
-func renderMSTeams(dst Destination, event Event) msTeamsMessage {
+func renderMSTeams(dst Destination, event notifyevent.Event) msTeamsMessage {
 	icon, color := "⚠️", "FFA500"
 	switch event.Status {
 	case "CRITICAL":
@@ -70,7 +75,7 @@ func renderMSTeams(dst Destination, event Event) msTeamsMessage {
 	if icon != "" {
 		title = icon + " " + title
 	}
-	text := strings.ReplaceAll(escapeMSTeamsMarkdown(notificationPlainText(event, false)), "\n", "  \n")
+	text := strings.ReplaceAll(escapeMSTeamsMarkdown(notifymsg.PlainText(event, false)), "\n", "  \n")
 	if event.URL != "" {
 		// Parentheses, backslashes and whitespace must not terminate the Markdown link target.
 		var target strings.Builder
@@ -103,8 +108,8 @@ func escapeMSTeamsMarkdown(value string) string {
 	return escaped.String()
 }
 
-func sendMSTeams(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
-	endpoint, err := resolveSecret(ctx, dst.URL)
+func sendMSTeams(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
+	endpoint, err := secret.Resolve(ctx, dst.URL)
 	if err != nil {
 		return fmt.Errorf("msteams url: %w", err)
 	}
@@ -119,9 +124,9 @@ func sendMSTeams(ctx context.Context, dst Destination, event Event, timeout time
 	if len(payload) > msTeamsPayloadLimit {
 		return errors.New("msteams payload exceeds the 28 KiB limit")
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotification(
+	response, err := httpclient.Post(
 		ctx,
 		client,
 		"msteams",
