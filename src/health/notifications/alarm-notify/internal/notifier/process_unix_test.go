@@ -33,6 +33,9 @@ type commandCapture struct {
 
 // Re-execute this test binary as an owned helper, including sendsms' fixed argv shape.
 func TestMain(m *testing.M) {
+	if len(os.Args) > 2 && os.Args[1] == "sns" && os.Args[2] == "publish" {
+		os.Exit(snsCommandHelper())
+	}
 	if mode := os.Getenv("NOTIFIER_TEST_COMMAND_HELPER"); mode != "" {
 		os.Exit(commandHelper(mode))
 	}

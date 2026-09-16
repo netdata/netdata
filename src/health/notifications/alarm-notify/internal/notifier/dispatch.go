@@ -32,6 +32,8 @@ func dispatch(
 		switch dst.Type {
 		case "syslog":
 			err = sendSyslog(ctx, processes, dst, event)
+		case "awssns":
+			err = sendAWSSNS(ctx, processes, dst, event)
 		case "command", "smstools3":
 			err = sendCommand(ctx, processes, dst, event)
 		case "webhook":
