@@ -2,7 +2,7 @@
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle, PagerDuty, Opsgenie, Microsoft Teams and Matrix.
+SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands and SMS Server Tools 3.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -11,7 +11,7 @@ The current increments provide explicit delivery, role-based routing, modern Sla
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
-Opsgenie alert creation and closure, Teams Workflows cards and Matrix room notices.
+Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices and foreground command delivery.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -139,6 +139,8 @@ PagerDuty requires `type: pagerduty` and `integration_key`; `api_version` and `a
 Opsgenie requires `type: opsgenie` and `api_key`, with an optional `api_url`.
 Teams requires `type: msteams` and `url`, with optional `icons`/`colors` maps.
 Matrix requires `type: matrix`, `api_url`, `access_token` and `room_id`.
+Custom commands require `type: command` and `executable`, with optional `args` and `env`.
+SMS Server Tools 3 requires `type: smstools3`, `executable` and `to`, with optional `env`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -146,7 +148,7 @@ follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
 MessageBird access keys, Gotify app tokens, ntfy credentials, ilert/PagerDuty integration keys, Alerta/Prowl/Kavenegar
-and Opsgenie API keys, Dynatrace API tokens and SMSEagle/Matrix access tokens accept literal strings or a whole `${env:VARIABLE}` or
+and Opsgenie API keys, Dynatrace API tokens, SMSEagle/Matrix access tokens and command environment values accept literal strings or a whole `${env:VARIABLE}` or
 `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
@@ -1477,9 +1479,104 @@ Save as `matrix-local.yaml` and run:
 
 The local receiver verifies request shape; it does not simulate Matrix membership, encryption or client rendering.
 
+## Custom commands
+
+`command` destinations execute a configured program on Linux or macOS. Use an absolute executable path and an optional
+list of literal arguments. The program receives one native JSON event followed by a newline on stdin. The notifier
+does not start a shell, interpolate arguments, source Bash functions or export Bash alert variables. Executable scripts
+with a valid interpreter line work like other programs.
+
+```yaml
+version: 1
+destinations:
+  custom:
+    type: command
+    executable: /opt/notifications/send-alert
+    args: [--recipient, ops]
+    env:
+      NOTIFY_TOKEN: ${env:NOTIFY_CUSTOM_TOKEN}
+routing:
+  roles:
+    custom_ops: [custom]
+```
+
+The only default environment entry is `PATH=/usr/local/bin:/usr/bin:/bin`. The optional `env` map extends or replaces
+these defaults; nothing else is inherited, including HOME, locale, proxy settings or credentials. Environment names
+use letters, digits and underscores and cannot start with a digit. Values accept literals and whole environment/file
+secret references; referenced values use the existing trimming/nonempty rules. Empty literal values are allowed.
+NUL bytes are rejected. References are resolved only for selected destinations. Arguments are always literal, including
+`${...}`, spaces and shell metacharacters. The executable is a literal path; it is never looked up through PATH.
+The child inherits the notifier's working directory and operating-system identity; this is not a privilege boundary.
+
+Commands **must stay in the foreground, wait for their children and keep them in the same process group**. Daemonizing,
+detaching or handing work to a persistent background process is unsupported. On cancellation or timeout, the notifier
+sends SIGKILL to the running command's process group and waits for the direct child and its stdin-copy cleanup before
+exiting. Process groups are cancellation support, not a sandbox for arbitrary programs. An additional cleanup allowance
+of up to 250 ms bounds an inherited stdin pipe if a command violates the foreground contract by exiting early.
+
+Exit status zero means success; any other exit status or launch failure fails that destination. Output goes directly
+to the null device, with no buffering or logging. Errors report launch/exit/cancellation categories without including
+the executable, arguments, environment or child output. Commands are not retried. Arguments can still be visible in
+the operating system's process listing; use the event on stdin or explicit environment for sensitive input.
+
+`validate` checks the configuration without inspecting the executable, resolving secrets or running programs.
+Windows and other platforms can validate configurations, but selected command delivery currently returns an explicit
+unsupported-platform error. Native Windows process management remains a later increment.
+
+### Local command exercise
+
+This example appends the received JSON to a local file using `tee` (adjust its absolute path if needed):
+
+```yaml
+version: 1
+destinations:
+  custom:
+    type: command
+    executable: /usr/bin/tee
+    args: [-a, /tmp/netdata-notify-events.jsonl]
+```
+
+Save as `command-local.yaml`, then run:
+
+```sh
+/tmp/alarm-notify validate --config command-local.yaml
+/tmp/alarm-notify send --config command-local.yaml --destination custom < examples/event.json
+cat /tmp/netdata-notify-events.jsonl
+```
+
+## SMS Server Tools 3
+
+Install and configure [SMS Server Tools 3](https://smstools3.kekekasvi.com/index.php?p=run), including its `sendsms`
+program, modem and `smsd` service. The invoking user needs the spool-directory permissions required by that installation.
+This provider uses the same foreground runner and platform support as custom commands.
+
+```yaml
+version: 1
+destinations:
+  sms:
+    type: smstools3
+    executable: /usr/local/bin/sendsms
+    to: '15005550009'
+    env:
+      LANG: C.UTF-8
+routing:
+  roles:
+    sms_ops: [sms]
+```
+
+Supply one phone number (digits with an optional leading `+`) per named destination. Route to multiple destinations
+for multiple recipients. `executable`, `to` and optional `env` are the only provider settings; arbitrary `args` are
+reserved for custom commands. Choose a locale supported by the gateway host when configuring `env`.
+
+Each delivery runs `sendsms <phone> <message>` as two literal arguments with empty stdin. The message uses Bash's
+status wording (needs attention, is critical, recovered), node, optional chart and summary, with the current value and
+units outside recovery. Summary underscores become spaces, and the text is truncated to 160 Unicode characters.
+Recovery durations remain pending with richer shared event facts. The gateway controls encoding and SMS segmentation;
+160 characters do not necessarily fit in one SMS. An exit status of zero reports tool acceptance, not handset delivery.
+
 ## Event document
 
-The webhook receives the typed event as JSON. `version` must be `1`. Required fields are `incident_id`, `timestamp`
+The webhook and custom command receive the typed event as JSON. `version` must be `1`. Required fields are `incident_id`, `timestamp`
 (RFC 3339), `node`, `alert`, `status`, and `summary`. `incident_id` is an opaque stable incident identifier supplied by
 the caller. Current statuses are `WARNING`, `CRITICAL`, and `CLEAR`.
 
@@ -1503,7 +1600,7 @@ go test -race -count=1 ./...
 go vet ./...
 ```
 
-Tests use tables keyed by case name and local HTTP receivers; no provider account or credentials are needed.
+Tests use tables keyed by case name, local HTTP receivers and owned helper processes; no provider account or credentials are needed.
 CI runs this module's tests on Linux. To check Windows compilation locally, use:
 
 ```sh
