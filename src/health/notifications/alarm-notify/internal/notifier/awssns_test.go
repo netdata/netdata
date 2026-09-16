@@ -37,6 +37,10 @@ func TestSNSConfig(t *testing.T) {
 			d.CredentialSource = "web_identity"
 			d.Env = map[string]string{"AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/path/notifier", "AWS_WEB_IDENTITY_TOKEN_FILE": "/unread/token", "AWS_ROLE_SESSION_NAME": "notifier-session"}
 		}},
+		"web identity punctuation path": {change: func(d *Destination) {
+			d.CredentialSource = "web_identity"
+			d.Env = map[string]string{"AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/team:ops!#$%&'()*;<>?[]^_`{|}~/notifier", "AWS_WEB_IDENTITY_TOKEN_FILE": "/unread/token"}
+		}},
 		"ecs": {change: func(d *Destination) {
 			d.CredentialSource = "ecs"
 			d.Env = map[string]string{"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/v2/credentials/example?key=value"}

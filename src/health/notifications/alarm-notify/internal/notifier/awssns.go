@@ -25,7 +25,7 @@ const snsMessageLimit = 262144
 
 var (
 	snsARNPattern     = regexp.MustCompile(`^arn:(aws(?:-[a-z]+)*):sns:([a-z0-9]+(?:-[a-z0-9]+)+):[0-9]{12}:([A-Za-z0-9_-]{1,256}|endpoint/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/[A-Za-z0-9-]+)$`)
-	snsRolePattern    = regexp.MustCompile(`^arn:aws(?:-[a-z]+)*:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$`)
+	snsRolePattern    = regexp.MustCompile(`^arn:aws(?:-[a-z]+)*:iam::[0-9]{12}:role/(?:[\x21-\x7e]+/)?[A-Za-z0-9_+=,.@-]{1,64}$`)
 	snsSessionPattern = regexp.MustCompile(`^[A-Za-z0-9_+=,.@-]{2,64}$`)
 )
 
