@@ -3,8 +3,18 @@
 #ifndef NETDATA_RRDENGINEAPI_H
 #define NETDATA_RRDENGINEAPI_H
 
-#include "rrdengine.h"
+#include "libnetdata/libnetdata.h"
+#include "dbengine-config.h"
 #include "dbengine-stats.h"
+
+// The engine's public API. Everything the daemon needs from the engine is declared here or in the other public
+// headers (dbengine-config.h, dbengine-stats.h, dbengine-workers.h, dbengine-tests.h); the rest of this directory
+// is private and no header here includes it.
+//
+// An engine instance is one tier of one database. Outside the engine it is an opaque pointer: the storage vtable's
+// STORAGE_INSTANCE is this very pointer, cast by the engine on either side, and the daemon only passes instances
+// around and indexes multidb_ctx[], the static tiers of the daemon's multi-host database.
+struct rrdengine_instance;
 
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 

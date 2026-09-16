@@ -18,8 +18,9 @@
 //
 // The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable, hands it its
 // configuration and optional services through dbengine-config.h, and reads what the engine publishes
-// (statistics, worker job ids) through the engine's own headers. The engine includes nothing of the
-// daemon.
+// (statistics, worker job ids) through the engine's own headers. Those public headers include nothing
+// of this file: this header and everything it pulls in are the engine's private side. The engine, in
+// turn, includes nothing of the daemon.
 
 #include <fcntl.h>
 #include <lz4.h>
