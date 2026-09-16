@@ -2305,7 +2305,7 @@ try_build_install() {
     fi
   fi
 
-  run sh -c '${1} "${2}" | tar -xf - -C "${3}"' "${decompress}" "${archive_name}" "${tmpdir}"
+  run sh -c '${0} "${1}" | tar -xf - -C "${2}"' "${decompress}" "${archive_name}" "${tmpdir}"
   rm -rf "${archive_name}" > /dev/null 2>&1
 
   if [ "${DRY_RUN}" -ne 1 ]; then
