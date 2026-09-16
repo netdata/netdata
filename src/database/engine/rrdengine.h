@@ -38,7 +38,6 @@ extern struct dbengine_config dbengine_cfg;
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
-bool dbengine_initialized(void);
 
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -486,11 +485,6 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-// a tier that came up and has not been shut down; the event loop's periodic work covers exactly these
-static inline bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
-    return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
-}
-
 // Retention and indexing work wait until the registry has been loaded from every journal: rotating a
 // datafile before then would drop metrics the registry has not learned yet. The loader's own datafile references only
 // protect the files it is reading at that moment; this flag keeps rotation from starting at all.
@@ -732,7 +726,8 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-void dbengine_shutdown(void);
+// rrdeng_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
+uint64_t rrdeng_get_used_disk_space_unsafe(struct rrdengine_instance *ctx);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);

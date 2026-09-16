@@ -2436,12 +2436,9 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     return data;
 }
 
-uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock)
+uint64_t rrdeng_get_used_disk_space_unsafe(struct rrdengine_instance *ctx)
 {
     uint64_t active_space = 0;
-
-    if (!having_lock)
-        netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
 
     struct rrdengine_datafile *first_datafile = get_first_ctx_datafile(ctx, true);
     struct rrdengine_datafile *last_datafile = get_last_ctx_datafile(ctx, true);
@@ -2449,14 +2446,19 @@ uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_
     if (first_datafile && last_datafile)
         active_space = last_datafile->pos;
 
-    if (!having_lock)
-        netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
-
     // calculate the estimated disk space based on the expected final size of the datafile
     // We cant know the final v1/v2 journal size -- we let the current v1 size be part of the calculation by not
     // including it in the active_space
     uint64_t estimated_disk_space = ctx_current_disk_space_get(ctx) + rrdeng_target_data_file_size(ctx) - active_space;
 
+    return estimated_disk_space;
+}
+
+uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx)
+{
+    netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
+    uint64_t estimated_disk_space = rrdeng_get_used_disk_space_unsafe(ctx);
+    netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
     return estimated_disk_space;
 }
 
@@ -2486,7 +2488,7 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
     // avoid disk calculation if we will trigger time retention
     // calculate estimated disk space only if we have a disk cap
     if (false == trigger_time_retention && ctx->config.max_disk_space)
-        estimated_disk_space = rrdeng_get_used_disk_space(ctx, true);
+        estimated_disk_space = rrdeng_get_used_disk_space_unsafe(ctx);
 
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
 

@@ -46,6 +46,15 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
+
+// a tier that came up and has not been shut down (rrdeng_exit() clears it first); the engine's
+// periodic work covers exactly these tiers, and the embedder uses it to skip tiers that never
+// started or already stopped
+bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx);
+
+// stop the engine's event loop and join its thread; after every tier's rrdeng_exit(). Nothing may
+// be enqueued to the engine afterwards
+void dbengine_shutdown(void);
 void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);
 void rrdeng_flush_all(struct rrdengine_instance *ctx);
@@ -57,7 +66,8 @@ void finalize_rrd_files(struct rrdengine_instance *ctx);
 
 // what the embedder reads about the tiers
 size_t rrdeng_active_tiers(void);
-uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_lock);
+time_t rrdeng_max_retention_s(struct rrdengine_instance *ctx);   // the tier's configured time limit; 0 = none
+uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx);
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 
 bool rrdeng_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);

@@ -115,5 +115,6 @@ struct rrdeng_tier_config {
 // default_update_every_s is negative. Call it once, from one thread, before the first rrdeng_init();
 // a second call with an equal configuration is a no-op, with a different one it is fatal.
 void dbengine_init(const struct dbengine_config *cfg);
+bool dbengine_initialized(void);
 
 #endif // NETDATA_DBENGINE_CONFIG_H

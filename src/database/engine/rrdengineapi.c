@@ -1210,6 +1210,14 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
     return UV_EIO;
 }
 
+bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
+    return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
+}
+
+time_t rrdeng_max_retention_s(struct rrdengine_instance *ctx) {
+    return ctx->config.max_retention_s;
+}
+
 size_t rrdeng_active_tiers(void) {
     size_t active = 0;
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
