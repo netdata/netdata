@@ -23,12 +23,11 @@ func TestCompile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(contract.Fields) == 0 || len(contract.Charts) == 0 || len(contract.Columns) == 0 {
+	if len(contract.Fields) == 0 || len(contract.Charts) == 0 {
 		t.Fatalf(
-			"compiled contract is incomplete: fields=%d charts=%d columns=%d",
+			"compiled contract is incomplete: fields=%d charts=%d",
 			len(contract.Fields),
 			len(contract.Charts),
-			len(contract.Columns),
 		)
 	}
 }
@@ -52,12 +51,7 @@ func TestOperationalChartTypesAreExplicit(t *testing.T) {
 	for _, context := range []string{
 		"redfish.collection.http_requests",
 		"redfish.collection.resources",
-		"redfish.collection.log_services",
 		"redfish.collection.detail_components",
-		"redfish.log_backend.storage",
-		"redfish.log_backend.pipeline",
-		"redfish.log_service.pipeline",
-		"redfish.log_service.reconciliation",
 	} {
 		if chart := charts[context]; chart.Type != ChartLine {
 			t.Errorf("comparison/overlapping context %q compiled as %q, want %q", context, chart.Type, ChartLine)
@@ -65,7 +59,6 @@ func TestOperationalChartTypesAreExplicit(t *testing.T) {
 	}
 	for _, context := range []string{
 		"redfish.collection.operations",
-		"redfish.log_backend.files",
 	} {
 		if chart := charts[context]; chart.Type != ChartStacked {
 			t.Errorf("additive context %q compiled as %q, want %q", context, chart.Type, ChartStacked)
@@ -82,34 +75,6 @@ func TestCompileChartsRejectsMissingOperationalChartType(t *testing.T) {
 	}
 }
 
-func TestCompileReturnsDeeplyIsolatedColumns(t *testing.T) {
-	first := MustCompile()
-	var mutatedID string
-	for index := range first.Columns {
-		if first.Columns[index].Members == nil {
-			continue
-		}
-		mutatedID = first.Columns[index].ID
-		first.Columns[index].Members["test_mutation"] = struct{}{}
-		break
-	}
-	if mutatedID == "" {
-		t.Fatal("compiled registry has no kind-scoped column")
-	}
-
-	second := MustCompile()
-	for _, column := range second.Columns {
-		if column.ID != mutatedID {
-			continue
-		}
-		if _, ok := column.Members["test_mutation"]; ok {
-			t.Fatalf("column %q shared its Members map across Compile calls", mutatedID)
-		}
-		return
-	}
-	t.Fatalf("mutated column %q is missing from the second contract", mutatedID)
-}
-
 func TestCompileChartsRejectsUnknownKindsBeforeConstructingCharts(t *testing.T) {
 	tests := []struct {
 		name string
@@ -119,13 +84,7 @@ func TestCompileChartsRejectsUnknownKindsBeforeConstructingCharts(t *testing.T) 
 		{name: "state", edit: func(contract *Contract) { contract.States[0].Kind = "unknown" }},
 		{name: "flag set", edit: func(contract *Contract) { contract.Flags[0].Kind = "unknown" }},
 		{name: "field", edit: func(contract *Contract) {
-			for index := range contract.Fields {
-				if contract.Fields[index].Exposure == ExposureOperationalScalar {
-					contract.Fields[index].Kind = "unknown"
-					return
-				}
-			}
-			panic("compiled registry has no operational scalar field")
+			contract.Fields[0].Kind = "unknown"
 		}},
 	}
 
@@ -270,114 +229,7 @@ func TestValidateRejectsUnreachableReadingAggregateOwner(t *testing.T) {
 	t.Fatal("compiled registry has no aggregate reading to mutate")
 }
 
-func TestCompiledColumnTypes(t *testing.T) {
-	contract := MustCompile()
-	columns := make(map[string]ColumnType, len(contract.Columns))
-	for _, column := range contract.Columns {
-		columns[column.ID] = column.Type
-	}
-
-	for id, want := range map[string]ColumnType{
-		"row_type":                            ColumnEnum,
-		"health":                              ColumnEnum,
-		"reading_type":                        ColumnEnum,
-		"threshold_upper_critical_activation": ColumnEnum,
-		"failure_predicted":                   ColumnBoolean,
-		"control_setpoint_type":               ColumnEnum,
-		"control_setting_min":                 ColumnFloat,
-		"software_lowest_supported_version":   ColumnString,
-		"assembly_country_of_origin":          ColumnString,
-		"log_service_overflow":                ColumnBoolean,
-	} {
-		if got := columns[id]; got != want {
-			t.Errorf("column %q type = %q, want %q", id, got, want)
-		}
-	}
-}
-
-func TestLogicalOwnerCandidatesColumnIsStructured(t *testing.T) {
-	contract := MustCompile()
-	for _, column := range contract.Columns {
-		if column.ID != "logical_owner_candidates" {
-			continue
-		}
-		if !column.Structured || column.Facet || column.Sortable {
-			t.Fatalf("logical_owner_candidates presentation = structured:%t facet:%t sortable:%t", column.Structured, column.Facet, column.Sortable)
-		}
-		return
-	}
-	t.Fatal("logical_owner_candidates column is missing")
-}
-
-func TestCompileColumnsRejectsIncompatibleDuplicateTypes(t *testing.T) {
-	_, err := compileColumns(Contract{Inventory: []InventoryFieldSpec{{
-		Kind:   "chassis",
-		Path:   "Status.Health",
-		Column: "health",
-		Type:   ColumnString,
-	}}})
-	if err == nil || !strings.Contains(err.Error(), `column "health" has conflicting types`) {
-		t.Fatalf("compileColumns() error = %v, want incompatible-type error", err)
-	}
-}
-
-func TestCompileColumnsPromotesCompatibleNumericTypes(t *testing.T) {
-	columns, err := compileColumns(Contract{
-		Inventory: []InventoryFieldSpec{{
-			Kind:   "processor",
-			Path:   "BaseSpeedMHz",
-			Column: "test_numeric",
-			Type:   ColumnInteger,
-		}},
-		Fields: []FieldSpec{{
-			Kind:      "processor",
-			Column:    "test_numeric",
-			Algorithm: AlgorithmAbsolute,
-			Float:     true,
-		}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, column := range columns {
-		if column.ID == "test_numeric" {
-			if column.Type != ColumnFloat {
-				t.Fatalf("numeric column type = %q, want %q", column.Type, ColumnFloat)
-			}
-			return
-		}
-	}
-	t.Fatal("numeric column not compiled")
-}
-
-func TestCompileColumnsKeepCommonColumnsApplicableToEveryKind(t *testing.T) {
-	contract := MustCompile()
-	for _, id := range []string{
-		"health",
-		"state",
-		"power_state",
-		"failure_predicted",
-		"resource_kind",
-		"host_uri",
-	} {
-		var found bool
-		for _, column := range contract.Columns {
-			if column.ID != id {
-				continue
-			}
-			found = true
-			if len(column.Members) != 0 {
-				t.Errorf("common column %q members = %v, want all kinds", id, column.Members)
-			}
-			break
-		}
-		if !found {
-			t.Errorf("common column %q is missing", id)
-		}
-	}
-}
-
-func TestCompileGroupsOperationalScalarRolesAndOmitsInventoryOnlyScalars(t *testing.T) {
+func TestCompileGroupsOperationalScalarRoles(t *testing.T) {
 	contract := MustCompile()
 	charts := make(map[string]ChartSpec, len(contract.Charts))
 	for _, chart := range contract.Charts {
@@ -443,15 +295,9 @@ func TestEveryOperationalRegistryRowReachesExactlyOneDirectChart(t *testing.T) {
 		}
 	}
 	for _, field := range contract.Fields {
-		if field.Exposure != ExposureOperationalScalar {
-			continue
-		}
 		assertOne("field "+field.ID, field.Metric, scalarBaseRowContext(field.Context, field.Role))
 	}
 	for _, reading := range contract.Readings {
-		if reading.Exposure != ExposureOperationalReading {
-			continue
-		}
 		assertOne(
 			"reading "+strings.Join([]string{reading.Family, reading.Basis, reading.Role}, "/"),
 			reading.Metric,
@@ -474,112 +320,6 @@ func TestFallbackCandidatesRequireExplicitEquivalenceProof(t *testing.T) {
 		return
 	}
 	t.Fatal("compiled registry has no fallback to mutate")
-}
-
-func TestCompiledExposureAndAggregateContract(t *testing.T) {
-	contract := MustCompile()
-	chartMetrics := make(map[string]struct{})
-	for _, chart := range contract.Charts {
-		for _, dimension := range chart.Dimensions {
-			chartMetrics[dimension.Metric] = struct{}{}
-		}
-	}
-
-	var inventoryFields, operationalFields, aggregatePairs int
-	for _, field := range contract.Fields {
-		_, charted := chartMetrics[field.Metric]
-		switch field.Exposure {
-		case ExposureInventoryOnly:
-			inventoryFields++
-			if charted {
-				t.Errorf("inventory-only field %q reaches a chart", field.ID)
-			}
-		case ExposureOperationalScalar:
-			operationalFields++
-			if !charted {
-				t.Errorf("operational field %q does not reach a direct chart", field.ID)
-			}
-		default:
-			t.Errorf("field %q has exposure %q", field.ID, field.Exposure)
-		}
-		for _, parent := range field.AggregateKinds {
-			aggregatePairs++
-			if !directAggregateRelationship(field.Kind, parent, contract.Relationships) {
-				t.Errorf("field %q has unreachable aggregate owner %q", field.ID, parent)
-			}
-			if field.AggregateClass == "" {
-				t.Errorf("field %q has aggregate owner %q without a summary class", field.ID, parent)
-			}
-		}
-	}
-	if inventoryFields != expectedInventoryFieldCount ||
-		operationalFields != expectedOperationalFieldCount ||
-		aggregatePairs != 413 {
-		t.Fatalf(
-			"field contract counts inventory=%d operational=%d aggregate_pairs=%d",
-			inventoryFields,
-			operationalFields,
-			aggregatePairs,
-		)
-	}
-
-	var inventoryReadings, primaryReadings, auxiliaryReadings int
-	for _, reading := range contract.Readings {
-		_, charted := chartMetrics[reading.Metric]
-		switch reading.Exposure {
-		case ExposureInventoryOnly:
-			inventoryReadings++
-			if charted {
-				t.Errorf(
-					"inventory-only reading %s/%s/%s reaches a chart",
-					reading.Family,
-					reading.Basis,
-					reading.Role,
-				)
-			}
-		case ExposureOperationalReading:
-			if reading.Primary {
-				primaryReadings++
-			} else {
-				auxiliaryReadings++
-			}
-			if !charted {
-				t.Errorf(
-					"operational reading %s/%s/%s does not reach a direct chart",
-					reading.Family,
-					reading.Basis,
-					reading.Role,
-				)
-			}
-			if !reading.Primary && len(reading.AggregateKinds) != 0 {
-				t.Errorf(
-					"auxiliary reading %s/%s/%s has aggregate owners %v",
-					reading.Family,
-					reading.Basis,
-					reading.Role,
-					reading.AggregateKinds,
-				)
-			}
-		default:
-			t.Errorf(
-				"reading %s/%s/%s has exposure %q",
-				reading.Family,
-				reading.Basis,
-				reading.Role,
-				reading.Exposure,
-			)
-		}
-	}
-	if inventoryReadings != expectedInventoryReadingCount ||
-		primaryReadings != expectedPrimaryReadingCount ||
-		auxiliaryReadings != expectedAuxiliaryReadingCount {
-		t.Fatalf(
-			"reading contract counts inventory=%d primary=%d auxiliary=%d",
-			inventoryReadings,
-			primaryReadings,
-			auxiliaryReadings,
-		)
-	}
 }
 
 func TestCompiledChartsStayBoundedAndUseGenericAggregateContexts(t *testing.T) {
@@ -648,6 +388,41 @@ func TestEveryChartSelectorHasDeclaredProducer(t *testing.T) {
 					dimension.Metric,
 				)
 			}
+		}
+	}
+}
+func TestCompiledAggregateContract(t *testing.T) {
+	contract := MustCompile()
+	chartMetrics := make(map[string]bool)
+	for _, chart := range contract.Charts {
+		for _, dimension := range chart.Dimensions {
+			chartMetrics[dimension.Metric] = true
+		}
+	}
+	aggregatePairs := 0
+	for _, field := range contract.Fields {
+		if !chartMetrics[field.Metric] {
+			t.Errorf("field %q does not reach a direct chart", field.ID)
+		}
+		for _, parent := range field.AggregateKinds {
+			aggregatePairs++
+			if !directAggregateRelationship(field.Kind, parent, contract.Relationships) {
+				t.Errorf("field %q has unreachable aggregate owner %q", field.ID, parent)
+			}
+			if field.AggregateClass == "" {
+				t.Errorf("field %q has aggregate owner %q without a summary class", field.ID, parent)
+			}
+		}
+	}
+	if aggregatePairs != 413 {
+		t.Fatalf("aggregate pairs=%d, want 413", aggregatePairs)
+	}
+	for _, reading := range contract.Readings {
+		if !chartMetrics[reading.Metric] {
+			t.Errorf("reading %s/%s/%s does not reach a direct chart", reading.Family, reading.Basis, reading.Role)
+		}
+		if !reading.Primary && len(reading.AggregateKinds) != 0 {
+			t.Errorf("auxiliary reading %s/%s/%s has aggregate owners %v", reading.Family, reading.Basis, reading.Role, reading.AggregateKinds)
 		}
 	}
 }

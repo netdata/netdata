@@ -63,12 +63,6 @@ func artifactTargets(root, repository string, contract registry.Contract) []arti
 			},
 		},
 		{
-			path: filepath.Join(filepath.Dir(root), "redfish_logs", "charts.yaml"),
-			render: func() ([]byte, error) {
-				return renderCharts(contract, "redfish_logs")
-			},
-		},
-		{
 			path: filepath.Join(repository, "src", "health", "health.d", "redfish.conf"),
 			render: func() ([]byte, error) {
 				return renderHealth(contract)
@@ -78,16 +72,6 @@ func artifactTargets(root, repository string, contract registry.Contract) []arti
 			path: filepath.Join(root, "metadata.yaml"),
 			render: func() ([]byte, error) {
 				return renderMetadata(contract, "redfish", filepath.Join(root, "metadata.yaml.tmpl"))
-			},
-		},
-		{
-			path: filepath.Join(filepath.Dir(root), "redfish_logs", "metadata.yaml"),
-			render: func() ([]byte, error) {
-				return renderMetadata(
-					contract,
-					"redfish_logs",
-					filepath.Join(filepath.Dir(root), "redfish_logs", "metadata.yaml.tmpl"),
-				)
 			},
 		},
 	}
@@ -309,7 +293,7 @@ func renderHealth(contract registry.Contract) ([]byte, error) {
 func compileHealthRules(contract registry.Contract) ([]healthRule, error) {
 	byContext := make(map[string]registry.ChartSpec)
 	for _, chart := range contract.Charts {
-		if chart.Module != "redfish" && chart.Module != "redfish_logs" {
+		if chart.Module != "redfish" {
 			continue
 		}
 		if current, ok := byContext[chart.Context]; ok {
@@ -357,31 +341,8 @@ func healthRulesForChart(chart registry.ChartSpec) []healthRule {
 	switch context {
 	case "redfish.collection.status":
 		return []healthRule{operational("Availability", "$partial + $unavailable", "$partial > 0", "$unavailable > 0")}
-	case "redfish.collection.logs_admission":
-		return []healthRule{operational(
-			"Errors",
-			"$over_limit + $duplicate_owner",
-			"$over_limit > 0 OR $duplicate_owner > 0",
-			"",
-		)}
 	case "redfish.collection.selected_system":
 		return []healthRule{operational("Availability", "$unreadable + $absent", "$unreadable > 0", "$absent > 0")}
-	case "redfish.log_backend.state":
-		return []healthRule{operational("Availability", "$unavailable", "", "$unavailable > 0")}
-	case "redfish.log_backend.pipeline":
-		return []healthRule{operational("Errors", "$write_failed", "$this > 0", "")}
-	case "redfish.log_service.ingestion_state":
-		subject := healthSubject(chart)
-		warning := operational("Errors", "$blocked_source", "$this > 0", "")
-		warning.Name += "_warning"
-		warning.Summary = subject + " log ingestion blocked"
-		warning.Info = subject + " log ingestion has remained blocked at its source for at least five minutes"
-		critical := operational("Errors", "$blocked_source", "", "$this > 0")
-		critical.Name += "_critical"
-		critical.Delay = "up 30m down 5m multiplier 1.5 max 1h"
-		critical.Summary = subject + " log ingestion persistently blocked"
-		critical.Info = subject + " log ingestion has remained blocked at its source for at least thirty minutes"
-		return []healthRule{warning, critical}
 	case "redfish.chassis.intrusion_state":
 		return []healthRule{hardware(
 			"$hardware_intrusion + $tampering_detected",
@@ -402,8 +363,6 @@ func healthRulesForChart(chart registry.ChartSpec) []healthRule {
 		return []healthRule{hardware("$out_of_range + $loss_of_input", "$out_of_range > 0", "$loss_of_input > 0")}
 	case "redfish.leak_detector.detector_state":
 		return []healthRule{hardware("$warning + $critical", "$warning > 0", "$critical > 0")}
-	case "redfish.log_service.overflow_state":
-		return []healthRule{hardware("$overflow", "", "$overflow > 0")}
 	}
 
 	switch {

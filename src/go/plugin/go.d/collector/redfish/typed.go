@@ -61,7 +61,6 @@ var typedResourceFactories = map[string]func() any{
 	"software":                        newTypedResource[schemas.SoftwareInventory],
 	"assembly":                        newTypedResource[schemas.Assembly],
 	"assembly_document":               newTypedResource[schemas.Assembly],
-	"log_service":                     newTypedResource[schemas.LogService],
 	"legacy_thermal":                  newTypedResource[schemas.Thermal],
 	"legacy_power":                    newTypedResource[schemas.Power],
 	"update_service":                  newTypedResource[schemas.UpdateService],

@@ -21,9 +21,7 @@ modules:
         - ilo
       related_resources:
         integrations:
-          list:
-            - plugin_name: go.d.plugin
-              module_name: redfish_logs
+          list: []
       info_provided_to_referring_integrations:
         description: ""
     overview:
@@ -33,13 +31,11 @@ modules:
 
           The collector covers endpoint health, systems, chassis, managers, processors, memory, storage, drives, volumes,
           network adapters and ports, PCIe, power, cooling, environmental sensors, batteries, leak detection, firmware,
-          assemblies, and LogService state. It publishes:
+          and assemblies. It publishes:
 
           - per-component metrics and state charts;
           - complete one-level rollups with population/completeness, min/average/max, fixed histograms, and state counts;
-          - deterministic ComputerSystem virtual nodes when `node_mode: system_vnodes` is selected;
-          - current hardware inventory through `redfish:inventory`;
-          - retained LogService records through `redfish:logs` when a referenced `redfish_logs` backend is ready.
+          - deterministic ComputerSystem virtual nodes when `node_mode: system_vnodes` is selected.
         method_description: |
           The collector authenticates to the Redfish ServiceRoot over HTTP or HTTPS, traverses only its closed standard-resource
           registry, and follows same-origin links. It prefers session authentication in `auto` mode and falls back to HTTP Basic
@@ -55,21 +51,19 @@ modules:
       multi_instance: true
       additional_permissions:
         description: |
-          A read-only Redfish account is normally required. No local elevated privileges are needed. Log storage requires the
-          Netdata log directory to be writable by the Agent through a configured `redfish_logs` job.
+          A read-only Redfish account is normally required. No local elevated privileges are needed.
       default_behavior:
         auto_detection:
           description: |
-            No endpoint is auto-detected by the collector itself. Configure static jobs, DynCfg jobs, or enable the independent
-            Redfish Service Discovery pipeline under `go.d/sd/redfish.conf`.
+            Endpoints are not automatically detected. Configure each endpoint through a static or DynCfg job.
         limits:
           description: |
             Detailed component charts are admitted atomically per logical owner and component family. The default cap is 100
-            components per family; exceeding it suppresses that whole detail group while preserving inventory and complete
-            one-level rollups. Set `charts.max_detailed_components_per_family: 0` for no configurable cap.
+            components per family; exceeding it suppresses that whole detail group while preserving complete one-level rollups.
+            Set `charts.max_detailed_components_per_family: 0` for no configurable cap.
 
-            LogService admission is atomic across the selected services and defaults to 256 services. Protocol response bounds,
-            closed traversal registries, and request concurrency protect the Agent from malformed or hostile payloads.
+            Protocol response bounds, closed traversal registries, and request concurrency protect the Agent from malformed
+            or hostile payloads.
         performance_impact:
           description: |
             The default interval is 60 seconds. BMCs are often slow and may serialize requests internally. The collector starts
@@ -84,15 +78,11 @@ modules:
           - title: Enable and authorize Redfish
             description: |
               Enable the BMC's Redfish service and create a least-privilege monitoring account that can read the desired systems,
-              chassis, managers, sensors, storage, and LogService entries.
+              chassis, managers, sensors, and storage.
           - title: Establish network and TLS trust
             description: |
               Ensure the Netdata Agent can reach the BMC. Prefer HTTPS with a trusted BMC certificate or configure `tls_ca`.
               `tls_skip_verify` is available for legacy/self-signed deployments but permits machine-in-the-middle attacks.
-          - title: Configure a log backend if logs are required
-            description: |
-              Redfish metrics do not require log storage. To ingest LogService entries, configure and enable a `redfish_logs` job.
-              Omitted endpoint routing selects the backend job named `default`; an explicit missing backend never falls back.
       configuration:
         file:
           name: go.d/redfish.conf
@@ -106,7 +96,7 @@ modules:
           list:
             - name: update_every
               group: Collection
-              description: Data collection interval, in seconds. The same interval paces endpoint metrics and LogService polling.
+              description: Data collection interval, in seconds.
               default_value: 60
               required: false
             - name: autodetection_retry
@@ -219,36 +209,6 @@ modules:
               description: Pins the generated virtual nodes to specific GUIDs or hostnames so they stay stable across BMC changes. Used only when the node mode is `system_vnodes`.
               default_value: "[]"
               required: false
-            - name: logs.enabled
-              group: Logs
-              description: Collect LogService entries. Collection runs only while the selected log backend is ready.
-              default_value: true
-              required: false
-            - name: logs.backend
-              group: Logs
-              description: Name of the `redfish_logs` job that stores the entries. Leave empty to use the job named `default`; a name that does not exist never falls back.
-              default_value: default
-              required: false
-            - name: logs.service_selector
-              group: Logs
-              description: Simple pattern selecting which of the discovered LogServices to collect.
-              default_value: "*"
-              required: false
-            - name: logs.max_services
-              group: Logs
-              description: Maximum number of LogServices collected from this endpoint.
-              default_value: 256
-              required: false
-            - name: logs.full_reconciliation_every
-              group: Logs
-              description: How often to re-read every selected LogService from the start, in seconds. Zero disables it.
-              default_value: 30m
-              required: false
-            - name: logs.cursor.orphan_retention
-              group: Logs
-              description: How long to keep the read position of a LogService that is no longer collected, in seconds. Zero keeps it forever.
-              default_value: 720h
-              required: false
         examples:
           folding:
             title: Config
@@ -289,10 +249,6 @@ modules:
             description: |
               The component-family population exceeded `charts.max_detailed_components_per_family`, or `charts.details` is false.
               The gate is atomic: the collector never selects an arbitrary subset that would break continuity.
-          - name: Redfish logs are unavailable
-            description: |
-              Ensure the selected `redfish_logs` job exists, is enabled, and is ready. Omitted routing selects `default`.
-              An explicitly configured missing or disabled backend does not fall back.
           - name: The same endpoint appears through more than one collector owner
             description: |
               Deterministic Redfish vnode GUIDs preserve identity but do not elect one collector. Differently named jobs and
@@ -311,119 +267,6 @@ modules:
               the affected vendor, model, firmware, and sanitized payload shape when a standard resource is missing.
     alerts:
 {{GENERATED_ALERTS}}
-    functions:
-      description: Live views backed by the latest collector snapshots and retained Redfish LogService journals.
-      list:
-        - id: inventory
-          name: Redfish Inventory
-          description: |
-            Returns the complete current standard inventory slice selected by Redfish job, host, and resource kind. Rows include
-            resource identity, ownership, acquisition state, status, source provenance, readings, thresholds, and applicable
-            type-specific inventory fields. The Function does not filter or page rows after the required source slice is selected.
-          parameters:
-            - id: __job
-              name: Redfish Job
-              description: Select exactly one active Redfish endpoint job.
-              type: select
-              required: true
-              default: ""
-              options: []
-            - id: host
-              name: Host
-              description: Select exactly one ComputerSystem or service scope exposed by the selected job.
-              type: select
-              required: true
-              default: ""
-              options: []
-            - id: resource_kind
-              name: Resource Kind
-              description: Select exactly one standard Redfish resource kind.
-              type: select
-              required: true
-              default: ""
-              options: []
-          returns:
-            description: Current resource and normalized-reading rows for the exact selected source slice.
-            columns:
-              - name: resource_kind
-                type: string
-                unit: ""
-                description: Normalized Redfish resource kind.
-              - name: name
-                type: string
-                unit: ""
-                description: Current source display name.
-              - name: resource_uri
-                type: string
-                unit: ""
-                description: Canonical same-origin Redfish resource URI.
-              - name: acquisition_state
-                type: string
-                unit: ""
-                description: Current readable, unreadable, or unknown acquisition state.
-              - name: health
-                type: string
-                unit: ""
-                description: Current normalized Redfish Health value when present.
-              - name: logical_owner_name
-                type: string
-                unit: ""
-                description: Proven logical ComputerSystem owner when one exists.
-              - name: reading_value
-                type: float
-                unit: ""
-                description: Normalized numeric reading for reading rows.
-          performance: |
-            Uses the latest immutable in-memory snapshots and performs no Redfish requests. A selected source slice may contain
-            thousands of rows; the Function returns it as one table because Netdata table Functions do not paginate.
-          security: |
-            Exposes hardware identifiers, inventory, locations, firmware, source properties, and readings. It never exposes
-            Redfish passwords, tokens, session locations, cookies, client keys, or proxy authorization headers.
-          availability: Available after at least one active endpoint job publishes an inventory snapshot.
-        - id: logs
-          name: Redfish Logs
-          description: |
-            Queries retained Redfish LogService entries across one or more ready named log backends, with the standard Netdata
-            logs facets, histogram, full-text search, time range, and source selectors.
-          parameters:
-            - id: __logs_sources
-              name: Redfish Log Backends
-              description: Select one or more ready Redfish log backends, or all.
-              type: multiselect
-              required: false
-              default: all
-              options: []
-          returns:
-            description: Historical structured Redfish LogEntry rows returned by the Netdata journal SDK.
-            columns:
-              - name: MESSAGE
-                type: string
-                unit: ""
-                description: Human-readable Redfish log message.
-              - name: REDFISH_HOST_NAME
-                type: string
-                unit: ""
-                description: Associated Redfish host name when known.
-              - name: REDFISH_SEVERITY
-                type: string
-                unit: ""
-                description: Source severity.
-              - name: REDFISH_MESSAGE_ID
-                type: string
-                unit: ""
-                description: Source registry MessageId.
-              - name: REDFISH_JSON
-                type: object
-                unit: ""
-                description: Complete losslessly normalized LogEntry JSON.
-          performance: |
-            Uses the existing journal SDK and retained backend indexes. The Function performs no Redfish requests.
-          security: |
-            Retains and exposes complete source LogEntry content, including audit usernames, origin addresses, OEM fields,
-            diagnostic data, and message arguments. Linked diagnostic payloads are not dereferenced. Redfish credentials,
-            sessions, cookies, client keys, and proxy authorization are never stored.
-          availability: Available only while at least one configured `redfish_logs` backend is ready and queryable.
-          require_cloud: true
     metrics:
       folding:
         title: Metrics
@@ -478,14 +321,6 @@ modules:
                 - name: readable
                 - name: unreadable
                 - name: unknown
-            - name: redfish.collection.logs_route
-              description: Selected log backend route state.
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: disabled
-                - name: ready
-                - name: unavailable
         - name: resource or reading
           description: Per-component standard resource and normalized-reading charts, optionally attributed to generated ComputerSystem vnodes.
           labels:

@@ -87,16 +87,6 @@
       "source": "mockups/DSP2046-examples/LeakDetector-v1-example.json"
     },
     {
-      "schema": "LogEntry",
-      "odata_type": "#LogEntry.v1_21_0.LogEntry",
-      "source": "mockups/DSP2046-examples/LogEntry-v1-example.json"
-    },
-    {
-      "schema": "LogService",
-      "odata_type": "#LogService.v1_9_0.LogService",
-      "source": "mockups/DSP2046-examples/LogService-v1-example.json"
-    },
-    {
       "schema": "Manager",
       "odata_type": "#Manager.v1_25_0.Manager",
       "source": "mockups/DSP2046-examples/Manager-v1-example.json"

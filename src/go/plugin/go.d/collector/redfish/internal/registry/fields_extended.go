@@ -31,17 +31,12 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 				context += "." + atom.Role
 			}
 			metric := strings.ReplaceAll(context, ".", "_")
-			column := atom.Column
-			if column == "" {
-				column = string(base.Kind) + "_" + snakePath(atom.Path)
-			}
 			spec := base
 			spec.ID = string(base.Kind) + "_" + snakePath(string(document)+"_"+atom.Path)
 			spec.Candidates = []SourceCandidate{{Document: document, Path: atom.Path, Unit: atom.SourceUnit}}
 			spec.Metric = metric
 			spec.Context = context
 			spec.Role = atom.Role
-			spec.Column = column
 			spec.Title = atom.Title
 			spec.Float = atom.Float
 			spec.AggregateKinds = append([]Kind(nil), base.AggregateKinds...)
@@ -58,28 +53,28 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 		Kind: "processor_core", Units: "instructions/cycle", Algorithm: AlgorithmAbsolute, Scale: Identity,
 		AggregateKinds: []Kind{"processor"}, ComponentClass: replaceable,
 	},
-		fieldAtom{Path: "InstructionsPerCycle", Role: "instructions", Column: "processor_core_instructions_per_cycle", Float: true,
+		fieldAtom{Path: "InstructionsPerCycle", Role: "instructions", Float: true,
 			Title: "Processor Core Instructions per Cycle"})
 	addFields("", "error_rate", FieldSpec{
 		Kind: "processor_core", Units: "errors/s", Algorithm: AlgorithmRate, Scale: Identity, Additive: true,
 		AggregateKinds: []Kind{"processor"}, ComponentClass: replaceable,
 	},
-		fieldAtom{Path: "CorrectableCoreErrorCount", Role: "correctable_core", Column: "processor_core_correctable_core_error_total", Float: true, Title: "Processor Core Correctable Core Error Rate"},
-		fieldAtom{Path: "CorrectableOtherErrorCount", Role: "correctable_other", Column: "processor_core_correctable_other_error_total", Float: true, Title: "Processor Core Correctable Other Error Rate"},
-		fieldAtom{Path: "UncorrectableCoreErrorCount", Role: "uncorrectable_core", Column: "processor_core_uncorrectable_core_error_total", Float: true, Title: "Processor Core Uncorrectable Core Error Rate"},
-		fieldAtom{Path: "UncorrectableOtherErrorCount", Role: "uncorrectable_other", Column: "processor_core_uncorrectable_other_error_total", Float: true, Title: "Processor Core Uncorrectable Other Error Rate"})
+		fieldAtom{Path: "CorrectableCoreErrorCount", Role: "correctable_core", Float: true, Title: "Processor Core Correctable Core Error Rate"},
+		fieldAtom{Path: "CorrectableOtherErrorCount", Role: "correctable_other", Float: true, Title: "Processor Core Correctable Other Error Rate"},
+		fieldAtom{Path: "UncorrectableCoreErrorCount", Role: "uncorrectable_core", Float: true, Title: "Processor Core Uncorrectable Core Error Rate"},
+		fieldAtom{Path: "UncorrectableOtherErrorCount", Role: "uncorrectable_other", Float: true, Title: "Processor Core Uncorrectable Other Error Rate"})
 	addFields("", "cycle_rate", FieldSpec{
 		Kind: "processor_core", Units: "cycles/s", Algorithm: AlgorithmRate, Scale: Identity, Additive: true,
 		AggregateKinds: []Kind{"processor"}, ComponentClass: replaceable,
 	},
-		fieldAtom{Path: "IOStallCount", Role: "io_stall", Column: "processor_core_io_stall_cycles_total", Float: true, Title: "Processor Core I/O Stall Cycle Rate"},
-		fieldAtom{Path: "MemoryStallCount", Role: "memory_stall", Column: "processor_core_memory_stall_cycles_total", Float: true, Title: "Processor Core Memory Stall Cycle Rate"},
-		fieldAtom{Path: "UnhaltedCycles", Role: "unhalted", Column: "processor_core_unhalted_cycles_total", Float: true, Title: "Processor Core Unhalted Cycle Rate"})
+		fieldAtom{Path: "IOStallCount", Role: "io_stall", Float: true, Title: "Processor Core I/O Stall Cycle Rate"},
+		fieldAtom{Path: "MemoryStallCount", Role: "memory_stall", Float: true, Title: "Processor Core Memory Stall Cycle Rate"},
+		fieldAtom{Path: "UnhaltedCycles", Role: "unhalted", Float: true, Title: "Processor Core Unhalted Cycle Rate"})
 
 	// Memory current-period activity and errors.
 	for _, atom := range []fieldAtom{
-		{Path: "CurrentPeriod.BlocksRead", Role: "read", Column: "memory_blocks_read_total", Float: true, Title: "Memory Read Throughput"},
-		{Path: "CurrentPeriod.BlocksWritten", Role: "written", Column: "memory_blocks_written_total", Float: true, Title: "Memory Write Throughput"},
+		{Path: "CurrentPeriod.BlocksRead", Role: "read", Float: true, Title: "Memory Read Throughput"},
+		{Path: "CurrentPeriod.BlocksWritten", Role: "written", Float: true, Title: "Memory Write Throughput"},
 	} {
 		context := "redfish.memory.io." + atom.Role
 		add(FieldSpec{
@@ -87,10 +82,10 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 			Candidates: []SourceCandidate{{
 				Document: "memory_metrics", Path: atom.Path, Unit: "blocks",
 				MultiplierDocument: "memory_metrics", MultiplierPath: "BlockSizeBytes",
-				MultiplierScale: Identity, MultiplierColumn: "memory_block_size_bytes",
+				MultiplierScale: Identity,
 			}},
 			Metric: strings.ReplaceAll(context, ".", "_"), Context: context, Role: atom.Role,
-			Column: atom.Column, Title: atom.Title, Units: "bytes/s", Scale: Identity,
+			Title: atom.Title, Units: "bytes/s", Scale: Identity,
 			Algorithm: AlgorithmRate, Float: true, Additive: true,
 			AggregateKinds: []Kind{"system", "chassis"}, ComponentClass: replaceable,
 		})
@@ -99,45 +94,45 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 		Kind: "memory", Units: "errors/s", Algorithm: AlgorithmRate, Scale: Identity, Additive: true,
 		AggregateKinds: []Kind{"system", "chassis"}, ComponentClass: replaceable,
 	},
-		fieldAtom{Path: "CurrentPeriod.CorrectableECCErrorCount", Role: "correctable", Column: "memory_current_correctable_ecc_error_total", Float: true, Title: "Memory Correctable ECC Error Rate"},
-		fieldAtom{Path: "CurrentPeriod.IndeterminateCorrectableErrorCount", Role: "indeterminate_correctable", Column: "memory_current_indeterminate_correctable_error_total", Float: true, Title: "Memory Indeterminate Correctable Error Rate"},
-		fieldAtom{Path: "CurrentPeriod.UncorrectableECCErrorCount", Role: "uncorrectable", Column: "memory_current_uncorrectable_ecc_error_total", Float: true, Title: "Memory Uncorrectable ECC Error Rate"},
-		fieldAtom{Path: "CurrentPeriod.IndeterminateUncorrectableErrorCount", Role: "indeterminate_uncorrectable", Column: "memory_current_indeterminate_uncorrectable_error_total", Float: true, Title: "Memory Indeterminate Uncorrectable Error Rate"})
+		fieldAtom{Path: "CurrentPeriod.CorrectableECCErrorCount", Role: "correctable", Float: true, Title: "Memory Correctable ECC Error Rate"},
+		fieldAtom{Path: "CurrentPeriod.IndeterminateCorrectableErrorCount", Role: "indeterminate_correctable", Float: true, Title: "Memory Indeterminate Correctable Error Rate"},
+		fieldAtom{Path: "CurrentPeriod.UncorrectableECCErrorCount", Role: "uncorrectable", Float: true, Title: "Memory Uncorrectable ECC Error Rate"},
+		fieldAtom{Path: "CurrentPeriod.IndeterminateUncorrectableErrorCount", Role: "indeterminate_uncorrectable", Float: true, Title: "Memory Indeterminate Uncorrectable Error Rate"})
 
 	// Storage and controller activity.
 	addFields("storage_metrics", "iops", FieldSpec{
 		Kind: "storage", Units: "requests/s", Algorithm: AlgorithmRate, Scale: Identity, Additive: true,
 		AggregateKinds: []Kind{"system", "chassis"}, ComponentClass: resource,
 	},
-		fieldAtom{Path: "IOStatistics.ReadHitIORequests", Role: "read_hit", Column: "storage_io_statistics_read_hit_io_requests", Float: true, Title: "Storage Read Hit IOPS"},
-		fieldAtom{Path: "IOStatistics.WriteHitIORequests", Role: "write_hit", Column: "storage_io_statistics_write_hit_io_requests", Float: true, Title: "Storage Write Hit IOPS"},
-		fieldAtom{Path: "IOStatistics.NonIORequests", Role: "non_io", Column: "storage_io_statistics_non_io_requests", Float: true, Title: "Storage Non-I/O Request Rate"})
+		fieldAtom{Path: "IOStatistics.ReadHitIORequests", Role: "read_hit", Float: true, Title: "Storage Read Hit IOPS"},
+		fieldAtom{Path: "IOStatistics.WriteHitIORequests", Role: "write_hit", Float: true, Title: "Storage Write Hit IOPS"},
+		fieldAtom{Path: "IOStatistics.NonIORequests", Role: "non_io", Float: true, Title: "Storage Non-I/O Request Rate"})
 	addFields("storage_controller_metrics", "error_rate", FieldSpec{
 		Kind: "storage_controller", Units: "errors/s", Algorithm: AlgorithmRate, Scale: Identity, Additive: true,
 		AggregateKinds: []Kind{"storage", "chassis"}, ComponentClass: replaceable,
 	},
-		fieldAtom{Path: "CorrectableECCErrorCount", Role: "correctable_ecc", Column: "storage_controller_correctable_ecc_error_total", Float: true, Title: "Storage Controller Correctable ECC Error Rate"},
-		fieldAtom{Path: "CorrectableParityErrorCount", Role: "correctable_parity", Column: "storage_controller_correctable_parity_error_total", Float: true, Title: "Storage Controller Correctable Parity Error Rate"},
-		fieldAtom{Path: "UncorrectableECCErrorCount", Role: "uncorrectable_ecc", Column: "storage_controller_uncorrectable_ecc_error_total", Float: true, Title: "Storage Controller Uncorrectable ECC Error Rate"},
-		fieldAtom{Path: "UncorrectableParityErrorCount", Role: "uncorrectable_parity", Column: "storage_controller_uncorrectable_parity_error_total", Float: true, Title: "Storage Controller Uncorrectable Parity Error Rate"})
+		fieldAtom{Path: "CorrectableECCErrorCount", Role: "correctable_ecc", Float: true, Title: "Storage Controller Correctable ECC Error Rate"},
+		fieldAtom{Path: "CorrectableParityErrorCount", Role: "correctable_parity", Float: true, Title: "Storage Controller Correctable Parity Error Rate"},
+		fieldAtom{Path: "UncorrectableECCErrorCount", Role: "uncorrectable_ecc", Float: true, Title: "Storage Controller Uncorrectable ECC Error Rate"},
+		fieldAtom{Path: "UncorrectableParityErrorCount", Role: "uncorrectable_parity", Float: true, Title: "Storage Controller Uncorrectable Parity Error Rate"})
 
 	// Volume activity uses the linked Metrics representation first and the
 	// legacy inline representation only as the declared fallback.
 	volumeIO := []struct {
-		path, group, role, units, column, title string
-		algorithm                               Algorithm
-		scale                                   Rational
+		path, group, role, units, title string
+		algorithm                       Algorithm
+		scale                           Rational
 	}{
-		{"ReadIOKiBytes", "io", "read", "bytes/s", "volume_io_statistics_read_io_ki_bytes", "Volume Read Throughput", AlgorithmRate, Rational{Num: 1024, Den: 1}},
-		{"WriteIOKiBytes", "io", "written", "bytes/s", "volume_io_statistics_write_io_ki_bytes", "Volume Write Throughput", AlgorithmRate, Rational{Num: 1024, Den: 1}},
-		{"ReadIORequests", "iops", "read", "requests/s", "volume_io_statistics_read_io_requests", "Volume Read IOPS", AlgorithmRate, Identity},
-		{"WriteIORequests", "iops", "written", "requests/s", "volume_io_statistics_write_io_requests", "Volume Write IOPS", AlgorithmRate, Identity},
-		{"ReadHitIORequests", "iops", "read_hit", "requests/s", "volume_io_statistics_read_hit_io_requests", "Volume Read Hit IOPS", AlgorithmRate, Identity},
-		{"WriteHitIORequests", "iops", "write_hit", "requests/s", "volume_io_statistics_write_hit_io_requests", "Volume Write Hit IOPS", AlgorithmRate, Identity},
-		{"NonIORequests", "iops", "non_io", "requests/s", "volume_io_statistics_non_io_requests", "Volume Non-I/O Request Rate", AlgorithmRate, Identity},
-		{"ReadIORequestTime", "io_time", "read", "percentage", "volume_io_statistics_read_io_request_time", "Volume Read I/O Time", AlgorithmDurationPercent, Identity},
-		{"WriteIORequestTime", "io_time", "written", "percentage", "volume_io_statistics_write_io_request_time", "Volume Write I/O Time", AlgorithmDurationPercent, Identity},
-		{"NonIORequestTime", "io_time", "non_io", "percentage", "volume_io_statistics_non_io_request_time", "Volume Non-I/O Time", AlgorithmDurationPercent, Identity},
+		{"ReadIOKiBytes", "io", "read", "bytes/s", "Volume Read Throughput", AlgorithmRate, Rational{Num: 1024, Den: 1}},
+		{"WriteIOKiBytes", "io", "written", "bytes/s", "Volume Write Throughput", AlgorithmRate, Rational{Num: 1024, Den: 1}},
+		{"ReadIORequests", "iops", "read", "requests/s", "Volume Read IOPS", AlgorithmRate, Identity},
+		{"WriteIORequests", "iops", "written", "requests/s", "Volume Write IOPS", AlgorithmRate, Identity},
+		{"ReadHitIORequests", "iops", "read_hit", "requests/s", "Volume Read Hit IOPS", AlgorithmRate, Identity},
+		{"WriteHitIORequests", "iops", "write_hit", "requests/s", "Volume Write Hit IOPS", AlgorithmRate, Identity},
+		{"NonIORequests", "iops", "non_io", "requests/s", "Volume Non-I/O Request Rate", AlgorithmRate, Identity},
+		{"ReadIORequestTime", "io_time", "read", "percentage", "Volume Read I/O Time", AlgorithmDurationPercent, Identity},
+		{"WriteIORequestTime", "io_time", "written", "percentage", "Volume Write I/O Time", AlgorithmDurationPercent, Identity},
+		{"NonIORequestTime", "io_time", "non_io", "percentage", "Volume Non-I/O Time", AlgorithmDurationPercent, Identity},
 	}
 	for _, atom := range volumeIO {
 		context := "redfish.volume." + atom.group + "." + atom.role
@@ -149,7 +144,7 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 			},
 			EquivalenceProof: "volume_metrics_preferred_inline_fallback",
 			Metric:           strings.ReplaceAll(context, ".", "_"), Context: context, Role: atom.role,
-			Column: atom.column, Title: atom.title, Units: atom.units, Scale: atom.scale,
+			Title: atom.title, Units: atom.units, Scale: atom.scale,
 			Algorithm: atom.algorithm, Float: true, Additive: atom.algorithm == AlgorithmRate,
 			Histogram:      map[bool]string{true: "percentage"}[atom.algorithm == AlgorithmDurationPercent],
 			AggregateKinds: []Kind{"storage"}, ComponentClass: resource,
@@ -159,18 +154,18 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 		Kind: "volume", Units: "errors/s", Algorithm: AlgorithmRate, Scale: Identity, Additive: true,
 		AggregateKinds: []Kind{"storage"}, ComponentClass: resource,
 	},
-		fieldAtom{Path: "CorrectableIOReadErrorCount", Role: "correctable_read", Column: "volume_correctable_io_read_error_total", Float: true, Title: "Volume Correctable Read Error Rate"},
-		fieldAtom{Path: "CorrectableIOWriteErrorCount", Role: "correctable_write", Column: "volume_correctable_io_write_error_total", Float: true, Title: "Volume Correctable Write Error Rate"},
-		fieldAtom{Path: "UncorrectableIOReadErrorCount", Role: "uncorrectable_read", Column: "volume_uncorrectable_io_read_error_total", Float: true, Title: "Volume Uncorrectable Read Error Rate"},
-		fieldAtom{Path: "UncorrectableIOWriteErrorCount", Role: "uncorrectable_write", Column: "volume_uncorrectable_io_write_error_total", Float: true, Title: "Volume Uncorrectable Write Error Rate"},
-		fieldAtom{Path: "ConsistencyCheckErrorCount", Role: "consistency_check", Column: "volume_consistency_check_error_total", Float: true, Title: "Volume Consistency Check Error Rate"},
-		fieldAtom{Path: "RebuildErrorCount", Role: "rebuild", Column: "volume_rebuild_error_total", Float: true, Title: "Volume Rebuild Error Rate"})
+		fieldAtom{Path: "CorrectableIOReadErrorCount", Role: "correctable_read", Float: true, Title: "Volume Correctable Read Error Rate"},
+		fieldAtom{Path: "CorrectableIOWriteErrorCount", Role: "correctable_write", Float: true, Title: "Volume Correctable Write Error Rate"},
+		fieldAtom{Path: "UncorrectableIOReadErrorCount", Role: "uncorrectable_read", Float: true, Title: "Volume Uncorrectable Read Error Rate"},
+		fieldAtom{Path: "UncorrectableIOWriteErrorCount", Role: "uncorrectable_write", Float: true, Title: "Volume Uncorrectable Write Error Rate"},
+		fieldAtom{Path: "ConsistencyCheckErrorCount", Role: "consistency_check", Float: true, Title: "Volume Consistency Check Error Rate"},
+		fieldAtom{Path: "RebuildErrorCount", Role: "rebuild", Float: true, Title: "Volume Rebuild Error Rate"})
 	addFields("volume_metrics", "event_rate", FieldSpec{
 		Kind: "volume", Units: "events/s", Algorithm: AlgorithmRate, Scale: Identity, Additive: true,
 		AggregateKinds: []Kind{"storage"}, ComponentClass: resource,
 	},
-		fieldAtom{Path: "ConsistencyCheckCount", Role: "consistency_checks", Column: "volume_consistency_check_total", Float: true, Title: "Volume Consistency Check Rate"},
-		fieldAtom{Path: "StateChangeCount", Role: "state_changes", Column: "volume_state_change_total", Float: true, Title: "Volume State Change Rate"})
+		fieldAtom{Path: "ConsistencyCheckCount", Role: "consistency_checks", Float: true, Title: "Volume Consistency Check Rate"},
+		fieldAtom{Path: "StateChangeCount", Role: "state_changes", Float: true, Title: "Volume State Change Rate"})
 
 	// Control values are operational only when the standard ControlType and
 	// SetPointUnits pair proves the semantic and conversion.
@@ -208,16 +203,11 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 		{"liquid_flow", "liters/minute", "Liquid Flow", "", []controlVariant{{"LiquidFlowLPM", "L/min", Identity}}},
 	}
 	controlRoles := []struct {
-		path, role, column, title string
+		path, role, title string
 	}{
-		{"Sensor.Reading", "sensor", "control_sensor_reading", "Sensor Reading"},
-		{"SetPoint", "setpoint", "control_setpoint", "Set Point"},
-		{"DefaultSetPoint", "default_setpoint", "control_default_setpoint", "Default Set Point"},
-		{"SetPointError", "setpoint_error", "control_setpoint_error", "Set Point Error"},
-		{"AllowableMin", "allowable_minimum", "control_allowable_min", "Allowable Minimum"},
-		{"AllowableMax", "allowable_maximum", "control_allowable_max", "Allowable Maximum"},
-		{"SettingMin", "setting_minimum", "control_setting_min", "Setting Minimum"},
-		{"SettingMax", "setting_maximum", "control_setting_max", "Setting Maximum"},
+		{"Sensor.Reading", "sensor", "Sensor Reading"},
+		{"SetPoint", "setpoint", "Set Point"},
+		{"SetPointError", "setpoint_error", "Set Point Error"},
 	}
 	for _, family := range controlFamilies {
 		for _, role := range controlRoles {
@@ -246,13 +236,11 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 				Metric:           strings.ReplaceAll(context, ".", "_"),
 				Context:          context,
 				Role:             role.role,
-				Column:           role.column,
 				Title:            "Control " + family.title + " " + role.title,
 				Units:            family.units,
 				Scale:            Identity,
 				Algorithm:        AlgorithmAbsolute,
 				Float:            true,
-				MixedColumnUnits: true,
 				Histogram:        family.histogram,
 				AggregateKinds:   []Kind{"chassis"},
 				ComponentClass:   resource,
@@ -261,7 +249,7 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 	}
 
 	// The same closed NVMe SMART adapter is applied to drives and storage
-	// controllers. Lifetime PowerOnHours remains inventory-only.
+	// controllers.
 	addNVMe := func(kind Kind, document Document, parents []Kind, componentClass string) {
 		kindTitle := map[Kind]string{"drive": "Drive", "storage_controller": "Storage Controller"}[kind]
 		type nvmeAtom struct {
@@ -273,7 +261,6 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 		}
 		atoms := []nvmeAtom{
 			{"AvailableSparePercent", "nvme.spare", "available", "percentage", "NVMe Available Spare", AlgorithmAbsolute, Identity, false, "percentage"},
-			{"AvailableSpareThresholdPercent", "nvme.spare", "threshold", "percentage", "NVMe Available Spare Threshold", AlgorithmAbsolute, Identity, false, "percentage"},
 			{"PercentageUsed", "nvme.wear", "used", "percentage", "NVMe Percentage Used", AlgorithmAbsolute, Identity, false, "percentage"},
 			{"CompositeTemperatureCelsius", "nvme.temperature", "composite", "Celsius", "NVMe Composite Temperature", AlgorithmAbsolute, Identity, false, "temperature"},
 			{"DataUnitsRead", "nvme.io", "read", "bytes/s", "NVMe Read Throughput", AlgorithmRate, Rational{Num: 512_000, Den: 1}, true, ""},
@@ -298,7 +285,7 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 				ID: string(kind) + "_nvme_" + snakePath(atom.path), Kind: kind,
 				Candidates: []SourceCandidate{{Document: document, Path: "NVMeSMART." + atom.path}},
 				Metric:     strings.ReplaceAll(context, ".", "_"), Context: context, Role: atom.role,
-				Column: string(kind) + "_nvme_" + snakePath(atom.path), Title: kindTitle + " " + atom.title,
+				Title: kindTitle + " " + atom.title,
 				Units: atom.units, Scale: atom.scale, Algorithm: atom.algorithm, Float: true,
 				Additive: atom.additive, Histogram: atom.histogram,
 				AggregateKinds: append([]Kind(nil), parents...), ComponentClass: componentClass,
@@ -406,7 +393,7 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 			ID: "port_" + snakePath(atom.path), Kind: "port",
 			Candidates: []SourceCandidate{{Document: "port_metrics", Path: atom.path}},
 			Metric:     strings.ReplaceAll(context, ".", "_"), Context: context, Role: atom.role,
-			Column: "port_" + snakePath(atom.path), Title: atom.title, Units: atom.units, Scale: atom.scale,
+			Title: atom.title, Units: atom.units, Scale: atom.scale,
 			Algorithm: AlgorithmRate, Float: true, Additive: true,
 			AggregateKinds: []Kind{"processor", "storage_controller", "network_adapter", "network_interface"},
 			ComponentClass: network,
@@ -432,7 +419,7 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 				ID: string(kind) + "_" + snakePath(atom.Path), Kind: kind,
 				Candidates: []SourceCandidate{{Document: document, Path: atom.Path}},
 				Metric:     strings.ReplaceAll(context, ".", "_"), Context: context, Role: atom.Role,
-				Column: string(kind) + "_" + snakePath(atom.Path), Title: atom.Title, Units: "errors/s",
+				Title: atom.Title, Units: "errors/s",
 				Scale: Identity, Algorithm: AlgorithmRate, Float: true, Additive: true,
 				AggregateKinds: parents, ComponentClass: network,
 			})
@@ -456,7 +443,7 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 			ID: "port_" + snakePath(atom.path), Kind: "port",
 			Candidates: []SourceCandidate{{Document: "port_metrics", Path: atom.path}},
 			Metric:     strings.ReplaceAll(context, ".", "_"), Context: context, Role: atom.role,
-			Column: "port_" + snakePath(atom.path), Title: atom.title, Units: atom.units,
+			Title: atom.title, Units: atom.units,
 			Scale: Identity, Algorithm: AlgorithmRate, Float: true, Additive: true,
 			AggregateKinds: []Kind{"processor", "storage_controller", "network_adapter", "network_interface"},
 			ComponentClass: network,
@@ -465,21 +452,18 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 
 	// Redundancy and heater metrics.
 	for _, atom := range []struct {
-		candidates          []SourceCandidate
-		role, column, title string
+		candidates  []SourceCandidate
+		role, title string
 	}{
-		{[]SourceCandidate{{Path: `ActiveRedundancySet.@odata.count`}, {Path: `ActiveRedundancyGroup.@odata.count`}}, "active", "redundancy_active_count", "Redundancy Active Members"},
-		{[]SourceCandidate{{Path: `RedundancySet.@odata.count`}, {Path: `RedundancyGroup.@odata.count`}}, "total", "redundancy_member_count", "Redundancy Total Members"},
-		{[]SourceCandidate{{Path: "MinNumNeeded"}, {Path: "MinNeededInGroup"}}, "minimum", "redundancy_min_needed", "Redundancy Minimum Members"},
-		{[]SourceCandidate{{Path: "MinNumNeededForFaultTolerance"}, {Path: "MinNeededForFaultTolerance"}}, "fault_tolerance_minimum", "redundancy_min_fault_tolerance", "Redundancy Fault-Tolerance Minimum"},
-		{[]SourceCandidate{{Path: "MaxNumSupported"}, {Path: "MaxSupportedInGroup"}}, "maximum", "redundancy_max_supported", "Redundancy Maximum Members"},
+		{[]SourceCandidate{{Path: `ActiveRedundancySet.@odata.count`}, {Path: `ActiveRedundancyGroup.@odata.count`}}, "active", "Redundancy Active Members"},
+		{[]SourceCandidate{{Path: `RedundancySet.@odata.count`}, {Path: `RedundancyGroup.@odata.count`}}, "total", "Redundancy Total Members"},
 	} {
 		context := "redfish.redundancy.members." + atom.role
 		add(FieldSpec{
 			ID: "redundancy_members_" + atom.role, Kind: "redundancy",
 			Candidates: atom.candidates, EquivalenceProof: "redundancy_model_equivalence",
 			Metric: strings.ReplaceAll(context, ".", "_"), Context: context, Role: atom.role,
-			Column: atom.column, Title: atom.title, Units: "members", Scale: Identity,
+			Title: atom.title, Units: "members", Scale: Identity,
 			Algorithm: AlgorithmAbsolute, Float: false, Additive: false,
 			AggregateKinds: []Kind{"system", "manager", "storage", "thermal_subsystem", "power_subsystem"},
 			ComponentClass: resource,
@@ -489,8 +473,8 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 		Kind: "heater", Units: "percentage", Algorithm: AlgorithmDurationPercent, Scale: Identity,
 		Histogram: "percentage", AggregateKinds: []Kind{"thermal_subsystem", "chassis"}, ComponentClass: replaceable,
 	},
-		fieldAtom{Path: "PrePowerOnHeatingTimeSeconds", Role: "pre_power_on", Column: "heater_pre_power_on_heating_seconds_total", Float: true, Title: "Heater Pre-Power-On Heating Time"},
-		fieldAtom{Path: "RuntimeHeatingTimeSeconds", Role: "runtime", Column: "heater_runtime_heating_seconds_total", Float: true, Title: "Heater Runtime Heating Time"})
+		fieldAtom{Path: "PrePowerOnHeatingTimeSeconds", Role: "pre_power_on", Float: true, Title: "Heater Pre-Power-On Heating Time"},
+		fieldAtom{Path: "RuntimeHeatingTimeSeconds", Role: "runtime", Float: true, Title: "Heater Runtime Heating Time"})
 
 	return result
 }
@@ -498,7 +482,6 @@ func extendedFieldSpecs(firstOrder int) []FieldSpec {
 type fieldAtom struct {
 	Path       string
 	Role       string
-	Column     string
 	SourceUnit string
 	Title      string
 	Float      bool

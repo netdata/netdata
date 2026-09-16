@@ -10,7 +10,7 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, in seconds. The same interval paces endpoint metrics and LogService polling.",
+        "description": "Data collection interval, in seconds.",
         "type": "integer",
         "minimum": 1,
         "default": 60
@@ -37,7 +37,10 @@
         "title": "Node mode",
         "description": "Where the charts appear: `local` publishes them on the collecting node, `system_vnodes` creates one virtual node per ComputerSystem.",
         "type": "string",
-        "enum": ["local", "system_vnodes"]
+        "enum": [
+          "local",
+          "system_vnodes"
+        ]
       },
       "system_uri": {
         "title": "ComputerSystem URI",
@@ -48,7 +51,12 @@
         "title": "Authentication method",
         "description": "How to authenticate with the BMC. `auto` prefers a Redfish session and falls back to HTTP basic authentication.",
         "type": "string",
-        "enum": ["auto", "session", "basic", "none"],
+        "enum": [
+          "auto",
+          "session",
+          "basic",
+          "none"
+        ],
         "default": "auto"
       },
       "username": {
@@ -158,7 +166,10 @@
       "host_scope_overrides": {
         "title": "HostScope overrides",
         "description": "Pins the generated virtual nodes to specific GUIDs or hostnames so they stay stable across BMC changes. Used only when the node mode is `system_vnodes`.",
-        "type": ["array", "null"],
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Override",
           "type": "object",
@@ -168,7 +179,7 @@
               "title": "Resource URI",
               "description": "Exact ComputerSystem resource URI this override applies to.",
               "type": "string",
-              "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
             },
             "guid": {
               "title": "GUID",
@@ -181,122 +192,92 @@
               "type": "string"
             }
           },
-          "required": ["resource_uri"],
+          "required": [
+            "resource_uri"
+          ],
           "anyOf": [
             {
               "properties": {
                 "guid": {
-                  "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                  "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
                 }
               },
-              "required": ["guid"]
+              "required": [
+                "guid"
+              ]
             },
             {
               "properties": {
                 "hostname": {
-                  "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                  "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
                 }
               },
-              "required": ["hostname"]
+              "required": [
+                "hostname"
+              ]
             }
           ]
         }
-      },
-      "logs": {
-        "title": "LogService",
-        "description": "Controls collection of the Redfish LogService entries.",
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "enabled": {
-            "title": "Enable LogService polling",
-            "description": "Collect LogService entries. Collection runs only while the selected log backend is ready.",
-            "type": "boolean",
-            "default": true
-          },
-          "backend": {
-            "title": "Log backend",
-            "description": "Name of the `redfish_logs` job that stores the entries. Leave empty to use the job named `default`; a name that does not exist never falls back.",
-            "type": "string",
-            "minLength": 1,
-            "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-          },
-          "service_selector": {
-            "title": "LogService selector",
-            "description": "Simple pattern selecting which of the discovered LogServices to collect.",
-            "type": "string",
-            "default": "*"
-          },
-          "max_services": {
-            "title": "Maximum selected LogServices",
-            "description": "Maximum number of LogServices collected from this endpoint.",
-            "type": "integer",
-            "minimum": 1,
-            "default": 256
-          },
-          "full_reconciliation_every": {
-            "title": "Full reconciliation interval",
-            "description": "How often to re-read every selected LogService from the start, in seconds. Zero disables it.",
-            "type": "number",
-            "minimum": 0,
-            "default": 1800
-          },
-          "cursor": {
-            "title": "Cursor",
-            "description": "Controls how the read positions of the LogServices are retained.",
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "orphan_retention": {
-                "title": "Orphan cursor retention",
-                "description": "How long to keep the read position of a LogService that is no longer collected, in seconds. Zero keeps it forever.",
-                "type": "number",
-                "minimum": 0,
-                "default": 2592000
-              }
-            }
-          }
-        }
       }
     },
-    "required": ["url", "node_mode"],
+    "required": [
+      "url",
+      "node_mode"
+    ],
     "allOf": [
       {
         "if": {
           "properties": {
-            "node_mode": {"const": "local"}
+            "node_mode": {
+              "const": "local"
+            }
           },
-          "required": ["node_mode"]
+          "required": [
+            "node_mode"
+          ]
         },
         "then": {
           "properties": {
-            "host_scope_overrides": {"maxItems": 0}
+            "host_scope_overrides": {
+              "maxItems": 0
+            }
           }
         }
       },
       {
         "if": {
           "properties": {
-            "auth_method": {"const": "none"}
+            "auth_method": {
+              "const": "none"
+            }
           },
-          "required": ["auth_method"]
+          "required": [
+            "auth_method"
+          ]
         },
         "then": {
           "properties": {
             "username": {
-              "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+              "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
             },
-            "password": {"maxLength": 0}
+            "password": {
+              "maxLength": 0
+            }
           }
         },
         "else": {
           "properties": {
             "username": {
-              "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
             },
-            "password": {"minLength": 1}
+            "password": {
+              "minLength": 1
+            }
           },
-          "required": ["username", "password"]
+          "required": [
+            "username",
+            "password"
+          ]
         }
       },
       {
@@ -304,23 +285,26 @@
           {
             "properties": {
               "tls_cert": {
-                "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+                "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
               },
               "tls_key": {
-                "pattern": "^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+                "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
               }
             }
           },
           {
             "properties": {
               "tls_cert": {
-                "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
               },
               "tls_key": {
-                "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+                "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
               }
             },
-            "required": ["tls_cert", "tls_key"]
+            "required": [
+              "tls_cert",
+              "tls_key"
+            ]
           }
         ]
       }
@@ -332,39 +316,64 @@
       "tabs": [
         {
           "title": "Collection",
-          "fields": ["update_every", "autodetection_retry", "collect"]
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "collect"
+          ]
         },
         {
           "title": "Target",
-          "fields": ["url", "system_uri"]
+          "fields": [
+            "url",
+            "system_uri"
+          ]
         },
         {
           "title": "Virtual Node",
-          "fields": ["node_mode", "vnode", "host_scope_overrides"]
+          "fields": [
+            "node_mode",
+            "vnode",
+            "host_scope_overrides"
+          ]
         },
         {
           "title": "Authentication",
-          "fields": ["auth_method", "username", "password"]
+          "fields": [
+            "auth_method",
+            "username",
+            "password"
+          ]
         },
         {
           "title": "HTTP",
-          "fields": ["timeout", "retries", "max_concurrent_requests", "proxy_url"]
+          "fields": [
+            "timeout",
+            "retries",
+            "max_concurrent_requests",
+            "proxy_url"
+          ]
         },
         {
           "title": "TLS",
-          "fields": ["tls_ca", "tls_cert", "tls_key", "tls_skip_verify"]
+          "fields": [
+            "tls_ca",
+            "tls_cert",
+            "tls_key",
+            "tls_skip_verify"
+          ]
         },
         {
           "title": "Cardinality",
-          "fields": ["charts"]
+          "fields": [
+            "charts"
+          ]
         },
         {
           "title": "Alerts",
-          "fields": ["alarms"]
-        },
-        {
-          "title": "Logs",
-          "fields": ["logs"]
+          "fields": [
+            "alarms"
+          ]
         }
       ]
     },

@@ -22,9 +22,6 @@ func compileFieldCharts(contract Contract, kinds map[Kind]KindSpec) ([]ChartSpec
 	var order []groupKey
 	groups := make(map[groupKey]*group)
 	for _, field := range contract.Fields {
-		if field.Exposure != ExposureOperationalScalar {
-			continue
-		}
 		context := scalarBaseRowContext(field.Context, field.Role)
 		key := groupKey{kind: field.Kind, context: context}
 		current := groups[key]
@@ -94,9 +91,6 @@ func compileReadingCharts(contract Contract) []ChartSpec {
 	seenCharts := make(map[string]struct{})
 	seenAlarms := make(map[string]struct{})
 	for _, reading := range contract.Readings {
-		if reading.Exposure != ExposureOperationalReading {
-			continue
-		}
 		if _, ok := seenCharts[reading.Context]; !ok {
 			seenCharts[reading.Context] = struct{}{}
 			class := ClassReadingScalar

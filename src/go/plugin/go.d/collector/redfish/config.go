@@ -3,13 +3,9 @@
 package redfish
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net"
-	"net/http"
 	"net/netip"
 	"net/url"
 	"path"
@@ -33,15 +29,10 @@ const (
 	defaultMaxConcurrentRequests      = 3
 	defaultCollect                    = "*"
 	defaultDetailedComponentsPerGroup = 100
-	defaultLogBackend                 = "default"
-	defaultLogServiceSelector         = "*"
-	defaultMaxLogServices             = 256
 )
 
 var (
-	defaultTimeout                = confopt.Duration(15 * time.Second)
-	defaultLogReconciliationEvery = confopt.Duration(30 * time.Minute)
-	defaultCursorOrphanRetention  = confopt.Duration(30 * 24 * time.Hour)
+	defaultTimeout = confopt.Duration(15 * time.Second)
 )
 
 var collectionFamilies = []string{
@@ -73,20 +64,8 @@ type HostScopeOverride struct {
 	Hostname    string `yaml:"hostname,omitempty" json:"hostname"`
 }
 
-type CursorConfig struct {
-	OrphanRetention *confopt.Duration `yaml:"orphan_retention,omitempty" json:"orphan_retention"`
-}
-
-type LogsConfig struct {
-	Enabled                 *bool             `yaml:"enabled,omitempty" json:"enabled"`
-	Backend                 *string           `yaml:"backend,omitempty" json:"backend"`
-	ServiceSelector         string            `yaml:"service_selector,omitempty" json:"service_selector"`
-	MaxServices             *int              `yaml:"max_services,omitempty" json:"max_services"`
-	FullReconciliationEvery *confopt.Duration `yaml:"full_reconciliation_every,omitempty" json:"full_reconciliation_every"`
-	Cursor                  CursorConfig      `yaml:"cursor,omitempty" json:"cursor"`
-}
-
 type Config struct {
+	Name               string `yaml:"name,omitempty" json:"name,omitempty"`
 	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
@@ -112,7 +91,6 @@ type Config struct {
 	Charts             ChartsConfig        `yaml:"charts,omitempty" json:"charts"`
 	Alarms             AlarmsConfig        `yaml:"alarms,omitempty" json:"alarms"`
 	HostScopeOverrides []HostScopeOverride `yaml:"host_scope_overrides,omitempty" json:"host_scope_overrides"`
-	Logs               LogsConfig          `yaml:"logs,omitempty" json:"logs"`
 }
 
 func (c *Config) applyDefaults() {
@@ -126,7 +104,6 @@ func (c *Config) applyDefaults() {
 	c.TLSCert = strings.TrimSpace(c.TLSCert)
 	c.TLSKey = strings.TrimSpace(c.TLSKey)
 	c.Collect = strings.TrimSpace(c.Collect)
-	c.Logs.ServiceSelector = strings.TrimSpace(c.Logs.ServiceSelector)
 
 	if c.UpdateEvery == 0 {
 		c.UpdateEvery = defaultUpdateEvery
@@ -158,21 +135,6 @@ func (c *Config) applyDefaults() {
 	if c.Alarms.EvaluateThresholds == nil {
 		c.Alarms.EvaluateThresholds = new(true)
 	}
-	if c.Logs.Enabled == nil {
-		c.Logs.Enabled = new(true)
-	}
-	if c.Logs.ServiceSelector == "" {
-		c.Logs.ServiceSelector = defaultLogServiceSelector
-	}
-	if c.Logs.MaxServices == nil {
-		c.Logs.MaxServices = new(defaultMaxLogServices)
-	}
-	if c.Logs.FullReconciliationEvery == nil {
-		c.Logs.FullReconciliationEvery = new(defaultLogReconciliationEvery)
-	}
-	if c.Logs.Cursor.OrphanRetention == nil {
-		c.Logs.Cursor.OrphanRetention = new(defaultCursorOrphanRetention)
-	}
 	for i := range c.HostScopeOverrides {
 		override := &c.HostScopeOverrides[i]
 		override.ResourceURI = strings.TrimSpace(override.ResourceURI)
@@ -181,10 +143,6 @@ func (c *Config) applyDefaults() {
 			override.GUID = parsed.String()
 		}
 		override.Hostname = strings.TrimSpace(override.Hostname)
-	}
-	if c.Logs.Backend != nil {
-		value := strings.TrimSpace(*c.Logs.Backend)
-		c.Logs.Backend = &value
 	}
 }
 
@@ -236,26 +194,8 @@ func (c Config) validate() error {
 	if err := validateCollectionPattern(c.Collect); err != nil {
 		errs = append(errs, fmt.Errorf("'collect': %w", err))
 	}
-	if _, err := matcher.NewSimplePatternsMatcher(c.Logs.ServiceSelector); err != nil {
-		errs = append(errs, fmt.Errorf("'logs.service_selector': %w", err))
-	}
 	if c.Charts.MaxDetailedComponentsPerFamily == nil || *c.Charts.MaxDetailedComponentsPerFamily < 0 {
 		errs = append(errs, errors.New("'charts.max_detailed_components_per_family' must be non-negative"))
-	}
-	if c.Logs.MaxServices == nil || *c.Logs.MaxServices <= 0 {
-		errs = append(errs, errors.New("'logs.max_services' must be positive"))
-	}
-	if c.Logs.FullReconciliationEvery == nil || c.Logs.FullReconciliationEvery.Duration() < 0 {
-		errs = append(errs, errors.New("'logs.full_reconciliation_every' must be non-negative"))
-	}
-	if c.Logs.Cursor.OrphanRetention == nil || c.Logs.Cursor.OrphanRetention.Duration() < 0 {
-		errs = append(errs, errors.New("'logs.cursor.orphan_retention' must be non-negative"))
-	}
-	if c.Logs.Backend != nil && *c.Logs.Backend == "" {
-		errs = append(errs, errors.New("'logs.backend' must not be explicitly empty"))
-	}
-	if len(c.LogsBackend()) > 256 {
-		errs = append(errs, errors.New("'logs.backend' must not exceed 256 bytes"))
 	}
 
 	if root != nil {
@@ -272,96 +212,6 @@ func (c Config) validate() error {
 	return errors.Join(errs...)
 }
 
-// PrepareDiscoveryProfile validates the endpoint-job portion of one Redfish
-// discovery profile without consuming or rewriting secret references.
-func PrepareDiscoveryProfile(raw map[string]any, scheme string) (map[string]any, error) {
-	scheme = strings.ToLower(strings.TrimSpace(scheme))
-	if scheme == "" {
-		scheme = "https"
-	}
-	if scheme != "https" && scheme != "http" {
-		return nil, errors.New("'scheme' must be one of: https, http")
-	}
-	for _, forbidden := range []string{"module", "name", "url", "system_uri", "host_scope_overrides"} {
-		if _, ok := raw[forbidden]; ok {
-			return nil, fmt.Errorf("%q is not allowed in a Redfish discovery profile", forbidden)
-		}
-	}
-
-	normalized := make(map[string]any, len(raw)+1)
-	maps.Copy(normalized, raw)
-	if _, ok := normalized["node_mode"]; !ok {
-		normalized["node_mode"] = "system_vnodes"
-	}
-	validated := make(map[string]any, len(normalized)+1)
-	maps.Copy(validated, normalized)
-	validated["url"] = scheme + "://192.0.2.1/redfish/v1/"
-	if proxy, ok := validated["proxy_url"].(string); ok && strings.HasPrefix(strings.TrimSpace(proxy), "${") {
-		// The discoverer resolves supported atomic references for its probe.
-		// Keep the original reference in normalized so the generated job owns
-		// normal runtime secret resolution.
-		validated["proxy_url"] = "http://127.0.0.1"
-	}
-
-	payload, err := json.Marshal(validated)
-	if err != nil {
-		return nil, fmt.Errorf("encode Redfish discovery profile: %w", err)
-	}
-	var cfg Config
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("decode Redfish discovery profile: %w", err)
-	}
-	cfg.applyDefaults()
-	if err := cfg.validate(); err != nil {
-		return nil, err
-	}
-	return normalized, nil
-}
-
-// DiscoveryEndpointIdentity returns the exact canonical endpoint URL and key
-// used by ordinary Redfish jobs.
-func DiscoveryEndpointIdentity(rawURL string) (string, string, error) {
-	root, origin, err := normalizeServiceRoot(rawURL)
-	if err != nil {
-		return "", "", err
-	}
-	return root.String(), stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars), nil
-}
-
-// NewDiscoveryHTTPClient constructs the ordinary Redfish transport without a
-// BMC client certificate. Discovery is deliberately unauthenticated.
-func NewDiscoveryHTTPClient(raw map[string]any, endpointURL string) (*http.Client, error) {
-	values := make(map[string]any, len(raw)+1)
-	maps.Copy(values, raw)
-	values["url"] = endpointURL
-	delete(values, "tls_cert")
-	delete(values, "tls_key")
-	payload, err := json.Marshal(values)
-	if err != nil {
-		return nil, fmt.Errorf("encode Redfish discovery transport: %w", err)
-	}
-	var cfg Config
-	decoder := json.NewDecoder(bytes.NewReader(payload))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("decode Redfish discovery transport: %w", err)
-	}
-	cfg.applyDefaults()
-	if err := validateProxyURL(cfg.ProxyURL); err != nil {
-		return nil, errors.New("invalid resolved discovery proxy_url")
-	}
-	return newHTTPClient(cfg)
-}
-
-func (c Config) LogsBackend() string {
-	if c.Logs.Backend == nil {
-		return defaultLogBackend
-	}
-	return *c.Logs.Backend
-}
-
 func (c ChartsConfig) aggregatesEnabled() bool {
 	return c.Aggregates == nil || *c.Aggregates
 }
@@ -372,10 +222,6 @@ func (c ChartsConfig) detailsEnabled() bool {
 
 func (c AlarmsConfig) thresholdEvaluationEnabled() bool {
 	return c.EvaluateThresholds == nil || *c.EvaluateThresholds
-}
-
-func (c LogsConfig) enabled() bool {
-	return c.Enabled == nil || *c.Enabled
 }
 
 func normalizeServiceRoot(raw string) (*url.URL, string, error) {

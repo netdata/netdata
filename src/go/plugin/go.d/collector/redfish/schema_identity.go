@@ -69,8 +69,6 @@ var resourceSchemaNames = map[string][]string{
 	"software":             {"SoftwareInventory"},
 	"assembly":             {"Assembly"},
 	"assembly_document":    {"Assembly"},
-	"log_service":          {"LogService"},
-	"log_entry":            {"LogEntry"},
 	"legacy_thermal":       {"Thermal"},
 	"legacy_power":         {"Power"},
 	"update_service":       {"UpdateService"},
@@ -119,21 +117,6 @@ func validateRequiredResourceProperties(kind string, data map[string]any) error 
 		value, ok := stringValue(data[property])
 		if !ok || strings.TrimSpace(value) == "" {
 			return fmt.Errorf("%s resource has no usable %s", kind, property)
-		}
-	}
-	return nil
-}
-
-func validateRequiredLogEntryProperties(data map[string]any, requireID bool) error {
-	if requireID {
-		if value, ok := stringValue(data["Id"]); !ok || strings.TrimSpace(value) == "" {
-			return errors.New("LogEntry has no usable Id")
-		}
-	}
-	for _, property := range []string{"Name", "EntryType"} {
-		value, ok := stringValue(data[property])
-		if !ok || strings.TrimSpace(value) == "" {
-			return fmt.Errorf("LogEntry has no usable %s", property)
 		}
 	}
 	return nil

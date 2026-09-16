@@ -5,9 +5,7 @@ package redfish
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/stmcginnis/gofish"
 )
@@ -37,7 +35,6 @@ type serviceRootDocument struct {
 	} `json:"Links"`
 	ProtocolFeaturesSupported struct {
 		MultipleHTTPRequests *bool `json:"MultipleHTTPRequests"`
-		ClientContextQuery   *bool `json:"ClientContextQuery"`
 		ExpandQuery          struct {
 			ExpandAll bool `json:"ExpandAll"`
 			Levels    bool `json:"Levels"`
@@ -96,82 +93,11 @@ type genericCondition struct {
 
 type genericResource struct {
 	ODataID          string        `json:"@odata.id"`
-	ODataType        string        `json:"@odata.type"`
 	ID               string        `json:"Id"`
 	Name             string        `json:"Name"`
-	Description      string        `json:"Description"`
 	Status           genericStatus `json:"Status"`
 	PowerState       string        `json:"PowerState"`
 	FailurePredicted *bool         `json:"FailurePredicted"`
-	Manufacturer     string        `json:"Manufacturer"`
-	Model            string        `json:"Model"`
-	PartNumber       string        `json:"PartNumber"`
-	SerialNumber     string        `json:"SerialNumber"`
-	AssetTag         string        `json:"AssetTag"`
-	SKU              string        `json:"SKU"`
-}
-
-type inventoryHost struct {
-	uri  string
-	key  string
-	name string
-}
-
-func (c *protocolClient) inventoryResourceRow(
-	node *graphNode,
-	observedAt time.Time,
-	host inventoryHost,
-) map[string]any {
-	kind, key, uri := node.Kind, node.Key, node.URI
-	id, name, schemaType := node.Doc.ID, node.Doc.Name, node.Doc.ODataType
-	status, powerState := node.Doc.Status, node.Doc.PowerState
-	failurePredicted := node.Doc.FailurePredicted
-	conditions := conditionCountsFrom(status.Conditions)
-	complete := node.Complete
-	hostURI, hostKey, hostName := host.uri, host.key, host.name
-	severity, rank := resourceSeverity(status, failurePredicted, conditions, complete)
-	if name == "" {
-		name = id
-	}
-	if hostName == "" {
-		hostName = hostURI
-	}
-	rowKey := stableKey("netdata:redfish:inventory-row:v1", "resource\x00"+key, 64)
-	return map[string]any{
-		"row_key":                  rowKey,
-		"sort_key":                 fmt.Sprintf("%d\x00%s\x00%s\x00%s", rank, kind, strings.ToLower(name), key),
-		"row_type":                 "resource",
-		"severity":                 severity,
-		"severity_rank":            rank,
-		"observed_at":              observedAt.UnixMilli(),
-		"membership_complete":      complete,
-		"acquisition_state":        "readable",
-		"endpoint_key":             stableKey("netdata:redfish:endpoint:v1", mustOrigin(c.config.URL), endpointKeyHexChars),
-		"host_uri":                 hostURI,
-		"host_key":                 hostKey,
-		"host_name":                hostName,
-		"resource_kind":            kind,
-		"resource_key":             key,
-		"id":                       emptyToNil(id),
-		"name":                     emptyToNil(name),
-		"resource_uri":             uri,
-		"identity_quality":         "addressable",
-		"health":                   emptyToNil(status.Health),
-		"health_rollup":            emptyToNil(status.HealthRollup),
-		"state":                    emptyToNil(status.State),
-		"power_state":              emptyToNil(powerState),
-		"failure_predicted":        failurePredicted,
-		"condition_ok_count":       conditions.OK,
-		"condition_warning_count":  conditions.Warning,
-		"condition_critical_count": conditions.Critical,
-		"condition_unknown_count":  conditions.Unknown,
-		"component_family":         kind,
-		"detail_gate":              "open",
-		"detail_component_count":   1,
-		"detail_component_cap":     dereferenceInt(c.config.Charts.MaxDetailedComponentsPerFamily),
-		"source_schema_type":       emptyToNil(schemaType),
-		"source_uris":              uri,
-	}
 }
 
 type conditionCounts struct {
@@ -236,35 +162,6 @@ func normalizedConditionSeverity(raw json.RawMessage) (string, bool) {
 	}
 }
 
-func resourceSeverity(
-	status genericStatus,
-	failurePredicted *bool,
-	conditions conditionCounts,
-	complete bool,
-) (string, int) {
-	if conditions.Critical > 0 {
-		return "critical", 0
-	}
-	if conditions.Warning > 0 {
-		return "warning", 1
-	}
-	for _, value := range []string{status.Health, status.HealthRollup} {
-		switch strings.ToLower(value) {
-		case "critical":
-			return "critical", 0
-		case "warning":
-			return "warning", 1
-		}
-	}
-	if failurePredicted != nil && *failurePredicted {
-		return "critical", 0
-	}
-	if !complete {
-		return "warning", 1
-	}
-	return "normal", 2
-}
-
 func (c *protocolClient) selectedSystemState(resources []baseResource, complete bool) string {
 	if c.config.SystemURI == "" {
 		return ""
@@ -286,21 +183,6 @@ func (c *protocolClient) selectedSystemState(resources []baseResource, complete 
 		return "absent"
 	}
 	return "unreadable"
-}
-
-func mustOrigin(raw string) string {
-	_, origin, err := normalizeServiceRoot(raw)
-	if err != nil {
-		return ""
-	}
-	return origin
-}
-
-func emptyToNil(value string) any {
-	if value == "" {
-		return nil
-	}
-	return value
 }
 
 func dereferenceInt(value *int) int {

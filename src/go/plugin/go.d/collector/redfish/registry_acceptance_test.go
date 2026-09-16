@@ -13,161 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/registry"
 )
 
-func TestEveryRegistryInventoryFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
-	for _, field := range standardRegistry.Inventory {
-		t.Run(fmt.Sprintf("%03d/%s/%s", field.Order, field.Kind, field.Column), func(t *testing.T) {
-			node := &graphNode{Kind: string(field.Kind), Data: make(map[string]any)}
-			setRegistryTestPath(node.Data, field.Path, inventoryFieldTestValue(field))
-			row := make(map[string]any)
-			applyRegisteredInventory(row, node)
-			value, present := row[field.Column]
-			if !present || value == nil {
-				t.Fatalf("valid path %q produced %#v present=%t", field.Path, value, present)
-			}
-
-			row = make(map[string]any)
-			applyRegisteredInventory(row, &graphNode{Kind: string(field.Kind), Data: make(map[string]any)})
-			if _, present := row[field.Column]; present {
-				t.Fatalf("absent path %q produced a Function value", field.Path)
-			}
-
-			node.Data = make(map[string]any)
-			setRegistryTestPath(node.Data, field.Path, nil)
-			row = make(map[string]any)
-			applyRegisteredInventory(row, node)
-			if value, present := row[field.Column]; !present || value != nil {
-				t.Fatalf("null path %q = %#v present=%t, want an explicit gap", field.Path, value, present)
-			}
-			if row["error_class"] != "protocol" {
-				t.Fatalf("null path %q error_class = %#v, want protocol", field.Path, row["error_class"])
-			}
-
-			node.Data = make(map[string]any)
-			setRegistryTestPath(node.Data, field.Path, inventoryFieldWrongType(field))
-			row = make(map[string]any)
-			applyRegisteredInventory(row, node)
-			if value, present := row[field.Column]; !present || value != nil {
-				t.Fatalf("wrong-typed path %q = %#v present=%t, want an explicit gap", field.Path, value, present)
-			}
-			if row["error_class"] != "protocol" {
-				t.Fatalf("wrong-typed path %q error_class = %#v, want protocol", field.Path, row["error_class"])
-			}
-		})
-	}
-}
-
-func TestEveryRegistryStateHasFunctionPresenceNullAndTypeSemantics(t *testing.T) {
-	columns := make(map[string]registry.ColumnSpec, len(standardRegistry.Columns))
-	for _, column := range standardRegistry.Columns {
-		columns[column.ID] = column
-	}
-	for _, state := range standardRegistry.States {
-		t.Run(fmt.Sprintf("%03d/%s/%s", state.Order, state.Kind, state.Column), func(t *testing.T) {
-			column, ok := columns[state.Column]
-			if !ok {
-				t.Fatalf("state Function column %q is not compiled", state.Column)
-			}
-			wantType := registry.ColumnEnum
-			valid := any("SourceEnumValue")
-			wrong := any(true)
-			if state.BooleanFalse != "" || state.BooleanTrue != "" {
-				wantType = registry.ColumnBoolean
-				valid = false
-				wrong = "wrong"
-			}
-			if column.Type != wantType {
-				t.Fatalf("state Function column %q type = %q, want %q", state.Column, column.Type, wantType)
-			}
-
-			node := &graphNode{
-				Kind: string(state.Kind), Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
-			}
-			document := node.Data
-			if state.Document != "" {
-				document = make(map[string]any)
-				node.Enrichment[string(state.Document)+":test"] = document
-			}
-			setRegistryTestPath(document, state.Path, valid)
-			row := make(map[string]any)
-			applyRegisteredStates(row, node)
-			if got, present := row[state.Column]; !present || got != valid {
-				t.Fatalf("valid state = %#v present=%t, want %#v", got, present, valid)
-			}
-
-			row = make(map[string]any)
-			applyRegisteredStates(row, &graphNode{
-				Kind: string(state.Kind), Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
-			})
-			if _, present := row[state.Column]; present {
-				t.Fatal("absent state produced a Function value")
-			}
-
-			setRegistryTestPath(document, state.Path, nil)
-			row = make(map[string]any)
-			applyRegisteredStates(row, node)
-			if got, present := row[state.Column]; !present || got != nil || row["error_class"] != "protocol" {
-				t.Fatalf("null state = %#v present=%t error_class=%#v", got, present, row["error_class"])
-			}
-
-			setRegistryTestPath(document, state.Path, wrong)
-			row = make(map[string]any)
-			applyRegisteredStates(row, node)
-			if got, present := row[state.Column]; !present || got != nil || row["error_class"] != "protocol" {
-				t.Fatalf("wrong-typed state = %#v present=%t error_class=%#v", got, present, row["error_class"])
-			}
-		})
-	}
-}
-
-func TestEveryRegistryFlagHasFunctionPresenceNullAndTypeSemantics(t *testing.T) {
-	for _, set := range standardRegistry.Flags {
-		for _, member := range set.Members {
-			t.Run(fmt.Sprintf("%03d/%s/%s", set.Order, set.Kind, member.Column), func(t *testing.T) {
-				node := &graphNode{
-					Kind: string(set.Kind), Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
-				}
-				document := registryTestDocument(node, set.Document)
-				setRegistryTestPath(document, member.Path, false)
-				row := make(map[string]any)
-				applyRegisteredFlags(row, node)
-				want := false
-				if member.Invert {
-					want = true
-				}
-				if got, present := row[member.Column]; !present || got != want {
-					t.Fatalf("valid flag = %#v present=%t, want %t", got, present, want)
-				}
-
-				node = &graphNode{
-					Kind: string(set.Kind), Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
-				}
-				registryTestDocument(node, set.Document)
-				row = make(map[string]any)
-				applyRegisteredFlags(row, node)
-				if _, present := row[member.Column]; present {
-					t.Fatal("absent flag produced a Function value")
-				}
-
-				document = registryTestDocument(node, set.Document)
-				setRegistryTestPath(document, member.Path, nil)
-				row = make(map[string]any)
-				applyRegisteredFlags(row, node)
-				if got, present := row[member.Column]; !present || got != nil || row["error_class"] != "protocol" {
-					t.Fatalf("null flag = %#v present=%t error_class=%#v", got, present, row["error_class"])
-				}
-
-				setRegistryTestPath(document, member.Path, "wrong")
-				row = make(map[string]any)
-				applyRegisteredFlags(row, node)
-				if got, present := row[member.Column]; !present || got != nil || row["error_class"] != "protocol" {
-					t.Fatalf("wrong-typed flag = %#v present=%t error_class=%#v", got, present, row["error_class"])
-				}
-			})
-		}
-	}
-}
-
-func TestEveryRegistryReadingHasFunctionPresenceNullAndTypeSemantics(t *testing.T) {
+func TestEveryRegistryReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
 	for _, surface := range standardRegistry.Readings {
 		if surface.DerivedFromEnergy {
 			continue
@@ -180,9 +26,8 @@ func TestEveryRegistryReadingHasFunctionPresenceNullAndTypeSemantics(t *testing.
 			if !reading.Valid {
 				t.Fatalf("valid zero did not normalize: %+v", reading)
 			}
-			row := (&protocolClient{}).inventoryReadingRow(node, detailGate{Open: true}, time.Unix(100, 0), reading)
-			if got, present := row["reading_value"]; !present || got != float64(0) {
-				t.Fatalf("valid zero Function reading = %#v present=%t", got, present)
+			if reading.Value != 0 {
+				t.Fatalf("valid zero reading = %v", reading.Value)
 			}
 
 			for _, test := range []struct {
@@ -198,18 +43,6 @@ func TestEveryRegistryReadingHasFunctionPresenceNullAndTypeSemantics(t *testing.
 					if invalid.Valid {
 						t.Fatalf("invalid source normalized as valid: %+v", invalid)
 					}
-					row := (&protocolClient{}).inventoryReadingRow(
-						invalidNode,
-						detailGate{Open: true},
-						time.Unix(100, 0),
-						invalid,
-					)
-					if _, present := row["reading_value"]; present {
-						t.Fatalf("invalid reading fabricated a Function value %#v", row["reading_value"])
-					}
-					if row["error_class"] != "protocol" {
-						t.Fatalf("invalid reading error_class = %#v, want protocol", row["error_class"])
-					}
 				})
 			}
 		})
@@ -224,50 +57,7 @@ func TestEveryRegistryReadingHasFunctionPresenceNullAndTypeSemantics(t *testing.
 	}
 }
 
-func TestFractionalInventorySourcesScaleExactlyToIntegerColumns(t *testing.T) {
-	for _, field := range standardRegistry.Inventory {
-		if field.SourceType != registry.ColumnFloat || field.Type != registry.ColumnInteger {
-			continue
-		}
-		t.Run(fmt.Sprintf("%s/%s", field.Kind, field.Path), func(t *testing.T) {
-			value := normalizeInventoryFieldValue(json.Number("1.5"), field)
-			want := field.Scale.Num * 3 / (field.Scale.Den * 2)
-			if value != want {
-				t.Fatalf("scaled 1.5 = %#v, want %d", value, want)
-			}
-		})
-	}
-}
-
 func TestEveryRegistryNumericConversionUsesItsDeclaredScale(t *testing.T) {
-	for _, field := range standardRegistry.Inventory {
-		sourceType := field.SourceType
-		if sourceType == "" {
-			sourceType = field.Type
-		}
-		if sourceType != registry.ColumnInteger && sourceType != registry.ColumnFloat {
-			continue
-		}
-		t.Run("inventory/"+string(field.Kind)+"/"+field.Column, func(t *testing.T) {
-			scale := field.Scale
-			if scale.Den == 0 {
-				scale = registry.Identity
-			}
-			got := normalizeInventoryFieldValue(json.Number("2"), field)
-			if field.Type == registry.ColumnInteger {
-				want := int64(2 * scale.Num / scale.Den)
-				if got != want {
-					t.Fatalf("scaled inventory value = %#v, want %d", got, want)
-				}
-				return
-			}
-			want := 2 * float64(scale.Num) / float64(scale.Den)
-			if got != want {
-				t.Fatalf("scaled inventory value = %#v, want %v", got, want)
-			}
-		})
-	}
-
 	for _, descriptor := range standardRegistry.Fields {
 		if descriptor.ID == managerClockDescriptor.ID {
 			continue
@@ -297,8 +87,17 @@ func TestEveryRegistryNumericConversionUsesItsDeclaredScale(t *testing.T) {
 				}
 				want *= 2 * float64(multiplierScale.Num) / float64(multiplierScale.Den)
 			}
-			if value.Inventory != want {
-				t.Fatalf("scaled scalar inventory = %#v, want %v", value.Inventory, want)
+			if descriptor.Algorithm != registry.AlgorithmAbsolute {
+				setRegistryTestPath(registryTestDocument(node, source.Document), source.Path, json.Number("4"))
+				next := time.Unix(101, 0)
+				if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+					next = time.Unix(1100, 0)
+					want /= 10
+				}
+				value = requireScalarValue(t, client, node, descriptor.ID, next)
+			}
+			if math.Abs(value.Value-want) > 1e-9*math.Max(1, math.Abs(want)) {
+				t.Fatalf("scaled scalar = %v, want %v", value.Value, want)
 			}
 		})
 	}
@@ -310,7 +109,6 @@ func TestEveryRegistryNumericConversionUsesItsDeclaredScale(t *testing.T) {
 				rawReading{
 					Path: "Reading", Type: readingType.SourceType, Units: readingType.SourceUnits[0],
 					Basis: "Zero", Role: "input", Value: json.Number("2"), Primary: true,
-					Inventory: make(map[string]any),
 				},
 				false,
 			)
@@ -340,7 +138,7 @@ func TestEveryRegistryScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
 			client := &protocolClient{}
 			client.hardwareState.initialize()
 			value, ok := scalarValueByID(client.scalarValues(node, time.Unix(100, 0)), descriptor.ID)
-			if !ok || !value.Present || !value.Valid || value.Inventory != float64(0) {
+			if !ok || !value.Present || !value.Valid || value.Value != 0 {
 				t.Fatalf("valid zero source = %+v present=%t", value, ok)
 			}
 
@@ -354,8 +152,8 @@ func TestEveryRegistryScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
 
 			nullNode := scalarTestNode(descriptor, source, nil)
 			value, ok = scalarValueByID(client.scalarValues(nullNode, time.Unix(100, 0)), descriptor.ID)
-			if !ok || !value.Present || value.Valid || value.Emit || value.Inventory != nil {
-				t.Fatalf("null source = %+v present=%t, want a present Function gap", value, ok)
+			if !ok || !value.Present || value.Valid || value.Emit {
+				t.Fatalf("null source = %+v present=%t, want a present gap", value, ok)
 			}
 
 			wrongNode := scalarTestNode(descriptor, source, map[string]any{"unexpected": true})
@@ -391,12 +189,45 @@ func TestEveryRegistryScalarFallbackHasPrecedenceAndFailureProvenance(t *testing
 					setScalarTestMultiplier(node, source)
 				}
 
+				selected := descriptor.Candidates[selectedIndex]
+				selectedDocument := registryTestDocument(node, selected.Document)
+				for _, requirement := range selected.Requires {
+					setRegistryTestPath(selectedDocument, requirement.Path, requirement.Value)
+				}
+				setRegistryTestPath(selectedDocument, selected.Path, json.Number(fmt.Sprint(selectedIndex+10)))
+				setScalarTestMultiplier(node, selected)
+
 				client := &protocolClient{}
 				client.hardwareState.initialize()
 				values := client.scalarValues(node, time.Unix(100, 0))
 				value, ok := scalarValueByID(values, descriptor.ID)
-				if !ok || !value.Valid || value.SelectedSource != sourcePath(descriptor.Candidates[selectedIndex]) {
+				if !ok || !value.Valid {
 					t.Fatalf("selected fallback = %+v present=%t", value, ok)
+				}
+				source := descriptor.Candidates[selectedIndex]
+				scale := descriptor.Scale
+				if source.Scale.Den != 0 {
+					scale = source.Scale
+				}
+				want := float64(selectedIndex+10) * float64(scale.Num) / float64(scale.Den)
+				if source.MultiplierPath != "" {
+					multiplierScale := source.MultiplierScale
+					if multiplierScale.Den == 0 {
+						multiplierScale = registry.Identity
+					}
+					want *= 2 * float64(multiplierScale.Num) / float64(multiplierScale.Den)
+				}
+				if descriptor.Algorithm != registry.AlgorithmAbsolute {
+					setRegistryTestPath(registryTestDocument(node, source.Document), source.Path, json.Number(fmt.Sprint(2*(selectedIndex+10))))
+					next := time.Unix(101, 0)
+					if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+						next = time.Unix(1100, 0)
+						want /= 10
+					}
+					value = requireScalarValue(t, client, node, descriptor.ID, next)
+				}
+				if math.Abs(value.Value-want) > 1e-9*math.Max(1, math.Abs(want)) {
+					t.Fatalf("selected source value = %v, want %v", value.Value, want)
 				}
 				expectedFailures := 0
 				for _, source := range descriptor.Candidates[:selectedIndex] {
@@ -548,55 +379,11 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 				}
 			}
 			for _, reading := range client.readingsForNode(node, time.Unix(100, 0)) {
-				if reading.Valid && reading.Exposure == registry.ExposureOperationalReading {
+				if reading.Valid {
 					t.Errorf("rejected class emitted reading %q", reading.SourcePath)
 				}
 			}
 		})
-	}
-}
-
-func inventoryFieldTestValue(field registry.InventoryFieldSpec) any {
-	if field.Structured {
-		return []any{map[string]any{"value": "synthetic"}}
-	}
-	typ := field.SourceType
-	if typ == "" {
-		typ = field.Type
-	}
-	switch typ {
-	case registry.ColumnString, registry.ColumnEnum:
-		return "synthetic"
-	case registry.ColumnBoolean:
-		return false
-	case registry.ColumnTimestamp:
-		return "2026-07-31T00:00:00Z"
-	case registry.ColumnInteger:
-		return json.Number("0")
-	case registry.ColumnFloat:
-		return json.Number("0")
-	default:
-		panic("unsupported inventory column type " + field.Type)
-	}
-}
-
-func inventoryFieldWrongType(field registry.InventoryFieldSpec) any {
-	if field.Structured {
-		return "wrong"
-	}
-	typ := field.SourceType
-	if typ == "" {
-		typ = field.Type
-	}
-	switch typ {
-	case registry.ColumnString, registry.ColumnEnum, registry.ColumnTimestamp:
-		return true
-	case registry.ColumnBoolean:
-		return "wrong"
-	case registry.ColumnInteger, registry.ColumnFloat:
-		return map[string]any{"wrong": true}
-	default:
-		panic("unsupported inventory column type " + field.Type)
 	}
 }
 
@@ -616,10 +403,9 @@ func syntheticRawReadingForSurface(
 		Primary:        true,
 		ReadingScoped:  surface.AlarmMetric != "",
 		Health:         "OK",
-		Inventory:      make(map[string]any),
 	}
 	if fixed {
-		raw.Inventory["fixed_family"] = surface.Family
+		raw.FixedFamily = surface.Family
 	}
 	node := &graphNode{Kind: "sensor", Key: raw.IdentitySource, Data: make(map[string]any)}
 	if surface.SemanticClass == "fan" {

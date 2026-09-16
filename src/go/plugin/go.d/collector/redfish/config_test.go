@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"maps"
 	"os"
-	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
@@ -264,94 +262,6 @@ func TestConfigSchemaTLSClientIdentityMatchesRuntime(t *testing.T) {
 	}
 }
 
-func TestConfigSchemaLogsBackendMatchesRuntime(t *testing.T) {
-	schema := compileConfigSchema(t)
-	base := func() map[string]any {
-		return map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "local", "auth_method": "none",
-		}
-	}
-	withBackend := func(value string) map[string]any {
-		config := base()
-		config["logs"] = map[string]any{"backend": value}
-		return config
-	}
-
-	tests := map[string]struct {
-		config map[string]any
-		valid  bool
-	}{
-		"omitted":                       {config: base(), valid: true},
-		"configured":                    {config: withBackend("isolated"), valid: true},
-		"configured with whitespace":    {config: withBackend(" \u00a0isolated\u3000 "), valid: true},
-		"maximum ASCII bytes":           {config: withBackend(strings.Repeat("x", 256)), valid: true},
-		"empty":                         {config: withBackend("")},
-		"ASCII whitespace only":         {config: withBackend(" \t\r\n")},
-		"every runtime-empty character": {config: withBackend(allTrimSpaceCharacters)},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			schemaErr := schema.Validate(test.config)
-			raw, err := json.Marshal(test.config)
-			require.NoError(t, err)
-			var cfg Config
-			require.NoError(t, json.Unmarshal(raw, &cfg))
-			cfg.applyDefaults()
-			runtimeErr := cfg.validate()
-			if test.valid {
-				require.NoError(t, schemaErr)
-				require.NoError(t, runtimeErr)
-			} else {
-				require.Error(t, schemaErr)
-				require.Error(t, runtimeErr)
-			}
-		})
-	}
-}
-
-func TestConfigSchemaLeavesLogsBackendByteLimitToRuntime(t *testing.T) {
-	schema := compileConfigSchema(t)
-	base := func(value string) map[string]any {
-		return map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "local", "auth_method": "none",
-			"logs": map[string]any{"backend": value},
-		}
-	}
-
-	tests := map[string]struct {
-		config       map[string]any
-		runtimeValid bool
-	}{
-		"257 ASCII bytes": {
-			config: base(strings.Repeat("x", 257)),
-		},
-		"258 multibyte UTF-8 bytes": {
-			config: base(strings.Repeat("é", 129)),
-		},
-		"256 normalized bytes with surrounding whitespace": {
-			config: base(" \u00a0" + strings.Repeat("x", 256) + "\u3000 "), runtimeValid: true,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			// Draft-07 maxLength counts pre-normalization code points, not normalized UTF-8 bytes.
-			require.NoError(t, schema.Validate(test.config))
-			raw, err := json.Marshal(test.config)
-			require.NoError(t, err)
-			var cfg Config
-			require.NoError(t, json.Unmarshal(raw, &cfg))
-			cfg.applyDefaults()
-			runtimeErr := cfg.validate()
-			if test.runtimeValid {
-				require.NoError(t, runtimeErr)
-				require.Len(t, cfg.LogsBackend(), 256)
-			} else {
-				require.ErrorContains(t, runtimeErr, "must not exceed 256 bytes")
-			}
-		})
-	}
-}
-
 func compileConfigSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
 	raw, err := os.ReadFile("config_schema.json")
@@ -369,7 +279,6 @@ func compileConfigSchema(t *testing.T) *jsonschema.Schema {
 
 func TestConfigDefaultsPreserveExplicitZeroSemantics(t *testing.T) {
 	zero := 0
-	zeroDuration := confopt.Duration(0)
 	cfg := Config{
 		URL:        "https://bmc.example.test",
 		NodeMode:   "local",
@@ -378,26 +287,13 @@ func TestConfigDefaultsPreserveExplicitZeroSemantics(t *testing.T) {
 		Charts: ChartsConfig{
 			MaxDetailedComponentsPerFamily: &zero,
 		},
-		Logs: LogsConfig{
-			FullReconciliationEvery: &zeroDuration,
-			Cursor: CursorConfig{
-				OrphanRetention: &zeroDuration,
-			},
-		},
 	}
 
 	cfg.applyDefaults()
 
 	require.Zero(t, *cfg.Retries)
 	require.Zero(t, *cfg.Charts.MaxDetailedComponentsPerFamily)
-	require.Zero(t, cfg.Logs.FullReconciliationEvery.Duration())
-	require.Zero(t, cfg.Logs.Cursor.OrphanRetention.Duration())
-	require.Equal(t, "default", cfg.LogsBackend())
 	require.NoError(t, cfg.validate())
-
-	explicit := "isolated"
-	cfg.Logs.Backend = &explicit
-	require.Equal(t, "isolated", cfg.LogsBackend())
 }
 
 func TestConfigValidation(t *testing.T) {
@@ -438,13 +334,6 @@ func TestConfigValidation(t *testing.T) {
 		"link local requires zone": {
 			cfg:     Config{URL: "https://[fe80::1]/", NodeMode: "local", AuthMethod: "none"},
 			wantErr: "requires an interface zone",
-		},
-		"explicit empty backend rejected": {
-			cfg: Config{
-				URL: "https://bmc.example.test", NodeMode: "local", AuthMethod: "none",
-				Logs: LogsConfig{Backend: new("")},
-			},
-			wantErr: "must not be explicitly empty",
 		},
 		"malformed URL does not disclose user-info": {
 			cfg: Config{
@@ -504,12 +393,12 @@ func TestNormalizeServiceRootCanonicalizesIPv4MappedIPv6(t *testing.T) {
 	require.Equal(t, plainOrigin, mappedOrigin)
 	require.Equal(t, plainRoot.String(), mappedRoot.String())
 
-	plainURL, plainKey, err := DiscoveryEndpointIdentity("https://192.0.2.1")
+	plainURL, plainOrigin, err := normalizeServiceRoot("https://192.0.2.1")
 	require.NoError(t, err)
-	mappedURL, mappedKey, err := DiscoveryEndpointIdentity("https://[::ffff:192.0.2.1]")
+	mappedURL, mappedOrigin, err := normalizeServiceRoot("https://[::ffff:192.0.2.1]")
 	require.NoError(t, err)
 	require.Equal(t, plainURL, mappedURL)
-	require.Equal(t, plainKey, mappedKey)
+	require.Equal(t, plainOrigin, mappedOrigin)
 }
 
 func TestApplyDefaultsCanonicalizesHostScopeOverrideGUID(t *testing.T) {

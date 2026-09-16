@@ -40,7 +40,6 @@ var kindSpecs = []KindSpec{
 	{ID: "firmware", Display: "Firmware", TopFamily: "Management", LeafFamily: "firmware", ComponentFamily: "firmware", ComponentClass: "resource", ParentPresentationRank: 34},
 	{ID: "software", Display: "Software", TopFamily: "Management", LeafFamily: "software", ComponentFamily: "software", ComponentClass: "resource", ParentPresentationRank: 35},
 	{ID: "assembly", Display: "Assembly", TopFamily: "Management", LeafFamily: "assembly", ComponentFamily: "assembly", ComponentClass: "resource", ParentPresentationRank: 36},
-	{ID: "log_service", Display: "Log Service", TopFamily: "Management", LeafFamily: "log_service", ComponentFamily: "log_service", ComponentClass: "log_service", ParentPresentationRank: 37},
 }
 
 var statusSpecs = []StatusSpec{
@@ -81,5 +80,4 @@ var statusSpecs = []StatusSpec{
 	{Kind: "firmware", Status: true},
 	{Kind: "software", Status: true},
 	{Kind: "assembly", Status: true},
-	{Kind: "log_service", Status: true, AggregateKinds: []Kind{"system", "chassis", "manager"}},
 }

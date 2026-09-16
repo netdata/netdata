@@ -136,35 +136,6 @@ func TestRequiredResourceProperties(t *testing.T) {
 				return validateRequiredResourceProperties("fan", map[string]any{"Id": "1"})
 			},
 		},
-		"inline LogEntry complete": {
-			validate: func() error {
-				return validateRequiredLogEntryProperties(map[string]any{
-					"Name": "Entry 1", "EntryType": "Event",
-				}, false)
-			},
-			valid: true,
-		},
-		"linked LogEntry requires Id": {
-			validate: func() error {
-				return validateRequiredLogEntryProperties(map[string]any{
-					"Name": "Entry 1", "EntryType": "Event",
-				}, true)
-			},
-		},
-		"LogEntry requires Name": {
-			validate: func() error {
-				return validateRequiredLogEntryProperties(map[string]any{
-					"Id": "1", "EntryType": "Event",
-				}, true)
-			},
-		},
-		"LogEntry requires EntryType": {
-			validate: func() error {
-				return validateRequiredLogEntryProperties(map[string]any{
-					"Id": "1", "Name": "Entry 1",
-				}, true)
-			},
-		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			err := test.validate()

@@ -122,10 +122,6 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, float64(1), scalars["redundancy_members_active"].Value)
 	require.True(t, scalars["redundancy_members_total"].Emit)
 	require.Equal(t, float64(2), scalars["redundancy_members_total"].Value)
-	inventory := make(map[string]any)
-	applyRegisteredInventory(inventory, redundancy[0])
-	require.Equal(t, int64(1), inventory["redundancy_active_count"])
-	require.Equal(t, int64(2), inventory["redundancy_member_count"])
 
 	withoutCount := *redundancy[0]
 	withoutCount.Data = cloneJSONMap(redundancy[0].Data)
@@ -260,14 +256,13 @@ func TestCompatibilityFixtureManualThresholdEvaluationCanBeDisabled(t *testing.T
 	readings := client.readingsForNode(temperature, time.Now())
 	require.Len(t, readings, 1)
 	require.Equal(t, "emergency", readings[0].EffectiveAlarm)
-	require.Equal(t, "combined", readings[0].EffectiveAlarmSource)
 
 	disabled := false
 	client.config.Alarms.EvaluateThresholds = &disabled
 	readings = client.readingsForNode(temperature, time.Now())
 	require.Len(t, readings, 1)
 	require.Equal(t, "clear", readings[0].EffectiveAlarm)
-	require.Equal(t, "source", readings[0].EffectiveAlarmSource)
+
 }
 
 func TestCompatibilityFixturesModernReadings(t *testing.T) {
@@ -349,8 +344,7 @@ func TestCompatibilityFixtureModernStandaloneSensor(t *testing.T) {
 	require.Equal(t, "clear", reading.SourceAlarm)
 	require.Equal(t, "critical", reading.DerivedAlarm)
 	require.Equal(t, "critical", reading.EffectiveAlarm)
-	require.Equal(t, "combined", reading.EffectiveAlarmSource)
-	require.Equal(t, "threshold_upper_critical", reading.EffectiveAlarmReason)
+
 }
 
 func TestCompatibilityFixtureLegacyPowerAndModernDrive(t *testing.T) {
@@ -386,8 +380,7 @@ func TestCompatibilityFixtureLegacyPowerAndModernDrive(t *testing.T) {
 	for _, value := range client.scalarValues(drive, time.Now()) {
 		fields[value.Descriptor.ID] = value
 	}
-	require.True(t, fields["drive_capacitybytes"].Emit)
-	require.Equal(t, float64(1_600_000_000_000), fields["drive_capacitybytes"].Value)
+
 	require.True(t, fields["drive_predictedmedialifeleftpercent"].Emit)
 	require.Equal(t, float64(98), fields["drive_predictedmedialifeleftpercent"].Value)
 }

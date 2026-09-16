@@ -9,31 +9,16 @@ import (
 )
 
 const (
-	expectedFieldCount              = 365
-	expectedInventoryFieldCount     = 107
-	expectedOperationalFieldCount   = 258
-	expectedReadingCount            = 940
-	expectedInventoryReadingCount   = 450
+	expectedFieldCount              = 258
+	expectedReadingCount            = 490
 	expectedPrimaryReadingCount     = 105
 	expectedAuxiliaryReadingCount   = 385
 	expectedOperationalScalarGroups = 105
 )
 
 func applyPresentationPolicy(contract *Contract) error {
-	seenFields := make(map[string]struct{}, len(contract.Fields))
 	for index := range contract.Fields {
 		field := &contract.Fields[index]
-		exposure, ok := fieldExposureByID[field.ID]
-		if !ok {
-			return fmt.Errorf("field %q has no explicit exposure disposition", field.ID)
-		}
-		field.Exposure = exposure
-		seenFields[field.ID] = struct{}{}
-		if field.Exposure == ExposureInventoryOnly {
-			field.AggregateKinds = nil
-			field.AggregateClass = ""
-			continue
-		}
 		field.AggregateKinds = admittedFieldAggregateKinds(*field, contract.Relationships)
 		if len(field.AggregateKinds) == 0 {
 			field.AggregateClass = ""
@@ -41,47 +26,13 @@ func applyPresentationPolicy(contract *Contract) error {
 		}
 		summary, ok := summaryClassForField(*field)
 		if !ok {
-			return fmt.Errorf(
-				"operational field %q has aggregate owners but no summary class for units %q (additive=%t)",
-				field.ID,
-				field.Units,
-				field.Additive,
-			)
+			return fmt.Errorf("field %q has aggregate owners but no summary class for units %q (additive=%t)", field.ID, field.Units, field.Additive)
 		}
 		field.AggregateClass = summary.ID
-	}
-	for id := range fieldExposureByID {
-		if _, ok := seenFields[id]; !ok {
-			return fmt.Errorf("field exposure disposition %q has no registry row", id)
-		}
 	}
 
 	for index := range contract.Readings {
 		reading := &contract.Readings[index]
-		switch reading.Exposure {
-		case ExposureInventoryOnly:
-			if reading.Primary {
-				return fmt.Errorf(
-					"inventory reading %s/%s/%s/%s cannot be primary",
-					reading.Family,
-					reading.Basis,
-					reading.Role,
-					reading.SemanticClass,
-				)
-			}
-			reading.AggregateKinds = nil
-			reading.AggregateClass = ""
-			continue
-		case ExposureOperationalReading:
-		default:
-			return fmt.Errorf(
-				"reading %s/%s/%s/%s has no explicit exposure disposition",
-				reading.Family,
-				reading.Basis,
-				reading.Role,
-				reading.SemanticClass,
-			)
-		}
 
 		if !reading.CommonContext {
 			reading.Metric = "reading_" + reading.Family + "_value"
@@ -110,7 +61,7 @@ func applyPresentationPolicy(contract *Contract) error {
 	}
 
 	contract.SummaryClasses = compileSummaryClasses(*contract)
-	return validateExposureCounts(*contract)
+	return validateSurfaceCounts(*contract)
 }
 
 func admittedFieldAggregateKinds(field FieldSpec, relationships []RelationshipSpec) []Kind {
@@ -326,71 +277,28 @@ func compileSummaryClasses(contract Contract) []SummaryClassSpec {
 	return result
 }
 
-func validateExposureCounts(contract Contract) error {
+func validateSurfaceCounts(contract Contract) error {
 	type fieldGroupKey struct {
 		kind    Kind
 		context string
 	}
-	var inventoryFields, operationalFields int
 	fieldGroups := make(map[fieldGroupKey]struct{})
 	for _, field := range contract.Fields {
-		switch field.Exposure {
-		case ExposureInventoryOnly:
-			inventoryFields++
-		case ExposureOperationalScalar:
-			operationalFields++
-			fieldGroups[fieldGroupKey{
-				kind: field.Kind, context: scalarBaseRowContext(field.Context, field.Role),
-			}] = struct{}{}
-		default:
-			return fmt.Errorf("field %q has unspecified exposure %q", field.ID, field.Exposure)
-		}
+		fieldGroups[fieldGroupKey{kind: field.Kind, context: scalarBaseRowContext(field.Context, field.Role)}] = struct{}{}
 	}
-	var inventoryReadings, primaryReadings, auxiliaryReadings int
+	var primaryReadings, auxiliaryReadings int
 	for _, reading := range contract.Readings {
-		switch reading.Exposure {
-		case ExposureInventoryOnly:
-			inventoryReadings++
-		case ExposureOperationalReading:
-			if reading.Primary {
-				primaryReadings++
-			} else {
-				auxiliaryReadings++
-			}
-		default:
-			return fmt.Errorf(
-				"reading %s/%s/%s/%s has unspecified exposure %q",
-				reading.Family,
-				reading.Basis,
-				reading.Role,
-				reading.SemanticClass,
-				reading.Exposure,
-			)
+		if reading.Primary {
+			primaryReadings++
+		} else {
+			auxiliaryReadings++
 		}
 	}
-	if len(contract.Fields) != expectedFieldCount ||
-		inventoryFields != expectedInventoryFieldCount ||
-		operationalFields != expectedOperationalFieldCount ||
-		len(fieldGroups) != expectedOperationalScalarGroups {
-		return fmt.Errorf(
-			"field exposure contract changed: total=%d inventory=%d operational=%d groups=%d",
-			len(contract.Fields),
-			inventoryFields,
-			operationalFields,
-			len(fieldGroups),
-		)
+	if len(contract.Fields) != expectedFieldCount || len(fieldGroups) != expectedOperationalScalarGroups {
+		return fmt.Errorf("field contract changed: total=%d groups=%d", len(contract.Fields), len(fieldGroups))
 	}
-	if len(contract.Readings) != expectedReadingCount ||
-		inventoryReadings != expectedInventoryReadingCount ||
-		primaryReadings != expectedPrimaryReadingCount ||
-		auxiliaryReadings != expectedAuxiliaryReadingCount {
-		return fmt.Errorf(
-			"reading exposure contract changed: total=%d inventory=%d primary=%d auxiliary=%d",
-			len(contract.Readings),
-			inventoryReadings,
-			primaryReadings,
-			auxiliaryReadings,
-		)
+	if len(contract.Readings) != expectedReadingCount || primaryReadings != expectedPrimaryReadingCount || auxiliaryReadings != expectedAuxiliaryReadingCount {
+		return fmt.Errorf("reading contract changed: total=%d primary=%d auxiliary=%d", len(contract.Readings), primaryReadings, auxiliaryReadings)
 	}
 	return nil
 }
