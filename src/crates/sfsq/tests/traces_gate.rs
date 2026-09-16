@@ -22,7 +22,8 @@ use std::sync::atomic::AtomicUsize;
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, kv_str, req_with, sealed_source, sealed_source_at, sp, tail_source, write_wal,
+    SpanSpec, corrupt_chunk, kv_str, req_with, sealed_source, sealed_source_at, sp, tail_source,
+    write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
@@ -147,19 +148,6 @@ fn min_duration(ns: i64) -> Condition {
         CompareOp::Gte,
         vec![PredicateValue::Integer(ns)],
     )
-}
-
-/// Flip the first payload byte of chunk `id` inside a sealed SFST — a
-/// CRC mismatch, the cheapest "corrupt in any way".
-fn corrupt_chunk(path: &Path, id: [u8; 4]) {
-    let mut bytes = std::fs::read(path).unwrap();
-    let offset = {
-        let container = chunk_file::container::Container::open(&bytes, b"SFST", 1).unwrap();
-        let meta = container.chunk_meta(id).expect("chunk present");
-        usize::try_from(meta.offset).unwrap()
-    };
-    bytes[offset] ^= 0xFF;
-    std::fs::write(path, &bytes).unwrap();
 }
 
 /// Make chunk `id` ABSENT from a sealed SFST by renaming its TOC entry

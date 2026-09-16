@@ -15,7 +15,7 @@ use sfsq::traces::{
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
-    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OVERVIEW_SCOPE_WINDOW,
+    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire,
     OverviewGridWire, OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals,
     SearchItems, SearchResult, SlowestResult, SlowestTraceWire, SpanWire, StatusWire, TraceItems,
     TraceResult, TraceSummaryWire,
@@ -336,6 +336,16 @@ pub(crate) fn parse_owner_word(word: &str) -> Result<AttributeOwner, String> {
         })
 }
 
+/// The selection-grammar word of a builtin field — for error messages
+/// that must speak the wire's language, not the engine's.
+pub(crate) fn builtin_word(field: BuiltinField) -> &'static str {
+    BUILTIN_WORDS
+        .iter()
+        .find(|(_, f)| *f == field)
+        .map(|(w, _)| *w)
+        .expect("the lockstep test pins a wire word for every builtin")
+}
+
 /// Render one enumerated key into the selection grammar — the exact
 /// inverse of [`parse_selection_key`] (round-trip pinned by tests), so
 /// the facet rail can feed keys straight back as selections.
@@ -467,14 +477,31 @@ fn to_percentiles(buckets: &[Option<DurationPercentiles>]) -> OverviewPercentile
     }
 }
 
-/// Shape the standalone `overview` mode's response.
-pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> OverviewResult {
+/// The heatmap's predicate from a request's `selections` alone — the
+/// page's grammar and builder, minus every duration bound (the grid
+/// never applies those; see the wire's `scope` doc). `None` when the
+/// selections constrain nothing, so the caller runs the plain grid.
+pub(crate) fn heatmap_predicate(
+    selections: &HashMap<String, Vec<String>>,
+) -> Result<Option<Predicate>, String> {
+    let predicate = build_predicate(selections, None, None, None, None)?;
+    Ok((!predicate.is_all()).then_some(predicate))
+}
+
+/// Shape the standalone `overview` mode's response; `scope` is what
+/// actually ran (the handler's decision, from the predicate it passed).
+pub(crate) fn to_overview_result(
+    data: OverviewData,
+    grid: sfst::Grid,
+    scope: &'static str,
+) -> OverviewResult {
     let parts = overview_parts(data, grid);
     OverviewResult {
         mode: "overview",
         version: 1,
         unit: "traces",
         status: parts.status,
+        scope,
         grid: parts.grid,
         totals: parts.totals,
         top_root_services: parts.top_root_services,
@@ -486,14 +513,14 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
 /// the legacy body minus `mode`, plus `coverage` — the GRID's aligned
 /// window, which the caller derived together with `grid` — and `scope`.
 ///
-/// `scope` is [`OVERVIEW_SCOPE_WINDOW`] because this pass carries no
-/// predicate at all: it aggregates the whole window, the page's
-/// selections included. The flag is the section's honesty, so it is set
-/// here from what actually ran, never from what a caller wanted.
+/// `scope` is the section's honesty: the handler passes the value for
+/// the predicate the engine pass actually carried, never what a caller
+/// wanted.
 pub(crate) fn to_overview_section(
     data: OverviewData,
     grid: sfst::Grid,
     coverage: CoverageWire,
+    scope: &'static str,
 ) -> OverviewSection {
     let parts = overview_parts(data, grid);
     OverviewSection {
@@ -501,7 +528,7 @@ pub(crate) fn to_overview_section(
         unit: "traces",
         status: parts.status,
         coverage,
-        scope: OVERVIEW_SCOPE_WINDOW,
+        scope,
         grid: parts.grid,
         totals: parts.totals,
         top_root_services: parts.top_root_services,

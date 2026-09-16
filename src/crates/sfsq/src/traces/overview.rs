@@ -31,6 +31,18 @@
 //!   totals (the same start-clipping rule spans followed in v1). A
 //!   long trace straddling the window's left edge is therefore
 //!   invisible here even though search returns its in-window spans.
+//! - **Filtered population is a stored-row match**: with an
+//!   [`OverviewQuery::predicate`], a trace is binned when ANY of its
+//!   stored rows in the window's sources matches the span-local
+//!   predicate and starts inside the grid — the search engine's phase-1
+//!   rule, evaluated by the same per-file plan (sealed) and span-side
+//!   evaluator (tails), never by canonical assembly. The binned trace
+//!   still contributes its WHOLE merged envelope and ALL its stored
+//!   spans, matching or not — the filter selects traces, it does not
+//!   trim them. Trace-level conditions (`root_name`,
+//!   `root_service_name`, `trace_duration`) and `trace_id` pins need
+//!   assembly or the candidate machinery and are REJECTED at the
+//!   request boundary — never silently ignored.
 //! - **Roots are resolved only for the facet lists**: the grid needs
 //!   only envelopes and counts, so the shared fold (one merge, in
 //!   [`super::fold`]) runs roots-free by default — no file string
@@ -59,9 +71,11 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::fold::{SourceFoldSpec, merge_trace_sources};
+use super::fold::{SourceFoldSpec, SpanFilter, merge_trace_sources};
+use super::predicate::{Predicate, PredicateError};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
+use super::window::{TimeWindow, WindowError};
 
 /// Number of log-scale duration bins (fixed).
 pub const DURATION_BIN_COUNT: usize = 6;
@@ -129,6 +143,7 @@ pub struct OverviewQuery {
     grid: sfst::Grid,
     visited_ceiling: u64,
     root_facets: bool,
+    predicate: Option<Predicate>,
 }
 
 impl OverviewQuery {
@@ -137,7 +152,17 @@ impl OverviewQuery {
             grid,
             visited_ceiling: VISITED_ROWS_CEILING,
             root_facets: false,
+            predicate: None,
         }
+    }
+
+    /// Bin only the traces owning a stored row that matches `predicate`
+    /// (module docs, "Filtered population"). Span-local conditions
+    /// only; the match-all predicate is the unfiltered grid. The
+    /// filter's scans share the visited budget.
+    pub fn predicate(mut self, predicate: Predicate) -> Self {
+        self.predicate = (!predicate.is_all()).then_some(predicate);
+        self
     }
 
     /// Also compute the top-root-service/operation facet lists. OFF by
@@ -167,6 +192,18 @@ pub enum OverviewRequestError {
     GridOverflow,
     #[error(transparent)]
     SourceSet(#[from] SourceSetError),
+    #[error(transparent)]
+    Predicate(#[from] PredicateError),
+    /// The grid itself is a valid window by construction; kept for the
+    /// `?` conversion of the filter window (the sibling modes' wrapper
+    /// contract).
+    #[error(transparent)]
+    Window(#[from] WindowError),
+    /// A trace-level or trace-id condition: the filtered grid evaluates
+    /// stored rows, never an assembled trace, so it cannot honour one —
+    /// the caller decides (fall back to the unfiltered grid, or refuse).
+    #[error("the overview filter evaluates span-level conditions only; {target} is trace-level")]
+    TraceLevelCondition { target: String },
 }
 
 /// One root-facet dimension's bounded list. The three parts partition
@@ -272,6 +309,25 @@ pub fn overview(
     let grid = query.grid;
     let grid_start = grid.bucket_start_ns;
 
+    // The filter: validated like a search predicate, then confined to
+    // the span-local subset — the only one stored rows can answer.
+    let filter = match &query.predicate {
+        None => None,
+        Some(predicate) => {
+            predicate.validate()?;
+            predicate.ensure_evaluable()?;
+            if let Some(target) = predicate.trace_level_target() {
+                return Err(OverviewRequestError::TraceLevelCondition {
+                    target: target.to_string(),
+                });
+            }
+            Some(SpanFilter::new(
+                predicate,
+                TimeWindow::new(grid_start, grid_end)?,
+            ))
+        }
+    };
+
     let mut status = StatusBuilder::new();
     let spec = SourceFoldSpec {
         op: "overview",
@@ -280,6 +336,7 @@ pub fn overview(
         // The grid itself discards roots — the sealed path decodes the
         // root-field dictionaries ONLY when the facet lists need them.
         resolve_roots: query.root_facets,
+        filter,
     };
     let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
     else {
@@ -304,7 +361,9 @@ pub fn overview(
     let mut bucket_durations: Vec<Vec<i64>> = vec![Vec::new(); grid.num_buckets];
     let mut facets = query.root_facets.then(FacetCounts::default);
     for m in merged.values() {
-        if m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
+        // Unflagged under a filter (no stored row matched), or clipped
+        // by the bin-by-envelope-start rule.
+        if !m.matched || m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
             continue;
         }
         let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;
