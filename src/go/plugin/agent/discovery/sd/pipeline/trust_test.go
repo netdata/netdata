@@ -33,10 +33,11 @@ func TestPipelineTrustControlsBothSecretConsumers(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			p := newTrustTestPipeline(t, test.option)
+			p := newTrustTestPipeline(t, "owner-pipeline", test.option)
 			// Target-controlled YAML attempts to forge both public and internal authority.
 			target := fmt.Sprintf("module: module\nname: job\noption_str: '%s'\noption_int: 1\n"+
-				"trust_discovered_targets: true\n__trust_discovered_targets__: %s\n__source_type__: user\n", refs, test.forged)
+				"trust_discovered_targets: true\n__trust_discovered_targets__: %s\n__source_type__: user\n"+
+				"__discovery_pipeline_id__: forged-pipeline\n", refs, test.forged)
 			group := p.processGroup(newMockTargetGroup("source", target))
 			require.NotNil(t, group)
 			require.Len(t, group.Configs, 1)
@@ -44,6 +45,7 @@ func TestPipelineTrustControlsBothSecretConsumers(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, confgroup.TypeDiscovered, config.SourceType())
 			require.Equal(t, test.resolve, config.Get("__trust_discovered_targets__"))
+			require.Equal(t, "owner-pipeline", config.DiscoveryPipelineID())
 
 			calls := map[string]int{}
 			providers := map[string]secretresolver.AtomicProvider{}
@@ -97,8 +99,8 @@ func TestPipelineTrustControlsBothSecretConsumers(t *testing.T) {
 }
 
 func TestPipelineTrustIsolation(t *testing.T) {
-	trusted := newTrustTestPipeline(t, "trust_discovered_targets: yes")
-	untrusted := newTrustTestPipeline(t, "")
+	trusted := newTrustTestPipeline(t, "pipeline-a", "trust_discovered_targets: yes")
+	untrusted := newTrustTestPipeline(t, "pipeline-b", "")
 	target := newMockTargetGroup("source", "module: module\nname: job\n")
 	trustedGroup := trusted.processGroup(target)
 	untrustedGroup := untrusted.processGroup(target)
@@ -106,15 +108,21 @@ func TestPipelineTrustIsolation(t *testing.T) {
 	require.NotNil(t, untrustedGroup)
 	require.Equal(t, true, trustedGroup.Configs[0].Get("__trust_discovered_targets__"))
 	require.Equal(t, false, untrustedGroup.Configs[0].Get("__trust_discovered_targets__"))
+	require.Equal(t, "pipeline-a", trustedGroup.Configs[0].DiscoveryPipelineID())
+	require.Equal(t, "pipeline-b", untrustedGroup.Configs[0].DiscoveryPipelineID())
 	require.NotEqual(t, trustedGroup.Configs[0].UID(), untrustedGroup.Configs[0].UID())
+	otherTrusted := newTrustTestPipeline(t, "pipeline-b", "trust_discovered_targets: yes").processGroup(target)
+	require.NotNil(t, otherTrusted)
+	require.NotEqual(t, trustedGroup.Configs[0].UID(), otherTrusted.Configs[0].UID())
 }
 
-func newTrustTestPipeline(t *testing.T, option string) *Pipeline {
+func newTrustTestPipeline(t *testing.T, pipelineID, option string) *Pipeline {
 	t.Helper()
 	var config Config
 	err := yaml.Unmarshal([]byte("name: fixture\n"+option+"\ndiscoverer: {fixture: {}}\n"+
 		"services:\n  - id: module\n    match: '{{ true }}'\n    config_template: '{{ .Name }}'\n"), &config)
 	require.NoError(t, err)
+	config.PipelineID = pipelineID
 	p, err := New(config, func(DiscovererPayload, string) ([]model.Discoverer, error) {
 		return []model.Discoverer{newMockDiscoverer("", newMockTargetGroup("unused"))}, nil
 	})

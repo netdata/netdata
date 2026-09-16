@@ -80,6 +80,7 @@ func (c sdConfig) ToPipelineConfig(configDefaults confgroup.Registry) (pipeline.
 		return pipeline.Config{}, fmt.Errorf("unmarshal pipeline config: %w", err)
 	}
 	cfg.Name = c.Name()
+	cfg.PipelineID = c.PipelineKey()
 
 	cfg.ConfigDefaults = configDefaults
 

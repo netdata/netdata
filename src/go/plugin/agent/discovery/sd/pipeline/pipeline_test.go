@@ -380,6 +380,7 @@ func prepareDiscoveredGroup(configNames ...string) *confgroup.Group {
 			SetProvider("mock").
 			SetSourceType(confgroup.TypeDiscovered).
 			SetTrustDiscoveredTargets(false).
+			SetDiscoveryPipelineID("").
 			SetSource("test").
 			SetName(name))
 	}
@@ -400,6 +401,7 @@ func prepareDiscoveredGroupWithModule(values ...string) *confgroup.Group {
 			SetProvider("mock").
 			SetSourceType(confgroup.TypeDiscovered).
 			SetTrustDiscoveredTargets(false).
+			SetDiscoveryPipelineID("").
 			SetSource("test").
 			SetName(cfgName).
 			SetModule(modName),

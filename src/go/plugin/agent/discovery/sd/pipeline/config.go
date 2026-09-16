@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	PipelineID     string             `yaml:"-" json:"-"`
 	Source         string             `yaml:"-" json:"-"`
 	ConfigDefaults confgroup.Registry `yaml:"-" json:"-"`
 

@@ -28,6 +28,7 @@ const (
 	ikeySourceType             = "__source_type__"
 	ikeyProvider               = "__provider__"
 	ikeyTrustDiscoveredTargets = "__trust_discovered_targets__"
+	ikeyDiscoveryPipelineID    = "__discovery_pipeline_id__"
 )
 
 const (
@@ -44,6 +45,10 @@ func (c Config) HashIncludeMap(_ string, k, _ any) (bool, error) {
 	if s == ikeyTrustDiscoveredTargets {
 		// Opt-in changes effective configuration; absent/false retain the default hash.
 		return c.SourceType() == TypeDiscovered && c.TrustDiscoveredTargets(), nil
+	}
+	if s == ikeyDiscoveryPipelineID {
+		// Reconcile ownership changes too, so later trust revocation uses the current owner.
+		return c.SourceType() == TypeDiscovered && c.TrustDiscoveredTargets() && c.DiscoveryPipelineID() != "", nil
 	}
 	return !strings.HasPrefix(s, "__") && !strings.HasSuffix(s, "__"), nil
 }
@@ -85,6 +90,16 @@ func (c Config) TrustDiscoveredTargets() bool {
 
 func (c Config) SetTrustDiscoveredTargets(v bool) Config {
 	return c.Set(ikeyTrustDiscoveredTargets, v)
+}
+
+// DiscoveryPipelineID identifies the producing pipeline, independently of target source text.
+func (c Config) DiscoveryPipelineID() string {
+	v, _ := c.Get(ikeyDiscoveryPipelineID).(string)
+	return v
+}
+
+func (c Config) SetDiscoveryPipelineID(v string) Config {
+	return c.Set(ikeyDiscoveryPipelineID, v)
 }
 
 func SourceTypePriority(sourceType string) int {

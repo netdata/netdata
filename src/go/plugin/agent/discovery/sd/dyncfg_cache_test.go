@@ -79,3 +79,36 @@ func TestSDConfigTrustRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestSDConfigPipelineIdentityIsOwnerStamped(t *testing.T) {
+	for _, sourceType := range []string{confgroup.TypeUser, confgroup.TypeDyncfg} {
+		t.Run(sourceType, func(t *testing.T) {
+			for _, key := range []string{"pipeline-a", "pipeline-b"} {
+				var config sdConfig
+				var err error
+				if sourceType == confgroup.TypeUser {
+					config, err = newSDConfigFromYAML([]byte("name: job\ndiscoverer: {fixture: {}}\n__pipeline_key__: forged\npipeline_id: forged\n"), "shared-source", sourceType, key)
+				} else {
+					config, err = newSDConfigFromJSON([]byte(`{"discoverer":{"fixture":{}},"__pipeline_key__":"forged","pipeline_id":"forged"}`), "job", "shared-source", sourceType, "fixture", key)
+				}
+				require.NoError(t, err)
+				actual, err := config.ToPipelineConfig(nil)
+				require.NoError(t, err)
+				require.Equal(t, key, actual.PipelineID)
+				// Serialized operator configuration must not carry owner authority.
+				jsonData, err := json.Marshal(actual)
+				require.NoError(t, err)
+				yamlData, err := yaml.Marshal(actual)
+				require.NoError(t, err)
+				for _, data := range [][]byte{jsonData, yamlData, config.DataJSON()} {
+					require.NotContains(t, string(data), key)
+				}
+				reloaded, err := newSDConfigFromYAML(yamlData, "shared-source", sourceType, key)
+				require.NoError(t, err)
+				roundtrip, err := reloaded.ToPipelineConfig(nil)
+				require.NoError(t, err)
+				require.Equal(t, key, roundtrip.PipelineID)
+			}
+		})
+	}
+}

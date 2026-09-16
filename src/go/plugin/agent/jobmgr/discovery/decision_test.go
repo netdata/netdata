@@ -881,17 +881,55 @@ func (cdtc *concurrentDecisionTestCommands) SubmitPreparedAndWait(
 
 func TestDecisionIndexReconcilesDiscoveryTrustChanges(t *testing.T) {
 	commands := &decisionTestCommands{}
-	var planned []bool
+	var planned []string
 	index := newDecisionTestIndex(t, commands, func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
-		planned = append(planned, change.Config.TrustDiscoveredTargets())
+		planned = append(planned, fmt.Sprintf("%s:%t", change.Config.DiscoveryPipelineID(), change.Config.TrustDiscoveredTargets()))
 		return jobmgr.WorkPlan{}, nil
 	})
-	for _, trust := range []bool{false, true, false} {
-		config := decisionTestConfig("job", confgroup.TypeDiscovered, "source").SetTrustDiscoveredTargets(trust)
+	for _, owner := range []struct {
+		pipelineID string
+		trust      bool
+	}{{"pipeline-a", false}, {"pipeline-a", true}, {"pipeline-b", true}, {"pipeline-b", false}} {
+		// Identical target sources and values must not hide a change of trusted owner.
+		config := decisionTestConfig("job", confgroup.TypeDiscovered, "source").
+			SetTrustDiscoveredTargets(owner.trust).SetDiscoveryPipelineID(owner.pipelineID)
 		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}))
+		require.Equal(t, owner.pipelineID, index.acknowledged[config.FullName()].DiscoveryPipelineID())
 		// Repeating the same authority and values must still be a no-op.
 		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}))
 	}
-	require.Equal(t, []bool{false, true, false}, planned)
+	require.Equal(t, []string{"pipeline-a:false", "pipeline-a:true", "pipeline-b:true", "pipeline-b:false"}, planned)
+	require.Len(t, commands.requests, 4)
+}
+
+func TestDecisionIndexCompetingRejectionDoesNotSuppressTrustRevocation(t *testing.T) {
+	commands := &sequenceDecisionTestCommands{results: []error{
+		nil,
+		jobmgr.RejectProposal(errors.New("invalid competing literal config")),
+		nil,
+	}}
+	index := newDecisionTestIndex(t, commands, func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+		return jobmgr.WorkPlan{}, nil
+	})
+	incumbent := decisionTestConfig("job", confgroup.TypeDiscovered, "shared-source").
+		SetDiscoveryPipelineID("pipeline-a").SetTrustDiscoveredTargets(true)
+	competitor := decisionTestConfig("job", confgroup.TypeDiscovered, "shared-source").
+		SetDiscoveryPipelineID("pipeline-b").SetTrustDiscoveredTargets(false)
+	apply := func(config confgroup.Config) {
+		t.Helper()
+		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: config.Source(), Configs: []confgroup.Config{config}}}))
+	}
+	apply(incumbent)
+	apply(competitor)
+	apply(competitor)
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, incumbent.UID(), index.acknowledged[incumbent.FullName()].UID())
+	require.Equal(t, 1, decisionIndexCensus(index).rejected)
+
+	// Same literal data and source, but this time the trusted owner really opts out.
+	incumbent.SetTrustDiscoveredTargets(false)
+	apply(incumbent)
 	require.Len(t, commands.requests, 3)
+	require.Equal(t, incumbent.UID(), index.acknowledged[incumbent.FullName()].UID())
+	require.Zero(t, decisionIndexCensus(index).rejected)
 }

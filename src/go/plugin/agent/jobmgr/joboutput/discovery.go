@@ -307,12 +307,14 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			if activation.kind == activationFailureProposal {
 				trustRevoked := incumbent.SourceType() == confgroup.TypeDiscovered &&
 					incumbent.TrustDiscoveredTargets() &&
+					incumbent.DiscoveryPipelineID() != "" &&
+					incumbent.DiscoveryPipelineID() == change.Config.DiscoveryPipelineID() &&
 					change.Config.SourceType() == confgroup.TypeDiscovered &&
 					!change.Config.TrustDiscoveredTargets()
 				if !trustRevoked {
 					return nil, jobmgr.RejectProposal(err)
 				}
-				// Invalid literal fields must not keep a previously trusted job alive.
+				// Only the owning pipeline can revoke trust despite invalid literal fields.
 			}
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
