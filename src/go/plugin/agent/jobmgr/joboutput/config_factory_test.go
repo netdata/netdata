@@ -122,12 +122,14 @@ func TestConfigModuleFactorySecretReferenceSourcePolicy(t *testing.T) {
 	const references = "${env:value}|${file:/synthetic/value}|${cmd:/synthetic/command}|${store:vault:main:value}"
 	tests := map[string]struct {
 		sourceType string
+		trust      bool
 		value      string
 		resolve    bool
 	}{
 		"stock":                {sourceType: confgroup.TypeStock, value: references, resolve: true},
 		"user":                 {sourceType: confgroup.TypeUser, value: references, resolve: true},
 		"dyncfg":               {sourceType: confgroup.TypeDyncfg, value: references, resolve: true},
+		"trusted discovered":   {sourceType: confgroup.TypeDiscovered, trust: true, value: references, resolve: true},
 		"discovered":           {sourceType: confgroup.TypeDiscovered, value: references},
 		"discovered malformed": {sourceType: confgroup.TypeDiscovered, value: "${store:invalid}|${env:}"},
 		"empty":                {value: references},
@@ -179,7 +181,7 @@ func TestConfigModuleFactorySecretReferenceSourcePolicy(t *testing.T) {
 					})
 					require.NoError(t, err)
 					config := factoryTestConfig(false)
-					config.SetSourceType(test.sourceType)
+					config.SetSourceType(test.sourceType).SetTrustDiscoveredTargets(test.trust)
 					config["option_str"] = test.value
 					config["option_int"] = 1
 

@@ -52,13 +52,25 @@ setup:
       name: 'go.d/sd/http.conf'
     options:
       description: |
-        The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn fetched items into collector jobs — see [Service Rules](#service-rules)).
+        The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn fetched items into collector jobs — see [Service Rules](#service-rules)).
 
         After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
       folding:
         title: 'Discoverer options'
         enabled: false
       list:
+        - name: 'trust_discovered_targets'
+          description: 'Allow generated collector jobs to resolve secret references. Enable only if you trust every target discovered by this pipeline.'
+          default_value: 'no'
+          required: false
+          group: 'Discovery'
+          detailed_description: |
+            Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+            It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+            The discovery endpoint controls the items returned to service rules; trust both that endpoint and its data sources.
+
+            The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+            credentials. See [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
         - name: 'url'
           description: 'HTTP/HTTPS endpoint that returns the items.'
           default_value: ''

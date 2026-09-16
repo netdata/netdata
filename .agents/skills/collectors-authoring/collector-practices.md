@@ -240,7 +240,8 @@ constructor defaults versus conditional branches, and which schema tests carry w
 `.agents/skills/collectors-go-design/operator-surface.md`; writing `config_schema.json` itself (text channels,
 tabs, widgets, secrets, standard option wording, the repo-wide rule tests) is owned by its sibling `config-schema.md`.
 
-Collector secret-reference source authority, literal application and DynCfg adoption are owned by
+Collector secret-reference source authority, per-pipeline discovery trust, literal application and DynCfg adoption
+are owned by
 `src/go/plugin/agent/jobmgr/ARCHITECTURE.md#secrets`; operator guidance is generated from
 `integrations/gen_doc_secrets_page.py`. Discovery value serialization guidance is owned by
 `integrations/gen_doc_service_discovery_page.py` (`config_template` and `troubleshooting`). Privileged operations route

@@ -212,7 +212,7 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 	var resolved any
 	var references bool
 	var err error
-	if !policy.SecretReferencesAllowed(config.SourceType()) {
+	if !policy.SecretReferencesAllowed(config) {
 		resolved, err = secretresolver.CloneLiteral(map[string]any(config))
 	} else if captureSnapshot {
 		resolved, references, snapshot, err = cmf.config.Resolver.ResolveWithSnapshot(

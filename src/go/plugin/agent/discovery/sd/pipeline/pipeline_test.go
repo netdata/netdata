@@ -379,6 +379,7 @@ func prepareDiscoveredGroup(configNames ...string) *confgroup.Group {
 		configs = append(configs, confgroup.Config{}.
 			SetProvider("mock").
 			SetSourceType(confgroup.TypeDiscovered).
+			SetTrustDiscoveredTargets(false).
 			SetSource("test").
 			SetName(name))
 	}
@@ -398,6 +399,7 @@ func prepareDiscoveredGroupWithModule(values ...string) *confgroup.Group {
 		configs = append(configs, confgroup.Config{}.
 			SetProvider("mock").
 			SetSourceType(confgroup.TypeDiscovered).
+			SetTrustDiscoveredTargets(false).
 			SetSource("test").
 			SetName(cfgName).
 			SetModule(modName),

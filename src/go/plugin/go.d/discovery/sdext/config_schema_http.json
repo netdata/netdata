@@ -133,6 +133,12 @@
           "http"
         ]
       },
+      "trust_discovered_targets": {
+        "title": "Trust discovered targets",
+        "description": "Allow generated collector jobs to resolve secret references. Enable only if you trust every target discovered by this pipeline.",
+        "type": "boolean",
+        "default": false
+      },
       "services": {
         "title": "Service rules",
         "description": "Rules that turn fetched HTTP discovery items into data collection jobs.",
@@ -176,7 +182,8 @@
         {
           "title": "Discovery",
           "fields": [
-            "discoverer"
+            "discoverer",
+            "trust_discovered_targets"
           ]
         },
         {
@@ -282,6 +289,9 @@
         }
       },
       "ui:help": "- Match fetched HTTP discovery items and generate collector configurations.\n- Generated job configs must include `name` and `module`; `module` is the collector name, for example `httpcheck` or `ping`.\n- If a generated config omits `module`, the rule ID is used as `module`; rely on this only for curated rules where the rule ID is the intended collector.\n- `.Item` contains the fetched item. String items expose the string as `.Item`; object items expose fields under `.Item`."
+    },
+    "trust_discovered_targets": {
+      "ui:help": "Applies to env, file, cmd and store references in generated collector jobs, including target-provided values. Does not resolve credentials used by discovery itself. Leave off for pipelines that can discover untrusted targets.\n\nThe discovery endpoint controls the items returned to service rules; trust both that endpoint and its data sources."
     }
   }
 }

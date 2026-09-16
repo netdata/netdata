@@ -303,7 +303,17 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			return nil, err
 		}
 		switch activation.kind {
-		case activationFailureQuarantined:
+		case activationFailureQuarantined, activationFailureProposal:
+			if activation.kind == activationFailureProposal {
+				trustRevoked := incumbent.SourceType() == confgroup.TypeDiscovered &&
+					incumbent.TrustDiscoveredTargets() &&
+					change.Config.SourceType() == confgroup.TypeDiscovered &&
+					!change.Config.TrustDiscoveredTargets()
+				if !trustRevoked {
+					return nil, jobmgr.RejectProposal(err)
+				}
+				// Invalid literal fields must not keep a previously trusted job alive.
+			}
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			return dcjc.prepareMutationWithRetryAfterApply(
@@ -400,8 +410,6 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				),
 				jobConfigFailure(err, "activation"),
 			)
-		case activationFailureProposal:
-			return nil, jobmgr.RejectProposal(err)
 		default:
 			return nil, err
 		}

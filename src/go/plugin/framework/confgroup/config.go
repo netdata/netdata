@@ -24,9 +24,10 @@ const (
 	keyVnode        = "vnode"
 	keyFunctionOnly = "function_only"
 
-	ikeySource     = "__source__"
-	ikeySourceType = "__source_type__"
-	ikeyProvider   = "__provider__"
+	ikeySource                 = "__source__"
+	ikeySourceType             = "__source_type__"
+	ikeyProvider               = "__provider__"
+	ikeyTrustDiscoveredTargets = "__trust_discovered_targets__"
 )
 
 const (
@@ -40,6 +41,10 @@ type Config map[string]any
 
 func (c Config) HashIncludeMap(_ string, k, _ any) (bool, error) {
 	s := k.(string)
+	if s == ikeyTrustDiscoveredTargets {
+		// Opt-in changes effective configuration; absent/false retain the default hash.
+		return c.SourceType() == TypeDiscovered && c.TrustDiscoveredTargets(), nil
+	}
 	return !strings.HasPrefix(s, "__") && !strings.HasSuffix(s, "__"), nil
 }
 
@@ -71,6 +76,16 @@ func (c Config) Provider() string              { v, _ := c.Get(ikeyProvider).(st
 func (c Config) SetSource(v string) Config     { return c.Set(ikeySource, v) }
 func (c Config) SetSourceType(v string) Config { return c.Set(ikeySourceType, v) }
 func (c Config) SetProvider(v string) Config   { return c.Set(ikeyProvider, v) }
+
+// TrustDiscoveredTargets reads authority stamped by the discovery pipeline after rendering.
+func (c Config) TrustDiscoveredTargets() bool {
+	v, _ := c.Get(ikeyTrustDiscoveredTargets).(bool)
+	return v
+}
+
+func (c Config) SetTrustDiscoveredTargets(v bool) Config {
+	return c.Set(ikeyTrustDiscoveredTargets, v)
+}
 
 func SourceTypePriority(sourceType string) int {
 	switch sourceType {

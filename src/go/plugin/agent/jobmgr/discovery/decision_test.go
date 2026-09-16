@@ -878,3 +878,20 @@ func (cdtc *concurrentDecisionTestCommands) SubmitPreparedAndWait(
 	close(cdtc.healthy)
 	return nil
 }
+
+func TestDecisionIndexReconcilesDiscoveryTrustChanges(t *testing.T) {
+	commands := &decisionTestCommands{}
+	var planned []bool
+	index := newDecisionTestIndex(t, commands, func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+		planned = append(planned, change.Config.TrustDiscoveredTargets())
+		return jobmgr.WorkPlan{}, nil
+	})
+	for _, trust := range []bool{false, true, false} {
+		config := decisionTestConfig("job", confgroup.TypeDiscovered, "source").SetTrustDiscoveredTargets(trust)
+		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}))
+		// Repeating the same authority and values must still be a no-op.
+		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}))
+	}
+	require.Equal(t, []bool{false, true, false}, planned)
+	require.Len(t, commands.requests, 3)
+}

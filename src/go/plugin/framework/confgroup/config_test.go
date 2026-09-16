@@ -358,3 +358,28 @@ func TestConfig_FunctionOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigTrustIdentity(t *testing.T) {
+	for _, source := range []string{TypeDiscovered, TypeUser, TypeStock, TypeDyncfg, "", "unknown"} {
+		t.Run(source, func(t *testing.T) {
+			config := Config{"module": "module", "name": "job"}.SetSourceType(source)
+			originalHash, originalUID := config.Hash(), config.UID()
+			config.SetTrustDiscoveredTargets(false)
+			assert.Equal(t, originalHash, config.Hash())
+			assert.Equal(t, originalUID, config.UID())
+			config.SetTrustDiscoveredTargets(true)
+			if source == TypeDiscovered {
+				assert.NotEqual(t, originalHash, config.Hash())
+				assert.NotEqual(t, originalUID, config.UID())
+			} else {
+				assert.Equal(t, originalHash, config.Hash())
+				assert.Equal(t, originalUID, config.UID())
+			}
+			cloned, err := config.Clone()
+			assert.NoError(t, err)
+			assert.Equal(t, config.Hash(), cloned.Hash())
+			config.SetTrustDiscoveredTargets(false)
+			assert.Equal(t, originalHash, config.Hash())
+		})
+	}
+}

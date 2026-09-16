@@ -77,6 +77,12 @@
           "k8s"
         ]
       },
+      "trust_discovered_targets": {
+        "title": "Trust discovered targets",
+        "description": "Allow generated collector jobs to resolve secret references. Enable only if you trust every target discovered by this pipeline.",
+        "type": "boolean",
+        "default": false
+      },
       "services": {
         "title": "Service rules",
         "description": "Rules that turn discovered Kubernetes pods and services into data collection jobs.",
@@ -120,7 +126,8 @@
         {
           "title": "Base",
           "fields": [
-            "discoverer"
+            "discoverer",
+            "trust_discovered_targets"
           ]
         },
         {
@@ -165,6 +172,9 @@
         }
       },
       "ui:help": "- Match discovered Kubernetes resources and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a pod or service matches, a data collection job is created."
+    },
+    "trust_discovered_targets": {
+      "ui:help": "Applies to env, file, cmd and store references in generated collector jobs, including target-provided values. Does not resolve credentials used by discovery itself. Leave off for pipelines that can discover untrusted targets.\n\nWorkload authors can control labels, annotations, environment values and other fields used by service rules."
     }
   }
 }
