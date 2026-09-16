@@ -25,6 +25,7 @@ references when their surfaces are affected, including the IBM.d exception.
 | `config_schema.json` (the DynCfg form) | `.agents/skills/collectors-go-design/config-schema.md`, then `src/plugins.d/DYNCFG.md` ("JSON Schema for Configuration UI") | Every visible property has a title and description; tabs equal `metadata.yaml` groups; secrets use `ui:widget: password`; the repo-wide `TestConfigSchemas*` rules must pass. |
 | Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Preserve public contracts unless a breaking change is explicitly approved. |
 | go.d V2 implementation details | `.agents/skills/collectors-go-framework-v2/SKILL.md`, `src/go/pkg/metrix/README.md`, `src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md` | Skill for maintainer style, READMEs for framework API contracts. Editing `metrix` or framework packages is framework-gated work. |
+| New go.d discoverer or changed discovery capability, ownership or lifecycle | `.agents/skills/collectors-go-design/SKILL.md#the-collector-design-note` and its architecture gate | Implementation under `src/go/plugin/go.d/discovery/sdext/discoverer/`; shared engine under `src/go/plugin/agent/discovery/`. |
 | go.d helper packages | `src/go/plugin/go.d/docs/helper-packages.md` | Check existing HTTP, config-option, matcher, logger, socket, command, SQL, ping, log-file, and cloud-auth helpers before adding custom plumbing. |
 | Collector design across plugins | `.agents/skills/collectors-authoring/SKILL.md` | NIDL, cardinality, obsoletion, missing data, logging, config discipline. |
 | `metadata.yaml` content (what the integration page says) | `.agents/skills/collectors-metadata-yaml/SKILL.md` | One contract per field; metric, option, and alert rows mirror the code; an empty default-behavior field renders a placeholder claim that MUST be true. |
@@ -102,8 +103,8 @@ a plausible future problem is not a requirement.
   unreachable value is not the clean end state.
 - Do not add allocation- or latency-oriented complexity until the path is shown hot by production frequency, a
   profile, or a representative benchmark. Once hot, follow "Hot-Path And Benchmark Discipline".
-- Coupling one job to another job's state, durable state for independent reads, schedulers, and queues are answered
-  by the Architecture Gate in `.agents/skills/collectors-go-design/SKILL.md` before implementation.
+- Collector and discoverer mechanisms covered above use
+  `.agents/skills/collectors-go-design/SKILL.md#architecture-gate`, including mechanisms owned by only one job.
 
 ## Hot-Path And Benchmark Discipline
 
