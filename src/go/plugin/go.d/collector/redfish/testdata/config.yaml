@@ -1,0 +1,36 @@
+vnode: existing-bmc
+update_every: 60
+autodetection_retry: 30
+url: https://bmc.example.test/redfish/v1/
+node_mode: system_vnodes
+system_uri: /redfish/v1/Systems/1
+auth_method: auto
+username: monitoring
+password: test-password
+timeout: 15
+retries: 2
+max_concurrent_requests: 3
+proxy_url: http://proxy.example.test:8080
+tls_ca: /etc/netdata/bmc-ca.pem
+tls_cert: /etc/netdata/bmc-client.pem
+tls_key: /etc/netdata/bmc-client-key.pem
+tls_skip_verify: true
+collect: "!firmware *"
+charts:
+  aggregates: true
+  details: true
+  max_detailed_components_per_family: 100
+alarms:
+  evaluate_thresholds: true
+host_scope_overrides:
+  - resource_uri: /redfish/v1/Systems/1
+    guid: 8b1481d2-010a-5e68-b70f-1fe12b8d3c0d
+    hostname: server-one
+logs:
+  enabled: true
+  backend: hardware
+  service_selector: "!AuditLog *"
+  max_services: 256
+  full_reconciliation_every: 1800
+  cursor:
+    orphan_retention: 2592000.0

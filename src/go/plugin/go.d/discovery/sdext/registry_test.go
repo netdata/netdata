@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,10 +23,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/dockersd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/httpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/netlistensd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,9 +37,11 @@ func TestRegistry_DockerInclusion(t *testing.T) {
 	withDocker := Registry(true)
 	assert.Contains(t, withDocker.Types(), discovererHTTP)
 	assert.Contains(t, withDocker.Types(), discovererDocker)
+	assert.Contains(t, withDocker.Types(), discovererRedfish)
 
 	withoutDocker := Registry(false)
 	assert.Contains(t, withoutDocker.Types(), discovererHTTP)
+	assert.Contains(t, withoutDocker.Types(), discovererRedfish)
 	assert.NotContains(t, withoutDocker.Types(), discovererDocker)
 }
 
@@ -319,4 +324,176 @@ exec "$@"
 	t.Cleanup(ndexec.SetRunnerPathsForTests(ndRun, ""))
 
 	return fixture
+}
+
+func TestRedfishSchemaLeavesPositiveScanConcurrencyOperatorOwned(t *testing.T) {
+	var schema struct {
+		JSONSchema struct {
+			Properties struct {
+				Discoverer struct {
+					Properties struct {
+						Redfish struct {
+							Properties map[string]map[string]any `json:"properties"`
+						} `json:"redfish"`
+					} `json:"properties"`
+				} `json:"discoverer"`
+			} `json:"properties"`
+		} `json:"jsonSchema"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(schemaRedfish), &schema))
+	property := schema.JSONSchema.Properties.Discoverer.Properties.Redfish.Properties["max_concurrent_scans"]
+	require.EqualValues(t, 1, property["minimum"])
+	assert.NotContains(t, property, "maximum")
+}
+
+func TestRedfishSchemaRejectsUnknownNetworkAndServiceKeys(t *testing.T) {
+	var schema map[string]any
+	require.NoError(t, json.Unmarshal([]byte(schemaRedfish), &schema))
+	properties := schema["jsonSchema"].(map[string]any)["properties"].(map[string]any)
+	discoverer := properties["discoverer"].(map[string]any)["properties"].(map[string]any)
+	redfish := discoverer["redfish"].(map[string]any)["properties"].(map[string]any)
+	networkItems := redfish["networks"].(map[string]any)["items"].(map[string]any)
+	serviceItems := properties["services"].(map[string]any)["items"].(map[string]any)
+	require.Equal(t, false, networkItems["additionalProperties"])
+	require.Equal(t, false, serviceItems["additionalProperties"])
+}
+
+func TestRedfishDiscoveryProfileSchemaMatchesRuntime(t *testing.T) {
+	const trimSpaceCharacters = "\t\n\v\f\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+
+	tests := map[string]struct {
+		profile map[string]any
+		valid   bool
+	}{
+		"none without credentials": {
+			profile: map[string]any{"auth_method": "none"}, valid: true,
+		},
+		"none with runtime-empty credentials": {
+			profile: map[string]any{"auth_method": "none", "username": trimSpaceCharacters, "password": ""}, valid: true,
+		},
+		"none with username": {
+			profile: map[string]any{"auth_method": "none", "username": "user"},
+		},
+		"none with whitespace password": {
+			profile: map[string]any{"auth_method": "none", "password": " "},
+		},
+		"auto with credentials": {
+			profile: map[string]any{"auth_method": "auto", "username": "user", "password": "secret"}, valid: true,
+		},
+		"auto with empty credentials": {
+			profile: map[string]any{"auth_method": "auto", "username": "", "password": ""},
+		},
+		"session with runtime-empty username": {
+			profile: map[string]any{"auth_method": "session", "username": trimSpaceCharacters, "password": "secret"},
+		},
+		"omitted authentication method with credentials": {
+			profile: map[string]any{"username": "user", "password": "secret"}, valid: true,
+		},
+		"omitted authentication method and credentials": {
+			profile: map[string]any{},
+		},
+		"both TLS identity fields runtime-empty": {
+			profile: map[string]any{"auth_method": "none", "tls_cert": trimSpaceCharacters, "tls_key": " \t"}, valid: true,
+		},
+		"both TLS identity fields configured": {
+			profile: map[string]any{"auth_method": "none", "tls_cert": " certificate ", "tls_key": " key "}, valid: true,
+		},
+		"TLS certificate only": {
+			profile: map[string]any{"auth_method": "none", "tls_cert": "certificate"},
+		},
+		"TLS key only": {
+			profile: map[string]any{"auth_method": "none", "tls_key": "key"},
+		},
+		"TLS certificate with runtime-empty key": {
+			profile: map[string]any{"auth_method": "none", "tls_cert": "certificate", "tls_key": trimSpaceCharacters},
+		},
+		"configured log backend": {
+			profile: map[string]any{"auth_method": "none", "logs": map[string]any{"backend": " \u00a0isolated\u3000 "}}, valid: true,
+		},
+		"empty log backend": {
+			profile: map[string]any{"auth_method": "none", "logs": map[string]any{"backend": ""}},
+		},
+		"runtime-empty log backend": {
+			profile: map[string]any{"auth_method": "none", "logs": map[string]any{"backend": trimSpaceCharacters}},
+		},
+	}
+
+	schema := compileRedfishDiscoverySchema(t)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile := maps.Clone(test.profile)
+			profile["name"] = "profile"
+			schemaErr := schema.Validate(redfishDiscoveryDocument(profile))
+			_, runtimeErr := redfish.PrepareDiscoveryProfile(test.profile, "https")
+			if test.valid {
+				require.NoError(t, schemaErr)
+				require.NoError(t, runtimeErr)
+			} else {
+				require.Error(t, schemaErr)
+				require.Error(t, runtimeErr)
+			}
+		})
+	}
+}
+
+func TestRedfishDiscoverySchemaLeavesLogsBackendByteLimitToRuntime(t *testing.T) {
+	tests := map[string]struct {
+		backend      string
+		runtimeValid bool
+	}{
+		"257 ASCII bytes": {
+			backend: strings.Repeat("x", 257),
+		},
+		"258 multibyte UTF-8 bytes": {
+			backend: strings.Repeat("é", 129),
+		},
+		"256 normalized bytes with surrounding whitespace": {
+			backend: " \u00a0" + strings.Repeat("x", 256) + "\u3000 ", runtimeValid: true,
+		},
+	}
+
+	schema := compileRedfishDiscoverySchema(t)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile := map[string]any{
+				"name": "profile", "auth_method": "none", "logs": map[string]any{"backend": test.backend},
+			}
+			// Draft-07 maxLength counts pre-normalization code points, not normalized UTF-8 bytes.
+			require.NoError(t, schema.Validate(redfishDiscoveryDocument(profile)))
+			delete(profile, "name")
+			_, runtimeErr := redfish.PrepareDiscoveryProfile(profile, "https")
+			if test.runtimeValid {
+				require.NoError(t, runtimeErr)
+			} else {
+				require.ErrorContains(t, runtimeErr, "must not exceed 256 bytes")
+			}
+		})
+	}
+}
+
+func compileRedfishDiscoverySchema(t *testing.T) *jsonschema.Schema {
+	t.Helper()
+	var document struct {
+		JSONSchema any `json:"jsonSchema"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(schemaRedfish), &document))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("redfish-discovery-schema.json", document.JSONSchema))
+	schema, err := compiler.Compile("redfish-discovery-schema.json")
+	require.NoError(t, err)
+	return schema
+}
+
+func redfishDiscoveryDocument(profile map[string]any) map[string]any {
+	return map[string]any{
+		"discoverer": map[string]any{
+			"redfish": map[string]any{
+				"profiles": []any{profile},
+				"networks": []any{map[string]any{
+					"subnet": "192.0.2.1", "ports": []any{443}, "profile": "profile",
+				}},
+			},
+		},
+		"services": []any{map[string]any{"id": "redfish", "match": "{{ true }}"}},
+	}
 }

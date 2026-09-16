@@ -1,0 +1,70 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Redfish log backend configuration.",
+    "type": "object",
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    },
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval for this backend's own charts, in seconds. It does not change how often the BMC is polled.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
+      "retention": {
+        "title": "Retention",
+        "description": "Controls how much log data this backend keeps.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "max_size": {
+            "title": "Maximum retained size",
+            "description": "Size the stored log data is trimmed back to, for example `10GB`. Must be positive.",
+            "type": "string",
+            "minLength": 1,
+            "default": "10GB"
+          }
+        }
+      }
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Collection",
+          "fields": ["update_every", "autodetection_retry"]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": ["vnode"]
+        },
+        {
+          "title": "Retention",
+          "fields": ["retention"]
+        }
+      ]
+    },
+    "vnode": {
+      "ui:placeholder": "<example-vnode-name>",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
+    }
+  }
+}

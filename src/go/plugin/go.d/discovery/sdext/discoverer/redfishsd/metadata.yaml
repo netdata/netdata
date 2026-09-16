@@ -1,0 +1,272 @@
+# yamllint disable rule:line-length
+---
+id: service-discovery-redfish
+meta:
+  kind: redfish
+  name: Redfish
+  tagline: Redfish BMC endpoints on explicitly configured network subnets and ports.
+  link: https://www.dmtf.org/standards/redfish
+  icon_filename: hardware.svg
+keywords:
+  - service discovery
+  - redfish
+  - bmc
+  - hardware
+  - out-of-band
+  - idrac
+  - ilo
+overview:
+  description: |
+    Netdata can scan explicitly configured IP networks and TCP ports for Redfish ServiceRoot endpoints, then generate ordinary
+    `redfish` collector jobs for every validated endpoint. Use this for BMC estates with rapid lifecycle changes where maintaining
+    a static endpoint list is impractical.
+
+    This page covers Redfish-specific setup. The shared Service Discovery rule model, generated-job lifecycle, and template
+    helpers are documented in [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md).
+  how_it_works: |
+    Each discovery cycle:
+
+    1. Normalizes the configured IPv4/IPv6 CIDR networks and resolves overlaps by longest prefix.
+    2. Tries every configured port using the connection profile assigned to the winning network.
+    3. Sends one bounded **unauthenticated** `GET /redfish/v1/` using that profile's scheme, proxy, timeout, and TLS policy.
+    4. Accepts only structurally valid Redfish ServiceRoot responses with safe same-origin links.
+    5. Caches positive endpoint evidence without credentials and emits one stable target per canonical origin.
+    6. Runs `services:` rules to render normal `redfish` jobs. The collector then authenticates and performs all hardware/log polling.
+
+    A failed re-probe removes the discovered target immediately. Static, user, and DynCfg jobs continue to follow the ordinary
+    Netdata job-source precedence rules.
+  limitations: |
+    - Discovery scans only explicitly configured networks and ports; there is no SSDP, broadcast, or internet-wide discovery.
+    - Each network entry is limited to 512 addresses. Split larger ranges into smaller entries.
+    - The probe is intentionally unauthenticated. A BMC that hides or rejects ServiceRoot before authentication cannot be discovered;
+      configure it as a static or DynCfg job instead.
+    - A profile selects one explicit scheme (`https` or `http`). To try both on one address, use separate discovery pipelines.
+    - Discovery validates endpoint presence only. Authentication and resource permissions are checked later by the generated collector job.
+    - Longest-prefix deduplication applies inside one discovery pipeline. Separate pipelines or Agents can still discover the same
+      endpoint; partition their networks so each `system_vnodes` endpoint has one active collector owner.
+setup:
+  prerequisites:
+    list:
+      - title: Plan bounded management networks
+        description: |
+          Identify the BMC management CIDRs and ports reachable from this Netdata Agent. Keep each entry at 512 addresses or fewer.
+      - title: Create Redfish monitoring credentials
+        description: |
+          Each connection profile becomes a generated collector job configuration. Create least-privilege accounts and reference
+          secrets with `${env:VARIABLE}` or `${file:/path}` rather than writing passwords directly.
+      - title: Establish TLS trust
+        description: |
+          Prefer HTTPS and configure `tls_ca` for your BMC CA. `tls_skip_verify` is available for legacy/self-signed deployments
+          but permits machine-in-the-middle attacks during both discovery and collection.
+  configuration:
+    file:
+      name: go.d/sd/redfish.conf
+    options:
+      description: |
+        The configuration has `discoverer.redfish` connection/network settings and `services` rules that render discovered targets
+        into `redfish` jobs. The stock file is disabled until explicitly enabled.
+      folding:
+        title: Discoverer options
+        enabled: false
+      list:
+        - name: rescan_interval
+          description: How often to scan configured networks. Zero scans once when the pipeline starts.
+          default_value: 30m
+          required: false
+        - name: device_cache_ttl
+          description: How long positive endpoint evidence remains trusted before a new probe. Zero disables age expiry.
+          default_value: 12h
+          required: false
+        - name: max_concurrent_scans
+          description: Maximum simultaneous ServiceRoot probes across the whole pipeline.
+          default_value: 32
+          required: false
+        - name: profiles
+          description: Named connection and generated-job profiles. At least one is required.
+          default_value: ""
+          required: true
+          detailed_description: |
+            Each profile requires a unique `name` and accepts:
+
+            - `scheme`: `https` (default) or explicit `http`;
+            - `node_mode`: `system_vnodes` (default) or `local`, plus optional `vnode` for local-mode placement;
+            - `auth_method`, `username`, and `password`;
+            - `timeout`, `retries`, `max_concurrent_requests`, `proxy_url`;
+            - `tls_ca`, `tls_cert`, `tls_key`, `tls_skip_verify`;
+            - `update_every`, `autodetection_retry`, `collect`, `charts`, `alarms`, and `logs`.
+
+            The required profile `name` identifies the connection profile; it does not become the generated job name. `module`,
+            `url`, `system_uri`, and `host_scope_overrides` cannot be passed through because endpoint identity is generated from the
+            discovered origin. Discovery never sends the BMC credentials or client certificate; it preserves them only for the
+            generated job. An explicit proxy is used for both the unauthenticated probe and later collection.
+        - name: networks
+          description: CIDR or literal-IP entries, each with ports and a profile name. At least one is required.
+          default_value: ""
+          required: true
+          detailed_description: |
+            Each entry requires:
+
+            - `subnet`: an IPv4/IPv6 CIDR or one literal address;
+            - `ports`: one or more unique TCP ports;
+            - `profile`: the exact name of a configured profile.
+
+            More-specific overlapping prefixes win. Equal normalized prefixes using the same profile merge their port lists;
+            assigning one equal prefix to different profiles is rejected.
+    examples:
+      folding:
+        title: Configuration examples
+        enabled: true
+      list:
+        - name: HTTPS BMC subnet
+          description: Discover standard HTTPS Redfish endpoints and create ComputerSystem vnodes.
+          config: |
+            disabled: no
+            discoverer:
+              redfish:
+                profiles:
+                  - name: secure-bmc
+                    scheme: https
+                    node_mode: system_vnodes
+                    username: monitoring
+                    password: ${file:/etc/netdata/redfish-password}
+                    tls_ca: /etc/netdata/redfish-ca.pem
+                networks:
+                  - subnet: 192.0.2.0/24
+                    ports: [443]
+                    profile: secure-bmc
+            services:
+              - id: redfish
+                match: '{{ true }}'
+                config_template: |
+                  name: discovered-{{ .EndpointKey }}
+                  url: {{ .URL }}
+                  {{ .JobConfig | toYaml }}
+        - name: Explicit HTTP for a legacy isolated management network
+          description: |
+            HTTP is supported only when the operator explicitly chooses it. Credentials, inventory, metrics, and logs are
+            unencrypted on the network.
+          config: |
+            disabled: no
+            discoverer:
+              redfish:
+                profiles:
+                  - name: legacy-http
+                    scheme: http
+                    node_mode: local
+                    username: monitoring
+                    password: ${env:REDFISH_PASSWORD}
+                networks:
+                  - subnet: 198.51.100.10
+                    ports: [80]
+                    profile: legacy-http
+            services:
+              - id: redfish
+                match: '{{ true }}'
+                config_template: |
+                  name: discovered-{{ .EndpointKey }}
+                  url: {{ .URL }}
+                  {{ .JobConfig | toYaml }}
+services:
+  description: |
+    A `services:` rule turns one validated Redfish origin into one or more collector jobs. The stock catch-all rule copies the
+    assigned profile through `.JobConfig`, while setting the stable job name and canonical URL from discovery.
+
+    Shared matching, skip-rule, multi-job, and template-rendering behavior is documented on the
+    [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page.
+  evaluation:
+    description: |
+      Profile selection and network overlap are resolved before rules run. A target therefore has exactly one current `.JobConfig`.
+      Use specific rules before a catch-all when you need different rendering.
+    list:
+      - name: Stable identity
+        description: "`.EndpointKey` depends only on the canonical origin, so changing profile settings updates the same discovered job."
+      - name: Module inference
+        description: "Use `id: redfish` to infer the collector module, or emit `module: redfish` explicitly from a differently named rule."
+  template_variables:
+    description: Variables exposed by a validated Redfish target.
+    list:
+      - name: .IPAddress
+        type: string
+        description: Discovered literal IP address.
+      - name: .Port
+        type: integer
+        description: Validated TCP port.
+      - name: .Scheme
+        type: string
+        description: Explicit `https` or `http` scheme from the winning profile.
+      - name: .URL
+        type: string
+        description: Canonical ServiceRoot URL for the generated collector job.
+      - name: .EndpointKey
+        type: string
+        description: Stable credential-free key derived from the canonical endpoint origin.
+      - name: .Profile
+        type: string
+        description: Name of the winning connection profile.
+      - name: .JobConfig
+        type: object
+        description: Validated endpoint-job fields from the winning profile, preserving secret references for collector resolution.
+  examples:
+    description: Service-rule bodies normally reuse `.JobConfig` rather than repeating every profile field.
+    list:
+      - name: Default catch-all
+        description: Generate one ordinary Redfish job for every validated endpoint.
+        config: |
+          - id: redfish
+            match: '{{ true }}'
+            config_template: |
+              name: discovered-{{ .EndpointKey }}
+              url: {{ .URL }}
+              {{ .JobConfig | toYaml }}
+      - name: Exclude one management address
+        description: Place a skip rule before the catch-all.
+        config: |
+          - id: skip-maintenance-bmc
+            match: '{{ eq .IPAddress "192.0.2.10" }}'
+          - id: redfish
+            match: '{{ true }}'
+            config_template: |
+              name: discovered-{{ .EndpointKey }}
+              url: {{ .URL }}
+              {{ .JobConfig | toYaml }}
+verify:
+  description: After enabling the pipeline, verify both discovery and the generated collector jobs.
+  checks:
+    list:
+      - name: Confirm discovery targets
+        description: |
+          Check Netdata collector logs for the Redfish discoverer. A validated target should appear under the configured pipeline
+          source with its IP, port, profile, and stable endpoint key; credentials are never logged.
+      - name: Confirm generated jobs
+        description: |
+          Open Collectors in the Netdata UI and inspect the `redfish` module. A discovered endpoint appears as
+          `discovered-<endpoint-key>` unless the service template deliberately changes the name.
+      - name: Confirm metrics or vnodes
+        description: |
+          Once the job authenticates, Redfish collection charts appear. With `node_mode: system_vnodes`, each discovered
+          ComputerSystem appears as a deterministic virtual node.
+troubleshooting:
+  problems:
+    list:
+      - name: No endpoint is discovered
+        description: |
+          Verify the CIDR, port, routing, firewall, scheme, proxy, and TLS policy. The ServiceRoot must respond successfully without
+          authentication and contain a valid Redfish version plus safe same-origin resource links.
+      - name: Discovery works but the collector job fails
+        description: |
+          Discovery does not test credentials or resource authorization. Check the generated `redfish` job's authentication,
+          account permissions, timeout, and TLS logs.
+      - name: An endpoint is collected twice after adding an override
+        description: |
+          A differently named static or DynCfg job is a separate collector instance; its URL does not suppress the discovered
+          job. Edit the discovered job in DynCfg, or use its exact `discovered-<endpoint-key>` name for a higher-precedence job,
+          so ordinary job-source precedence replaces rather than duplicates it. Keep one active owner when using
+          `system_vnodes`.
+      - name: The wrong profile wins
+        description: |
+          Overlapping networks use longest-prefix precedence. Inspect the normalized prefixes and make the intended exception more
+          specific. Equal prefixes cannot be assigned to different profiles in one pipeline.
+      - name: An endpoint disappears after a scan
+        description: |
+          A failed re-probe removes positive evidence immediately so stale jobs do not remain active. Investigate reachability,
+          ServiceRoot validity, TLS, proxy, and timeout failures.
