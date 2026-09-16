@@ -66,6 +66,34 @@ destinations:
   signl4:
     type: signl4
     url: ${env:NOTIFY_SIGNL4_URL}
+  alerta:
+    type: alerta
+    api_url: ${env:NOTIFY_ALERTA_API_URL}
+    api_key: ${env:NOTIFY_ALERTA_API_KEY}
+    environment: Production
+  dynatrace:
+    type: dynatrace
+    api_url: ${env:NOTIFY_DYNATRACE_API_URL}
+    api_token: ${env:NOTIFY_DYNATRACE_API_TOKEN}
+    entity_selector: 'type(HOST),tag("netdata")'
+  prowl:
+    type: prowl
+    api_key: ${env:NOTIFY_PROWL_API_KEY}
+  kavenegar:
+    type: kavenegar
+    api_key: ${env:NOTIFY_KAVENEGAR_API_KEY}
+    sender: '+15005550006'
+    recipient: '+15005550009'
+  smseagle:
+    type: smseagle
+    api_url: ${env:NOTIFY_SMSEAGLE_API_URL}
+    access_token: ${env:NOTIFY_SMSEAGLE_ACCESS_TOKEN}
+    recipients: ['+15005550009', '05005550009']
+    message_type: sms
+  pagerduty:
+    type: pagerduty
+    api_version: 2
+    integration_key: ${env:NOTIFY_PAGERDUTY_INTEGRATION_KEY}
 routing:
   default: [local]
   roles:
@@ -82,3 +110,7 @@ routing:
     push_ops: [gotify, ntfy]
     chat_webhooks: [rocketchat, flock, fleep]
     incident_ops: [ilert, signl4]
+    monitoring_ops: [alerta, dynatrace]
+    form_ops: [prowl, kavenegar]
+    appliance_ops: [smseagle]
+    pagerduty_ops: [pagerduty]

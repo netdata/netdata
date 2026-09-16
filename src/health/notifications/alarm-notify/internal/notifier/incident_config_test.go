@@ -106,7 +106,7 @@ func TestIncidentFieldIsolation(t *testing.T) {
 	} {
 		t.Run(provider, func(t *testing.T) {
 			dst := Destination{Type: provider, IntegrationKey: "synthetic-key"}
-			require.EqualError(t, dst.validate(), "integration_key requires type: ilert")
+			require.EqualError(t, dst.validate(), "integration_key requires type: ilert or pagerduty")
 		})
 	}
 }

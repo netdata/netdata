@@ -25,11 +25,22 @@ type Routing struct {
 }
 
 type Destination struct {
+	APIVersion      *configInteger `yaml:"api_version,omitempty"`
+	Recipients      []string       `yaml:"recipients,omitempty"`
+	MessageType     string         `yaml:"message_type,omitempty"`
+	CallDuration    *configInteger `yaml:"call_duration,omitempty"`
+	VoiceID         *configInteger `yaml:"voice_id,omitempty"`
 	Type            string         `yaml:"type"`
 	URL             string         `yaml:"url,omitempty"`
 	Channel         string         `yaml:"channel,omitempty"`
 	Sender          string         `yaml:"sender,omitempty"`
 	IntegrationKey  string         `yaml:"integration_key,omitempty"`
+	APIKey          string         `yaml:"api_key,omitempty"`
+	Environment     string         `yaml:"environment,omitempty"`
+	APIToken        string         `yaml:"api_token,omitempty"`
+	EntitySelector  string         `yaml:"entity_selector,omitempty"`
+	EventType       string         `yaml:"event_type,omitempty"`
+	Source          string         `yaml:"source,omitempty"`
 	BearerToken     string         `yaml:"bearer_token,omitempty"`
 	BotToken        string         `yaml:"bot_token,omitempty"`
 	AppToken        string         `yaml:"app_token,omitempty"`
@@ -101,17 +112,42 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "pagerduty" {
+		return dst.validatePagerDuty()
+	}
+	if dst.APIVersion != nil {
+		return errors.New("api_version requires type: pagerduty")
+	}
+	if dst.Type == "smseagle" {
+		return dst.validateSMSEagle()
+	}
+	if dst.Recipients != nil || dst.MessageType != "" || dst.CallDuration != nil || dst.VoiceID != nil {
+		return errors.New("recipients, message_type, call_duration and voice_id require type: smseagle")
+	}
+	if dst.Type == "prowl" || dst.Type == "kavenegar" {
+		return dst.validateFormProvider()
+	}
+	if dst.Type == "alerta" || dst.Type == "dynatrace" {
+		return dst.validateMonitoring()
+	}
+	if dst.APIKey != "" || dst.Environment != "" || dst.APIToken != "" || dst.EntitySelector != "" ||
+		dst.EventType != "" ||
+		dst.Source != "" {
+		return errors.New(
+			"api_key requires type: alerta, prowl or kavenegar; environment requires type: alerta; api_token, entity_selector, event_type and source require type: dynatrace",
+		)
+	}
 	if dst.Type == "ilert" {
 		return dst.validateIlert()
 	}
 	if dst.IntegrationKey != "" {
-		return errors.New("integration_key requires type: ilert")
+		return errors.New("integration_key requires type: ilert or pagerduty")
 	}
 	if dst.Type == "rocketchat" || dst.Type == "flock" || dst.Type == "fleep" {
 		return dst.validateChatWebhook()
 	}
 	if dst.Channel != "" || dst.Sender != "" {
-		return errors.New("channel requires type: rocketchat; sender requires type: fleep")
+		return errors.New("channel requires type: rocketchat; sender requires type: fleep or kavenegar")
 	}
 	if dst.Type == "gotify" {
 		return dst.validateGotify()
@@ -126,7 +162,9 @@ func (dst Destination) validate() error {
 		return dst.validateMessageBird()
 	}
 	if dst.AccessKey != "" || dst.Originator != "" || dst.Recipient != "" {
-		return errors.New("access_key, originator and recipient require type: messagebird")
+		return errors.New(
+			"access_key and originator require type: messagebird; recipient requires type: messagebird or kavenegar",
+		)
 	}
 	if dst.Type == "twilio" {
 		return dst.validateTwilio()
@@ -138,7 +176,9 @@ func (dst Destination) validate() error {
 		return dst.validatePushbullet()
 	}
 	if dst.AccessToken != "" || dst.Email != "" || dst.ChannelTag != "" || dst.SourceDeviceID != "" {
-		return errors.New("access_token, email, channel_tag and source_device_id require type: pushbullet")
+		return errors.New(
+			"access_token, email, channel_tag and source_device_id require type: pushbullet; access_token also supports ntfy and smseagle",
+		)
 	}
 	if dst.Type == "pushover" {
 		return dst.validatePushover()
@@ -151,13 +191,13 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert or signl4; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle or pagerduty; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
 		dst.RetriesOnLimit != nil {
 		return errors.New(
-			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird or ilert",
+			"bot_token, chat_id, message_thread_id and retries_on_limit require type: telegram; api_url requires telegram, pushover, pushbullet, twilio, messagebird, gotify, ilert, alerta, dynatrace, prowl, kavenegar, smseagle or pagerduty",
 		)
 	}
 	if dst.Type != "webhook" && dst.BearerToken != "" {
@@ -250,6 +290,14 @@ func validateAPIBase(endpoint, provider, officialHost string) error {
 	}
 	if strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), officialHost) && u.Scheme != "https" {
 		return fmt.Errorf("the official %s API requires HTTPS", provider)
+	}
+	return nil
+}
+
+func validatePhoneNumber(value, provider, field string) error {
+	digits := strings.TrimPrefix(value, "+")
+	if digits == "" || strings.IndexFunc(digits, func(r rune) bool { return r < '0' || r > '9' }) != -1 {
+		return fmt.Errorf("%s %s must be one phone number using digits and an optional leading +", provider, field)
 	}
 	return nil
 }

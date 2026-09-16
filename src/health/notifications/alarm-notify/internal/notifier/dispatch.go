@@ -59,6 +59,18 @@ func dispatch(
 			err = sendIlert(ctx, dst, event, timeout)
 		case "signl4":
 			err = postJSON(ctx, dst, renderSIGNL4(event), timeout)
+		case "alerta":
+			err = sendAlerta(ctx, dst, event, timeout)
+		case "pagerduty":
+			err = sendPagerDuty(ctx, dst, event, timeout)
+		case "smseagle":
+			err = sendSMSEagle(ctx, dst, event, timeout)
+		case "prowl":
+			err = sendProwl(ctx, dst, event, timeout)
+		case "kavenegar":
+			err = sendKavenegar(ctx, dst, event, timeout)
+		case "dynatrace":
+			err = sendDynatrace(ctx, dst, event, timeout)
 		default:
 			err = errors.New("destination provider is not implemented")
 		}

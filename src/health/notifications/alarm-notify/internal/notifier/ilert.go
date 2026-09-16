@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -15,7 +16,7 @@ import (
 const ilertDefaultAPI = "https://api.ilert.com/api"
 
 func (dst Destination) validateIlert() error {
-	if dst != (Destination{Type: dst.Type, IntegrationKey: dst.IntegrationKey, APIURL: dst.APIURL}) {
+	if !reflect.DeepEqual(dst, Destination{Type: dst.Type, IntegrationKey: dst.IntegrationKey, APIURL: dst.APIURL}) {
 		return errors.New("ilert destinations support integration_key and api_url only")
 	}
 	for _, field := range []struct{ name, value string }{
