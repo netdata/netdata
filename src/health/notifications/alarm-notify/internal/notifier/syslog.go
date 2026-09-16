@@ -6,12 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/netip"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 )
 
 func (dst Destination) validateSyslog() error {
@@ -38,23 +36,13 @@ func (dst Destination) validateSyslog() error {
 	if strings.ContainsRune(dst.Prefix, 0) {
 		return errors.New("syslog prefix must not contain NUL")
 	}
-	if dst.Host != "" && !validSyslogHost(dst.Host) {
+	if dst.Host != "" && !validCommandHost(dst.Host) {
 		return errors.New("syslog host must be a hostname or unbracketed IP address without whitespace or options")
 	}
 	if dst.Port != nil && (dst.Host == "" || *dst.Port < 1 || *dst.Port > 65535) {
 		return errors.New("syslog port requires host and must be an integer from 1 to 65535")
 	}
 	return nil
-}
-
-func validSyslogHost(host string) bool {
-	if strings.HasPrefix(host, "-") || strings.IndexFunc(host, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) != -1 {
-		return false
-	}
-	if _, err := netip.ParseAddr(host); err == nil {
-		return true
-	}
-	return !strings.ContainsAny(host, ":/\\[]@?#%${}")
 }
 
 func renderSyslog(dst Destination, event Event) ([]string, error) {
@@ -95,22 +83,7 @@ func renderSyslog(dst Destination, event Event) ([]string, error) {
 		}
 	}
 	args = append(args, dst.Args...)
-	return append(args, "--", escapeSyslogControls(text)), nil
-}
-
-// Keep message controls out of newline-framed logs and terminal displays.
-func escapeSyslogControls(text string) string {
-	var escaped strings.Builder
-	escaped.Grow(len(text))
-	for _, r := range text {
-		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
-			quoted := strconv.QuoteRune(r)
-			escaped.WriteString(quoted[1 : len(quoted)-1])
-		} else {
-			escaped.WriteRune(r)
-		}
-	}
-	return escaped.String()
+	return append(args, "--", escapeNotificationControls(text)), nil
 }
 
 func sendSyslog(ctx context.Context, processes *commandProcesses, dst Destination, event Event) error {

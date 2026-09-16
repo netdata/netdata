@@ -3,7 +3,7 @@
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
 SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands, SMS Server Tools 3, syslog, AWS SNS, Kafka HTTP
-bridges and email through sendmail.
+bridges, email through sendmail and IRC through nc.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -13,7 +13,7 @@ Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/Mes
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
 Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog,
-AWS SNS, Kafka HTTP bridges and email through sendmail.
+AWS SNS, Kafka HTTP bridges, email through sendmail and IRC through nc.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -152,6 +152,7 @@ AWS SNS requires `type: awssns`, `executable`, `target_arn` and `credential_sour
 `message_template`.
 Kafka HTTP bridges require `type: kafka`, a full `url` and literal `sender_ip`.
 Email requires `type: email`, `executable` and a `recipients` array; `from`, `plain_text_only`, `threading` and `env` are optional.
+IRC requires `type: irc`, `executable`, `host`, `nickname`, `realname` and `channel`; `port` and `env` are optional.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -1560,6 +1561,63 @@ routing applies. Child output is discarded and not included in diagnostics.
 This increment uses the native Event content. Classification, source/edit/expression details, role headers,
 active-alert counts/listings, cloud-specific links/artwork and richer presentation remain explicitly tracked for
 later implementation or a separate removal decision in [CAPABILITIES.md](CAPABILITIES.md). Production Bash is unchanged.
+
+## IRC through nc
+
+`irc` destinations use an explicitly configured nc-compatible executable on Linux or macOS. Each named destination
+opens one connection and sends to one channel. Use role routing for multiple channels; each connection needs a
+nickname the server will accept. The notifier does not discover nc or fall back to another nickname.
+
+```yaml
+version: 1
+destinations:
+  irc_ops:
+    type: irc
+    executable: /usr/bin/nc
+    host: irc.example.com
+    port: 6667
+    nickname: netdata-alerts
+    realname: Netdata alerts
+    channel: '#operations'
+routing:
+  roles:
+    sysadmin: [irc_ops]
+```
+
+Save as `irc.yaml`, adjust the executable and server settings, then validate and send:
+
+```sh
+/tmp/alarm-notify validate --config irc.yaml
+/tmp/alarm-notify send --config irc.yaml --role sysadmin < examples/event.json
+```
+
+The executable receives only the literal host and decimal port as separate arguments. The default port is `6667`;
+transport remains plaintext, matching the current Bash default. Choosing another port does not enable TLS. This
+increment supports guest access to channels without server passwords, SASL, channel keys or service authentication.
+Configure a hostname or an unbracketed IPv4/IPv6 address, a protocol-safe ASCII nickname and a nonempty realname.
+A channel starts with `#`, `&`, `+` or `!`, has at most 50 UTF-8 bytes and contains no spaces, controls or commas.
+These settings are literal; only optional `env` values accept secret references. Arbitrary nc arguments are not exposed.
+
+The session sends `NICK`/`USER`, answers registration `PING` challenges, waits for the server's welcome, then waits
+for its own channel join. Notifications contain the native summary/info, node, alert, status transition, chart,
+context, values, timestamp and optional URL. Newlines become comma-space, other controls are visibly escaped and
+backslashes stay literal. Long messages split at UTF-8 boundaries, reserving room for the sender prefix reported
+by the server so forwarded lines fit the 512-byte IRC limit. There is no automatic retry or nickname fallback.
+
+Each message chunk is followed by a synchronization `PING`. A matching `PONG` permits the next chunk or `QUIT`;
+completion also requires connection closure and a zero process exit. This confirms the exchange progressed without
+an observed rejection, not that another client received or read the alert. Numeric errors `400`–`599` fail delivery,
+except `422` (no MOTD). Registration/join failures, early EOF, malformed or oversized protocol frames, process errors
+and timeout also fail. An ordinary server `ERROR` closing the connection after our `QUIT` is expected.
+
+The invocation deadline covers the whole exchange. Increase `--timeout` for servers with slow registration or flood
+limits. Explicit environment, foreground process ownership and platform restrictions follow
+[custom commands](#custom-commands). Protocol output is parsed with bounded buffers; raw replies and child stderr
+are never logged. Cancellation closes the owned protocol pipes and waits for cleanup; inherited pipes from a command
+that exits early have the same 250 ms cleanup allowance. No external IRC network is needed by the test suite.
+
+These behaviors deliberately correct Bash's blind send-and-quit sequence, unhandled PING challenges, unchecked nc
+exit status, backslash interpretation and unbounded message lines. Production Bash and its configuration are unchanged.
 
 ## Custom commands
 

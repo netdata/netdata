@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 type notificationField struct {
@@ -54,4 +55,19 @@ func notificationPlainText(event Event, includeURL bool) string {
 		lines = append(lines, event.URL)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// Keep message controls out of newline-framed logs and terminal displays.
+func escapeNotificationControls(text string) string {
+	var escaped strings.Builder
+	escaped.Grow(len(text))
+	for _, r := range text {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			quoted := strconv.QuoteRune(r)
+			escaped.WriteString(quoted[1 : len(quoted)-1])
+		} else {
+			escaped.WriteRune(r)
+		}
+	}
+	return escaped.String()
 }
