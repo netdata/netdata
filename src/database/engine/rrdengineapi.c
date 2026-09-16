@@ -1205,6 +1205,34 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
     return UV_EIO;
 }
 
+bool rrdeng_get_cache_statistics(RRDENG_CACHE which, struct pgc_statistics *out) {
+    PGC *cache = NULL;
+    switch(which) {
+        case RRDENG_CACHE_MAIN:   cache = main_cache;   break;
+        case RRDENG_CACHE_OPEN:   cache = open_cache;   break;
+        case RRDENG_CACHE_EXTENT: cache = extent_cache; break;
+    }
+    if(!cache) {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+    *out = pgc_get_statistics(cache);
+    return true;
+}
+
+size_t rrdeng_pages_pending_flush(void) {
+    return main_cache ? pgc_hot_and_dirty_entries(main_cache) : 0;
+}
+
+bool rrdeng_get_mrg_statistics(struct mrg_statistics *out) {
+    if(!main_mrg) {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+    mrg_get_statistics(main_mrg, out);
+    return true;
+}
+
 bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
     return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
 }

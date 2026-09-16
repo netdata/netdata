@@ -70,6 +70,189 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 // ---------------------------------------------------------------------------------------------------------------------
+// page cache statistics: the engine runs three caches (pages, open datafiles, extents), each reports this
+
+// CACHE COMPILE TIME CONFIGURATION (the struct below depends on it, so it lives with the struct)
+// #define PGC_COUNT_POINTS_COLLECTED 1
+
+struct pgc_size_histogram_entry {
+    size_t upto;
+    size_t count;
+};
+
+#define PGC_SIZE_HISTOGRAM_ENTRIES 15
+#define PGC_QUEUE_HOT   0
+#define PGC_QUEUE_DIRTY 1
+#define PGC_QUEUE_CLEAN 2
+
+struct pgc_size_histogram {
+    struct pgc_size_histogram_entry array[PGC_SIZE_HISTOGRAM_ENTRIES];
+};
+
+struct pgc_queue_statistics {
+    struct pgc_size_histogram size_histogram;
+
+    PAD64(size_t) entries;
+    PAD64(int64_t) size;
+
+    PAD64(size_t) max_entries;
+    PAD64(int64_t) max_size;
+
+    PAD64(size_t) added_entries;
+    PAD64(int64_t) added_size;
+
+    PAD64(size_t) removed_entries;
+    PAD64(int64_t) removed_size;
+};
+
+struct pgc_statistics {
+    PAD64(int64_t) wanted_cache_size;
+    PAD64(int64_t) current_cache_size;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // volume
+
+    PAD64(size_t) entries;                 // all the entries (includes clean, dirty, hot)
+    PAD64(int64_t) size;                   // all the entries (includes clean, dirty, hot)
+
+    PAD64(size_t) referenced_entries;      // all the entries currently referenced
+    PAD64(int64_t) referenced_size;        // all the entries currently referenced
+
+    PAD64(size_t) added_entries;
+    PAD64(int64_t) added_size;
+
+    PAD64(size_t) removed_entries;
+    PAD64(int64_t) removed_size;
+
+#ifdef PGC_COUNT_POINTS_COLLECTED
+    PAD64(size_t) points_collected;
+#endif
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // migrations
+
+    PAD64(size_t) evicting_entries;
+    PAD64(int64_t) evicting_size;
+
+    PAD64(size_t) flushing_entries;
+    PAD64(int64_t) flushing_size;
+
+    PAD64(size_t) hot2dirty_entries;
+    PAD64(int64_t) hot2dirty_size;
+
+    PAD64(size_t) hot_empty_pages_evicted_immediately;
+    PAD64(size_t) hot_empty_pages_evicted_later;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // workload
+
+    PAD64(size_t) acquires;
+    PAD64(size_t) releases;
+
+    PAD64(size_t) acquires_for_deletion;
+
+    PAD64(size_t) searches_exact;
+    PAD64(size_t) searches_exact_hits;
+    PAD64(size_t) searches_exact_misses;
+
+    PAD64(size_t) searches_closest;
+    PAD64(size_t) searches_closest_hits;
+    PAD64(size_t) searches_closest_misses;
+
+    PAD64(size_t) flushes_completed;
+    PAD64(int64_t) flushes_completed_size;
+    PAD64(int64_t) flushes_cancelled_size;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // critical events
+
+    PAD64(size_t) events_cache_under_severe_pressure;
+    PAD64(size_t) events_cache_needs_space_aggressively;
+    PAD64(size_t) events_flush_critical;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // worker threads
+
+    PAD64(size_t) p2_workers_search;
+    PAD64(size_t) p2_workers_add;
+    PAD64(size_t) p0_workers_evict; // priority 0, we always need this when inline evictions are enabled
+    PAD64(size_t) p2_workers_flush;
+    PAD64(size_t) p2_workers_jv2_flush;
+    PAD64(size_t) p2_workers_hot2dirty;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // waste events
+
+    // waste events - spins
+    PAD64(size_t) p2_waste_insert_spins;
+    PAD64(size_t) p2_waste_evict_useless_spins;
+
+    // waste events - eviction
+    PAD64(size_t) p2_waste_evict_relocated;
+    PAD64(size_t) p2_waste_evict_thread_signals;
+    PAD64(size_t) p2_waste_evictions_inline_on_add;
+    PAD64(size_t) p2_waste_evictions_inline_on_release;
+
+    // waste events - flushing
+    PAD64(size_t) p2_waste_flush_on_add;
+    PAD64(size_t) p2_waste_flush_on_release;
+    PAD64(size_t) p2_waste_flushes_cancelled;
+
+    // ----------------------------------------------------------------------------------------------------------------
+    // per queue statistics
+
+    struct pgc_queue_statistics queues[3];
+};
+
+typedef enum {
+    RRDENG_CACHE_MAIN = 0,      // the pages
+    RRDENG_CACHE_OPEN,          // the open datafiles
+    RRDENG_CACHE_EXTENT,        // the compressed extents
+} RRDENG_CACHE;
+
+// A snapshot of one cache; false, with *out zeroed, when that cache does not exist (no tier came up yet, or the
+// caches were destroyed). The counters are read one by one, not under a lock: a snapshot is consistent per field.
+bool rrdeng_get_cache_statistics(RRDENG_CACHE which, struct pgc_statistics *out);
+
+// pages of the main cache still to be written: hot (collected) plus dirty (waiting for a flush); 0 without a cache
+size_t rrdeng_pages_pending_flush(void);
+
+// bytes lost to alignment inside page data allocations (process-wide)
+size_t pgd_padding_bytes(void);
+
+// ---------------------------------------------------------------------------------------------------------------------
+// metrics registry statistics
+
+struct mrg_statistics {
+    // --- sampled lock-free by mrg_get_statistics() ---
+    // Writers use relaxed atomics. The padded fields below are updated on hotter reader/writer paths.
+
+    size_t entries;
+    int64_t size;    // total memory used, with indexing
+
+    size_t additions;
+    size_t additions_duplicate;
+
+    size_t deletions;
+    size_t delete_having_retention_or_referenced;
+    size_t delete_misses;
+
+    // --- hot counters --- multiple readers / writers
+
+    PAD64(ssize_t) entries_acquired;
+    PAD64(ssize_t) current_references;
+
+    PAD64(size_t) search_hits;
+    PAD64(size_t) search_misses;
+
+    PAD64(size_t) writers;
+    PAD64(size_t) writers_conflicts;
+};
+
+// A snapshot of the registry; false, with *out zeroed, when it does not exist
+bool rrdeng_get_mrg_statistics(struct mrg_statistics *out);
+
+// ---------------------------------------------------------------------------------------------------------------------
 // query / cache efficiency (process-wide, running totals)
 
 struct time_and_count {

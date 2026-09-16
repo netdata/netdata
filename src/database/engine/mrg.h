@@ -3,6 +3,7 @@
 #define DBENGINE_METRIC_H
 
 #include "libnetdata/libnetdata.h"
+#include "dbengine-stats.h"
 
 typedef struct metric METRIC;
 typedef struct mrg MRG;
@@ -14,32 +15,6 @@ typedef struct mrg_entry {
     time_t last_time_s;
     uint32_t latest_update_every_s;
 } MRG_ENTRY;
-
-struct mrg_statistics {
-    // --- sampled lock-free by mrg_get_statistics() ---
-    // Writers use relaxed atomics. The padded fields below are updated on hotter reader/writer paths.
-
-    size_t entries;
-    int64_t size;    // total memory used, with indexing
-
-    size_t additions;
-    size_t additions_duplicate;
-
-    size_t deletions;
-    size_t delete_having_retention_or_referenced;
-    size_t delete_misses;
-
-    // --- hot counters --- multiple readers / writers
-
-    PAD64(ssize_t) entries_acquired;
-    PAD64(ssize_t) current_references;
-
-    PAD64(size_t) search_hits;
-    PAD64(size_t) search_misses;
-
-    PAD64(size_t) writers;
-    PAD64(size_t) writers_conflicts;
-};
 
 MRG *mrg_create(void);
 MRG *mrg_create_for_unittest(void);

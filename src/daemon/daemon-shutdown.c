@@ -114,7 +114,7 @@ static void rrdeng_quiesce_all()
 static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
-    if(!pgc_hot_and_dirty_entries(main_cache))
+    if(!rrdeng_pages_pending_flush())
         return;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
@@ -128,7 +128,8 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
             rrdeng_flush_all(multidb_ctx[tier]);
     }
 
-    struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
+    struct pgc_statistics pgc_main_stats;
+    rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
     size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
     size_t entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
     if(size_to_flush > starting_size_to_flush || !starting_size_to_flush)
@@ -155,7 +156,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         return;
 
     for(size_t iterations = 0; true ;iterations++) {
-        pgc_main_stats = pgc_get_statistics(main_cache);
+        rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
         size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
         entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
         if(!starting_size_to_flush || size_to_flush > starting_size_to_flush)
