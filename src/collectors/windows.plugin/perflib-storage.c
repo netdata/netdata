@@ -795,6 +795,8 @@ static struct mount_points_scan_status mount_points_scan_volumes(
         return (struct mount_points_scan_status){ .started = false, .complete = false, .eviction_safe = false };
     }
 
+    bool complete = true;
+    bool eviction_safe = true;
     do {
         char first_path[ND_MOUNT_PATH_MAX] = "";
         bool had_path = false;
@@ -893,8 +895,14 @@ static struct mount_points_scan_status mount_points_scan_cluster_storage(DICTION
         char volume_id[MAX_PATH + 1] = "";
         bool volume_id_found = mount_path_len >= 0 && (size_t)mount_path_len < _countof(mount_path) &&
                                volume_id_for_mount_path(mount_path, volume_id, sizeof(volume_id));
-        if (fd.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT && !volume_id_found)
+        if (fd.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT && !volume_id_found) {
+            // Without the volume identity this path cannot be deduplicated safely. Retain the
+            // previous snapshot and suppress eviction for this refresh instead of publishing a
+            // partial ClusterStorage result as complete.
+            complete = false;
+            eviction_safe = false;
             continue;
+        }
 
         if (volume_id_found && mount_points_has_volume_id(paths, volume_id))
             continue;
@@ -920,7 +928,7 @@ static struct mount_points_scan_status mount_points_scan_cluster_storage(DICTION
         return (struct mount_points_scan_status){ .started = true, .complete = false, .eviction_safe = false };
     }
 
-    return (struct mount_points_scan_status){ .started = true, .complete = true, .eviction_safe = true };
+    return (struct mount_points_scan_status){ .started = true, .complete = complete, .eviction_safe = eviction_safe };
 }
 
 struct mount_points_scan_ops {
