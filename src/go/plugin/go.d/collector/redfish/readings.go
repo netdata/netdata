@@ -49,6 +49,7 @@ type rawReading struct {
 	Basis                 string
 	Role                  string
 	Value                 any
+	ValuePresent          bool
 	Primary               bool
 	PhysicalContext       string
 	PhysicalSubcontext    string
@@ -187,6 +188,7 @@ func sensorExcerptReadings(source sensorExcerptSource) []rawReading {
 			Basis:                 "Zero",
 			Role:                  "input",
 			Value:                 value,
+			ValuePresent:          present,
 			Primary:               true,
 			PhysicalContext:       physical,
 			PhysicalSubcontext:    subcontext,
@@ -222,6 +224,7 @@ func sensorExcerptReadings(source sensorExcerptSource) []rawReading {
 			Basis:              "Zero",
 			Role:               auxiliary.Role,
 			Value:              auxValue,
+			ValuePresent:       true,
 			PhysicalContext:    physical,
 			PhysicalSubcontext: subcontext,
 			ImplementationType: implementation,
@@ -251,6 +254,14 @@ func mergeProvenSensorReadings(current, excerpts []rawReading) []rawReading {
 			continue
 		}
 		target := &current[match]
+		if !target.ValuePresent && excerpt.ValuePresent {
+			// Use the excerpt's numeric provenance while preserving explicit Sensor health.
+			health := target.Health
+			*target = excerpt
+			if health != "" {
+				target.Health = health
+			}
+		}
 		if target.RangeMin == nil {
 			target.RangeMin = excerpt.RangeMin
 		}
@@ -313,6 +324,7 @@ func sensorRawReadings(data map[string]any) []rawReading {
 			Basis:                 basis,
 			Role:                  "input",
 			Value:                 reading,
+			ValuePresent:          present,
 			Primary:               true,
 			PhysicalContext:       physical,
 			PhysicalSubcontext:    subcontext,
@@ -348,6 +360,7 @@ func sensorRawReadings(data map[string]any) []rawReading {
 			Basis:                 basis,
 			Role:                  auxiliary.Role,
 			Value:                 value,
+			ValuePresent:          true,
 			PhysicalContext:       physical,
 			PhysicalSubcontext:    subcontext,
 			ImplementationType:    implementation,
@@ -394,6 +407,7 @@ func sensorElectricalAuxiliaries(data map[string]any, physical, subcontext, impl
 			Basis:              "Zero",
 			Role:               spec.Role,
 			Value:              value,
+			ValuePresent:       true,
 			PhysicalContext:    physical,
 			PhysicalSubcontext: subcontext,
 			ImplementationType: implementation,
@@ -411,7 +425,7 @@ func legacyThermalReadings(node *graphNode) []rawReading {
 		if !ok && health == "" {
 			return nil
 		}
-		return []rawReading{legacyReading(node, value, "Temperature", "Cel", "input", health)}
+		return []rawReading{legacyReading(node, value, ok, "Temperature", "Cel", "input", health)}
 	case "Fans":
 		value, ok := firstValue(node.Data, "Reading", "ReadingRPM")
 		if !ok && health == "" {
@@ -424,7 +438,7 @@ func legacyThermalReadings(node *graphNode) []rawReading {
 		} else if units == "" || strings.EqualFold(units, "RPM") {
 			units = "{rev}/min"
 		}
-		return []rawReading{legacyReading(node, value, sourceType, units, "input", health)}
+		return []rawReading{legacyReading(node, value, ok, sourceType, units, "input", health)}
 	default:
 		return nil
 	}
@@ -439,13 +453,13 @@ func legacyPowerReadings(node *graphNode) []rawReading {
 		if !ok && health == "" {
 			return nil
 		}
-		return []rawReading{legacyReading(node, value, "Power", "W", "input", health)}
+		return []rawReading{legacyReading(node, value, ok, "Power", "W", "input", health)}
 	case "Voltages":
 		value, ok := firstValue(node.Data, "ReadingVolts", "Reading")
 		if !ok && health == "" {
 			return nil
 		}
-		return []rawReading{legacyReading(node, value, "Voltage", "V", "input", health)}
+		return []rawReading{legacyReading(node, value, ok, "Voltage", "V", "input", health)}
 	default:
 		return nil
 	}
@@ -454,6 +468,7 @@ func legacyPowerReadings(node *graphNode) []rawReading {
 func legacyReading(
 	node *graphNode,
 	value any,
+	present bool,
 	sourceType, units, role, health string,
 ) rawReading {
 	physical, _ := stringValueAt(node.Data, "PhysicalContext")
@@ -464,6 +479,7 @@ func legacyReading(
 		Basis:                 "Zero",
 		Role:                  role,
 		Value:                 value,
+		ValuePresent:          present,
 		Primary:               true,
 		PhysicalContext:       physical,
 		Health:                health,
@@ -491,6 +507,7 @@ func excerptReadings(node *graphNode) []rawReading {
 				Basis:           "Zero",
 				Role:            role,
 				Value:           raw,
+				ValuePresent:    true,
 				Primary:         true,
 				PhysicalContext: physical,
 			}

@@ -297,6 +297,7 @@ func (c *protocolClient) collectResourceGraph(ctx context.Context, root *service
 		}
 		queue = append(queue, node)
 	}
+	visited := make(map[*graphNode]string)
 	for pos := 0; pos < len(queue); pos++ {
 		if err := ctx.Err(); err != nil {
 			return graph, err
@@ -305,7 +306,13 @@ func (c *protocolClient) collectResourceGraph(ctx context.Context, root *service
 		readable := parent.AcquisitionState == "readable" && parent.Data != nil
 		if !readable {
 			graph.Complete = false
+			continue // Restore unavailable descendants after all successful paths are walked.
 		}
+		if quality, ok := visited[parent]; ok && quality == parent.IdentityQuality {
+			continue
+		}
+		// A later addressable representation may expose links absent from an excerpt.
+		visited[parent] = parent.IdentityQuality
 		for _, rel := range relationshipsFor(parent.Kind) {
 			if !c.familyEnabled(rel.Family) {
 				continue
@@ -317,9 +324,7 @@ func (c *protocolClient) collectResourceGraph(ctx context.Context, root *service
 			var enrichments map[string]map[string]any
 			complete := false
 			var err error
-			if readable {
-				children, enrichments, complete, err = c.acquireRelationship(ctx, parent, rel, stats)
-			}
+			children, enrichments, complete, err = c.acquireRelationship(ctx, parent, rel, stats)
 			if rel.Mode != relationshipEnrichment {
 				children = c.reconcileGraphMembership(parent, rel, children, complete)
 				graph.recordMembership(parent, rel, complete)
@@ -353,7 +358,9 @@ func (c *protocolClient) collectResourceGraph(ctx context.Context, root *service
 
 func (g *resourceGraph) addChild(parent, child *graphNode, queue *[]*graphNode) error {
 	if existing := g.ByIdentity[child.Kind+"\x00"+child.Locator]; existing != nil {
-		mergeEquivalentGraphNode(existing, child)
+		if mergeEquivalentGraphNode(existing, child) {
+			*queue = append(*queue, existing)
+		}
 		existing.Parents[parent.Key] = parent
 		return nil
 	}
@@ -1090,11 +1097,14 @@ func containingResourceURI(node *graphNode) string {
 	return ""
 }
 
-func mergeEquivalentGraphNode(existing, candidate *graphNode) {
+func mergeEquivalentGraphNode(existing, candidate *graphNode) bool {
 	if existing == nil || candidate == nil {
-		return
+		return false
 	}
-	if candidate.IdentityQuality == "addressable" && existing.IdentityQuality != "addressable" {
+	promoted := candidate.AcquisitionState == "readable" && candidate.Data != nil &&
+		(existing.AcquisitionState != "readable" || existing.Data == nil ||
+			(candidate.IdentityQuality == "addressable" && existing.IdentityQuality != "addressable"))
+	if promoted {
 		existing.URI = candidate.URI
 		existing.Data = candidate.Data
 		existing.Doc = candidate.Doc
@@ -1103,6 +1113,7 @@ func mergeEquivalentGraphNode(existing, candidate *graphNode) {
 		existing.Complete = candidate.Complete
 		existing.IdentityQuality = candidate.IdentityQuality
 		existing.SourceModel = candidate.SourceModel
+		existing.SourcePath = candidate.SourcePath
 		existing.Response = candidate.Response
 	}
 
@@ -1111,6 +1122,7 @@ func mergeEquivalentGraphNode(existing, candidate *graphNode) {
 		candidate.SensorExcerpts,
 	)
 	existing.Response = mergeResponseMetadata(existing.Response, candidate.Response)
+	return promoted
 }
 
 func cloneSensorExcerptSources(values []sensorExcerptSource) []sensorExcerptSource {
@@ -1426,16 +1438,9 @@ func (c *protocolClient) addEmbeddedComponentSlice(
 	current = c.reconcileGraphMembership(parent, rel, unique, complete)
 
 	for _, node := range current {
-		node.Parents[parent.Key] = parent
-		if existing := graph.ByIdentity[node.Kind+"\x00"+node.Locator]; existing != nil {
-			mergeEquivalentGraphNode(existing, node)
-			existing.Parents[parent.Key] = parent
-			continue
-		}
-		if err := graph.add(node); err != nil {
+		if err := graph.addChild(parent, node, queue); err != nil {
 			return err
 		}
-		*queue = append(*queue, node)
 	}
 	graph.recordMembership(parent, rel, complete)
 	return nil
