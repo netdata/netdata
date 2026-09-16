@@ -942,10 +942,10 @@ parse_version() {
 
 get_latest_tag() {
   if [ -z "${_latest_tag}" ]; then
-    case "${RELEASE_CHANNEL}" in
+    case "${1}" in
       stable) _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")" ;;
       nightly) _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")" ;;
-      *) fatal "Unknown release channel ${RELEASE_CHANNEL}, unable to update" U0029 ;;
+      *) warning "Unknown release channel ${1}, updating may not work correctly" ; _latest_tag="" ;;
     esac
   fi
 
@@ -1045,7 +1045,8 @@ set_tarball_urls() {
     export NETDATA_TARBALL_URL="file://${path}/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
   else
-    latest="$(get_latest_tag)"
+    latest="$(get_latest_tag "${1}")"
+    [ -z "${latest}" ] && fatal "Unknown release channel ${1}, unable to update" U0029
     case "${1}" in
       stable)
         export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/${filename}"
@@ -1055,7 +1056,6 @@ set_tarball_urls() {
         export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/${filename}"
         export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/sha256sums.txt"
         ;;
-      *) fatal "Unknown release channel ${RELEASE_CHANNEL}, unable to update" U0029 ;;
     esac
   fi
 }
