@@ -536,8 +536,13 @@ static void volume_space_worker(void *ptr __maybe_unused)
         }
 
         netdata_mutex_lock(&volume_space_mutex);
+        cancelled = volume_space_worker_cancel_requested[worker_id] || volume_space_worker_stop;
         volume_space_worker_busy[worker_id] = false;
         volume_space_worker_started_ut[worker_id] = 0;
+        if (cancelled) {
+            netdata_mutex_unlock(&volume_space_mutex);
+            continue;
+        }
         if (!volume_space_results)
             volume_space_results = dictionary_create_advanced(
                 DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));

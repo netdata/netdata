@@ -333,15 +333,13 @@ void nd_thread_join_threads()
     do {
         spinlock_lock(&threads_globals.exited.spinlock);
         nti = threads_globals.exited.list;
+        while(nti && !nd_thread_try_claim_join(nti))
+            nti = nti->next;
         if(nti) {
             // Claim the wrapper before unlinking it. A direct owner may have the same pointer
             // and can free it immediately after winning the JOINED CAS.
-            if(nd_thread_try_claim_join(nti)) {
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-                nti->list = ND_THREAD_LIST_NONE;
-            }
-            else
-                nti = NULL;
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+            nti->list = ND_THREAD_LIST_NONE;
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
