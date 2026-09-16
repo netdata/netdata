@@ -77,7 +77,7 @@ func artifactTargets(root, repository string, contract registry.Contract) []arti
 		{
 			path: filepath.Join(root, "metadata.yaml"),
 			render: func() ([]byte, error) {
-				return renderMetadata(contract, "redfish", filepath.Join(root, "metadata.yaml.in"))
+				return renderMetadata(contract, "redfish", filepath.Join(root, "metadata.yaml.tmpl"))
 			},
 		},
 		{
@@ -86,7 +86,7 @@ func artifactTargets(root, repository string, contract registry.Contract) []arti
 				return renderMetadata(
 					contract,
 					"redfish_logs",
-					filepath.Join(filepath.Dir(root), "redfish_logs", "metadata.yaml.in"),
+					filepath.Join(filepath.Dir(root), "redfish_logs", "metadata.yaml.tmpl"),
 				)
 			},
 		},
