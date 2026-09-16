@@ -15,6 +15,10 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const commandDefaultPath = "/usr/local/bin:/usr/bin:/bin"
@@ -41,7 +45,7 @@ func (dst Destination) validateCommand() error {
 		if !validEnvironmentName(name) {
 			return errors.New("command env names must use letters, digits and underscores, without a leading digit")
 		}
-		if _, err := secretReference(value); err != nil {
+		if _, err := secret.IsReference(value); err != nil {
 			return fmt.Errorf("command env: %w", err)
 		}
 		if strings.ContainsRune(value, 0) {
@@ -80,7 +84,7 @@ func validEnvironmentName(name string) bool {
 func commandEnvironment(ctx context.Context, configured map[string]string) ([]string, error) {
 	values := map[string]string{"PATH": commandDefaultPath}
 	for name, raw := range configured {
-		value, err := resolveSecret(ctx, raw)
+		value, err := secret.Resolve(ctx, raw)
 		if err != nil {
 			return nil, fmt.Errorf("command env: %w", err)
 		}
@@ -97,7 +101,7 @@ func commandEnvironment(ctx context.Context, configured map[string]string) ([]st
 	return env, nil
 }
 
-func sendCommand(ctx context.Context, processes *commandProcesses, dst Destination, event Event) error {
+func sendCommand(ctx context.Context, processes *commandexec.Runner, dst Destination, event notifyevent.Event) error {
 	env, err := commandEnvironment(ctx, dst.Env)
 	if err != nil {
 		return err
@@ -113,10 +117,10 @@ func sendCommand(ctx context.Context, processes *commandProcesses, dst Destinati
 		}
 		input = append(input, '\n')
 	}
-	return processes.run(ctx, dst.Executable, args, env, bytes.NewReader(input))
+	return processes.Run(ctx, dst.Executable, args, env, bytes.NewReader(input))
 }
 
-func renderSMSTools3(event Event) string {
+func renderSMSTools3(event notifyevent.Event) string {
 	status := "needs attention"
 	switch event.Status {
 	case "CRITICAL":

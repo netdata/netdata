@@ -10,6 +10,9 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 // https://docs.discord.com/developers/resources/message#embed-limits
@@ -51,7 +54,7 @@ type discordEmbedField struct {
 	Inline bool   `json:"inline"`
 }
 
-func sendDiscord(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendDiscord(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	message, err := renderDiscord(event)
 	if err != nil {
 		return err
@@ -59,7 +62,7 @@ func sendDiscord(ctx context.Context, dst Destination, event Event, timeout time
 	return postJSON(ctx, dst, message, timeout)
 }
 
-func renderDiscord(event Event) (discordMessage, error) {
+func renderDiscord(event notifyevent.Event) (discordMessage, error) {
 	title, err := discordText(event.Status+": "+event.Summary, discordTitleLimit)
 	if err != nil {
 		return discordMessage{}, err
@@ -74,8 +77,8 @@ func renderDiscord(event Event) (discordMessage, error) {
 		Timestamp: event.Timestamp.Format(time.RFC3339),
 	}
 	total := utf8.RuneCountInString(title) + utf8.RuneCountInString(description)
-	for _, field := range notificationFields(event) {
-		value, err := discordText(field.value, discordFieldLimit)
+	for _, field := range notifymsg.Fields(event) {
+		value, err := discordText(field.Value, discordFieldLimit)
 		if err != nil {
 			return discordMessage{}, err
 		}
@@ -83,8 +86,8 @@ func renderDiscord(event Event) (discordMessage, error) {
 			continue // Discord does not accept empty fields; optional whitespace-only facts are absent.
 		}
 		// Names are fixed labels; at most seven fields, below Discord's limit of 25.
-		embed.Fields = append(embed.Fields, discordEmbedField{Name: field.name, Value: value, Inline: true})
-		total += utf8.RuneCountInString(field.name) + utf8.RuneCountInString(value)
+		embed.Fields = append(embed.Fields, discordEmbedField{Name: field.Name, Value: value, Inline: true})
+		total += utf8.RuneCountInString(field.Name) + utf8.RuneCountInString(value)
 	}
 	if total > discordEmbedLimit {
 		return discordMessage{}, errors.New("discord embed exceeds the 6000-character combined limit")

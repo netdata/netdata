@@ -11,6 +11,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,9 +26,9 @@ func TestRenderPushover(t *testing.T) {
 	critical, recovery := full, full
 	critical.Status = "CRITICAL"
 	recovery.Status, recovery.PreviousStatus = "CLEAR", "CRITICAL"
-	minimal := Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
+	minimal := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
 	for name, test := range map[string]struct {
-		event        Event
+		event        notifyevent.Event
 		fixture      string
 		replacements []string
 	}{
@@ -51,7 +53,7 @@ func TestPushoverEscaping(t *testing.T) {
 	input := `<b>"hot" & 'cold'</b>`
 	escaped := `&lt;b&gt;&#34;hot&#34; &amp; &#39;cold&#39;&lt;/b&gt;`
 	zero := 0.0
-	event := Event{Node: input, Alert: input, Summary: input, Info: input, Chart: input, Context: input,
+	event := notifyevent.Event{Node: input, Alert: input, Summary: input, Info: input, Chart: input, Context: input,
 		Value: &zero, Units: input, Status: "WARNING", Timestamp: expectedEvent().Timestamp,
 		URL: `https://example.com/?a="&b='<tag>`}
 	assert.Equal(t, pushoverMessage{
@@ -98,7 +100,7 @@ func TestPushoverTitleAndURLLimits(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			const titlePrefix = "node WARNING: "
 			const urlPrefix = "https://example.com/"
-			event := Event{Node: "node", Alert: "alert", Status: "WARNING", Timestamp: expectedEvent().Timestamp,
+			event := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Timestamp: expectedEvent().Timestamp,
 				Summary: strings.Repeat(test.symbol, 250-len(titlePrefix)+test.extra),
 				URL:     urlPrefix + strings.Repeat(test.symbol, 512-len(urlPrefix)+test.extra)}
 			want := pushoverMessage{Token: pushoverTestToken, User: pushoverTestUser, HTML: 1, Timestamp: 1789387200,
@@ -131,8 +133,8 @@ func TestReadPushoverResponse(t *testing.T) {
 		"null":              {status: 200, body: `null`, err: "invalid pushover response"},
 		"invalid JSON":      {status: 200, body: `synthetic-private-value`, err: "invalid pushover response"},
 		"trailing JSON":     {status: 200, body: `{"status":1}{}`, err: "invalid pushover response"},
-		"size boundary":     {status: 200, body: `{"status":1}` + strings.Repeat(" ", notificationResponseLimit-12)},
-		"oversized":         {status: 200, body: `{"status":1}` + strings.Repeat(" ", notificationResponseLimit), err: "256 KiB"},
+		"size boundary":     {status: 200, body: `{"status":1}` + strings.Repeat(" ", httpclient.ResponseLimit-12)},
+		"oversized":         {status: 200, body: `{"status":1}` + strings.Repeat(" ", httpclient.ResponseLimit), err: "256 KiB"},
 		"unconfirmed":       {status: 204, err: "HTTP 204"},
 		"quota":             {status: 429, body: `{"status":1}`, err: "HTTP 429"},
 		"server error":      {status: 503, body: `synthetic-private-value`, err: "HTTP 503"},

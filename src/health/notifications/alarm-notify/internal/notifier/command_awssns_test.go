@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -274,8 +275,8 @@ func TestRunSNSCancellation(t *testing.T) {
 func TestSNSClosedProcessAdmission(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("TMPDIR", dir)
-	processes := &commandProcesses{}
-	processes.closeAndWait()
+	processes := &commandexec.Runner{}
+	processes.CloseAndWait()
 	dst, capture := snsHelperDestination(t, "")
 	require.ErrorIs(t, sendAWSSNS(context.Background(), processes, dst, expectedEvent()), context.Canceled)
 	_, err := os.Stat(capture)

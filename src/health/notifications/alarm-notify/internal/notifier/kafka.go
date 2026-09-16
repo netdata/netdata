@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"net/netip"
 	"reflect"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 func (dst Destination) validateKafka() error {
@@ -17,7 +20,7 @@ func (dst Destination) validateKafka() error {
 	if err != nil || address.Zone() != "" {
 		return errors.New("kafka sender_ip must be a literal IPv4 or IPv6 address without a zone")
 	}
-	reference, err := secretReference(dst.URL)
+	reference, err := secret.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("kafka url: %w", err)
 	}
@@ -43,7 +46,7 @@ type kafkaMessage struct {
 	Info             string   `json:"info"`
 }
 
-func renderKafka(dst Destination, event Event) kafkaMessage {
+func renderKafka(dst Destination, event notifyevent.Event) kafkaMessage {
 	return kafkaMessage{
 		HostIP: dst.SenderIP, When: event.Timestamp.Unix(), Name: event.Alert, Chart: event.Chart,
 		Status: event.Status, OldStatus: event.PreviousStatus, Value: event.Value, OldValue: event.PreviousValue,

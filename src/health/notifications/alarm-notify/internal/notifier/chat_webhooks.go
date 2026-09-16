@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"unicode"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 func (dst Destination) validateChatWebhook() error {
@@ -30,7 +32,7 @@ func (dst Destination) validateChatWebhook() error {
 	if !reflect.DeepEqual(dst, allowed) {
 		return fmt.Errorf("%s destination contains fields for another provider", dst.Type)
 	}
-	reference, err := secretReference(dst.URL)
+	reference, err := secret.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("%s url: %w", dst.Type, err)
 	}

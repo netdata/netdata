@@ -24,6 +24,10 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 func (dst Destination) validateEmail() error {
@@ -100,7 +104,7 @@ func emailEncodedWords(value string) string {
 	return strings.Join(words, "\r\n ")
 }
 
-func renderEmail(dst Destination, event Event) ([]string, []byte, error) {
+func renderEmail(dst Destination, event notifyevent.Event) ([]string, []byte, error) {
 	var message bytes.Buffer
 	args := []string{"-t", "-i"}
 	var recipients []string
@@ -147,7 +151,7 @@ func renderEmail(dst Destination, event Event) ([]string, []byte, error) {
 		fmt.Fprintf(&message, "In-Reply-To: %s\r\nReferences: %s\r\n", thread, thread)
 	}
 	message.WriteString("MIME-Version: 1.0\r\n")
-	plain := notificationPlainText(event, true) + "\nIncident ID: " + event.IncidentID
+	plain := notifymsg.PlainText(event, true) + "\nIncident ID: " + event.IncidentID
 	for _, duration := range []struct {
 		name  string
 		value *uint32
@@ -188,7 +192,7 @@ func writeEmailText(w io.Writer, text string) {
 	_ = encoded.Close()
 }
 
-func sendEmail(ctx context.Context, processes *commandProcesses, dst Destination, event Event) error {
+func sendEmail(ctx context.Context, processes *commandexec.Runner, dst Destination, event notifyevent.Event) error {
 	env, err := commandEnvironment(ctx, dst.Env)
 	if err != nil {
 		return err
@@ -197,5 +201,5 @@ func sendEmail(ctx context.Context, processes *commandProcesses, dst Destination
 	if err != nil {
 		return err
 	}
-	return processes.run(ctx, dst.Executable, args, env, bytes.NewReader(message))
+	return processes.Run(ctx, dst.Executable, args, env, bytes.NewReader(message))
 }

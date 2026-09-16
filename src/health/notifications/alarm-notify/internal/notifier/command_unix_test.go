@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -377,8 +378,8 @@ func TestRunCommandCancellation(t *testing.T) {
 
 func TestClosedCommandAdmission(t *testing.T) {
 	dst, capture := testCommandDestination(t, "record")
-	processes := &commandProcesses{}
-	processes.closeAndWait()
+	processes := &commandexec.Runner{}
+	processes.CloseAndWait()
 	require.ErrorIs(t, sendCommand(context.Background(), processes, dst, expectedEvent()), context.Canceled)
 	_, err := os.Stat(capture)
 	assert.ErrorIs(t, err, os.ErrNotExist)

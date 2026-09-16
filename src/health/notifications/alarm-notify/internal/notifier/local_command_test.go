@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -138,18 +139,18 @@ func TestCommandFieldIsolation(t *testing.T) {
 
 func TestRenderSMSTools3(t *testing.T) {
 	for name, test := range map[string]struct {
-		change func(*Event)
+		change func(*notifyevent.Event)
 		want   string
 	}{
 		"warning":                 {want: "test-node needs attention: test.chart, Temperature is high = 42.5 C"},
-		"critical":                {change: func(e *Event) { e.Status = "CRITICAL" }, want: "test-node is critical: test.chart, Temperature is high = 42.5 C"},
-		"clear omits value":       {change: func(e *Event) { e.Status = "CLEAR" }, want: "test-node recovered: test.chart, Temperature is high"},
-		"missing chart and value": {change: func(e *Event) { e.Chart, e.Value = "", nil }, want: "test-node needs attention: Temperature is high"},
-		"zero no units":           {change: func(e *Event) { e.Value, e.Units = new(float64), "" }, want: "test-node needs attention: test.chart, Temperature is high = 0"},
-		"underscores":             {change: func(e *Event) { e.Summary = "high_temperature" }, want: "test-node needs attention: test.chart, high temperature = 42.5 C"},
-		"Unicode at cap":          {change: func(e *Event) { e.Node = strings.Repeat("界", 160) }, want: strings.Repeat("界", 160)},
-		"Unicode over cap":        {change: func(e *Event) { e.Node = strings.Repeat("界", 161) }, want: strings.Repeat("界", 160)},
-		"ASCII over cap":          {change: func(e *Event) { e.Node = strings.Repeat("a", 161) }, want: strings.Repeat("a", 160)},
+		"critical":                {change: func(e *notifyevent.Event) { e.Status = "CRITICAL" }, want: "test-node is critical: test.chart, Temperature is high = 42.5 C"},
+		"clear omits value":       {change: func(e *notifyevent.Event) { e.Status = "CLEAR" }, want: "test-node recovered: test.chart, Temperature is high"},
+		"missing chart and value": {change: func(e *notifyevent.Event) { e.Chart, e.Value = "", nil }, want: "test-node needs attention: Temperature is high"},
+		"zero no units":           {change: func(e *notifyevent.Event) { e.Value, e.Units = new(float64), "" }, want: "test-node needs attention: test.chart, Temperature is high = 0"},
+		"underscores":             {change: func(e *notifyevent.Event) { e.Summary = "high_temperature" }, want: "test-node needs attention: test.chart, high temperature = 42.5 C"},
+		"Unicode at cap":          {change: func(e *notifyevent.Event) { e.Node = strings.Repeat("界", 160) }, want: strings.Repeat("界", 160)},
+		"Unicode over cap":        {change: func(e *notifyevent.Event) { e.Node = strings.Repeat("界", 161) }, want: strings.Repeat("界", 160)},
+		"ASCII over cap":          {change: func(e *notifyevent.Event) { e.Node = strings.Repeat("a", 161) }, want: strings.Repeat("a", 160)},
 	} {
 		t.Run(name, func(t *testing.T) {
 			event := expectedEvent()

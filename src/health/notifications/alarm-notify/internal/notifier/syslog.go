@@ -10,6 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 func (dst Destination) validateSyslog() error {
@@ -45,7 +49,7 @@ func (dst Destination) validateSyslog() error {
 	return nil
 }
 
-func renderSyslog(dst Destination, event Event) ([]string, error) {
+func renderSyslog(dst Destination, event notifyevent.Event) ([]string, error) {
 	facility, level, prefix := dst.Facility, dst.Level, dst.Prefix
 	if facility == "" {
 		facility = "local6"
@@ -83,10 +87,10 @@ func renderSyslog(dst Destination, event Event) ([]string, error) {
 		}
 	}
 	args = append(args, dst.Args...)
-	return append(args, "--", escapeNotificationControls(text)), nil
+	return append(args, "--", notifymsg.EscapeControls(text)), nil
 }
 
-func sendSyslog(ctx context.Context, processes *commandProcesses, dst Destination, event Event) error {
+func sendSyslog(ctx context.Context, processes *commandexec.Runner, dst Destination, event notifyevent.Event) error {
 	args, err := renderSyslog(dst, event)
 	if err != nil {
 		return err
@@ -95,5 +99,5 @@ func sendSyslog(ctx context.Context, processes *commandProcesses, dst Destinatio
 	if err != nil {
 		return err
 	}
-	return processes.run(ctx, dst.Executable, args, env, nil)
+	return processes.Run(ctx, dst.Executable, args, env, nil)
 }

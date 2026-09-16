@@ -11,6 +11,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 type alertaEvent struct {
@@ -30,7 +34,7 @@ type alertaEvent struct {
 	RawData     string            `json:"rawData"`
 }
 
-func renderAlerta(dst Destination, event Event) (alertaEvent, error) {
+func renderAlerta(dst Destination, event notifyevent.Event) (alertaEvent, error) {
 	raw, err := json.Marshal(event)
 	if err != nil {
 		return alertaEvent{}, errors.New("cannot encode alerta event")
@@ -38,7 +42,7 @@ func renderAlerta(dst Destination, event Event) (alertaEvent, error) {
 	message := alertaEvent{
 		Resource: event.Node, Event: event.Alert, Environment: dst.Environment,
 		Severity: strings.ToLower(event.Status), Service: []string{"Netdata"}, Group: "Performance",
-		Text: notificationPlainText(event, true), Tags: []string{"incident_id:" + event.IncidentID},
+		Text: notifymsg.PlainText(event, true), Tags: []string{"incident_id:" + event.IncidentID},
 		Attributes: map[string]string{"name": event.Alert, "chart": event.Chart, "context": event.Context},
 		Origin:     "netdata/" + event.Node, Type: "netdataAlarm",
 		CreateTime: event.Timestamp.UTC().Format("2006-01-02T15:04:05.000Z"), RawData: string(raw),
@@ -51,9 +55,9 @@ func renderAlerta(dst Destination, event Event) (alertaEvent, error) {
 	} else if event.Chart != "" {
 		message.Event = event.Chart + "." + event.Alert
 	}
-	for _, field := range notificationFields(event) {
-		if field.name == "Value" {
-			message.Value = field.value
+	for _, field := range notifymsg.Fields(event) {
+		if field.Name == "Value" {
+			message.Value = field.Value
 		}
 	}
 	if event.URL != "" {
@@ -62,7 +66,7 @@ func renderAlerta(dst Destination, event Event) (alertaEvent, error) {
 	return message, nil
 }
 
-func sendAlerta(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendAlerta(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	if err := dst.resolveMonitoring(ctx); err != nil {
 		return err
 	}
@@ -74,9 +78,9 @@ func sendAlerta(ctx context.Context, dst Destination, event Event, timeout time.
 	if dst.APIKey != "" {
 		headers.Set("Authorization", "Key "+dst.APIKey)
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(
+	response, err := httpclient.PostJSON(
 		ctx,
 		client,
 		"alerta",
@@ -102,7 +106,7 @@ func readAlertaResponse(response *http.Response) error {
 		Status string `json:"status"`
 		ID     string `json:"id"`
 	}
-	if err := decodeNotificationResponse("alerta", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("alerta", response.Body, &result); err != nil {
 		return err
 	}
 	if result.Status != "ok" || strings.TrimSpace(result.ID) == "" {

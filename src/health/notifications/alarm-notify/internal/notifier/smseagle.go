@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 func (dst Destination) validateSMSEagle() error {
@@ -55,7 +60,7 @@ func (dst Destination) validateSMSEagle() error {
 		}
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"access_token", dst.AccessToken}} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("smseagle %s: %w", field.name, err)
 		}
@@ -86,14 +91,14 @@ type smseagleMessage struct {
 	VoiceID  int64    `json:"voice_id,omitempty"`
 }
 
-func renderSMSEagle(dst Destination, event Event) (string, smseagleMessage, error) {
+func renderSMSEagle(dst Destination, event notifyevent.Event) (string, smseagleMessage, error) {
 	message := smseagleMessage{To: slices.Clone(dst.Recipients)}
 	mode := dst.MessageType
 	if mode == "" {
 		mode = "sms"
 	}
 	if mode == "sms" || mode == "mms" {
-		message.Text = notificationPlainText(event, true)
+		message.Text = notifymsg.PlainText(event, true)
 		message.Encoding = smseagleEncoding(message.Text)
 		return "messages/" + mode, message, nil
 	}
@@ -102,7 +107,7 @@ func renderSMSEagle(dst Destination, event Event) (string, smseagleMessage, erro
 		message.Duration = int64(*dst.CallDuration)
 	}
 	if mode == "tts" || mode == "tts_advanced" {
-		message.Text = notificationPlainText(event, false)
+		message.Text = notifymsg.PlainText(event, false)
 		if utf8.RuneCountInString(message.Text) > 960 {
 			return "", smseagleMessage{}, errors.New("smseagle TTS text exceeds the 960-character limit")
 		}
@@ -129,12 +134,12 @@ func smseagleEncoding(text string) string {
 	return "standard"
 }
 
-func sendSMSEagle(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendSMSEagle(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"access_token", &dst.AccessToken}} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("smseagle %s: %w", field.name, err)
 		}
@@ -148,9 +153,9 @@ func sendSMSEagle(ctx context.Context, dst Destination, event Event, timeout tim
 		return err
 	}
 	endpoint := strings.TrimRight(dst.APIURL, "/") + "/api/v2/" + method
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(ctx, client, "smseagle", endpoint,
+	response, err := httpclient.PostJSON(ctx, client, "smseagle", endpoint,
 		http.Header{"Access-Token": {dst.AccessToken}, "Accept": {"application/json"}}, message)
 	if err != nil {
 		return err
@@ -167,7 +172,7 @@ func readSMSEagleResponse(response *http.Response, recipients int) error {
 		Status string `json:"status"`
 		ID     int64  `json:"id"`
 	}
-	if err := decodeNotificationResponse("smseagle", response.Body, &results); err != nil {
+	if err := httpclient.DecodeResponse("smseagle", response.Body, &results); err != nil {
 		return err
 	}
 	if len(results) != recipients || recipients == 0 {

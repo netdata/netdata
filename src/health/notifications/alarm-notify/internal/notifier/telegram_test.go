@@ -16,6 +16,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,11 +28,11 @@ func TestRenderTelegram(t *testing.T) {
 	critical, recovery := full, full
 	critical.Status = "CRITICAL"
 	recovery.Status, recovery.PreviousStatus = "CLEAR", "CRITICAL"
-	minimal := Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
+	minimal := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
 	topic := configInteger(7)
 	fullDestination := Destination{ChatID: "-100123", MessageThreadID: &topic}
 	tests := map[string]struct {
-		event        Event
+		event        notifyevent.Event
 		dst          Destination
 		fixture      string
 		replacements []string
@@ -80,7 +82,7 @@ func TestTelegramEscaping(t *testing.T) {
 	input := `<b>"hot" & 'cold'</b>`
 	escaped := `&lt;b&gt;&#34;hot&#34; &amp; &#39;cold&#39;&lt;/b&gt;`
 	value := 0.0
-	event := Event{Node: input, Alert: input, Summary: input, Info: input, Chart: input, Context: input,
+	event := notifyevent.Event{Node: input, Alert: input, Summary: input, Info: input, Chart: input, Context: input,
 		Value: &value, Units: input, Status: "WARNING", Timestamp: expectedEvent().Timestamp,
 		URL: `https://example.com/?a="&b='<tag>`}
 	got, err := renderTelegram(Destination{ChatID: "1"}, event)
@@ -107,7 +109,7 @@ func TestTelegramTextLimits(t *testing.T) {
 		"entities do not consume visible space": {symbol: "&"}, "escaped overflow": {symbol: "&", extra: 1},
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{Node: "node", Alert: "alert", Status: "WARNING", Timestamp: expectedEvent().Timestamp,
+			event := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Timestamp: expectedEvent().Timestamp,
 				Summary: strings.Repeat(test.symbol, available+test.extra)}
 			got, err := renderTelegram(Destination{ChatID: "1"}, event)
 			if test.extra != 0 {
@@ -176,8 +178,8 @@ func TestReadTelegramResponse(t *testing.T) {
 		"trailing document":      {status: 200, body: `{"ok":true} {}`, err: "invalid telegram response"},
 		"negative delay":         {status: 429, body: `{"ok":false,"parameters":{"retry_after":-1}}`, err: "invalid telegram retry delay"},
 		"delay integer overflow": {status: 429, body: `{"ok":false,"parameters":{"retry_after":9223372036854775808}}`, err: "invalid telegram response"},
-		"response boundary":      {status: 200, body: `{"ok":true}` + strings.Repeat(" ", notificationResponseLimit-len(`{"ok":true}`)), want: telegramResponse{OK: &ok}},
-		"oversized":              {status: 200, body: strings.Repeat(" ", notificationResponseLimit+1), err: "256 KiB limit"},
+		"response boundary":      {status: 200, body: `{"ok":true}` + strings.Repeat(" ", httpclient.ResponseLimit-len(`{"ok":true}`)), want: telegramResponse{OK: &ok}},
+		"oversized":              {status: 200, body: strings.Repeat(" ", httpclient.ResponseLimit+1), err: "256 KiB limit"},
 		"unexpected HTTP status": {status: 503, body: `synthetic-private-value`, err: "HTTP 503"},
 	} {
 		t.Run(name, func(t *testing.T) {

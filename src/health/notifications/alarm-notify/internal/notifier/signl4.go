@@ -2,6 +2,11 @@
 
 package notifier
 
+import (
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+)
+
 type signl4Event struct {
 	Title        string `json:"Title"`
 	Message      string `json:"Message"`
@@ -11,14 +16,14 @@ type signl4Event struct {
 	SourceSystem string `json:"X-S4-SourceSystem"`
 }
 
-func renderSIGNL4(event Event) signl4Event {
+func renderSIGNL4(event notifyevent.Event) signl4Event {
 	status := "new"
 	if event.Status == "CLEAR" {
 		status = "resolved"
 	}
 	return signl4Event{
 		Title:   event.Node + " " + event.Status + ": " + event.Summary,
-		Message: notificationPlainText(event, true), Severity: event.Status,
+		Message: notifymsg.PlainText(event, true), Severity: event.Status,
 		ExternalID: event.IncidentID, Status: status, SourceSystem: "Netdata",
 	}
 }

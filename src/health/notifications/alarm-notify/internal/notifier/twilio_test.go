@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,9 +26,9 @@ func TestRenderTwilio(t *testing.T) {
 	critical, clear := full, full
 	critical.Status = "CRITICAL"
 	clear.Status, clear.PreviousStatus = "CLEAR", "CRITICAL"
-	minimal := Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
+	minimal := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
 	for name, test := range map[string]struct {
-		event             Event
+		event             notifyevent.Event
 		from, to, fixture string
 		replacements      []string
 	}{
@@ -56,7 +58,7 @@ func TestTwilioPlainText(t *testing.T) {
 		"form characters": "<b>\"quoted\" & + = % 'text'</b>\\\n😀", "no shortening": strings.Repeat("界😀", 1700),
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{
+			event := notifyevent.Event{
 				Node:      "node",
 				Alert:     "alert",
 				Status:    "WARNING",
@@ -86,8 +88,8 @@ func TestReadTwilioResponse(t *testing.T) {
 		"null":               {status: 201, body: `null`, err: "invalid twilio response"},
 		"invalid JSON":       {status: 201, body: "synthetic-private-value", err: "invalid twilio response"},
 		"trailing JSON":      {status: 201, body: success + `{}`, err: "invalid twilio response"},
-		"size boundary":      {status: 201, body: success + strings.Repeat(" ", notificationResponseLimit-len(success))},
-		"oversized":          {status: 201, body: strings.Repeat(" ", notificationResponseLimit+1), err: "256 KiB"},
+		"size boundary":      {status: 201, body: success + strings.Repeat(" ", httpclient.ResponseLimit-len(success))},
+		"oversized":          {status: 201, body: strings.Repeat(" ", httpclient.ResponseLimit+1), err: "256 KiB"},
 		"HTTP error":         {status: 400, body: "synthetic-private-value", err: "HTTP 400"},
 		"wrong success code": {status: 200, body: success, err: "HTTP 200"},
 		"no content":         {status: 204, err: "HTTP 204"},

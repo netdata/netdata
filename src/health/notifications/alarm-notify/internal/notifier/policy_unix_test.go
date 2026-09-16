@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +54,7 @@ func TestRunCommandStatusPolicies(t *testing.T) {
 			if test.calls {
 				captured := readCommandCaptures(t, capture)
 				require.Len(t, captured, 1)
-				var got Event
+				var got notifyevent.Event
 				require.NoError(t, json.NewDecoder(strings.NewReader(captured[0].Input)).Decode(&got))
 				assert.Equal(t, event, got)
 			} else {

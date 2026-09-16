@@ -11,6 +11,11 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const ilertDefaultAPI = "https://api.ilert.com/api"
@@ -22,7 +27,7 @@ func (dst Destination) validateIlert() error {
 	for _, field := range []struct{ name, value string }{
 		{"integration_key", dst.IntegrationKey}, {"api_url", dst.APIURL},
 	} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("ilert %s: %w", field.name, err)
 		}
@@ -43,13 +48,13 @@ func validateIlertField(name, value string) error {
 }
 
 type ilertEvent struct {
-	IntegrationKey string      `json:"integrationKey"`
-	EventType      string      `json:"eventType"`
-	AlertKey       string      `json:"alertKey"`
-	Summary        string      `json:"summary"`
-	Details        string      `json:"details"`
-	Links          []ilertLink `json:"links,omitempty"`
-	CustomDetails  Event       `json:"customDetails"`
+	IntegrationKey string            `json:"integrationKey"`
+	EventType      string            `json:"eventType"`
+	AlertKey       string            `json:"alertKey"`
+	Summary        string            `json:"summary"`
+	Details        string            `json:"details"`
+	Links          []ilertLink       `json:"links,omitempty"`
+	CustomDetails  notifyevent.Event `json:"customDetails"`
 }
 
 type ilertLink struct {
@@ -57,13 +62,13 @@ type ilertLink struct {
 	Text string `json:"text"`
 }
 
-func renderIlert(dst Destination, event Event) ilertEvent {
+func renderIlert(dst Destination, event notifyevent.Event) ilertEvent {
 	message := ilertEvent{
 		IntegrationKey: dst.IntegrationKey, EventType: "ALERT",
 		// ilert trims keys and compares them case-insensitively; preserve opaque ID distinctions.
 		AlertKey: fmt.Sprintf("%x", sha256.Sum256([]byte(event.IncidentID))),
 		Summary:  event.Node + " " + event.Status + ": " + event.Summary,
-		Details:  notificationPlainText(event, false), CustomDetails: event,
+		Details:  notifymsg.PlainText(event, false), CustomDetails: event,
 	}
 	if event.Status == "CLEAR" {
 		message.EventType = "RESOLVE"
@@ -74,12 +79,12 @@ func renderIlert(dst Destination, event Event) ilertEvent {
 	return message
 }
 
-func sendIlert(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendIlert(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{{"integration_key", &dst.IntegrationKey}, {"api_url", &dst.APIURL}} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("ilert %s: %w", field.name, err)
 		}
@@ -92,9 +97,9 @@ func sendIlert(ctx context.Context, dst Destination, event Event, timeout time.D
 	if base == "" {
 		base = ilertDefaultAPI
 	}
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotificationJSON(
+	response, err := httpclient.PostJSON(
 		ctx,
 		client,
 		"ilert",

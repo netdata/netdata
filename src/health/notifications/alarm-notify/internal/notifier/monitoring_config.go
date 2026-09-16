@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 func (dst Destination) validateMonitoring() error {
@@ -37,7 +39,7 @@ func (dst Destination) validateMonitoring() error {
 		return fmt.Errorf("%s destination contains fields for another provider", dst.Type)
 	}
 	for _, field := range dst.monitoringSecrets() {
-		reference, err := secretReference(*field.value)
+		reference, err := secret.IsReference(*field.value)
 		if err != nil {
 			return fmt.Errorf("%s %s: %w", dst.Type, field.name, err)
 		}
@@ -88,7 +90,7 @@ func validateMonitoringField(provider, name, value string) error {
 
 func (dst *Destination) resolveMonitoring(ctx context.Context) error {
 	for _, field := range dst.monitoringSecrets() {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("%s %s: %w", dst.Type, field.name, err)
 		}

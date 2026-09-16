@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 // Slack's section text/field limits are documented in its Block Kit reference.
@@ -50,7 +53,7 @@ type slackText struct {
 	Verbatim bool   `json:"verbatim,omitempty"`
 }
 
-func sendSlack(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendSlack(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	message, err := renderSlack(event)
 	if err != nil {
 		return err
@@ -58,18 +61,18 @@ func sendSlack(ctx context.Context, dst Destination, event Event, timeout time.D
 	return postJSON(ctx, dst, message, timeout)
 }
 
-func renderSlack(event Event) (slackMessage, error) {
+func renderSlack(event notifyevent.Event) (slackMessage, error) {
 	color := map[string]string{"WARNING": "warning", "CRITICAL": "danger", "CLEAR": "good"}[event.Status]
 	summary, err := slackPlainText(event.Status+": "+event.Summary, slackSectionLimit)
 	if err != nil {
 		return slackMessage{}, err
 	}
 	var blocks []slackBlock
-	values := append(notificationFields(event), notificationField{"Time", event.Timestamp.Format(time.RFC3339)})
+	values := append(notifymsg.Fields(event), notifymsg.Field{Name: "Time", Value: event.Timestamp.Format(time.RFC3339)})
 	fields := make([]slackText, 0, len(values)) // At most eight fields, below Slack's limit of ten.
 	fallback := []string{summary.Text}
 	for _, value := range values {
-		field, err := slackPlainText(value.name+"\n"+value.value, slackFieldLimit)
+		field, err := slackPlainText(value.Name+"\n"+value.Value, slackFieldLimit)
 		if err != nil {
 			return slackMessage{}, err
 		}

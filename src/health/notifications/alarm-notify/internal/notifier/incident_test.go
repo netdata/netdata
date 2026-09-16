@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,7 +57,7 @@ func TestIncidentContent(t *testing.T) {
 		"long content":       {node: "node", alert: "alert", summary: strings.Repeat("界😀", 3000)},
 	} {
 		t.Run(name, func(t *testing.T) {
-			event := Event{
+			event := notifyevent.Event{
 				Version:    1,
 				IncidentID: "incident",
 				Node:       test.node,

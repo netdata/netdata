@@ -14,6 +14,11 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 func (dst Destination) validateMatrix() error {
@@ -27,7 +32,7 @@ func (dst Destination) validateMatrix() error {
 		return errors.New("matrix room_id must be a literal !-prefixed room ID without whitespace or controls")
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"access_token", dst.AccessToken}} {
-		reference, err := secretReference(field.value)
+		reference, err := secret.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("matrix %s: %w", field.name, err)
 		}
@@ -68,7 +73,7 @@ type matrixMessage struct {
 	FormattedBody string `json:"formatted_body"`
 }
 
-func renderMatrix(event Event) matrixMessage {
+func renderMatrix(event notifyevent.Event) matrixMessage {
 	icon := "⚠️"
 	switch event.Status {
 	case "CRITICAL":
@@ -76,7 +81,7 @@ func renderMatrix(event Event) matrixMessage {
 	case "CLEAR":
 		icon = "✅"
 	}
-	text := icon + " " + notificationPlainText(event, false)
+	text := icon + " " + notifymsg.PlainText(event, false)
 	formatted := strings.ReplaceAll(html.EscapeString(text), "\n", "<br>")
 	if event.URL != "" {
 		text += "\n" + event.URL
@@ -90,12 +95,12 @@ func renderMatrix(event Event) matrixMessage {
 	}
 }
 
-func sendMatrix(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendMatrix(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	for _, field := range []struct {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"access_token", &dst.AccessToken}} {
-		value, err := resolveSecret(ctx, *field.value)
+		value, err := secret.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("matrix %s: %w", field.name, err)
 		}
@@ -107,9 +112,9 @@ func sendMatrix(ctx context.Context, dst Destination, event Event, timeout time.
 	// Transaction IDs identify individual sends, not the alert lifecycle.
 	endpoint := strings.TrimRight(dst.APIURL, "/") + "/_matrix/client/v3/rooms/" + url.PathEscape(dst.RoomID) +
 		"/send/m.room.message/nd_" + rand.Text()
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := requestNotificationJSON(
+	response, err := httpclient.RequestJSON(
 		ctx,
 		client,
 		"matrix",
@@ -137,7 +142,7 @@ func readMatrixResponse(response *http.Response) error {
 		ErrorCode string `json:"errcode"`
 		Error     string `json:"error"`
 	}
-	if err := decodeNotificationResponse("matrix", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("matrix", response.Body, &result); err != nil {
 		return err
 	}
 	if !validMatrixID(result.EventID, '$') || result.ErrorCode != "" || result.Error != "" {

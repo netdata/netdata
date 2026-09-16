@@ -14,6 +14,10 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 func (dst Destination) validateIRC() error {
@@ -63,11 +67,11 @@ func validIRCChannel(channel string) bool {
 		!strings.Contains(channel, ",") && !strings.Contains(channel, "${") && strings.IndexFunc(channel, func(r rune) bool { return unicode.IsControl(r) || unicode.IsSpace(r) }) < 0
 }
 
-func renderIRC(event Event) string {
+func renderIRC(event notifyevent.Event) string {
 	// Preserve literal backslashes; flatten newlines without letting text become IRC/CTCP commands.
-	text := notificationPlainText(event, true)
+	text := notifymsg.PlainText(event, true)
 	text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
-	return escapeNotificationControls(strings.ReplaceAll(text, "\n", ", "))
+	return notifymsg.EscapeControls(strings.ReplaceAll(text, "\n", ", "))
 }
 
 type ircMessage struct {
@@ -293,7 +297,7 @@ func ircSession(dst Destination, text string, reader io.Reader, writer io.WriteC
 	}
 }
 
-func sendIRC(ctx context.Context, processes *commandProcesses, dst Destination, event Event) error {
+func sendIRC(ctx context.Context, processes *commandexec.Runner, dst Destination, event notifyevent.Event) error {
 	env, err := commandEnvironment(ctx, dst.Env)
 	if err != nil {
 		return err
@@ -303,6 +307,6 @@ func sendIRC(ctx context.Context, processes *commandProcesses, dst Destination, 
 		port = int64(*dst.Port)
 	}
 	text := renderIRC(event)
-	return processes.runSession(ctx, dst.Executable, []string{dst.Host, strconv.FormatInt(port, 10)}, env,
+	return processes.RunSession(ctx, dst.Executable, []string{dst.Host, strconv.FormatInt(port, 10)}, env,
 		func(reader io.Reader, writer io.WriteCloser) error { return ircSession(dst, text, reader, writer) })
 }

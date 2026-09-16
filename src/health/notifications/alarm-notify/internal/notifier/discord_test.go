@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,11 +21,11 @@ func TestRenderDiscord(t *testing.T) {
 	critical, recovery := full, full
 	critical.Status = "CRITICAL"
 	recovery.Status, recovery.PreviousStatus = "CLEAR", "CRITICAL"
-	minimal := Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
+	minimal := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: full.Timestamp}
 	blank := minimal
 	blank.Chart, blank.Context, blank.Info = " \n", "\t", " \n\t"
 	tests := map[string]struct {
-		event        Event
+		event        notifyevent.Event
 		fixture      string
 		replacements []string
 	}{
@@ -101,7 +102,7 @@ func TestRenderDiscordLimits(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			event := Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: time.Now()}
+			event := notifyevent.Event{Node: "node", Alert: "alert", Status: "WARNING", Summary: "summary", Timestamp: time.Now()}
 			switch test.field {
 			case "summary":
 				event.Summary = test.value

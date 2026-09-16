@@ -14,6 +14,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,7 +63,7 @@ func pagerDutyTestFixture(t *testing.T, version int64, variant, status, previous
 func TestRenderPagerDuty(t *testing.T) {
 	full := expectedEvent()
 	full.URL = "https://example.com/alert?id=1&view=chart#details"
-	minimal := Event{
+	minimal := notifyevent.Event{
 		Version:    1,
 		IncidentID: "test-incident",
 		Timestamp:  full.Timestamp,
@@ -179,8 +181,8 @@ func TestReadPagerDutyResponse(t *testing.T) {
 			"wrong key":      {p.status, strings.Replace(success, pagerDutyTestIncidentKey, "synthetic-private-value", 1), "acknowledgment"},
 			"wrong key type": {p.status, fmt.Sprintf(`{"status":"success","%s":1}`, p.key), "invalid"},
 			"malformed":      {p.status, "synthetic-private-value", "invalid"}, "trailing": {p.status, success + success, "invalid"},
-			"limit":      {p.status, success + strings.Repeat(" ", notificationResponseLimit-len(success)), ""},
-			"over limit": {p.status, success + strings.Repeat(" ", notificationResponseLimit-len(success)+1), "256 KiB"},
+			"limit":      {p.status, success + strings.Repeat(" ", httpclient.ResponseLimit-len(success)), ""},
+			"over limit": {p.status, success + strings.Repeat(" ", httpclient.ResponseLimit-len(success)+1), "256 KiB"},
 		} {
 			t.Run(fmt.Sprintf("v%d/%s", version, name), func(t *testing.T) {
 				reader := strings.NewReader(test.body)

@@ -10,19 +10,23 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
+	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 )
 
 const kavenegarDefaultAPI = "https://api.kavenegar.com/v1"
 
-func renderKavenegar(dst Destination, event Event) url.Values {
+func renderKavenegar(dst Destination, event notifyevent.Event) url.Values {
 	return url.Values{
 		"sender":   {dst.Sender},
 		"receptor": {dst.Recipient},
-		"message":  {notificationPlainText(event, true)},
+		"message":  {notifymsg.PlainText(event, true)},
 	}
 }
 
-func sendKavenegar(ctx context.Context, dst Destination, event Event, timeout time.Duration) error {
+func sendKavenegar(ctx context.Context, dst Destination, event notifyevent.Event, timeout time.Duration) error {
 	if err := dst.resolveFormProvider(ctx); err != nil {
 		return err
 	}
@@ -31,9 +35,9 @@ func sendKavenegar(ctx context.Context, dst Destination, event Event, timeout ti
 		base = kavenegarDefaultAPI
 	}
 	endpoint := strings.TrimRight(base, "/") + "/" + url.PathEscape(dst.APIKey) + "/sms/send.json"
-	client := notificationHTTPClient(timeout)
+	client := httpclient.New(timeout)
 	defer client.CloseIdleConnections()
-	response, err := postNotification(ctx, client, "kavenegar", endpoint, "application/x-www-form-urlencoded",
+	response, err := httpclient.Post(ctx, client, "kavenegar", endpoint, "application/x-www-form-urlencoded",
 		http.Header{"Accept": {"application/json"}}, strings.NewReader(renderKavenegar(dst, event).Encode()))
 	if err != nil {
 		return err
@@ -54,7 +58,7 @@ func readKavenegarResponse(response *http.Response) error {
 			MessageID int64 `json:"messageid"`
 		} `json:"entries"`
 	}
-	if err := decodeNotificationResponse("kavenegar", response.Body, &result); err != nil {
+	if err := httpclient.DecodeResponse("kavenegar", response.Body, &result); err != nil {
 		return err
 	}
 	// This acknowledges API acceptance; final SMS delivery is asynchronous.
