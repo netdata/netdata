@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -27,6 +28,10 @@ func (p *commandProcesses) closeAndWait() {
 }
 
 func (p *commandProcesses) run(ctx context.Context, executable string, args, env []string, input io.Reader) error {
+	return p.runCommand(ctx, executable, args, env, input, false)
+}
+
+func (p *commandProcesses) runCommand(ctx context.Context, executable string, args, env []string, input io.Reader, privateHome bool) (result error) {
 	p.mu.Lock()
 	if err := ctx.Err(); err != nil {
 		p.mu.Unlock()
@@ -48,6 +53,19 @@ func (p *commandProcesses) run(ctx context.Context, executable string, args, env
 	cmd.WaitDelay = 250 * time.Millisecond
 	if err := configureCommandProcess(cmd); err != nil {
 		return err
+	}
+	if privateHome {
+		home, err := os.MkdirTemp("", "alarm-notify-home-")
+		if err != nil {
+			return errors.New("could not create private command home")
+		}
+		// Remove credential caches before the admitted call releases Run's shutdown wait.
+		defer func() {
+			if err := os.RemoveAll(home); err != nil {
+				result = errors.Join(result, errors.New("could not remove private command home"))
+			}
+		}()
+		cmd.Env = append(cmd.Env, "HOME="+home)
 	}
 	if err := cmd.Start(); err != nil {
 		if ctx.Err() != nil {

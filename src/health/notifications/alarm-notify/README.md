@@ -2,7 +2,7 @@
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands, SMS Server Tools 3 and syslog.
+SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands, SMS Server Tools 3, syslog and AWS SNS.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -11,7 +11,7 @@ The current increments provide explicit delivery, role-based routing, modern Sla
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
-Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery and syslog.
+Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog and AWS SNS.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -142,6 +142,8 @@ Matrix requires `type: matrix`, `api_url`, `access_token` and `room_id`.
 Custom commands require `type: command` and `executable`, with optional `args` and `env`.
 SMS Server Tools 3 requires `type: smstools3`, `executable` and `to`, with optional `env`.
 Syslog requires `type: syslog` and `executable`, with optional facility, level, prefix, remote target and command settings.
+AWS SNS requires `type: awssns`, `executable`, `target_arn` and `credential_source`, with mode-specific `env` and an optional
+`message_template`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -1640,6 +1642,89 @@ Save the example above as `syslog.yaml`, then validate it without writing logs:
 
 Running `send` with this configuration writes to the configured log targets. The module's syslog tests instead use
 owned helper processes to inspect argv, environment and results without invoking a real logger.
+
+## AWS SNS
+
+`awssns` uses an explicitly configured [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/reference/sns/publish.html)
+executable on Linux or macOS. Use a current CLI v2 installation and grant its selected identity `sns:Publish` for the
+configured target. Each destination names a literal standard topic ARN or platform endpoint ARN; the region comes
+from that ARN. Platform application names accept 1-256 ASCII letters, digits, underscores, hyphens or periods;
+periods are not allowed in standard topic names. FIFO topics require additional publishing fields and are not supported
+by this adapter.
+
+```yaml
+version: 1
+destinations:
+  sns_ops:
+    type: awssns
+    executable: /usr/local/bin/aws
+    target_arn: arn:aws:sns:us-east-1:123456789012:netdata-alerts
+    credential_source: static
+    env:
+      AWS_ACCESS_KEY_ID: ${env:NOTIFY_AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${file:/run/secrets/notify-aws-secret}
+      # Include AWS_SESSION_TOKEN when using temporary static credentials.
+    message_template: |-
+      {{status}} on {{node}}: {{summary}}
+      {{chart}} {{value_string}}
+      {{url}}
+routing:
+  roles:
+    ops: [sns_ops]
+```
+
+Choose exactly one explicit credential source. The `env` map accepts only the variables listed for that mode:
+
+| `credential_source` | Required `env` variables | Optional `env` variables |
+|---|---|---|
+| `static` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | `AWS_SESSION_TOKEN` |
+| `web_identity` | `AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE` | `AWS_ROLE_SESSION_NAME` |
+| `ecs` | `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` | None |
+| `imds` | None | None |
+
+Values support literal values and whole `${env:NAME}` / `${file:/absolute/path}` references. References are resolved
+only for selected destinations. A web-identity token file value must resolve to an absolute filename; the CLI reads
+that token file itself. An ECS value must be a relative path beginning with `/`, fetched from the fixed ECS metadata
+address `169.254.170.2`. IMDS mode explicitly enables the CLI's EC2 instance-role provider. Other modes disable it.
+Missing or invalid credentials fail delivery; they do not fall back to an ambient profile.
+
+The CLI receives a private temporary home, empty shared AWS/Boto configuration, and an allowlisted environment.
+Ambient AWS credentials, profiles, credential processes, custom model directories, endpoint overrides and proxies
+are not inherited. The adapter sets the region, UTF-8 file encoding, standard AWS endpoints, `NO_PROXY=*`, disabled
+pager/auto-prompt, and one publish attempt. No arbitrary CLI options or environment overrides are accepted. AWS
+credential providers may make their own retrieval attempts within the invocation deadline. This deliberately requires
+explicit configuration even when an interactive `aws` command already works in the developer's shell.
+
+The subject follows Bash's wording: `<node> needs attention - <alert> - <chart>` for WARNING, `is critical` for
+CRITICAL and `recovered` for CLEAR. Alert underscores become spaces; an absent chart is omitted. Subjects must contain
+fewer than 100 Unicode characters and no control characters or line breaks. Invalid subjects fail before launch.
+The default body is `<status> on <node> at <RFC3339 timestamp>: <chart> <value> <units>`, omitting absent chart/value
+facts. CLEAR includes the current value, and zero is retained. Bodies must be nonempty UTF-8 and at most 262144 bytes;
+there is no automatic truncation or protocol-specific message structure.
+
+`message_template` customizes the body with `{{field}}` placeholders. Every native Event field is available:
+`version`, `incident_id`, `timestamp`, `node`, `alert`, `chart`, `context`, `status`, `previous_status`, `summary`,
+`info`, `value`, `previous_value`, `units`, and `url`. Additional fields are `status_message` (the subject's status
+wording), `value_string` and `previous_value_string` (number plus units). Missing optional values become empty strings.
+Whitespace around a placeholder name is ignored. Write `{{{{` to emit a literal `{{`. Unknown or unclosed placeholders
+fail configuration validation. Substitution happens once: inserted text is not evaluated, shell syntax is literal,
+and templates do not resolve secret references. Richer Bash facts and its shell-format syntax remain later work.
+
+The adapter sends `TargetArn`, `Subject` and `Message` as JSON on stdin via `--cli-input-json file:///dev/stdin`.
+This avoids putting event text on the command line or treating text beginning with `file://` as a file to read.
+The CLI's output is discarded; exit status zero means the publish call succeeded, not that subscribers received it.
+Failure or cancellation may occur after AWS accepted a publish, so the adapter never retries it automatically.
+The foreground process cleanup described for custom commands applies; its private home is removed before the
+invocation returns, including failures and cancellation.
+
+Save the example as `awssns.yaml`, then validate without reading secrets, launching the CLI or contacting AWS:
+
+```sh
+/tmp/alarm-notify validate --config awssns.yaml
+```
+
+`send` publishes to the configured AWS target. The module tests use owned helper executables and synthetic credentials;
+they do not contact AWS or metadata endpoints. Windows builds support validation but do not yet run command providers.
 
 ## Event document
 

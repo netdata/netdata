@@ -36,6 +36,9 @@ func TestMain(m *testing.M) {
 	if mode := os.Getenv("NOTIFIER_TEST_COMMAND_HELPER"); mode != "" {
 		os.Exit(commandHelper(mode))
 	}
+	if len(os.Args) > 2 && os.Args[1] == "sns" && os.Args[2] == "publish" {
+		os.Exit(snsCommandHelper())
+	}
 	os.Exit(m.Run())
 }
 
@@ -175,6 +178,35 @@ func TestRunLocalCommand(t *testing.T) {
 			wantEnv := []string{"GORACE=atexit_sleep_ms=0", "NOTIFIER_TEST_CAPTURE=" + capture,
 				"NOTIFIER_TEST_COMMAND_HELPER=" + test.mode, "PATH=" + commandDefaultPath, "TOKEN=synthetic-private-value"}
 			assert.Equal(t, []commandCapture{{Args: wantArgs, Env: wantEnv, Input: wantInput}}, readCommandCaptures(t, capture))
+		})
+	}
+}
+
+func TestRunCommandHelperPrecedence(t *testing.T) {
+	for name, test := range map[string]struct {
+		mode string
+		code int
+	}{
+		"record SNS-looking arguments": {"record", 0},
+		"fail SNS-looking arguments":   {"fail", 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dst, capture := testCommandDestination(t, test.mode)
+			dst.Args = []string{"sns", "publish", "literal argument"}
+			cfg := Config{Version: 1, Destinations: map[string]Destination{"target": dst}}
+			var stdout, stderr bytes.Buffer
+			code := Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--destination", "target"}, strings.NewReader(validEvent), &stdout, &stderr)
+			require.Equal(t, test.code, code, stderr.String())
+			if test.mode == "fail" {
+				assert.Contains(t, stderr.String(), "exited with status 7")
+			}
+			input, err := json.Marshal(expectedEvent())
+			require.NoError(t, err)
+			assert.Equal(t, []commandCapture{{
+				Args:  []string{"sns", "publish", "literal argument"},
+				Env:   []string{"GORACE=atexit_sleep_ms=0", "NOTIFIER_TEST_CAPTURE=" + capture, "NOTIFIER_TEST_COMMAND_HELPER=" + test.mode, "PATH=" + commandDefaultPath},
+				Input: string(input) + "\n",
+			}}, readCommandCaptures(t, capture))
 		})
 	}
 }
