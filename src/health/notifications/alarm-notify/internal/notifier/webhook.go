@@ -79,11 +79,30 @@ func postNotificationJSON(
 	headers http.Header,
 	message any,
 ) (*http.Response, error) {
+	return requestNotificationJSON(ctx, client, provider, http.MethodPost, endpoint, headers, message)
+}
+
+func requestNotificationJSON(
+	ctx context.Context,
+	client *http.Client,
+	provider, method, endpoint string,
+	headers http.Header,
+	message any,
+) (*http.Response, error) {
 	payload, err := json.Marshal(message)
 	if err != nil {
 		return nil, errors.New("could not encode notification")
 	}
-	return postNotification(ctx, client, provider, endpoint, "application/json", headers, bytes.NewReader(payload))
+	return requestNotification(
+		ctx,
+		client,
+		provider,
+		method,
+		endpoint,
+		"application/json",
+		headers,
+		bytes.NewReader(payload),
+	)
 }
 
 func postNotification(
@@ -93,7 +112,17 @@ func postNotification(
 	headers http.Header,
 	payload io.Reader,
 ) (*http.Response, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, payload)
+	return requestNotification(ctx, client, provider, http.MethodPost, endpoint, contentType, headers, payload)
+}
+
+func requestNotification(
+	ctx context.Context,
+	client *http.Client,
+	provider, method, endpoint, contentType string,
+	headers http.Header,
+	payload io.Reader,
+) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, method, endpoint, payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct %s request", provider)
 	}

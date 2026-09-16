@@ -2,7 +2,7 @@
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle, PagerDuty and Opsgenie.
+SMSEagle, PagerDuty, Opsgenie, Microsoft Teams and Matrix.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -11,7 +11,7 @@ The current increments provide explicit delivery, role-based routing, modern Sla
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
-and Opsgenie alert creation and closure.
+Opsgenie alert creation and closure, Teams Workflows cards and Matrix room notices.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -40,15 +40,19 @@ class Receiver(BaseHTTPRequestHandler):
         opsgenie = self.path.endswith("/v2/alerts") or (
             "/v2/alerts/" in self.path and self.path.endswith("/close?identifierType=alias")
         )
+        matrix = "/_matrix/client/v3/rooms/" in self.path and "/send/m.room.message/" in self.path
+        teams = self.path.split("?", 1)[0].endswith("/teams")
         status = 200
-        if opsgenie or self.path.endswith(("/events", "/v2/enqueue")):
+        if teams or opsgenie or self.path.endswith(("/events", "/v2/enqueue")):
             status = 202
         elif self.path.endswith(("/Messages.json", "/messages", "/signl4", "/alert", "/api/v2/events/ingest")):
             status = 201
         self.send_response(status)
         self.send_header("Content-Type", "application/xml" if self.path.endswith("/add") else "application/json")
         self.end_headers()
-        if opsgenie:
+        if matrix:
+            self.wfile.write(b'{"event_id":"$test-event"}')
+        elif opsgenie:
             self.wfile.write(b'{"result":"Request will be processed","requestId":"test-request"}')
         elif self.path.endswith(("/api/v2/messages/sms", "/api/v2/messages/mms",
                                "/api/v2/calls/ring", "/api/v2/calls/tts", "/api/v2/calls/tts_advanced")):
@@ -77,6 +81,8 @@ class Receiver(BaseHTTPRequestHandler):
                 b'{"ok":true,"success":true,"status":1,"iden":"test-push","sid":"test-message",'
                 b'"id":"test-message","event":"message","result":{"message_id":1}}'
             )
+
+    do_PUT = do_POST
 
     def log_message(self, *args):
         pass  # Avoid logging credential-bearing request paths.
@@ -131,6 +137,8 @@ Both accept an optional `api_url`. SMSEagle requires `type: smseagle`, `api_url`
 array, with optional message/call settings described below.
 PagerDuty requires `type: pagerduty` and `integration_key`; `api_version` and `api_url` are optional.
 Opsgenie requires `type: opsgenie` and `api_key`, with an optional `api_url`.
+Teams requires `type: msteams` and `url`, with optional `icons`/`colors` maps.
+Matrix requires `type: matrix`, `api_url`, `access_token` and `room_id`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -138,7 +146,7 @@ follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
 MessageBird access keys, Gotify app tokens, ntfy credentials, ilert/PagerDuty integration keys, Alerta/Prowl/Kavenegar
-and Opsgenie API keys, Dynatrace API tokens and SMSEagle access tokens accept literal strings or a whole `${env:VARIABLE}` or
+and Opsgenie API keys, Dynatrace API tokens and SMSEagle/Matrix access tokens accept literal strings or a whole `${env:VARIABLE}` or
 `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
 identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
@@ -182,9 +190,9 @@ ntfy uses UTF-8 `text/plain`;
 the other providers use `application/json`.
 Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. ilert accepts HTTP 202;
-SIGNL4 accepts HTTP 200, 201 or 202. These providers make one attempt and
+SIGNL4 accepts HTTP 200, 201 or 202. Teams Workflows accepts HTTP 200–299. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
-Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar, SMSEagle, PagerDuty and Opsgenie check bounded JSON acknowledgments;
+Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar, SMSEagle, PagerDuty, Opsgenie and Matrix check bounded JSON acknowledgments;
 Prowl checks a bounded XML acknowledgment. Telegram can retry rate limits as described below.
 Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
@@ -1340,6 +1348,132 @@ Save as `opsgenie-local.yaml` and run:
 
 Repeat with WARNING, CRITICAL and CLEAR while retaining the same `incident_id`. The receiver prints the create and
 close bodies and returns synthetic acknowledgments; it does not create actual Opsgenie alerts.
+
+## Microsoft Teams Workflows
+
+Use a Workflows webhook with the **When a Teams webhook request is received** trigger, set to **Anyone**, and an
+appropriate posting action for a MessageCard. The workflow selects the chat/channel. Keep the complete callback URL
+secret; this mode must not send an Authorization header. Tenant-authenticated triggers and OAuth token acquisition
+are not implemented. Follow Microsoft's [Workflows setup](https://learn.microsoft.com/en-us/connectors/teams/#when-a-teams-webhook-request-is-received).
+Assign a co-owner so the workflow can remain maintained when its owner changes.
+
+This is an approved replacement for Bash's retired Office 365 Connector setup. Configure a complete URL for each
+named destination; multiple destinations preserve channel fan-out without `CHANNEL` substitution.
+
+```yaml
+version: 1
+destinations:
+  teams:
+    type: msteams
+    url: ${env:NOTIFY_TEAMS_WORKFLOW_URL}
+    icons:
+      warning: '⚠️'
+      critical: '🔥'
+      clear: '💚'
+    colors:
+      warning: 'FFA500'
+      critical: 'D93F3C'
+      clear: '65A677'
+routing:
+  roles:
+    teams_ops: [teams]
+```
+
+`url` accepts literal, environment or file references. `icons` and `colors` are optional maps using only `warning`,
+`critical` and `clear`; omitted entries use the defaults shown above. Icons are literal text without control characters;
+colors are six hexadecimal digits without `#`. An explicit empty string suppresses that status's icon or color.
+
+The MessageCard carries the status/title, common native alert facts, timestamp, summary and information. Event text
+is escaped as Markdown. Navigation uses a clickable inline link because Workflows does not render MessageCard
+buttons. See [Microsoft's migration notice](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/).
+
+Cards exceeding 28 KiB of serialized JSON fail before sending, without truncation. Workflow processing can impose
+additional limits. Any HTTP 2xx response means the webhook accepted the request; it does not confirm that the later
+workflow action posted successfully. Response bodies are closed without reading. There are no retries or redirects.
+
+### Local Teams exercise
+
+Use the receiver above:
+
+```yaml
+version: 1
+destinations:
+  teams:
+    type: msteams
+    url: http://127.0.0.1:18080/teams
+routing:
+  roles:
+    teams_ops: [teams]
+```
+
+Save as `teams-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config teams-local.yaml --role teams_ops < examples/event.json
+```
+
+## Matrix room notices
+
+Use a Matrix account already joined to an **unencrypted room**, with permission to send messages. Supply its access
+token and the full room ID from your client, not a room alias. The provider uses the
+[Client-Server API](https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid).
+Like Bash, it sends unencrypted `m.notice` events; it does not log in, join rooms or perform end-to-end encryption.
+
+```yaml
+version: 1
+destinations:
+  matrix:
+    type: matrix
+    api_url: https://matrix.example.org
+    access_token: ${env:NOTIFY_MATRIX_ACCESS_TOKEN}
+    room_id: '!room:example.org'
+routing:
+  roles:
+    matrix_ops: [matrix]
+```
+
+`api_url` is the homeserver's client API base and may contain a reverse-proxy prefix. It accepts literal, environment
+or file references, requires a nonempty HTTP(S) URL and rejects query strings, fragments and embedded credentials.
+The public `matrix.org` and `matrix-client.matrix.org` hosts require HTTPS; custom bases permit deliberate local HTTP.
+`access_token` also accepts literal/environment/file references and must resolve to printable ASCII without whitespace.
+
+Use one named destination per room; route a role to several destinations for fan-out. `room_id` is a literal, opaque,
+case-sensitive `!`-prefixed ID without whitespace or controls. Both older IDs containing a server name and newer IDs
+without one are accepted. Path-sensitive characters are escaped when building the request URL.
+
+Each send uses `PUT /_matrix/client/v3/rooms/<room>/send/m.room.message/<transaction>` with a fresh random transaction
+ID and Bearer authentication. Repeating an invocation creates another notice, including when the incident ID and event
+are unchanged. WARNING/CRITICAL/CLEAR retain their status icons; notices contain plain text plus escaped HTML with the
+same native facts and navigation. Client notification settings may suppress `m.notice` push notifications.
+
+Success requires HTTP 200 and a bounded JSON `event_id` acknowledgment. Replies are limited to 256 KiB and the
+invocation deadline. Homeserver errors, including permission and complete-event size limits, fail the destination
+without logging response content. The notifier does not truncate content, retry requests or follow redirects.
+
+### Local Matrix exercise
+
+The receiver above accepts PUT and returns a synthetic event ID:
+
+```yaml
+version: 1
+destinations:
+  matrix:
+    type: matrix
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    room_id: '!room:example.org'
+routing:
+  roles:
+    matrix_ops: [matrix]
+```
+
+Save as `matrix-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config matrix-local.yaml --role matrix_ops < examples/event.json
+```
+
+The local receiver verifies request shape; it does not simulate Matrix membership, encryption or client rendering.
 
 ## Event document
 

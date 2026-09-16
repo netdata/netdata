@@ -65,6 +65,10 @@ func dispatch(
 			err = sendPagerDuty(ctx, dst, event, timeout)
 		case "opsgenie":
 			err = sendOpsgenie(ctx, dst, event, timeout)
+		case "msteams":
+			err = sendMSTeams(ctx, dst, event, timeout)
+		case "matrix":
+			err = sendMatrix(ctx, dst, event, timeout)
 		case "smseagle":
 			err = sendSMSEagle(ctx, dst, event, timeout)
 		case "prowl":

@@ -234,6 +234,7 @@ func TestHTTPStatusAcknowledgment(t *testing.T) {
 		provider string
 		status   int
 	}{
+		"Teams 200": {"msteams", 200}, "Teams 202": {"msteams", 202}, "Teams 204": {"msteams", 204},
 		"Flock": {"flock", 200}, "Fleep": {"fleep", 200}, "ilert": {"ilert", 202},
 		"SIGNL4 200": {"signl4", 200}, "SIGNL4 201": {"signl4", 201}, "SIGNL4 202": {"signl4", 202},
 	} {
