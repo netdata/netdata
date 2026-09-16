@@ -3,6 +3,7 @@
 package notifier
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -11,6 +12,56 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestEventDurations(t *testing.T) {
+	for field := range map[string]struct{}{"duration": {}, "non_clear_duration": {}} {
+		for name, test := range map[string]struct {
+			input string
+			want  *uint32
+			err   bool
+		}{
+			"omitted": {}, "null": {input: "null"},
+			"zero":     {input: "0", want: new(uint32(0))},
+			"seconds":  {input: "123", want: new(uint32(123))},
+			"maximum":  {input: "4294967295", want: new(uint32(4294967295))},
+			"overflow": {input: "4294967296", err: true},
+			"negative": {input: "-1", err: true}, "negative zero": {input: "-0", err: true},
+			"fraction": {input: "1.5", err: true}, "decimal": {input: "1.0", err: true},
+			"exponent": {input: "1e3", err: true}, "boolean": {input: "true", err: true},
+			"string": {input: `"synthetic-private-value"`, err: true}, "array": {input: "[]", err: true},
+		} {
+			t.Run(field+"/"+name, func(t *testing.T) {
+				input := validEvent
+				if test.input != "" {
+					input = strings.Replace(input, `"version": 1`, `"version": 1, "`+field+`": `+test.input, 1)
+				}
+				got, err := readEvent(strings.NewReader(input))
+				if test.err {
+					require.ErrorContains(t, err, "invalid JSON event")
+					assert.NotContains(t, err.Error(), "synthetic-private-value")
+					assert.Equal(t, Event{}, got)
+					return
+				}
+				require.NoError(t, err)
+				want := expectedEvent()
+				if field == "duration" {
+					want.Duration = test.want
+				} else {
+					want.NonClearDuration = test.want
+				}
+				assert.Equal(t, want, got)
+				// Public Event consumers omit unknown durations and retain explicit zero.
+				encoded, err := json.Marshal(got)
+				require.NoError(t, err)
+				wantJSON := validEvent
+				if test.want != nil {
+					wantJSON = input
+				}
+				assert.JSONEq(t, wantJSON, string(encoded))
+			})
+		}
+	}
+}
 
 const validEvent = `{
   "version": 1,

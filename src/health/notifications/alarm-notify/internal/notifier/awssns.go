@@ -123,6 +123,12 @@ func validateSNSCredentials(source string, env map[string]string, references boo
 }
 
 func snsFields(event Event) map[string]string {
+	duration := func(seconds *uint32) string {
+		if seconds == nil {
+			return ""
+		}
+		return strconv.FormatUint(uint64(*seconds), 10)
+	}
 	value := func(number *float64) string {
 		if number == nil {
 			return ""
@@ -149,6 +155,7 @@ func snsFields(event Event) map[string]string {
 		"chart": event.Chart, "context": event.Context, "status": event.Status, "previous_status": event.PreviousStatus,
 		"summary": event.Summary, "info": event.Info, "value": value(event.Value), "previous_value": value(event.PreviousValue),
 		"units": event.Units, "url": event.URL, "status_message": status,
+		"duration": duration(event.Duration), "non_clear_duration": duration(event.NonClearDuration),
 		"value_string": withUnits(event.Value), "previous_value_string": withUnits(event.PreviousValue),
 	}
 }

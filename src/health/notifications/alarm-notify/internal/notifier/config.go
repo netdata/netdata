@@ -25,6 +25,7 @@ type Routing struct {
 }
 
 type Destination struct {
+	SenderIP         string            `yaml:"sender_ip,omitempty"`
 	TargetARN        string            `yaml:"target_arn,omitempty"`
 	CredentialSource string            `yaml:"credential_source,omitempty"`
 	MessageTemplate  string            `yaml:"message_template,omitempty"`
@@ -126,6 +127,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "kafka" {
+		return dst.validateKafka()
+	}
+	if dst.SenderIP != "" {
+		return errors.New("destination contains fields for another provider: sender_ip requires kafka")
+	}
 	if dst.Type == "awssns" {
 		return dst.validateAWSSNS()
 	}
@@ -237,7 +244,7 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command, smstools3, syslog or awssns; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command, smstools3, syslog, awssns or kafka; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||

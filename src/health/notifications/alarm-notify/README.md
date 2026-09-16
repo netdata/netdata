@@ -2,7 +2,7 @@
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands, SMS Server Tools 3, syslog and AWS SNS.
+SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands, SMS Server Tools 3, syslog, AWS SNS and Kafka HTTP bridges.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -11,7 +11,8 @@ The current increments provide explicit delivery, role-based routing, modern Sla
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
-Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog and AWS SNS.
+Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog,
+AWS SNS and Kafka HTTP bridges.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -47,9 +48,13 @@ class Receiver(BaseHTTPRequestHandler):
             status = 202
         elif self.path.endswith(("/Messages.json", "/messages", "/signl4", "/alert", "/api/v2/events/ingest")):
             status = 201
+        elif self.path.split("?", 1)[0].endswith("/kafka"):
+            status = 204
         self.send_response(status)
         self.send_header("Content-Type", "application/xml" if self.path.endswith("/add") else "application/json")
         self.end_headers()
+        if status == 204:
+            return
         if matrix:
             self.wfile.write(b'{"event_id":"$test-event"}')
         elif opsgenie:
@@ -144,6 +149,7 @@ SMS Server Tools 3 requires `type: smstools3`, `executable` and `to`, with optio
 Syslog requires `type: syslog` and `executable`, with optional facility, level, prefix, remote target and command settings.
 AWS SNS requires `type: awssns`, `executable`, `target_arn` and `credential_source`, with mode-specific `env` and an optional
 `message_template`.
+Kafka HTTP bridges require `type: kafka`, a full `url` and literal `sender_ip`.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -1704,7 +1710,8 @@ there is no automatic truncation or protocol-specific message structure.
 
 `message_template` customizes the body with `{{field}}` placeholders. Every native Event field is available:
 `version`, `incident_id`, `timestamp`, `node`, `alert`, `chart`, `context`, `status`, `previous_status`, `summary`,
-`info`, `value`, `previous_value`, `units`, and `url`. Additional fields are `status_message` (the subject's status
+`info`, `value`, `previous_value`, `duration`, `non_clear_duration`, `units`, and `url`.
+Durations render as whole seconds. Additional fields are `status_message` (the subject's status
 wording), `value_string` and `previous_value_string` (number plus units). Missing optional values become empty strings.
 Whitespace around a placeholder name is ignored. Write `{{{{` to emit a literal `{{`. Unknown or unclosed placeholders
 fail configuration validation. Substitution happens once: inserted text is not evaluated, shell syntax is literal,
@@ -1726,19 +1733,78 @@ Save the example as `awssns.yaml`, then validate without reading secrets, launch
 `send` publishes to the configured AWS target. The module tests use owned helper executables and synthetic credentials;
 they do not contact AWS or metadata endpoints. Windows builds support validation but do not yet run command providers.
 
+## Kafka HTTP bridge
+
+`kafka` posts to a configured HTTP bridge URL. It does not connect to Kafka brokers or implement a specific vendor's
+REST API. The receiver must accept the document below and return HTTP **204**; other responses, including 200, 201
+and 202, fail. Acceptance by the bridge does not confirm downstream Kafka delivery. Requests are not retried and
+redirects are not followed.
+
+```yaml
+version: 1
+destinations:
+  bridge:
+    type: kafka
+    url: http://127.0.0.1:18080/kafka
+    sender_ip: 192.0.2.1
+routing:
+  roles:
+    sysadmin: [bridge]
+```
+
+`url` is a full HTTP(S) URL, literal or a whole `${env:KAFKA_URL}` / `${file:/absolute/path}` reference. References are
+resolved only for selected destinations. URLs may contain a path/query, but not user information or fragments.
+Treat URLs containing credentials as secrets. `sender_ip` is a required literal IPv4 or IPv6 address without a port,
+network prefix or zone. It labels the message's `host_ip`; it does not select the outbound interface or resolve `node`.
+
+The request uses `Content-Type: application/json`. Its fixed fields retain the Bash bridge's names:
+
+| Bridge field | Native source |
+|---|---|
+| `host_ip` | Destination `sender_ip` |
+| `when` | `timestamp` converted to Unix seconds; subsecond precision is discarded |
+| `name`, `chart` | `alert`, `chart` |
+| `status`, `old_status` | `status`, `previous_status` |
+| `value`, `old_value` | `value`, `previous_value` |
+| `duration`, `non_clear_duration` | Optional event duration facts, in seconds |
+| `units`, `info` | `units`, `info` |
+
+Missing numeric values/durations are JSON `null`; explicit zero remains zero. Missing strings are empty. Quotes,
+newlines, Unicode and other string content are JSON encoded. This intentionally corrects Bash's unquoted keys,
+unescaped interpolation and default form content type. A bridge depending on that old syntax needs adjustment.
+
+Save this example as `kafka.yaml`. With the local receiver from **Build and run** listening, validate and send:
+
+```sh
+/tmp/alarm-notify validate --config kafka.yaml
+/tmp/alarm-notify send --config kafka.yaml --role sysadmin < examples/event.json
+```
+
+That event has no duration facts, so both are sent as `null`. To exercise measured durations, add `"duration": 0` and
+`"non_clear_duration": 123` to the event document. The notifier accepts these facts from its caller; it does not infer
+them from local state or track history.
+
 ## Event document
 
 The webhook and custom command receive the typed event as JSON. `version` must be `1`. Required fields are `incident_id`, `timestamp`
 (RFC 3339), `node`, `alert`, `status`, and `summary`. `incident_id` is an opaque stable incident identifier supplied by
 the caller. Current statuses are `WARNING`, `CRITICAL`, and `CLEAR`.
 
-Optional fields are `chart`, `context`, `previous_status`, `info`, `value`, `previous_value`, `units`, and `url`.
+Optional fields are `chart`, `context`, `previous_status`, `info`, `value`, `previous_value`, `duration`,
+`non_clear_duration`, `units`, and `url`.
 `previous_status` accepts the three current statuses plus `UNINITIALIZED`, `UNDEFINED`, and `REMOVED`.
 `url` is a caller-supplied alert navigation link: absolute HTTP(S), without embedded user/password information;
 fragments are allowed. Use a URL suitable for disclosure in notifications. The notifier does not fetch this link.
 Generic webhooks include `url` when it is supplied and omit it otherwise.
 Values are finite JSON numbers or null; missing values are sent as null and zero remains zero. Unknown fields and
 trailing documents are rejected. Strings are encoded as JSON, including quotes, newlines, and Unicode.
+
+`duration` is the time spent in the previous alert state; `non_clear_duration` is the total elapsed time the alert
+is/was non-clear. Both are caller-supplied whole seconds from 0 through 4294967295, matching the Agent's unsigned
+32-bit notification arguments. Negative, fractional, exponent-form and string values are rejected. Omitted or null
+durations mean unknown and are omitted from the public Event JSON; explicit zero is retained. They are public facts:
+when supplied they also appear in webhook/custom-command input and Alerta/Opsgenie raw event details, and are available
+to SNS message templates. Other providers' duration presentation remains pending in the capability inventory.
 
 This increment does not infer initial-CLEAR eligibility or apply severity filters or critical-history policy. Those
 capabilities remain pending in the inventory. Add future internal-only event facts separately from this public
