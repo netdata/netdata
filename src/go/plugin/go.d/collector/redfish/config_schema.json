@@ -10,124 +10,131 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Endpoint metric and LogService polling interval, in seconds.",
+        "description": "Data collection interval, in seconds. The same interval paces endpoint metrics and LogService polling.",
         "type": "integer",
         "minimum": 1,
         "default": 60
       },
       "autodetection_retry": {
         "title": "Detection retry",
-        "description": "Recheck interval in seconds. Zero disables retries.",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
         "type": "integer",
         "minimum": 0,
         "default": 0
       },
       "vnode": {
         "title": "Virtual Node",
-        "description": "Associates the collector output with an existing Virtual Node.",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Used only when the node mode is `local`.",
         "type": "string"
       },
       "url": {
         "title": "ServiceRoot URL",
-        "description": "HTTP or HTTPS origin, optionally ending in /redfish/v1/.",
+        "description": "URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS.",
         "type": "string",
         "format": "uri"
       },
       "node_mode": {
         "title": "Node mode",
-        "description": "Use local to emit on the collecting node, or system_vnodes to create deterministic ComputerSystem HostScopes.",
+        "description": "Where the charts appear: `local` publishes them on the collecting node, `system_vnodes` creates one virtual node per ComputerSystem.",
         "type": "string",
         "enum": ["local", "system_vnodes"]
       },
       "system_uri": {
         "title": "ComputerSystem URI",
-        "description": "Optional exact same-origin ComputerSystem resource URI.",
+        "description": "Restricts collection to one ComputerSystem, given as its exact resource URI on the same origin. Leave empty to collect every system.",
         "type": "string"
       },
       "auth_method": {
         "title": "Authentication method",
+        "description": "How to authenticate with the BMC. `auto` prefers a Redfish session and falls back to HTTP basic authentication.",
         "type": "string",
         "enum": ["auto", "session", "basic", "none"],
         "default": "auto"
       },
       "username": {
         "title": "Username",
-        "type": "string",
-        "sensitive": true
+        "description": "Username of the BMC account. Required unless the authentication method is `none`.",
+        "type": "string"
       },
       "password": {
         "title": "Password",
-        "type": "string",
-        "sensitive": true
+        "description": "Password of the BMC account. Required unless the authentication method is `none`.",
+        "type": "string"
       },
       "timeout": {
         "title": "Timeout",
-        "description": "HTTP request timeout in seconds.",
+        "description": "HTTP request timeout, in seconds.",
         "type": "number",
         "exclusiveMinimum": 0,
         "default": 15
       },
       "retries": {
         "title": "GET retries",
-        "description": "Additional attempts for eligible transient GET failures.",
+        "description": "Number of extra attempts for a request that fails with a transient error.",
         "type": "integer",
         "minimum": 0,
         "default": 2
       },
       "max_concurrent_requests": {
         "title": "Maximum concurrent requests",
+        "description": "Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit.",
         "type": "integer",
         "minimum": 1,
         "default": 3
       },
       "proxy_url": {
         "title": "Proxy URL",
-        "description": "HTTP or HTTPS proxy URL. Empty uses environment proxy settings.",
-        "type": "string",
-        "sensitive": true
+        "description": "Proxy to use for the BMC requests. Leave empty to use the proxy settings from the environment.",
+        "type": "string"
       },
       "tls_ca": {
         "title": "TLS CA",
+        "description": "Path to a CA bundle file used to verify the BMC certificate. Leave empty to use the system trust store.",
         "type": "string"
       },
       "tls_cert": {
         "title": "TLS client certificate",
+        "description": "Path to a client certificate file for mutual TLS. Requires a client key.",
         "type": "string"
       },
       "tls_key": {
         "title": "TLS client key",
-        "type": "string",
-        "sensitive": true
+        "description": "Path to the client key file for mutual TLS. Requires a client certificate.",
+        "type": "string"
       },
       "tls_skip_verify": {
         "title": "Skip TLS verification",
+        "description": "Accept any certificate the BMC presents, including self-signed and expired ones.",
         "type": "boolean",
         "default": false
       },
       "collect": {
         "title": "Collection families",
-        "description": "Simple pattern selecting base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware families. Base is always collected.",
+        "description": "Simple pattern selecting which component families to collect: base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware. Base is always collected.",
         "type": "string",
         "default": "*"
       },
       "charts": {
         "title": "Charts",
+        "description": "Controls how many charts this job creates.",
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "aggregates": {
             "title": "Aggregate charts",
+            "description": "Create one summary chart per component family, in addition to any detailed charts.",
             "type": "boolean",
             "default": true
           },
           "details": {
             "title": "Detailed component charts",
+            "description": "Create one chart per individual component, such as each fan, sensor, or drive.",
             "type": "boolean",
             "default": true
           },
           "max_detailed_components_per_family": {
             "title": "Detailed component cap",
-            "description": "Maximum distinct components per logical owner and component family. Zero means unlimited.",
+            "description": "Maximum number of components charted per family and per owner. Zero removes the limit.",
             "type": "integer",
             "minimum": 0,
             "default": 100
@@ -136,11 +143,13 @@
       },
       "alarms": {
         "title": "Alarms",
+        "description": "Controls how the health of a component is decided.",
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "evaluate_thresholds": {
             "title": "Evaluate source thresholds",
+            "description": "Compare readings against the warning and critical thresholds the BMC reports, for components where the BMC reports no health state of its own. A health state reported by the BMC always wins.",
             "type": "boolean",
             "default": true
           }
@@ -148,23 +157,27 @@
       },
       "host_scope_overrides": {
         "title": "HostScope overrides",
-        "description": "Optional ComputerSystem identity overrides used only when node_mode is system_vnodes.",
+        "description": "Pins the generated virtual nodes to specific GUIDs or hostnames so they stay stable across BMC changes. Used only when the node mode is `system_vnodes`.",
         "type": ["array", "null"],
         "items": {
+          "title": "Override",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "resource_uri": {
               "title": "Resource URI",
+              "description": "Exact ComputerSystem resource URI this override applies to.",
               "type": "string",
               "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
             },
             "guid": {
               "title": "GUID",
+              "description": "GUID to assign to the generated virtual node. Set this or a hostname.",
               "type": "string"
             },
             "hostname": {
               "title": "Hostname",
+              "description": "Hostname to assign to the generated virtual node. Set this or a GUID.",
               "type": "string"
             }
           },
@@ -191,47 +204,52 @@
       },
       "logs": {
         "title": "LogService",
+        "description": "Controls collection of the Redfish LogService entries.",
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "enabled": {
             "title": "Enable LogService polling",
+            "description": "Collect LogService entries. Collection runs only while the selected log backend is ready.",
             "type": "boolean",
             "default": true
           },
           "backend": {
             "title": "Log backend",
-            "description": "Exact redfish_logs job name, limited to 256 UTF-8 bytes after surrounding whitespace is trimmed. Omit to use default.",
+            "description": "Name of the `redfish_logs` job that stores the entries. Leave empty to use the job named `default`; a name that does not exist never falls back.",
             "type": "string",
             "minLength": 1,
             "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
           },
           "service_selector": {
             "title": "LogService selector",
+            "description": "Simple pattern selecting which of the discovered LogServices to collect.",
             "type": "string",
             "default": "*"
           },
           "max_services": {
             "title": "Maximum selected LogServices",
+            "description": "Maximum number of LogServices collected from this endpoint.",
             "type": "integer",
             "minimum": 1,
             "default": 256
           },
           "full_reconciliation_every": {
             "title": "Full reconciliation interval",
-            "description": "Seconds between complete source reconciliations. Zero disables periodic reconciliation.",
+            "description": "How often to re-read every selected LogService from the start, in seconds. Zero disables it.",
             "type": "number",
             "minimum": 0,
             "default": 1800
           },
           "cursor": {
             "title": "Cursor",
+            "description": "Controls how the read positions of the LogServices are retained.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "orphan_retention": {
                 "title": "Orphan cursor retention",
-                "description": "Seconds to retain inactive cursor records. Zero retains indefinitely.",
+                "description": "How long to keep the read position of a LogService that is no longer collected, in seconds. Zero keeps it forever.",
                 "type": "number",
                 "minimum": 0,
                 "default": 2592000
@@ -309,9 +327,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -353,14 +368,19 @@
         }
       ]
     },
+    "url": {
+      "ui:placeholder": "https://192.0.2.10/redfish/v1/"
+    },
+    "vnode": {
+      "ui:placeholder": "<example-vnode-name>",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
+    },
     "password": {
-      "ui:widget": "password"
+      "ui:widget": "password",
+      "ui:placeholder": "${env:REDFISH_PASSWORD}"
     },
-    "tls_key": {
-      "ui:widget": "password"
-    },
-    "proxy_url": {
-      "ui:widget": "password"
+    "host_scope_overrides": {
+      "ui:listFlavour": "list"
     }
   }
 }

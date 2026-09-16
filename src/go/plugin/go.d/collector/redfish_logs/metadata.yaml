@@ -71,22 +71,22 @@ modules:
           list:
             - name: update_every
               group: Collection
-              description: Operational chart refresh interval. It does not control BMC polling.
+              description: Data collection interval for this backend's own charts, in seconds. It does not change how often the BMC is polled.
               default_value: 1
               required: false
             - name: autodetection_retry
               group: Collection
-              description: Failed initial-check retry interval in seconds. Zero disables retries.
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
               default_value: 0
               required: false
             - name: vnode
               group: Virtual Node
-              description: Associates backend operational metrics with an existing configured virtual node.
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
               required: false
             - name: retention.max_size
               group: Retention
-              description: Positive retained-size target for this backend, such as `10GB`.
+              description: Size the stored log data is trimmed back to, for example `10GB`. Must be positive.
               default_value: 10GB
               required: false
         examples:

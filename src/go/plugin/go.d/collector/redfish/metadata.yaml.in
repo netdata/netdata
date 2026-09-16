@@ -106,147 +106,147 @@ modules:
           list:
             - name: update_every
               group: Collection
-              description: Endpoint metric and LogService polling interval in seconds.
+              description: Data collection interval, in seconds. The same interval paces endpoint metrics and LogService polling.
               default_value: 60
               required: false
             - name: autodetection_retry
               group: Collection
-              description: Failed initial-check retry interval in seconds. Zero disables retries.
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
               default_value: 0
               required: false
             - name: url
               group: Target
-              description: Redfish origin or ServiceRoot URL. HTTP and HTTPS are supported.
+              description: URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS.
               default_value: ""
               required: true
             - name: node_mode
               group: Virtual Node
-              description: "`local` publishes on the collecting node; `system_vnodes` creates deterministic ComputerSystem HostScopes."
+              description: "Where the charts appear: `local` publishes them on the collecting node, `system_vnodes` creates one virtual node per ComputerSystem."
               default_value: ""
               required: true
             - name: vnode
               group: Virtual Node
-              description: Associates local-mode output with an existing configured virtual node.
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Used only when the node mode is `local`.
               default_value: ""
               required: false
             - name: system_uri
               group: Target
-              description: Optional exact same-origin ComputerSystem URI filter; empty selects every system.
+              description: Restricts collection to one ComputerSystem, given as its exact resource URI on the same origin. Leave empty to collect every system.
               default_value: ""
               required: false
             - name: auth_method
               group: Authentication
-              description: Authentication mode (`auto`, `session`, `basic`, or `none`). Auto prefers session and falls back to Basic.
+              description: How to authenticate with the BMC. `auto` prefers a Redfish session and falls back to HTTP basic authentication.
               default_value: auto
               required: false
             - name: username
               group: Authentication
-              description: "Redfish username. Required except with `auth_method: none`."
+              description: Username of the BMC account. Required unless the authentication method is `none`.
               default_value: ""
               required: false
             - name: password
               group: Authentication
-              description: Redfish password. Use a Netdata secret reference.
+              description: Password of the BMC account. Required unless the authentication method is `none`.
               default_value: ""
               required: false
             - name: timeout
               group: HTTP
-              description: Per-request timeout.
+              description: HTTP request timeout, in seconds.
               default_value: 15
               required: false
             - name: retries
               group: HTTP
-              description: Additional attempts for eligible transient GET failures.
+              description: Number of extra attempts for a request that fails with a transient error.
               default_value: 2
               required: false
             - name: max_concurrent_requests
               group: HTTP
-              description: Maximum requests in flight against this endpoint.
+              description: Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit.
               default_value: 3
               required: false
             - name: proxy_url
               group: HTTP
-              description: Explicit HTTP/HTTPS proxy URL. Empty uses the process environment proxy policy.
+              description: Proxy to use for the BMC requests. Leave empty to use the proxy settings from the environment.
               default_value: ""
               required: false
             - name: tls_ca
               group: TLS
-              description: CA certificate bundle used to verify the Redfish HTTPS endpoint.
+              description: Path to a CA bundle file used to verify the BMC certificate. Leave empty to use the system trust store.
               default_value: ""
               required: false
             - name: tls_cert
               group: TLS
-              description: Optional client certificate. Must be configured together with `tls_key`.
+              description: Path to a client certificate file for mutual TLS. Requires a client key.
               default_value: ""
               required: false
             - name: tls_key
               group: TLS
-              description: Optional client private key. Use a Netdata secret reference.
+              description: Path to the client key file for mutual TLS. Requires a client certificate.
               default_value: ""
               required: false
             - name: tls_skip_verify
               group: TLS
-              description: Disable HTTPS certificate verification. Use only when secure trust configuration is not possible.
+              description: Accept any certificate the BMC presents, including self-signed and expired ones.
               default_value: false
               required: false
             - name: collect
               group: Collection
-              description: Simple-pattern selector over base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware. Base is always collected.
+              description: "Simple pattern selecting which component families to collect: base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware. Base is always collected."
               default_value: "*"
               required: false
             - name: charts.aggregates
               group: Cardinality
-              description: Enable complete one-level aggregate charts.
+              description: Create one summary chart per component family, in addition to any detailed charts.
               default_value: true
               required: false
             - name: charts.details
               group: Cardinality
-              description: Enable per-component detail charts.
+              description: Create one chart per individual component, such as each fan, sensor, or drive.
               default_value: true
               required: false
             - name: charts.max_detailed_components_per_family
               group: Cardinality
-              description: Atomic detail admission cap per logical owner and component family. Zero means unlimited.
+              description: Maximum number of components charted per family and per owner. Zero removes the limit.
               default_value: 100
               required: false
             - name: alarms.evaluate_thresholds
               group: Alerts
-              description: Evaluate usable source warning/critical thresholds when the BMC reading state is absent or clear; an abnormal BMC state remains authoritative.
+              description: Compare readings against the warning and critical thresholds the BMC reports, for components where the BMC reports no health state of its own. A health state reported by the BMC always wins.
               default_value: true
               required: false
             - name: host_scope_overrides
               group: Virtual Node
-              description: "Optional ComputerSystem URI to GUID/hostname overrides for deterministic generated HostScopes; used only with `node_mode: system_vnodes`."
+              description: Pins the generated virtual nodes to specific GUIDs or hostnames so they stay stable across BMC changes. Used only when the node mode is `system_vnodes`.
               default_value: "[]"
               required: false
             - name: logs.enabled
               group: Logs
-              description: Poll eligible LogServices only while the selected backend is ready.
+              description: Collect LogService entries. Collection runs only while the selected log backend is ready.
               default_value: true
               required: false
             - name: logs.backend
               group: Logs
-              description: Exact `redfish_logs` job name. Omit to select `default`; an explicit unavailable name never falls back.
+              description: Name of the `redfish_logs` job that stores the entries. Leave empty to use the job named `default`; a name that does not exist never falls back.
               default_value: default
               required: false
             - name: logs.service_selector
               group: Logs
-              description: Simple-pattern selector matched against discovered LogService identities.
+              description: Simple pattern selecting which of the discovered LogServices to collect.
               default_value: "*"
               required: false
             - name: logs.max_services
               group: Logs
-              description: Maximum selected LogServices admitted as one atomic set.
+              description: Maximum number of LogServices collected from this endpoint.
               default_value: 256
               required: false
             - name: logs.full_reconciliation_every
               group: Logs
-              description: Interval between complete LogEntry source reconciliations. Zero disables periodic reconciliation.
+              description: How often to re-read every selected LogService from the start, in seconds. Zero disables it.
               default_value: 30m
               required: false
             - name: logs.cursor.orphan_retention
               group: Logs
-              description: How long inactive LogService cursor records are retained. Zero retains them indefinitely.
+              description: How long to keep the read position of a LogService that is no longer collected, in seconds. Zero keeps it forever.
               default_value: 720h
               required: false
         examples:

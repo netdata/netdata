@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "What to scan and how to connect to what is found.",
         "type": "object",
         "properties": {
           "redfish": {
             "title": "Redfish",
+            "description": "Settings of the Redfish endpoint scanner.",
             "type": "object",
             "properties": {
               "rescan_interval": {
@@ -29,42 +31,143 @@
               },
               "max_concurrent_scans": {
                 "title": "Concurrent scans",
+                "description": "Maximum number of addresses probed at the same time across all networks.",
                 "type": "integer",
                 "minimum": 1,
                 "default": 32
               },
               "profiles": {
                 "title": "Connection profiles",
+                "description": "Named sets of connection settings that networks reference by name, and that the generated jobs inherit. At least one is required.",
                 "type": "array",
                 "minItems": 1,
                 "items": {
+                  "title": "Profile",
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "name": {"type": "string"},
-                    "scheme": {"type": "string", "enum": ["https", "http"], "default": "https"},
-                    "node_mode": {"type": "string", "enum": ["local", "system_vnodes"], "default": "system_vnodes"},
-                    "vnode": {"type": "string"},
-                    "auth_method": {"type": "string", "enum": ["auto", "session", "basic", "none"], "default": "auto"},
-                    "username": {"type": "string", "sensitive": true},
-                    "password": {"type": "string", "sensitive": true},
-                    "autodetection_retry": {"type": "integer", "minimum": 0, "default": 0},
-                    "timeout": {"type": "number", "exclusiveMinimum": 0, "default": 15},
-                    "retries": {"type": "integer", "minimum": 0, "default": 2},
-                    "max_concurrent_requests": {"type": "integer", "minimum": 1, "default": 3},
-                    "proxy_url": {"type": "string", "sensitive": true},
-                    "tls_ca": {"type": "string"},
-                    "tls_cert": {"type": "string"},
-                    "tls_key": {"type": "string", "sensitive": true},
-                    "tls_skip_verify": {"type": "boolean", "default": false},
-                    "collect": {"type": "string", "default": "*"},
+                    "name": {
+                      "title": "Name",
+                      "description": "Identifies this profile so a network can reference it. It does not become the name of the generated job.",
+                      "type": "string"
+                    },
+                    "scheme": {
+                      "title": "Scheme",
+                      "description": "Scheme used to reach the Redfish service on the discovered addresses.",
+                      "type": "string",
+                      "enum": ["https", "http"],
+                      "default": "https"
+                    },
+                    "node_mode": {
+                      "title": "Node mode",
+                      "description": "Where the charts of the generated jobs appear: `local` publishes them on the collecting node, `system_vnodes` creates one virtual node per ComputerSystem.",
+                      "type": "string",
+                      "enum": ["local", "system_vnodes"],
+                      "default": "system_vnodes"
+                    },
+                    "vnode": {
+                      "title": "Virtual Node",
+                      "description": "Associates the generated jobs with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Used only when the node mode is `local`.",
+                      "type": "string"
+                    },
+                    "auth_method": {
+                      "title": "Authentication method",
+                      "description": "How the generated jobs authenticate with the BMC. `auto` prefers a Redfish session and falls back to HTTP basic authentication.",
+                      "type": "string",
+                      "enum": ["auto", "session", "basic", "none"],
+                      "default": "auto"
+                    },
+                    "username": {
+                      "title": "Username",
+                      "description": "Username of the BMC account. Required unless the authentication method is `none`. Discovery never sends it; it is only passed to the generated jobs.",
+                      "type": "string"
+                    },
+                    "password": {
+                      "title": "Password",
+                      "description": "Password of the BMC account. Required unless the authentication method is `none`. Discovery never sends it; it is only passed to the generated jobs.",
+                      "type": "string"
+                    },
+                    "autodetection_retry": {
+                      "title": "Detection retry",
+                      "description": "How often a generated job retries the initial connection when it fails to start, in seconds. Zero disables retries.",
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    },
+                    "timeout": {
+                      "title": "Timeout",
+                      "description": "HTTP request timeout, in seconds. It applies to the discovery probe and to the generated jobs.",
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "default": 15
+                    },
+                    "retries": {
+                      "title": "GET retries",
+                      "description": "Number of extra attempts for a request that fails with a transient error.",
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 2
+                    },
+                    "max_concurrent_requests": {
+                      "title": "Maximum concurrent requests",
+                      "description": "Maximum number of requests a generated job sends to one BMC at the same time. Lower it for controllers that rate-limit.",
+                      "type": "integer",
+                      "minimum": 1,
+                      "default": 3
+                    },
+                    "proxy_url": {
+                      "title": "Proxy URL",
+                      "description": "Proxy to use for the BMC requests. It applies to the discovery probe and to the generated jobs. Leave empty to use the proxy settings from the environment.",
+                      "type": "string"
+                    },
+                    "tls_ca": {
+                      "title": "TLS CA",
+                      "description": "Path to a CA bundle file used to verify the BMC certificate. Leave empty to use the system trust store.",
+                      "type": "string"
+                    },
+                    "tls_cert": {
+                      "title": "TLS client certificate",
+                      "description": "Path to a client certificate file for mutual TLS. Requires a client key. Used only by the generated jobs, never by the discovery probe.",
+                      "type": "string"
+                    },
+                    "tls_key": {
+                      "title": "TLS client key",
+                      "description": "Path to the client key file for mutual TLS. Requires a client certificate. Used only by the generated jobs, never by the discovery probe.",
+                      "type": "string"
+                    },
+                    "tls_skip_verify": {
+                      "title": "Skip TLS verification",
+                      "description": "Accept any certificate the BMC presents, including self-signed and expired ones.",
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "collect": {
+                      "title": "Collection families",
+                      "description": "Simple pattern selecting which component families the generated jobs collect: base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware. Base is always collected.",
+                      "type": "string",
+                      "default": "*"
+                    },
                     "charts": {
+                      "title": "Charts",
+                      "description": "Controls how many charts the generated jobs create.",
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
-                        "aggregates": {"type": "boolean", "default": true},
-                        "details": {"type": "boolean", "default": true},
+                        "aggregates": {
+                          "title": "Aggregate charts",
+                          "description": "Create one summary chart per component family, in addition to any detailed charts.",
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "details": {
+                          "title": "Detailed component charts",
+                          "description": "Create one chart per individual component, such as each fan, sensor, or drive.",
+                          "type": "boolean",
+                          "default": true
+                        },
                         "max_detailed_components_per_family": {
+                          "title": "Detailed component cap",
+                          "description": "Maximum number of components charted per family and per owner. Zero removes the limit.",
                           "type": "integer",
                           "minimum": 0,
                           "default": 100
@@ -72,36 +175,82 @@
                       }
                     },
                     "alarms": {
+                      "title": "Alarms",
+                      "description": "Controls how the health of a component is decided.",
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
-                        "evaluate_thresholds": {"type": "boolean", "default": true}
+                        "evaluate_thresholds": {
+                          "title": "Evaluate source thresholds",
+                          "description": "Compare readings against the warning and critical thresholds the BMC reports, for components where the BMC reports no health state of its own. A health state reported by the BMC always wins.",
+                          "type": "boolean",
+                          "default": true
+                        }
                       }
                     },
                     "logs": {
+                      "title": "LogService",
+                      "description": "Controls collection of the Redfish LogService entries.",
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
-                        "enabled": {"type": "boolean", "default": true},
+                        "enabled": {
+                          "title": "Enable LogService polling",
+                          "description": "Collect LogService entries. Collection runs only while the selected log backend is ready.",
+                          "type": "boolean",
+                          "default": true
+                        },
                         "backend": {
+                          "title": "Log backend",
+                          "description": "Name of the `redfish_logs` job that stores the entries. Leave empty to use the job named `default`; a name that does not exist never falls back.",
                           "type": "string",
-                          "description": "Exact redfish_logs job name, limited to 256 UTF-8 bytes after surrounding whitespace is trimmed. Omit to use default.",
                           "minLength": 1,
                           "pattern": "[^\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
                         },
-                        "service_selector": {"type": "string", "default": "*"},
-                        "max_services": {"type": "integer", "minimum": 1, "default": 256},
-                        "full_reconciliation_every": {"type": "number", "minimum": 0, "default": 1800},
+                        "service_selector": {
+                          "title": "LogService selector",
+                          "description": "Simple pattern selecting which of the discovered LogServices to collect.",
+                          "type": "string",
+                          "default": "*"
+                        },
+                        "max_services": {
+                          "title": "Maximum selected LogServices",
+                          "description": "Maximum number of LogServices collected from one endpoint.",
+                          "type": "integer",
+                          "minimum": 1,
+                          "default": 256
+                        },
+                        "full_reconciliation_every": {
+                          "title": "Full reconciliation interval",
+                          "description": "How often to re-read every selected LogService from the start, in seconds. Zero disables it.",
+                          "type": "number",
+                          "minimum": 0,
+                          "default": 1800
+                        },
                         "cursor": {
+                          "title": "Cursor",
+                          "description": "Controls how the read positions of the LogServices are retained.",
                           "type": "object",
                           "additionalProperties": false,
                           "properties": {
-                            "orphan_retention": {"type": "number", "minimum": 0, "default": 2592000}
+                            "orphan_retention": {
+                              "title": "Orphan cursor retention",
+                              "description": "How long to keep the read position of a LogService that is no longer collected, in seconds. Zero keeps it forever.",
+                              "type": "number",
+                              "minimum": 0,
+                              "default": 2592000
+                            }
                           }
                         }
                       }
                     },
-                    "update_every": {"type": "integer", "minimum": 1, "default": 60}
+                    "update_every": {
+                      "title": "Update every",
+                      "description": "Data collection interval of the generated jobs, in seconds. The same interval paces endpoint metrics and LogService polling.",
+                      "type": "integer",
+                      "minimum": 1,
+                      "default": 60
+                    }
                   },
                   "required": ["name"],
                   "allOf": [
@@ -160,20 +309,32 @@
               },
               "networks": {
                 "title": "Networks",
+                "description": "Address ranges to scan, each with the ports to try and the profile to use. At least one is required.",
                 "type": "array",
                 "minItems": 1,
                 "items": {
+                  "title": "Network",
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "subnet": {"type": "string"},
+                    "subnet": {
+                      "title": "Subnet",
+                      "description": "IPv4 or IPv6 range in CIDR notation, or a single address. Where ranges overlap, the most specific one wins.",
+                      "type": "string"
+                    },
                     "ports": {
+                      "title": "Ports",
+                      "description": "TCP ports to try on every address in this range.",
                       "type": "array",
                       "minItems": 1,
                       "uniqueItems": true,
-                      "items": {"type": "integer", "minimum": 1, "maximum": 65535}
+                      "items": {"title": "Port", "type": "integer", "minimum": 1, "maximum": 65535}
                     },
-                    "profile": {"type": "string"}
+                    "profile": {
+                      "title": "Profile",
+                      "description": "Name of the connection profile to use for this range, as defined on the Connection profiles list.",
+                      "type": "string"
+                    }
                   },
                   "required": ["subnet", "ports", "profile"]
                 }
@@ -186,15 +347,29 @@
       },
       "services": {
         "title": "Service rules",
+        "description": "Rules that turn a discovered Redfish endpoint into a data collection job.",
         "type": "array",
         "minItems": 1,
         "items": {
+          "title": "Rule",
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "id": {"type": "string", "default": "redfish"},
-            "match": {"type": "string", "default": "{{ true }}"},
+            "id": {
+              "title": "Rule ID",
+              "description": "Identifies this rule in the logs, so you can tell which rule matched an endpoint.",
+              "type": "string",
+              "default": "redfish"
+            },
+            "match": {
+              "title": "Match expression",
+              "description": "Go template expression that must evaluate to `true` for this rule to apply to a discovered endpoint.",
+              "type": "string",
+              "default": "{{ true }}"
+            },
             "config_template": {
+              "title": "Config template",
+              "description": "Go template that produces the job configuration in YAML. It must set the module and a unique job name.",
               "type": "string",
               "default": "module: redfish\nname: discovered-{{ .EndpointKey }}\nurl: {{ .URL }}\n{{ .JobConfig | toYaml }}"
             }
@@ -206,19 +381,40 @@
     "required": ["discoverer", "services"]
   },
   "uiSchema": {
-    "uiOptions": {"fullPage": true},
     "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Discovery",
+          "fields": ["discoverer"]
+        },
+        {
+          "title": "Service rules",
+          "fields": ["services"]
+        }
+      ]
+    },
     "discoverer": {
       "redfish": {
+        "rescan_interval": {"ui:placeholder": "30m"},
+        "device_cache_ttl": {"ui:placeholder": "12h"},
         "profiles": {
           "ui:listFlavour": "list",
           "items": {
-            "password": {"ui:widget": "password"},
-            "tls_key": {"ui:widget": "password"},
-            "proxy_url": {"ui:widget": "password"}
+            "name": {"ui:placeholder": "datacenter-bmc"},
+            "password": {
+              "ui:widget": "password",
+              "ui:placeholder": "${env:REDFISH_PASSWORD}"
+            }
           }
         },
-        "networks": {"ui:listFlavour": "list"}
+        "networks": {
+          "ui:listFlavour": "list",
+          "items": {
+            "subnet": {"ui:placeholder": "192.0.2.0/24"},
+            "profile": {"ui:placeholder": "datacenter-bmc"}
+          }
+        }
       }
     },
     "services": {
