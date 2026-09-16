@@ -190,6 +190,9 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
     physical_disk_cleanup(d);
 }
 
+#define VOLUME_SPACE_WORKER_COUNT 4
+#define VOLUME_SPACE_QUERY_TIMEOUT_UT (10 * USEC_PER_SEC)
+
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
 static DICTIONARY *mountPoints = NULL, *deviceMountPaths = NULL, *mountPointVolumeIds = NULL;
 static DICTIONARY *uncertainMountPoints = NULL;
@@ -220,9 +223,12 @@ static netdata_cond_t volume_space_cond;
 static DICTIONARY *volume_space_request = NULL;
 static DICTIONARY *volume_space_results = NULL;
 static bool volume_space_worker_stop = false;
-static ND_THREAD *volume_space_thread = NULL;
-static HANDLE volume_space_worker_handle = NULL;
-static volatile LONG volume_space_worker_finished = 0;
+static ND_THREAD *volume_space_threads[VOLUME_SPACE_WORKER_COUNT] = {0};
+static HANDLE volume_space_worker_handles[VOLUME_SPACE_WORKER_COUNT] = {0};
+static volatile LONG volume_space_worker_finished[VOLUME_SPACE_WORKER_COUNT] = {0};
+static bool volume_space_worker_busy[VOLUME_SPACE_WORKER_COUNT] = {0};
+static bool volume_space_worker_cancel_requested[VOLUME_SPACE_WORKER_COUNT] = {0};
+static usec_t volume_space_worker_started_ut[VOLUME_SPACE_WORKER_COUNT] = {0};
 static bool storage_initialized = false;
 static DICTIONARY *volume_space_cycle_results = NULL;
 static DICTIONARY *volume_space_extra_targets = NULL;
@@ -234,13 +240,18 @@ static inline bool logical_disk_is_excluded(const char *mount_point)
 }
 
 static void volume_space_worker(void *ptr);
+static void volume_space_cancel_expired(void);
 static STRING *getFileSystemType(struct logical_disk *d, const char *diskName);
 static bool logical_disk_metadata_due(const struct logical_disk *d, usec_t now_ut);
 
-static void volume_space_cancel_io(void *data __maybe_unused)
+static void volume_space_cancel_io(void *data)
 {
+    size_t worker_id = (size_t)(uintptr_t)data;
+    if (worker_id >= VOLUME_SPACE_WORKER_COUNT)
+        return;
+
     netdata_mutex_lock(&volume_space_mutex);
-    HANDLE handle = volume_space_worker_handle;
+    HANDLE handle = volume_space_worker_handles[worker_id];
     if (handle)
         CancelSynchronousIo(handle);
     netdata_mutex_unlock(&volume_space_mutex);
@@ -277,14 +288,26 @@ static void initialize(void)
     netdata_mutex_init(&volume_space_mutex);
     netdata_cond_init(&volume_space_cond);
     volume_space_worker_stop = false;
-    volume_space_worker_handle = NULL;
-    InterlockedExchange(&volume_space_worker_finished, 0);
-    volume_space_thread = nd_thread_create(
-        "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_DEFAULT, volume_space_worker, NULL);
-    if (!volume_space_thread)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create the PerflibStorage volume-space worker");
-    else
-        nd_thread_set_manual_join(volume_space_thread);
+    memset(volume_space_worker_handles, 0, sizeof(volume_space_worker_handles));
+    memset(volume_space_worker_busy, 0, sizeof(volume_space_worker_busy));
+    memset(volume_space_worker_cancel_requested, 0, sizeof(volume_space_worker_cancel_requested));
+    memset(volume_space_worker_started_ut, 0, sizeof(volume_space_worker_started_ut));
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++) {
+        InterlockedExchange(&volume_space_worker_finished[i], 0);
+        volume_space_threads[i] = nd_thread_create(
+            "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_DEFAULT, volume_space_worker, (void *)(uintptr_t)i);
+        if (!volume_space_threads[i]) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create PerflibStorage volume-space worker %zu", i);
+            volume_space_worker_stop = true;
+            break;
+        }
+        nd_thread_set_manual_join(volume_space_threads[i]);
+    }
+    if (volume_space_worker_stop) {
+        netdata_mutex_lock(&volume_space_mutex);
+        netdata_cond_broadcast(&volume_space_cond);
+        netdata_mutex_unlock(&volume_space_mutex);
+    }
     storage_initialized = true;
 }
 
@@ -432,6 +455,7 @@ static bool volume_space(const char *name, uint64_t *total_bytes, uint64_t *free
 
 static void volume_space_worker(void *ptr __maybe_unused)
 {
+    size_t worker_id = (size_t)(uintptr_t)ptr;
     worker_register("WIN_PERFLIB_STORAGE_SPACE");
 
     DWORD previous_error_mode = 0;
@@ -448,70 +472,107 @@ static void volume_space_worker(void *ptr __maybe_unused)
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot duplicate the PerflibStorage volume-space worker handle");
     }
     netdata_mutex_lock(&volume_space_mutex);
-    volume_space_worker_handle = worker_handle;
+    volume_space_worker_handles[worker_id] = worker_handle;
     netdata_mutex_unlock(&volume_space_mutex);
-    nd_thread_register_canceller(volume_space_cancel_io, NULL);
+    nd_thread_register_canceller(volume_space_cancel_io, (void *)(uintptr_t)worker_id);
 
     // Cleanup owns this worker's lifecycle. Registering it with SERVICE_COLLECTORS would allow the daemon's
     // generic shutdown drain to free the ND_THREAD wrapper before the Windows plugin cleanup can join it.
     while (true) {
+        char name[ND_MOUNT_PATH_MAX];
+        bool metadata = false;
+        bool have_target = false;
         netdata_mutex_lock(&volume_space_mutex);
-        while (!volume_space_worker_stop && !volume_space_request)
+        while (!volume_space_worker_stop && (!volume_space_request || !dictionary_entries(volume_space_request)))
             netdata_cond_wait(&volume_space_cond, &volume_space_mutex);
 
-        if (volume_space_worker_stop) {
-            netdata_mutex_unlock(&volume_space_mutex);
-            break;
+        if (!volume_space_worker_stop && volume_space_request) {
+            struct volume_space_request *request_value;
+            dfe_start_write(volume_space_request, request_value)
+            {
+                snprintfz(name, sizeof(name), "%s", request_dfe.name);
+                metadata = request_value->metadata;
+                dictionary_del(volume_space_request, request_dfe.name);
+                have_target = true;
+                break;
+            }
+            dfe_done(request_value);
+            if (!dictionary_entries(volume_space_request)) {
+                dictionary_destroy(volume_space_request);
+                volume_space_request = NULL;
+            }
         }
+        bool stopping = volume_space_worker_stop;
+        netdata_mutex_unlock(&volume_space_mutex);
+        if (stopping)
+            break;
+        if (!have_target)
+            continue;
 
-        DICTIONARY *request = volume_space_request;
-        volume_space_request = NULL;
+        netdata_mutex_lock(&volume_space_mutex);
+        volume_space_worker_busy[worker_id] = true;
+        volume_space_worker_cancel_requested[worker_id] = false;
+        volume_space_worker_started_ut[worker_id] = now_monotonic_usec();
         netdata_mutex_unlock(&volume_space_mutex);
 
-        struct volume_space_request *result;
-        dfe_start_read(request, result)
-        {
-            netdata_mutex_lock(&volume_space_mutex);
-            bool stopping = volume_space_worker_stop;
-            netdata_mutex_unlock(&volume_space_mutex);
-            if (stopping)
-                break;
+        struct volume_space_result value = {0};
+        value.success = volume_space(name, &value.total_bytes, &value.free_bytes);
 
-            struct volume_space_result value = {0};
-            value.success = volume_space(result_dfe.name, &value.total_bytes, &value.free_bytes);
-            if (result->metadata) {
-                value.metadata_attempted = true;
-                struct logical_disk metadata = {0};
-                STRING *filesystem = getFileSystemType(&metadata, result_dfe.name);
-                if (filesystem) {
-                    value.metadata_success = true;
-                    value.drive_type = metadata.DriveType;
-                    value.serial_number = metadata.SerialNumber;
-                    value.readonly = metadata.readonly;
-                    snprintfz(value.filesystem, sizeof(value.filesystem), "%s", string2str(filesystem));
-                    string_freez(filesystem);
-                }
+        netdata_mutex_lock(&volume_space_mutex);
+        bool cancelled = volume_space_worker_cancel_requested[worker_id] || volume_space_worker_stop;
+        netdata_mutex_unlock(&volume_space_mutex);
+        if (!cancelled && metadata) {
+            value.metadata_attempted = true;
+            struct logical_disk metadata_disk = {0};
+            STRING *filesystem = getFileSystemType(&metadata_disk, name);
+            if (filesystem) {
+                value.metadata_success = true;
+                value.drive_type = metadata_disk.DriveType;
+                value.serial_number = metadata_disk.SerialNumber;
+                value.readonly = metadata_disk.readonly;
+                snprintfz(value.filesystem, sizeof(value.filesystem), "%s", string2str(filesystem));
+                string_freez(filesystem);
             }
-            netdata_mutex_lock(&volume_space_mutex);
-            if (!volume_space_results)
-                volume_space_results = dictionary_create_advanced(
-                    DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
-            dictionary_set(volume_space_results, result_dfe.name, &value, sizeof(value));
-            netdata_mutex_unlock(&volume_space_mutex);
         }
-        dfe_done(result);
-        dictionary_destroy(request);
+
+        netdata_mutex_lock(&volume_space_mutex);
+        volume_space_worker_busy[worker_id] = false;
+        volume_space_worker_started_ut[worker_id] = 0;
+        if (!volume_space_results)
+            volume_space_results = dictionary_create_advanced(
+                DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+        dictionary_set(volume_space_results, name, &value, sizeof(value));
+        netdata_cond_broadcast(&volume_space_cond);
+        netdata_mutex_unlock(&volume_space_mutex);
     }
 
     SetThreadErrorMode(previous_error_mode, NULL);
     worker_unregister();
-    InterlockedExchange(&volume_space_worker_finished, 1);
+    InterlockedExchange(&volume_space_worker_finished[worker_id], 1);
+}
+
+static void volume_space_cancel_expired(void)
+{
+    usec_t now_ut = now_monotonic_usec();
+
+    netdata_mutex_lock(&volume_space_mutex);
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++) {
+        if (!volume_space_worker_busy[i] || !volume_space_worker_started_ut[i] ||
+            now_ut - volume_space_worker_started_ut[i] < VOLUME_SPACE_QUERY_TIMEOUT_UT)
+            continue;
+
+        volume_space_worker_cancel_requested[i] = true;
+        HANDLE handle = volume_space_worker_handles[i];
+        if (handle)
+            CancelSynchronousIo(handle);
+    }
+    netdata_mutex_unlock(&volume_space_mutex);
 }
 
 static void volume_space_add_target(DICTIONARY *request, const char *name, usec_t now_ut)
 {
     struct logical_disk *d = dictionary_get(logicalDisks, name);
-    struct volume_space_request value = { .metadata = logical_disk_metadata_due(d, now_ut) };
+    struct volume_space_request value = { .metadata = !d || logical_disk_metadata_due(d, now_ut) };
     dictionary_set(request, name, &value, sizeof(value));
 }
 
@@ -520,7 +581,14 @@ static void volume_space_submit(DICTIONARY *extra_targets, usec_t now_ut)
     DICTIONARY *request = dictionary_create_advanced(
         DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_request));
 
-    if (!volume_space_thread) {
+    bool workers_available = false;
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++) {
+        if (volume_space_threads[i]) {
+            workers_available = true;
+            break;
+        }
+    }
+    if (!workers_available) {
         dictionary_destroy(request);
         return;
     }
@@ -541,10 +609,10 @@ static void volume_space_submit(DICTIONARY *extra_targets, usec_t now_ut)
     netdata_mutex_lock(&volume_space_mutex);
     if (!volume_space_worker_stop) {
         // Keep only the newest request while a slow query is in progress. The worker will pick it
-        // up after the current request completes, so a busy worker never causes a cycle to be lost.
+        // up as soon as a pool slot becomes available, so a busy worker never causes a cycle to be lost.
         dictionary_destroy(volume_space_request);
         volume_space_request = request;
-        netdata_cond_signal(&volume_space_cond);
+        netdata_cond_broadcast(&volume_space_cond);
         request = NULL;
     }
     netdata_mutex_unlock(&volume_space_mutex);
@@ -2200,6 +2268,7 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     // must happen before the perflib pass: it resolves perflib device names to mount paths
     mount_points_refresh(now_ut);
 
+    volume_space_cancel_expired();
     volume_space_cycle_results = volume_space_collect_results();
     volume_space_extra_targets = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
@@ -2240,65 +2309,74 @@ void do_PerflibStorage_cleanup(void)
     volume_space_worker_stop = true;
     netdata_cond_broadcast(&volume_space_cond);
     netdata_mutex_unlock(&volume_space_mutex);
-    nd_thread_signal_cancel(volume_space_thread);
 
-    if (volume_space_thread) {
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++)
+        if (volume_space_threads[i])
+            nd_thread_signal_cancel(volume_space_threads[i]);
+
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++) {
+        if (!volume_space_threads[i])
+            continue;
+
         netdata_mutex_lock(&volume_space_mutex);
-        HANDLE worker_handle = volume_space_worker_handle;
+        HANDLE worker_handle = volume_space_worker_handles[i];
         netdata_mutex_unlock(&volume_space_mutex);
         DWORD wait_result = worker_handle ?
             WaitForSingleObject(worker_handle, VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS) : WAIT_FAILED;
         if (wait_result == WAIT_TIMEOUT) {
-            // Keep the duplicated handle open with the worker state: the worker may still be using it.
+            // Keep the duplicated handle and all worker state: the worker may still be using them.
             nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "PerflibStorage volume-space worker did not stop within %u seconds; leaving its state intact",
+                "PerflibStorage volume-space worker %zu did not stop within %u seconds; leaving its state intact",
+                i,
                 VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS / 1000);
             return;
         }
 
-        if (wait_result == WAIT_FAILED && !InterlockedCompareExchange(&volume_space_worker_finished, 1, 1)) {
+        if (wait_result == WAIT_FAILED && !InterlockedCompareExchange(&volume_space_worker_finished[i], 1, 1)) {
             // The handle remains owned by the retained cleanup state until the worker is proven finished.
             nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot wait for the PerflibStorage volume-space worker; retaining its state");
+                "Cannot wait for the PerflibStorage volume-space worker %zu; retaining its state",
+                i);
             return;
         }
 
-        int join_result = nd_thread_join(volume_space_thread);
+        int join_result = nd_thread_join(volume_space_threads[i]);
         if (join_result) {
             nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot join the PerflibStorage volume-space worker (error: %d)",
+                "Cannot join the PerflibStorage volume-space worker %zu (error: %d)",
+                i,
                 join_result);
 
             usec_t retry_started_ut = now_monotonic_usec();
-            while (!InterlockedCompareExchange(&volume_space_worker_finished, 1, 1) &&
+            while (!InterlockedCompareExchange(&volume_space_worker_finished[i], 1, 1) &&
                    now_monotonic_usec() - retry_started_ut < VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS * USEC_PER_MS) {
                 Sleep(1);
             }
 
-            if (!InterlockedCompareExchange(&volume_space_worker_finished, 1, 1)) {
+            if (!InterlockedCompareExchange(&volume_space_worker_finished[i], 1, 1)) {
                 // Do not tear down synchronization or close the worker handle while it may still run.
                 nd_log(
                     NDLS_COLLECTORS,
                     NDLP_ERR,
-                    "PerflibStorage volume-space worker is still running; retaining its state");
+                    "PerflibStorage volume-space worker %zu is still running; retaining its state",
+                    i);
                 return;
             }
         }
 
-        volume_space_thread = NULL;
-
         netdata_mutex_lock(&volume_space_mutex);
-        if (volume_space_worker_handle) {
-            CloseHandle(volume_space_worker_handle);
-            volume_space_worker_handle = NULL;
+        if (volume_space_worker_handles[i]) {
+            CloseHandle(volume_space_worker_handles[i]);
+            volume_space_worker_handles[i] = NULL;
         }
         netdata_mutex_unlock(&volume_space_mutex);
+        volume_space_threads[i] = NULL;
     }
 
     netdata_mutex_lock(&volume_space_mutex);
