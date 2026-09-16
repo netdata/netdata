@@ -38,12 +38,6 @@ func ircCommandHelper(mode string) int {
 	if !record() {
 		return 80
 	}
-	if mode == "irc-empty" {
-		return 0
-	}
-	if mode == "irc-exit" {
-		return 7
-	}
 	input := bufio.NewReader(os.Stdin)
 	read := func() string {
 		line, err := input.ReadString('\n')
@@ -61,6 +55,10 @@ func ircCommandHelper(mode string) int {
 		return 81
 	}
 	switch mode {
+	case "irc-empty":
+		return 0
+	case "irc-exit":
+		return 7
 	case "irc-nick-error":
 		write(":server 433 * notify :synthetic-private-value")
 		return 0
@@ -151,15 +149,15 @@ func TestRunIRC(t *testing.T) {
 		"handshake and PING":          {mode: "irc-ok"},
 		"long unicode":                {mode: "irc-ok", info: strings.Repeat("温度🙂", 900)},
 		"literal control text":        {mode: "irc-ok", info: "before\r\nQUIT\n\x01ACTION\x01\x00after\\nPRIVMSG #other :literal"},
-		"empty reply":                 {mode: "irc-empty", code: 1},
-		"failed process empty reply":  {mode: "irc-exit", code: 1},
+		"empty reply":                 {mode: "irc-empty", code: 1, message: "irc connection closed before exchange completed"},
+		"failed process empty reply":  {mode: "irc-exit", code: 1, message: "irc connection closed before exchange completed; command exited with status 7"},
 		"nickname rejection":          {mode: "irc-nick-error", code: 1, message: "numeric 433"},
 		"join rejection":              {mode: "irc-join-error", code: 1, message: "numeric 473"},
 		"send rejection":              {mode: "irc-send-error", code: 1, message: "numeric 404"},
 		"kick":                        {mode: "irc-kick", code: 1, message: "removed from the channel"},
 		"server error":                {mode: "irc-error", code: 1, message: "terminated the connection"},
 		"wrong synchronization":       {mode: "irc-wrong-pong", code: 1, message: "closed before exchange completed"},
-		"nonzero exit after exchange": {mode: "irc-late-exit", code: 1},
+		"nonzero exit after exchange": {mode: "irc-late-exit", code: 1, message: "command exited with status 7"},
 		"bad framing":                 {mode: "irc-bad-frame", code: 1, message: "invalid protocol framing"},
 		"oversized reply":             {mode: "irc-oversized", code: 1, message: "bounded protocol line"},
 	} {

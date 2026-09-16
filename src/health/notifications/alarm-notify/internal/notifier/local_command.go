@@ -58,8 +58,9 @@ func validCommandHost(host string) bool {
 	if strings.HasPrefix(host, "-") || strings.IndexFunc(host, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) != -1 {
 		return false
 	}
-	if _, err := netip.ParseAddr(host); err == nil {
-		return true
+	if addr, err := netip.ParseAddr(host); err == nil {
+		// ParseAddr accepts arbitrary zone text; apply the host character policy to it too.
+		host = addr.Zone()
 	}
 	return !strings.ContainsAny(host, ":/\\[]@?#%${}")
 }

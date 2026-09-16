@@ -135,18 +135,21 @@ func (p *commandProcesses) runProcess(ctx context.Context, executable string, ar
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if sessionErr != nil {
-		return sessionErr
-	}
 	if err == nil {
-		return nil
+		return sessionErr
 	}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
 		if exit.ExitCode() >= 0 {
-			return fmt.Errorf("command exited with status %d", exit.ExitCode())
+			err = fmt.Errorf("command exited with status %d", exit.ExitCode())
+		} else {
+			err = errors.New("command terminated by signal")
 		}
-		return errors.New("command terminated by signal")
+	} else {
+		err = errors.New("command input did not complete")
 	}
-	return errors.New("command input did not complete")
+	if sessionErr != nil {
+		return fmt.Errorf("%w; %w", sessionErr, err)
+	}
+	return err
 }

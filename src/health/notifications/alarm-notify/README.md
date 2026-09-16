@@ -1595,6 +1595,7 @@ The executable receives only the literal host and decimal port as separate argum
 transport remains plaintext, matching the current Bash default. Choosing another port does not enable TLS. This
 increment supports guest access to channels without server passwords, SASL, channel keys or service authentication.
 Configure a hostname or an unbracketed IPv4/IPv6 address, a protocol-safe ASCII nickname and a nonempty realname.
+IPv6 zones such as `%eth0` or `%2` are supported; zone text must also pass the host character restrictions.
 A channel starts with `#`, `&`, `+` or `!`, has at most 50 UTF-8 bytes and contains no spaces, controls or commas.
 These settings are literal; only optional `env` values accept secret references. Arbitrary nc arguments are not exposed.
 
@@ -1608,7 +1609,8 @@ Each message chunk is followed by a synchronization `PING`. A matching `PONG` pe
 completion also requires connection closure and a zero process exit. This confirms the exchange progressed without
 an observed rejection, not that another client received or read the alert. Numeric errors `400`–`599` fail delivery,
 except `422` (no MOTD). Registration/join failures, early EOF, malformed or oversized protocol frames, process errors
-and timeout also fail. An ordinary server `ERROR` closing the connection after our `QUIT` is expected.
+and timeout also fail. If both the protocol and the process fail, diagnostics retain both errors, including the
+process exit status when available. An ordinary server `ERROR` closing the connection after our `QUIT` is expected.
 
 The invocation deadline covers the whole exchange. Increase `--timeout` for servers with slow registration or flood
 limits. Explicit environment, foreground process ownership and platform restrictions follow
@@ -1757,7 +1759,8 @@ backslashes are preserved.
 The notifier passes one message argument; logger controls any wire-format limits or truncation.
 
 Omit `host` to use local logging. Remote `host` is a literal hostname or unbracketed IPv4/IPv6 address; use the separate
-integer `port` field (1–65535) when needed. An omitted port leaves the logger's default in effect. Remote logging retains
+integer `port` field (1–65535) when needed. IPv6 zones such as `%eth0` or `%2` are supported and must pass the host
+character restrictions. An omitted port leaves the logger's default in effect. Remote logging retains
 the existing plaintext behavior; no TLS transport is added in this increment.
 
 Optional `args` preserves Bash's `logger_options` capability as a list of literal, complete logger options. These
