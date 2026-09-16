@@ -1997,30 +1997,54 @@ webhook document.
 
 ## Internal packages
 
-All packages belong to this standalone module. Shared packages do not import `internal/notifier` or depend on
-provider types.
+All packages belong to this standalone module. Providers implement a single delivery contract:
+
+```go
+type Sender interface {
+    Send(context.Context, event.Event) error
+}
+```
+
+A sender represents one configured destination. Success means the provider accepted the request; it does not promise
+that a human received the notification. The context carries the whole invocation deadline.
 
 | Package | Ownership |
 |---|---|
-| `internal/event` | Public notification data and JSON field tags; internal-only routing facts belong separately |
-| `internal/message` | Unescaped common fields, plain text and control escaping; providers own presentation |
+| `internal/app` | CLI options, event input, output and invocation resources |
+| `internal/notifier` | Sender contract, routing, status policies, sequential fan-out and delivery results |
+| `internal/config` | Strict YAML document decoding and typed factories supplied through an explicit registry |
+| `internal/config/field` | Reusable configuration scalar validation, including strict integers |
+| `internal/providers` | Explicit built-in registration |
+| `internal/providers/<provider>` | Typed configuration, validation, rendering, delivery and acknowledgment for one provider |
+| `internal/event` | Public notification data and JSON field tags; internal routing facts belong separately |
+| `internal/message` | Common fields, plain text, control escaping and shared severity colors |
 | `internal/secret` | Whole-value reference syntax and lazy environment/file resolution |
 | `internal/httpclient` | Request construction, client settings, safe errors and bounded response reads |
-| `internal/commandexec` | Foreground processes, interactive sessions, platform support and cleanup |
-| `internal/notifier` | Current CLI/input/configuration, routing, policies and provider implementations |
+| `internal/commandexec` | Command options/environment, foreground processes, interactive sessions and cleanup |
+| `internal/testutil` | Provider-independent test fixtures and helpers |
 
-Providers call shared packages directly. HTTP status acceptance, response acknowledgment, endpoint rules and retries
-remain provider decisions. Callers close HTTP response bodies and idle connections. Shared secret validation performs
-no reads; resolution happens only when an eligible destination sends.
+To add a provider, create its package with a typed `Config`, validating `New` constructor and `Send` method, register
+its constructor in `providers.Builtin`, and add its tests and documentation. The engine and other providers need no
+changes. Provider packages do not import each other or the application. Payloads, endpoint rules, acknowledgment
+checks and retries stay with the provider; shared mechanisms contain no provider dispatch.
 
-The invocation owns a `commandexec.Runner`. Cancel the invocation context before calling `CloseAndWait`, which rejects
-new child work and waits for admitted work to finish cleanup. The runner owns process-group cancellation, session I/O
-and private command homes. Blocked caller-owned input or secret-file reads are outside that shutdown wait.
+Constructors validate all configured destinations without resolving secrets or performing delivery. Configuration
+keeps its flat YAML shape and supports aliases and merges. A provider rejects undeclared fields even when their
+value is empty, zero or null. Typed factories decode the original YAML node graph to preserve cross-destination
+aliases while checking field names, duplicate keys and scalar types. Decoder diagnostics never echo input values.
 
-The next redesign step moves every provider into its own package with typed configuration and a common delivery
-interface, separating application orchestration from provider ownership. No legacy adapter or second dispatch path
-is introduced for that transition. Existing payload fixtures and CLI/provider integration tests stay with their
-behavior owners; shared-package tests cover their mechanisms directly.
+The application owns one HTTP client and command runner per invocation. Providers close response bodies; the
+application closes idle HTTP connections. Secrets resolve only for eligible sends, into local copies of each
+provider's configuration. Constructors retain their own copies of mutable options.
+
+Cancel the invocation context before calling `commandexec.Runner.CloseAndWait`, which rejects new child work and
+waits for admitted work to finish cleanup. The runner owns process-group cancellation, session I/O and private
+command homes. Blocked caller-owned input or secret-file reads remain outside that shutdown wait. The application
+alone writes CLI output, including after cancellation.
+
+Payload fixtures and private renderer/response/config tests live beside their provider. App tests exercise real
+YAML-to-HTTP and command paths; engine tests exercise routing and filtering with recording senders. The registry
+checks the complete provider inventory and field isolation, including explicitly empty foreign fields.
 
 ## Validation
 

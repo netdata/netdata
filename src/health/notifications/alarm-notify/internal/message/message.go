@@ -75,3 +75,15 @@ func EscapeControls(text string) string {
 	}
 	return escaped.String()
 }
+
+// StatusColor is the severity palette used by chat webhook messages.
+func StatusColor(status string) string {
+	switch status {
+	case "WARNING":
+		return "#f0ad4e"
+	case "CRITICAL":
+		return "#d9534f"
+	default:
+		return "#5cb85c"
+	}
+}

@@ -4,10 +4,15 @@ package notifier
 
 import (
 	"errors"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+type Routing struct {
+	Roles    map[string][]string           `yaml:"roles,omitempty"`
+	Default  []string                      `yaml:"default,omitempty"`
+	Policies map[string]*DestinationPolicy `yaml:"policies,omitempty"`
+}
 
 type DestinationPolicy struct {
 	NoWarn  bool `yaml:"nowarn,omitempty"`
@@ -49,72 +54,6 @@ func (policy *DestinationPolicy) skipReason(status string) string {
 		}
 	}
 	return ""
-}
-
-func (cfg Config) validateRouting() error {
-	validateTargets := func(names []string) error {
-		for _, name := range names {
-			if _, ok := cfg.Destinations[name]; !ok {
-				return errors.New("routing references an unconfigured destination")
-			}
-		}
-		return nil
-	}
-	if err := validateTargets(cfg.Routing.Default); err != nil {
-		return err
-	}
-	for role, names := range cfg.Routing.Roles {
-		if strings.TrimSpace(role) == "" {
-			return errors.New("routing role name must not be empty")
-		}
-		if reservedRole(role) {
-			return errors.New("silent and disabled are reserved roles and cannot be configured")
-		}
-		if names == nil {
-			return errors.New(
-				"routing role requires a destination list; use [] to suppress delivery",
-			)
-		}
-		if err := validateTargets(names); err != nil {
-			return err
-		}
-	}
-	for name, policy := range cfg.Routing.Policies {
-		if err := validateTargets([]string{name}); err != nil {
-			return err
-		}
-		if policy == nil {
-			return errors.New("routing policy requires a mapping; use {} for no filters")
-		}
-	}
-	return nil
-}
-
-func selectDestinations(cfg Config, destination string, roles []string) ([]string, error) {
-	if destination != "" {
-		if _, ok := cfg.Destinations[destination]; !ok {
-			return nil, errors.New("selected destination is not configured")
-		}
-		return []string{destination}, nil
-	}
-	var selected []string
-	seen := make(map[string]bool)
-	for _, role := range roles {
-		if reservedRole(role) {
-			continue
-		}
-		names, ok := cfg.Routing.Roles[role]
-		if !ok {
-			names = cfg.Routing.Default
-		}
-		for _, name := range names {
-			if !seen[name] {
-				selected = append(selected, name)
-				seen[name] = true
-			}
-		}
-	}
-	return selected, nil
 }
 
 func reservedRole(role string) bool {
