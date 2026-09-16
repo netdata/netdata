@@ -153,7 +153,9 @@ sb_resolve_bundle() {
     if [ -d "$input" ]; then
         # A symlinked manifest or artifact would send every later read outside
         # the bundle. A real bundle contains no links, so refuse rather than follow.
-        if [ -n "$(find "$input" -maxdepth 3 -type l -print -quit 2>/dev/null)" ]; then
+        # No depth limit: bundle-summary.sh resolves every manifest path under
+        # this root, so a link at any depth can redirect one of those reads.
+        if [ -n "$(find "$input" -type l -print -quit 2>/dev/null)" ]; then
             sb_die "bundle directory contains symlinks; refusing to follow them: ${input}"
         fi
         if [ -f "${input}/MANIFEST.json" ] && [ ! -h "${input}/MANIFEST.json" ]; then

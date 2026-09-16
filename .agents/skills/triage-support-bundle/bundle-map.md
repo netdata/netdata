@@ -134,8 +134,9 @@ collected.
 
 Windows: one merged event-log file covering the Netdata ETW channels plus the legacy channel and
 Netdata records from the Application log, ordered for triage with the highest-volume channel last and
-smallest. It also records **channel state**, because a disabled or full channel is otherwise
-indistinguishable from the agent having logged nothing. Any on-disk log files are collected too, but
+smallest. It also records **channel state**, because a disabled channel is otherwise indistinguishable
+from the agent having logged nothing. It carries no maximum size or retention mode, so it cannot
+confirm a full channel - ask for that separately. Any on-disk log files are collected too, but
 a default Windows install logs to the channels, not to files.
 
 There is no updater log and no coredump metadata on Windows.

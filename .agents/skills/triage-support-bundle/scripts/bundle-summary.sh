@@ -147,14 +147,16 @@ hdr "Truncated, withheld, skipped"
 found=0
 # A capped file copy carries no in-body marker at all: the only signal is the
 # manifest origin. Report those first, or the section claims a clean bundle
-# while on-disk logs are silently incomplete.
+# while on-disk logs are silently incomplete. Withheld symlink and reparse-point
+# sources DO write a body marker, so they are left to the scan below rather than
+# reported twice.
 while IFS=$'\t' read -r p origin; do
     [ -n "$p" ] || continue
     printf '  %s%s%s\n      manifest origin: %s\n' "$SB_YELLOW" "$p" "$SB_NC" "$origin"
     found=1
 done < <(jq -r '.files[]
            | select(.kind == "file")
-           | select(.origin | test("line-aligned|symlink, withheld|reparse point - withheld"))
+           | select(.origin | test("line-aligned"))
            | "\(.path)\t\(.origin)"' "$M")
 while IFS= read -r p; do
     [ -n "$p" ] || continue
