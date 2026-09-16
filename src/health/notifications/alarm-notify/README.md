@@ -2,7 +2,7 @@
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands and SMS Server Tools 3.
+SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands, SMS Server Tools 3 and syslog.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -11,7 +11,7 @@ The current increments provide explicit delivery, role-based routing, modern Sla
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
-Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices and foreground command delivery.
+Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery and syslog.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption; final redesign follows the working functional baseline.
 
@@ -141,6 +141,7 @@ Teams requires `type: msteams` and `url`, with optional `icons`/`colors` maps.
 Matrix requires `type: matrix`, `api_url`, `access_token` and `room_id`.
 Custom commands require `type: command` and `executable`, with optional `args` and `env`.
 SMS Server Tools 3 requires `type: smstools3`, `executable` and `to`, with optional `env`.
+Syslog requires `type: syslog` and `executable`, with optional facility, level, prefix, remote target and command settings.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -1573,6 +1574,69 @@ status wording (needs attention, is critical, recovered), node, optional chart a
 units outside recovery. Summary underscores become spaces, and the text is truncated to 160 Unicode characters.
 Recovery durations remain pending with richer shared event facts. The gateway controls encoding and SMS segmentation;
 160 characters do not necessarily fit in one SMS. An exit status of zero reports tool acceptance, not handset delivery.
+
+## Syslog
+
+`syslog` uses an explicitly configured `logger` executable, with the same environment, foreground execution,
+cancellation and safe diagnostics as custom commands. Command delivery currently runs on Linux and macOS.
+The executable must support `-p facility.level` and a `--` argument terminator for local logging. Remote targets
+require `-n host` and optional `-P port`, as supported by
+[util-linux logger](https://man7.org/linux/man-pages/man1/logger.1.html). The macOS system logger supports local
+logging, but not these remote options.
+
+```yaml
+version: 1
+destinations:
+  local_log:
+    type: syslog
+    executable: /usr/bin/logger
+  remote_log:
+    type: syslog
+    executable: /usr/bin/logger
+    facility: daemon
+    level: notice
+    prefix: netdata
+    host: logs.example.org
+    port: 1514
+    args: [--tcp, --rfc3164]
+routing:
+  roles:
+    log_ops: [local_log, remote_log]
+```
+
+`facility` defaults to `local6`; use a standard lowercase syslog facility such as `auth`, `daemon`, `mail` or
+`local0` through `local7`. Without `level`, CRITICAL maps to `crit`, WARNING to `warning`, and CLEAR to `info`.
+An explicit `level` overrides the severity for every status: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`,
+`info` or `debug`. The logger aliases `security`, `panic`, `error` and `warn` are accepted in the corresponding fields.
+
+`prefix` defaults to `netdata` and is literal text at the start of the message, not logger's header tag.
+The message contains status, node, an RFC3339 event timestamp, optional chart and current value/units, including on
+CLEAR. Null values are omitted and zero remains zero. Rendered NUL characters are rejected before launching the tool.
+The notifier passes one message argument; logger controls any wire-format limits or truncation.
+
+Omit `host` to use local logging. Remote `host` is a literal hostname or unbracketed IPv4/IPv6 address; use the separate
+integer `port` field (1–65535) when needed. An omitted port leaves the logger's default in effect. Remote logging retains
+the existing plaintext behavior; no TLS transport is added in this increment.
+
+Optional `args` preserves Bash's `logger_options` capability as a list of literal, complete logger options. These
+follow the generated priority/host/port options and precede `--` and the message. Options may override earlier settings
+according to the chosen logger; its supported flags determine what is available. For example, util-linux accepts
+`--tcp`, `--udp`, `--rfc3164`, `--rfc5424`, `--socket-errors=on`, or `-t` followed by a tag. Optional `env` works as
+described for custom commands. Neither event text nor option strings are evaluated by a shell.
+
+Each named destination builds its own options and reports its own result. Routes deduplicate destination names and
+keep the existing any-success exit rule. This avoids Bash's accumulated remote options and last-recipient-only status.
+Zero exit status means logger accepted the command, not that a remote collector or local daemon durably stored it.
+Some loggers can report success despite local socket errors; use supported logger options to select stricter reporting.
+
+Validate configuration without writing logs:
+
+```sh
+/tmp/alarm-notify validate --config syslog.yaml
+```
+
+Running `send` with this configuration writes to the configured log targets. The module's syslog tests instead use
+owned helper processes to inspect argv, environment and results without invoking a real logger.
 
 ## Event document
 

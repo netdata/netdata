@@ -30,6 +30,8 @@ func dispatch(
 		dst := cfg.Destinations[name]
 		var err error
 		switch dst.Type {
+		case "syslog":
+			err = sendSyslog(ctx, processes, dst, event)
 		case "command", "smstools3":
 			err = sendCommand(ctx, processes, dst, event)
 		case "webhook":
