@@ -1318,10 +1318,12 @@ static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3
 {
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled && dim_uuid) {
+        // Every tier slot, not the configured count: that count stops at the first tier that failed to start,
+        // while a tier above it is up, rotating, and holding the longest retention there is - data a later
+        // restart would serve. A tier that never came up simply has nothing to report. No active-flag gate
+        // either: this runs during shutdown too, after the tiers exited, and their retention must still count.
         bool no_retention = true;
-        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-            if (!multidb_ctx[tier])
-                continue;
+        for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
             time_t first_time_t = 0, last_time_t = 0;
             if (rrdeng_metric_retention_by_uuid((void *) multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0) {
@@ -2282,12 +2284,9 @@ size_t populate_metrics_from_database(void *mrg, dbengine_preload_add_fn add)
         if (!sqlite3_column_uuid_copy(res, 0, uuid))
             continue;
 
-        for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++) {
-            if (unlikely(!multidb_ctx[tier]))
-                continue;
-
+        // the configured count is right here: this runs inside the first rrdeng_init(), before any tier could fail
+        for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++)
             add(mrg, multidb_ctx[tier], &uuid);
-        }
         count++;
     }
 
