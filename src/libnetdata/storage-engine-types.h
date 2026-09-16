@@ -8,6 +8,8 @@
 #ifndef NETDATA_STORAGE_ENGINE_TYPES_H
 #define NETDATA_STORAGE_ENGINE_TYPES_H
 
+#include <time.h>
+
 typedef struct rrddim RRDDIM;
 
 typedef struct storage_query_handle STORAGE_QUERY_HANDLE;

@@ -1925,7 +1925,9 @@ if(ENABLE_DBENGINE)
     # engine header stays reachable by its path. Being a static archive, an engine object that is only referenced
     # by its own constructors would be dropped from the link silently; today every constructor lives in an object
     # that is referenced by name as well (rrdengine.c, rrdengineapi.c), and that must stay so (CMake 3.16 has no
-    # WHOLE_ARCHIVE).
+    # WHOLE_ARCHIVE). The published statistics structs (dbengine-stats.h) are assembled by both this target and
+    # netdata, and their layout depends on the compile-time switches in that header: never give one target a
+    # definition the other does not get, or the snapshots pulse copies across the boundary silently misalign.
     set(DBENGINE_FILES
             src/database/engine/include/dbengine/rrdengineapi.h
             src/database/engine/include/dbengine/dbengine-config.h

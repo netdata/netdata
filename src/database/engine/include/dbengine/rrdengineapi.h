@@ -103,7 +103,8 @@ extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_G
 //
 // The engine takes work only while it is serving: from the moment the first tier's rrdeng_init() spawned the
 // event loop until dbengine_shutdown() starts. Outside that window rrdeng_enq_work() returns false having done
-// nothing (no queueing, no wake-up, the completion is not touched), and the caller runs or drops the work itself;
+// nothing the caller can observe (no queueing, no wake-up, the completion is not touched), and the caller runs or
+// drops the work itself;
 // rrdeng_work_available() answers the same question up front, for a caller that wants to plan a batch. The
 // answer can change between the two calls only in one direction, serving -> stopped, so a request accepted is
 // always completed. Only this entry point is gated; the engine's own commands are not.
