@@ -21,6 +21,21 @@ struct health_raised_summary {
     } active_alerts;
 };
 
+#if defined(OS_WINDOWS)
+static bool health_exec_is_legacy_alarm_notify_script(const char *exec) {
+    if(!exec || !*exec)
+        return false;
+
+    const char *basename = exec;
+    for(const char *p = exec; *p; p++) {
+        if(*p == '/' || *p == '\\')
+            basename = p + 1;
+    }
+
+    return !strcasecmp(basename, "alarm-notify.sh");
+}
+#endif
+
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     // this has to ALWAYS remove the given alarm entry from the queue
 
@@ -454,6 +469,17 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
                           ae_chart_id(ae), ae_name(ae));
         goto done;
     }
+
+#if defined(OS_WINDOWS)
+    // The legacy notifier is a shell script and Windows installations do not provide
+    // a supported shell runtime. Native executables remain available for explicit use.
+    if(health_exec_is_legacy_alarm_notify_script(exec)) {
+        netdata_log_debug(D_HEALTH,
+                          "Health not sending notification for alarm '%s.%s' (alarm-notify.sh is disabled on Windows)",
+                          ae_chart_id(ae), ae_name(ae));
+        goto done;
+    }
+#endif
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "[%s]: Sending notification for alarm '%s.%s' status %s.",
