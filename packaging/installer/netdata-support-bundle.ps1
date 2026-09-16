@@ -1147,7 +1147,17 @@ if ($ApiOk) {
     Save-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
     Save-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Save-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
-    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (running/failed), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
+    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (running/failed/disabled/orphan/incomplete), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
+    # /api/v3/info answers without any access check, so $ApiOk can be true while
+    # this endpoint - behind the dyncfg ACL - refuses us, and Save-Api deletes the
+    # file on failure leaving no trace at all. The bundle cannot authenticate:
+    # bearer token FILENAMES are themselves live tokens and are never collected.
+    $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
+    if (-not (Test-Path $dyncfgPath)) {
+        $marker = '{"error":"dyncfg tree was not collected","hint":"the agent answered /api/v3/info but refused /api/v3/config; this is expected when the API is bearer-protected or the dyncfg ACL denies local reads. The bundle never collects bearer tokens, so it cannot authenticate. Ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
+        Write-Utf8 $dyncfgPath $marker
+        Add-Manifest '07-runtime\dyncfg-tree.json' 'file' 'generated' 'Collector job state was unavailable (see hint in the file)'
+    }
     Save-Api '07-runtime\ml-info.json' 'Machine learning status' '/api/v1/ml_info'
     Save-Api '07-runtime\self-cpu.csv' 'Netdata CPU last 10min (csv)' '/api/v1/data?chart=netdata.server_cpu&after=-600&points=60&format=csv'
     Save-Api '07-runtime\self-memory.csv' 'Netdata memory last 10min (csv)' '/api/v1/data?chart=netdata.memory&after=-600&points=60&format=csv'

@@ -1510,7 +1510,17 @@ collect_runtime() {
     collect_api 07-runtime/alerts-active.json "Currently raised alerts" "/api/v3/alerts?options=active"
     collect_api 07-runtime/alerts-all.json "All alert instances (summary)" "/api/v1/alarms?all"
     collect_api 07-runtime/functions.json "Registered functions (which plugins expose what)" /api/v1/functions
-    collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (running/failed), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
+    collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (running/failed/disabled/orphan/incomplete), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
+    # /api/v3/info answers without any access check, so api_ok can be 1 while
+    # this endpoint - which sits behind the dyncfg ACL - refuses us. The bundle
+    # cannot authenticate: bearer token FILENAMES are themselves live tokens and
+    # are never collected. Say so, rather than leaving a bare exit code, so the
+    # reader does not read the absence as "no collector jobs exist".
+    if [ -f "$WORK/07-runtime/dyncfg-tree.json" ] && \
+       grep -q '"error":"capture failed' "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null; then
+      printf '%s\n' '{"error":"dyncfg tree was not collected","hint":"the agent answered /api/v3/info but refused /api/v3/config; this is expected when the API is bearer-protected or the dyncfg ACL denies local reads. The bundle never collects bearer tokens, so it cannot authenticate. Ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}' \
+        > "$WORK/07-runtime/dyncfg-tree.json"
+    fi
     collect_api 07-runtime/ml-info.json "Machine learning status" /api/v1/ml_info
     # netdata's own resource usage, bounded windows (perf triage without screenshots)
     collect_api 07-runtime/self-cpu.csv "Netdata CPU last 10min (csv)" "/api/v1/data?chart=netdata.server_cpu&after=-600&points=60&format=csv"
