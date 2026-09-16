@@ -2258,11 +2258,11 @@ bool pgc_destroy(PGC *cache, bool flush) {
     // free all unreferenced clean pages
     free_all_unreferenced_clean_pages(cache);
 
-    // stop the eviction thread
+    // stop the eviction thread. Its completion lives as long as the cache does: a cache left allocated below is
+    // still signalled by whoever asks it for space, and a signal with no thread waiting is a no-op.
     nd_thread_signal_cancel(cache->evictor.thread);
     completion_mark_complete_a_job(&cache->evictor.completion);
     nd_thread_join(cache->evictor.thread);
-    completion_destroy(&cache->evictor.completion);
 
     if(PGC_REFERENCED_PAGES(cache)) {
         netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
@@ -2283,6 +2283,7 @@ bool pgc_destroy(PGC *cache, bool flush) {
         waitq_destroy(&cache->dirty.wq);
         waitq_destroy(&cache->clean.wq);
 #endif
+        completion_destroy(&cache->evictor.completion);
         freez(cache->index);
         freez(cache);
     }
