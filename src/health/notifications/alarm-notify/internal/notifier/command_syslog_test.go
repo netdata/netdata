@@ -23,12 +23,22 @@ func TestRunSyslog(t *testing.T) {
 		remote       bool
 		code         int
 		priority     string
+		change       func(*Destination, *Event)
+		message      string
 	}{
 		"warning":         {status: "WARNING", priority: "local6.warning"},
 		"critical":        {status: "CRITICAL", priority: "local6.crit"},
 		"clear":           {status: "CLEAR", priority: "local6.info"},
 		"remote override": {status: "WARNING", remote: true, priority: "daemon.notice"},
 		"failure":         {status: "WARNING", mode: "fail", code: 1, priority: "local6.warning"},
+		"escaped controls": {
+			status: "WARNING", priority: "local6.warning",
+			change: func(dst *Destination, event *Event) {
+				dst.Prefix = "alert\n"
+				event.Node, event.Chart, event.Units = "node\x1b[31m", "chart\r", "C\u0085\u2028\u2029"
+			},
+			message: `alert\n WARNING on node\x1b[31m at 2026-09-14T12:00:00Z: chart\r 42.5 C\u0085\u2028\u2029`,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			mode := test.mode
@@ -43,9 +53,16 @@ func TestRunSyslog(t *testing.T) {
 				dst.Args = []string{"--tcp"}
 				wantArgs = append(wantArgs, "-n", "logs.example.org", "-P", "1514", "--tcp")
 			}
-			wantArgs = append(wantArgs, "--", "netdata "+test.status+" on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C")
 			event := expectedEvent()
 			event.Status = test.status
+			if test.change != nil {
+				test.change(&dst, &event)
+			}
+			message := test.message
+			if message == "" {
+				message = "netdata " + test.status + " on test-node at 2026-09-14T12:00:00Z: test.chart 42.5 C"
+			}
+			wantArgs = append(wantArgs, "--", message)
 			data, err := json.Marshal(event)
 			require.NoError(t, err)
 			cfg := Config{Version: 1, Destinations: map[string]Destination{"target": dst}}

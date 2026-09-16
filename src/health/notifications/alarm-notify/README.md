@@ -1612,6 +1612,9 @@ An explicit `level` overrides the severity for every status: `emerg`, `alert`, `
 `prefix` defaults to `netdata` and is literal text at the start of the message, not logger's header tag.
 The message contains status, node, an RFC3339 event timestamp, optional chart and current value/units, including on
 CLEAR. Null values are omitted and zero remains zero. Rendered NUL characters are rejected before launching the tool.
+Other control characters and Unicode line/paragraph separators are written as visible backslash escapes (for example,
+`\n`, `\r`, `\x1b` and `\u2028`) to prevent multiline or forged-looking log records. Ordinary Unicode, quotes and literal
+backslashes are preserved.
 The notifier passes one message argument; logger controls any wire-format limits or truncation.
 
 Omit `host` to use local logging. Remote `host` is a literal hostname or unbracketed IPv4/IPv6 address; use the separate
@@ -1629,7 +1632,7 @@ keep the existing any-success exit rule. This avoids Bash's accumulated remote o
 Zero exit status means logger accepted the command, not that a remote collector or local daemon durably stored it.
 Some loggers can report success despite local socket errors; use supported logger options to select stricter reporting.
 
-Validate configuration without writing logs:
+Save the example above as `syslog.yaml`, then validate it without writing logs:
 
 ```sh
 /tmp/alarm-notify validate --config syslog.yaml

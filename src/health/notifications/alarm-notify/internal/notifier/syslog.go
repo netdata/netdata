@@ -95,7 +95,22 @@ func renderSyslog(dst Destination, event Event) ([]string, error) {
 		}
 	}
 	args = append(args, dst.Args...)
-	return append(args, "--", text), nil
+	return append(args, "--", escapeSyslogControls(text)), nil
+}
+
+// Keep message controls out of newline-framed logs and terminal displays.
+func escapeSyslogControls(text string) string {
+	var escaped strings.Builder
+	escaped.Grow(len(text))
+	for _, r := range text {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			quoted := strconv.QuoteRune(r)
+			escaped.WriteString(quoted[1 : len(quoted)-1])
+		} else {
+			escaped.WriteRune(r)
+		}
+	}
+	return escaped.String()
 }
 
 func sendSyslog(ctx context.Context, processes *commandProcesses, dst Destination, event Event) error {
