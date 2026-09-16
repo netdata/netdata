@@ -373,7 +373,7 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
 - Never `git checkout <file>`, `git reset`, delete files, or rewrite history without explicit user approval. Undo a
   change by editing it out, not by checking the file out.
 - Local commits: authorization to implement includes local commits unless the user asks to leave changes uncommitted.
-  Commit coherent, validated implementation before its independent review, and completed, validated review fixes as
+  Commit coherent, validated implementation before any independent review, and completed, validated review fixes as
   follow-up commits. Keep unfinished or unvalidated work uncommitted.
 - Pushes, squashing and other history rewrites still require explicit user authorization.
 - Commit messages and PR bodies describe the change. A PR body links the follow-up issues tracked from its SOW.
@@ -392,19 +392,22 @@ approves it, then run `.agents/sow/worktree-link.sh` (see Storage Model).
 ### Review
 
 The main agent owns delegation, review timing, scope, lenses, depth and reviewer count within the user's directions
-and the readiness requirement below. During development, assess the actual change, unresolved uncertainty and available
+and the readiness assessment below. During development, assess the actual change, unresolved uncertainty and available
 validation; phase boundaries, commits and SOW steps do not require subagents by themselves. Direct work and self-review
 are appropriate when the affected behavior is well understood. Independent challenge is useful for consequential
 design assumptions, complex interactions or material blind spots. Exploration MAY be delegated to keep bulky source
 investigation out of the main context; return concise evidence and owner pointers, and verify consequential findings
 without routinely repeating the entire exploration.
 
-- Readiness: before declaring an implementation branch ready for merge, its final changes MUST have received
-  independent review. If adequate review has not already occurred, the main agent MUST assign a reviewer who did not
-  implement the reviewed changes.
-- Earlier review MAY satisfy readiness where its scope and assumptions remain valid for the final deliverable. The
-  main agent MUST obtain review of subsequent material changes and uncovered interactions; an automatic repeat of
-  the entire review is not required.
+- Initial readiness: before first declaring work ready, the main agent MUST assess whether direct verification is
+  sufficient or independent review would materially improve confidence. Consider plausible mistakes, consequences,
+  interacting behavior, unfamiliar assumptions and validation gaps. Small documentation edits and straightforward,
+  locally understandable changes MAY use self-review and appropriate validation. Independent review is REQUIRED when
+  material uncertainty or consequential interactions remain. Diff size alone does not determine review depth.
+- Earlier independent review by a human, another model or a GitHub bot MAY satisfy the review need where its actual
+  coverage and assumptions remain valid and findings have been verified and addressed. An approval label alone does
+  not establish adequate coverage. When independent review is required and needed coverage is missing, the main agent
+  MUST assign a reviewer who did not implement the reviewed changes.
 
 Review findings are leads until verified against the relevant design or shipped code and its contracts.
 
@@ -435,22 +438,24 @@ Review findings are leads until verified against the relevant design or shipped 
 - Delegated reviewers MUST NOT edit files, perform operational actions or launch other agents; state these boundaries
   in the assignment. Supply the selected scope, relevant acceptance criteria, owner sources, validation and the SOW
   filename when present.
-- Review evidence: the SOW's Validation section MUST record the reviewer, reviewed commit or identified working-tree
-  state, covered scope and interactions, findings and their dispositions (or no findings), and remaining limitations.
-  When relying on earlier review, explain why its coverage remains valid for the final state. Preserve relevant
-  validation evidence alongside the review; for work without a SOW, include the review summary in the final report.
+- Review evidence: the SOW's Validation section MUST record the chosen assessment approach and why it is sufficient,
+  assessed commit or identified working-tree state, covered scope and interactions, findings and dispositions (or
+  none), and remaining limitations. When independent review is used, also identify the reviewer; when reusing earlier
+  review, explain why its coverage remains valid. Preserve relevant validation evidence alongside the assessment;
+  for work without a SOW, include a brief assessment summary in the final report.
 - Review checkpoints follow "Git And PR Workflow". Focused review MAY compare commits; it does not require uncommitted
   changes. Choose review scope from the changed behavior and remaining uncertainty, not the working tree's status.
-- Follow-up review: after a fix, retain earlier evidence that still holds. Check a bounded fix and its affected
-  interactions directly or with a focused reviewer. Widen review when changed assumptions, shared behavior, contracts
-  or missing coverage invalidate the earlier assessment beyond that fix. A blocker label or new commit alone does
-  not require a fresh reviewer or another complete review of the original scope.
+- Follow-up review: assess each subsequent change against earlier review and validation, retaining evidence that
+  still holds. A bounded correction MAY be verified directly; obtain focused independent review when the change
+  introduces material risk or invalidates earlier assumptions. Repeat broader review only when changed assumptions,
+  shared behavior, contracts or missing coverage invalidate the earlier assessment beyond the change. A new commit,
+  bot finding, blocker label, review round or readiness declaration does not itself require another reviewer.
 - Recurrence: when findings repeatedly cluster in one subsystem, investigate the shared cause or missing invariant
   rather than accumulating case fixes. Broaden investigation when the evidence warrants it; obtain user approval
   for remedies that change architecture, scope, public behavior or an approved design.
-- Stop when no verified shipping blocker remains, material risks have been assessed and required review and validation
-  are complete. Reviewer unanimity, exact readiness phrases and zero optional suggestions are NOT required. Nits alone
-  MUST NOT keep a review cycle open.
+- Stop when no verified shipping blocker remains, material risks have been assessed, validation is complete and any
+  review required by the risk assessment and applicable instructions is complete. Reviewer unanimity, exact readiness
+  phrases and zero optional suggestions are NOT required. Nits alone MUST NOT keep a review cycle open.
 
 ### Followup Discipline
 
