@@ -14,7 +14,10 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use common::{kv_str, req, req_with, sp, sealed_source, tail_source, write_wal};
+use common::{
+    corrupt_chunk, kv_str, req, req_with, sealed_source, sealed_source_at, sp, tail_source,
+    write_wal,
+};
 use sfsq::traces::{
     AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_COUNT, DurationPercentiles,
     FACET_TOP_K, OverviewData, OverviewQuery, OverviewRequestError, PartialReason, Predicate,
@@ -865,6 +868,86 @@ fn filtered_grid_charges_the_visited_ceiling() {
         assert!(data.status.has(PartialReason::OverviewCeiling));
         assert_eq!(data.total_traces, 0);
     }
+}
+
+/// The filter's scans are charged to the fold's ONE ceiling and
+/// accumulate across sources: two files each affordable alone are not
+/// affordable together, and the merge stops with the partial reason
+/// while the traces the earlier file already selected stay binned.
+#[test]
+fn filter_work_accumulates_across_sources() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_a = write_wal(dir.path(), vec![req(&c[..2])], "a"); // A
+    let wal_b = write_wal(dir.path(), vec![req(&c[2..])], "b"); // B, C
+    let src_a = || sealed_source(dir.path(), &wal_a, "a");
+    let src_b = || sealed_source(dir.path(), &wal_b, "b");
+    let predicate = || name_in(&["a-1", "c-1"]);
+    let at = |sources: Vec<TraceSource>, ceiling: u64| {
+        run(
+            sources,
+            OverviewQuery::new(grid())
+                .predicate(predicate())
+                .visited_rows_ceiling_for_tests(ceiling),
+        )
+    };
+    // The smallest ceiling under which one file alone completes: its
+    // fold rows plus its filter's scan and emission.
+    let minimal = |source: &dyn Fn() -> TraceSource| {
+        (0..64)
+            .find(|&ceiling| at(vec![source()], ceiling).status == QueryStatus::Complete)
+            .expect("a small file completes under a small ceiling")
+    };
+    let (cost_a, cost_b) = (minimal(&src_a), minimal(&src_b));
+
+    // Together they need the SUM: one unit short trips the ceiling.
+    let data = at(vec![src_a(), src_b()], cost_a + cost_b - 1);
+    assert!(data.status.has(PartialReason::OverviewCeiling));
+    assert_eq!(data.total_traces, 1, "the first file's selection survives the stop");
+    assert_eq!(data.cells[1][3], 1, "A");
+    assert_eq!(data.cells[5][5], 0, "C was never flagged");
+
+    let data = at(vec![src_a(), src_b()], cost_a + cost_b);
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.total_traces, 2);
+    assert_eq!((data.cells[1][3], data.cells[5][5]), (1, 1));
+}
+
+/// A file whose rows merge but whose filter scan fails (here: a corrupt
+/// trace-id column, which the UNFILTERED grid never reads) contributes
+/// no selected trace: its matches are unknown, so its traces stay
+/// unflagged, the failure is on the result, and the merge goes on to
+/// the next source.
+#[test]
+fn a_failed_filter_scan_leaves_the_files_traces_unflagged() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_bad = write_wal(dir.path(), vec![req(&c[2..])], "bad"); // B, C
+    let wal_ok = write_wal(dir.path(), vec![req(&c[..2])], "ok"); // A
+    // Seal once, corrupt in place, then build sources WITHOUT resealing.
+    drop(sealed_source(dir.path(), &wal_bad, "bad"));
+    let bad_path = dir.path().join("bad.sfst");
+    corrupt_chunk(&bad_path, *b"TRCE");
+    let src = || {
+        vec![
+            sealed_source_at(&bad_path, "bad"),
+            sealed_source(dir.path(), &wal_ok, "ok"),
+        ]
+    };
+
+    // Unfiltered, the column is never read: the file counts, complete.
+    let plain = run(src(), OverviewQuery::new(grid()));
+    assert_eq!(plain.status, QueryStatus::Complete);
+    assert_eq!(plain.total_traces, 3);
+
+    // Filtered, C's match is unknowable: A alone is selected, the
+    // failure is flagged, and the healthy file after it still ran.
+    let data = filtered(src(), name_in(&["a-1", "c-1"]));
+    assert!(data.status.has(PartialReason::SourceFailure));
+    assert!(!data.status.has(PartialReason::OverviewCeiling));
+    assert_eq!(data.total_traces, 1);
+    assert_eq!(data.cells[1][3], 1, "A, from the healthy file");
+    assert_eq!(data.cells[5][5], 0, "C stays unflagged");
 }
 
 /// Trace-level and trace-id conditions cannot be answered from stored

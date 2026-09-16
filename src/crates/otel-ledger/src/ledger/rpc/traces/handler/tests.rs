@@ -1226,16 +1226,44 @@ async fn the_aggregate_follows_the_selections_but_never_the_duration_bounds() {
     assert_eq!(v["data"]["overview"]["scope"], "window");
 }
 
+/// Every trace-level word the engine owns (`trace_level_target`), as
+/// the wire spells it, with a value the list can apply. `trace_duration`
+/// is absent: a selection value is text and the field takes integers,
+/// so the list rejects it before any grid decision.
+const TRACE_LEVEL_SELECTIONS: [(&str, &str); 3] = [
+    ("root_service_name", "svc-a"),
+    ("root_name", "span-1"),
+    ("trace_id", "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"),
+];
+
 #[tokio::test]
 async fn a_trace_level_selection_word_falls_back_to_the_window_grid() {
     let h = handler_with_search_corpus().await;
-    // `root_service_name` is a legitimate LIST filter but stored rows
+    // A trace-level word is a legitimate LIST filter but stored rows
     // cannot answer it for the grid: the grid runs unfiltered and says
     // so, rather than guessing from the rollup's approximate root.
+    for (word, value) in TRACE_LEVEL_SELECTIONS {
+        let mut body = functions_body(20);
+        body["selections"] = json!({word: [value]});
+        let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+        assert!(!ids(&v["data"]).is_empty(), "{word}: the list applies the word");
+        let o = &v["data"]["overview"];
+        assert_eq!(o["scope"], "window", "{word}");
+        assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}), "{word}");
+    }
     let mut body = functions_body(20);
     body["selections"] = json!({"root_service_name": ["svc-a"]});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"], "the list applies the word");
+    assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
+
+    // Mixed with a span-level word, the WHOLE predicate is dropped: the
+    // span-level half alone (svc-b: 2 traces) would misrepresent a list
+    // that applies both.
+    let mut body = functions_body(20);
+    body["selections"] =
+        json!({"root_service_name": ["svc-a"], "resource.service.name": ["svc-b"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert!(ids(&v["data"]).is_empty(), "no trace is on both services");
     let o = &v["data"]["overview"];
     assert_eq!(o["scope"], "window");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
@@ -1260,15 +1288,23 @@ async fn the_overview_mode_applies_selections_and_reports_scope() {
     assert_eq!(v["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
 
     // No list to carry a trace-level word for: a clean client error
-    // naming the word, never a silently unfiltered grid.
-    let mut body = window_body();
-    merge(&mut body, json!({"selections": {"root_service_name": ["svc-a"]}}));
-    let err = call_on(&h, as_mode("overview", body))
-        .await
-        .expect_err("must be a client error");
-    let msg = err.to_string();
-    assert!(msg.contains("root_service_name"), "{msg}");
-    assert!(msg.contains("trace-level"), "{msg}");
+    // naming the word, never a silently unfiltered grid — alone or
+    // mixed with a span-level word.
+    let mixed = json!({"root_service_name": ["svc-a"], "resource.service.name": ["svc-b"]});
+    let cases = TRACE_LEVEL_SELECTIONS
+        .iter()
+        .map(|(word, value)| (*word, json!({*word: [*value]})))
+        .chain([("root_service_name", mixed)]);
+    for (word, selections) in cases {
+        let mut body = window_body();
+        merge(&mut body, json!({"selections": selections}));
+        let err = call_on(&h, as_mode("overview", body))
+            .await
+            .expect_err("must be a client error");
+        let msg = err.to_string();
+        assert!(msg.contains(word), "{msg}");
+        assert!(msg.contains("trace-level"), "{msg}");
+    }
 }
 
 #[tokio::test]
