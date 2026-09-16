@@ -1187,7 +1187,10 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
     // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
     rrdeng_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
-    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
+    if (!rrdeng_dbengine_spawn(ctx))
+        netdata_log_error("DBENGINE: tier %zu: the engine is not running and could not be started, the tier cannot be initialized",
+                          (size_t)tc->tier);
+    else if (!init_rrd_files(ctx)) {
         // success - we run this ctx too
         __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
         __atomic_store_n(&ctx->atomic.active, true, __ATOMIC_RELEASE);

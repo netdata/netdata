@@ -50,7 +50,8 @@ time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh);
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh);
 time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
-/* must call once before using anything */
+// bring a tier up; the first one spawns the engine's event loop. Once dbengine_shutdown() has run, the engine
+// cannot be started again in this process: a later rrdeng_init() fails with UV_EIO
 int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_config *tc);
 
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
@@ -62,8 +63,9 @@ int rrdeng_exit(struct rrdengine_instance *ctx);
 // started or already stopped
 bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx);
 
-// stop the engine's event loop and join its thread; after every tier's rrdeng_exit(). Nothing may
-// be enqueued to the engine afterwards
+// stop the engine's event loop and join its thread; after every tier's rrdeng_exit(). Nothing may be enqueued
+// to the engine afterwards, and the engine cannot be started again in this process (rrdeng_init() fails). A
+// second call does nothing
 void dbengine_shutdown(void);
 void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);

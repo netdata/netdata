@@ -98,6 +98,15 @@ struct rrdeng_main {
         }
 };
 
+// The event loop's lifecycle: spawned once by the first tier that comes up, stopped once by dbengine_shutdown().
+// There is no way back: a second spawn would create the caches and the registry again over the live ones, and
+// libuv does not re-initialise a closed loop. So a tier that comes up after the stop is refused, not hung.
+static struct {
+    SPINLOCK spinlock;
+    bool spawned;
+    bool stopped;
+} rrdeng_lifecycle = { .spinlock = SPINLOCK_INITIALIZER, .spawned = false, .stopped = false };
+
 #if defined(OS_WINDOWS)
 netdata_mutex_t rrdeng_async_mutex;
 
@@ -2589,15 +2598,17 @@ static void dbengine_initialize_structures(void) {
 }
 
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
-    static bool spawned = false;
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-
     // Every exit must release the spinlock: the other tier init threads are
     // waiting on it, and a failed attempt leaves spawned == false so the next
     // caller retries the setup rather than spinning forever.
-    spinlock_lock(&spinlock);
+    spinlock_lock(&rrdeng_lifecycle.spinlock);
 
-    if(!spawned) {
+    if(rrdeng_lifecycle.stopped) {
+        netdata_log_error("DBENGINE: the engine was shut down and cannot be started again in this process");
+        goto fail;
+    }
+
+    if(!rrdeng_lifecycle.spawned) {
         int ret;
 
         ret = uv_loop_init(&rrdeng_main.loop);
@@ -2644,14 +2655,14 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         fatal_assert(0 != rrdeng_main.thread);
 
         rrdeng_cmd_queue_set_accepting(true);
-        spawned = true;
+        rrdeng_lifecycle.spawned = true;
     }
 
-    spinlock_unlock(&spinlock);
+    spinlock_unlock(&rrdeng_lifecycle.spinlock);
     return true;
 
 fail:
-    spinlock_unlock(&spinlock);
+    spinlock_unlock(&rrdeng_lifecycle.spinlock);
     return false;
 }
 
@@ -2948,7 +2959,15 @@ void dbengine_event_loop(void* arg) {
 
 void dbengine_shutdown(void)
 {
-    // refuse embedder work first, so no request can be queued behind the loop's exit and left unanswered
+    // no tier may come up from here on: it would find no loop to serve it. A second call has nothing to stop.
+    spinlock_lock(&rrdeng_lifecycle.spinlock);
+    bool already_stopped = rrdeng_lifecycle.stopped;
+    rrdeng_lifecycle.stopped = true;
+    spinlock_unlock(&rrdeng_lifecycle.spinlock);
+    if(already_stopped)
+        return;
+
+    // refuse embedder work next, so no request can be queued behind the loop's exit and left unanswered
     rrdeng_cmd_queue_set_accepting(false);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
