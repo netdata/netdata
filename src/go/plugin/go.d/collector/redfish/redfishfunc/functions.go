@@ -521,7 +521,12 @@ func boundedJSONStringSize(value string, remaining int) int {
 		r, width := utf8.DecodeRuneInString(value[index:])
 		index += width
 		switch {
-		case (r == utf8.RuneError && width == 1) || r == '\u2028' || r == '\u2029':
+		case r == utf8.RuneError && width == 1:
+			// encoding/json replaces every invalid byte with a literal U+FFFD, not a \ufffd escape.
+			if !add(utf8.RuneLen(utf8.RuneError)) {
+				return size
+			}
+		case r == '\u2028' || r == '\u2029':
 			if !add(6) {
 				return size
 			}

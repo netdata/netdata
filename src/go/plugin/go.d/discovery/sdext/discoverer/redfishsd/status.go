@@ -251,7 +251,10 @@ func jsonStringEncodedSize(value string) int {
 		r, width := utf8.DecodeRuneInString(value[index:])
 		index += width
 		switch {
-		case (r == utf8.RuneError && width == 1) || r == '\u2028' || r == '\u2029':
+		case r == utf8.RuneError && width == 1:
+			// encoding/json replaces every invalid byte with a literal U+FFFD, not a \ufffd escape.
+			size += utf8.RuneLen(utf8.RuneError)
+		case r == '\u2028' || r == '\u2029':
 			size += 6
 		default:
 			size += width
