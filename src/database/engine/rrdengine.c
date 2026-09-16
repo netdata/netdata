@@ -2959,12 +2959,13 @@ void dbengine_event_loop(void* arg) {
 
 void dbengine_shutdown(void)
 {
-    // no tier may come up from here on: it would find no loop to serve it. A second call has nothing to stop.
+    // no tier may come up from here on: it would find no loop to serve it. A second call has nothing to stop,
+    // and neither has a call on an engine that never spawned: its queue and thread do not exist.
     spinlock_lock(&rrdeng_lifecycle.spinlock);
-    bool already_stopped = rrdeng_lifecycle.stopped;
+    bool nothing_to_stop = rrdeng_lifecycle.stopped || !rrdeng_lifecycle.spawned;
     rrdeng_lifecycle.stopped = true;
     spinlock_unlock(&rrdeng_lifecycle.spinlock);
-    if(already_stopped)
+    if(nothing_to_stop)
         return;
 
     // refuse embedder work next, so no request can be queued behind the loop's exit and left unanswered

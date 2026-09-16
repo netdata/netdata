@@ -3436,7 +3436,7 @@ void unittest_stress_test(void) {
     for(size_t i = 0; i < pgc_uts.query_threads ;i++)
         nd_thread_join(queries_threads[i],NULL);
 
-    pgc_destroy(pgc_uts.cache);
+    pgc_destroy(pgc_uts.cache, true);
 
     freez(pgc_uts.metrics);
     freez(pgc_uts.random_data);

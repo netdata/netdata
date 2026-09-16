@@ -459,7 +459,7 @@ int pgd_test(int argc, char *argv[])
     ::testing::InitGoogleTest(&argc, argv);
     int rc = RUN_ALL_TESTS();
 
-    pgc_destroy(dummy_cache);
+    pgc_destroy(dummy_cache, true);
 
     return rc;
 }

@@ -4,11 +4,11 @@
 #include "database/rrddim-collection.h"
 #include "daemon/unit_test_bridge.h"
 
+#ifdef ENABLE_DBENGINE
+
 // The zero-page-cadence test below inspects the collect handle's current page, which only the engine's private
 // header describes. This is the one translation unit outside src/database/engine/ that includes it, on purpose.
 #include "database/engine/rrdengine.h"
-
-#ifdef ENABLE_DBENGINE
 
 #define CHARTS 64
 #define DIMS 16 // CHARTS * DIMS dimensions

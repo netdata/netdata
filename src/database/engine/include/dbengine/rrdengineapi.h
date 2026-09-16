@@ -51,7 +51,9 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh);
 time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
 // bring a tier up; the first one spawns the engine's event loop. Once dbengine_shutdown() has run, the engine
-// cannot be started again in this process: a later rrdeng_init() fails with UV_EIO
+// cannot be started again in this process: a later rrdeng_init() fails with UV_EIO. A tier init and the shutdown
+// must not overlap: the check is made when the tier starts, so an init that is still in flight when the shutdown
+// begins would wait on a loop that is gone (the daemon joins its tier inits at startup, long before any shutdown)
 int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_config *tc);
 
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
@@ -63,9 +65,10 @@ int rrdeng_exit(struct rrdengine_instance *ctx);
 // started or already stopped
 bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx);
 
-// stop the engine's event loop and join its thread; after every tier's rrdeng_exit(). Nothing may be enqueued
-// to the engine afterwards, and the engine cannot be started again in this process (rrdeng_init() fails). A
-// second call does nothing
+// stop the engine's event loop and join its thread; after every tier's rrdeng_exit(), and never while a
+// rrdeng_init() is in flight. Nothing may be enqueued to the engine afterwards, and the engine cannot be started
+// again in this process (rrdeng_init() fails). On an engine that never spawned, or on a second call, it returns
+// at once; a second call does not wait for the first to finish
 void dbengine_shutdown(void);
 void rrdeng_quiesce(struct rrdengine_instance *ctx);
 void rrdeng_flush_dirty(struct rrdengine_instance *ctx);
@@ -104,10 +107,9 @@ extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_G
 // The engine takes work only while it is serving: from the moment the first tier's rrdeng_init() spawned the
 // event loop until dbengine_shutdown() starts. Outside that window rrdeng_enq_work() returns false having done
 // nothing the caller can observe (no queueing, no wake-up, the completion is not touched), and the caller runs or
-// drops the work itself;
-// rrdeng_work_available() answers the same question up front, for a caller that wants to plan a batch. The
-// answer can change between the two calls only in one direction, serving -> stopped, so a request accepted is
-// always completed. Only this entry point is gated; the engine's own commands are not.
+// drops the work itself; rrdeng_work_available() answers the same question up front, for a caller that wants to
+// plan a batch. Once the engine serves, the only later change is to stopped, so a request accepted is always
+// completed. Only this entry point is gated; the engine's own commands are not.
 struct rrdeng_work_request {
     void (*fn)(void *data);
     void *data;
