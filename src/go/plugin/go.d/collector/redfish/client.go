@@ -24,8 +24,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/stmcginnis/gofish"
-	"github.com/stmcginnis/gofish/schemas"
 )
 
 const (
@@ -63,26 +61,15 @@ type protocolClient struct {
 	sessions    []sessionHandle
 	refreshMu   sync.Mutex
 
-	baseMu                 sync.Mutex
-	baseMembership         map[string][]baseResource
-	graphMu                sync.Mutex
-	graphMembership        map[string]graphMembershipSnapshot
-	graphMembershipSize    int
-	graphMembershipCounted bool
-	logicalOwners          map[string]logicalPlacementSnapshot
-	systemOwners           map[string][]string
-	selectedSystemMu       sync.Mutex
-	selectedSystemIncluded map[string]struct{}
-	collectionMu           sync.Mutex
-	collectionProgress     map[string]collectionProgress
-	collectionProgressSize int
-	collectionProgressUsed bool
-	knownCollections       map[string]struct{}
-	expansionValue         string
-	expansionDisabled      map[string]struct{}
-	memberCursor           map[string]int
-	fairnessCursor         map[string]int
-	expansionFallbackSeen  bool
+	baseMu                sync.Mutex
+	baseMembership        map[string][]baseResource
+	graphMu               sync.Mutex
+	graphMembership       map[string]graphMembershipSnapshot
+	collectionMu          sync.Mutex
+	knownCollections      map[string]struct{}
+	expansionValue        string
+	expansionDisabled     map[string]struct{}
+	expansionFallbackSeen bool
 
 	identities identityRegistry
 
@@ -204,85 +191,54 @@ func newEndpointClient(cfg Config, client *http.Client) (endpointClient, error) 
 		families[family] = family == "base" || familyMatcher.MatchString(family)
 	}
 	result := &protocolClient{
-		config:                 cfg,
-		endpointJob:            cfg.Name,
-		http:                   client,
-		root:                   root,
-		origin:                 origin,
-		authMode:               cfg.AuthMethod,
-		baseMembership:         make(map[string][]baseResource),
-		graphMembership:        make(map[string]graphMembershipSnapshot),
-		logicalOwners:          make(map[string]logicalPlacementSnapshot),
-		systemOwners:           make(map[string][]string),
-		selectedSystemIncluded: make(map[string]struct{}),
-		collectionProgress:     make(map[string]collectionProgress),
-		knownCollections:       make(map[string]struct{}),
-		expansionDisabled:      make(map[string]struct{}),
-		memberCursor:           make(map[string]int),
-		fairnessCursor:         make(map[string]int),
-		sem:                    make(chan struct{}, cfg.MaxConcurrentRequests),
-		families:               families,
+		config:            cfg,
+		endpointJob:       cfg.Name,
+		http:              client,
+		root:              root,
+		origin:            origin,
+		authMode:          cfg.AuthMethod,
+		baseMembership:    make(map[string][]baseResource),
+		graphMembership:   make(map[string]graphMembershipSnapshot),
+		knownCollections:  make(map[string]struct{}),
+		expansionDisabled: make(map[string]struct{}),
+		sem:               make(chan struct{}, cfg.MaxConcurrentRequests),
+		families:          families,
 	}
 	result.hardwareState.initialize()
 	return result, nil
 }
 
+// Check identifies the endpoint without acquiring remote session state. Session
+// credentials are validated when the running collector first authenticates.
 func (c *protocolClient) Check(ctx context.Context) error {
-	ctx = withOperationBudget(ctx)
 	stats := &wireStats{failures: make(map[string]int)}
 	defer c.rememberCompatibilityDiagnostics(stats)
-	if !c.authenticationInitialized() {
-		switch c.config.AuthMethod {
-		case "auto", "session":
-			root, err := c.fetchServiceRoot(ctx, false, stats)
-			if err != nil {
-				return fmt.Errorf("read unauthenticated ServiceRoot for session discovery: %w", err)
-			}
-			if err := c.initializeSession(ctx, root, stats); err != nil {
-				if c.config.AuthMethod != "auto" || !errors.Is(err, errSessionUnsupported) {
-					return err
-				}
-				c.setAuth("basic", "", "")
-				if _, err := c.fetchServiceRoot(ctx, true, stats); err != nil {
-					return fmt.Errorf("validate Basic authentication fallback: %w", err)
-				}
-			}
-		case "basic", "none":
-			c.setAuth(c.config.AuthMethod, "", "")
-		default:
-			return fmt.Errorf("unsupported authentication mode %q", c.config.AuthMethod)
-		}
-	}
+	_, err := c.fetchServiceRoot(ctx, c.config.AuthMethod == "basic", stats)
+	return err
+}
 
-	root, err := c.fetchServiceRoot(ctx, c.config.AuthMethod != "none", stats)
-	if err != nil {
-		return err
+func (c *protocolClient) initializeAuthentication(ctx context.Context, stats *wireStats) error {
+	c.refreshMu.Lock()
+	defer c.refreshMu.Unlock()
+	if c.authenticationInitialized() {
+		return nil
 	}
-	resources, membership, _, fetchErr := c.fetchBaseResources(ctx, root, stats)
-	readable := 0
-	for _, resource := range resources {
-		if resource.AcquisitionState == "readable" {
-			readable++
+	switch c.config.AuthMethod {
+	case "auto", "session":
+		root, err := c.fetchServiceRoot(ctx, false, stats)
+		if err != nil {
+			return fmt.Errorf("read unauthenticated ServiceRoot for session discovery: %w", err)
 		}
-	}
-	if readable == 0 {
-		if fetchErr != nil {
-			return fetchErr
-		}
-		return errors.New("ServiceRoot has no readable ComputerSystem, Chassis, or Manager")
-	}
-	if c.config.SystemURI != "" {
-		selected, _ := normalizeConfiguredResourceURI(c.root, c.config.SystemURI)
-		if !membership["system"] {
-			return errors.New("ComputerSystem collection is incomplete")
-		}
-		for _, resource := range resources {
-			if resource.Kind == "system" && resource.URI == selected &&
-				resource.AcquisitionState == "readable" {
-				return nil
+		if err := c.initializeSession(ctx, root, stats); err != nil {
+			if c.config.AuthMethod != "auto" || !errors.Is(err, errSessionUnsupported) {
+				return err
 			}
+			c.setAuth("basic", "", "")
 		}
-		return fmt.Errorf("configured ComputerSystem %q is not present and readable", selected)
+	case "basic", "none":
+		c.setAuth(c.config.AuthMethod, "", "")
+	default:
+		return fmt.Errorf("unsupported authentication mode %q", c.config.AuthMethod)
 	}
 	return nil
 }
@@ -303,7 +259,6 @@ func (c *protocolClient) selectedAuthenticationMethod() string {
 }
 
 func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) {
-	ctx = withOperationBudget(ctx)
 	started := time.Now()
 	stats := &wireStats{failures: make(map[string]int)}
 	result := collectionResult{
@@ -317,22 +272,25 @@ func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) 
 	}
 	result.Diagnostics = append(result.Diagnostics, c.takeCompatibilityDiagnostics()...)
 
-	root, err := c.fetchServiceRoot(ctx, true, stats)
+	err := c.initializeAuthentication(ctx, stats)
+	var root *serviceRootDocument
+	if err == nil {
+		root, err = c.fetchServiceRoot(ctx, true, stats)
+	}
 	if err != nil {
 		result.Metrics.Status = "unavailable"
 		result.Metrics.Duration = time.Since(started).Seconds()
-		result.Metrics.SelectedSystem = selectedSystemFailureState(c.config.SystemURI, err)
 		c.copyWireStats(&result.Metrics, stats)
 		return result, err
 	}
-	resources, membership, baseComplete, baseErr := c.fetchBaseResources(ctx, root, stats)
+	resources, _, baseComplete, baseErr := c.fetchBaseResources(ctx, root, stats)
 	graph, graphErr := c.collectResourceGraph(ctx, root, resources, stats)
 	collectionErr := errors.Join(baseErr, graphErr)
 	result.Complete = baseComplete && baseErr == nil && graph.Complete && graphErr == nil
 	if identityIntegrityError(graphErr) {
 		result.Complete = false
 		result.Diagnostics = append(result.Diagnostics, boundedDiagnostic(graphErr.Error()))
-		c.finishCollectionResult(&result, graph, resources, membership["system"], stats, started)
+		c.finishCollectionResult(&result, graph, stats, started)
 		return result, collectionErr
 	}
 	var hardwareErr error
@@ -351,18 +309,16 @@ func (c *protocolClient) Collect(ctx context.Context) (collectionResult, error) 
 	if identityIntegrityError(hardwareErr) {
 		result.Hardware = nil
 		result.Complete = false
-		c.finishCollectionResult(&result, graph, resources, membership["system"], stats, started)
+		c.finishCollectionResult(&result, graph, stats, started)
 		return result, collectionErr
 	}
-	c.finishCollectionResult(&result, graph, resources, membership["system"], stats, started)
+	c.finishCollectionResult(&result, graph, stats, started)
 	return result, collectionErr
 }
 
 func (c *protocolClient) finishCollectionResult(
 	result *collectionResult,
 	graph *resourceGraph,
-	resources []baseResource,
-	systemMembershipComplete bool,
 	stats *wireStats,
 	started time.Time,
 ) {
@@ -385,7 +341,6 @@ func (c *protocolClient) finishCollectionResult(
 	} else {
 		result.Metrics.Status = "partial"
 	}
-	result.Metrics.SelectedSystem = c.selectedSystemState(resources, systemMembershipComplete)
 	result.Metrics.Duration = time.Since(started).Seconds()
 	c.copyWireStats(&result.Metrics, stats)
 	result.Diagnostics = appendUniqueDiagnostics(
@@ -706,7 +661,12 @@ func (c *protocolClient) createSession(
 		}
 		return err
 	}
-	var session schemas.Session
+	var session struct {
+		ODataType string `json:"@odata.type"`
+		ODataID   string `json:"@odata.id"`
+		ID        string `json:"Id"`
+		Name      string `json:"Name"`
+	}
 	if err := decodeJSON(response, &session); err != nil {
 		return fail(fmt.Errorf("decode created Redfish session: %w", err))
 	}
@@ -717,13 +677,7 @@ func (c *protocolClient) createSession(
 	if err != nil || !sameResourceIdentity(canonicalResourceURI(sessionID), canonicalResourceURI(sessionTarget)) {
 		return fail(errors.New("create Redfish session: body identity does not match Location"))
 	}
-	var envelope struct {
-		ODataType string `json:"@odata.type"`
-	}
-	if err := json.Unmarshal(response.body, &envelope); err != nil {
-		return fail(errors.New("create Redfish session: body is not a Session resource"))
-	}
-	if err := validateResourceSchemaType("session", envelope.ODataType); err != nil {
+	if err := validateResourceSchemaType("session", session.ODataType); err != nil {
 		return fail(fmt.Errorf("create Redfish session: %w", err))
 	}
 	response.finish(nil)
@@ -862,9 +816,10 @@ func (c *protocolClient) refreshSession(
 	if err := c.initializeSession(ctx, root, stats); err != nil {
 		return requestAuth{}, fmt.Errorf("recreate Redfish session: %w", err)
 	}
-	if c.deleteSessionIndependent(ctx, old, stats) == nil {
-		c.forgetSession(old)
-	}
+	// A 401 has invalidated this credential. Deletion is best effort: retaining
+	// an expired token as pending cleanup would block the next refresh forever.
+	_ = c.deleteSessionIndependent(ctx, old, stats)
+	c.forgetSession(old)
 	return c.currentAuth(true), nil
 }
 
@@ -933,29 +888,22 @@ func (c *protocolClient) fetchServiceRoot(ctx context.Context, authenticated boo
 		response.finish(err)
 		return nil, err
 	}
-	var typed gofish.Service
-	if err := json.Unmarshal(response.body, &typed); err != nil {
-		response.finish(err)
-		return nil, fmt.Errorf("decode typed ServiceRoot: %w", err)
-	}
-	resolvedID, err := c.resolveURI(response.url, typed.ODataID, false)
+	resolvedID, err := c.resolveURI(response.url, root.ODataID, false)
 	if err != nil ||
 		!sameResourceIdentity(canonicalResourceURI(resolvedID), canonicalResourceURI(response.url)) {
 		err = errors.New("ServiceRoot identity does not match requested URI")
 		response.finish(err)
 		return nil, err
 	}
-	if err := validateResourceSchemaType("service", typed.ODataType); err != nil {
+	if err := validateResourceSchemaType("service", root.ODataType); err != nil {
 		response.finish(err)
 		return nil, err
 	}
-	if !validRedfishVersion(typed.RedfishVersion) {
+	if !validRedfishVersion(root.RedfishVersion) {
 		err := errors.New("ServiceRoot has no valid RedfishVersion")
 		response.finish(err)
 		return nil, err
 	}
-	clearTypedRawData(&typed)
-	root.Typed = &typed
 	root.Response = metadataForResponse(response)
 	response.finish(nil)
 	c.serviceMetaMu.Lock()
@@ -977,7 +925,6 @@ type baseResource struct {
 	URI                string
 	Doc                genericResource
 	Data               map[string]any
-	Typed              any
 	Response           responseMetadata
 	AcquisitionState   string
 	ErrorClass         string
@@ -997,14 +944,11 @@ func (c *protocolClient) fetchBaseResources(
 		{"chassis", root.Chassis},
 		{"manager", root.Managers},
 	}
-	order := c.fairnessOrder("base-collection-kinds", len(collections))
-	defer c.advanceFairnessCursor("base-collection-kinds", len(collections), 1)
 	var resources []baseResource
 	membership := make(map[string]bool, len(collections))
 	complete := true
 	var joined error
-	for _, index := range order {
-		collection := collections[index]
+	for _, collection := range collections {
 		if collection.link.ODataID == "" {
 			membership[collection.kind] = true
 			c.replaceBaseMembership(collection.kind, nil)
@@ -1017,7 +961,6 @@ func (c *protocolClient) fetchBaseResources(
 			joined = errors.Join(joined, fmt.Errorf("%s collection: %w", collection.kind, err))
 			current, memberErr := c.fetchBaseMembers(
 				ctx,
-				"base\x00"+collection.kind,
 				collection.kind,
 				members,
 				stats,
@@ -1033,7 +976,6 @@ func (c *protocolClient) fetchBaseResources(
 		complete = complete && ok
 		current, memberErr := c.fetchBaseMembers(
 			ctx,
-			"base\x00"+collection.kind,
 			collection.kind,
 			members,
 			stats,
@@ -1053,7 +995,6 @@ func (c *protocolClient) fetchBaseResources(
 
 func (c *protocolClient) fetchBaseMembers(
 	ctx context.Context,
-	cursorKey string,
 	kind string,
 	members []collectionMember,
 	stats *wireStats,
@@ -1061,10 +1002,8 @@ func (c *protocolClient) fetchBaseMembers(
 ) ([]baseResource, error) {
 	current := make([]baseResource, len(members))
 	var failures boundedErrorAccumulator
-	order := c.collectionMemberOrder(cursorKey, len(members))
-	attempted := 0
 	completed := true
-	for _, index := range order {
+	for index := range members {
 		if err := contextError(ctx); err != nil {
 			failures.Add(err)
 			completed = false
@@ -1072,14 +1011,10 @@ func (c *protocolClient) fetchBaseMembers(
 		}
 		member := members[index]
 		resource, err := c.fetchBaseMember(ctx, kind, member, stats)
-		attempted++
 		if err != nil {
 			failures.Add(fmt.Errorf("%s resource: %w", kind, err))
 			resource = c.unreadableBaseResource(kind, member.Ref.ODataID, classifyError(err))
 			if isCallerContextError(err) {
-				completed = false
-			}
-			if classifyError(err) == "limit" {
 				completed = false
 			}
 		}
@@ -1104,7 +1039,6 @@ func (c *protocolClient) fetchBaseMembers(
 			current[index] = resource
 		}
 	}
-	c.advanceCollectionMemberCursor(cursorKey, len(members), attempted, completed)
 	return current, failures.Err()
 }
 
@@ -1124,16 +1058,11 @@ func (c *protocolClient) fetchBaseMember(
 	if err := validateRequiredResourceProperties(kind, member.Data); err != nil {
 		return baseResource{}, err
 	}
-	typed, err := decodeTypedResource(kind, member.Raw)
-	if err != nil {
-		return baseResource{}, err
-	}
 	return baseResource{
 		Kind:               kind,
 		URI:                member.Ref.ODataID,
 		Doc:                doc,
 		Data:               cloneJSONMap(member.Data),
-		Typed:              typed,
 		Response:           member.Response,
 		AcquisitionState:   "readable",
 		MembershipComplete: true,
@@ -1181,8 +1110,8 @@ func (c *protocolClient) fetchBaseResource(
 		response.finish(err)
 		return baseResource{}, err
 	}
-	typed, err := decodeTypedResource(kind, response.body)
-	if err != nil {
+	rawType, _ := stringValue(data["@odata.type"])
+	if err := validateResourceSchemaType(kind, rawType); err != nil {
 		response.finish(err)
 		return baseResource{}, err
 	}
@@ -1192,7 +1121,6 @@ func (c *protocolClient) fetchBaseResource(
 		URI:                canonicalResourceURI(response.url),
 		Doc:                doc,
 		Data:               data,
-		Typed:              typed,
 		Response:           metadataForResponse(response),
 		AcquisitionState:   "readable",
 		MembershipComplete: true,
@@ -1201,7 +1129,7 @@ func (c *protocolClient) fetchBaseResource(
 
 func (c *protocolClient) replaceBaseMembership(kind string, resources []baseResource) {
 	c.baseMu.Lock()
-	c.baseMembership[kind] = cloneBaseResources(resources)
+	c.baseMembership[kind] = snapshotBaseResources(resources)
 	c.baseMu.Unlock()
 }
 
@@ -1211,13 +1139,13 @@ func (c *protocolClient) incompleteBaseMembership(
 ) []baseResource {
 	c.baseMu.Lock()
 	defer c.baseMu.Unlock()
-	resources := cloneBaseResources(current)
+	resources := append([]baseResource(nil), current...)
 	present := make(map[string]struct{}, len(current))
 	for i := range resources {
 		present[resources[i].URI] = struct{}{}
 		resources[i].MembershipComplete = false
 	}
-	for _, retained := range cloneBaseResources(c.baseMembership[kind]) {
+	for _, retained := range c.baseMembership[kind] {
 		if _, ok := present[retained.URI]; ok {
 			continue
 		}
@@ -1227,6 +1155,7 @@ func (c *protocolClient) incompleteBaseMembership(
 		clearCurrentBaseResource(&retained)
 		resources = append(resources, retained)
 	}
+	c.baseMembership[kind] = snapshotBaseResources(resources)
 	return resources
 }
 
@@ -1251,22 +1180,18 @@ func (c *protocolClient) unreadableBaseResource(kind, uri, class string) baseRes
 }
 
 func clearCurrentBaseResource(resource *baseResource) {
-	resource.Typed = nil
 	resource.Doc.Status = genericStatus{}
 	resource.Doc.PowerState = ""
 	resource.Doc.FailurePredicted = nil
 	resource.Data = nil
 }
 
-func cloneBaseResources(resources []baseResource) []baseResource {
-	result := make([]baseResource, len(resources))
-	copy(result, resources)
+// Membership continuity needs source identities, never previous measurements.
+func snapshotBaseResources(resources []baseResource) []baseResource {
+	result := append([]baseResource(nil), resources...)
 	for i := range result {
-		result[i].Data = cloneJSONMap(resources[i].Data)
-		result[i].Doc.Status.Conditions = append(
-			[]genericCondition(nil),
-			resources[i].Doc.Status.Conditions...,
-		)
+		clearCurrentBaseResource(&result[i])
+		result[i].Response = responseMetadata{}
 	}
 	return result
 }
@@ -1308,13 +1233,11 @@ func (c *protocolClient) fetchCollectionMembersAt(
 			query := make(url.Values, 1)
 			query.Set("$expand", expand)
 			expanded.RawQuery = query.Encode()
-			progressKey := "expand\x00" + identity + "\x00" + expand
 			members, complete, err := c.fetchCollectionMemberPages(
 				ctx,
 				&expanded,
 				nil,
 				stats,
-				progressKey,
 				kind,
 				true,
 			)
@@ -1322,7 +1245,6 @@ func (c *protocolClient) fetchCollectionMembersAt(
 				return members, true, nil
 			}
 			if persistentCollectionExpansionFailure(err) {
-				c.deleteCollectionProgress(progressKey)
 				c.disableCollectionExpansion(identity, expand)
 			}
 			if isCallerContextError(err) {
@@ -1335,7 +1257,6 @@ func (c *protocolClient) fetchCollectionMembersAt(
 		target,
 		first,
 		stats,
-		"ordinary\x00"+identity,
 		kind,
 		false,
 	)
@@ -1374,42 +1295,24 @@ func (c *protocolClient) fetchCollectionMemberPages(
 	target *url.URL,
 	first *responseData,
 	stats *wireStats,
-	progressKey string,
 	expectedKind string,
 	requireExpanded bool,
 ) ([]collectionMember, bool, error) {
-	progress, resumed := c.loadCollectionProgress(progressKey)
-	if resumed {
-		next, err := url.Parse(progress.NextURL)
-		if err != nil {
-			c.deleteCollectionProgress(progressKey)
-			return nil, false, errors.New("stored Redfish collection continuation is invalid")
-		}
-		target = next
-	} else {
-		progress = collectionProgress{
-			NextURL:            target.String(),
-			CollectionIdentity: canonicalResourceURI(target),
-			ExpectedCount:      -1,
-			SeenPages:          make(map[string]struct{}),
-			SeenMembers:        make(map[string]struct{}),
-		}
+	progress := collectionProgress{
+		CollectionIdentity: canonicalResourceURI(target),
+		ExpectedCount:      -1,
+		SeenPages:          make(map[string]struct{}),
+		SeenMembers:        make(map[string]struct{}),
 	}
 	fail := func(response *responseData, err error) ([]collectionMember, bool, error) {
 		if response != nil {
 			response.finish(err)
 		}
-		if resumableCollectionError(err) {
-			progress.NextURL = target.String()
-			c.saveCollectionProgress(progressKey, progress)
-		} else {
-			c.deleteCollectionProgress(progressKey)
-		}
-		return cloneCollectionMembers(progress.Members), false, err
+		return progress.Members, false, err
 	}
 
 	for {
-		if err := consumeCollectionPageBudget(ctx); err != nil {
+		if err := contextError(ctx); err != nil {
 			return fail(nil, err)
 		}
 		pageKey := target.String()
@@ -1435,7 +1338,7 @@ func (c *protocolClient) fetchCollectionMemberPages(
 		if err := decodeJSON(response, &page); err != nil {
 			return fail(response, err)
 		}
-		if !resumed && len(progress.SeenPages) == 0 {
+		if len(progress.SeenPages) == 0 {
 			progress.CollectionIdentity = canonicalResourceURI(response.url)
 		}
 		resolvedPageID, err := c.resolveURI(response.url, page.ODataID, false)
@@ -1453,10 +1356,6 @@ func (c *protocolClient) fetchCollectionMemberPages(
 		}
 		if progress.ExpectedCount < 0 {
 			progress.ExpectedCount = *page.Count
-			if progress.ExpectedCount > maxCollectionMembers {
-				err := errors.New("collection advertised count exceeds the internal member limit")
-				return fail(response, err)
-			}
 		} else if progress.ExpectedCount != *page.Count {
 			err := errors.New("collection @odata.count changed between pages")
 			return fail(response, err)
@@ -1468,9 +1367,6 @@ func (c *protocolClient) fetchCollectionMemberPages(
 		var rawMembers []json.RawMessage
 		if err := json.Unmarshal(page.Members, &rawMembers); err != nil {
 			return fail(response, errors.New("collection Members is not an array"))
-		}
-		if err := consumeCollectionMemberBudget(ctx, len(rawMembers)); err != nil {
-			return fail(response, err)
 		}
 		for _, rawMember := range rawMembers {
 			var data map[string]any
@@ -1540,12 +1436,10 @@ func (c *protocolClient) fetchCollectionMemberPages(
 			}
 			if completionErr != nil {
 				response.finish(completionErr)
-				c.deleteCollectionProgress(progressKey)
-				return cloneCollectionMembers(progress.Members), false, completionErr
+				return progress.Members, false, completionErr
 			}
 			response.finish(nil)
-			c.deleteCollectionProgress(progressKey)
-			return cloneCollectionMembers(progress.Members), true, nil
+			return progress.Members, true, nil
 		}
 		next, err := c.resolveURI(response.url, page.NextLink, true)
 		if err != nil {
@@ -1553,7 +1447,6 @@ func (c *protocolClient) fetchCollectionMemberPages(
 		}
 		response.finish(nil)
 		target = next
-		progress.NextURL = target.String()
 	}
 }
 
@@ -1570,105 +1463,6 @@ func collectionMemberLinks(members []collectionMember) []redfishLink {
 		result[i] = members[i].Ref
 	}
 	return result
-}
-
-func cloneCollectionMembers(members []collectionMember) []collectionMember {
-	result := make([]collectionMember, len(members))
-	for i := range members {
-		result[i] = members[i]
-		result[i].Data = cloneJSONMap(members[i].Data)
-		result[i].Raw = append([]byte(nil), members[i].Raw...)
-	}
-	return result
-}
-
-func cloneCollectionProgress(progress collectionProgress) collectionProgress {
-	progress.Members = cloneCollectionMembers(progress.Members)
-	for i := range progress.Members {
-		progress.Members[i].Data = nil
-		progress.Members[i].Raw = nil
-	}
-	progress.SeenPages = cloneStringSet(progress.SeenPages)
-	progress.SeenMembers = cloneStringSet(progress.SeenMembers)
-	return progress
-}
-
-func collectionProgressRetentionMembers(progress collectionProgress) int {
-	return len(progress.Members) + len(progress.SeenPages) + len(progress.SeenMembers)
-}
-
-func (c *protocolClient) loadCollectionProgress(key string) (collectionProgress, bool) {
-	c.collectionMu.Lock()
-	defer c.collectionMu.Unlock()
-	c.ensureCollectionStateLocked()
-	progress, ok := c.collectionProgress[key]
-	return cloneCollectionProgress(progress), ok
-}
-
-func (c *protocolClient) saveCollectionProgress(key string, progress collectionProgress) {
-	c.saveCollectionProgressWithinBudget(key, progress, collectionProgressRetentionBudget)
-}
-
-func (c *protocolClient) saveCollectionProgressWithinBudget(
-	key string,
-	progress collectionProgress,
-	budget retainedStateBudget,
-) bool {
-	c.collectionMu.Lock()
-	defer c.collectionMu.Unlock()
-	c.ensureCollectionStateLocked()
-	c.ensureCollectionProgressUsageLocked()
-	existing, exists := c.collectionProgress[key]
-	existingMembers := collectionProgressRetentionMembers(existing)
-	candidateMembers := collectionProgressRetentionMembers(progress)
-	baseMembers := c.collectionProgressSize - existingMembers
-	baseEntries := len(c.collectionProgress)
-	if exists {
-		baseEntries--
-	}
-	if !retainedStateFits(baseEntries, baseMembers, 1, candidateMembers, budget) {
-		if exists {
-			delete(c.collectionProgress, key)
-			c.collectionProgressSize = baseMembers
-		}
-		return false
-	}
-	c.collectionProgress[key] = cloneCollectionProgress(progress)
-	c.collectionProgressSize = baseMembers + candidateMembers
-	return true
-}
-
-func (c *protocolClient) deleteCollectionProgress(key string) {
-	c.collectionMu.Lock()
-	defer c.collectionMu.Unlock()
-	c.ensureCollectionStateLocked()
-	c.ensureCollectionProgressUsageLocked()
-	if progress, exists := c.collectionProgress[key]; exists {
-		c.collectionProgressSize -= collectionProgressRetentionMembers(progress)
-	}
-	delete(c.collectionProgress, key)
-}
-
-func (c *protocolClient) ensureCollectionProgressUsageLocked() {
-	if c.collectionProgressUsed {
-		return
-	}
-	c.collectionProgressSize = 0
-	for _, progress := range c.collectionProgress {
-		c.collectionProgressSize += collectionProgressRetentionMembers(progress)
-	}
-	c.collectionProgressUsed = true
-}
-
-func resumableCollectionError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if isCallerContextError(err) || classifyError(err) == "limit" || retryableTransport(err) {
-		return true
-	}
-	var status statusError
-	return errors.As(err, &status) && retryableStatus(status.status)
 }
 
 func isCallerContextError(err error) bool {
@@ -1710,9 +1504,6 @@ func validateExpandedCollectionMember(
 	encoded, err := json.Marshal(data)
 	if err != nil {
 		return nil, errors.New("encode expanded collection member")
-	}
-	if _, err := decodeTypedResource(kind, encoded); err != nil {
-		return nil, err
 	}
 	return encoded, nil
 }
@@ -1758,9 +1549,7 @@ func (c *protocolClient) collectionExpansion(identity string) string {
 func (c *protocolClient) disableCollectionExpansion(identity, value string) {
 	c.collectionMu.Lock()
 	c.ensureCollectionStateLocked()
-	if len(c.expansionDisabled) < maxGraphResources {
-		c.expansionDisabled[identity+"\x00"+value] = struct{}{}
-	}
+	c.expansionDisabled[identity+"\x00"+value] = struct{}{}
 	c.expansionFallbackSeen = true
 	c.collectionMu.Unlock()
 }
@@ -1778,9 +1567,7 @@ func (c *protocolClient) takeExpansionFallbackDiagnostic() string {
 func (c *protocolClient) markKnownCollection(identity string) {
 	c.collectionMu.Lock()
 	c.ensureCollectionStateLocked()
-	if len(c.knownCollections) < maxGraphResources {
-		c.knownCollections[identity] = struct{}{}
-	}
+	c.knownCollections[identity] = struct{}{}
 	c.collectionMu.Unlock()
 }
 
@@ -1792,88 +1579,13 @@ func (c *protocolClient) isKnownCollection(identity string) bool {
 	return ok
 }
 
-func (c *protocolClient) collectionMemberOrder(key string, count int) []int {
-	if count <= 0 {
-		return nil
-	}
-	c.collectionMu.Lock()
-	c.ensureCollectionStateLocked()
-	start := c.memberCursor[key] % count
-	c.collectionMu.Unlock()
-	order := make([]int, count)
-	for offset := range count {
-		order[offset] = (start + offset) % count
-	}
-	return order
-}
-
-func (c *protocolClient) advanceCollectionMemberCursor(
-	key string,
-	count int,
-	attempted int,
-	complete bool,
-) {
-	c.collectionMu.Lock()
-	defer c.collectionMu.Unlock()
-	c.ensureCollectionStateLocked()
-	if count <= 0 || complete {
-		delete(c.memberCursor, key)
-		return
-	}
-	start := c.memberCursor[key] % count
-	step := max(attempted, 1)
-	if _, exists := c.memberCursor[key]; exists || len(c.memberCursor) < maxGraphResources {
-		c.memberCursor[key] = (start + step) % count
-	}
-}
-
 func (c *protocolClient) ensureCollectionStateLocked() {
-	if c.collectionProgress == nil {
-		c.collectionProgress = make(map[string]collectionProgress)
-		c.collectionProgressSize = 0
-		c.collectionProgressUsed = true
-	}
 	if c.knownCollections == nil {
 		c.knownCollections = make(map[string]struct{})
 	}
 	if c.expansionDisabled == nil {
 		c.expansionDisabled = make(map[string]struct{})
 	}
-	if c.memberCursor == nil {
-		c.memberCursor = make(map[string]int)
-	}
-	if c.fairnessCursor == nil {
-		c.fairnessCursor = make(map[string]int)
-	}
-}
-
-func (c *protocolClient) fairnessOrder(key string, count int) []int {
-	if count <= 0 {
-		return nil
-	}
-	c.collectionMu.Lock()
-	c.ensureCollectionStateLocked()
-	start := c.fairnessCursor[key] % count
-	c.collectionMu.Unlock()
-	order := make([]int, count)
-	for offset := range count {
-		order[offset] = (start + offset) % count
-	}
-	return order
-}
-
-func (c *protocolClient) advanceFairnessCursor(key string, count, attempted int) {
-	if count <= 0 {
-		return
-	}
-	c.collectionMu.Lock()
-	defer c.collectionMu.Unlock()
-	c.ensureCollectionStateLocked()
-	if _, exists := c.fairnessCursor[key]; !exists &&
-		len(c.fairnessCursor) >= maxGraphResources {
-		return
-	}
-	c.fairnessCursor[key] = (c.fairnessCursor[key] + max(attempted, 1)) % count
 }
 
 func (c *protocolClient) do(
@@ -2013,9 +1725,6 @@ func (c *protocolClient) doOnce(
 	spec protocolRequest,
 	stats *wireStats,
 ) (*responseData, error) {
-	if err := consumeRequestBudget(ctx); err != nil {
-		return nil, err
-	}
 	sem, err := c.acquireRequest(ctx)
 	if err != nil {
 		return nil, err
@@ -2064,9 +1773,6 @@ func (c *protocolClient) doOnce(
 	finishedAt := time.Now()
 	if stats != nil {
 		stats.received += int64(len(payload))
-	}
-	if budgetErr := consumeBodyBudget(ctx, len(payload)); budgetErr != nil {
-		return nil, budgetErr
 	}
 	if err != nil {
 		return nil, sanitizeTransportError(err)
@@ -2319,16 +2025,6 @@ func sleepContext(ctx context.Context, delay time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
-}
-
-func selectedSystemFailureState(systemURI string, err error) string {
-	if systemURI == "" {
-		return ""
-	}
-	if err != nil {
-		return "unreadable"
-	}
-	return "unknown"
 }
 
 func stringAt(data map[string]any, path string) string {

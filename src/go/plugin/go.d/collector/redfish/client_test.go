@@ -39,7 +39,6 @@ func TestProtocolClientBasicCheckAndCollect(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, result.Complete)
 	assert.Equal(t, "success", result.Metrics.Status)
-	assert.Equal(t, "present", result.Metrics.SelectedSystem)
 	assert.NotEmpty(t, result.Hardware)
 	assert.Positive(t, result.Metrics.HTTPRequests["started"])
 
@@ -52,19 +51,6 @@ func TestProtocolClientBasicCheckAndCollect(t *testing.T) {
 	coverage.hardware.observe(result.Hardware)
 	require.NoError(t, cycle.CommitCycleSuccess())
 	collecttest.AssertChartCoverage(t, coverage, collecttest.ChartCoverageExpectation{})
-}
-
-func TestFairnessOrderRotatesByAttemptedWork(t *testing.T) {
-	client := &protocolClient{}
-
-	require.Equal(t, []int{0, 1, 2, 3}, client.fairnessOrder("work", 4))
-	client.advanceFairnessCursor("work", 4, 2)
-	require.Equal(t, []int{2, 3, 0, 1}, client.fairnessOrder("work", 4))
-	client.advanceFairnessCursor("work", 4, 1)
-	require.Equal(t, []int{3, 0, 1, 2}, client.fairnessOrder("work", 4))
-
-	require.Nil(t, client.fairnessOrder("empty", 0))
-	client.advanceFairnessCursor("empty", 0, 1)
 }
 
 type sensitiveNetError struct {
@@ -133,18 +119,63 @@ func TestProtocolClientSessionLifecycle(t *testing.T) {
 	assert.Equal(t, int64(1), server.sessionDeletes.Load())
 }
 
-func TestProtocolClientReusesSessionAcrossRepeatedCheck(t *testing.T) {
-	t.Parallel()
+func TestProtocolClientCheckOnlyReadsServiceRoot(t *testing.T) {
+	for _, method := range []string{"auto", "session", "basic", "none"} {
+		t.Run(method, func(t *testing.T) {
+			var requests []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests = append(requests, r.Method+" "+r.URL.RequestURI())
+				assert.Empty(t, r.Header.Get("X-Auth-Token"))
+				if method == "basic" {
+					user, password, ok := r.BasicAuth()
+					assert.True(t, ok)
+					assert.Equal(t, "user", user)
+					assert.Equal(t, "test-password", password)
+				} else {
+					assert.Empty(t, r.Header.Get("Authorization"))
+				}
+				serveServiceRoot(w, true)
+			}))
+			defer server.Close()
+			client := newTestProtocolClient(t, testConfig(server.URL, method))
+			require.NoError(t, client.Check(context.Background()))
+			require.NoError(t, client.Check(context.Background()))
+			require.NoError(t, client.Close(context.Background()))
+			assert.Equal(t, []string{"GET /redfish/v1/", "GET /redfish/v1/"}, requests)
+			assert.False(t, client.authenticationInitialized())
+		})
+	}
+}
 
-	server := newRedfishTestServer(t, redfishTestServerConfig{supportSession: true})
+func TestProtocolClientCheckDoesNotRefreshAnExpiredSession(t *testing.T) {
+	var expire atomic.Bool
+	server := newRedfishTestServer(t, redfishTestServerConfig{supportSession: true, expireSessionOnce: &expire})
 	defer server.Close()
+	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
+	_, err := client.Collect(context.Background())
+	require.NoError(t, err)
+	expire.Store(true)
+	require.NoError(t, client.Check(context.Background()))
+	assert.Equal(t, int64(1), server.sessionCreates.Load())
+	assert.Zero(t, server.sessionDeletes.Load())
+	assert.True(t, expire.Load(), "Check must not use an active session token")
+	expire.Store(false)
+	require.NoError(t, client.Close(context.Background()))
+}
 
+func TestProtocolClientSessionCredentialsValidatedOnlyDuringCollect(t *testing.T) {
+	server := newRedfishTestServer(t, redfishTestServerConfig{sessionStatus: http.StatusUnauthorized})
+	defer server.Close()
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
 	require.NoError(t, client.Check(context.Background()))
-	require.NoError(t, client.Check(context.Background()))
-	require.NoError(t, client.Close(context.Background()))
+	assert.Zero(t, server.sessionCreates.Load())
+	result, err := client.Collect(context.Background())
+	require.Error(t, err)
+	assert.Equal(t, "unavailable", result.Metrics.Status)
+	assert.Empty(t, result.Hardware)
+	assert.Zero(t, server.basicRequests.Load(), "session mode must not fall back to Basic")
 	assert.Equal(t, int64(1), server.sessionCreates.Load())
-	assert.Equal(t, int64(1), server.sessionDeletes.Load())
+	require.NoError(t, client.Close(context.Background()))
 }
 
 func TestProtocolClientCleansMalformedCreatedSession(t *testing.T) {
@@ -157,7 +188,7 @@ func TestProtocolClientCleansMalformedCreatedSession(t *testing.T) {
 	defer server.Close()
 
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
-	require.Error(t, client.Check(context.Background()))
+	require.Error(t, client.initializeAuthentication(context.Background(), nil))
 	assert.Equal(t, int64(1), server.sessionCreates.Load())
 	assert.Equal(t, int64(1), server.sessionDeletes.Load())
 }
@@ -173,8 +204,8 @@ func TestProtocolClientDoesNotCreateAnotherSessionUntilPendingCleanupSucceeds(t 
 	defer server.Close()
 
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
-	require.Error(t, client.Check(context.Background()))
-	require.ErrorContains(t, client.Check(context.Background()), "retire unactivated Redfish session")
+	require.Error(t, client.initializeAuthentication(context.Background(), nil))
+	require.ErrorContains(t, client.initializeAuthentication(context.Background(), nil), "retire unactivated Redfish session")
 	assert.Equal(t, int64(1), server.sessionCreates.Load())
 	assert.Equal(t, int64(2), server.sessionDeletes.Load())
 	require.Error(t, client.Close(context.Background()))
@@ -191,8 +222,8 @@ func TestProtocolClientRetriesSessionCreationAfterPendingSessionIsAlreadyGone(t 
 	defer server.Close()
 
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
-	require.Error(t, client.Check(context.Background()))
-	err := client.Check(context.Background())
+	require.Error(t, client.initializeAuthentication(context.Background(), nil))
+	err := client.initializeAuthentication(context.Background(), nil)
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), "retire unactivated Redfish session")
 	assert.Equal(t, int64(2), server.sessionCreates.Load())
@@ -209,7 +240,7 @@ func TestProtocolClientTriesEveryAdvertisedSessionPath(t *testing.T) {
 	defer server.Close()
 
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
-	require.NoError(t, client.Check(context.Background()))
+	require.NoError(t, client.initializeAuthentication(context.Background(), nil))
 	require.NoError(t, client.Close(context.Background()))
 	assert.Equal(t, int64(1), server.unsupportedSessionCreates.Load())
 	assert.Equal(t, int64(1), server.sessionCreates.Load())
@@ -292,7 +323,7 @@ func TestProtocolClientCleanupUsesIndependentContext(t *testing.T) {
 	defer server.Close()
 
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
-	require.NoError(t, client.Check(context.Background()))
+	require.NoError(t, client.initializeAuthentication(context.Background(), nil))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cancel()
@@ -312,6 +343,8 @@ func TestProtocolClientRecreatesExpiredSessionOnce(t *testing.T) {
 
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
 	require.NoError(t, client.Check(context.Background()))
+	_, err := client.Collect(context.Background())
+	require.NoError(t, err)
 	expireOnce.Store(true)
 
 	result, err := client.Collect(context.Background())
@@ -322,6 +355,29 @@ func TestProtocolClientRecreatesExpiredSessionOnce(t *testing.T) {
 	assert.Equal(t, int64(2), server.sessionDeletes.Load())
 }
 
+func TestProtocolClientRecoversFromRepeatedSessionExpiration(t *testing.T) {
+	var expire atomic.Bool
+	server := newRedfishTestServer(t, redfishTestServerConfig{
+		supportSession:              true,
+		expireSessionOnce:           &expire,
+		sessionDeleteStatusSequence: []int{http.StatusUnauthorized, http.StatusUnauthorized, http.StatusNoContent},
+	})
+	defer server.Close()
+	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
+	require.NoError(t, client.Check(context.Background()))
+	_, err := client.Collect(context.Background())
+	require.NoError(t, err)
+	for range 2 {
+		expire.Store(true)
+		result, err := client.Collect(context.Background())
+		require.NoError(t, err)
+		assert.True(t, result.Complete)
+	}
+	require.NoError(t, client.Close(context.Background()))
+	assert.Equal(t, int64(3), server.sessionCreates.Load())
+	assert.Equal(t, int64(3), server.sessionDeletes.Load())
+}
+
 func TestProtocolClientSessionRecoveryAccountsForEveryWireOperation(t *testing.T) {
 	t.Parallel()
 
@@ -329,7 +385,7 @@ func TestProtocolClientSessionRecoveryAccountsForEveryWireOperation(t *testing.T
 	defer server.Close()
 
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
-	require.NoError(t, client.Check(context.Background()))
+	require.NoError(t, client.initializeAuthentication(context.Background(), nil))
 	auth := client.currentAuth(true)
 	stats := &wireStats{failures: make(map[string]int)}
 
@@ -379,7 +435,7 @@ func TestProtocolClientAutoFallbackClassification(t *testing.T) {
 			defer server.Close()
 
 			client := newTestProtocolClient(t, testConfig(server.URL, "auto"))
-			err := client.Check(context.Background())
+			_, err := client.Collect(context.Background())
 			if tc.wantErr {
 				require.Error(t, err)
 			} else {
@@ -514,7 +570,7 @@ func TestProtocolClientRejectsRedirectThatChangesAuthorizedQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = client.do(
-		withOperationBudget(context.Background()),
+		context.Background(),
 		protocolRequest{method: http.MethodGet, target: target, auth: client.currentAuth(false)},
 		nil,
 		false,
@@ -542,7 +598,7 @@ func TestProtocolClientRejectsRedirectThatRemovesAuthorizedQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = client.do(
-		withOperationBudget(context.Background()),
+		context.Background(),
 		protocolRequest{method: http.MethodGet, target: target, auth: client.currentAuth(false)},
 		nil,
 		false,
@@ -578,7 +634,7 @@ func TestSuccessfulSessionResponseReportsCompatibilityHeaders(t *testing.T) {
 	root.Links.Sessions.ODataID = "/redfish/v1/SessionService/Sessions"
 	stats := &wireStats{failures: make(map[string]int)}
 
-	require.NoError(t, client.initializeSession(withOperationBudget(context.Background()), root, stats))
+	require.NoError(t, client.initializeSession(context.Background(), root, stats))
 	assert.Equal(t, []string{
 		"Redfish compatibility: response OData-Version header is missing",
 	}, responseCompatibilityDiagnostics(stats))
@@ -750,78 +806,6 @@ func TestFetchCollectionAcceptsSameOriginRedirectIdentity(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, complete)
 	assert.Empty(t, members)
-}
-
-func TestFetchCollectionResumesPageRejectedByMemberBudget(t *testing.T) {
-	t.Parallel()
-
-	var firstPageRequests atomic.Int64
-	var secondPageRequests atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		memberID := "1"
-		next := "/redfish/v1/Test?page=2"
-		if r.URL.Query().Get("page") == "2" {
-			secondPageRequests.Add(1)
-			memberID = "2"
-			next = ""
-		} else {
-			firstPageRequests.Add(1)
-		}
-		writeJSON(w, map[string]any{
-			"@odata.id":              "/redfish/v1/Test",
-			"@odata.type":            "#TestCollection.TestCollection",
-			"Members@odata.count":    2,
-			"Members@odata.nextLink": next,
-			"Members": []any{
-				map[string]any{"@odata.id": "/redfish/v1/Systems/" + memberID},
-			},
-		})
-	}))
-	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-
-	first := withOperationBudget(context.Background())
-	require.NoError(t, consumeCollectionMemberBudget(first, maxCollectionMembers-1))
-	members, complete, err := client.fetchCollection(first, "/redfish/v1/Test", nil)
-	require.ErrorContains(t, err, "collection member work")
-	assert.False(t, complete)
-	require.Len(t, members, 1)
-	assert.Equal(t, "/redfish/v1/Systems/1", members[0].ODataID)
-
-	members, complete, err = client.fetchCollection(
-		withOperationBudget(context.Background()),
-		"/redfish/v1/Test",
-		nil,
-	)
-	require.NoError(t, err)
-	assert.True(t, complete)
-	require.Len(t, members, 2)
-	assert.Equal(t, "/redfish/v1/Systems/1", members[0].ODataID)
-	assert.Equal(t, "/redfish/v1/Systems/2", members[1].ODataID)
-	assert.Equal(t, int64(1), firstPageRequests.Load())
-	assert.Equal(t, int64(2), secondPageRequests.Load())
-}
-
-func TestProtocolClientWorkBudgetStopsBeforeRequest(t *testing.T) {
-	t.Parallel()
-
-	var requests atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		requests.Add(1)
-		http.Error(w, "unexpected", http.StatusInternalServerError)
-	}))
-	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-	ctx := withOperationBudget(context.Background())
-	operationBudgetFrom(ctx).requests.Store(maxCycleRequests)
-
-	_, err := client.doOnce(
-		ctx,
-		protocolRequest{method: http.MethodGet, target: client.root, auth: requestAuth{}},
-		nil,
-	)
-	require.ErrorContains(t, err, "request work")
-	assert.Zero(t, requests.Load())
 }
 
 func TestFetchCollectionContinuesAfterInvalidMember(t *testing.T) {
@@ -1029,7 +1013,7 @@ func TestCollectionExpansionFailureClassification(t *testing.T) {
 	}
 }
 
-func TestProtocolClientResumesCollectionAtOpaqueNextPage(t *testing.T) {
+func TestProtocolClientRestartsPaginationAfterCancellation(t *testing.T) {
 	t.Parallel()
 
 	var firstPageRequests, secondPageRequests atomic.Int64
@@ -1051,12 +1035,15 @@ func TestProtocolClientResumesCollectionAtOpaqueNextPage(t *testing.T) {
 			})
 			return
 		}
-		firstPageRequests.Add(1)
+		memberID := "/redfish/v1/Test/1"
+		if firstPageRequests.Add(1) > 1 {
+			memberID = "/redfish/v1/Test/3"
+		}
 		writeJSON(w, map[string]any{
 			"@odata.id":              "/redfish/v1/Test",
 			"@odata.type":            "#ResourceCollection.ResourceCollection",
 			"Members@odata.count":    2,
-			"Members":                []any{map[string]any{"@odata.id": "/redfish/v1/Test/1"}},
+			"Members":                []any{map[string]any{"@odata.id": memberID}},
 			"Members@odata.nextLink": "/redfish/v1/Test?page=2",
 		})
 	}))
@@ -1074,13 +1061,13 @@ func TestProtocolClientResumesCollectionAtOpaqueNextPage(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, complete)
 	require.Len(t, members, 2)
-	assert.Equal(t, "/redfish/v1/Test/1", members[0].ODataID)
+	assert.Equal(t, "/redfish/v1/Test/3", members[0].ODataID)
 	assert.Equal(t, "/redfish/v1/Test/2", members[1].ODataID)
-	assert.Equal(t, int64(1), firstPageRequests.Load())
+	assert.Equal(t, int64(2), firstPageRequests.Load())
 	assert.Equal(t, int64(2), secondPageRequests.Load())
 }
 
-func TestProtocolClientRotatesMemberWorkAfterCancellation(t *testing.T) {
+func TestProtocolClientCancellationMarksUnvisitedMembersUnknown(t *testing.T) {
 	t.Parallel()
 
 	blocked := make(chan struct{}, 2)
@@ -1110,7 +1097,12 @@ func TestProtocolClientRotatesMemberWorkAfterCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		result := make(chan error, 1)
 		go func() {
-			_, err := client.fetchBaseMembers(ctx, "base\x00system", "system", members, nil, true)
+			resources, err := client.fetchBaseMembers(ctx, "system", members, nil, true)
+			assert.Equal(t, []baseResource{
+				{Kind: "system", URI: "/redfish/v1/Systems/1", AcquisitionState: "unreadable", ErrorClass: "protocol", MembershipComplete: true},
+				{Kind: "system", URI: "/redfish/v1/Systems/2", AcquisitionState: "unknown", ErrorClass: "timeout", MembershipComplete: true},
+				{Kind: "system", URI: "/redfish/v1/Systems/3", AcquisitionState: "unknown", ErrorClass: "timeout", MembershipComplete: true},
+			}, resources)
 			result <- err
 		}()
 		select {
@@ -1127,14 +1119,7 @@ func TestProtocolClientRotatesMemberWorkAfterCancellation(t *testing.T) {
 			t.Fatal("timed out waiting for canceled Redfish member collection")
 		}
 	}
-	requests := recorder.paths()
-	require.GreaterOrEqual(t, len(requests), 4)
-	assert.Equal(t, []string{
-		"/redfish/v1/Systems/1",
-		"/redfish/v1/Systems/2",
-		"/redfish/v1/Systems/3",
-		"/redfish/v1/Systems/1",
-	}, requests[:4])
+	assert.Equal(t, []string{"/redfish/v1/Systems/1", "/redfish/v1/Systems/1"}, recorder.paths())
 }
 
 func TestProtocolClientDoesNotSleepAfterFinalRetryableResponse(t *testing.T) {
@@ -1212,49 +1197,6 @@ func TestProtocolClientRetryBudgetDoesNotOverflow(t *testing.T) {
 	require.NotNil(t, response)
 	response.finish(nil)
 	assert.Equal(t, int64(2), requests.Load())
-}
-
-func TestCollectionProgressRetentionBoundsEmptyKeyChurn(t *testing.T) {
-	client := &protocolClient{}
-	budget := retainedStateBudget{entries: 2, members: 2}
-	progress := collectionProgress{
-		SeenPages:   make(map[string]struct{}),
-		SeenMembers: make(map[string]struct{}),
-	}
-
-	require.True(t, client.saveCollectionProgressWithinBudget("first", progress, budget))
-	require.True(t, client.saveCollectionProgressWithinBudget("second", progress, budget))
-	assert.False(t, client.saveCollectionProgressWithinBudget("third", progress, budget))
-	assert.Len(t, client.collectionProgress, 2)
-
-	progress.Members = []collectionMember{{}, {}, {}}
-	assert.False(t, client.saveCollectionProgressWithinBudget("first", progress, budget))
-	assert.NotContains(t, client.collectionProgress, "first")
-	assert.Contains(t, client.collectionProgress, "second")
-
-	pageOnly := collectionProgress{
-		SeenPages: map[string]struct{}{"page-1": {}, "page-2": {}, "page-3": {}},
-	}
-	assert.False(t, (&protocolClient{}).saveCollectionProgressWithinBudget(
-		"invalid-pages",
-		pageOnly,
-		retainedStateBudget{entries: 1, members: 2},
-	))
-
-	withBody := collectionProgress{
-		Members: []collectionMember{{
-			Data: map[string]any{"large": strings.Repeat("x", 1024)},
-			Raw:  []byte(strings.Repeat("x", 1024)),
-		}},
-	}
-	bodyClient := &protocolClient{}
-	require.True(t, bodyClient.saveCollectionProgressWithinBudget(
-		"body",
-		withBody,
-		retainedStateBudget{entries: 1, members: 1},
-	))
-	assert.Nil(t, bodyClient.collectionProgress["body"].Members[0].Data)
-	assert.Nil(t, bodyClient.collectionProgress["body"].Members[0].Raw)
 }
 
 func TestProtocolClientResponseGuards(t *testing.T) {
@@ -1383,6 +1325,56 @@ func TestProtocolClientRetainsLastCompleteMembershipWithoutReplayingCurrentState
 		}
 	}
 	require.True(t, foundSystem)
+}
+
+func TestProtocolClientRetainsPartialMembershipUntilAuthoritativeRemoval(t *testing.T) {
+	var phase atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/redfish/v1/":
+			serveServiceRoot(w, false)
+		case "/redfish/v1/Systems":
+			switch phase.Load() {
+			case 0:
+				writeJSON(w, map[string]any{
+					"@odata.id": r.URL.Path, "@odata.type": "#ComputerSystemCollection.ComputerSystemCollection",
+					"Members@odata.count": 2,
+					"Members":             []any{map[string]any{"@odata.id": "/redfish/v1/Systems/1"}, map[string]any{"Id": "invalid"}},
+				})
+			case 1:
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			default:
+				serveCollection(w, r.URL.Path)
+			}
+		case "/redfish/v1/Systems/1":
+			serveBaseResource(w, r.URL.Path, "#ComputerSystem.v1_21_0.ComputerSystem", "System")
+		case "/redfish/v1/Chassis", "/redfish/v1/Managers":
+			serveCollection(w, r.URL.Path)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
+	first, err := client.Collect(context.Background())
+	require.Error(t, err)
+	assert.False(t, first.Complete)
+	assert.Equal(t, map[string]int{"discovered": 2, "readable": 2}, first.Metrics.Resources)
+	phase.Store(1)
+	second, err := client.Collect(context.Background())
+	require.Error(t, err)
+	assert.Equal(t, map[string]int{"discovered": 2, "readable": 1, "unknown": 1}, second.Metrics.Resources)
+	for _, metric := range second.Hardware {
+		assert.NotEqual(t, "system_health", metric.Metric, "previous health must never be replayed")
+	}
+	phase.Store(2)
+	third, err := client.Collect(context.Background())
+	require.NoError(t, err)
+	assert.True(t, third.Complete)
+	assert.Equal(t, map[string]int{"discovered": 1, "readable": 1}, third.Metrics.Resources)
+	for _, metric := range third.Hardware {
+		assert.False(t, strings.HasPrefix(metric.Metric, "system_"), "authoritatively removed system must not survive")
+	}
 }
 
 type redfishTestServerConfig struct {
@@ -1646,8 +1638,6 @@ func writeJSONBody(w http.ResponseWriter, value any) {
 func testConfig(rawURL, auth string) Config {
 	cfg := Config{
 		URL:        rawURL,
-		NodeMode:   "local",
-		SystemURI:  "/redfish/v1/Systems/1",
 		AuthMethod: auth,
 		Username:   "user",
 		Password:   "test-password",

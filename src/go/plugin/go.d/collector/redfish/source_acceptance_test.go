@@ -9,20 +9,17 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/registry"
 )
 
-func TestEveryRegistryReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
-	for _, surface := range standardRegistry.Readings {
-		if surface.DerivedFromEnergy {
+func TestEverySourceReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
+	for key, surface := range readingDescriptors {
+		if key.Role == "energy_rate" {
 			continue
 		}
-		surface := surface
-		name := strings.Join([]string{surface.Family, surface.Basis, surface.Role, surface.SemanticClass}, "/")
+		name := strings.Join([]string{key.Family, key.Basis, key.Role, key.SemanticClass}, "/")
 		t.Run(name, func(t *testing.T) {
-			raw, node := syntheticRawReadingForSurface(surface, json.Number("0"))
-			reading := normalizeReading(node, raw, true)
+			raw, node := syntheticRawReadingForSurface(key, surface, json.Number("0"))
+			reading := normalizeReading(node, raw)
 			if !reading.Valid {
 				t.Fatalf("valid zero did not normalize: %+v", reading)
 			}
@@ -38,8 +35,8 @@ func TestEveryRegistryReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
 				{name: "wrong_type", value: map[string]any{"invalid": true}},
 			} {
 				t.Run(test.name, func(t *testing.T) {
-					invalidRaw, invalidNode := syntheticRawReadingForSurface(surface, test.value)
-					invalid := normalizeReading(invalidNode, invalidRaw, true)
+					invalidRaw, invalidNode := syntheticRawReadingForSurface(key, surface, test.value)
+					invalid := normalizeReading(invalidNode, invalidRaw)
 					if invalid.Valid {
 						t.Fatalf("invalid source normalized as valid: %+v", invalid)
 					}
@@ -57,8 +54,8 @@ func TestEveryRegistryReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
 	}
 }
 
-func TestEveryRegistryNumericConversionUsesItsDeclaredScale(t *testing.T) {
-	for _, descriptor := range standardRegistry.Fields {
+func TestEverySourceNumericConversionUsesItsDeclaredScale(t *testing.T) {
+	for _, descriptor := range scalarFields {
 		if descriptor.ID == managerClockDescriptor.ID {
 			continue
 		}
@@ -77,20 +74,20 @@ func TestEveryRegistryNumericConversionUsesItsDeclaredScale(t *testing.T) {
 				scale = source.Scale
 			}
 			if scale.Den == 0 {
-				scale = registry.Identity
+				scale = identityScale
 			}
 			want := 2 * float64(scale.Num) / float64(scale.Den)
 			if source.MultiplierPath != "" {
 				multiplierScale := source.MultiplierScale
 				if multiplierScale.Den == 0 {
-					multiplierScale = registry.Identity
+					multiplierScale = identityScale
 				}
 				want *= 2 * float64(multiplierScale.Num) / float64(multiplierScale.Den)
 			}
-			if descriptor.Algorithm != registry.AlgorithmAbsolute {
-				setRegistryTestPath(registryTestDocument(node, source.Document), source.Path, json.Number("4"))
+			if descriptor.Algorithm != algorithmAbsolute {
+				setSourceTestPath(sourceTestDocument(node, source.Document), source.Path, json.Number("4"))
 				next := time.Unix(101, 0)
-				if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+				if descriptor.Algorithm == algorithmDurationPercent {
 					next = time.Unix(1100, 0)
 					want /= 10
 				}
@@ -102,22 +99,21 @@ func TestEveryRegistryNumericConversionUsesItsDeclaredScale(t *testing.T) {
 		})
 	}
 
-	for _, readingType := range standardRegistry.ReadingTypes {
-		t.Run("reading/"+readingType.SourceType, func(t *testing.T) {
+	for key, readingType := range readingTypes {
+		t.Run("reading/"+key.SourceType, func(t *testing.T) {
 			reading := normalizeReading(
-				&graphNode{Kind: "sensor", Key: readingType.SourceType},
+				&graphNode{Kind: "sensor", Key: key.SourceType},
 				rawReading{
-					Path: "Reading", Type: readingType.SourceType, Units: readingType.SourceUnits[0],
+					Path: "Reading", Type: key.SourceType, Units: key.Units,
 					Basis: "Zero", Role: "input", Value: json.Number("2"), Primary: true,
 				},
-				false,
 			)
 			if !reading.Valid {
 				t.Fatalf("reading conversion did not normalize: %+v", reading)
 			}
 			scale := readingType.Scale
 			if scale.Den == 0 {
-				scale = registry.Identity
+				scale = identityScale
 			}
 			want := 2 * float64(scale.Num) / float64(scale.Den)
 			if reading.Value != want {
@@ -127,8 +123,8 @@ func TestEveryRegistryNumericConversionUsesItsDeclaredScale(t *testing.T) {
 	}
 }
 
-func TestEveryRegistryScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
-	for _, descriptor := range standardRegistry.Fields {
+func TestEverySourceScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
+	for _, descriptor := range scalarFields {
 		if descriptor.ID == managerClockDescriptor.ID {
 			continue
 		}
@@ -165,8 +161,8 @@ func TestEveryRegistryScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
 	}
 }
 
-func TestEveryRegistryScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T) {
-	for _, descriptor := range standardRegistry.Fields {
+func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T) {
+	for _, descriptor := range scalarFields {
 		if len(descriptor.Candidates) < 2 {
 			continue
 		}
@@ -177,24 +173,24 @@ func TestEveryRegistryScalarFallbackHasPrecedenceAndFailureProvenance(t *testing
 					Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
 				}
 				for index, source := range descriptor.Candidates {
-					document := registryTestDocument(node, source.Document)
+					document := sourceTestDocument(node, source.Document)
 					for _, requirement := range source.Requires {
-						setRegistryTestPath(document, requirement.Path, requirement.Value)
+						setSourceTestPath(document, requirement.Path, requirement.Value)
 					}
 					value := any(json.Number(fmt.Sprintf("%d", index+10)))
 					if index < selectedIndex {
 						value = map[string]any{"malformed": true}
 					}
-					setRegistryTestPath(document, source.Path, value)
+					setSourceTestPath(document, source.Path, value)
 					setScalarTestMultiplier(node, source)
 				}
 
 				selected := descriptor.Candidates[selectedIndex]
-				selectedDocument := registryTestDocument(node, selected.Document)
+				selectedDocument := sourceTestDocument(node, selected.Document)
 				for _, requirement := range selected.Requires {
-					setRegistryTestPath(selectedDocument, requirement.Path, requirement.Value)
+					setSourceTestPath(selectedDocument, requirement.Path, requirement.Value)
 				}
-				setRegistryTestPath(selectedDocument, selected.Path, json.Number(fmt.Sprint(selectedIndex+10)))
+				setSourceTestPath(selectedDocument, selected.Path, json.Number(fmt.Sprint(selectedIndex+10)))
 				setScalarTestMultiplier(node, selected)
 
 				client := &protocolClient{}
@@ -213,14 +209,14 @@ func TestEveryRegistryScalarFallbackHasPrecedenceAndFailureProvenance(t *testing
 				if source.MultiplierPath != "" {
 					multiplierScale := source.MultiplierScale
 					if multiplierScale.Den == 0 {
-						multiplierScale = registry.Identity
+						multiplierScale = identityScale
 					}
 					want *= 2 * float64(multiplierScale.Num) / float64(multiplierScale.Den)
 				}
-				if descriptor.Algorithm != registry.AlgorithmAbsolute {
-					setRegistryTestPath(registryTestDocument(node, source.Document), source.Path, json.Number(fmt.Sprint(2*(selectedIndex+10))))
+				if descriptor.Algorithm != algorithmAbsolute {
+					setSourceTestPath(sourceTestDocument(node, source.Document), source.Path, json.Number(fmt.Sprint(2*(selectedIndex+10))))
 					next := time.Unix(101, 0)
-					if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+					if descriptor.Algorithm == algorithmDurationPercent {
 						next = time.Unix(1100, 0)
 						want /= 10
 					}
@@ -231,7 +227,7 @@ func TestEveryRegistryScalarFallbackHasPrecedenceAndFailureProvenance(t *testing
 				}
 				expectedFailures := 0
 				for _, source := range descriptor.Candidates[:selectedIndex] {
-					document := registryTestDocument(node, source.Document)
+					document := sourceTestDocument(node, source.Document)
 					if sourceRequirementsMatch(document, source.Requires) {
 						expectedFailures++
 					}
@@ -253,15 +249,15 @@ func TestEveryRegistryScalarFallbackHasPrecedenceAndFailureProvenance(t *testing
 	}
 }
 
-func TestEveryRegistryRateFieldResetsOnDecreaseAndEpochChange(t *testing.T) {
-	for _, descriptor := range standardRegistry.Fields {
-		if descriptor.Algorithm == registry.AlgorithmAbsolute {
+func TestEverySourceRateFieldResetsOnDecreaseAndEpochChange(t *testing.T) {
+	for _, descriptor := range scalarFields {
+		if descriptor.Algorithm == algorithmAbsolute {
 			continue
 		}
 		t.Run(descriptor.ID, func(t *testing.T) {
 			source := descriptor.Candidates[0]
 			node := scalarTestNode(descriptor, source, json.Number("10"))
-			document := registryTestDocument(node, source.Document)
+			document := sourceTestDocument(node, source.Document)
 			client := &protocolClient{}
 			client.hardwareState.initialize()
 			at := time.Unix(100, 0)
@@ -270,77 +266,43 @@ func TestEveryRegistryRateFieldResetsOnDecreaseAndEpochChange(t *testing.T) {
 				t.Fatal("first sample emitted instead of establishing a baseline")
 			}
 			increment := "20"
-			if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+			if descriptor.Algorithm == algorithmDurationPercent {
 				increment = "10.01"
 			}
-			setRegistryTestPath(document, source.Path, json.Number(increment))
+			setSourceTestPath(document, source.Path, json.Number(increment))
 			if value := requireScalarValue(t, client, node, descriptor.ID, at.Add(10*time.Second)); !value.Emit {
 				t.Fatal("increasing sample did not emit")
 			}
-			setRegistryTestPath(document, source.Path, json.Number("5"))
+			setSourceTestPath(document, source.Path, json.Number("5"))
 			if value := requireScalarValue(t, client, node, descriptor.ID, at.Add(20*time.Second)); value.Emit {
 				t.Fatal("decrease emitted instead of resetting the baseline")
 			}
 			postReset := "6"
-			if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+			if descriptor.Algorithm == algorithmDurationPercent {
 				postReset = "5.01"
 			}
-			setRegistryTestPath(document, source.Path, json.Number(postReset))
+			setSourceTestPath(document, source.Path, json.Number(postReset))
 			if value := requireScalarValue(t, client, node, descriptor.ID, at.Add(30*time.Second)); !value.Emit {
 				t.Fatal("post-reset increase did not emit")
 			}
-			setRegistryTestPath(document, "LifetimeStartDateTime", "2026-07-31T00:00:00Z")
+			setSourceTestPath(document, "LifetimeStartDateTime", "2026-07-31T00:00:00Z")
 			epochValue := "7"
-			if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+			if descriptor.Algorithm == algorithmDurationPercent {
 				epochValue = "5.02"
 			}
-			setRegistryTestPath(document, source.Path, json.Number(epochValue))
+			setSourceTestPath(document, source.Path, json.Number(epochValue))
 			if value := requireScalarValue(t, client, node, descriptor.ID, at.Add(40*time.Second)); value.Emit {
 				t.Fatal("epoch change emitted instead of resetting the baseline")
 			}
 			postEpoch := "8"
-			if descriptor.Algorithm == registry.AlgorithmDurationPercent {
+			if descriptor.Algorithm == algorithmDurationPercent {
 				postEpoch = "5.03"
 			}
-			setRegistryTestPath(document, source.Path, json.Number(postEpoch))
+			setSourceTestPath(document, source.Path, json.Number(postEpoch))
 			if value := requireScalarValue(t, client, node, descriptor.ID, at.Add(50*time.Second)); !value.Emit {
 				t.Fatal("post-epoch increase did not emit")
 			}
 		})
-	}
-}
-
-func TestRegistryCommonContextsHaveExactDimensions(t *testing.T) {
-	want := map[string]string{
-		"system.hw.sensor.temperature.input": "input",
-		"system.hw.sensor.voltage.input":     "input",
-		"system.hw.sensor.voltage.average":   "average",
-		"system.hw.sensor.fan.input":         "input",
-		"system.hw.sensor.current.input":     "input",
-		"system.hw.sensor.current.average":   "average",
-		"system.hw.sensor.power.input":       "input",
-		"system.hw.sensor.power.average":     "average",
-		"system.hw.sensor.energy.input":      "input",
-		"system.hw.sensor.humidity.input":    "input",
-		"system.hw.sensor.pressure.input":    "input",
-	}
-	for _, chart := range standardRegistry.Charts {
-		dimension, ok := want[chart.Context]
-		if !ok {
-			continue
-		}
-		for _, candidate := range chart.Dimensions {
-			if candidate.ID == "present" || candidate.Metric == "present" {
-				t.Errorf("common chart %q has prohibited synthetic present dimension", chart.Context)
-			}
-		}
-		if len(chart.Dimensions) != 1 || chart.Dimensions[0].ID != dimension {
-			t.Errorf("common context %q dimensions = %#v, want exactly %q", chart.Context, chart.Dimensions, dimension)
-		}
-		delete(want, chart.Context)
-	}
-	for context := range want {
-		t.Errorf("common context %q is missing", context)
 	}
 }
 
@@ -388,55 +350,56 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 }
 
 func syntheticRawReadingForSurface(
-	surface registry.ReadingSurfaceSpec,
+	key readingKey,
+	surface readingDescriptor,
 	value any,
 ) (rawReading, *graphNode) {
-	sourceType, sourceUnits, fixed := registryReadingSource(surface.Family)
+	sourceType, sourceUnits, fixed := sourceReadingSource(key.Family)
 	raw := rawReading{
-		Path:           "Synthetic." + surface.Family + "." + surface.Basis + "." + surface.Role,
-		IdentitySource: "Synthetic." + surface.Family + "." + surface.Basis + "." + surface.Role,
+		Path:           "Synthetic." + key.Family + "." + key.Basis + "." + key.Role,
+		IdentitySource: "Synthetic." + key.Family + "." + key.Basis + "." + key.Role,
 		Type:           sourceType,
 		Units:          sourceUnits,
-		Basis:          surface.Basis,
-		Role:           surface.Role,
+		Basis:          key.Basis,
+		Role:           key.Role,
 		Value:          value,
 		Primary:        true,
 		ReadingScoped:  surface.AlarmMetric != "",
 		Health:         "OK",
 	}
 	if fixed {
-		raw.FixedFamily = surface.Family
+		raw.FixedFamily = key.Family
 	}
 	node := &graphNode{Kind: "sensor", Key: raw.IdentitySource, Data: make(map[string]any)}
-	if surface.SemanticClass == "fan" {
+	if key.SemanticClass == "fan" {
 		node.Kind = "fan"
 	}
 	return raw, node
 }
 
-func scalarTestNode(descriptor registry.FieldSpec, source registry.SourceCandidate, value any) *graphNode {
+func scalarTestNode(descriptor sourceField, source scalarSource, value any) *graphNode {
 	node := &graphNode{
 		Kind: string(descriptor.Kind), Key: descriptor.ID,
 		Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
 	}
-	document := registryTestDocument(node, source.Document)
+	document := sourceTestDocument(node, source.Document)
 	for _, requirement := range source.Requires {
-		setRegistryTestPath(document, requirement.Path, requirement.Value)
+		setSourceTestPath(document, requirement.Path, requirement.Value)
 	}
-	setRegistryTestPath(document, source.Path, value)
+	setSourceTestPath(document, source.Path, value)
 	setScalarTestMultiplier(node, source)
 	return node
 }
 
-func setScalarTestMultiplier(node *graphNode, source registry.SourceCandidate) {
+func setScalarTestMultiplier(node *graphNode, source scalarSource) {
 	if source.MultiplierPath == "" {
 		return
 	}
-	document := registryTestDocument(node, source.Document)
+	document := sourceTestDocument(node, source.Document)
 	if source.MultiplierDocument != "" {
-		document = registryTestDocument(node, source.MultiplierDocument)
+		document = sourceTestDocument(node, source.MultiplierDocument)
 	}
-	setRegistryTestPath(document, source.MultiplierPath, json.Number("2"))
+	setSourceTestPath(document, source.MultiplierPath, json.Number("2"))
 }
 
 func requireScalarValue(
@@ -452,4 +415,37 @@ func requireScalarValue(
 		t.Fatalf("scalar %q = %+v present=%t", id, value, ok)
 	}
 	return value
+}
+
+var benchmarkReading readingDescriptor
+var benchmarkReadingFound bool
+
+func BenchmarkMatchReadingSurface(b *testing.B) {
+	for name, key := range map[string]readingKey{
+		"common":   {"temperature", "zero", "input", "direct"},
+		"fallback": {"power", "delta", "average", "direct"},
+	} {
+		b.Run(name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				benchmarkReading, benchmarkReadingFound = matchReading(key.Family, key.Basis, key.Role, key.SemanticClass)
+			}
+			if !benchmarkReadingFound {
+				b.Fatal("source mapping missing")
+			}
+		})
+	}
+}
+
+func BenchmarkHardwareScalarValues(b *testing.B) {
+	client := &protocolClient{}
+	client.hardwareState.initialize()
+	node := &graphNode{Kind: "memory", Key: "dimm-1", Enrichment: map[string]map[string]any{"memory_metrics": {"CapacityUtilizationPercent": json.Number("50")}}}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		values := client.scalarValues(node, time.Unix(int64(i)+1, 0))
+		if len(values) == 0 {
+			b.Fatal("capacity observation missing")
+		}
+	}
 }

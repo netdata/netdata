@@ -10,8 +10,6 @@ import (
 	"sync"
 )
 
-const maxIdentityBindings = maxGraphResources * 32
-
 var errIdentityIntegrity = errors.New("Redfish identity integrity failure")
 
 type identityBinding struct {
@@ -48,15 +46,6 @@ func (r *identityRegistry) register(values []identityBinding) error {
 			return fmt.Errorf("%w: %s key collision", errIdentityIntegrity, value.Domain)
 		}
 		pending[key] = digest
-	}
-	additional := 0
-	for key := range pending {
-		if _, exists := r.bindings[key]; !exists {
-			additional++
-		}
-	}
-	if len(r.bindings)+additional > maxIdentityBindings {
-		return fmt.Errorf("%w: identity registry exceeds the internal safety limit", errIdentityIntegrity)
 	}
 	maps.Copy(r.bindings, pending)
 	return nil

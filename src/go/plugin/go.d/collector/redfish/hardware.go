@@ -14,66 +14,95 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/registry"
 )
 
 const promotedLabelLimit = 256
 
-var redfishHostScopeNamespace = uuid.MustParse("1dc41e5f-4d26-5617-824f-f695cd185e51")
 var managerDateTimeOffsetPattern = regexp.MustCompile(`[+-][0-9]{2}:[0-9]{2}$`)
 
 type hardwareObservation struct {
-	Metric  string
-	Value   float64
-	Counter bool
-	State   string
-	States  []string
-	Labels  []metrix.Label
-	Scope   metrix.HostScope
+	Metric string
+	Value  float64
+	State  string
+	States []string
+	Labels []metrix.Label
 }
 
 type hardwareMetrics struct {
-	store metrix.CollectorStore
+	meter  metrix.SnapshotMeter
+	gauges map[string]metrix.SnapshotGauge
+	states map[string]metrix.StateSetInstrument
 }
 
 func newHardwareMetrics(store metrix.CollectorStore) *hardwareMetrics {
-	return &hardwareMetrics{store: store}
+	meter := store.Write().SnapshotMeter("")
+	result := &hardwareMetrics{meter: meter, gauges: make(map[string]metrix.SnapshotGauge), states: make(map[string]metrix.StateSetInstrument)}
+	gauge := func(metric string) {
+		if _, exists := result.gauges[metric]; !exists {
+			result.gauges[metric] = meter.Gauge(metric)
+		}
+	}
+	states := func(metric string, values []string) {
+		if _, exists := result.states[metric]; !exists {
+			result.states[metric] = meter.StateSet(metric, metrix.WithStateSetMode(metrix.ModeEnum), metrix.WithStateSetStates(values...))
+		}
+	}
+	for _, field := range scalarFields {
+		gauge(field.Metric)
+	}
+	for _, reading := range readingDescriptors {
+		gauge(reading.Metric)
+		if reading.AlarmMetric != "" {
+			states(reading.AlarmMetric, alarmStates)
+		}
+	}
+	for kind, status := range sourceStatusByKind {
+		states(kind+"_acquisition_state", acquisitionStates)
+		if status.Status {
+			states(kind+"_health", healthStates)
+			states(kind+"_health_rollup", healthStates)
+			states(kind+"_state", resourceStates)
+			for _, state := range healthStates {
+				gauge(kind + "_conditions_" + state)
+			}
+		}
+		if status.PowerState {
+			states(kind+"_power_state", powerStates)
+		}
+		if status.FailurePredicted {
+			states(kind+"_failure_predicted", failureStates)
+		}
+	}
+	for _, source := range additionalStateSources {
+		states(source.Metric, source.States)
+	}
+	for _, set := range sourceFlagSets {
+		for _, member := range set.Members {
+			gauge(set.Metric + "_" + member.Role)
+		}
+	}
+	return result
 }
 
 func (m *hardwareMetrics) observe(observations []hardwareObservation) {
 	for _, observation := range observations {
-		meter := m.store.Write().SnapshotMeter("").WithHostScope(observation.Scope)
-		if len(observation.Labels) > 0 {
-			meter = meter.WithLabels(observation.Labels...)
-		}
+		labels := m.meter.LabelSet(observation.Labels...)
 		if observation.State != "" {
-			meter.StateSet(
-				observation.Metric,
-				metrix.WithStateSetMode(metrix.ModeEnum),
-				metrix.WithStateSetStates(observation.States...),
-			).Enable(observation.State)
-			continue
+			m.states[observation.Metric].ObserveStateSet(metrix.StateSetPoint{States: map[string]bool{observation.State: true}}, labels)
+		} else {
+			m.gauges[observation.Metric].Observe(observation.Value, labels)
 		}
-		if observation.Counter {
-			meter.Counter(observation.Metric).ObserveTotal(observation.Value)
-			continue
-		}
-		meter.Gauge(observation.Metric).Observe(observation.Value)
 	}
 }
-
-var standardRegistry = registry.MustCompile()
 
 const (
 	maxProtocolNumericTokenBytes  = 128
 	maxProtocolDurationTokenBytes = 640
 )
 
-var managerClockDescriptor = func() registry.FieldSpec {
-	for _, descriptor := range standardRegistry.Fields {
+var managerClockDescriptor = func() sourceField {
+	for _, descriptor := range scalarFields {
 		if descriptor.ID == "manager_datetime_clock_offset" {
 			return descriptor
 		}
@@ -88,86 +117,20 @@ type rateBaseline struct {
 	Multiplier float64
 }
 
-type detailGate struct {
-	Count      int
-	Open       bool
-	Complete   bool
-	Generation uint64
-	Members    map[string]struct{}
-}
-
-type aggregateMember struct {
-	Key       string
-	Node      *graphNode
-	Value     float64
-	Readable  bool
-	Histogram string
-	RangeMin  *float64
-	RangeMax  *float64
-	Slices    []string
-}
-
-type aggregateSnapshot struct {
-	OwnerKey            string
-	OwnerKind           string
-	ChildKind           string
-	Semantic            string
-	Role                string
-	Family              string
-	Basis               string
-	Units               string
-	Source              string
-	PhysicalContext     string
-	SemanticSourceClass string
-	AggregateClass      string
-	Additive            bool
-	Histogram           string
-	States              []string
-	OneHot              bool
-	Members             map[string]struct{}
-	SliceMembers        map[string]map[string]struct{}
-}
-
-func (c *protocolClient) hardwareSurface(
-	graph *resourceGraph,
-	observedAt time.Time,
-) ([]hardwareObservation, error) {
-	nodes := c.filterSelectedSystem(graph, graph.emittedNodes())
+func (c *protocolClient) hardwareSurface(graph *resourceGraph, observedAt time.Time) ([]hardwareObservation, error) {
+	nodes := graph.emittedNodes()
 	if graph.Complete {
 		c.pruneRateBaselines(nodes)
 	}
-	metricNodes := make([]*graphNode, 0, len(nodes))
-	for _, node := range nodes {
-		if c.metricPlacementReady(node) {
-			metricNodes = append(metricNodes, node)
-		}
-	}
-	if err := c.validateHostScopeIdentities(metricNodes); err != nil {
-		return nil, err
-	}
-	readings := make(map[string][]normalizedReading)
+	readings := make(map[string][]normalizedReading, len(nodes))
 	for _, node := range nodes {
 		readings[node.Key] = c.readingsForNode(node, observedAt)
 	}
 	if err := c.validateAndRegisterReadingIdentities(readings); err != nil {
 		return nil, err
 	}
-	evidence := graph.detailEvidence(metricNodes, readings)
-	gates, gateRetentionComplete := c.detailGatesWithinBudget(
-		metricNodes,
-		readings,
-		evidence,
-		graph.Complete,
-		detailGateRetentionBudget,
-	)
-	if !gateRetentionComplete {
-		graph.addDiagnostic("Redfish detail-gate continuity state exceeded its internal retention budget")
-	}
-
 	var observations []hardwareObservation
-	scalarsByNode := make(map[string][]scalarValue)
 	for _, node := range nodes {
-		gate := gateForNode(node, readings[node.Key], gates)
 		values := c.scalarValues(node, observedAt)
 		if value, present, diagnostic := managerClockValue(node); present {
 			if diagnostic != "" {
@@ -177,61 +140,25 @@ func (c *protocolClient) hardwareSurface(
 				values = append(values, value)
 			}
 		}
+		observations = append(observations, c.statusObservations(node)...)
+		labels := c.metricLabels(node, nil)
 		for _, value := range values {
 			for _, failure := range value.SourceFailures {
 				graph.addDiagnostic(failure)
 			}
-		}
-		flags := flagValues(node)
-		scalarsByNode[node.Key] = values
-
-		if c.metricPlacementReady(node) && detailAllowed(node, gate) {
-			observations = append(observations, c.statusObservations(node)...)
-			for _, value := range values {
-				if !value.Emit {
-					continue
-				}
-				observations = append(observations, hardwareObservation{
-					Metric: value.Descriptor.Metric,
-					Value:  value.Value,
-					Labels: c.metricLabels(node, nil),
-					Scope:  c.scopeForNode(node),
-				})
+			if value.Emit {
+				observations = append(observations, hardwareObservation{Metric: value.Descriptor.Metric, Value: value.Value, Labels: labels})
 			}
-			observations = append(observations, c.flagObservations(node, flags)...)
 		}
+		observations = append(observations, c.flagObservations(node, flagValues(node))...)
 		for _, reading := range readings[node.Key] {
 			graph.addDiagnostic(reading.SourceAlarmDiagnostic)
-			if c.metricPlacementReady(node) &&
-				detailAllowed(node, gate) &&
-				(reading.Valid || reading.EffectiveAlarm != "") {
+			if reading.Valid || reading.SourceAlarm != "" {
 				observations = append(observations, c.readingObservations(node, reading)...)
 			}
 		}
 	}
-	if c.takeRateRetentionOverflow() {
-		graph.addDiagnostic("Redfish rate-baseline continuity state exceeded its internal retention budget")
-	}
-	observations = append(observations, c.detailGateObservations(gates, graph)...)
-	if c.config.Charts.aggregatesEnabled() {
-		aggregates, err := c.aggregateObservations(
-			graph,
-			metricNodes,
-			readings,
-			scalarsByNode,
-		)
-		if err != nil {
-			return observations, err
-		}
-		observations = append(observations, aggregates...)
-	}
 	return observations, nil
-}
-
-func (c *protocolClient) metricPlacementReady(node *graphNode) bool {
-	return c.config.NodeMode != "system_vnodes" ||
-		!isSubordinate(node.Kind) ||
-		node.PlacementComplete
 }
 
 func validateReadingIdentities(readings map[string][]normalizedReading) error {
@@ -289,8 +216,8 @@ func (c *protocolClient) pruneRateBaselines(nodes []*graphNode) {
 }
 
 type flagValue struct {
-	Set     registry.FlagSetSpec
-	Member  registry.FlagMemberSpec
+	Set     flagSet
+	Member  flagMember
 	Value   bool
 	Present bool
 	Emit    bool
@@ -298,7 +225,7 @@ type flagValue struct {
 
 func flagValues(node *graphNode) []flagValue {
 	var result []flagValue
-	for _, set := range standardRegistry.Flags {
+	for _, set := range sourceFlagSets {
 		if string(set.Kind) != node.Kind {
 			continue
 		}
@@ -328,7 +255,6 @@ func flagValues(node *graphNode) []flagValue {
 
 func (c *protocolClient) flagObservations(node *graphNode, values []flagValue) []hardwareObservation {
 	labels := c.metricLabels(node, nil)
-	scope := c.scopeForNode(node)
 	result := make([]hardwareObservation, 0, len(values))
 	for _, value := range values {
 		if !value.Emit || !value.Present {
@@ -338,14 +264,13 @@ func (c *protocolClient) flagObservations(node *graphNode, values []flagValue) [
 			Metric: value.Set.Metric + "_" + value.Member.Role,
 			Value:  boolFloat(value.Value),
 			Labels: labels,
-			Scope:  scope,
 		})
 	}
 	return result
 }
 
 type scalarValue struct {
-	Descriptor     registry.FieldSpec
+	Descriptor     sourceField
 	Value          float64
 	SourceFailures []string
 	Present        bool
@@ -355,10 +280,7 @@ type scalarValue struct {
 
 func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarValue {
 	result := make([]scalarValue, 0)
-	for _, descriptor := range standardRegistry.Fields {
-		if descriptor.Kind != registry.Kind(node.Kind) {
-			continue
-		}
+	for _, descriptor := range scalarFieldsByKind[node.Kind] {
 		if descriptor.ID == managerClockDescriptor.ID {
 			// DateTime is observed against the response midpoint by
 			// managerClockValue; it is deliberately not a generic numeric field.
@@ -427,7 +349,7 @@ func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarVal
 				}
 				scale := source.MultiplierScale
 				if scale.Den == 0 {
-					scale = registry.Identity
+					scale = identityScale
 				}
 				multiplier *= sourceMultiplier * float64(scale.Num) / float64(scale.Den)
 			}
@@ -439,8 +361,8 @@ func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarVal
 				sourceFailures = append(sourceFailures, scalarSourceFailure(descriptor, sourceName, "normalized value non-finite"))
 			}
 			candidate.SourceFailures = slices.Clone(sourceFailures)
-			candidate.Emit = candidate.Valid && descriptor.Algorithm == registry.AlgorithmAbsolute
-			if descriptor.Algorithm != registry.AlgorithmAbsolute && candidate.Valid {
+			candidate.Emit = candidate.Valid && descriptor.Algorithm == algorithmAbsolute
+			if descriptor.Algorithm != algorithmAbsolute && candidate.Valid {
 				rate, emit := c.rateValue(
 					node.Key+"\x00"+descriptor.ID,
 					exact,
@@ -463,7 +385,7 @@ func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarVal
 	return result
 }
 
-func scalarSourceFailure(descriptor registry.FieldSpec, source, reason string) string {
+func scalarSourceFailure(descriptor sourceField, source, reason string) string {
 	return fmt.Sprintf(
 		"Redfish compatibility: scalar %s preferred source %s: %s",
 		descriptor.ID,
@@ -472,7 +394,7 @@ func scalarSourceFailure(descriptor registry.FieldSpec, source, reason string) s
 	)
 }
 
-func sourceRequirementsMatch(document map[string]any, requirements []registry.SourceRequirement) bool {
+func sourceRequirementsMatch(document map[string]any, requirements []sourceRequirement) bool {
 	for _, requirement := range requirements {
 		value, ok := stringValueAt(document, requirement.Path)
 		if !ok || value != requirement.Value {
@@ -528,7 +450,7 @@ func managerClockValue(node *graphNode) (scalarValue, bool, string) {
 	}, true, ""
 }
 
-func sourcePath(source registry.SourceCandidate) string {
+func sourcePath(source scalarSource) string {
 	if source.Document == "" {
 		return source.Path
 	}
@@ -554,7 +476,7 @@ func (c *protocolClient) rateValue(
 	key, exact string,
 	multiplier float64,
 	at time.Time,
-	algorithm registry.Algorithm,
+	algorithm scalarAlgorithm,
 	epoch string,
 ) (float64, bool) {
 	if !boundedProtocolNumber(exact) {
@@ -566,16 +488,6 @@ func (c *protocolClient) rateValue(
 	}
 	c.rateMu.Lock()
 	previous, exists := c.rateBaselines[key]
-	limit := c.rateBaselineLimit
-	if limit <= 0 {
-		limit = rateBaselineRetentionLimit()
-		c.rateBaselineLimit = limit
-	}
-	if !exists && len(c.rateBaselines) >= limit {
-		c.rateRetentionOverflow = true
-		c.rateMu.Unlock()
-		return 0, false
-	}
 	c.rateBaselines[key] = rateBaseline{
 		Value: new(big.Rat).Set(current), At: at, Epoch: epoch, Multiplier: multiplier,
 	}
@@ -588,40 +500,13 @@ func (c *protocolClient) rateValue(
 	delta := new(big.Rat).Sub(current, previous.Value)
 	value, _ := delta.Float64()
 	value *= multiplier / elapsed
-	if algorithm == registry.AlgorithmDurationPercent {
+	if algorithm == algorithmDurationPercent {
 		value *= 100
 		if value < 0 || value > 100 {
 			return 0, false
 		}
 	}
 	return value, isFinite(value)
-}
-
-func (c *protocolClient) takeRateRetentionOverflow() bool {
-	c.rateMu.Lock()
-	overflow := c.rateRetentionOverflow
-	c.rateRetentionOverflow = false
-	c.rateMu.Unlock()
-	return overflow
-}
-
-func rateBaselineRetentionLimit() int {
-	perKind := make(map[registry.Kind]int)
-	maximum := 0
-	for _, field := range standardRegistry.Fields {
-		if field.Algorithm == registry.AlgorithmAbsolute {
-			continue
-		}
-		perKind[field.Kind]++
-		maximum = max(maximum, perKind[field.Kind])
-	}
-	if maximum == 0 {
-		maximum = 1
-	}
-	if maximum > math.MaxInt/maxGraphResources {
-		return math.MaxInt
-	}
-	return maxGraphResources * maximum
 }
 
 func rateEpoch(document map[string]any) string {
@@ -671,8 +556,8 @@ var redfishDurationPattern = regexp.MustCompile(
 	`^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$`,
 )
 
-func numericSourceValue(value any, algorithm registry.Algorithm) (string, float64, bool) {
-	if algorithm != registry.AlgorithmDurationPercent {
+func numericSourceValue(value any, algorithm scalarAlgorithm) (string, float64, bool) {
+	if algorithm != algorithmDurationPercent {
 		return numericValue(value)
 	}
 	text, ok := value.(string)
@@ -708,221 +593,8 @@ func isFinite(value float64) bool {
 	return !math.IsNaN(value) && !math.IsInf(value, 0)
 }
 
-func (c *protocolClient) filterSelectedSystem(graph *resourceGraph, nodes []*graphNode) []*graphNode {
-	if c.config.SystemURI == "" {
-		return nodes
-	}
-	selected, _ := normalizeConfiguredResourceURI(c.root, c.config.SystemURI)
-	current := make(map[string]struct{})
-	for _, node := range nodes {
-		if node.Kind == "system" && node.URI != selected {
-			continue
-		}
-		if len(node.SystemOwners) > 0 {
-			owned := false
-			for _, system := range node.SystemOwners {
-				if system.URI == selected {
-					owned = true
-					break
-				}
-			}
-			if !owned {
-				continue
-			}
-		} else if graph != nil && !graph.Complete &&
-			node.Kind != "service" &&
-			(node.Kind != "system" || node.URI != selected) {
-			// A partial refresh cannot prove that a newly unowned resource is
-			// shared. Admit it only after complete ownership evidence; prior
-			// selected membership is restored below.
-			continue
-		}
-		current[node.Key] = struct{}{}
-	}
-
-	c.selectedSystemMu.Lock()
-	if graph != nil && graph.Complete {
-		c.selectedSystemIncluded = cloneStringSet(current)
-	} else {
-		for key := range c.selectedSystemIncluded {
-			current[key] = struct{}{}
-		}
-	}
-	c.selectedSystemMu.Unlock()
-
-	result := make([]*graphNode, 0, len(current))
-	for _, node := range nodes {
-		if _, ok := current[node.Key]; ok {
-			result = append(result, node)
-		}
-	}
-	return result
-}
-
-func (c *protocolClient) detailGates(
-	nodes []*graphNode,
-	readings map[string][]normalizedReading,
-	evidence map[string]bool,
-	graphComplete bool,
-) map[string]detailGate {
-	result, _ := c.detailGatesWithinBudget(
-		nodes,
-		readings,
-		evidence,
-		graphComplete,
-		detailGateRetentionBudget,
-	)
-	return result
-}
-
-func (c *protocolClient) detailGatesWithinBudget(
-	nodes []*graphNode,
-	readings map[string][]normalizedReading,
-	evidence map[string]bool,
-	graphComplete bool,
-	budget retainedStateBudget,
-) (map[string]detailGate, bool) {
-	current := make(map[string]map[string]struct{})
-	for _, node := range nodes {
-		if !isSubordinate(node.Kind) {
-			continue
-		}
-		family := componentFamily(node, readings[node.Key])
-		owner := node.LogicalOwner
-		if owner == nil {
-			continue
-		}
-		key := owner.Key + "\x00" + family
-		if current[key] == nil {
-			current[key] = make(map[string]struct{})
-		}
-		current[key][node.Key] = struct{}{}
-	}
-
-	c.gateMu.Lock()
-	defer c.gateMu.Unlock()
-	if c.detailGateState == nil {
-		c.detailGateState = make(map[string]detailGate)
-	}
-	if graphComplete {
-		for key := range c.detailGateState {
-			if _, exists := current[key]; !exists {
-				delete(c.detailGateState, key)
-			}
-		}
-	}
-	retainedMembers := 0
-	for _, gate := range c.detailGateState {
-		retainedMembers += len(gate.Members)
-	}
-	result := make(map[string]detailGate, len(current))
-	keys := make([]string, 0, len(current))
-	for key := range current {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	retentionComplete := true
-	for _, key := range keys {
-		members := current[key]
-		previous := c.detailGateState[key]
-		if evidence[key] {
-			count := len(members)
-			cap := dereferenceInt(c.config.Charts.MaxDetailedComponentsPerFamily)
-			candidate := detailGate{
-				Count:      count,
-				Open:       c.config.Charts.detailsEnabled() && (cap == 0 || count <= cap),
-				Complete:   true,
-				Generation: previous.Generation + 1,
-				Members:    cloneStringSet(members),
-			}
-			_, exists := c.detailGateState[key]
-			baseEntries := len(c.detailGateState)
-			baseMembers := retainedMembers - len(previous.Members)
-			if exists {
-				baseEntries--
-			}
-			if retainedStateFits(baseEntries, baseMembers, 1, len(candidate.Members), budget) {
-				c.detailGateState[key] = candidate
-				retainedMembers = baseMembers + len(candidate.Members)
-			} else {
-				if exists {
-					delete(c.detailGateState, key)
-					retainedMembers = baseMembers
-				}
-				retentionComplete = false
-			}
-			previous = candidate
-		} else if previous.Members == nil {
-			count := len(members)
-			previous = detailGate{
-				Count:    count,
-				Open:     false,
-				Complete: false,
-				Members:  cloneStringSet(members),
-			}
-		} else {
-			previous.Complete = false
-		}
-		result[key] = previous
-	}
-	return result, retentionComplete
-}
-
-func cloneStringSet(src map[string]struct{}) map[string]struct{} {
-	result := make(map[string]struct{}, len(src))
-	for key := range src {
-		result[key] = struct{}{}
-	}
-	return result
-}
-
-func componentFamily(node *graphNode, readings []normalizedReading) string {
-	if node.Kind == "sensor" {
-		if len(readings) > 0 && readings[0].Family != "" {
-			return "sensor." + readings[0].Family
-		}
-		return "sensor.unknown"
-	}
-	return node.Kind
-}
-
-func gateForNode(
-	node *graphNode,
-	readings []normalizedReading,
-	gates map[string]detailGate,
-) detailGate {
-	if !isSubordinate(node.Kind) {
-		return detailGate{Count: 1, Open: true, Complete: node.Complete, Members: map[string]struct{}{node.Key: {}}}
-	}
-	if node.LogicalOwner == nil {
-		return detailGate{Count: 1, Open: false, Complete: false}
-	}
-	return gates[node.LogicalOwner.Key+"\x00"+componentFamily(node, readings)]
-}
-
-func isSubordinate(kind string) bool {
-	switch kind {
-	case "service", "system", "chassis", "manager":
-		return false
-	default:
-		return true
-	}
-}
-
-func detailAllowed(node *graphNode, gate detailGate) bool {
-	if !isSubordinate(node.Kind) {
-		return true
-	}
-	if !gate.Open {
-		return false
-	}
-	_, ok := gate.Members[node.Key]
-	return ok
-}
-
 func (c *protocolClient) statusObservations(node *graphNode) []hardwareObservation {
 	labels := c.metricLabels(node, nil)
-	scope := c.scopeForNode(node)
 	prefix := strings.ReplaceAll(node.Kind, "-", "_")
 	var result []hardwareObservation
 	status := statusForKind(node.Kind)
@@ -932,25 +604,24 @@ func (c *protocolClient) statusObservations(node *graphNode) []hardwareObservati
 			State:  normalizedEnum(node.AcquisitionState, acquisitionStates),
 			States: acquisitionStates,
 			Labels: labels,
-			Scope:  scope,
 		})
 	}
 	if status.Status {
 		if state, present, _ := categoricalStringState(node.Data, "Status.Health", normalizeHealth); present {
-			result = append(result, stateObservation(prefix+"_health", state, healthStates, labels, scope))
+			result = append(result, stateObservation(prefix+"_health", state, healthStates, labels))
 		}
 		if state, present, _ := categoricalStringState(node.Data, "Status.HealthRollup", normalizeHealth); present {
-			result = append(result, stateObservation(prefix+"_health_rollup", state, healthStates, labels, scope))
+			result = append(result, stateObservation(prefix+"_health_rollup", state, healthStates, labels))
 		}
 		if state, present, _ := categoricalStringState(node.Data, "Status.State", normalizeResourceState); present {
-			result = append(result, stateObservation(prefix+"_state", state, resourceStates, labels, scope))
+			result = append(result, stateObservation(prefix+"_state", state, resourceStates, labels))
 		}
 	}
 	if status.PowerState {
 		if state, present, _ := categoricalStringState(node.Data, "PowerState", func(value string) string {
 			return normalizedEnum(value, powerStates)
 		}); present {
-			result = append(result, stateObservation(prefix+"_power_state", state, powerStates, labels, scope))
+			result = append(result, stateObservation(prefix+"_power_state", state, powerStates, labels))
 		}
 	}
 	if status.FailurePredicted {
@@ -963,7 +634,7 @@ func (c *protocolClient) statusObservations(node *graphNode) []hardwareObservati
 					state = "clear"
 				}
 			}
-			result = append(result, stateObservation(prefix+"_failure_predicted", state, failureStates, labels, scope))
+			result = append(result, stateObservation(prefix+"_failure_predicted", state, failureStates, labels))
 		}
 	}
 	if status.Status {
@@ -975,39 +646,22 @@ func (c *protocolClient) statusObservations(node *graphNode) []hardwareObservati
 					Metric: prefix + "_conditions_" + role,
 					Value:  float64(value),
 					Labels: labels,
-					Scope:  scope,
 				})
 			}
 		}
 	}
-	result = append(result, c.additionalStateObservations(node, labels, scope)...)
+	result = append(result, c.additionalStateObservations(node, labels)...)
 	return result
 }
 
-func statusForKind(kind string) registry.StatusSpec {
-	for _, status := range standardRegistry.Status {
-		if status.Kind == registry.Kind(kind) {
-			return status
-		}
-	}
-	return registry.StatusSpec{}
-}
-
-var (
-	healthStates      = registry.HealthStates
-	resourceStates    = registry.ResourceStates
-	powerStates       = registry.PowerStates
-	failureStates     = registry.FailureStates
-	acquisitionStates = registry.AcquisitionStates
-)
+func statusForKind(kind string) statusDescriptor { return sourceStatusByKind[kind] }
 
 func stateObservation(
 	metric, state string,
 	states []string,
 	labels []metrix.Label,
-	scope metrix.HostScope,
 ) hardwareObservation {
-	return hardwareObservation{Metric: metric, State: state, States: states, Labels: labels, Scope: scope}
+	return hardwareObservation{Metric: metric, State: state, States: states, Labels: labels}
 }
 
 func normalizeHealth(value string) string {
@@ -1045,26 +699,9 @@ type stateSource struct {
 	BooleanTrue  string
 }
 
-var additionalStateSources = func() []stateSource {
-	result := make([]stateSource, 0, len(standardRegistry.States))
-	for _, source := range standardRegistry.States {
-		result = append(result, stateSource{
-			Kind:         string(source.Kind),
-			Document:     string(source.Document),
-			Path:         source.Path,
-			Metric:       source.Metric,
-			States:       source.States,
-			BooleanFalse: source.BooleanFalse,
-			BooleanTrue:  source.BooleanTrue,
-		})
-	}
-	return result
-}()
-
 func (c *protocolClient) additionalStateObservations(
 	node *graphNode,
 	labels []metrix.Label,
-	scope metrix.HostScope,
 ) []hardwareObservation {
 	var result []hardwareObservation
 	for _, source := range additionalStateSources {
@@ -1094,7 +731,7 @@ func (c *protocolClient) additionalStateObservations(
 		} else {
 			state = "unknown"
 		}
-		result = append(result, stateObservation(source.Metric, state, source.States, labels, scope))
+		result = append(result, stateObservation(source.Metric, state, source.States, labels))
 	}
 	return result
 }
@@ -1119,27 +756,7 @@ func (c *protocolClient) metricLabels(node *graphNode, reading *normalizedReadin
 	addLabel("resource_kind", node.Kind)
 	addLabel("resource_name", node.Doc.Name)
 	addLabel("source_model", node.SourceModel)
-	for _, kind := range standardRegistry.Kinds {
-		if kind.ID == registry.Kind(node.Kind) {
-			addLabel("component_family", kind.ComponentFamily)
-			break
-		}
-	}
-	if node.LogicalOwner != nil {
-		addLabel("logical_owner_key", node.LogicalOwner.Key)
-		addLabel("logical_owner_name", node.LogicalOwner.Doc.Name)
-	}
-	if node.RollupOwner != nil {
-		addLabel("rollup_owner_kind", node.RollupOwner.Kind)
-		addLabel("rollup_owner_key", node.RollupOwner.Key)
-		addLabel("rollup_owner_name", node.RollupOwner.Doc.Name)
-	}
-	if len(node.SystemOwners) == 1 {
-		for _, system := range node.SystemOwners {
-			addLabel("system_key", system.Key)
-			addLabel("system_name", system.Doc.Name)
-		}
-	}
+	addLabel("component_family", componentFamilies[node.Kind])
 	addMetricResourceLabels(addLabel, node)
 	if reading != nil {
 		addLabel("reading_key", reading.Key)
@@ -1190,132 +807,6 @@ func addMetricResourceLabels(add func(string, string), node *graphNode) {
 	addPath("link_type", "LinkNetworkTechnology", "ActiveLinkTechnology")
 }
 
-func (c *protocolClient) scopeForNode(node *graphNode) metrix.HostScope {
-	if c.config.NodeMode != "system_vnodes" {
-		return metrix.HostScope{}
-	}
-	if len(node.SystemOwners) == 1 {
-		for _, system := range node.SystemOwners {
-			return c.systemHostScope(system)
-		}
-	}
-	return c.serviceHostScope()
-}
-
-func (c *protocolClient) validateHostScopeIdentities(nodes []*graphNode) error {
-	if c.config.NodeMode != "system_vnodes" {
-		return nil
-	}
-	seen := make(map[string]string)
-	bindings := make([]identityBinding, 0, len(nodes))
-	for _, node := range nodes {
-		identity := "service:" + stableKey("netdata:redfish:endpoint:v1", c.origin, endpointKeyHexChars)
-		if len(node.SystemOwners) == 1 {
-			for _, system := range node.SystemOwners {
-				identity = "system:" + system.Key
-			}
-		}
-		guid := c.scopeForNode(node).GUID
-		if previous, exists := seen[guid]; exists && previous != identity {
-			return fmt.Errorf(
-				"%w: Redfish HostScope GUID collision between %s and %s",
-				errIdentityIntegrity,
-				previous,
-				identity,
-			)
-		}
-		seen[guid] = identity
-		bindings = append(bindings, identityBinding{
-			Domain: "host_scope", Key: guid, Preimage: identity,
-		})
-	}
-	if err := c.identities.register(bindings); err != nil {
-		return fmt.Errorf("%w: Redfish HostScope GUID collision", err)
-	}
-	return nil
-}
-
-func (c *protocolClient) systemHostScope(system *graphNode) metrix.HostScope {
-	guid := uuid.NewSHA1(redfishHostScopeNamespace, []byte("system\x00"+c.origin+"\x00"+system.URI)).String()
-	hostname := "redfish-" + system.Key[:min(12, len(system.Key))]
-	for _, override := range c.config.HostScopeOverrides {
-		uri, _ := normalizeConfiguredResourceURI(c.root, override.ResourceURI)
-		if uri != system.URI {
-			continue
-		}
-		if override.GUID != "" {
-			guid = override.GUID
-		}
-		if override.Hostname != "" {
-			hostname = override.Hostname
-		}
-	}
-	labels := map[string]string{
-		"_vnode_type":    "redfish",
-		"endpoint_key":   stableKey("netdata:redfish:endpoint:v1", c.origin, endpointKeyHexChars),
-		"redfish_origin": c.origin,
-		"system_key":     system.Key,
-	}
-	addHostLabel(labels, "endpoint_job", c.endpointJob)
-	addHostLabel(labels, "system_name", system.Doc.Name)
-	addMapHostLabel(labels, system.Data, "system_uuid", "UUID")
-	addMapHostLabel(labels, system.Data, "manufacturer", "Manufacturer")
-	addMapHostLabel(labels, system.Data, "model", "Model")
-	addMapHostLabel(labels, system.Data, "serial_number", "SerialNumber")
-	addMapHostLabel(labels, system.Data, "asset_tag", "AssetTag")
-	addMapHostLabel(labels, system.Data, "part_number", "PartNumber")
-	addMapHostLabel(labels, system.Data, "sku", "SKU")
-	addMapHostLabel(labels, system.Data, "bios_version", "BiosVersion")
-	return metrix.HostScope{ScopeKey: guid, GUID: guid, Hostname: hostname, Labels: labels}
-}
-
-func (c *protocolClient) serviceHostScope() metrix.HostScope {
-	guid := uuid.NewSHA1(redfishHostScopeNamespace, []byte("service\x00"+c.origin+"\x00/redfish/v1/")).String()
-	key := stableKey("netdata:redfish:endpoint:v1", c.origin, endpointKeyHexChars)
-	hostname := "redfish-service-" + key[:min(12, len(key))]
-	for _, override := range c.config.HostScopeOverrides {
-		uri, _ := normalizeConfiguredResourceURI(c.root, override.ResourceURI)
-		if uri != "/redfish/v1" {
-			continue
-		}
-		if override.GUID != "" {
-			guid = override.GUID
-		}
-		if override.Hostname != "" {
-			hostname = override.Hostname
-		}
-	}
-	labels := map[string]string{
-		"_vnode_type":    "redfish",
-		"endpoint_key":   key,
-		"redfish_origin": c.origin,
-	}
-	addHostLabel(labels, "endpoint_job", c.endpointJob)
-	c.serviceMetaMu.RLock()
-	addHostLabel(labels, "service_name", c.serviceName)
-	addHostLabel(labels, "redfish_version", c.redfishVersion)
-	c.serviceMetaMu.RUnlock()
-	return metrix.HostScope{
-		ScopeKey: guid,
-		GUID:     guid,
-		Hostname: hostname,
-		Labels:   labels,
-	}
-}
-
-func addHostLabel(labels map[string]string, key, value string) {
-	value = strings.TrimSpace(value)
-	if value != "" && len(value) <= promotedLabelLimit {
-		labels[key] = value
-	}
-}
-
-func addMapHostLabel(labels map[string]string, data map[string]any, key, path string) {
-	if value, ok := stringValueAt(data, path); ok {
-		addHostLabel(labels, key, value)
-	}
-}
-
 func snakeCase(value string) string {
 	value = strings.TrimSpace(value)
 	var result strings.Builder
@@ -1341,765 +832,9 @@ func snakeCase(value string) string {
 	return result.String()
 }
 
-func (c *protocolClient) detailGateObservations(
-	gates map[string]detailGate,
-	graph *resourceGraph,
-) []hardwareObservation {
-	var result []hardwareObservation
-	keys := make([]string, 0, len(gates))
-	for key := range gates {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		gate := gates[key]
-		parts := strings.SplitN(key, "\x00", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		owner := graph.findKey(parts[0])
-		if owner == nil {
-			continue
-		}
-		family := parts[1]
-		labels := c.metricLabels(owner, nil)
-		labels = upsertLabel(labels, "logical_owner_key", owner.Key)
-		labels = upsertLabel(labels, "component_family", family)
-		scope := c.scopeForNode(owner)
-		result = append(result,
-			hardwareObservation{Metric: "collection_detail_components_components", Value: float64(gate.Count), Labels: labels, Scope: scope},
-			hardwareObservation{Metric: "collection_detail_components_cap", Value: float64(dereferenceInt(c.config.Charts.MaxDetailedComponentsPerFamily)), Labels: labels, Scope: scope},
-			stateObservation("collection_detail_gate", map[bool]string{true: "open", false: "closed"}[gate.Open], []string{"open", "closed"}, labels, scope),
-			stateObservation("collection_detail_evidence", map[bool]string{true: "complete", false: "incomplete"}[gate.Complete], []string{"complete", "incomplete"}, labels, scope),
-		)
-	}
-	return result
-}
-
 func (g *resourceGraph) findKey(key string) *graphNode {
 	g.ensureLookupIndexes()
 	return g.ByKey[key]
-}
-
-func (c *protocolClient) aggregateObservations(
-	graph *resourceGraph,
-	nodes []*graphNode,
-	readings map[string][]normalizedReading,
-	scalars map[string][]scalarValue,
-) ([]hardwareObservation, error) {
-	nodeByKey := make(map[string]*graphNode, len(nodes))
-	for _, node := range nodes {
-		nodeByKey[node.Key] = node
-	}
-	sliceEvidence, nodeSlices := aggregateSliceEvidence(graph, nodes)
-	keyRegistry := make(map[string]string)
-	type currentGroup struct {
-		aggregateSnapshot
-		Owner   *graphNode
-		Members map[string]aggregateMember
-	}
-	current := make(map[string]*currentGroup)
-	add := func(key string, snapshot aggregateSnapshot, owner *graphNode, member aggregateMember) {
-		group := current[key]
-		if group == nil {
-			snapshot.Members = make(map[string]struct{})
-			snapshot.SliceMembers = make(map[string]map[string]struct{})
-			group = &currentGroup{
-				aggregateSnapshot: snapshot,
-				Owner:             owner,
-				Members:           make(map[string]aggregateMember),
-			}
-			current[key] = group
-		}
-		memberKey := member.Key
-		if memberKey == "" {
-			memberKey = member.Node.Key
-		}
-		group.Members[memberKey] = member
-		group.aggregateSnapshot.Members[memberKey] = struct{}{}
-		for _, sliceKey := range member.Slices {
-			members := group.aggregateSnapshot.SliceMembers[sliceKey]
-			if members == nil {
-				members = make(map[string]struct{})
-				group.aggregateSnapshot.SliceMembers[sliceKey] = members
-			}
-			members[memberKey] = struct{}{}
-		}
-	}
-	for _, node := range nodes {
-		if node.RollupOwner == nil {
-			continue
-		}
-		for _, reading := range readings[node.Key] {
-			if !reading.Primary ||
-				reading.Family == "" ||
-				reading.AggregateSemantic == "" ||
-				reading.AggregateClass == "" {
-				continue
-			}
-			if !kindContains(reading.AggregateKinds, node.RollupOwner.Kind) {
-				continue
-			}
-			childContext := aggregateReadingContext(node.Kind, reading.Context)
-			snapshot := aggregateSnapshot{
-				OwnerKey:            node.RollupOwner.Key,
-				OwnerKind:           node.RollupOwner.Kind,
-				ChildKind:           node.Kind,
-				Semantic:            childContext,
-				Role:                reading.Role,
-				Family:              "sensor." + reading.Family,
-				Basis:               reading.Basis,
-				Units:               reading.Units,
-				Source:              reading.SourcePath,
-				PhysicalContext:     reading.PhysicalContext,
-				SemanticSourceClass: reading.SemanticSourceClass,
-				AggregateClass:      reading.AggregateClass,
-				Histogram:           reading.Histogram,
-			}
-			add(aggregateGroupKey(snapshot), snapshot, node.RollupOwner, aggregateMember{
-				Key: reading.Key, Node: node, Value: reading.Value, Readable: reading.Valid, Histogram: reading.Histogram,
-				RangeMin: reading.RangeMin, RangeMax: reading.RangeMax, Slices: nodeSlices[node.Key],
-			})
-		}
-		for _, value := range scalars[node.Key] {
-			if !value.Present ||
-				value.Descriptor.AggregateClass == "" {
-				continue
-			}
-			if !kindContains(value.Descriptor.AggregateKinds, node.RollupOwner.Kind) {
-				continue
-			}
-			snapshot := aggregateSnapshot{
-				OwnerKey:       node.RollupOwner.Key,
-				OwnerKind:      node.RollupOwner.Kind,
-				ChildKind:      node.Kind,
-				Semantic:       value.Descriptor.Context,
-				Role:           value.Descriptor.Role,
-				Family:         node.Kind,
-				Basis:          "zero",
-				Units:          value.Descriptor.Units,
-				AggregateClass: value.Descriptor.AggregateClass,
-				Additive:       value.Descriptor.Additive,
-				Histogram:      value.Descriptor.Histogram,
-			}
-			add(aggregateGroupKey(snapshot), snapshot, node.RollupOwner, aggregateMember{
-				Node: node, Value: value.Value, Readable: value.Emit, Histogram: value.Descriptor.Histogram,
-				Slices: nodeSlices[node.Key],
-			})
-		}
-	}
-	currentKeys := make([]string, 0, len(current))
-	for key := range current {
-		currentKeys = append(currentKeys, key)
-	}
-	sort.Strings(currentKeys)
-	for _, key := range currentKeys {
-		if err := c.registerAggregateKey(keyRegistry, key); err != nil {
-			return nil, err
-		}
-	}
-
-	currentSnapshots := make(map[string]aggregateSnapshot, len(current))
-	for key, group := range current {
-		currentSnapshots[key] = group.aggregateSnapshot
-	}
-	c.aggregateMu.Lock()
-	effective, aggregateRetentionComplete := reconcileAggregateSnapshots(
-		c.aggregateState,
-		currentSnapshots,
-		sliceEvidence,
-		nodeByKey,
-		graph.Complete,
-		aggregateRetentionBudget,
-	)
-	c.aggregateMu.Unlock()
-	if !aggregateRetentionComplete {
-		graph.addDiagnostic("Redfish aggregate continuity state exceeded its internal retention budget")
-	}
-
-	var result []hardwareObservation
-	keys := make([]string, 0, len(effective))
-	for key := range effective {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		if err := c.registerAggregateKey(keyRegistry, key); err != nil {
-			return nil, err
-		}
-		info := effective[key]
-		if len(info.Members) == 0 {
-			continue
-		}
-		owner := nodeByKey[info.OwnerKey]
-		if owner == nil {
-			continue
-		}
-		var readable []aggregateMember
-		unreadable, unknown := 0, 0
-		currentGroup := current[key]
-		for memberKey := range info.Members {
-			if currentGroup == nil {
-				unknown++
-				continue
-			}
-			member, exists := currentGroup.Members[memberKey]
-			if !exists {
-				unknown++
-				continue
-			}
-			if !member.Readable {
-				unreadable++
-				continue
-			}
-			readable = append(readable, member)
-		}
-		scope := c.scopeForNode(owner)
-		prefix := "aggregate_" + info.AggregateClass
-		groupComplete := aggregateSlicesComplete(info.SliceMembers, sliceEvidence) &&
-			unreadable == 0 && unknown == 0
-		labels := c.aggregateLabels(owner, info, key)
-		result = append(result, aggregatePopulationObservations(
-			len(info.Members),
-			len(readable),
-			unreadable,
-			unknown,
-			groupComplete,
-			labels,
-			scope,
-		)...)
-		if len(readable) > 0 {
-			minimum, maximum, total := readable[0].Value, readable[0].Value, 0.0
-			for _, member := range readable {
-				minimum = min(minimum, member.Value)
-				maximum = max(maximum, member.Value)
-				total += member.Value
-			}
-			result = append(result,
-				hardwareObservation{Metric: prefix + "_minimum", Value: minimum, Labels: labels, Scope: scope},
-				hardwareObservation{Metric: prefix + "_average", Value: total / float64(len(readable)), Labels: labels, Scope: scope},
-				hardwareObservation{Metric: prefix + "_maximum", Value: maximum, Labels: labels, Scope: scope},
-			)
-			if info.Additive {
-				result = append(result, hardwareObservation{
-					Metric: prefix + "_total", Value: total,
-					Labels: labels, Scope: scope,
-				})
-			}
-		}
-		result = append(result, histogramObservations(
-			readable,
-			labels,
-			scope,
-			info.Histogram,
-		)...)
-	}
-	categorical, err := c.categoricalAggregateObservations(
-		graph,
-		nodes,
-		nodeByKey,
-		readings,
-		sliceEvidence,
-		nodeSlices,
-		keyRegistry,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return append(result, categorical...), nil
-}
-
-func cloneAggregateSnapshot(src aggregateSnapshot) aggregateSnapshot {
-	src.States = append([]string(nil), src.States...)
-	src.Members = cloneStringSet(src.Members)
-	if src.SliceMembers != nil {
-		slices := make(map[string]map[string]struct{}, len(src.SliceMembers))
-		for key, members := range src.SliceMembers {
-			slices[key] = cloneStringSet(members)
-		}
-		src.SliceMembers = slices
-	}
-	return src
-}
-
-func aggregateSnapshotWithCurrentMetadata(
-	retained aggregateSnapshot,
-	current aggregateSnapshot,
-) aggregateSnapshot {
-	members, slices := retained.Members, retained.SliceMembers
-	retained = current
-	retained.Members = members
-	retained.SliceMembers = slices
-	return retained
-}
-
-func reconcileAggregateSnapshots(
-	retained map[string]aggregateSnapshot,
-	current map[string]aggregateSnapshot,
-	sliceEvidence map[string]bool,
-	nodeByKey map[string]*graphNode,
-	graphComplete bool,
-	budget retainedStateBudget,
-) (map[string]aggregateSnapshot, bool) {
-	if graphComplete {
-		for key, snapshot := range retained {
-			if nodeByKey[snapshot.OwnerKey] == nil {
-				delete(retained, key)
-			}
-		}
-	}
-	allKeys := make(map[string]struct{}, len(retained)+len(current))
-	for key := range retained {
-		allKeys[key] = struct{}{}
-	}
-	for key := range current {
-		allKeys[key] = struct{}{}
-	}
-	keys := make([]string, 0, len(allKeys))
-	for key := range allKeys {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	retainedMembers := aggregateRetentionMembers(retained)
-	retentionComplete := retainedStateFits(
-		0,
-		0,
-		len(retained),
-		retainedMembers,
-		budget,
-	)
-	for _, key := range keys {
-		snapshot, exists := retained[key]
-		currentSnapshot, currentExists := current[key]
-		if !exists {
-			if !currentExists {
-				continue
-			}
-			snapshot = cloneAggregateSnapshot(currentSnapshot)
-			snapshot.Members = nil
-			snapshot.SliceMembers = nil
-		}
-		if currentExists {
-			snapshot = aggregateSnapshotWithCurrentMetadata(snapshot, currentSnapshot)
-		}
-		if snapshot.SliceMembers == nil {
-			snapshot.SliceMembers = make(map[string]map[string]struct{})
-		}
-		sliceKeys := make(map[string]struct{}, len(snapshot.SliceMembers))
-		for sliceKey := range snapshot.SliceMembers {
-			sliceKeys[sliceKey] = struct{}{}
-		}
-		if currentExists {
-			for sliceKey := range currentSnapshot.SliceMembers {
-				sliceKeys[sliceKey] = struct{}{}
-			}
-		}
-		for sliceKey := range sliceKeys {
-			complete, observed := sliceEvidence[sliceKey]
-			if !observed || !complete {
-				continue
-			}
-			if !currentExists || len(currentSnapshot.SliceMembers[sliceKey]) == 0 {
-				delete(snapshot.SliceMembers, sliceKey)
-				continue
-			}
-			snapshot.SliceMembers[sliceKey] = cloneStringSet(currentSnapshot.SliceMembers[sliceKey])
-		}
-		refreshAggregateMembers(&snapshot)
-		if len(snapshot.Members) == 0 {
-			if exists {
-				retainedMembers -= aggregateSnapshotRetentionMembers(retained[key])
-			}
-			delete(retained, key)
-			continue
-		}
-		existingMembers := 0
-		baseEntries := len(retained)
-		if exists {
-			existingMembers = aggregateSnapshotRetentionMembers(retained[key])
-			baseEntries--
-		}
-		baseMembers := retainedMembers - existingMembers
-		candidateMembers := aggregateSnapshotRetentionMembers(snapshot)
-		if retainedStateFits(baseEntries, baseMembers, 1, candidateMembers, budget) {
-			retained[key] = snapshot
-			retainedMembers = baseMembers + candidateMembers
-			continue
-		}
-		if exists {
-			delete(retained, key)
-			retainedMembers = baseMembers
-		}
-		retentionComplete = false
-	}
-
-	effective := make(map[string]aggregateSnapshot, len(retained)+len(current))
-	for key, snapshot := range retained {
-		effective[key] = cloneAggregateSnapshot(snapshot)
-	}
-	for key, currentSnapshot := range current {
-		snapshot, exists := effective[key]
-		if !exists {
-			snapshot = cloneAggregateSnapshot(currentSnapshot)
-		} else {
-			snapshot = aggregateSnapshotWithCurrentMetadata(snapshot, currentSnapshot)
-		}
-		if snapshot.SliceMembers == nil {
-			snapshot.SliceMembers = make(map[string]map[string]struct{})
-		}
-		for sliceKey, members := range currentSnapshot.SliceMembers {
-			if sliceEvidence[sliceKey] {
-				continue
-			}
-			combined := cloneStringSet(snapshot.SliceMembers[sliceKey])
-			for memberKey := range members {
-				combined[memberKey] = struct{}{}
-			}
-			snapshot.SliceMembers[sliceKey] = combined
-		}
-		refreshAggregateMembers(&snapshot)
-		effective[key] = snapshot
-	}
-	return effective, retentionComplete
-}
-
-func aggregateRetentionMembers(retained map[string]aggregateSnapshot) int {
-	total := 0
-	for _, snapshot := range retained {
-		total += aggregateSnapshotRetentionMembers(snapshot)
-	}
-	return total
-}
-
-func aggregateSnapshotRetentionMembers(snapshot aggregateSnapshot) int {
-	total := len(snapshot.Members)
-	for _, members := range snapshot.SliceMembers {
-		total += len(members)
-	}
-	return total
-}
-
-func refreshAggregateMembers(snapshot *aggregateSnapshot) {
-	snapshot.Members = make(map[string]struct{})
-	for _, members := range snapshot.SliceMembers {
-		for memberKey := range members {
-			snapshot.Members[memberKey] = struct{}{}
-		}
-	}
-}
-
-func aggregateSlicesComplete(
-	slices map[string]map[string]struct{},
-	evidence map[string]bool,
-) bool {
-	if len(slices) == 0 {
-		return false
-	}
-	for sliceKey := range slices {
-		complete, observed := evidence[sliceKey]
-		if !observed || !complete {
-			return false
-		}
-	}
-	return true
-}
-
-func (c *protocolClient) categoricalAggregateObservations(
-	graph *resourceGraph,
-	nodes []*graphNode,
-	nodeByKey map[string]*graphNode,
-	readings map[string][]normalizedReading,
-	sliceEvidence map[string]bool,
-	nodeSlices map[string][]string,
-	keyRegistry map[string]string,
-) ([]hardwareObservation, error) {
-	type categoryMember struct {
-		Counts   map[string]int
-		Readable bool
-	}
-	type categoryGroup struct {
-		aggregateSnapshot
-		Owner   *graphNode
-		Members map[string]categoryMember
-	}
-	groups := make(map[string]*categoryGroup)
-	add := func(
-		owner, node *graphNode,
-		snapshot aggregateSnapshot,
-		state string,
-		count int,
-		readable bool,
-	) {
-		if owner == nil || node == nil {
-			return
-		}
-		snapshot.OwnerKey = owner.Key
-		snapshot.OwnerKind = owner.Kind
-		snapshot.ChildKind = node.Kind
-		snapshot.Basis = "state"
-		snapshot.Units = categoricalAggregateUnits(snapshot.AggregateClass)
-		key := aggregateGroupKey(snapshot)
-		group := groups[key]
-		if group == nil {
-			snapshot.States = append([]string(nil), snapshot.States...)
-			snapshot.Members = make(map[string]struct{})
-			snapshot.SliceMembers = make(map[string]map[string]struct{})
-			group = &categoryGroup{
-				aggregateSnapshot: snapshot,
-				Owner:             owner, Members: make(map[string]categoryMember),
-			}
-			groups[key] = group
-		}
-		member, exists := group.Members[node.Key]
-		if !exists {
-			member = categoryMember{Counts: make(map[string]int, len(snapshot.States)), Readable: true}
-		}
-		member.Readable = member.Readable && readable
-		if readable && state != "" {
-			member.Counts[state] += count
-		}
-		group.Members[node.Key] = member
-		group.aggregateSnapshot.Members[node.Key] = struct{}{}
-		for _, sliceKey := range nodeSlices[node.Key] {
-			members := group.aggregateSnapshot.SliceMembers[sliceKey]
-			if members == nil {
-				members = make(map[string]struct{})
-				group.aggregateSnapshot.SliceMembers[sliceKey] = members
-			}
-			members[node.Key] = struct{}{}
-		}
-	}
-
-	for _, node := range nodes {
-		owner := node.RollupOwner
-		if owner == nil {
-			continue
-		}
-		family := componentFamily(node, readings[node.Key])
-		status := statusForKind(node.Kind)
-		statusAggregates := kindContains(status.AggregateKinds, owner.Kind)
-		if status.Status && statusAggregates {
-			if state, present, readable := categoricalStringState(node.Data, "Status.Health", normalizeHealth); present {
-				add(owner, node, aggregateSnapshot{
-					Semantic: "redfish." + node.Kind + ".health", Role: "health", Family: family,
-					AggregateClass: "health", States: healthStates, OneHot: true,
-				}, state, 1, readable)
-			}
-			if state, present, readable := categoricalStringState(node.Data, "Status.HealthRollup", normalizeHealth); present {
-				add(owner, node, aggregateSnapshot{
-					Semantic: "redfish." + node.Kind + ".health_rollup", Role: "health_rollup", Family: family,
-					AggregateClass: "health_rollup", States: healthStates, OneHot: true,
-				}, state, 1, readable)
-			}
-			if state, present, readable := categoricalStringState(node.Data, "Status.State", normalizeResourceState); present {
-				add(owner, node, aggregateSnapshot{
-					Semantic: "redfish." + node.Kind + ".state", Role: "state", Family: family,
-					AggregateClass: "resource_state", States: resourceStates, OneHot: true,
-				}, state, 1, readable)
-			}
-		}
-		if status.PowerState && statusAggregates {
-			if state, present, readable := categoricalStringState(node.Data, "PowerState", func(value string) string {
-				return normalizedEnum(value, powerStates)
-			}); present {
-				add(owner, node, aggregateSnapshot{
-					Semantic: "redfish." + node.Kind + ".power_state", Role: "power_state", Family: family,
-					AggregateClass: "power_state", States: powerStates, OneHot: true,
-				}, state, 1, readable)
-			}
-		}
-		if status.FailurePredicted && statusAggregates {
-			if raw, exists := jsonPath(node.Data, "FailurePredicted"); exists && raw != nil {
-				prediction := "unknown"
-				readable := false
-				if value, ok := raw.(bool); ok {
-					readable = true
-					if value {
-						prediction = "predicted"
-					} else {
-						prediction = "clear"
-					}
-				}
-				add(owner, node, aggregateSnapshot{
-					Semantic: "redfish." + node.Kind + ".failure_predicted", Role: "failure_predicted", Family: family,
-					AggregateClass: "failure_predicted", States: failureStates, OneHot: true,
-				}, prediction, 1, readable)
-			}
-		}
-		if node.AcquisitionState != "" && statusAggregates {
-			acquisition := normalizedEnum(node.AcquisitionState, acquisitionStates)
-			add(owner, node, aggregateSnapshot{
-				Semantic: "redfish." + node.Kind + ".acquisition_state", Role: "acquisition_state", Family: family,
-				AggregateClass: "acquisition_state", States: acquisitionStates, OneHot: true,
-			}, acquisition, 1, true)
-		}
-		if status.Status && statusAggregates {
-			if conditions, present, readable := conditionCountsForNode(node); present {
-				semantic := "redfish." + node.Kind + ".conditions"
-				for state, count := range map[string]int{
-					"ok": conditions.OK, "warning": conditions.Warning,
-					"critical": conditions.Critical, "unknown": conditions.Unknown,
-				} {
-					add(owner, node, aggregateSnapshot{
-						Semantic: semantic, Role: "conditions", Family: family,
-						AggregateClass: "conditions", States: healthStates,
-					}, state, count, readable)
-				}
-			}
-		}
-
-		for _, stateSpec := range standardRegistry.States {
-			if string(stateSpec.Kind) != node.Kind ||
-				!kindContains(stateSpec.AggregateKinds, owner.Kind) {
-				continue
-			}
-			document := node.Data
-			if stateSpec.Document != "" {
-				document = findEnrichment(node, string(stateSpec.Document))
-			}
-			raw, present := jsonPath(document, stateSpec.Path)
-			if !present || raw == nil {
-				continue
-			}
-			state := "unknown"
-			readable := false
-			if stateSpec.BooleanFalse != "" || stateSpec.BooleanTrue != "" {
-				if value, ok := raw.(bool); ok {
-					readable = true
-					if value {
-						state = stateSpec.BooleanTrue
-					} else {
-						state = stateSpec.BooleanFalse
-					}
-				}
-			} else if value, ok := raw.(string); ok {
-				state, readable = normalizedEnum(value, stateSpec.States), true
-			}
-			role := strings.TrimPrefix(stateSpec.Context, "redfish."+node.Kind+".")
-			add(owner, node, aggregateSnapshot{
-				Semantic: stateSpec.Context, Role: role, Family: family,
-				AggregateClass: stateSpec.Metric, States: stateSpec.States, OneHot: true,
-			}, state, 1, readable)
-		}
-
-		for _, flag := range flagValues(node) {
-			if !flag.Emit || !kindContains(flag.Set.AggregateKinds, owner.Kind) {
-				continue
-			}
-			count := 0
-			if flag.Present && flag.Value {
-				count = 1
-			}
-			roles := make([]string, 0, len(flag.Set.Members))
-			for _, member := range flag.Set.Members {
-				roles = append(roles, member.Role)
-			}
-			role := strings.TrimPrefix(flag.Set.Context, "redfish."+node.Kind+".")
-			add(owner, node, aggregateSnapshot{
-				Semantic: flag.Set.Context, Role: role, Family: family,
-				AggregateClass: flag.Set.Metric, States: roles,
-			}, flag.Member.Role, count, true)
-		}
-
-		for _, reading := range readings[node.Key] {
-			if !reading.Primary || reading.AggregateSemantic == "" || reading.EffectiveAlarm == "" ||
-				!kindContains(reading.AggregateKinds, owner.Kind) {
-				continue
-			}
-			add(owner, node, aggregateSnapshot{
-				Semantic: aggregateReadingContext(node.Kind, reading.Context), Role: "alarm",
-				Family: "sensor." + reading.Family, AggregateClass: "reading_alarm",
-				States: registry.AlarmStates, OneHot: true,
-			}, reading.EffectiveAlarm, 1, true)
-		}
-	}
-	groupKeys := make([]string, 0, len(groups))
-	for key := range groups {
-		groupKeys = append(groupKeys, key)
-	}
-	sort.Strings(groupKeys)
-	for _, key := range groupKeys {
-		if err := c.registerAggregateKey(keyRegistry, key); err != nil {
-			return nil, err
-		}
-	}
-
-	currentSnapshots := make(map[string]aggregateSnapshot, len(groups))
-	for key, group := range groups {
-		currentSnapshots[key] = group.aggregateSnapshot
-	}
-	c.aggregateMu.Lock()
-	effective, aggregateRetentionComplete := reconcileAggregateSnapshots(
-		c.categoricalAggregateState,
-		currentSnapshots,
-		sliceEvidence,
-		nodeByKey,
-		graph.Complete,
-		aggregateRetentionBudget,
-	)
-	c.aggregateMu.Unlock()
-	if !aggregateRetentionComplete {
-		graph.addDiagnostic("Redfish aggregate continuity state exceeded its internal retention budget")
-	}
-
-	keys := make([]string, 0, len(effective))
-	for key := range effective {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	var result []hardwareObservation
-	for _, key := range keys {
-		if err := c.registerAggregateKey(keyRegistry, key); err != nil {
-			return nil, err
-		}
-		info := effective[key]
-		owner := nodeByKey[info.OwnerKey]
-		if owner == nil {
-			continue
-		}
-		counts := make(map[string]int, len(info.States))
-		readable, unreadable, unknown := 0, 0, 0
-		currentGroup := groups[key]
-		for memberKey := range info.Members {
-			if currentGroup == nil {
-				unknown++
-				continue
-			}
-			member, exists := currentGroup.Members[memberKey]
-			if !exists {
-				unknown++
-				continue
-			}
-			if !member.Readable {
-				unreadable++
-				continue
-			}
-			readable++
-			for state, count := range member.Counts {
-				counts[state] += count
-			}
-		}
-		if info.OneHot && slices.Contains(info.States, "unknown") {
-			counts["unknown"] += unknown + unreadable
-		}
-		complete := aggregateSlicesComplete(info.SliceMembers, sliceEvidence) &&
-			unreadable == 0 && unknown == 0
-		labels := c.aggregateLabels(owner, info, key)
-		scope := c.scopeForNode(owner)
-		result = append(result, aggregatePopulationObservations(
-			len(info.Members), readable, unreadable, unknown, complete, labels, scope,
-		)...)
-		result = append(result, aggregateNoHistogramObservations(readable, labels, scope)...)
-		for _, state := range info.States {
-			result = append(result, hardwareObservation{
-				Metric: "aggregate_" + info.AggregateClass + "_" + state,
-				Value:  float64(counts[state]),
-				Labels: labels,
-				Scope:  scope,
-			})
-		}
-	}
-	return result, nil
 }
 
 func categoricalStringState(
@@ -2118,13 +853,6 @@ func categoricalStringState(
 	return normalize(value), true, true
 }
 
-func categoricalAggregateUnits(class string) string {
-	if class == "conditions" {
-		return "conditions"
-	}
-	return "components"
-}
-
 func conditionCountsForNode(node *graphNode) (conditionCounts, bool, bool) {
 	if node == nil {
 		return conditionCounts{}, false, false
@@ -2137,223 +865,6 @@ func conditionCountsForNode(node *graphNode) (conditionCounts, bool, bool) {
 		return conditionCounts{}, true, false
 	}
 	return conditionCountsFrom(node.Doc.Status.Conditions), true, true
-}
-
-func aggregatePopulationObservations(
-	total, readable, unreadable, unknown int,
-	complete bool,
-	labels []metrix.Label,
-	scope metrix.HostScope,
-) []hardwareObservation {
-	return []hardwareObservation{
-		{Metric: "aggregate_population_total", Value: float64(total), Labels: labels, Scope: scope},
-		{Metric: "aggregate_population_readable", Value: float64(readable), Labels: labels, Scope: scope},
-		{Metric: "aggregate_population_unreadable", Value: float64(unreadable), Labels: labels, Scope: scope},
-		{Metric: "aggregate_population_unknown", Value: float64(unknown), Labels: labels, Scope: scope},
-		{Metric: "aggregate_completeness_complete", Value: boolFloat(complete), Labels: labels, Scope: scope},
-		{Metric: "aggregate_completeness_incomplete", Value: boolFloat(!complete), Labels: labels, Scope: scope},
-	}
-}
-
-func aggregateNoHistogramObservations(
-	readable int,
-	labels []metrix.Label,
-	scope metrix.HostScope,
-) []hardwareObservation {
-	return []hardwareObservation{
-		{Metric: "aggregate_population_histogram_eligible", Value: 0, Labels: labels, Scope: scope},
-		{Metric: "aggregate_population_histogram_ineligible", Value: float64(readable), Labels: labels, Scope: scope},
-		{Metric: "aggregate_completeness_histogram_available", Value: 0, Labels: labels, Scope: scope},
-		{Metric: "aggregate_completeness_histogram_unavailable", Value: 1, Labels: labels, Scope: scope},
-	}
-}
-
-func kindContains(values []registry.Kind, value string) bool {
-	for _, candidate := range values {
-		if string(candidate) == value {
-			return true
-		}
-	}
-	return false
-}
-
-func aggregateGroupKey(snapshot aggregateSnapshot) string {
-	// Every field before PhysicalContext is a hash, registry value, or normalized
-	// enum and cannot contain NUL. PhysicalContext is the only raw BMC value and
-	// is final, so the shipped aggregate identity remains unambiguous.
-	return strings.Join([]string{
-		snapshot.OwnerKey,
-		snapshot.OwnerKind,
-		snapshot.Semantic,
-		snapshot.Role,
-		snapshot.Family,
-		snapshot.Basis,
-		snapshot.Units,
-		snapshot.Source,
-		snapshot.PhysicalContext,
-	}, "\x00")
-}
-
-func aggregateReadingContext(childKind, context string) string {
-	return "redfish." + childKind + "." + strings.TrimPrefix(context, "redfish.")
-}
-
-func aggregateSliceEvidence(
-	graph *resourceGraph,
-	nodes []*graphNode,
-) (map[string]bool, map[string][]string) {
-	evidence := make(map[string]bool)
-	nodeSlices := make(map[string][]string)
-	nodeByKey := make(map[string]*graphNode, len(nodes))
-	for _, node := range nodes {
-		nodeByKey[node.Key] = node
-	}
-	for _, slice := range graph.Slices {
-		sliceKey := aggregateSliceKey(slice)
-		complete, exists := evidence[sliceKey]
-		if !exists {
-			complete = true
-		}
-		evidence[sliceKey] = complete && slice.Complete
-		for _, memberKey := range slice.Members {
-			node := nodeByKey[memberKey]
-			if node == nil || node.RollupOwner == nil || node.RollupOwner.Key != slice.ParentKey {
-				continue
-			}
-			nodeSlices[memberKey] = appendUniqueString(nodeSlices[memberKey], sliceKey)
-		}
-	}
-	for _, node := range nodes {
-		if node.RollupOwner == nil || len(nodeSlices[node.Key]) != 0 {
-			continue
-		}
-		// Production graph placement derives a rollup owner from a contributing
-		// slice. Keep a conservative identity for synthetic/test graphs rather
-		// than treating their membership as authoritative.
-		sliceKey := strings.Join([]string{
-			"unattributed", node.RollupOwner.Key, node.Key,
-		}, "\x00")
-		nodeSlices[node.Key] = []string{sliceKey}
-		evidence[sliceKey] = false
-	}
-	return evidence, nodeSlices
-}
-
-func aggregateSliceKey(slice graphSlice) string {
-	return strings.Join([]string{
-		slice.ParentKey,
-		slice.Path,
-		slice.ChildKind,
-		slice.Family,
-		string(slice.Mode),
-		slice.Source,
-	}, "\x00")
-}
-
-func appendUniqueString(values []string, value string) []string {
-	if slices.Contains(values, value) {
-		return values
-	}
-	return append(values, value)
-}
-
-func (c *protocolClient) aggregateLabels(
-	owner *graphNode,
-	info aggregateSnapshot,
-	groupKey string,
-) []metrix.Label {
-	labels := c.metricLabels(owner, nil)
-	labels = upsertLabel(labels, "rollup_owner_kind", owner.Kind)
-	labels = upsertLabel(labels, "rollup_owner_key", owner.Key)
-	labels = upsertLabel(labels, "rollup_owner_name", owner.Doc.Name)
-	labels = upsertLabel(labels, "aggregate_key", c.aggregateKeyDigest(groupKey))
-	labels = upsertLabel(labels, "component_family", info.Family)
-	labels = upsertLabel(labels, "aggregate_class", info.AggregateClass)
-	labels = upsertLabel(labels, "aggregate_semantic", info.Semantic)
-	labels = upsertLabel(labels, "aggregate_role", info.Role)
-	labels = upsertLabel(labels, "aggregate_units", info.Units)
-	labels = upsertLabel(labels, "child_resource_kind", info.ChildKind)
-	labels = upsertLabel(labels, "reading_basis", info.Basis)
-	labels = upsertLabel(labels, "reading_source", info.Source)
-	labels = upsertLabel(labels, "physical_context", info.PhysicalContext)
-	labels = upsertLabel(labels, "semantic_source_class", info.SemanticSourceClass)
-	return labels
-}
-
-func histogramObservations(
-	members []aggregateMember,
-	labels []metrix.Label,
-	scope metrix.HostScope,
-	kind string,
-) []hardwareObservation {
-	if kind == "" {
-		return []hardwareObservation{
-			{Metric: "aggregate_population_histogram_eligible", Value: 0, Labels: labels, Scope: scope},
-			{Metric: "aggregate_population_histogram_ineligible", Value: float64(len(members)), Labels: labels, Scope: scope},
-			{Metric: "aggregate_completeness_histogram_available", Value: 0, Labels: labels, Scope: scope},
-			{Metric: "aggregate_completeness_histogram_unavailable", Value: 1, Labels: labels, Scope: scope},
-		}
-	}
-	histogram, ok := registry.Histogram(kind)
-	if !ok {
-		return nil
-	}
-	counts := make([]int, len(histogram.Buckets))
-	eligible := 0
-	for _, member := range members {
-		value, ok := aggregateHistogramValue(member, kind)
-		if !ok {
-			continue
-		}
-		eligible++
-		index := len(histogram.Buckets) - 1
-		for candidate, bucket := range histogram.Buckets {
-			if bucket.UpperExclusive == nil {
-				index = candidate
-				break
-			}
-			if value < *bucket.UpperExclusive ||
-				(bucket.UpperInclusive && value == *bucket.UpperExclusive) {
-				index = candidate
-				break
-			}
-		}
-		counts[index]++
-	}
-	result := []hardwareObservation{
-		{Metric: "aggregate_population_histogram_eligible", Value: float64(eligible), Labels: labels, Scope: scope},
-		{Metric: "aggregate_population_histogram_ineligible", Value: float64(len(members) - eligible), Labels: labels, Scope: scope},
-		{Metric: "aggregate_completeness_histogram_available", Value: boolFloat(eligible > 0), Labels: labels, Scope: scope},
-		{Metric: "aggregate_completeness_histogram_unavailable", Value: boolFloat(eligible == 0), Labels: labels, Scope: scope},
-	}
-	if eligible == 0 {
-		return result
-	}
-	for i, count := range counts {
-		result = append(result, hardwareObservation{
-			Metric: "aggregate_" + kind + "_distribution_" + histogram.Buckets[i].ID,
-			Value:  float64(count),
-			Labels: labels,
-			Scope:  scope,
-		})
-	}
-	return result
-}
-
-func aggregateHistogramValue(member aggregateMember, kind string) (float64, bool) {
-	if member.Histogram != kind || !member.Readable || !isFinite(member.Value) {
-		return 0, false
-	}
-	if kind != "range_percentage" {
-		return member.Value, true
-	}
-	if member.RangeMin == nil || member.RangeMax == nil ||
-		!isFinite(*member.RangeMin) || !isFinite(*member.RangeMax) ||
-		*member.RangeMax <= *member.RangeMin {
-		return 0, false
-	}
-	value := 100 * (member.Value - *member.RangeMin) / (*member.RangeMax - *member.RangeMin)
-	return value, isFinite(value)
 }
 
 func boolFloat(value bool) float64 {
@@ -2384,60 +895,14 @@ func upsertLabel(labels []metrix.Label, key, value string) []metrix.Label {
 // Keep the locks with the protocol state. Collection is serial today, while
 // explicit locking preserves correctness if framework scheduling changes.
 type hardwareState struct {
-	rateMu                    sync.Mutex
-	rateBaselines             map[string]rateBaseline
-	rateBaselineLimit         int
-	rateRetentionOverflow     bool
-	gateMu                    sync.Mutex
-	detailGateState           map[string]detailGate
-	aggregateMu               sync.Mutex
-	aggregateState            map[string]aggregateSnapshot
-	categoricalAggregateState map[string]aggregateSnapshot
-	aggregateDigest           func(string) string
+	rateMu        sync.Mutex
+	rateBaselines map[string]rateBaseline
 }
 
 func (s *hardwareState) initialize() {
 	if s.rateBaselines == nil {
 		s.rateBaselines = make(map[string]rateBaseline)
 	}
-	if s.rateBaselineLimit <= 0 {
-		s.rateBaselineLimit = rateBaselineRetentionLimit()
-	}
-	if s.detailGateState == nil {
-		s.detailGateState = make(map[string]detailGate)
-	}
-	if s.aggregateState == nil {
-		s.aggregateState = make(map[string]aggregateSnapshot)
-	}
-	if s.categoricalAggregateState == nil {
-		s.categoricalAggregateState = make(map[string]aggregateSnapshot)
-	}
-	if s.aggregateDigest == nil {
-		s.aggregateDigest = func(preimage string) string {
-			return stableKey("netdata:redfish:aggregate:v1", preimage, 32)
-		}
-	}
-}
-
-func (c *protocolClient) aggregateKeyDigest(preimage string) string {
-	if c.aggregateDigest == nil {
-		return stableKey("netdata:redfish:aggregate:v1", preimage, 32)
-	}
-	return c.aggregateDigest(preimage)
-}
-
-func (c *protocolClient) registerAggregateKey(registry map[string]string, preimage string) error {
-	digest := c.aggregateKeyDigest(preimage)
-	if previous, exists := registry[digest]; exists && previous != preimage {
-		return fmt.Errorf("%w: Redfish aggregate-key collision", errIdentityIntegrity)
-	}
-	registry[digest] = preimage
-	if err := c.identities.register([]identityBinding{{
-		Domain: "aggregate", Key: digest, Preimage: preimage,
-	}}); err != nil {
-		return fmt.Errorf("%w: Redfish aggregate-key collision", err)
-	}
-	return nil
 }
 
 func registeredValueAt(data map[string]any, path string) (any, bool) {
