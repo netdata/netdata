@@ -107,7 +107,7 @@ func TestRunTelegram(t *testing.T) {
 			calls:    1,
 			explicit: true,
 			code:     1,
-			err:      "all selected destinations failed",
+			err:      "all attempted destinations failed",
 		},
 		"oversize skips HTTP": {oversized: true, explicit: true, code: 1, err: "4096-character"},
 	}

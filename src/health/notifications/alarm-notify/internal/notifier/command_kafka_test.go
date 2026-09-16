@@ -37,7 +37,7 @@ func TestRunKafka(t *testing.T) {
 		"202 rejected": {status: 202, err: "HTTP 202"}, "205 rejected": {status: 205, err: "HTTP 205"},
 		"unauthorized": {status: 401, err: "HTTP 401"}, "redirect refused": {status: 307, err: "HTTP 307"},
 		"no rate limit retry": {status: 429, err: "HTTP 429"}, "no server retry": {status: 503, err: "HTTP 503"},
-		"all failed":        {explicit: true, status: 500, err: "all selected destinations failed"},
+		"all failed":        {explicit: true, status: 500, err: "all attempted destinations failed"},
 		"transport failure": {drop: true, err: "transport failed"},
 	} {
 		t.Run(name, func(t *testing.T) {

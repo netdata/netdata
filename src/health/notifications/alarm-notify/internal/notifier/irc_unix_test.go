@@ -227,7 +227,7 @@ func TestRunIRCSelection(t *testing.T) {
 		"unused":                 {selection: "silent", secret: "${env:NOTIFIER_TEST_MISSING_IRC_SECRET}"},
 		"any success and dedupe": {selection: "mixed", calls: 1, message: "1 succeeded, 1 failed"},
 		"missing secret":         {secret: "${env:NOTIFIER_TEST_MISSING_IRC_SECRET}", code: 1, message: "not set"},
-		"all failures":           {selection: "bad", code: 1, message: "all selected destinations failed"},
+		"all failures":           {selection: "bad", code: 1, message: "all attempted destinations failed"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dst, capture := ircHelperDestination(t, "irc-ok")
