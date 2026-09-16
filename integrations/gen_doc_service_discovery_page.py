@@ -85,7 +85,8 @@ services:
 ```""",
         "notes": [
             "`disabled: yes` keeps the file on disk but turns the pipeline off.",
-            "`trust_discovered_targets` defaults to `no`. Set it to `yes` only if you trust every target discovered by this pipeline: generated collector jobs may then resolve `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}`, including references supplied by targets. Other pipelines remain unchanged.",
+            "`trust_discovered_targets` defaults to `no`. Setting it to `yes` lets generated collector jobs resolve `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}`, including references in target-controlled values copied by service rules. Those references can make Netdata read local files, run commands, or fetch stored secrets with the secret providers' permissions; collectors may send the results back to a target.",
+            "Enable only if you control and trust every target this pipeline can discover. Enabling accepts that risk for the whole pipeline: one untrusted target is enough to abuse it. Other pipelines remain unchanged.",
             "Trust the inputs used by your service rules: Docker container metadata and commands, local process command lines, Kubernetes workload labels/annotations/environment, HTTP response items, or SNMP device system information. Custom rules can expose additional target-controlled values. The option does not resolve credentials used by the discoverer itself; SNMP scanning still requires literal credentials.",
             "Editing a stock file requires restarting the agent. UI-managed pipelines apply live.",
             "Where each discoverer's stock conf ships (with the Netdata package, with the Helm chart, or not at all) is documented on its per-discoverer page.",
