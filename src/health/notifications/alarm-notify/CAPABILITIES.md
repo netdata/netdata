@@ -17,7 +17,9 @@ unsupported buttons; configurable status icons/colors are retained.
 Custom commands require foreground execution and waiting for their children by explicit approval; detached/background
 work is unsupported. Native executable/argv/JSON input replaces Bash function/global syntax; legacy adapters remain later work.
 SNS preserves message customization through native Event placeholders by explicit approval; Bash shell syntax and
-richer event facts remain later work.
+richer event facts remain later work. Kafka HTTP bridges use valid JSON with the existing payload field names and
+HTTP 204 acknowledgment by explicit approval, correcting Bash's hand-built JSON-like body and form content type.
+Optional duration facts preserve unknown versus zero and are available to public Event consumers and SNS templates.
 HipChat is excluded from the Go migration by explicit approval following its
 [end of life](https://www.atlassian.com/partnerships/slack/faq); production Bash remains unchanged.
 
@@ -61,7 +63,7 @@ HipChat is excluded from the Go migration by explicit approval following its
 - Custom foreground commands with absolute executables, literal argv, native JSON stdin, explicit environment/secret
   references, discarded output, safe exit diagnostics and process-group cancellation on Linux/macOS.
 - SMS Server Tools 3 through configured sendsms, one phone per destination, Bash status wording and a 160-character
-  limit, with existing routing/fan-out and command cleanup. Recovery durations remain pending with richer event facts.
+  limit, with existing routing/fan-out and command cleanup. Recovery duration presentation remains pending.
 - Syslog through configured logger, with local/remote targets, facility/status severity or fixed level, message prefix,
   literal extra options and explicit environment. Each destination owns its options/results; shared routing and
   foreground command cleanup apply. Remote tool support and wire format remain properties of the configured logger.
@@ -69,6 +71,8 @@ HipChat is excluded from the Go migration by explicit approval following its
 - AWS SNS through configured AWS CLI v2, standard topics/platform endpoints, ARN-derived region, Bash subject/default
   body wording and native message templates. Explicit credential sources, private CLI home/configuration, stdin JSON
   and one publish attempt use the foreground command lifecycle; exit status indicates publish acceptance.
+- Kafka HTTP bridge delivery with full URLs, literal sender IPs, the existing field names, valid JSON, supplied duration
+  facts and HTTP 204 acknowledgment. Shared routing, selected-only secret resolution and safe HTTP handling apply.
 
 ## Bash providers
 
@@ -81,7 +85,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Email | `send_email` | Pending |
 | Pushover | `send_pushover` | Implemented with app/user or group keys, HTML, priorities, timestamp, navigation, safe shortening and acknowledgment checks |
 | Pushbullet | `send_pushbullet` | Email/channel targets, access token, optional source device, links/notes and acknowledgment checks implemented |
-| Kafka HTTP bridge | `send_kafka` | Pending |
+| Kafka HTTP bridge | `send_kafka` | HTTP POST, full URL/sender IP, complete bridge payload and exact HTTP 204 acknowledgment implemented; valid JSON/content type is an approved correction |
 | PagerDuty | `send_pd` | Events API v1 (default) and v2, per-integration routing, trigger/resolve with stable incident keys, event details/navigation, API base/key references and JSON acknowledgment checks implemented |
 | Twilio | `send_twilio` | Account/sender/recipient text delivery, form encoding, Basic auth, custom API bases and acknowledgment checks implemented |
 | HipChat | `send_hipchat` | Excluded by explicit decision after service/product end of life; Bash retained |
@@ -101,7 +105,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | AWS SNS | `send_awssns` | AWS CLI v2 adapter with ARN-derived region, status subject/body, native message templates, explicit static/web-identity/ECS/IMDS credentials, isolated configuration and command cleanup implemented on Linux/macOS |
 | Matrix | `send_matrix` | Client-Server v3 PUT, unencrypted m.notice, opaque room IDs, token/base references, fresh transactions, plain/escaped HTML content and event-ID acknowledgments implemented |
 | Syslog | `send_syslog` | logger adapter with local/remote host/port, facility/severity overrides, prefix, extra options, explicit environment and command cleanup implemented; native destinations isolate options and use existing any-success aggregation |
-| SMS Server Tools 3 | `send_sms` | sendsms command adapter, explicit path/env, named recipients, status-aware text, 160-character truncation and exit-status acceptance implemented on Linux/macOS; richer recovery facts pending |
+| SMS Server Tools 3 | `send_sms` | sendsms command adapter, explicit path/env, named recipients, status-aware text, 160-character truncation and exit-status acceptance implemented on Linux/macOS; recovery duration presentation pending |
 | Dynatrace | `send_dynatrace` | Approved Events API v2, API token/base, entity selector, configured event type/source, current alert content and per-event result checks implemented; CLEAR retains configured type without explicit problem closure |
 | Opsgenie | `send_opsgenie` | Approved Alert API v2/API Integration, P3/P1 creation and CLEAR closure by stable alias, API key/base references, native Event content and asynchronous acknowledgment checks implemented |
 | Gotify | `send_gotify` | Application-token auth, JSON messages, status priorities, custom API base and acknowledgment checks implemented |
@@ -117,16 +121,16 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-recipient details pending with providers |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Pending |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Pending; ownership changes require a semantic comparison |
-| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar, SMSEagle, PagerDuty, Opsgenie, Teams and Matrix content/link/status formatting plus SMS Server Tools/syslog compact text and SNS subject/body templates implemented; other providers and richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth; Rocket.Chat URL/channel; Flock URL; Fleep URL/sender; ilert integration key/API; SIGNL4 URL; Alerta API/key/environment; Dynatrace API/token/selector/type/source; Prowl API/key batch; Kavenegar API/key/sender/recipient; SMSEagle API/token/recipients/mode/duration/voice; PagerDuty integration key/API/version; Opsgenie API/key; Teams URL/icons/colors; Matrix API/token/room and custom command/sendsms executable/args/env/recipient and syslog facility/level/prefix/host/port and SNS target/credential/template settings implemented; remaining provider configuration pending |
+| Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar, SMSEagle, PagerDuty, Opsgenie, Teams and Matrix content/link/status formatting plus SMS Server Tools/syslog compact text, SNS subject/body templates and Kafka bridge payloads implemented; optional duration facts are available, with other providers and richer presentation pending |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth; Rocket.Chat URL/channel; Flock URL; Fleep URL/sender; ilert integration key/API; SIGNL4 URL; Alerta API/key/environment; Dynatrace API/token/selector/type/source; Prowl API/key batch; Kavenegar API/key/sender/recipient; SMSEagle API/token/recipients/mode/duration/voice; PagerDuty integration key/API/version; Opsgenie API/key; Teams URL/icons/colors; Matrix API/token/room and custom command/sendsms executable/args/env/recipient and syslog facility/level/prefix/host/port and SNS target/credential/template and Kafka URL/sender-IP settings implemented; remaining provider configuration pending |
 | Results | Per-target failures and Bash's any-success invocation result | Implemented for all current Go providers; provider subtarget details pending with remaining providers |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Pending; `validate` is available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
 | Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
 
-The first twenty-one implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
+The first twenty-two implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
 Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle, PagerDuty, Opsgenie, Teams, Matrix, custom commands, SMS Server Tools 3, syslog and AWS SNS. Windows command delivery remains
+SMSEagle, PagerDuty, Opsgenie, Teams, Matrix, custom commands, SMS Server Tools 3, syslog, AWS SNS and Kafka HTTP bridges. Windows command delivery remains
 a later platform increment; configuration validation and the existing HTTP providers still compile for Windows.
 Related providers may share small PRs.
 Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.

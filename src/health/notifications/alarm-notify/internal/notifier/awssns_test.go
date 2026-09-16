@@ -237,6 +237,7 @@ func TestSNSTemplateFields(t *testing.T) {
 		"alert": "test_alert", "chart": "test.chart", "context": "test.context", "status": "WARNING", "previous_status": "CLEAR",
 		"summary": "Temperature is high", "info": "A quote: \"hot\"\nUnicode: θερμοκρασία", "value": "42.5", "previous_value": "0",
 		"units": "C", "url": "", "status_message": "needs attention", "value_string": "42.5 C", "previous_value_string": "0 C",
+		"duration": "", "non_clear_duration": "",
 	}, fields)
 	for name, test := range map[string]struct{ input, want, err string }{
 		"escapes": {input: "{{{{node}} {{ node }} ${status} }}", want: "{{node}} test-node ${status} }}"},
@@ -254,8 +255,27 @@ func TestSNSTemplateFields(t *testing.T) {
 		})
 	}
 	fields = snsFields(Event{})
-	for _, key := range []string{"value", "previous_value", "value_string", "previous_value_string"} {
+	for _, key := range []string{"value", "previous_value", "value_string", "previous_value_string", "duration", "non_clear_duration"} {
 		assert.Empty(t, fields[key])
+	}
+}
+
+func TestSNSDurationTemplates(t *testing.T) {
+	for name, test := range map[string]struct {
+		duration, nonClear *uint32
+		want               string
+	}{
+		"unknown":          {want: "previous=; non-clear="},
+		"zero and nonzero": {duration: new(uint32(0)), nonClear: new(uint32(123)), want: "previous=0; non-clear=123"},
+		"maximum":          {duration: new(uint32(4294967295)), want: "previous=4294967295; non-clear="},
+	} {
+		t.Run(name, func(t *testing.T) {
+			event := expectedEvent()
+			event.Duration, event.NonClearDuration = test.duration, test.nonClear
+			got, err := renderSNS(Destination{TargetARN: testSNSARN, MessageTemplate: "previous={{duration}}; non-clear={{non_clear_duration}}"}, event)
+			require.NoError(t, err)
+			assert.Equal(t, snsPublish{TargetARN: testSNSARN, Subject: "test-node needs attention - test alert - test.chart", Message: test.want}, got)
+		})
 	}
 }
 

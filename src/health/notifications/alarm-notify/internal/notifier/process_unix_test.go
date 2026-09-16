@@ -157,6 +157,7 @@ func TestRunLocalCommand(t *testing.T) {
 			dst.Args = wantArgs
 			event := expectedEvent()
 			event.Status = test.status
+			event.Duration, event.NonClearDuration = new(uint32(0)), new(uint32(123))
 			input, err := json.Marshal(event)
 			require.NoError(t, err)
 			wantInput := string(input) + "\n"

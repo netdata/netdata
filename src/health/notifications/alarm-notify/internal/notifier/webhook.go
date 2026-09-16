@@ -62,10 +62,15 @@ func postJSON(ctx context.Context, dst Destination, message any, timeout time.Du
 	// These providers acknowledge delivery through HTTP status, not the response body.
 	// Close without buffering or draining an arbitrary remote body.
 	defer response.Body.Close()
-	accepted := response.StatusCode == http.StatusOK ||
-		dst.Type == "webhook" && response.StatusCode >= 200 && response.StatusCode < 300 ||
-		dst.Type == "signl4" &&
-			(response.StatusCode == http.StatusCreated || response.StatusCode == http.StatusAccepted)
+	accepted := response.StatusCode == http.StatusOK
+	switch dst.Type {
+	case "webhook":
+		accepted = response.StatusCode >= 200 && response.StatusCode < 300
+	case "signl4":
+		accepted = accepted || response.StatusCode == http.StatusCreated || response.StatusCode == http.StatusAccepted
+	case "kafka":
+		accepted = response.StatusCode == http.StatusNoContent
+	}
 	if !accepted {
 		return fmt.Errorf("%s returned HTTP %d", dst.Type, response.StatusCode)
 	}
