@@ -21,7 +21,10 @@ mean for an investigation.
   is whatever the status file recorded.
 - **Anything outside netdata's own scope.** No full system journal, no other services' logs, no
   packet captures. Cross-service causality is out of reach.
-- **Secrets.** Never collected, by design, with the single documented streaming-key exception.
+- **Secrets.** Never collected from *standard* captures, with the documented streaming-key exception.
+  This guarantee does **not** extend to a bundle carrying raw SNMP evidence: that store bypasses
+  sanitization entirely and can contain whatever the devices returned, including credentials. The
+  manifest says which case you have.
 
 ## Single host, single moment
 
@@ -38,9 +41,11 @@ mean for an investigation.
 
 ## Window and cap limits
 
-- **The collection window is a flag on the run**, and it bounds every journal capture, which are then
-  additionally tailed. Log files, configurations and API responses each have their own caps.
-  An incident outside the window leaves nothing.
+- **The collection window is a flag on the run**, and it bounds the *journal* captures, which are
+  then additionally tailed. It does **not** bound the on-disk log files: those are copied with their
+  own size cap and no time filter, so an older incident can still survive in a log tail on a quiet
+  host. Configurations and API responses have their own caps. Treat the window as decisive for
+  journal evidence and as a hint elsewhere.
 - **The configuration sweep stops after a bounded number of files** on POSIX, and covers only a fixed
   set of subdirectories on Windows.
 - **Caps cut at line boundaries**, and a capped tail with no line break is withheld entirely - so an

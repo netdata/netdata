@@ -67,15 +67,39 @@ sb_need() {
 # backslash separators. The ZIP spec requires forward slashes, so unzip treats
 # each entry as one flat filename containing backslashes and the bundle tree
 # never materialises. Rebuild the tree so such a bundle is readable here.
+#
+# Security: unzip refuses traversal in real path components, but a backslash
+# entry reaches it as ONE flat filename, so its own guard never applies. Undoing
+# the escaping therefore has to re-apply that guard: an entry normalising to an
+# absolute path or containing a ".." component is rejected, not moved. Without
+# this, a crafted bundle could write anywhere the invoking user can.
 _sb_flatten_backslash_entries() {
-    local root="$1" f rel dest
+    local root="$1" f rel dest seg
     while IFS= read -r -d '' f; do
         rel="${f#"$root"/}"
         case "$rel" in
             *\\*) : ;;
             *) continue ;;
         esac
-        dest="${root}/${rel//\\//}"
+        rel="${rel//\\//}"
+
+        local unsafe=0
+        case "$rel" in
+            /*|[A-Za-z]:/*) unsafe=1 ;;
+        esac
+        local IFS_SAVE="$IFS"; IFS='/'
+        for seg in $rel; do
+            [ "$seg" = ".." ] && unsafe=1
+        done
+        IFS="$IFS_SAVE"
+
+        if [ "$unsafe" -eq 1 ]; then
+            sb_warn "rejected unsafe bundle entry (path traversal): ${rel}"
+            rm -f "$f"
+            continue
+        fi
+
+        dest="${root}/${rel}"
         mkdir -p "$(dirname "$dest")"
         mv -f "$f" "$dest"
     done < <(find "$root" -maxdepth 1 -type f -name '*\\*' -print0 2>/dev/null)
@@ -117,8 +141,19 @@ sb_resolve_bundle() {
             tar --zstd -xf "$input" -C "$tmp" 2>/dev/null \
                 || { sb_need zstd; zstd -dc "$input" | tar -xf - -C "$tmp"; } ;;
         *.tar.gz|*.tgz) sb_need tar; tar -xzf "$input" -C "$tmp" ;;
-        *.zip)          sb_need unzip; unzip -q "$input" -d "$tmp" 2>/dev/null || true
-                        _sb_flatten_backslash_entries "$tmp" ;;
+        *.zip)
+            sb_need unzip
+            # unzip exits 1 for warnings, which is what a backslash-separator
+            # bundle produces. Anything above that is a real extraction failure
+            # (corrupt archive, CRC error) and must not be analysed as if it
+            # were complete - the parity check compares paths, not contents, so
+            # it would happily report parity over truncated files.
+            set +e; unzip -q "$input" -d "$tmp" 2>/dev/null; _sb_rc=$?; set -e
+            if [ "$_sb_rc" -gt 1 ]; then
+                rm -rf "$tmp"; SB_BUNDLE_TMP=""
+                sb_die "zip extraction failed (unzip exit ${_sb_rc}); the archive is damaged or truncated."
+            fi
+            _sb_flatten_backslash_entries "$tmp" ;;
         *)              sb_die "unrecognized bundle format: ${input}" ;;
     esac
 
