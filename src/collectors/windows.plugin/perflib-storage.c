@@ -795,8 +795,6 @@ static struct mount_points_scan_status mount_points_scan_volumes(
         return (struct mount_points_scan_status){ .started = false, .complete = false, .eviction_safe = false };
     }
 
-    bool complete = true;
-    bool eviction_safe = true;
     do {
         char first_path[ND_MOUNT_PATH_MAX] = "";
         bool had_path = false;
@@ -866,6 +864,8 @@ static struct mount_points_scan_status mount_points_scan_cluster_storage(DICTION
         return (struct mount_points_scan_status){ .started = false, .complete = false, .eviction_safe = false };
     }
 
+    bool complete = true;
+    bool eviction_safe = true;
     do {
         if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
             !(fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
