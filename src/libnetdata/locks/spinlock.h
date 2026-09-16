@@ -35,7 +35,11 @@ typedef struct netdata_spinlock
 #define SPINLOCK_INITIALIZER { .locked = false }
 #endif
 
+// Overridable at build time (-D...) so a lab build can trip the detector quickly.
+#ifndef SPINLOCK_DEADLOCK_TIMEOUT_SEC
 #define SPINLOCK_DEADLOCK_TIMEOUT_SEC 3600 // Number of seconds to wait before declaring a deadlock
+#endif
+
 #define SPINS_BEFORE_DEADLOCK_CHECK 100000
 
 // Helper function to detect deadlocks
