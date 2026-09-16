@@ -1534,7 +1534,7 @@ collect_runtime() {
       # timeout, a transport error and a 5xx all land here identically, and
       # naming one of them would be the exact over-reading this marker exists
       # to prevent.
-      _dt_detail=$(cat "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null | tr -d '\n')
+      _dt_detail=$(tr -d "\n" < "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null)
       printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" \
         > "$WORK/07-runtime/dyncfg-tree.json"
       manifest_fix_bytes 07-runtime/dyncfg-tree.json
