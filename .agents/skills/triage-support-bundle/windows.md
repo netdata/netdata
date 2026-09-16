@@ -19,12 +19,15 @@ The agent logs into dedicated event-log channels, not to files. One merged captu
 channels plus the legacy channel and Netdata records from the Application log, ordered for triage
 with the highest-volume channel placed last on the smallest budget.
 
-The capture also records **channel state**, and that matters: a disabled or full channel is otherwise
-indistinguishable from the agent having logged nothing. Check the state before reading absence as
-silence.
+The capture also records **channel state**, and that matters: a disabled channel is otherwise
+indistinguishable from the agent having logged nothing. Check it before reading absence as silence.
+The capture does not carry maximum size or retention mode, so it identifies a disabled channel but
+cannot confirm a full one - ask for that separately when it matters.
 
 A default install produces no daemon records in the legacy channel at all, so a report of "nothing in
-the event log" usually means the wrong channel was inspected interactively.
+the event log" usually means the wrong channel was inspected interactively. A host can be configured
+to log to files instead, and the bundle collects those when present - check before concluding the
+agent logged nothing.
 
 ## Windows-only evidence
 
@@ -35,8 +38,10 @@ the event log" usually means the wrong channel was inspected interactively.
   holds a marker stating why - not elevated, timed out, or an access error - so the reason is visible
   rather than the file simply being missing.
 - **Access control detail** - lists with inheritance state, protected-list detection, integrity
-  labels, and alternate data streams. A download-marker stream means the file was blocked on arrival;
-  a protected list means inheritance was disabled, a common post-restore breakage.
+  labels, and alternate data streams. A download-marker stream records that the file arrived from another
+  machine; it is provenance, not proof that Windows blocked execution, so do not conclude a failure
+  from the stream alone. A protected list means inheritance was disabled, a common post-restore
+  breakage.
 - **Installer registry information** and the install tree.
 - **The claim configuration file**, which POSIX does not have in that form.
 

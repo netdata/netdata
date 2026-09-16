@@ -22,7 +22,8 @@ INCIDENT=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --incident) INCIDENT="${2:-}"; shift 2 ;;
+        --incident) [ $# -ge 2 ] || sb_die "--incident needs an ISO8601 timestamp"
+                    INCIDENT="$2"; shift 2 ;;
         -h|--help)  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)         sb_die "unknown option: $1" ;;
         *)          INPUT="$1"; shift ;;
@@ -80,23 +81,34 @@ fi
 GEN="$(jq -r '.generated_utc' "$M")"
 echo "generated       : ${GEN}"
 if [ -n "$INCIDENT" ]; then
-    if command -v date >/dev/null 2>&1 \
-       && gi="$(date -u -d "$INCIDENT" +%s 2>/dev/null)" \
-       && gg="$(date -u -d "$GEN" +%s 2>/dev/null)"; then
-        hrs="$(( (gg - gi) / 3600 ))"
-        echo "incident        : ${INCIDENT}  (${hrs}h before collection)"
-        if [ -n "$WIN" ]; then
-            wh="$(echo "$WIN" | grep -oE '[0-9]+')"
-            if [ "$hrs" -gt "$wh" ]; then
-                sb_warn "INCIDENT IS OUTSIDE THE LOG WINDOW (${wh}h). Log silence proves nothing; ask for a bundle with a wider window."
-            elif [ "$hrs" -lt 0 ]; then
-                sb_warn "incident timestamp is AFTER collection; this bundle cannot contain it."
+    # BSD/macOS date has no -d; fall back to GNU-style gdate, then to python.
+    to_epoch() {
+        date -u -d "$1" +%s 2>/dev/null \
+          || gdate -u -d "$1" +%s 2>/dev/null \
+          || python3 -c 'import sys,datetime as d;t=sys.argv[1].replace("Z","+00:00");print(int(d.datetime.fromisoformat(t).timestamp()))' "$1" 2>/dev/null
+    }
+    gi="$(to_epoch "$INCIDENT")"; gg="$(to_epoch "$GEN")"
+    if [ -n "$gi" ] && [ -n "$gg" ]; then
+        delta=$(( gg - gi ))
+        # Compare seconds, not truncated hours: an incident up to 59 minutes
+        # AFTER collection used to divide down to 0 and read as "inside".
+        if [ "$delta" -lt 0 ]; then
+            sb_warn "incident timestamp is AFTER collection by $(( -delta / 60 ))m; this bundle cannot contain it."
+        else
+            echo "incident        : ${INCIDENT}  ($(( delta / 3600 ))h $(( (delta % 3600) / 60 ))m before collection)"
+            if [ -n "$WIN" ]; then
+                wh="$(printf '%s' "$WIN" | grep -oE '[0-9]+')"
+                if [ "$delta" -gt $(( wh * 3600 )) ]; then
+                    sb_warn "INCIDENT IS OUTSIDE THE JOURNAL WINDOW (${wh}h). Journal silence proves nothing; on-disk log tails are not window-bounded, so check those before concluding."
+                else
+                    echo -e "${SB_GREEN}incident is inside the journal window${SB_NC}"
+                fi
             else
-                echo -e "${SB_GREEN}incident is inside the journal window${SB_NC}"
+                sb_warn "no journal capture, so the window cannot be checked; judge log evidence on its own timestamps."
             fi
         fi
     else
-        sb_warn "could not parse --incident '${INCIDENT}'"
+        sb_warn "could not parse --incident '${INCIDENT}' (expected ISO8601, e.g. 2026-09-13T19:30:00Z)"
     fi
 else
     sb_warn "no --incident given: you cannot judge whether silence is meaningful without it."
@@ -111,7 +123,10 @@ done
 
 hdr "Key artifacts"
 check() { # path, note
-    if jq -e --arg p "$1" '.files[] | select(.path==$p)' "$M" >/dev/null 2>&1; then
+    # Manifest membership is not presence: a row whose file is missing on disk
+    # is a broken bundle, not an available artifact.
+    if jq -e --arg p "$1" '.files[] | select(.path==$p)' "$M" >/dev/null 2>&1 \
+       && [ -f "${B}/$1" ] && [ -r "${B}/$1" ]; then
         printf '  %-42s %spresent%s\n' "$1" "$SB_GREEN" "$SB_NC"
     else
         printf '  %-42s %sabsent%s   %s\n' "$1" "$SB_YELLOW" "$SB_NC" "$2"

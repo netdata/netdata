@@ -51,9 +51,10 @@ by-product of one of those stages, which is why locating the stage locates the e
   config directory, so a job or alert created in the UI appears in neither the config files nor the
   config tree listing. Where the bundle carries the dynamic layer, read it; where it does not
   (Windows), say the evidence is missing rather than concluding the job does not exist.
-- **A collector failing and a collector lacking privileges look identical from the chart.** Only the
-  permissions area separates them, and only because it captures capabilities and security contexts
-  rather than mode bits.
+- **A collector failing and a collector lacking privileges look identical from the chart.** The chart
+  alone is ambiguous; job state and the collector log usually separate them first. Reach for the
+  permissions area when those are absent or inconclusive - it is the only artifact carrying
+  capabilities and security contexts rather than mode bits.
 - **Streaming and Cloud fail independently.** Establish which one the reporter actually means before
   choosing evidence; "offline" is used for both.
 - **Health state is a snapshot; health history is log text.** The bundle captures current alert state

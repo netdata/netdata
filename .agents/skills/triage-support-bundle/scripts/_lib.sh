@@ -135,12 +135,16 @@ sb_resolve_bundle() {
 
     tmp="$(mktemp -d "${TMPDIR:-/tmp}/netdata-bundle.XXXXXX")"
     SB_BUNDLE_TMP="$tmp"
+    # Callers install their cleanup trap only after this function returns, so
+    # every failure below has to remove its own scratch directory.
+    _sb_resolve_fail() { rm -rf "$tmp"; SB_BUNDLE_TMP=""; sb_die "$@"; }
     case "$input" in
         *.tar.zst)
             sb_need tar
             tar --zstd -xf "$input" -C "$tmp" 2>/dev/null \
-                || { sb_need zstd; zstd -dc "$input" | tar -xf - -C "$tmp"; } ;;
-        *.tar.gz|*.tgz) sb_need tar; tar -xzf "$input" -C "$tmp" ;;
+                || { sb_need zstd; zstd -dc "$input" | tar -xf - -C "$tmp"; } \
+                || _sb_resolve_fail "could not extract ${input}" ;;
+        *.tar.gz|*.tgz) sb_need tar; tar -xzf "$input" -C "$tmp" || _sb_resolve_fail "could not extract ${input}" ;;
         *.zip)
             sb_need unzip
             # unzip exits 1 for warnings, which is what a backslash-separator
@@ -150,15 +154,14 @@ sb_resolve_bundle() {
             # it would happily report parity over truncated files.
             set +e; unzip -q "$input" -d "$tmp" 2>/dev/null; _sb_rc=$?; set -e
             if [ "$_sb_rc" -gt 1 ]; then
-                rm -rf "$tmp"; SB_BUNDLE_TMP=""
-                sb_die "zip extraction failed (unzip exit ${_sb_rc}); the archive is damaged or truncated."
+                _sb_resolve_fail "zip extraction failed (unzip exit ${_sb_rc}); the archive is damaged or truncated."
             fi
             _sb_flatten_backslash_entries "$tmp" ;;
-        *)              sb_die "unrecognized bundle format: ${input}" ;;
+        *)              _sb_resolve_fail "unrecognized bundle format: ${input}" ;;
     esac
 
     root="$(find "$tmp" -maxdepth 3 -name MANIFEST.json -print -quit)"
-    [ -n "$root" ] || sb_die "no MANIFEST.json inside ${input}"
+    [ -n "$root" ] || _sb_resolve_fail "no MANIFEST.json inside ${input}"
     # shellcheck disable=SC2034
     SB_BUNDLE_DIR="$(dirname "$root")"
 }

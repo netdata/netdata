@@ -41,7 +41,9 @@ The bundle is built to remove the "send a screenshot" round trip.
 1. **Per-thread CPU** is the key artifact: it names which subsystem is hot rather than reporting one
    undifferentiated process. POSIX only.
 2. **The agent's own bounded resource windows** in the runtime area cover the recent past.
-3. **Process status, limits and descriptor count** for leak and limit questions. POSIX only.
+3. **Process status, limits and descriptor count** for leak and limit questions. These are derived
+   from `/proc`, so they are absent on macOS and BSD as well as Windows - absence there is the
+   platform, not a capture failure.
 4. **Database size and metric counts**, because cost scales with what is retained and how many
    entities exist.
 5. **Machine-learning status**, since training is a recognised cost centre and can be turned down.

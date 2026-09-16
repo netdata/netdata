@@ -21,7 +21,10 @@ Order of checks:
    non-default filesystem flags on the config, log, state, cache and binary paths. An immutable flag
    on a state directory silently blocks the agent's own writes; a security-context mislabel fails
    collectors with nothing in the agent log.
-3. **Mandatory access control state**, which explains denials that appear nowhere else.
+3. **Mandatory access control state** - whether SELinux or AppArmor is present and enforcing. The
+   bundle does **not** carry individual denials or the effective policy, so this indicates that
+   mandatory access control may be involved; ask for the audit log when a specific denial has to be
+   explained.
 
 Compare against the expected ownership and capabilities in the owner document rather than against
 intuition - "root owns it, so it is fine" is wrong here, because several plugins need a specific
@@ -32,9 +35,10 @@ Two properties of the capture to respect:
 - A configured plugin-directory override is **deliberately not read**, so on a host that relocated
   its plugins the capture may describe a directory the agent does not use. Check the effective
   configuration before concluding the plugins are missing.
-- Tools are feature-detected and a missing tool is reported rather than skipped. The extended
-  attribute tool is not installed by default on Debian and Ubuntu, so its absence is common and is
-  not a finding.
+- Tools are feature-detected. The extended attribute tool is not installed by default on Debian and
+  Ubuntu, so its absence is common and is not a finding. Note the asymmetry: where the filesystem
+  flag tool is unavailable those flags are simply omitted, so an empty result is "not checked",
+  never "no immutable flag set".
 
 The highest-cost trap in this whole class - capabilities that appear set and do not work - is in
 `./false-signals.md`. Read it before reporting a capability as correct.
@@ -50,10 +54,12 @@ Order of checks:
    namespaces are a recurring collector-failure class.
 3. **Zombie processes**, which indicate plugin reaping failures - the signature of a container
    started without an init process.
-4. **Where the logs actually are.** In a container the agent's log files are symlinks to standard
-   output, so no history exists on disk. The bundle writes a marker naming the command that retrieves
-   it from the host. A marker is not logs, and the retrieved output is unsanitized, so it must be
-   handled privately.
+4. **Where the logs actually are.** In the official container image the agent's log files are
+   symlinks to standard output, so no history exists on disk and the bundle writes a marker naming
+   the command that retrieves it from the host. A marker is not logs, and the retrieved output is
+   unsanitized, so it must be handled privately. Other images and host-mounted log directories keep
+   real files, which the bundle collects normally - check which case you have before sending the
+   reporter after container logs that may not exist.
 
 Recurring causes, as patterns: missing host mounts or capabilities; a missing shared process
 namespace; socket permission or group-identifier mismatches that surface as unreadable container

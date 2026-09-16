@@ -50,7 +50,9 @@ Owners: `src/health/README.md#alert-lifecycle-and-states` for states and
 
 Written as patterns, not as a measured ranking.
 
-- A **silencer or routing rule** left in place, commonly after earlier maintenance.
+- A **silencer** left in place, commonly after earlier maintenance. A routing rule is a different
+  symptom: it suppresses the notification, not the alert, so it explains "no notification" and never
+  "no alert".
 - The alert **targets a context this node does not collect**, so it was never enabled.
 - An alert **will not clear because the entity it watched disappeared** - a removed disk, a deleted
   container - leaving the instance without fresh data rather than with good data.

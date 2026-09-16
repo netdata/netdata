@@ -35,7 +35,7 @@ Resolve every absence through this list before concluding anything:
 | The agent's API was down | Everything in the runtime area is gone and a "was down" marker replaces it |
 | The producer no longer exists | The source was removed upstream; the map below flags these |
 | Global deadline | The body reads `SKIPPED: global deadline reached`, and the manifest `origin` is `skipped` |
-| Per-command timeout | POSIX: the `# exit:` trailer is non-zero. Windows: the body is replaced by a timeout line |
+| Per-command timeout | Windows replaces the body with a timeout line. POSIX only shows a non-zero `# exit:` trailer, which is the wrapped command's own status - an ordinary command failure looks identical, so a non-zero trailer is not by itself evidence of a timeout |
 | Cap exceeded | A command capture carries a `### TRUNCATED ###` line; an API body is replaced wholesale by a withheld-body JSON marker; a copied file simply starts mid-source, and only the manifest `origin` says so |
 | Sanitizer withheld it | The body states the content was withheld - binary or NUL bytes, a symlinked source, a capped tail with no line break, or a sanitizer failure |
 | Genuinely absent | Everything above is excluded, and the host really had no such file |
@@ -148,7 +148,7 @@ There is no updater log and no coredump metadata on Windows.
 | `cloud-state.txt` / `claimed-id.txt` | The claim id only. POSIX captures a listing plus the id; Windows copies the id file | The claim token and private key are never collected |
 | `db-disk-usage.txt` | Per-tier disk usage and database file sizes. POSIX additionally reports corruption sentinels | Read against the effective config, not against expectations |
 | `health-silencers.json` | Persisted alert silencers | POSIX only. **Absent on Windows**, so "why are alerts silent" has no evidence there |
-| `pythond-job-statuses.json` | python.d job state | POSIX only, and only when that plugin wrote a dump |
+| `pythond-job-statuses.json` | python.d job state | POSIX only, only when that plugin wrote a dump, and only in bundles produced after the collector change that renamed it. Before that change the same content was published at `go.d-job-statuses.json` under a go.d title |
 | `dyncfg/` | Configs created or modified through the UI or API | POSIX only. **Absent on Windows**, so UI-created jobs and UI-edited alerts are invisible there |
 | `snmp-diagnostics-status.txt` | Always present; states whether SNMP evidence was requested and what happened | Hand SNMP questions to `triage-snmp-diagnostics` |
 | `snmp-diagnostics/` | The opt-in, **unsanitized** SNMP store | Owned by `triage-snmp-diagnostics` |
@@ -161,8 +161,11 @@ Older bundles may contain a `go.d-job-statuses.json` path whose contents are act
 
 ## `07-runtime/` - live agent state
 
-Present only when the agent's API answered. Otherwise the whole area is replaced by a single marker
-file, whose own text lists three causes - see `./false-signals.md`.
+The API captures here are present only when the agent's API answered; otherwise a single marker file
+replaces them, and its own text lists three causes - see `./false-signals.md`. The binary-derived
+captures are the exception: build information and the build cache run the binary rather than the API,
+so they survive a dead daemon and are the fallback identity evidence when everything else here is
+missing.
 
 | Path | Holds |
 |---|---|
@@ -171,7 +174,7 @@ file, whose own text lists three causes - see `./false-signals.md`.
 | `stream-info.json`, `aclk.json` | Streaming and cloud-connection diagnostics |
 | `alerts-active.json`, `alerts-all.json` | Current alert state - a snapshot, never a history |
 | `functions.json` | Which plugins expose what |
-| `dyncfg-tree.json` | **The authoritative collector job state**: every go.d and scripts.d job with its status, plus service discovery, vnodes, secret stores and alert prototypes |
+| `dyncfg-tree.json` | **The authoritative collector job state**: every go.d and scripts.d job with its status (`accepted`, `running`, `failed`, `disabled`, `orphan`, `incomplete`, `none`), plus service discovery, vnodes, secret stores and alert prototypes. Added by the collector change that removed the dead on-disk job-state file, so bundles produced before it do not carry this path |
 | `ml-info.json` | Machine-learning status only; model state is never collected |
 | `self-cpu.csv`, `self-memory.csv`, `self-api-clients.csv` | The agent's own bounded resource windows |
 | `buildinfo.txt`, `buildinfo.json` | Required by the bug template; **works with the daemon down**, because it runs the binary |
@@ -196,9 +199,10 @@ The probes are deliberately asymmetric: local API reads clear proxy variables an
 address, while the Cloud probe **retains** the real proxy configuration so it represents the
 installation's actual network path.
 
-Windows: the socket inventory filtered to netdata processes, DNS configuration (with no search-domain
-withholding), proxy configuration from both the system and the user hive, and a Cloud probe that is
-TCP and TLS only.
+Windows: the socket inventory filtered to netdata processes, DNS configuration, proxy configuration
+from both the system and the user hive, and a Cloud probe that is TCP and TLS only. The Windows DNS
+capture carries interface aliases and server addresses only - there are no search domains in it to
+withhold, and none to read.
 
 ## `09-permissions/` - why the agent cannot read or execute something
 

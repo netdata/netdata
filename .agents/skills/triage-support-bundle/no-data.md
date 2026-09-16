@@ -26,7 +26,9 @@ targets; `src/daemon/config/README.md#configuration-section-details` and
    agent logs to its own journal namespace, captured separately.
 4. **Configuration, effective first.** The effective running config is authoritative and annotates
    unrecognized options, which resolves most "my config is ignored" reports outright. Then the
-   plugin's own config, then the dynamic configuration area for anything created in the UI.
+   dynamic configuration area, because a UI- or API-created entry **overrides** the plugin file for
+   that job - reading the file first is how triage blames a setting that is not in effect. Read the
+   plugin's own config last.
 5. **Privileges.** A plugin that lost a capability or a setuid bit produces nothing and commonly logs
    nothing useful. Go to `./environment.md` - this is one of the most common causes of "the collector
    is broken" and it is invisible in a directory listing.
