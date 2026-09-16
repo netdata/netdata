@@ -85,23 +85,33 @@ func TestTeamsMatrixEscaping(t *testing.T) {
 
 func TestMSTeamsStyle(t *testing.T) {
 	for name, test := range map[string]struct {
-		icons, colors map[string]string
-		prefix, color string
+		icons, colors  map[string]string
+		prefix, color  string
+		node, nodeText string
 	}{
-		"defaults": {prefix: "⚠️ ", color: "FFA500"}, "custom": {icons: map[string]string{"warning": "*alarm*"}, colors: map[string]string{"warning": "abcDEF"}, prefix: "\\*alarm\\* ", color: "abcDEF"},
-		"empty overrides": {icons: map[string]string{"warning": ""}, colors: map[string]string{"warning": ""}},
-		"other status":    {icons: map[string]string{"clear": "x"}, colors: map[string]string{"critical": "abcdef"}, prefix: "⚠️ ", color: "FFA500"},
+		"defaults": {prefix: "⚠️ ", color: "FFA500"}, "custom": {icons: map[string]string{"warning": "*alarm*"}, colors: map[string]string{"warning": "abcDEF"}, prefix: "*alarm* ", color: "abcDEF"},
+		"empty overrides":      {icons: map[string]string{"warning": ""}, colors: map[string]string{"warning": ""}},
+		"other status":         {icons: map[string]string{"clear": "x"}, colors: map[string]string{"critical": "abcdef"}, prefix: "⚠️ ", color: "FFA500"},
+		"hostname punctuation": {node: "prod-db-01.example.net", nodeText: `prod\-db\-01\.example\.net`, prefix: "⚠️ ", color: "FFA500"},
+		"literal Markdown":     {node: "db_*.[east]", nodeText: `db\_\*\.\[east\]`, prefix: "⚠️ ", color: "FFA500"},
+		"literal backslash":    {node: `node\branch`, nodeText: `node\\branch`, prefix: "⚠️ ", color: "FFA500"},
+		"Unicode hostname":     {node: "δοκιμή-01", nodeText: `δοκιμή\-01`, prefix: "⚠️ ", color: "FFA500"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dst := teamsMatrixTestDestination("msteams")
 			dst.Icons, dst.Colors = test.icons, test.colors
+			event := teamsMatrixTestEvent("WARNING", "minimal")
 			var want msTeamsMessage
 			require.NoError(
 				t,
 				json.Unmarshal([]byte(teamsMatrixTestFixture(t, "msteams", "WARNING", "minimal")), &want),
 			)
-			want.Title, want.ThemeColor = test.prefix+"Alert WARNING from Netdata on node", test.color
-			assert.Equal(t, want, renderMSTeams(dst, teamsMatrixTestEvent("WARNING", "minimal")))
+			if test.node != "" {
+				event.Node = test.node
+				want.Text = strings.Replace(want.Text, "Node: node", "Node: "+test.nodeText, 1)
+			}
+			want.Title, want.ThemeColor = test.prefix+"Alert WARNING from Netdata on "+event.Node, test.color
+			assert.Equal(t, want, renderMSTeams(dst, event))
 		})
 	}
 }

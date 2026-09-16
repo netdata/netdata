@@ -51,7 +51,7 @@ HipChat is excluded from the Go migration by explicit approval following its
   native event details/navigation and matching JSON acknowledgments.
 - Opsgenie Alert API v2 create/close requests with Bash priorities, stable aliases, native content/navigation,
   API-key/base references and asynchronous request-acceptance checks.
-- Teams Workflows MessageCard webhooks with configurable status icons/colors, escaped native content and inline links.
+- Teams Workflows MessageCard webhooks with configurable status icons/colors, plain titles, escaped body text and inline links.
 - Matrix v3 room notices with bearer-token/base references, plain text and escaped HTML, fresh transaction IDs and
   event-ID acknowledgments; unencrypted room delivery matches the Bash capability.
 - The generic webhook is an initial development capability. It does not complete migration of Bash's custom sender.

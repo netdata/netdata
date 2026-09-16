@@ -85,9 +85,10 @@ func renderMSTeams(dst Destination, event Event) msTeamsMessage {
 		}
 		text += "\n\n[View alert](" + target.String() + ")"
 	}
+	// Teams renders the title as plain text; Markdown escaping applies only to the body.
 	return msTeamsMessage{
 		Context: "http://schema.org/extensions", Type: "MessageCard", ThemeColor: color,
-		Title: escapeMSTeamsMarkdown(title), Text: text,
+		Title: title, Text: text,
 	}
 }
 

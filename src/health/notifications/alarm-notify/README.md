@@ -1383,9 +1383,11 @@ routing:
 `critical` and `clear`; omitted entries use the defaults shown above. Icons are literal text without control characters;
 colors are six hexadecimal digits without `#`. An explicit empty string suppresses that status's icon or color.
 
-The MessageCard carries the status/title, common native alert facts, timestamp, summary and information. Event text
-is escaped as Markdown. Navigation uses a clickable inline link because Workflows does not render MessageCard
-buttons. See [Microsoft's migration notice](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/).
+The MessageCard carries the status/title, common native alert facts, timestamp, summary and information. The title
+preserves the node name and configured icon as plain text, following the
+[Teams formatting rules](https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/cards-format).
+Event text in the body is escaped as Markdown. Navigation uses a clickable inline link because Workflows does not
+render MessageCard buttons. See [Microsoft's migration notice](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/).
 
 Cards exceeding 28 KiB of serialized JSON fail before sending, without truncation. Workflow processing can impose
 additional limits. Any HTTP 2xx response means the webhook accepted the request; it does not confirm that the later
