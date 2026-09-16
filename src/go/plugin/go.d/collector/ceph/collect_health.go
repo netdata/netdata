@@ -3,13 +3,14 @@
 package ceph
 
 import (
+	"context"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collectHealth(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiHealthMinimal)
+func (c *Collector) collectHealth(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathApiHealthMinimal)
 	if err != nil {
 		return err
 	}

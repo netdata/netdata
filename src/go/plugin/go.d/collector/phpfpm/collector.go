@@ -42,13 +42,13 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	Socket             string `yaml:"socket,omitempty" json:"socket"`
-	Address            string `yaml:"address,omitempty" json:"address"`
-	FcgiPath           string `yaml:"fcgi_path,omitempty" json:"fcgi_path"`
+	web.HTTPConfig     `       yaml:",inline"                       json:""`
+	Socket             string `yaml:"socket,omitempty"              json:"socket"`
+	Address            string `yaml:"address,omitempty"             json:"address"`
+	FcgiPath           string `yaml:"fcgi_path,omitempty"           json:"fcgi_path"`
 }
 
 type Collector struct {
@@ -62,8 +62,8 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
-	cli, err := c.initClient()
+func (c *Collector) Init(ctx context.Context) error {
+	cli, err := c.initClient(ctx)
 	if err != nil {
 		return fmt.Errorf("init client: %v", err)
 	}
@@ -72,8 +72,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -87,8 +87,8 @@ func (c *Collector) Charts() *Charts {
 	return charts.Copy()
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 	}
@@ -99,4 +99,4 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {}
+func (c *Collector) Cleanup(ctx context.Context) {}

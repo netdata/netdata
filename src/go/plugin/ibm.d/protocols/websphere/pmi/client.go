@@ -38,12 +38,12 @@ type Client struct {
 }
 
 // NewClient validates the configuration and prepares an HTTP client.
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	if time.Duration(cfg.HTTPConfig.ClientConfig.Timeout) <= 0 {
 		cfg.HTTPConfig.ClientConfig.Timeout = confopt.Duration(5 * time.Second)
 	}
 
-	httpClient, err := web.NewHTTPClient(cfg.HTTPConfig.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("pmi protocol: creating http client failed: %w", err)
 	}

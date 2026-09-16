@@ -3,11 +3,12 @@
 package dockerhub
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	var (
 		reposNum = len(c.Repositories)
 		ch       = make(chan *repository, reposNum)
@@ -15,7 +16,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	)
 
 	for _, name := range c.Repositories {
-		go c.collectRepo(name, ch)
+		go c.collectRepo(ctx, name, ch)
 	}
 
 	var (
@@ -44,8 +45,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectRepo(repoName string, ch chan *repository) {
-	repo, err := c.client.getRepository(repoName)
+func (c *Collector) collectRepo(ctx context.Context, repoName string, ch chan *repository) {
+	repo, err := c.client.getRepository(ctx, repoName)
 	if err != nil {
 		c.Error(err)
 	}

@@ -3,6 +3,7 @@
 package x509check
 
 import (
+	"context"
 	"errors"
 )
 
@@ -13,6 +14,6 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initProvider() (provider, error) {
-	return newProvider(c.Config)
+func (c *Collector) initProvider(ctx context.Context) (provider, error) {
+	return newProvider(ctx, c.Config)
 }

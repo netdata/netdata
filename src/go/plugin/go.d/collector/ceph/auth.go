@@ -4,6 +4,7 @@ package ceph
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -23,7 +24,7 @@ type (
 	}
 )
 
-func (c *Collector) authLogin() (string, error) {
+func (c *Collector) authLogin(ctx context.Context) (string, error) {
 	// https://docs.ceph.com/en/reef/mgr/ceph_api/#post--api-auth
 
 	req, err := func() (*http.Request, error) {
@@ -40,7 +41,7 @@ func (c *Collector) authLogin() (string, error) {
 			return nil, err
 		}
 
-		req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiAuth)
+		req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathApiAuth)
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +73,7 @@ func (c *Collector) authLogin() (string, error) {
 	return tok.Token, nil
 }
 
-func (c *Collector) authCheck() (bool, error) {
+func (c *Collector) authCheck(ctx context.Context) (bool, error) {
 	// https://docs.ceph.com/en/reef/mgr/ceph_api/#post--api-auth-check
 	if c.token == "" {
 		return false, nil
@@ -84,7 +85,7 @@ func (c *Collector) authCheck() (bool, error) {
 			return nil, err
 		}
 
-		req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiAuthCheck)
+		req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathApiAuthCheck)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +113,7 @@ func (c *Collector) authCheck() (bool, error) {
 	return resp.Username != "", nil
 }
 
-func (c *Collector) authLogout() error {
+func (c *Collector) authLogout(ctx context.Context) error {
 	// https://docs.ceph.com/en/reef/mgr/ceph_api/#post--api-auth-logout
 
 	if c.token == "" {
@@ -121,7 +122,7 @@ func (c *Collector) authLogout() error {
 	defer func() { c.token = "" }()
 
 	req, err := func() (*http.Request, error) {
-		req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiAuthLogout)
+		req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathApiAuthLogout)
 		if err != nil {
 			return nil, err
 		}

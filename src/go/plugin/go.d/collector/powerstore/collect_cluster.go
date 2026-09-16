@@ -2,7 +2,9 @@
 
 package powerstore
 
-func (c *Collector) collectClusterSpace() {
+import "context"
+
+func (c *Collector) collectClusterSpace(ctx context.Context) {
 	if len(c.discovered.clusters) == 0 {
 		return
 	}
@@ -11,7 +13,7 @@ func (c *Collector) collectClusterSpace() {
 	defer func() { <-c.sem }()
 
 	cl := c.discovered.clusters[0]
-	sm, err := c.client.SpaceMetricsByCluster(cl.ID)
+	sm, err := c.client.SpaceMetricsByCluster(ctx, cl.ID)
 	if err != nil {
 		c.Warningf("error collecting cluster space metrics: %v", err)
 		return

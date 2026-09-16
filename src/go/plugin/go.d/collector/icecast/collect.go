@@ -3,6 +3,7 @@
 package icecast
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -12,18 +13,18 @@ const (
 	urlPathServerStats = "/status-json.xsl" // https://icecast.org/docs/icecast-trunk/server_stats/
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectServerStats(mx); err != nil {
+	if err := c.collectServerStats(ctx, mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectServerStats(mx map[string]int64) error {
-	stats, err := c.queryServerStats()
+func (c *Collector) collectServerStats(ctx context.Context, mx map[string]int64) error {
+	stats, err := c.queryServerStats(ctx)
 	if err != nil {
 		return err
 	}
@@ -64,8 +65,8 @@ func (c *Collector) collectServerStats(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) queryServerStats() (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServerStats)
+func (c *Collector) queryServerStats(ctx context.Context) (*serverStats, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStats)
 	if err != nil {
 		return nil, err
 	}

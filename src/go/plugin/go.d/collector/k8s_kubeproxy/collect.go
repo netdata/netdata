@@ -6,14 +6,15 @@ import (
 	"math"
 	"strings"
 
+	"context"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	raw, err := c.prom.ScrapeSeries()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	raw, err := c.prom.ScrapeSeries(ctx)
 
 	if err != nil {
 		return nil, err

@@ -35,7 +35,10 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		return nil, err
 	}
 
-	client, err := web.NewHTTPClient(cfg.clientConfig())
+	clientConfig := cfg.clientConfig()
+	ctx, cancel := context.WithTimeout(context.Background(), clientConfig.Timeout.Duration())
+	defer cancel()
+	client, err := web.NewHTTPClient(ctx, clientConfig)
 	if err != nil {
 		if errors.Is(err, tlscfg.ErrTLSFile) || errors.Is(err, safefile.ErrFile) {
 			return nil, dyncfg.NewPublicError(publicErrFile, err)
@@ -75,14 +78,16 @@ func (d *Discoverer) String() string {
 }
 
 func (d *Discoverer) Test(ctx context.Context) error {
-	if d == nil || ctx == nil {
+	if d == nil {
+		return errors.New("invalid HTTP discovery test")
+	}
+	defer d.client.CloseIdleConnections()
+	if ctx == nil {
 		return errors.New("invalid HTTP discovery test")
 	}
 	if d.request.Method != "" && d.request.Method != http.MethodGet {
 		return dyncfg.ErrTestUnsupported
 	}
-
-	defer d.client.CloseIdleConnections()
 
 	_, err := d.fetchTargetGroup(ctx)
 	if err == nil {
@@ -111,6 +116,7 @@ func (d *Discoverer) Test(ctx context.Context) error {
 }
 
 func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
+	defer d.client.CloseIdleConnections()
 	d.Info("instance is started")
 	d.Debugf("used config: interval: %s, response body limit: %d, source: %s", d.interval, responseBodyLimit, d.source)
 	defer func() { d.Info("instance is stopped") }()
@@ -147,11 +153,12 @@ func (d *Discoverer) discover(ctx context.Context, in chan<- []model.TargetGroup
 }
 
 func (d *Discoverer) fetchTargetGroup(ctx context.Context) (model.TargetGroup, error) {
-	req, err := web.NewHTTPRequest(d.request)
+	ctx, cancel := context.WithTimeout(ctx, d.client.Timeout)
+	defer cancel()
+	req, err := web.NewHTTPRequest(ctx, d.request)
 	if err != nil {
 		return nil, newFetchError(fetchPhaseRequest, fmt.Errorf("create HTTP request: %w", err))
 	}
-	req = req.WithContext(ctx)
 	safeURL := sanitizedURL(req.URL.String())
 
 	resp, err := d.client.Do(req)

@@ -41,11 +41,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string           `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	Address            string           `yaml:"address" json:"address"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Address            string           `yaml:"address"                       json:"address"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 
@@ -73,13 +73,13 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	pdb, err := c.initRedisClient()
+	pdb, err := c.initRedisClient(ctx)
 	if err != nil {
 		return fmt.Errorf("init redis client: %v", err)
 	}

@@ -67,12 +67,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
-	if err := c.validateConfig(); err != nil {
+func (c *Collector) Init(ctx context.Context) error {
+	if err := c.validateConfig(ctx); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prom, err := c.initPrometheusClient()
+	prom, err := c.initPrometheusClient(ctx)
 	if err != nil {
 		return fmt.Errorf("prometheus client initialization: %v", err)
 	}
@@ -81,8 +81,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -96,8 +96,8 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 		return nil

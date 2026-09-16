@@ -85,12 +85,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("validating config: %v", err)
 	}
 
-	prom, err := c.initPrometheusClient()
+	prom, err := c.initPrometheusClient(ctx)
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}

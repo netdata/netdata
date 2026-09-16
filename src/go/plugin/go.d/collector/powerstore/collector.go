@@ -58,11 +58,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	VolumeSelector     string `yaml:"volume_selector,omitempty" json:"volume_selector"`
+	web.HTTPConfig     `       yaml:",inline"                       json:""`
+	VolumeSelector     string `yaml:"volume_selector,omitempty"     json:"volume_selector"`
 }
 
 type (
@@ -100,12 +100,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if c.Username == "" || c.Password == "" {
 		return errors.New("config: username and password aren't set")
 	}
 
-	cli, err := client.New(c.ClientConfig, c.RequestConfig)
+	cli, err := client.New(ctx, c.ClientConfig, c.RequestConfig)
 	if err != nil {
 		return fmt.Errorf("error creating PowerStore client: %v", err)
 	}
@@ -132,16 +132,16 @@ func (c *Collector) volumeMatches(name string) bool {
 	return c.volMatcher.MatchString(name)
 }
 
-func (c *Collector) Check(context.Context) error {
-	if err := c.client.Login(); err != nil {
+func (c *Collector) Check(ctx context.Context) error {
+	if err := c.client.Login(ctx); err != nil {
 		return err
 	}
 	// Verify API access by running discovery (no metrics written).
-	return c.discovery()
+	return c.discovery(ctx)
 }
 
-func (c *Collector) Collect(context.Context) error {
-	return c.collect()
+func (c *Collector) Collect(ctx context.Context) error {
+	return c.collect(ctx)
 }
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
