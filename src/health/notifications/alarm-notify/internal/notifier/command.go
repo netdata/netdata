@@ -84,7 +84,11 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return 1
 	}
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
-	defer cancel()
+	processes := &commandProcesses{}
+	defer func() {
+		cancel()
+		processes.closeAndWait()
+	}()
 	// Keep output on this goroutine so cancellation cannot race with a caller's writer.
 	updates := make(chan commandUpdate)
 	publish := func(update commandUpdate) {
@@ -96,6 +100,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	go func() {
 		err := execute(
 			ctx,
+			processes,
 			*configPath,
 			args[0] == "validate",
 			destination,
@@ -153,6 +158,7 @@ receive:
 
 func execute(
 	ctx context.Context,
+	processes *commandProcesses,
 	configPath string,
 	validateOnly bool,
 	destination string,
@@ -187,5 +193,5 @@ func execute(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return dispatch(ctx, cfg, destinations, event, timeout, report)
+	return dispatch(ctx, processes, cfg, destinations, event, timeout, report)
 }

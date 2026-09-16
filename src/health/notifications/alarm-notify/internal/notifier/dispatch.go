@@ -15,6 +15,7 @@ type deliveryResult struct {
 
 func dispatch(
 	ctx context.Context,
+	processes *commandProcesses,
 	cfg Config,
 	destinations []string,
 	event Event,
@@ -29,6 +30,8 @@ func dispatch(
 		dst := cfg.Destinations[name]
 		var err error
 		switch dst.Type {
+		case "command", "smstools3":
+			err = sendCommand(ctx, processes, dst, event)
 		case "webhook":
 			err = sendWebhook(ctx, dst, event, timeout)
 		case "slack":

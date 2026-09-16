@@ -108,6 +108,8 @@ func TestSMSEagleFieldIsolation(t *testing.T) {
 			v := reflect.ValueOf(&dst).Elem().Field(i)
 			if v.Kind() == reflect.Map {
 				v.Set(reflect.ValueOf(map[string]string{"warning": "synthetic-private-value"}))
+			} else if v.Kind() == reflect.Slice {
+				v.Set(reflect.ValueOf([]string{"synthetic-private-value"}))
 			} else if v.Kind() == reflect.String {
 				v.SetString("synthetic-private-value")
 			} else {

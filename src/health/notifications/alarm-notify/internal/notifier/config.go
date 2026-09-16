@@ -25,6 +25,9 @@ type Routing struct {
 }
 
 type Destination struct {
+	Executable      string            `yaml:"executable,omitempty"`
+	Args            []string          `yaml:"args,omitempty"`
+	Env             map[string]string `yaml:"env,omitempty"`
 	RoomID          string            `yaml:"room_id,omitempty"`
 	Icons           map[string]string `yaml:"icons,omitempty"`
 	Colors          map[string]string `yaml:"colors,omitempty"`
@@ -115,6 +118,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "command" || dst.Type == "smstools3" {
+		return dst.validateCommand()
+	}
+	if dst.Executable != "" || dst.Args != nil || dst.Env != nil {
+		return errors.New("destination contains fields for another provider: executable, args and env require command or smstools3")
+	}
 	if dst.Type == "msteams" {
 		return dst.validateMSTeams()
 	}
@@ -208,7 +217,7 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams or matrix; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command or smstools3; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
