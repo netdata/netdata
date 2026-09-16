@@ -800,7 +800,9 @@ fn filtered_grid_selects_straddling_traces_from_either_source() {
         assert_eq!(data.cells[5][5], 1, "{name}: merged 12s envelope, bucket 5");
         assert_eq!(data.total_spans, 2, "{name}: both stored spans of C");
     }
-    // A match confined to the tail selects a tail-only trace too.
+    // A trace held by ONE source only (B, sealed) is selected by its
+    // own match; the tail-only counterpart runs in
+    // `filtered_grid_requires_the_match_to_start_inside_the_grid`.
     let data = filtered(src(), name_in(&["b-err"]));
     assert_eq!((data.total_traces, data.total_errors), (1, 1));
 }
