@@ -25,6 +25,11 @@ type Routing struct {
 }
 
 type Destination struct {
+	Facility        string            `yaml:"facility,omitempty"`
+	Level           string            `yaml:"level,omitempty"`
+	Prefix          string            `yaml:"prefix,omitempty"`
+	Host            string            `yaml:"host,omitempty"`
+	Port            *configInteger    `yaml:"port,omitempty"`
 	Executable      string            `yaml:"executable,omitempty"`
 	Args            []string          `yaml:"args,omitempty"`
 	Env             map[string]string `yaml:"env,omitempty"`
@@ -118,11 +123,17 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "syslog" {
+		return dst.validateSyslog()
+	}
+	if dst.Facility != "" || dst.Level != "" || dst.Prefix != "" || dst.Host != "" || dst.Port != nil {
+		return errors.New("destination contains fields for another provider: facility, level, prefix, host and port require syslog")
+	}
 	if dst.Type == "command" || dst.Type == "smstools3" {
 		return dst.validateCommand()
 	}
 	if dst.Executable != "" || dst.Args != nil || dst.Env != nil {
-		return errors.New("destination contains fields for another provider: executable, args and env require command or smstools3")
+		return errors.New("destination contains fields for another provider: executable, args and env require command, smstools3 or syslog")
 	}
 	if dst.Type == "msteams" {
 		return dst.validateMSTeams()
@@ -217,7 +228,7 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command or smstools3; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command, smstools3 or syslog; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||
