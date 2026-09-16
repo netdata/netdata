@@ -36,14 +36,14 @@ func excerptReadings(node *graphNode) []rawReading {
 		{"Voltage", "Voltage", "V", "voltage", nil},
 		{"ReadingRPM", "Rotational", "{rev}/min", "speed", nil},
 	})
-	for kind, resource := range node.Enrichment {
+	for enrichmentKey, resource := range node.Enrichment {
 		var sources []excerptReadingSource
 		switch {
-		case strings.HasPrefix(kind, "processor_metrics"):
+		case strings.HasPrefix(enrichmentKey, "processor_metrics"):
 			sources = []excerptReadingSource{
 				{"CoreVoltage", "Voltage", "V", "core_voltage", nil},
 			}
-		case strings.HasPrefix(kind, "power_supply_metrics"):
+		case strings.HasPrefix(enrichmentKey, "power_supply_metrics"):
 			sources = []excerptReadingSource{
 				{"InputPowerWatts", "Power", "W", "input_power", nil},
 				{"OutputPowerWatts", "Power", "W", "output_power", nil},
@@ -97,7 +97,7 @@ func excerptReadings(node *graphNode) []rawReading {
 				},
 				{"PolyPhaseCurrentAmps", "Current", "A", "current", []string{"Line1", "Line2", "Line3", "Neutral"}},
 			}
-		case strings.HasPrefix(kind, "battery_metrics"):
+		case strings.HasPrefix(enrichmentKey, "battery_metrics"):
 			sources = []excerptReadingSource{
 				{"InputCurrentAmps", "Current", "A", "input_current", nil},
 				{"InputVoltage", "Voltage", "V", "input_voltage", nil},
@@ -106,7 +106,7 @@ func excerptReadings(node *graphNode) []rawReading {
 				{"StoredChargeAmpHours", "ChargeAh", "A.h", "stored_charge", nil},
 				{"StoredEnergyWattHours", "EnergyWh", "W.h", "stored_energy", nil},
 			}
-		case strings.HasPrefix(kind, "environment_metrics"):
+		case strings.HasPrefix(enrichmentKey, "environment_metrics"):
 			sources = []excerptReadingSource{
 				{"AbsoluteHumidity", "AbsoluteHumidity", "g/m3", "absolute_humidity", nil},
 				{"PowerWatts", "Power", "W", "power", nil},
@@ -120,7 +120,7 @@ func excerptReadings(node *graphNode) []rawReading {
 				{"EnergyJoules", "EnergyJoules", "J", "energy", nil},
 				{"EnergykWh", "EnergykWh", "kW.h", "energy", nil},
 			}
-		case strings.HasPrefix(kind, "thermal_metrics"):
+		case strings.HasPrefix(enrichmentKey, "thermal_metrics"):
 			sources = []excerptReadingSource{
 				{"PowerWatts", "Power", "W", "power", nil},
 				{"DeltaPressurekPa", "PressurekPa", "kPa", "pressure", nil},
@@ -134,19 +134,20 @@ func excerptReadings(node *graphNode) []rawReading {
 					[]string{"Ambient", "Exhaust", "Intake", "Internal"},
 				},
 			}
-		case strings.HasPrefix(kind, "heater_metrics"):
+		case strings.HasPrefix(enrichmentKey, "heater_metrics"):
 			sources = []excerptReadingSource{
 				{"PowerWatts", "Power", "W", "power", nil},
 			}
 		}
-		result = excerptDocumentReadings(result, node.Kind, resource.Data, resource.URI, sources)
+		// Keep acquired documents distinct before path-based reading deduplication.
+		result = excerptDocumentReadings(result, enrichmentKey, resource.Data, resource.URI, sources)
 	}
 	return result
 }
 
 func excerptDocumentReadings(
 	result []rawReading,
-	kind string,
+	pathPrefix string,
 	document map[string]any,
 	sourceDocumentURI string,
 	sources []excerptReadingSource,
@@ -157,7 +158,7 @@ func excerptDocumentReadings(
 		if !present || raw == nil {
 			continue
 		}
-		path := kind + "." + source.Path
+		path := pathPrefix + "." + source.Path
 		if source.Keys == nil {
 			result = excerptValueReadings(result, raw, path, sourceDocumentURI, source, physical)
 			continue
