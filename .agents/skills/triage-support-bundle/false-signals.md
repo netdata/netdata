@@ -53,9 +53,10 @@ several times has not ruled the cause out - they have confirmed it.
 
 ## The runtime area being empty
 
-A marker replaces the runtime captures whenever the agent's API did not answer. Its own text names
-three causes: the agent was down, the API was bound somewhere other than the loopback address, or it
-required authentication.
+A marker replaces the runtime captures whenever the agent's API did not answer. The marker itself only
+says the API was unreachable and points at the logs and the status file; the three possible causes -
+the agent was down, the API was bound somewhere other than the loopback address, or it required
+authentication - are spelled out in the bundle's own `README.md`. Read that before concluding.
 
 Only the first is "the agent was down". Separate them with the process capture, the socket inventory
 and the effective web configuration before reporting an outage.

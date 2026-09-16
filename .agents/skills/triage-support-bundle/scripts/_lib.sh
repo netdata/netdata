@@ -63,6 +63,18 @@ sb_need() {
     command -v "$1" >/dev/null 2>&1 || sb_die "'$1' is required but not installed."
 }
 
+# True when $2 resolves to $1 or something beneath it. pwd -P resolves symlinks,
+# so a path that pivots out through a link fails this test.
+_sb_path_inside() {
+    local root_real target_real
+    root_real="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
+    target_real="$(cd "$2" 2>/dev/null && pwd -P)" || return 1
+    case "$target_real" in
+        "$root_real"|"$root_real"/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Windows bundles produced under PowerShell 5.1 store zip entries with
 # backslash separators. The ZIP spec requires forward slashes, so unzip treats
 # each entry as one flat filename containing backslashes and the bundle tree
@@ -74,7 +86,11 @@ sb_need() {
 # absolute path or containing a ".." component is rejected, not moved. Without
 # this, a crafted bundle could write anywhere the invoking user can.
 _sb_flatten_backslash_entries() {
-    local root="$1" f rel dest seg
+    local root="$1" f rel dest seg parent
+    # A support bundle never legitimately contains a symlink: the producer
+    # withholds symlinked sources rather than following them. Anything of that
+    # shape in the archive is a pivot for escaping the tree, so drop it first.
+    find "$root" -type l -exec rm -f {} + 2>/dev/null || true
     while IFS= read -r -d '' f; do
         rel="${f#"$root"/}"
         case "$rel" in
@@ -100,7 +116,17 @@ _sb_flatten_backslash_entries() {
         fi
 
         dest="${root}/${rel}"
-        mkdir -p "$(dirname "$dest")"
+        # Rejecting ".." is not sufficient on its own: an archive can also ship a
+        # symlink entry and then a backslash entry that normalises THROUGH it,
+        # so a purely lexical check still lands outside the tree. Create the
+        # parent, then confirm its resolved path is still inside root.
+        parent="$(dirname "$dest")"
+        mkdir -p "$parent"
+        if ! _sb_path_inside "$root" "$parent"; then
+            sb_warn "rejected unsafe bundle entry (escapes via a link): ${rel}"
+            rm -f "$f"
+            continue
+        fi
         mv -f "$f" "$dest"
     done < <(find "$root" -maxdepth 1 -type f -name '*\\*' -print0 2>/dev/null)
 }
