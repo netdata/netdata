@@ -6,8 +6,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"strings"
-
-	"github.com/stmcginnis/gofish"
 )
 
 type redfishLink struct {
@@ -44,7 +42,6 @@ type serviceRootDocument struct {
 		} `json:"ExpandQuery"`
 	} `json:"ProtocolFeaturesSupported"`
 
-	Typed    *gofish.Service  `json:"-"`
 	Raw      map[string]any   `json:"-"`
 	Response responseMetadata `json:"-"`
 }
@@ -65,7 +62,6 @@ type collectionMember struct {
 }
 
 type collectionProgress struct {
-	NextURL            string
 	CollectionIdentity string
 	ExpectedCount      int
 	Members            []collectionMember
@@ -160,29 +156,6 @@ func normalizedConditionSeverity(raw json.RawMessage) (string, bool) {
 	default:
 		return "unknown", true
 	}
-}
-
-func (c *protocolClient) selectedSystemState(resources []baseResource, complete bool) string {
-	if c.config.SystemURI == "" {
-		return ""
-	}
-	selected, _ := normalizeConfiguredResourceURI(c.root, c.config.SystemURI)
-	for _, resource := range resources {
-		if resource.Kind == "system" && resource.URI == selected {
-			switch resource.AcquisitionState {
-			case "readable":
-				return "present"
-			case "unreadable":
-				return "unreadable"
-			default:
-				return "unknown"
-			}
-		}
-	}
-	if complete {
-		return "absent"
-	}
-	return "unreadable"
 }
 
 func dereferenceInt(value *int) int {

@@ -8,36 +8,13 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/registry"
 	"github.com/stretchr/testify/require"
 )
-
-func TestAggregateLabelsEnforcePromotedLabelPolicy(t *testing.T) {
-	client := &protocolClient{origin: "https://bmc.example.test", endpointJob: "job"}
-	owner := placementTestNode("chassis", "owner", "/redfish/v1/Chassis/1", nil)
-	owner.Doc.Name = strings.Repeat("x", promotedLabelLimit+1)
-	owner.RollupOwner = placementTestNode("system", "previous", "/redfish/v1/Systems/1", nil)
-	owner.RollupOwner.Doc.Name = "stale owner"
-
-	labels := client.aggregateLabels(owner, aggregateSnapshot{
-		Family:              " fan ",
-		Role:                "   ",
-		PhysicalContext:     strings.Repeat("y", promotedLabelLimit+1),
-		SemanticSourceClass: " standard ",
-	}, "group")
-
-	require.Equal(t, "fan", observationLabel(labels, "component_family"))
-	require.Equal(t, "standard", observationLabel(labels, "semantic_source_class"))
-	require.Empty(t, observationLabel(labels, "rollup_owner_name"))
-	require.Empty(t, observationLabel(labels, "aggregate_role"))
-	require.Empty(t, observationLabel(labels, "physical_context"))
-}
 
 func TestValidateReadingIdentitiesRejectsOnlyDifferentPreimages(t *testing.T) {
 	const key = "0123456789abcdef0123456789abcdef"
@@ -161,43 +138,24 @@ func TestMemoryThroughputUsesTopLevelBlockSize(t *testing.T) {
 
 }
 
-func TestEveryRegistryScalarFieldHasRuntimeProducer(t *testing.T) {
+func TestEverySourceScalarFieldHasRuntimeProducer(t *testing.T) {
 	at := time.Now()
-	for _, descriptor := range standardRegistry.Fields {
+	for _, descriptor := range scalarFields {
 		if descriptor.ID == managerClockDescriptor.ID {
 			continue
 		}
 		t.Run(descriptor.ID, func(t *testing.T) {
-			requireRegistryDescriptorRuntimeValue(t, descriptor, at)
+			requireSourceDescriptorRuntimeValue(t, descriptor, at)
 		})
 	}
 }
 
 func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *testing.T) {
-	descriptor := registry.FieldSpec{
-		ID:        "test_fallback",
-		Kind:      "processor",
-		Algorithm: registry.AlgorithmAbsolute,
-		Scale:     registry.Identity,
-		Candidates: []registry.SourceCandidate{
-			{Document: "processor_metrics", Path: "Preferred"},
-			{Path: "Fallback"},
-		},
-	}
 	node := &graphNode{
-		Kind: "processor",
-		Key:  "processor",
-		Data: map[string]any{
-			"Fallback": json.Number("42"),
-		},
-		Enrichment: map[string]map[string]any{
-			"processor_metrics": {"Preferred": "not-a-number"},
-		},
+		Kind: "system", Key: "system",
+		Data:       map[string]any{"ProcessorSummary": map[string]any{"Metrics": map[string]any{"BandwidthPercent": json.Number("42")}}},
+		Enrichment: map[string]map[string]any{"processor_summary_metrics": {"BandwidthPercent": "not-a-number"}},
 	}
-
-	original := standardRegistry.Fields
-	standardRegistry.Fields = []registry.FieldSpec{descriptor}
-	t.Cleanup(func() { standardRegistry.Fields = original })
 
 	values := (&protocolClient{}).scalarValues(node, time.Now())
 	if len(values) != 1 {
@@ -208,7 +166,7 @@ func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *tes
 		t.Fatalf("fallback value = %+v, want value 42 from Fallback", got)
 	}
 	if len(got.SourceFailures) != 1 ||
-		!strings.Contains(got.SourceFailures[0], "processor_metrics.Preferred") ||
+		!strings.Contains(got.SourceFailures[0], "processor_summary_metrics.BandwidthPercent") ||
 		!strings.Contains(got.SourceFailures[0], "malformed") {
 		t.Fatalf("fallback failure provenance = %v", got.SourceFailures)
 	}
@@ -225,9 +183,9 @@ func TestFindEnrichmentRejectsAmbiguousDocumentKind(t *testing.T) {
 	require.Equal(t, json.Number("1"), findEnrichment(node, "memory_metrics")["Reading"])
 }
 
-func TestEveryRegistryStateAndFlagHasRuntimeProducer(t *testing.T) {
+func TestEverySourceStateAndFlagHasRuntimeProducer(t *testing.T) {
 	client := &protocolClient{}
-	for _, source := range standardRegistry.States {
+	for _, source := range additionalStateSources {
 		t.Run("state/"+source.Metric, func(t *testing.T) {
 			node := &graphNode{
 				Kind:       string(source.Kind),
@@ -235,14 +193,14 @@ func TestEveryRegistryStateAndFlagHasRuntimeProducer(t *testing.T) {
 				Data:       make(map[string]any),
 				Enrichment: make(map[string]map[string]any),
 			}
-			document := registryTestDocument(node, source.Document)
+			document := sourceTestDocument(node, source.Document)
 			value := any(source.States[0])
 			wantState := source.States[0]
 			if source.BooleanFalse != "" || source.BooleanTrue != "" {
 				value = false
 				wantState = source.BooleanFalse
 			}
-			setRegistryTestPath(document, source.Path, value)
+			setSourceTestPath(document, source.Path, value)
 			observation := observationByMetric(client.statusObservations(node), source.Metric)
 			if observation == nil {
 				t.Fatalf("state source %s.%s has no runtime observation", source.Document, source.Path)
@@ -253,7 +211,7 @@ func TestEveryRegistryStateAndFlagHasRuntimeProducer(t *testing.T) {
 		})
 	}
 
-	for _, set := range standardRegistry.Flags {
+	for _, set := range sourceFlagSets {
 		t.Run("flags/"+set.Metric, func(t *testing.T) {
 			node := &graphNode{
 				Kind:       string(set.Kind),
@@ -261,9 +219,9 @@ func TestEveryRegistryStateAndFlagHasRuntimeProducer(t *testing.T) {
 				Data:       make(map[string]any),
 				Enrichment: make(map[string]map[string]any),
 			}
-			document := registryTestDocument(node, set.Document)
+			document := sourceTestDocument(node, set.Document)
 			for _, member := range set.Members {
-				setRegistryTestPath(document, member.Path, true)
+				setSourceTestPath(document, member.Path, true)
 			}
 			values := flagValues(node)
 			observations := client.flagObservations(node, values)
@@ -286,56 +244,54 @@ func TestEveryRegistryStateAndFlagHasRuntimeProducer(t *testing.T) {
 	}
 }
 
-func TestEveryRegistryReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
-	for _, surface := range standardRegistry.Readings {
-		if surface.DerivedFromEnergy {
+func TestEverySourceReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
+	for key, surface := range readingDescriptors {
+		if key.Role == "energy_rate" {
 			continue
 		}
 		name := strings.Join(
-			[]string{surface.Family, surface.Basis, surface.Role, surface.SemanticClass},
+			[]string{key.Family, key.Basis, key.Role, key.SemanticClass},
 			"/",
 		)
 		t.Run(name, func(t *testing.T) {
-			sourceType, sourceUnits, fixed := registryReadingSource(surface.Family)
+			sourceType, sourceUnits, fixed := sourceReadingSource(key.Family)
 			raw := rawReading{
 				Path:           "Synthetic." + name,
 				IdentitySource: "Synthetic." + name,
 				Type:           sourceType,
 				Units:          sourceUnits,
-				Basis:          surface.Basis,
-				Role:           surface.Role,
+				Basis:          key.Basis,
+				Role:           key.Role,
 				Value:          json.Number("10"),
 				Primary:        true,
 				ReadingScoped:  surface.AlarmMetric != "",
 				Health:         "OK",
 			}
 			if fixed {
-				raw.FixedFamily = surface.Family
+				raw.FixedFamily = key.Family
 			}
 			node := &graphNode{Kind: "sensor", Key: name}
-			switch surface.SemanticClass {
+			switch key.SemanticClass {
 			case "fan":
 				node.Kind = "fan"
 			case "", "direct", "ambient_pressure":
 			default:
-				t.Fatalf("unrecognized semantic class %q", surface.SemanticClass)
+				t.Fatalf("unrecognized semantic class %q", key.SemanticClass)
 			}
 
-			reading := normalizeReading(node, raw, true)
+			reading := normalizeReading(node, raw)
 			if !reading.Valid {
 				t.Fatalf("reading is invalid: %+v", reading)
 			}
 			if reading.Metric != surface.Metric ||
 				reading.Context != surface.Context ||
 
-				reading.AlarmMetric != surface.AlarmMetric ||
-				reading.AggregateSemantic != surface.AggregateMetric {
+				reading.AlarmMetric != surface.AlarmMetric {
 				t.Fatalf(
-					"normalized surface = metric %q context %q alarm %q aggregate %q; want %+v",
+					"normalized surface = metric %q context %q alarm %q; want %+v",
 					reading.Metric,
 					reading.Context,
 					reading.AlarmMetric,
-					reading.AggregateSemantic,
 					surface,
 				)
 			}
@@ -356,18 +312,18 @@ func TestEveryRegistryReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
 	}
 }
 
-func registryReadingSource(family string) (sourceType, sourceUnits string, fixed bool) {
-	for _, source := range standardRegistry.ReadingTypes {
-		if source.Family == family && len(source.SourceUnits) > 0 {
-			return source.SourceType, source.SourceUnits[0], false
+func sourceReadingSource(family string) (sourceType, sourceUnits string, fixed bool) {
+	for key, source := range readingTypes {
+		if source.Family == family {
+			return key.SourceType, key.Units, false
 		}
 	}
 	return "Synthetic", "Synthetic", true
 }
 
-func requireRegistryDescriptorRuntimeValue(
+func requireSourceDescriptorRuntimeValue(
 	t *testing.T,
-	descriptor registry.FieldSpec,
+	descriptor sourceField,
 	at time.Time,
 ) {
 	t.Helper()
@@ -381,17 +337,17 @@ func requireRegistryDescriptorRuntimeValue(
 		Data:       make(map[string]any),
 		Enrichment: make(map[string]map[string]any),
 	}
-	document := registryTestDocument(node, source.Document)
+	document := sourceTestDocument(node, source.Document)
 	for _, requirement := range source.Requires {
-		setRegistryTestPath(document, requirement.Path, requirement.Value)
+		setSourceTestPath(document, requirement.Path, requirement.Value)
 	}
-	setRegistryTestPath(document, source.Path, json.Number("10"))
+	setSourceTestPath(document, source.Path, json.Number("10"))
 	if source.MultiplierPath != "" {
 		multiplierDocument := document
 		if source.MultiplierDocument != "" {
-			multiplierDocument = registryTestDocument(node, source.MultiplierDocument)
+			multiplierDocument = sourceTestDocument(node, source.MultiplierDocument)
 		}
-		setRegistryTestPath(multiplierDocument, source.MultiplierPath, json.Number("2"))
+		setSourceTestPath(multiplierDocument, source.MultiplierPath, json.Number("2"))
 	}
 
 	client := &protocolClient{}
@@ -408,7 +364,7 @@ func requireRegistryDescriptorRuntimeValue(
 	if !first.Present || !first.Valid {
 		t.Fatalf("first scalar = %+v, want present and valid", first)
 	}
-	if descriptor.Algorithm == registry.AlgorithmAbsolute {
+	if descriptor.Algorithm == algorithmAbsolute {
 		if !first.Emit {
 			t.Fatalf("absolute scalar = %+v, want emitted", first)
 		}
@@ -418,7 +374,7 @@ func requireRegistryDescriptorRuntimeValue(
 		t.Fatalf("first counter sample = %+v, want baseline only", first)
 	}
 
-	setRegistryTestPath(document, source.Path, json.Number("11"))
+	setSourceTestPath(document, source.Path, json.Number("11"))
 	values = client.scalarValues(node, at.Add(100*time.Second))
 	second, ok := scalarValueByID(values, descriptor.ID)
 	if !ok || !second.Present || !second.Valid || !second.Emit {
@@ -426,7 +382,7 @@ func requireRegistryDescriptorRuntimeValue(
 	}
 }
 
-func registryTestDocument(node *graphNode, document registry.Document) map[string]any {
+func sourceTestDocument(node *graphNode, document string) map[string]any {
 	if document == "" {
 		return node.Data
 	}
@@ -439,7 +395,7 @@ func registryTestDocument(node *graphNode, document registry.Document) map[strin
 	return value
 }
 
-func setRegistryTestPath(document map[string]any, path string, value any) {
+func setSourceTestPath(document map[string]any, path string, value any) {
 	const countAnnotation = ".@odata.count"
 	if before, ok := strings.CutSuffix(path, countAnnotation); ok {
 		propertyPath := before
@@ -500,7 +456,7 @@ func TestNVMETemperatureArrayProducesDistinctReadings(t *testing.T) {
 		},
 	}
 	nodes, complete, err := client.sensorExcerptArrayNodes(
-		withOperationBudget(context.Background()),
+		context.Background(),
 		&resourceGraph{},
 		parent,
 		"Metrics.NVMeSMART.TemperatureSensorsCelsius",
@@ -548,7 +504,7 @@ func TestArrayReadingDataSourceURIStabilizesIdentityAcrossReorder(t *testing.T) 
 			array[index] = values[index]
 		}
 		nodes, complete, err := client.sensorExcerptArrayNodes(
-			withOperationBudget(context.Background()),
+			context.Background(),
 			&resourceGraph{},
 			parent,
 			"ThermalMetrics.TemperatureReadingsCelsius",
@@ -583,65 +539,6 @@ func TestArrayReadingDataSourceURIStabilizesIdentityAcrossReorder(t *testing.T) 
 	}
 }
 
-func TestSensorExcerptArrayCardinalityGateCountsComponentsNotReadings(t *testing.T) {
-	details := true
-	cap := 100
-	root, origin, err := normalizeServiceRoot("https://bmc.example/redfish/v1/")
-	require.NoError(t, err)
-	client := &protocolClient{
-		root: root, origin: origin,
-		config: Config{
-			Charts: ChartsConfig{
-				Details:                        &details,
-				MaxDetailedComponentsPerFamily: &cap,
-			},
-		},
-	}
-	client.hardwareState.initialize()
-	owner := &graphNode{
-		Kind: "thermal_subsystem",
-		Key:  "thermal",
-		URI:  "/redfish/v1/Chassis/1/ThermalSubsystem",
-	}
-	array := make([]any, 101)
-	for index := range array {
-		array[index] = map[string]any{
-			"Reading":       json.Number(fmt.Sprint(20 + index%10)),
-			"DataSourceUri": fmt.Sprintf("/redfish/v1/Sensors/Temperature-%03d", index),
-		}
-	}
-	nodes, complete, err := client.sensorExcerptArrayNodes(
-		withOperationBudget(context.Background()),
-		&resourceGraph{},
-		owner,
-		"ThermalMetrics.TemperatureReadingsCelsius",
-		sensorExcerptArraySpec{
-			Path: "TemperatureReadingsCelsius", Type: "Temperature", Units: "Cel",
-		},
-		map[string]any{"TemperatureReadingsCelsius": array},
-	)
-	require.NoError(t, err)
-	require.True(t, complete)
-	require.Len(t, nodes, 101)
-
-	readings := make(map[string][]normalizedReading, len(nodes))
-	for _, node := range nodes {
-		node.LogicalOwner = owner
-		readings[node.Key] = client.readingsForNode(node, time.Now())
-		require.Len(t, readings[node.Key], 1)
-	}
-	const gateKey = "thermal\x00sensor.temperature"
-	gate := client.detailGates(
-		nodes,
-		readings,
-		map[string]bool{gateKey: true},
-		true,
-	)[gateKey]
-	require.Equal(t, 101, gate.Count)
-	require.False(t, gate.Open)
-	require.Len(t, gate.Members, 101)
-}
-
 func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 	root, origin, err := normalizeServiceRoot("https://bmc.example/redfish/v1/")
 	require.NoError(t, err)
@@ -663,7 +560,7 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 	graph := &resourceGraph{Nodes: []*graphNode{addressable}}
 	owner := &graphNode{Kind: "thermal_subsystem", Key: "thermal", URI: "/redfish/v1/ThermalSubsystem"}
 	nodes, complete, err := client.sensorExcerptArrayNodes(
-		withOperationBudget(context.Background()),
+		context.Background(),
 		graph,
 		owner,
 		"ThermalMetrics.TemperatureReadingsCelsius",
@@ -674,9 +571,7 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 			"TemperatureReadingsCelsius": []any{map[string]any{
 				"Reading":       json.Number("43"),
 				"DataSourceUri": "/redfish/v1/Sensors/A#/Reading",
-				"Thresholds": map[string]any{
-					"UpperCritical": map[string]any{"Reading": json.Number("40")},
-				},
+				"Status":        map[string]any{"Health": "Critical"},
 			}},
 		},
 	)
@@ -689,103 +584,7 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 	readings := client.readingsForNode(addressable, time.Now())
 	require.Len(t, readings, 1)
 	require.Equal(t, float64(42), readings[0].Value, "the addressable Sensor reading has precedence")
-	require.Equal(t, "critical", readings[0].DerivedAlarm, "the excerpt can provide complementary thresholds")
-}
-
-func TestReadingAlarmFusionUsesSourceAbnormalPrecedence(t *testing.T) {
-	tests := map[string]struct {
-		source, derived string
-		wantState       string
-	}{
-		"source warning is not elevated": {
-			source: "warning", derived: "critical", wantState: "warning",
-		},
-		"source critical is not elevated": {
-			source: "critical", derived: "emergency", wantState: "critical",
-		},
-		"source clear can be elevated": {
-			source: "clear", derived: "critical", wantState: "critical",
-		},
-		"source clear remains clear": {
-			source: "clear", derived: "clear", wantState: "clear",
-		},
-		"absent source uses derived": {
-			derived: "warning", wantState: "warning",
-		},
-		"source abnormal survives derived clear": {
-			source: "warning", derived: "clear", wantState: "warning",
-		},
-		"source survives absent derived": {
-			source: "critical", wantState: "critical",
-		},
-		"no usable result stays absent": {},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			state := fuseAlarm(test.source, test.derived)
-			if state != test.wantState {
-				t.Fatalf(
-					"fuseAlarm(%q, %q) = %q, want %q",
-					test.source,
-					test.derived,
-					state,
-					test.wantState,
-				)
-			}
-		})
-	}
-}
-
-func TestReadingAlarmManualEvaluationPolicy(t *testing.T) {
-	node := &graphNode{Kind: "sensor", Key: "sensor-key"}
-	raw := rawReading{
-		Path:          "Reading",
-		Type:          "Temperature",
-		Units:         "Cel",
-		Value:         json.Number("80"),
-		ReadingScoped: true,
-		Health:        "Warning",
-		Thresholds: map[string]rawThreshold{
-			"upper_critical": {
-				Value: json.Number("70"), Activation: "Increasing",
-			},
-		},
-	}
-
-	disabled := normalizeReading(node, raw, false)
-	if disabled.SourceAlarm != "warning" ||
-		disabled.DerivedAlarm != "" ||
-		disabled.EffectiveAlarm != "warning" {
-		t.Fatalf("disabled manual evaluation = %+v", disabled)
-	}
-
-	enabled := normalizeReading(node, raw, true)
-	if enabled.SourceAlarm != "warning" ||
-		enabled.DerivedAlarm != "critical" ||
-		enabled.EffectiveAlarm != "warning" {
-		t.Fatalf("source-abnormal precedence = %+v", enabled)
-	}
-
-	raw.Health = "OK"
-	sourceClear := normalizeReading(node, raw, true)
-	if sourceClear.EffectiveAlarm != "critical" {
-		t.Fatalf("source-clear threshold fallback = %+v", sourceClear)
-	}
-
-	raw.Health = ""
-	sourceAbsent := normalizeReading(node, raw, true)
-	if sourceAbsent.EffectiveAlarm != "critical" {
-		t.Fatalf("source-absent threshold fallback = %+v", sourceAbsent)
-	}
-
-	raw.Thresholds["upper_critical"] = rawThreshold{
-		Value: json.Number("70"), Activation: "Disabled",
-	}
-	disabledThreshold := normalizeReading(node, raw, true)
-	if disabledThreshold.DerivedAlarm != "" ||
-		disabledThreshold.EffectiveAlarm != "" {
-		t.Fatalf("disabled threshold handling = %+v", disabledThreshold)
-	}
+	require.Equal(t, "critical", readings[0].SourceAlarm, "the excerpt can provide complementary source health")
 }
 
 func TestReadingSourceAlarmDiagnostics(t *testing.T) {
@@ -811,7 +610,7 @@ func TestReadingSourceAlarmDiagnostics(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			raw := base
 			raw.Health = test.health
-			reading := normalizeReading(node, raw, false)
+			reading := normalizeReading(node, raw)
 			if reading.SourceAlarm != test.wantAlarm {
 				t.Fatalf("source alarm = %q, want %q", reading.SourceAlarm, test.wantAlarm)
 			}
@@ -823,7 +622,7 @@ func TestReadingSourceAlarmDiagnostics(t *testing.T) {
 
 	notReadingScoped := base
 	notReadingScoped.ReadingScoped = false
-	reading := normalizeReading(node, notReadingScoped, false)
+	reading := normalizeReading(node, notReadingScoped)
 	if reading.SourceAlarmDiagnostic != "" {
 		t.Fatalf("ineligible resource-level health produced reading diagnostic %q", reading.SourceAlarmDiagnostic)
 	}
@@ -838,8 +637,8 @@ func TestReadingSourceAlarmSurvivesInvalidNumericValue(t *testing.T) {
 		Value:         map[string]any{"invalid": true},
 		ReadingScoped: true,
 		Health:        "Critical",
-	}, true)
-	if reading.Valid || reading.SourceAlarm != "critical" || reading.EffectiveAlarm != "critical" {
+	})
+	if reading.Valid || reading.SourceAlarm != "critical" {
 		t.Fatalf("invalid numeric reading lost source alarm: %+v", reading)
 	}
 
@@ -849,17 +648,17 @@ func TestReadingSourceAlarmSurvivesInvalidNumericValue(t *testing.T) {
 	}
 }
 
-func TestReadingAlarmEmitsEveryClosedRegistryStateWithoutFabricatingMissing(t *testing.T) {
+func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T) {
 	client := &protocolClient{}
 	node := &graphNode{Kind: "sensor", Key: "sensor"}
-	for _, state := range registry.AlarmStates {
+	for _, state := range alarmStates {
 		reading := normalizedReading{
 			Key: "reading", Metric: "reading_temperature_zero_input",
 			AlarmMetric: "reading_temperature_zero_input_alarm",
-			Valid:       true, EffectiveAlarm: state,
+			Valid:       true, SourceAlarm: state,
 		}
 		observation := observationByMetric(client.readingObservations(node, reading), reading.AlarmMetric)
-		if observation == nil || observation.State != state || !slices.Equal(observation.States, registry.AlarmStates) {
+		if observation == nil || observation.State != state || !slices.Equal(observation.States, alarmStates) {
 			t.Fatalf("alarm state %q observation = %#v", state, observation)
 		}
 	}
@@ -869,58 +668,6 @@ func TestReadingAlarmEmitsEveryClosedRegistryStateWithoutFabricatingMissing(t *t
 	}
 	if observation := observationByMetric(client.readingObservations(node, reading), reading.AlarmMetric); observation != nil {
 		t.Fatalf("missing effective alarm fabricated observation %#v", observation)
-	}
-}
-
-func TestDerivedAlarmThresholdTruthMatrix(t *testing.T) {
-	thresholds := map[string]rawThreshold{
-		"lower_caution":  {Value: json.Number("10"), Activation: "Decreasing"},
-		"upper_critical": {Value: json.Number("20"), Activation: "Increasing"},
-		"upper_fatal":    {Value: json.Number("30"), Activation: "Increasing"},
-	}
-	tests := map[string]struct {
-		value     float64
-		wantState string
-	}{
-		"strictly below lower": {
-			value: 9, wantState: "warning",
-		},
-		"equal lower is clear": {
-			value: 10, wantState: "clear",
-		},
-		"inside range is clear": {
-			value: 15, wantState: "clear",
-		},
-		"equal upper is clear": {
-			value: 20, wantState: "clear",
-		},
-		"above critical": {
-			value: 21, wantState: "critical",
-		},
-		"above fatal chooses worst": {
-			value: 31, wantState: "emergency",
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			state := deriveAlarm(test.value, thresholds, 1)
-			if state != test.wantState {
-				t.Fatalf(
-					"deriveAlarm(%v) = %q, want %q",
-					test.value,
-					state,
-					test.wantState,
-				)
-			}
-		})
-	}
-
-	unusable := map[string]rawThreshold{
-		"upper_critical": {Value: "not-a-number", Activation: "Increasing"},
-		"lower_caution":  {Value: json.Number("10"), Activation: "Disabled"},
-	}
-	if state := deriveAlarm(50, unusable, 1); state != "" {
-		t.Fatalf("unusable thresholds = %q, want no derived result", state)
 	}
 }
 
@@ -955,47 +702,20 @@ func TestDerivedPowerResetsBaselineOnReadingSemanticChange(t *testing.T) {
 	}
 }
 
-func TestRateBaselineRetentionBudgetKeepsExistingContinuity(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	client.rateBaselineLimit = 1
-	t0 := time.Unix(100, 0)
-
-	_, emit := client.rateValue("first", "1", 1, t0, registry.AlgorithmRate, "epoch")
-	require.False(t, emit)
-	_, emit = client.rateValue("second", "1", 1, t0, registry.AlgorithmRate, "epoch")
-	require.False(t, emit)
-	require.Contains(t, client.rateBaselines, "first")
-	require.NotContains(t, client.rateBaselines, "second")
-	require.True(t, client.takeRateRetentionOverflow())
-	require.False(t, client.takeRateRetentionOverflow())
-
-	value, emit := client.rateValue(
-		"first",
-		"61",
-		1,
-		t0.Add(time.Minute),
-		registry.AlgorithmRate,
-		"epoch",
-	)
-	require.True(t, emit)
-	require.Equal(t, 1.0, value)
-}
-
 func TestRateBaselineResetsWhenMultiplierChanges(t *testing.T) {
 	client := &protocolClient{}
 	client.hardwareState.initialize()
 	t0 := time.Unix(100, 0)
 
-	_, emit := client.rateValue("memory-blocks", "100", 512, t0, registry.AlgorithmRate, "epoch")
+	_, emit := client.rateValue("memory-blocks", "100", 512, t0, algorithmRate, "epoch")
 	require.False(t, emit)
 	_, emit = client.rateValue(
-		"memory-blocks", "110", 4096, t0.Add(time.Second), registry.AlgorithmRate, "epoch",
+		"memory-blocks", "110", 4096, t0.Add(time.Second), algorithmRate, "epoch",
 	)
 	require.False(t, emit)
 
 	value, emit := client.rateValue(
-		"memory-blocks", "120", 4096, t0.Add(2*time.Second), registry.AlgorithmRate, "epoch",
+		"memory-blocks", "120", 4096, t0.Add(2*time.Second), algorithmRate, "epoch",
 	)
 	require.True(t, emit)
 	require.Equal(t, 40_960.0, value)
@@ -1009,19 +729,18 @@ func TestOversizedProtocolNumbersFailSoftWithoutRetainedBaselines(t *testing.T) 
 		_, _, ok := numericValue(json.Number(value))
 		require.False(t, ok)
 	}
-	_, _, ok := numericSourceValue("PT"+fraction+"S", registry.AlgorithmDurationPercent)
+	_, _, ok := numericSourceValue("PT"+fraction+"S", algorithmDurationPercent)
 	require.False(t, ok)
 
 	client := &protocolClient{}
 	client.hardwareState.initialize()
-	client.rateBaselineLimit = 1_000
 	for index := range 1_000 {
 		_, emit := client.rateValue(
 			fmt.Sprintf("rotating-partial-resource-%d", index),
 			fraction,
 			1,
 			time.Unix(int64(index), 0),
-			registry.AlgorithmRate,
+			algorithmRate,
 			"epoch",
 		)
 		require.False(t, emit)
@@ -1081,594 +800,6 @@ func TestDerivedPowerResetsBaselineOnDecreaseAndEpochChange(t *testing.T) {
 	require.Zero(t, derivedPowerCount(client.readingsForNode(node, t0.Add(4*time.Minute))))
 	node.Data["Reading"] = json.Number("230")
 	require.Equal(t, 1, derivedPowerCount(client.readingsForNode(node, t0.Add(5*time.Minute))))
-}
-
-func TestSelectedSystemRetainsPriorInclusionDuringPartialOwnershipRefresh(t *testing.T) {
-	root, origin, err := normalizeServiceRoot("https://bmc.example/redfish/v1/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := &protocolClient{
-		config: Config{SystemURI: "/redfish/v1/Systems/1"},
-		root:   root, origin: origin,
-		selectedSystemIncluded: make(map[string]struct{}),
-	}
-	selected := &graphNode{Kind: "system", URI: "/redfish/v1/Systems/1", Key: "system-1"}
-	other := &graphNode{Kind: "system", URI: "/redfish/v1/Systems/2", Key: "system-2"}
-	component := &graphNode{
-		Kind:         "fan",
-		Key:          "fan-1",
-		SystemOwners: map[string]*graphNode{selected.Key: selected},
-	}
-
-	complete := &resourceGraph{Complete: true}
-	if got := client.filterSelectedSystem(complete, []*graphNode{selected, other, component}); !containsNode(got, component.Key) {
-		t.Fatal("selected component was not included in the complete topology")
-	}
-
-	component.SystemOwners = map[string]*graphNode{other.Key: other}
-	partial := &resourceGraph{Complete: false}
-	if got := client.filterSelectedSystem(partial, []*graphNode{selected, other, component}); !containsNode(got, component.Key) {
-		t.Fatal("partial ownership refresh excluded a previously included component")
-	}
-
-	if got := client.filterSelectedSystem(complete, []*graphNode{selected, other, component}); containsNode(got, component.Key) {
-		t.Fatal("complete ownership refresh retained a component proven exclusive to another system")
-	}
-}
-
-func TestSelectedSystemDoesNotAdmitNewUnownedResourceDuringPartialRefresh(t *testing.T) {
-	root, origin, err := normalizeServiceRoot("https://bmc.example/redfish/v1/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := &protocolClient{
-		config: Config{SystemURI: "/redfish/v1/Systems/1"},
-		root:   root, origin: origin,
-		selectedSystemIncluded: make(map[string]struct{}),
-	}
-	selected := &graphNode{Kind: "system", URI: "/redfish/v1/Systems/1", Key: "system-1"}
-	service := &graphNode{Kind: "service", URI: "/redfish/v1/", Key: "service"}
-	orphan := &graphNode{Kind: "fan", Key: "new-unowned-fan"}
-
-	complete := &resourceGraph{Complete: true}
-	client.filterSelectedSystem(complete, []*graphNode{service, selected})
-
-	partial := &resourceGraph{Complete: false}
-	got := client.filterSelectedSystem(partial, []*graphNode{service, selected, orphan})
-	if containsNode(got, orphan.Key) {
-		t.Fatal("partial ownership refresh admitted a newly unowned component")
-	}
-	if !containsNode(got, service.Key) {
-		t.Fatal("partial ownership refresh excluded the service scope")
-	}
-
-	got = client.filterSelectedSystem(complete, []*graphNode{service, selected, orphan})
-	if !containsNode(got, orphan.Key) {
-		t.Fatal("complete ownership refresh did not admit a proven service-scoped component")
-	}
-}
-
-func TestDetailCardinalityGateIsAtomicPerOwnerAndComponentFamily(t *testing.T) {
-	cap := 1
-	details := true
-	client := &protocolClient{
-		config: Config{
-			Charts: ChartsConfig{
-				Details:                        &details,
-				MaxDetailedComponentsPerFamily: &cap,
-			},
-		},
-	}
-	client.hardwareState.initialize()
-	ownerA := &graphNode{Kind: "system", Key: "system-a"}
-	ownerB := &graphNode{Kind: "system", Key: "system-b"}
-	fanA1 := &graphNode{Kind: "fan", Key: "fan-a-1", LogicalOwner: ownerA}
-	fanA2 := &graphNode{Kind: "fan", Key: "fan-a-2", LogicalOwner: ownerA}
-	driveA := &graphNode{Kind: "drive", Key: "drive-a", LogicalOwner: ownerA}
-	fanB := &graphNode{Kind: "fan", Key: "fan-b", LogicalOwner: ownerB}
-	nodes := []*graphNode{ownerA, ownerB, fanA1, fanA2, driveA, fanB}
-	evidence := map[string]bool{
-		"system-a\x00fan":   true,
-		"system-a\x00drive": true,
-		"system-b\x00fan":   true,
-	}
-
-	gates := client.detailGates(nodes, nil, evidence, true)
-	if gate := gates["system-a\x00fan"]; gate.Open || gate.Count != 2 || len(gate.Members) != 2 {
-		t.Fatalf("over-cap fan gate = %+v, want the complete family atomically closed", gate)
-	}
-	for _, key := range []string{"system-a\x00drive", "system-b\x00fan"} {
-		if gate := gates[key]; !gate.Open || gate.Count != 1 || len(gate.Members) != 1 {
-			t.Fatalf("independent gate %q = %+v, want open", key, gate)
-		}
-	}
-	if detailAllowed(fanA1, gates["system-a\x00fan"]) ||
-		detailAllowed(fanA2, gates["system-a\x00fan"]) {
-		t.Fatal("closed component-family gate admitted an arbitrary subset")
-	}
-	if !detailAllowed(driveA, gates["system-a\x00drive"]) ||
-		!detailAllowed(fanB, gates["system-b\x00fan"]) {
-		t.Fatal("one over-cap family closed an independent owner or component family")
-	}
-}
-
-func TestDetailCardinalityGateHandlesLargeFamilyWithoutSelection(t *testing.T) {
-	const componentCount = 1_001
-	cap := 100
-	details := true
-	client := &protocolClient{
-		config: Config{
-			Charts: ChartsConfig{
-				Details:                        &details,
-				MaxDetailedComponentsPerFamily: &cap,
-			},
-		},
-	}
-	client.hardwareState.initialize()
-
-	owner := &graphNode{Kind: "system", Key: "system"}
-	nodes := make([]*graphNode, componentCount+1)
-	nodes[0] = owner
-	for index := range componentCount {
-		nodes[index+1] = &graphNode{
-			Kind:         "temperature",
-			Key:          fmt.Sprintf("temperature-%04d", index),
-			LogicalOwner: owner,
-		}
-	}
-
-	const gateKey = "system\x00temperature"
-	gates := client.detailGates(nodes, nil, map[string]bool{gateKey: true}, true)
-	gate := gates[gateKey]
-	if gate.Open || gate.Count != componentCount || len(gate.Members) != componentCount {
-		t.Fatalf("large-family gate = %+v, want all %d components atomically closed", gate, componentCount)
-	}
-	for _, node := range nodes[1:] {
-		if detailAllowed(node, gate) {
-			t.Fatalf("closed large-family gate selected component %q", node.Key)
-		}
-	}
-
-	unlimited := 0
-	client.config.Charts.MaxDetailedComponentsPerFamily = &unlimited
-	gate = client.detailGates(nodes, nil, map[string]bool{gateKey: true}, true)[gateKey]
-	if !gate.Open || gate.Count != componentCount || len(gate.Members) != componentCount {
-		t.Fatalf("unlimited large-family gate = %+v, want all %d components open", gate, componentCount)
-	}
-}
-
-func TestDetailGateRetentionBudgetDoesNotFilterCurrentComponents(t *testing.T) {
-	details := true
-	client := &protocolClient{config: Config{Charts: ChartsConfig{Details: &details}}}
-	client.hardwareState.initialize()
-	owner := &graphNode{Kind: "system", Key: "system"}
-	first := &graphNode{Kind: "fan", Key: "fan-1", LogicalOwner: owner}
-	second := &graphNode{Kind: "fan", Key: "fan-2", LogicalOwner: owner}
-	const gateKey = "system\x00fan"
-
-	gates, retained := client.detailGatesWithinBudget(
-		[]*graphNode{owner, first},
-		nil,
-		map[string]bool{gateKey: true},
-		false,
-		retainedStateBudget{entries: 1, members: 1},
-	)
-	require.True(t, retained)
-	require.Len(t, gates[gateKey].Members, 1)
-
-	gates, retained = client.detailGatesWithinBudget(
-		[]*graphNode{owner, first, second},
-		nil,
-		map[string]bool{gateKey: true},
-		false,
-		retainedStateBudget{entries: 1, members: 1},
-	)
-	require.False(t, retained)
-	require.Len(t, gates[gateKey].Members, 2)
-	require.Empty(t, client.detailGateState)
-}
-
-func TestDetailCardinalityEvidenceRequiresCompleteUnionAcrossSlices(t *testing.T) {
-	owner := &graphNode{Kind: "system", Key: "system"}
-	first := &graphNode{Kind: "fan", Key: "fan-1", LogicalOwner: owner}
-	second := &graphNode{Kind: "fan", Key: "fan-2", LogicalOwner: owner}
-	graph := &resourceGraph{
-		Complete: false,
-		Nodes:    []*graphNode{owner, first, second},
-		Slices: []graphSlice{
-			{ParentKey: owner.Key, Path: "FansA", ChildKind: "fan", Complete: true, Members: []string{first.Key}},
-			{ParentKey: owner.Key, Path: "FansB", ChildKind: "fan", Complete: false, Members: []string{second.Key}},
-		},
-	}
-	const key = "system\x00fan"
-	if evidence := graph.detailEvidence(graph.Nodes, nil); evidence[key] {
-		t.Fatal("one complete slice incorrectly proved the multi-slice component-family union complete")
-	}
-
-	graph.Complete = true
-	graph.Slices[1].Complete = true
-	if evidence := graph.detailEvidence(graph.Nodes, nil); !evidence[key] {
-		t.Fatal("all complete contributing slices did not prove the component-family union complete")
-	}
-}
-
-func TestPartialTopologyRetainsAtomicLogicalPlacementDecision(t *testing.T) {
-	client := &protocolClient{
-		logicalOwners: map[string]logicalPlacementSnapshot{
-			"sensor": {
-				OwnerKey: "chassis",
-			},
-		},
-	}
-	service := &graphNode{
-		Kind: "service", Key: "service", URI: "/redfish/v1/",
-		Parents: make(map[string]*graphNode), RollupParents: make(map[string]*graphNode),
-		SystemOwners: make(map[string]*graphNode),
-	}
-	chassis := &graphNode{
-		Kind: "chassis", Key: "chassis", URI: "/redfish/v1/Chassis/1",
-		Parents: map[string]*graphNode{service.Key: service}, RollupParents: make(map[string]*graphNode),
-		SystemOwners: make(map[string]*graphNode),
-	}
-	sensor := &graphNode{
-		Kind: "sensor", Key: "sensor", URI: "/redfish/v1/Sensors/1",
-		Parents: map[string]*graphNode{service.Key: service}, RollupParents: map[string]*graphNode{service.Key: service},
-		SystemOwners: make(map[string]*graphNode),
-	}
-	graph := &resourceGraph{Nodes: []*graphNode{service, chassis, sensor}, Complete: false}
-
-	client.resolveGraphPlacement(graph)
-	if sensor.LogicalOwner != chassis {
-		t.Fatalf("logical owner = %#v, want retained chassis", sensor.LogicalOwner)
-	}
-}
-
-func TestAggregateKeyIsStableAcrossSummaryContexts(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	owner, child, graph, reading := aggregateTestSurface(true)
-
-	observations := mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		map[string][]normalizedReading{child.Key: {reading}},
-		nil,
-	)
-	groupKey := aggregateGroupKey(aggregateSnapshot{
-		OwnerKey:        owner.Key,
-		OwnerKind:       owner.Kind,
-		Semantic:        aggregateReadingContext(child.Kind, reading.Context),
-		Role:            reading.Role,
-		Family:          "sensor." + reading.Family,
-		Basis:           reading.Basis,
-		Units:           reading.Units,
-		Source:          reading.SourcePath,
-		PhysicalContext: reading.PhysicalContext,
-	})
-	wantPreimage := strings.Join([]string{
-		owner.Key,
-		owner.Kind,
-		aggregateReadingContext(child.Kind, reading.Context),
-		reading.Role,
-		"sensor." + reading.Family,
-		reading.Basis,
-		reading.Units,
-		reading.SourcePath,
-		reading.PhysicalContext,
-	}, "\x00")
-	if groupKey != wantPreimage {
-		t.Fatalf("aggregate key preimage = %q, want exact public contract %q", groupKey, wantPreimage)
-	}
-	for _, metric := range []string{
-		"aggregate_population_total",
-		"aggregate_completeness_complete",
-		"aggregate_temperature_minimum",
-		"aggregate_temperature_average",
-		"aggregate_temperature_maximum",
-	} {
-		observation := observationByMetric(observations, metric)
-		if observation == nil {
-			t.Fatalf("metric %q is missing", metric)
-		}
-		want := stableKey(
-			"netdata:redfish:aggregate:v1",
-			groupKey,
-			32,
-		)
-		if got := observationLabel(observation.Labels, "aggregate_key"); got != want {
-			t.Fatalf("%s aggregate_key = %q, want %q", metric, got, want)
-		}
-	}
-	minimumKey := observationLabel(
-		observationByMetric(observations, "aggregate_temperature_minimum").Labels,
-		"aggregate_key",
-	)
-	averageKey := observationLabel(
-		observationByMetric(observations, "aggregate_temperature_average").Labels,
-		"aggregate_key",
-	)
-	if minimumKey != averageKey {
-		t.Fatal("minimum and average summary contexts do not share the exact aggregate identity")
-	}
-}
-
-func TestReadingAggregatesKeepDistinctCanonicalSourcesOnOneComponent(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	owner, child, graph, first := aggregateTestSurface(true)
-	second := first
-	second.Key = "second-reading-key"
-	second.SourcePath = "Sensor.Excerpt.Temperature.Reading"
-	second.Value = 84
-
-	observations := mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		map[string][]normalizedReading{child.Key: {first, second}},
-		nil,
-	)
-	var keys, sources []string
-	for _, observation := range observations {
-		if observation.Metric != "aggregate_temperature_minimum" {
-			continue
-		}
-		keys = append(keys, observationLabel(observation.Labels, "aggregate_key"))
-		sources = append(sources, observationLabel(observation.Labels, "reading_source"))
-	}
-	if len(keys) != 2 || keys[0] == keys[1] {
-		t.Fatalf("aggregate keys = %v, want two distinct source groups", keys)
-	}
-	sort.Strings(sources)
-	if got := strings.Join(sources, ","); got != "Sensor.Excerpt.Temperature.Reading,Sensor.Reading" {
-		t.Fatalf("aggregate reading sources = %q", got)
-	}
-}
-
-func TestNumericAggregatesStayIsolatedByParentUnitsAndRole(t *testing.T) {
-	tests := []struct {
-		name  string
-		build func() (*resourceGraph, []*graphNode, map[string][]normalizedReading)
-		label string
-	}{
-		{
-			name:  "parent",
-			label: "rollup_owner_key",
-			build: func() (*resourceGraph, []*graphNode, map[string][]normalizedReading) {
-				ownerA, childA, graph, readingA := aggregateTestSurface(true)
-				ownerB := &graphNode{Kind: "chassis", Key: "chassis-key-b"}
-				childB := &graphNode{Kind: "sensor", Key: "sensor-key-b", RollupOwner: ownerB}
-				readingB := readingA
-				readingB.Key = "reading-key-b"
-				graph.Slices = append(graph.Slices, graphSlice{
-					ParentKey: ownerB.Key, Path: "Sensors", ChildKind: childB.Kind,
-					Family: "thermal", Source: "modern", Mode: relationshipComponents,
-					Complete: true, Members: []string{childB.Key},
-				})
-				return graph,
-					[]*graphNode{ownerA, childA, ownerB, childB},
-					map[string][]normalizedReading{childA.Key: {readingA}, childB.Key: {readingB}}
-			},
-		},
-		{
-			name:  "units",
-			label: "aggregate_units",
-			build: func() (*resourceGraph, []*graphNode, map[string][]normalizedReading) {
-				owner, childA, graph, readingA := aggregateTestSurface(true)
-				childB := &graphNode{Kind: "sensor", Key: "sensor-key-b", RollupOwner: owner}
-				readingB := readingA
-				readingB.Key = "reading-key-b"
-				readingB.Units = "kelvin"
-				graph.Slices[0].Members = append(graph.Slices[0].Members, childB.Key)
-				return graph,
-					[]*graphNode{owner, childA, childB},
-					map[string][]normalizedReading{childA.Key: {readingA}, childB.Key: {readingB}}
-			},
-		},
-		{
-			name:  "role",
-			label: "aggregate_role",
-			build: func() (*resourceGraph, []*graphNode, map[string][]normalizedReading) {
-				owner, childA, graph, readingA := aggregateTestSurface(true)
-				childB := &graphNode{Kind: "sensor", Key: "sensor-key-b", RollupOwner: owner}
-				readingB := readingA
-				readingB.Key = "reading-key-b"
-				readingB.Role = "average"
-				readingB.Context = "redfish.reading.temperature.zero.average"
-				readingB.AggregateSemantic = "sensor_temperature_average"
-				graph.Slices[0].Members = append(graph.Slices[0].Members, childB.Key)
-				return graph,
-					[]*graphNode{owner, childA, childB},
-					map[string][]normalizedReading{childA.Key: {readingA}, childB.Key: {readingB}}
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			client := &protocolClient{}
-			client.hardwareState.initialize()
-			graph, nodes, readings := test.build()
-			observations := mustAggregateObservations(t, client, graph, nodes, readings, nil)
-			values := make(map[string]struct{})
-			keys := make(map[string]struct{})
-			for _, observation := range observations {
-				if observation.Metric != "aggregate_temperature_minimum" {
-					continue
-				}
-				values[observationLabel(observation.Labels, test.label)] = struct{}{}
-				keys[observationLabel(observation.Labels, "aggregate_key")] = struct{}{}
-			}
-			if len(values) != 2 || len(keys) != 2 {
-				t.Fatalf("isolated %s groups: label values=%v aggregate keys=%v, want two of each", test.name, values, keys)
-			}
-		})
-	}
-}
-
-func TestAggregateRetentionBudgetDoesNotFilterCurrentMembers(t *testing.T) {
-	const (
-		groupKey = "group"
-		ownerKey = "owner"
-		sliceKey = "slice"
-	)
-	snapshot := func(memberKeys ...string) aggregateSnapshot {
-		members := make(map[string]struct{}, len(memberKeys))
-		for _, key := range memberKeys {
-			members[key] = struct{}{}
-		}
-		return aggregateSnapshot{
-			OwnerKey:       ownerKey,
-			AggregateClass: "temperature",
-			Members:        cloneStringSet(members),
-			SliceMembers:   map[string]map[string]struct{}{sliceKey: members},
-		}
-	}
-	retained := make(map[string]aggregateSnapshot)
-	owner := &graphNode{Kind: "system", Key: ownerKey}
-	budget := retainedStateBudget{entries: 1, members: 2}
-
-	effective, complete := reconcileAggregateSnapshots(
-		retained,
-		map[string]aggregateSnapshot{groupKey: snapshot("first")},
-		map[string]bool{sliceKey: true},
-		map[string]*graphNode{ownerKey: owner},
-		false,
-		budget,
-	)
-	require.True(t, complete)
-	require.Len(t, effective[groupKey].Members, 1)
-	require.Contains(t, retained, groupKey)
-
-	effective, complete = reconcileAggregateSnapshots(
-		retained,
-		map[string]aggregateSnapshot{groupKey: snapshot("first", "second")},
-		map[string]bool{sliceKey: true},
-		map[string]*graphNode{ownerKey: owner},
-		false,
-		budget,
-	)
-	require.False(t, complete)
-	require.Len(t, effective[groupKey].Members, 2)
-	require.Empty(t, retained)
-}
-
-func TestAggregatesDoNotCascadeOrUseAmbiguousParents(t *testing.T) {
-	t.Run("no recursive cascade", func(t *testing.T) {
-		client := &protocolClient{}
-		client.hardwareState.initialize()
-		root := &graphNode{Kind: "system", Key: "system-key"}
-		owner, child, graph, reading := aggregateTestSurface(true)
-		owner.RollupOwner = root
-		graph.Slices = append(graph.Slices, graphSlice{
-			ParentKey: root.Key, Path: "Chassis", ChildKind: owner.Kind,
-			Family: "chassis", Source: "modern", Mode: relationshipComponents,
-			Complete: true, Members: []string{owner.Key},
-		})
-		observations := mustAggregateObservations(
-			t,
-			client,
-			graph,
-			[]*graphNode{root, owner, child},
-			map[string][]normalizedReading{child.Key: {reading}},
-			nil,
-		)
-		for _, observation := range observations {
-			if strings.HasPrefix(observation.Metric, "aggregate_") &&
-				observationLabel(observation.Labels, "rollup_owner_key") == root.Key {
-				t.Fatalf("child aggregate recursively cascaded to %q: %#v", root.Key, observation)
-			}
-		}
-	})
-
-	t.Run("ambiguous parent", func(t *testing.T) {
-		client := &protocolClient{}
-		client.hardwareState.initialize()
-		left := &graphNode{Kind: "chassis", Key: "left"}
-		right := &graphNode{Kind: "chassis", Key: "right"}
-		child := &graphNode{
-			Kind: "sensor", Key: "sensor",
-			RollupParents: map[string]*graphNode{left.Key: left, right.Key: right},
-		}
-		_, _, _, reading := aggregateTestSurface(true)
-		graph := &resourceGraph{Complete: true, Nodes: []*graphNode{left, right, child}}
-		observations := mustAggregateObservations(
-			t,
-			client,
-			graph,
-			graph.Nodes,
-			map[string][]normalizedReading{child.Key: {reading}},
-			nil,
-		)
-		for _, observation := range observations {
-			if strings.HasPrefix(observation.Metric, "aggregate_") {
-				t.Fatalf("ambiguous parent produced aggregate observation %#v", observation)
-			}
-		}
-	})
-}
-
-func TestAggregateDigestCollisionFailsInsteadOfMerging(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	client.aggregateDigest = func(string) string { return strings.Repeat("0", 32) }
-	owner, child, graph, first := aggregateTestSurface(true)
-	second := first
-	second.Key = "second-reading-key"
-	second.SourcePath = "Sensor.Excerpt.Temperature.Reading"
-
-	_, err := client.aggregateObservations(
-		graph,
-		[]*graphNode{owner, child},
-		map[string][]normalizedReading{child.Key: {first, second}},
-		nil,
-	)
-	if err == nil || !strings.Contains(err.Error(), "aggregate-key collision") {
-		t.Fatalf("aggregate collision error = %v", err)
-	}
-}
-
-func TestAggregateDigestCollisionIsRememberedAcrossCycles(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	client.aggregateDigest = func(string) string { return strings.Repeat("0", 32) }
-	owner, child, graph, reading := aggregateTestSurface(true)
-
-	_, err := client.aggregateObservations(
-		graph,
-		[]*graphNode{owner, child},
-		map[string][]normalizedReading{child.Key: {reading}},
-		nil,
-	)
-	require.NoError(t, err)
-
-	reading.SourcePath = "Sensor.Excerpt.Temperature.Reading"
-	_, err = client.aggregateObservations(
-		graph,
-		[]*graphNode{owner, child},
-		map[string][]normalizedReading{child.Key: {reading}},
-		nil,
-	)
-	require.ErrorContains(t, err, "aggregate-key collision")
-	require.True(t, identityIntegrityError(err))
-}
-
-func TestCategoricalAggregateUsesExactChildContext(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	owner, child, graph, _ := aggregateTestSurface(true)
-	child.Kind = "fan"
-	graph.Slices[0].ChildKind = child.Kind
-	child.Data = map[string]any{"Status": map[string]any{"Health": "OK"}}
-
-	observations := mustAggregateObservations(t, client, graph, []*graphNode{owner, child}, nil, nil)
-	observation := observationByMetric(observations, "aggregate_health_ok")
-	if observation == nil {
-		t.Fatal("aggregate health observation is missing")
-	}
-	if got := observationLabel(observation.Labels, "aggregate_semantic"); got != "redfish.fan.health" {
-		t.Fatalf("aggregate semantic = %q, want exact child context", got)
-	}
 }
 
 func TestFlagObservationsDoNotFabricateMissingSiblingValues(t *testing.T) {
@@ -1773,40 +904,6 @@ func TestConditionDeduplicationPreservesStructuralFieldBoundaries(t *testing.T) 
 	require.Equal(t, 2, counts.Warning)
 }
 
-func TestRangeNormalizedHistogramUsesAuthoritativeBounds(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	owner, child, graph, reading := aggregateTestSurface(true)
-	reading.Histogram = "range_percentage"
-	minimum, maximum := 0.0, 200.0
-	reading.RangeMin, reading.RangeMax = &minimum, &maximum
-	reading.Value = 100
-
-	observations := mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		map[string][]normalizedReading{child.Key: {reading}},
-		nil,
-	)
-	if got := aggregateMetricValue(observations, "aggregate_range_percentage_distribution_50_60"); got != 1 {
-		t.Fatalf("range-normalized 50-60 bucket = %v, want 1", got)
-	}
-	if got := aggregateMetricValue(observations, "aggregate_population_histogram_eligible"); got != 1 {
-		t.Fatalf("histogram eligible population = %v, want 1", got)
-	}
-
-	reading.RangeMax = nil
-	observations = mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		map[string][]normalizedReading{child.Key: {reading}},
-		nil,
-	)
-	if got := aggregateMetricValue(observations, "aggregate_population_histogram_ineligible"); got != 1 {
-		t.Fatalf("histogram ineligible population = %v, want 1", got)
-	}
-}
-
 func TestNormalizeReadingRejectsValueOutsideAdvertisedRange(t *testing.T) {
 	reading := normalizeReading(
 		&graphNode{Kind: "sensor", Key: "sensor-key"},
@@ -1815,7 +912,6 @@ func TestNormalizeReadingRejectsValueOutsideAdvertisedRange(t *testing.T) {
 			Role: "input", Value: json.Number("101"), Primary: true,
 			RangeMin: json.Number("0"), RangeMax: json.Number("100"),
 		},
-		true,
 	)
 	if reading.Valid {
 		t.Fatal("reading outside ReadingRangeMax remained valid")
@@ -1824,204 +920,6 @@ func TestNormalizeReadingRejectsValueOutsideAdvertisedRange(t *testing.T) {
 		reading.RangeMax == nil || *reading.RangeMax != 100 {
 		t.Fatalf("normalized reading range = [%v,%v], want [0,100]", reading.RangeMin, reading.RangeMax)
 	}
-}
-
-func TestAbsentConditionsDoNotCreateFalseZeroAggregate(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	owner, child, graph, _ := aggregateTestSurface(true)
-	child.Kind = "fan"
-	graph.Slices[0].ChildKind = child.Kind
-	child.Data = map[string]any{"Status": map[string]any{"Health": "OK"}}
-
-	observations := mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		nil,
-		nil,
-	)
-	if observationByMetric(observations, "aggregate_conditions_ok") != nil {
-		t.Fatal("absent Status.Conditions created a false all-zero aggregate")
-	}
-	if observationByMetric(client.statusObservations(child), "fan_conditions_ok") != nil {
-		t.Fatal("absent Status.Conditions created a false direct condition chart")
-	}
-
-	child.Data = map[string]any{
-		"Status": map[string]any{
-			"Health":     "OK",
-			"Conditions": []any{},
-		},
-	}
-	observations = mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		nil,
-		nil,
-	)
-	condition := observationByMetric(observations, "aggregate_conditions_ok")
-	if condition == nil || condition.Value != 0 {
-		t.Fatalf("present empty Status.Conditions observation = %#v, want explicit zero", condition)
-	}
-	if got := observationLabel(condition.Labels, "aggregate_units"); got != "conditions" {
-		t.Fatalf("condition aggregate units = %q, want conditions", got)
-	}
-	if direct := observationByMetric(client.statusObservations(child), "fan_conditions_ok"); direct == nil || direct.Value != 0 {
-		t.Fatalf("present empty direct condition observation = %#v, want explicit zero", direct)
-	}
-}
-
-func TestCategoricalAggregateRetainsMembershipAcrossPartialSlice(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	owner, child, graph, _ := aggregateTestSurface(true)
-	child.Kind = "fan"
-	graph.Slices[0].ChildKind = child.Kind
-	child.Data = map[string]any{"Status": map[string]any{"Health": "OK"}}
-
-	initial := mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		nil,
-		nil,
-	)
-	if got := aggregateMetricValue(initial, "aggregate_health_ok"); got != 1 {
-		t.Fatalf("initial aggregate health OK count = %v, want 1", got)
-	}
-
-	graph.Complete = false
-	graph.Slices[0].Complete = false
-	graph.Slices[0].Members = nil
-	partial := mustAggregateObservations(t, client, graph, []*graphNode{owner}, nil, nil)
-	if got := aggregateMetricValue(partial, "aggregate_population_unknown"); got != 1 {
-		t.Fatalf("partial categorical unknown population = %v, want 1", got)
-	}
-	if got := aggregateMetricValue(partial, "aggregate_health_unknown"); got != 1 {
-		t.Fatalf("partial categorical health unknown count = %v, want 1", got)
-	}
-	if got := aggregateMetricValue(partial, "aggregate_completeness_incomplete"); got != 1 {
-		t.Fatalf("partial categorical completeness = %v, want incomplete", got)
-	}
-}
-
-func TestAggregateMembershipFollowsItsContributingSlice(t *testing.T) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	owner, child, graph, reading := aggregateTestSurface(true)
-	readings := map[string][]normalizedReading{child.Key: {reading}}
-
-	initial := mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		readings,
-		nil,
-	)
-	if got := aggregateMetricValue(initial, "aggregate_population_total"); got != 1 {
-		t.Fatalf("initial aggregate population = %v, want 1", got)
-	}
-
-	graph.Complete = false
-	graph.Slices[0].Complete = false
-	partial := mustAggregateObservations(t, client,
-		graph,
-		[]*graphNode{owner, child},
-		nil,
-		nil,
-	)
-	if got := aggregateMetricValue(partial, "aggregate_population_total"); got != 1 {
-		t.Fatalf("partial aggregate population = %v, want retained 1", got)
-	}
-	if got := aggregateMetricValue(partial, "aggregate_population_unknown"); got != 1 {
-		t.Fatalf("partial aggregate unknown = %v, want 1", got)
-	}
-
-	graph.Slices[0].Complete = true
-	graph.Slices[0].Members = nil
-	graph.Slices = append(graph.Slices, graphSlice{
-		ParentKey: "other-owner",
-		Path:      "Unrelated",
-		ChildKind: "fan",
-		Family:    "thermal",
-		Source:    "modern",
-		Mode:      relationshipComponents,
-		Complete:  false,
-	})
-	removed := mustAggregateObservations(t, client, graph, []*graphNode{owner}, nil, nil)
-	if observationByMetric(
-		removed,
-		"aggregate_population_total",
-	) != nil {
-		t.Fatal("a complete contributing slice did not remove the aggregate after its member disappeared")
-	}
-}
-
-func aggregateTestSurface(complete bool) (
-	*graphNode,
-	*graphNode,
-	*resourceGraph,
-	normalizedReading,
-) {
-	owner := &graphNode{Kind: "chassis", Key: "chassis-key"}
-	child := &graphNode{
-		Kind:        "sensor",
-		Key:         "sensor-key",
-		RollupOwner: owner,
-	}
-	graph := &resourceGraph{
-		Complete: complete,
-		Slices: []graphSlice{{
-			ParentKey: owner.Key,
-			Path:      "Sensors",
-			ChildKind: child.Kind,
-			Family:    "thermal",
-			Source:    "modern",
-			Mode:      relationshipComponents,
-			Complete:  complete,
-			Members:   []string{child.Key},
-		}},
-	}
-	reading := normalizedReading{
-		Key:                 "reading-key",
-		SourcePath:          "Sensor.Reading",
-		Family:              "temperature",
-		Units:               "Celsius",
-		Basis:               "zero",
-		Role:                "input",
-		Value:               42,
-		Valid:               true,
-		Primary:             true,
-		AggregateClass:      "temperature",
-		AggregateSemantic:   "sensor_temperature_input",
-		Context:             "redfish.reading.temperature.zero.input",
-		AggregateKinds:      []registry.Kind{"chassis"},
-		SemanticSourceClass: "standard",
-		PhysicalContext:     "Intake",
-	}
-	return owner, child, graph, reading
-}
-
-func mustAggregateObservations(
-	t *testing.T,
-	client *protocolClient,
-	graph *resourceGraph,
-	nodes []*graphNode,
-	readings map[string][]normalizedReading,
-	scalars map[string][]scalarValue,
-) []hardwareObservation {
-	t.Helper()
-	observations, err := client.aggregateObservations(graph, nodes, readings, scalars)
-	if err != nil {
-		t.Fatalf("aggregate observations: %v", err)
-	}
-	return observations
-}
-
-func aggregateMetricValue(observations []hardwareObservation, metric string) float64 {
-	observation := observationByMetric(observations, metric)
-	if observation == nil {
-		return math.NaN()
-	}
-	return observation.Value
 }
 
 func observationLabel(labels []metrix.Label, key string) string {

@@ -12,25 +12,14 @@ import (
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/registry"
 )
 
-const (
-	maxGraphResources            = 100_000
-	maxPlacementEdges            = maxGraphResources
-	maxPlacementOwnerBindings    = maxGraphResources
-	maxPlacementPropagationSteps = maxGraphResources * 16
-)
-
-type relationshipMode = registry.RelationshipMode
+type relationshipMode string
 
 const (
-	relationshipComponents  = registry.RelationshipComponent
-	relationshipEnrichment  = registry.RelationshipEnrichment
-	relationshipTraversal   = registry.RelationshipTraversal
-	relationshipAssociation = registry.RelationshipAssociation
-	relationshipLegacy      = registry.RelationshipLegacy
+	relationshipComponents = "component"
+	relationshipEnrichment = "enrichment"
+	relationshipLegacy     = "legacy"
 )
 
 type graphRelationship struct {
@@ -41,11 +30,9 @@ type graphRelationship struct {
 	Mode       relationshipMode
 	Embedded   bool
 	Source     string
-	RollupRank int
 }
 
 type graphCollectionRequest struct {
-	cursorKey          string
 	parent             *graphNode
 	relationship       graphRelationship
 	members            []collectionMember
@@ -53,28 +40,99 @@ type graphCollectionRequest struct {
 	pageErr            error
 }
 
-func graphRelationshipsFromRegistry() []graphRelationship {
-	result := make([]graphRelationship, 0, len(standardRegistry.Relationships))
-	for _, source := range standardRegistry.Relationships {
-		sourceModel := source.SourceModel
-		if source.Embedded && sourceModel == "" {
-			sourceModel = "embedded_excerpt"
-		}
-		result = append(result, graphRelationship{
-			ParentKind: string(source.Parent),
-			Path:       source.Path,
-			ChildKind:  string(source.Child),
-			Family:     source.Family,
-			Mode:       source.Mode,
-			Embedded:   source.Embedded,
-			Source:     sourceModel,
-			RollupRank: source.RollupRank,
-		})
-	}
-	return result
+// Supported source links. These describe acquisition, not inferred ownership.
+var graphRelationships = []graphRelationship{
+	{ParentKind: "service", Path: "Storage", ChildKind: "storage", Family: "storage", Mode: "traversal"},
+	{ParentKind: "service", Path: "UpdateService", ChildKind: "update_service", Family: "firmware", Mode: "traversal"},
+	{ParentKind: "update_service", Path: "FirmwareInventory", ChildKind: "firmware", Family: "firmware", Mode: "traversal"},
+	{ParentKind: "update_service", Path: "SoftwareInventory", ChildKind: "software", Family: "firmware", Mode: "traversal"},
+	{ParentKind: "system", Path: "Processors", ChildKind: "processor", Family: "compute", Mode: "component"},
+	{ParentKind: "system", Path: "Memory", ChildKind: "memory", Family: "memory", Mode: "component"},
+	{ParentKind: "system", Path: "Storage", ChildKind: "storage", Family: "storage", Mode: "component"},
+	{ParentKind: "system", Path: "EthernetInterfaces", ChildKind: "ethernet_interface", Family: "network", Mode: "component"},
+	{ParentKind: "system", Path: "NetworkInterfaces", ChildKind: "network_interface", Family: "network", Mode: "component"},
+	{ParentKind: "system", Path: "PCIeDevices", ChildKind: "pcie_device", Family: "pcie", Mode: "component"},
+	{ParentKind: "system", Path: "PCIeFunctions", ChildKind: "pcie_function", Family: "pcie", Mode: "component"},
+	{ParentKind: "system", Path: "Redundancy", ChildKind: "redundancy", Family: "base", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "system", Path: "Links.OffloadedNetworkDeviceFunctions", ChildKind: "network_device_function", Family: "network", Mode: "association"},
+	{ParentKind: "chassis", Path: "Drives", ChildKind: "drive", Family: "storage", Mode: "component"},
+	{ParentKind: "chassis", Path: "Memory", ChildKind: "memory", Family: "memory", Mode: "component"},
+	{ParentKind: "chassis", Path: "NetworkAdapters", ChildKind: "network_adapter", Family: "network", Mode: "component"},
+	{ParentKind: "chassis", Path: "PCIeDevices", ChildKind: "pcie_device", Family: "pcie", Mode: "component"},
+	{ParentKind: "chassis", Path: "Sensors", ChildKind: "sensor", Family: "sensors", Mode: "component"},
+	{ParentKind: "chassis", Path: "Controls", ChildKind: "control", Family: "thermal", Mode: "component"},
+	{ParentKind: "chassis", Path: "LeakDetectors", ChildKind: "leak_detector", Family: "thermal", Mode: "component"},
+	{ParentKind: "chassis", Path: "ThermalSubsystem", ChildKind: "thermal_subsystem", Family: "thermal", Mode: "component"},
+	{ParentKind: "chassis", Path: "PowerSubsystem", ChildKind: "power_subsystem", Family: "power", Mode: "component"},
+	{ParentKind: "chassis", Path: "Processors", ChildKind: "processor", Family: "compute", Mode: "component"},
+	{ParentKind: "chassis", Path: "Links.Storage", ChildKind: "storage", Family: "storage", Mode: "association"},
+	{ParentKind: "chassis", Path: "Thermal", ChildKind: "legacy_thermal", Family: "thermal", Mode: "legacy"},
+	{ParentKind: "chassis", Path: "Power", ChildKind: "legacy_power", Family: "power", Mode: "legacy"},
+	{ParentKind: "chassis", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "chassis", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "manager", Path: "EthernetInterfaces", ChildKind: "ethernet_interface", Family: "network", Mode: "component"},
+	{ParentKind: "manager", Path: "DedicatedNetworkPorts", ChildKind: "network_port", Family: "network", Mode: "component"},
+	{ParentKind: "manager", Path: "SharedNetworkPorts", ChildKind: "network_port", Family: "network", Mode: "component"},
+	{ParentKind: "manager", Path: "Redundancy", ChildKind: "redundancy", Family: "base", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "processor", Path: "Ports", ChildKind: "port", Family: "network", Mode: "component"},
+	{ParentKind: "processor", Path: "Metrics", ChildKind: "processor_metrics", Family: "compute", Mode: "enrichment"},
+	{ParentKind: "processor", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "processor", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "memory", Path: "Metrics", ChildKind: "memory_metrics", Family: "memory", Mode: "enrichment"},
+	{ParentKind: "memory", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "memory", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "storage", Path: "Controllers", ChildKind: "storage_controller", Family: "storage", Mode: "component"},
+	{ParentKind: "storage", Path: "Drives", ChildKind: "drive", Family: "storage", Mode: "component"},
+	{ParentKind: "storage", Path: "Volumes", ChildKind: "volume", Family: "storage", Mode: "component"},
+	{ParentKind: "storage", Path: "Redundancy", ChildKind: "redundancy", Family: "storage", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "storage", Path: "Metrics", ChildKind: "storage_metrics", Family: "storage", Mode: "enrichment"},
+	{ParentKind: "storage_controller", Path: "Ports", ChildKind: "port", Family: "network", Mode: "component"},
+	{ParentKind: "storage_controller", Path: "Metrics", ChildKind: "storage_controller_metrics", Family: "storage", Mode: "enrichment"},
+	{ParentKind: "storage_controller", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "storage_controller", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "drive", Path: "Metrics", ChildKind: "drive_metrics", Family: "storage", Mode: "enrichment"},
+	{ParentKind: "drive", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "drive", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "volume", Path: "Metrics", ChildKind: "volume_metrics", Family: "storage", Mode: "enrichment"},
+	{ParentKind: "network_adapter", Path: "NetworkDeviceFunctions", ChildKind: "network_device_function", Family: "network", Mode: "component"},
+	{ParentKind: "network_adapter", Path: "NetworkPorts", ChildKind: "network_port", Family: "network", Mode: "component"},
+	{ParentKind: "network_adapter", Path: "Ports", ChildKind: "port", Family: "network", Mode: "component"},
+	{ParentKind: "network_adapter", Path: "Metrics", ChildKind: "network_adapter_metrics", Family: "network", Mode: "enrichment"},
+	{ParentKind: "network_adapter", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "network_adapter", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "network_interface", Path: "NetworkDeviceFunctions", ChildKind: "network_device_function", Family: "network", Mode: "component"},
+	{ParentKind: "network_interface", Path: "NetworkPorts", ChildKind: "network_port", Family: "network", Mode: "component"},
+	{ParentKind: "network_interface", Path: "Ports", ChildKind: "port", Family: "network", Mode: "component"},
+	{ParentKind: "network_device_function", Path: "Metrics", ChildKind: "network_device_function_metrics", Family: "network", Mode: "enrichment"},
+	{ParentKind: "port", Path: "Metrics", ChildKind: "port_metrics", Family: "network", Mode: "enrichment"},
+	{ParentKind: "port", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "pcie_device", Path: "PCIeFunctions", ChildKind: "pcie_function", Family: "pcie", Mode: "component"},
+	{ParentKind: "pcie_device", Path: "EnvironmentMetrics", ChildKind: "environment_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "pcie_device", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "thermal_subsystem", Path: "CoolantConnectors", ChildKind: "coolant_connector", Family: "thermal", Mode: "component"},
+	{ParentKind: "thermal_subsystem", Path: "Fans", ChildKind: "fan", Family: "thermal", Mode: "component"},
+	{ParentKind: "thermal_subsystem", Path: "Filters", ChildKind: "filter", Family: "thermal", Mode: "component"},
+	{ParentKind: "thermal_subsystem", Path: "Heaters", ChildKind: "heater", Family: "thermal", Mode: "component"},
+	{ParentKind: "thermal_subsystem", Path: "Pumps", ChildKind: "pump", Family: "thermal", Mode: "component"},
+	{ParentKind: "thermal_subsystem", Path: "LeakDetection", ChildKind: "leak_detection", Family: "thermal", Mode: "component"},
+	{ParentKind: "thermal_subsystem", Path: "CoolantConnectorRedundancy", ChildKind: "redundancy", Family: "thermal", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "thermal_subsystem", Path: "FanRedundancy", ChildKind: "redundancy", Family: "thermal", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "thermal_subsystem", Path: "ThermalMetrics", ChildKind: "thermal_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "leak_detection", Path: "LeakDetectorGroups", ChildKind: "leak_detector_group", Family: "thermal", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "leak_detection", Path: "LeakDetectors", ChildKind: "leak_detector", Family: "thermal", Mode: "component"},
+	{ParentKind: "leak_detector_group", Path: "Detectors", ChildKind: "leak_detector", Family: "thermal", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "power_subsystem", Path: "PowerSupplies", ChildKind: "power_supply", Family: "power", Mode: "component"},
+	{ParentKind: "power_subsystem", Path: "Batteries", ChildKind: "battery", Family: "power", Mode: "component"},
+	{ParentKind: "power_subsystem", Path: "PowerSupplyRedundancy", ChildKind: "redundancy", Family: "power", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "power_supply", Path: "Metrics", ChildKind: "power_supply_metrics", Family: "power", Mode: "enrichment"},
+	{ParentKind: "power_supply", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "battery", Path: "Metrics", ChildKind: "battery_metrics", Family: "power", Mode: "enrichment"},
+	{ParentKind: "battery", Path: "Assembly", ChildKind: "assembly_document", Family: "firmware", Mode: "enrichment"},
+	{ParentKind: "sensor", Path: "SensorGroup", ChildKind: "redundancy", Family: "sensors", Mode: "component", Embedded: true, Source: "embedded_excerpt"},
+	{ParentKind: "heater", Path: "Metrics", ChildKind: "heater_metrics", Family: "thermal", Mode: "enrichment"},
+	{ParentKind: "system", Path: "ProcessorSummary.Metrics", ChildKind: "processor_summary_metrics", Family: "compute", Mode: "enrichment"},
+	{ParentKind: "system", Path: "MemorySummary.Metrics", ChildKind: "memory_summary_metrics", Family: "memory", Mode: "enrichment"},
 }
-
-var graphRelationships = graphRelationshipsFromRegistry()
 
 type graphNode struct {
 	Kind             string
@@ -82,7 +140,6 @@ type graphNode struct {
 	Locator          string
 	Key              string
 	Data             map[string]any
-	Typed            any
 	Enrichment       map[string]map[string]any
 	Doc              genericResource
 	AcquisitionState string
@@ -94,13 +151,7 @@ type graphNode struct {
 	Response         responseMetadata
 	SensorExcerpts   []sensorExcerptSource
 
-	Parents           map[string]*graphNode
-	RollupParents     map[string]*graphNode
-	RollupOwner       *graphNode
-	LogicalOwner      *graphNode
-	SystemOwners      map[string]*graphNode
-	PlacementComplete bool
-	TraversalDepth    int
+	Parents map[string]*graphNode
 }
 
 type sensorExcerptSource struct {
@@ -115,7 +166,6 @@ type resourceGraph struct {
 	ByIdentity  map[string]*graphNode
 	ByKey       map[string]*graphNode
 	ByURI       map[string]*graphNode
-	ByAnyURI    map[string]*graphNode
 	KeySources  map[string]string
 	Slices      []graphSlice
 	Complete    bool
@@ -143,21 +193,13 @@ type graphSlice struct {
 	ParentKey string
 	Path      string
 	ChildKind string
-	Family    string
-	Source    string
-	Mode      relationshipMode
 	Complete  bool
-	Members   []string
 }
 
 type graphMembershipSnapshot struct {
 	ParentKey    string
 	Relationship graphRelationship
 	Members      []*graphNode
-}
-
-type logicalPlacementSnapshot struct {
-	OwnerKey string
 }
 
 type graphFetchBroker struct {
@@ -228,22 +270,9 @@ func (g *resourceGraph) emittedNodes() []*graphNode {
 	return out
 }
 
-func (c *protocolClient) collectResourceGraph(
-	ctx context.Context,
-	root *serviceRootDocument,
-	base []baseResource,
-	stats *wireStats,
-) (graph *resourceGraph, resultErr error) {
+func (c *protocolClient) collectResourceGraph(ctx context.Context, root *serviceRootDocument, base []baseResource, stats *wireStats) (graph *resourceGraph, resultErr error) {
 	ctx = withGraphFetchBroker(ctx)
-	graph = &resourceGraph{
-		ByIdentity: make(map[string]*graphNode),
-		ByKey:      make(map[string]*graphNode),
-		ByURI:      make(map[string]*graphNode),
-		ByAnyURI:   make(map[string]*graphNode),
-		KeySources: make(map[string]string),
-		Complete:   true,
-		register:   c.identities.register,
-	}
+	graph = &resourceGraph{Complete: true, register: c.identities.register}
 	defer func() {
 		if resultErr != nil {
 			graph.Complete = false
@@ -252,248 +281,99 @@ func (c *protocolClient) collectResourceGraph(
 			graph.Complete = false
 			resultErr = errors.Join(resultErr, err)
 		}
-		c.resolveGraphPlacement(graph)
 		graph.addResponseDiagnostics()
 	}()
-	service := &graphNode{
-		Kind:             "service",
-		URI:              "/redfish/v1/",
-		Locator:          "/redfish/v1/",
-		Data:             serviceRootMap(root),
-		AcquisitionState: "readable",
-		Complete:         true,
-		IdentityQuality:  "addressable",
-		SourceModel:      "typed_resource",
-		Response:         root.Response,
-		Parents:          make(map[string]*graphNode),
-		RollupParents:    make(map[string]*graphNode),
-		SystemOwners:     make(map[string]*graphNode),
-	}
+	service := &graphNode{Kind: "service", URI: "/redfish/v1/", Locator: "/redfish/v1/", Data: serviceRootMap(root), AcquisitionState: "readable", Complete: true, IdentityQuality: "addressable", SourceModel: "resource", Response: root.Response, Parents: make(map[string]*graphNode)}
 	service.Key = resourceKey(c.origin, service.Kind, service.Locator)
 	if err := graph.add(service); err != nil {
 		return graph, err
 	}
-
-	queue := make([]*graphNode, 0, len(base)+1)
-	queue = append(queue, service)
+	queue := []*graphNode{service}
 	for _, item := range base {
-		node := &graphNode{
-			Kind:             item.Kind,
-			URI:              item.URI,
-			Locator:          item.URI,
-			Data:             cloneJSONMap(item.Data),
-			Typed:            item.Typed,
-			Doc:              item.Doc,
-			AcquisitionState: item.AcquisitionState,
-			ErrorClass:       item.ErrorClass,
-			Complete:         item.MembershipComplete,
-			IdentityQuality:  "addressable",
-			SourceModel:      "typed_resource",
-			Response:         item.Response,
-			Parents:          map[string]*graphNode{service.Key: service},
-			RollupParents:    make(map[string]*graphNode),
-			SystemOwners:     make(map[string]*graphNode),
-			TraversalDepth:   1,
-		}
+		node := &graphNode{Kind: item.Kind, URI: item.URI, Locator: item.URI, Data: item.Data, Doc: item.Doc, AcquisitionState: item.AcquisitionState, ErrorClass: item.ErrorClass, Complete: item.MembershipComplete, IdentityQuality: "addressable", SourceModel: "resource", Response: item.Response, Parents: map[string]*graphNode{service.Key: service}}
 		node.Key = resourceKey(c.origin, node.Kind, node.Locator)
-		if item.Kind == "system" {
-			node.SystemOwners[node.Key] = node
-		}
 		if err := graph.add(node); err != nil {
-			graph.Complete = false
 			return graph, err
 		}
 		queue = append(queue, node)
 	}
-
-	// Root base links were already acquired above. UpdateService and a
-	// root-level Storage collection are the only additional root edges.
-	var traversalErr error
-traversal:
-	for pos := 0; pos < len(queue); {
-		depth := queue[pos].TraversalDepth
-		end := pos
-		for end < len(queue) && queue[end].TraversalDepth == depth {
-			end++
+	visited := make(map[*graphNode]string)
+	for pos := 0; pos < len(queue); pos++ {
+		if err := ctx.Err(); err != nil {
+			return graph, err
 		}
-		frontier := append([]*graphNode(nil), queue[pos:end]...)
-		sort.Slice(frontier, func(i, j int) bool { return frontier[i].Key < frontier[j].Key })
-		frontierKey := fmt.Sprintf("graph-frontier-depth:%d", depth)
-		frontierOrder := c.fairnessOrder(frontierKey, len(frontier))
-		frontierAttempted := 0
-		for _, frontierIndex := range frontierOrder {
-			if err := ctx.Err(); err != nil {
-				graph.Complete = false
-				traversalErr = errors.Join(traversalErr, err)
-				c.advanceFairnessAfterWork(frontierKey, len(frontier), frontierAttempted)
-				break traversal
-			}
-			parent := frontier[frontierIndex]
-			frontierAttempted++
-			if parent.AcquisitionState != "readable" || parent.Data == nil {
-				graph.Complete = false
-				graph.addDiagnostic(fmt.Sprintf(
-					"%s %s is %s (%s)",
-					parent.Kind, parent.URI, parent.AcquisitionState, parent.ErrorClass,
-				))
-				for _, rel := range relationshipsFor(parent.Kind) {
-					if rel.Mode == relationshipEnrichment || !c.familyEnabled(rel.Family) {
-						continue
-					}
-					children, _ := c.reconcileGraphMembership(parent, rel, nil, false)
-					slice := graphSlice{
-						ParentKey: parent.Key,
-						Path:      rel.Path,
-						ChildKind: rel.ChildKind,
-						Family:    rel.Family,
-						Source:    rel.Source,
-						Mode:      rel.Mode,
-						Complete:  false,
-						Members:   make([]string, 0, len(children)),
-					}
-					for _, child := range children {
-						slice.Members = append(slice.Members, child.Key)
-						existing := graph.ByIdentity[child.Kind+"\x00"+child.Locator]
-						if existing != nil {
-							mergeEquivalentGraphNode(existing, child)
-							existing.Parents[parent.Key] = parent
-							if rel.establishesRollupOwnership() {
-								existing.RollupParents[parent.Key] = parent
-							}
-							continue
-						}
-						child.Parents[parent.Key] = parent
-						child.TraversalDepth = parent.TraversalDepth + 1
-						if rel.establishesRollupOwnership() {
-							child.RollupParents[parent.Key] = parent
-						}
-						if err := graph.add(child); err != nil {
-							graph.Complete = false
-							return graph, err
-						}
-						queue = append(queue, child)
-					}
-					graph.Slices = append(graph.Slices, slice)
-				}
+		parent := queue[pos]
+		readable := parent.AcquisitionState == "readable" && parent.Data != nil
+		if !readable {
+			graph.Complete = false
+			continue // Restore unavailable descendants after all successful paths are walked.
+		}
+		if quality, ok := visited[parent]; ok && quality == parent.IdentityQuality {
+			continue
+		}
+		// A later addressable representation may expose links absent from an excerpt.
+		visited[parent] = parent.IdentityQuality
+		for _, rel := range relationshipsFor(parent.Kind) {
+			if !c.familyEnabled(rel.Family) {
 				continue
 			}
-			relationships := relationshipsFor(parent.Kind)
-			relationshipOrder := c.fairnessOrder(
-				"graph-relationships\x00"+parent.Key,
-				len(relationships),
-			)
-			relationshipsAttempted := 0
-			for _, relationshipIndex := range relationshipOrder {
-				if err := ctx.Err(); err != nil {
-					graph.Complete = false
-					traversalErr = errors.Join(traversalErr, err)
-					c.advanceFairnessCursor(
-						"graph-relationships\x00"+parent.Key,
-						len(relationships),
-						relationshipsAttempted,
-					)
-					c.advanceFairnessAfterWork(frontierKey, len(frontier), frontierAttempted)
-					break traversal
+			if err := ctx.Err(); err != nil {
+				return graph, err
+			}
+			var children []*graphNode
+			var enrichments map[string]map[string]any
+			complete := false
+			var err error
+			children, enrichments, complete, err = c.acquireRelationship(ctx, parent, rel, stats)
+			if rel.Mode != relationshipEnrichment {
+				children = c.reconcileGraphMembership(parent, rel, children, complete)
+				graph.recordMembership(parent, rel, complete)
+			}
+			if len(enrichments) > 0 {
+				if parent.Enrichment == nil {
+					parent.Enrichment = make(map[string]map[string]any)
 				}
-				rel := relationships[relationshipIndex]
-				if !c.familyEnabled(rel.Family) {
-					continue
-				}
-				relationshipsAttempted++
-				children, enrichments, complete, err := c.acquireRelationship(ctx, parent, rel, stats)
-				if rel.Mode != relationshipEnrichment {
-					var retained bool
-					children, retained = c.reconcileGraphMembership(parent, rel, children, complete)
-					if !retained {
-						graph.addDiagnostic("Redfish graph continuity state exceeded its internal retention budget")
-					}
-					slice := graphSlice{
-						ParentKey: parent.Key,
-						Path:      rel.Path,
-						ChildKind: rel.ChildKind,
-						Family:    rel.Family,
-						Source:    rel.Source,
-						Mode:      rel.Mode,
-						Complete:  complete,
-						Members:   make([]string, 0, len(children)),
-					}
-					for _, child := range children {
-						slice.Members = append(slice.Members, child.Key)
-					}
-					graph.Slices = append(graph.Slices, slice)
-				}
-				if len(enrichments) > 0 {
-					if parent.Enrichment == nil {
-						parent.Enrichment = make(map[string]map[string]any)
-					}
-					maps.Copy(parent.Enrichment, enrichments)
-				}
-				if rel.Mode == relationshipEnrichment {
-					if addErr := c.addEmbeddedEnrichmentComponents(
-						ctx, graph, parent, rel, enrichments, complete && err == nil, &queue,
-					); addErr != nil {
-						graph.Complete = false
-						return graph, errors.Join(err, addErr)
-					}
-				}
-				for _, child := range children {
-					existing := graph.ByIdentity[child.Kind+"\x00"+child.Locator]
-					if existing != nil {
-						mergeEquivalentGraphNode(existing, child)
-						existing.Parents[parent.Key] = parent
-						if rel.establishesRollupOwnership() {
-							existing.RollupParents[parent.Key] = parent
-						}
-						continue
-					}
-					child.Parents[parent.Key] = parent
-					child.TraversalDepth = parent.TraversalDepth + 1
-					if rel.establishesRollupOwnership() {
-						child.RollupParents[parent.Key] = parent
-					}
-					if err := graph.add(child); err != nil {
-						graph.Complete = false
-						return graph, err
-					}
-					queue = append(queue, child)
-				}
-				if err != nil {
-					graph.Complete = false
-					graph.addDiagnostic(fmt.Sprintf("%s %s: %v", parent.Kind, rel.Path, err))
-				}
-				if !complete {
-					graph.Complete = false
-				}
-				if err != nil && classifyError(err) == "limit" {
-					traversalErr = errors.Join(traversalErr, err)
-					c.advanceFairnessCursor(
-						"graph-relationships\x00"+parent.Key,
-						len(relationships),
-						relationshipsAttempted,
-					)
-					c.advanceFairnessAfterWork(frontierKey, len(frontier), frontierAttempted)
-					break traversal
+				maps.Copy(parent.Enrichment, enrichments)
+			}
+			if rel.Mode == relationshipEnrichment {
+				if addErr := c.addEmbeddedEnrichmentComponents(ctx, graph, parent, rel, enrichments, complete && err == nil, &queue); addErr != nil {
+					return graph, errors.Join(err, addErr)
 				}
 			}
-			c.advanceFairnessCursor(
-				"graph-relationships\x00"+parent.Key,
-				len(relationships),
-				relationshipsAttempted,
-			)
+			for _, child := range children {
+				if addErr := graph.addChild(parent, child, &queue); addErr != nil {
+					return graph, addErr
+				}
+			}
+			if err != nil {
+				graph.addDiagnostic(fmt.Sprintf("%s %s: %v", parent.Kind, rel.Path, err))
+			}
+			if !complete || err != nil {
+				graph.Complete = false
+			}
 		}
-		c.advanceFairnessAfterWork(frontierKey, len(frontier), frontierAttempted)
-		pos = end
 	}
-
-	return graph, traversalErr
+	return graph, nil
 }
 
-func (c *protocolClient) advanceFairnessAfterWork(key string, count, attempted int) {
-	step := attempted
-	if attempted == count {
-		step = 1
+func (g *resourceGraph) addChild(parent, child *graphNode, queue *[]*graphNode) error {
+	if existing := g.ByIdentity[child.Kind+"\x00"+child.Locator]; existing != nil {
+		if mergeEquivalentGraphNode(existing, child) {
+			*queue = append(*queue, existing)
+		}
+		existing.Parents[parent.Key] = parent
+		return nil
 	}
-	c.advanceFairnessCursor(key, count, step)
+	child.Parents[parent.Key] = parent
+	if err := g.add(child); err != nil {
+		return err
+	}
+	*queue = append(*queue, child)
+	return nil
+}
+
+func (g *resourceGraph) recordMembership(parent *graphNode, rel graphRelationship, complete bool) {
+	g.Slices = append(g.Slices, graphSlice{ParentKey: parent.Key, Path: rel.Path, ChildKind: rel.ChildKind, Complete: complete})
 }
 
 func graphMembershipKey(parentKey string, rel graphRelationship) string {
@@ -504,364 +384,73 @@ func (c *protocolClient) finalizeGraphMembership(graph *resourceGraph) error {
 	if graph == nil {
 		return nil
 	}
-	observed := make(map[string]struct{}, len(graph.Slices))
+	observed := make(map[string]bool, len(graph.Slices))
 	for _, slice := range graph.Slices {
-		observed[slice.ParentKey+"\x00"+slice.Path+"\x00"+slice.ChildKind] = struct{}{}
+		observed[slice.ParentKey+"\x00"+slice.Path+"\x00"+slice.ChildKind] = true
 	}
+	c.graphMu.Lock()
+	defer c.graphMu.Unlock()
 	if graph.Complete {
-		c.graphMu.Lock()
-		c.ensureGraphMembershipUsageLocked()
 		for key := range c.graphMembership {
-			if _, ok := observed[key]; !ok {
-				c.graphMembershipSize -= len(c.graphMembership[key].Members)
+			if !observed[key] {
 				delete(c.graphMembership, key)
 			}
 		}
-		indices := make([]int, len(graph.Slices))
-		for index := range graph.Slices {
-			indices[index] = index
-		}
-		sort.Slice(indices, func(i, j int) bool {
-			left, right := graph.Slices[indices[i]], graph.Slices[indices[j]]
-			return graphMembershipKeyFromSlice(left) < graphMembershipKeyFromSlice(right)
-		})
-		retentionComplete := true
-		for _, index := range indices {
-			slice := graph.Slices[index]
-			key := graphMembershipKeyFromSlice(slice)
-			if len(slice.Members) == 0 {
-				continue
-			}
-			if _, exists := c.graphMembership[key]; exists {
-				continue
-			}
-			if !retainedStateFits(
-				len(c.graphMembership),
-				c.graphMembershipSize,
-				1,
-				len(slice.Members),
-				graphMembershipRetentionBudget,
-			) {
-				retentionComplete = false
-				continue
-			}
-			parent := graph.findKey(slice.ParentKey)
-			if parent == nil {
-				retentionComplete = false
-				continue
-			}
-			members := make([]*graphNode, 0, len(slice.Members))
-			for _, memberKey := range slice.Members {
-				member := graph.findKey(memberKey)
-				if member == nil {
-					retentionComplete = false
-					continue
-				}
-				members = append(members, member)
-			}
-			if len(members) != len(slice.Members) {
-				continue
-			}
-			c.graphMembership[key] = graphMembershipSnapshot{
-				ParentKey:    parent.Key,
-				Relationship: relationshipFromGraphSlice(parent, slice),
-				Members:      cloneGraphNodesStatic(members, false),
-			}
-			c.graphMembershipSize += len(members)
-		}
-		c.graphMu.Unlock()
-		if !retentionComplete {
-			graph.addDiagnostic("Redfish graph continuity state exceeded its internal retention budget")
-		}
 		return nil
 	}
-
-	c.graphMu.Lock()
-	pending := make(map[string]graphMembershipSnapshot, len(c.graphMembership))
+	// Unvisited branches retain identities only, so a failed read cannot replay measurements.
+	pending := make(map[string][]graphMembershipSnapshot)
 	for key, snapshot := range c.graphMembership {
-		if _, ok := observed[key]; ok {
-			continue
-		}
-		pending[key] = graphMembershipSnapshot{
-			ParentKey:    snapshot.ParentKey,
-			Relationship: snapshot.Relationship,
-			Members:      cloneGraphNodesStatic(snapshot.Members, true),
+		if !observed[key] {
+			pending[snapshot.ParentKey] = append(pending[snapshot.ParentKey], snapshot)
 		}
 	}
-	c.graphMu.Unlock()
-
-	keys := make([]string, 0, len(pending))
-	waiting := make(map[string][]string)
-	for key, snapshot := range pending {
-		keys = append(keys, key)
-		waiting[snapshot.ParentKey] = append(waiting[snapshot.ParentKey], key)
-	}
-	sort.Strings(keys)
-	for parentKey := range waiting {
-		sort.Strings(waiting[parentKey])
-	}
-
-	queued := make(map[string]struct{}, len(pending))
-	ready := make([]string, 0, len(pending))
-	enqueue := func(key string) {
-		if _, exists := queued[key]; exists {
-			return
-		}
-		queued[key] = struct{}{}
-		ready = append(ready, key)
-	}
-	enqueueChildren := func(parentKey string) {
-		for _, key := range waiting[parentKey] {
-			enqueue(key)
-		}
-	}
-	for _, key := range keys {
-		if graph.findKey(pending[key].ParentKey) != nil {
-			enqueue(key)
-		}
-	}
-
-	var failures boundedErrorAccumulator
-	for position := 0; position < len(ready); position++ {
-		snapshot := pending[ready[position]]
-		parent := graph.findKey(snapshot.ParentKey)
-		if parent == nil {
-			continue
-		}
-		rel := snapshot.Relationship
-		slice := graphSlice{
-			ParentKey: parent.Key,
-			Path:      rel.Path,
-			ChildKind: rel.ChildKind,
-			Family:    rel.Family,
-			Source:    rel.Source,
-			Mode:      rel.Mode,
-			Complete:  false,
-			Members:   make([]string, 0, len(snapshot.Members)),
-		}
-		for _, child := range snapshot.Members {
-			child.Parents[parent.Key] = parent
-			child.TraversalDepth = parent.TraversalDepth + 1
-			if rel.establishesRollupOwnership() {
-				child.RollupParents[parent.Key] = parent
-			}
-			if existing := graph.ByIdentity[child.Kind+"\x00"+child.Locator]; existing != nil {
-				mergeEquivalentGraphNode(existing, child)
-				existing.Parents[parent.Key] = parent
-				if rel.establishesRollupOwnership() {
-					existing.RollupParents[parent.Key] = parent
-				}
-				slice.Members = append(slice.Members, existing.Key)
-				enqueueChildren(existing.Key)
-				continue
-			}
-			if err := graph.add(child); err != nil {
-				failures.Add(fmt.Errorf("restore retained graph slice %s: %w", rel.Path, err))
-				continue
-			}
-			slice.Members = append(slice.Members, child.Key)
-			enqueueChildren(child.Key)
-		}
-		graph.Slices = append(graph.Slices, slice)
-	}
-	return failures.Err()
-}
-
-func graphMembershipKeyFromSlice(slice graphSlice) string {
-	return graphMembershipKey(slice.ParentKey, graphRelationship{
-		Path:      slice.Path,
-		ChildKind: slice.ChildKind,
-	})
-}
-
-func relationshipFromGraphSlice(parent *graphNode, slice graphSlice) graphRelationship {
-	for _, candidate := range relationshipsFor(parent.Kind) {
-		if candidate.Path == slice.Path &&
-			candidate.ChildKind == slice.ChildKind &&
-			candidate.Mode == slice.Mode &&
-			candidate.Source == slice.Source {
-			return candidate
-		}
-	}
-	return graphRelationship{
-		ParentKind: parent.Kind,
-		Path:       slice.Path,
-		ChildKind:  slice.ChildKind,
-		Family:     slice.Family,
-		Mode:       slice.Mode,
-		Source:     slice.Source,
-		RollupRank: 0,
-	}
-}
-
-func (g *resourceGraph) detailEvidence(
-	nodes []*graphNode,
-	readings map[string][]normalizedReading,
-) map[string]bool {
-	nodeByKey := make(map[string]*graphNode, len(nodes))
-	result := make(map[string]bool)
-	incompleteOwnerKinds := make(map[string]map[string]struct{})
-	for _, node := range nodes {
-		nodeByKey[node.Key] = node
-		if !isSubordinate(node.Kind) || node.LogicalOwner == nil {
-			continue
-		}
-		result[node.LogicalOwner.Key+"\x00"+componentFamily(node, readings[node.Key])] = true
-	}
-	for _, slice := range g.Slices {
-		if slice.Complete {
-			continue
-		}
-		parent := nodeByKey[slice.ParentKey]
-		if parent != nil {
-			owner := parent.LogicalOwner
-			if owner == nil && !isSubordinate(parent.Kind) {
-				owner = parent
-			}
-			if owner != nil {
-				kinds := incompleteOwnerKinds[owner.Key]
-				if kinds == nil {
-					kinds = make(map[string]struct{})
-					incompleteOwnerKinds[owner.Key] = kinds
-				}
-				kinds[slice.ChildKind] = struct{}{}
-				if slice.ChildKind == "sensor" || slice.ModeledFamilyIsVariable() {
-					kinds["*"] = struct{}{}
+	queue := append([]*graphNode(nil), graph.Nodes...)
+	for pos := 0; pos < len(queue); pos++ {
+		parent := queue[pos]
+		snapshots := pending[parent.Key]
+		delete(pending, parent.Key)
+		for _, snapshot := range snapshots {
+			children := cloneGraphNodesStatic(snapshot.Members, true)
+			for _, child := range children {
+				if err := graph.addChild(parent, child, &queue); err != nil {
+					return err
 				}
 			}
-		}
-		for _, memberKey := range slice.Members {
-			node := nodeByKey[memberKey]
-			if node == nil || !isSubordinate(node.Kind) || node.LogicalOwner == nil {
-				continue
-			}
-			result[node.LogicalOwner.Key+"\x00"+componentFamily(node, readings[node.Key])] = false
+			graph.recordMembership(parent, snapshot.Relationship, false)
 		}
 	}
-	for key := range result {
-		ownerKey, family, ok := strings.Cut(key, "\x00")
-		if !ok {
-			continue
-		}
-		kinds := incompleteOwnerKinds[ownerKey]
-		if _, all := kinds["*"]; all {
-			result[key] = false
-			continue
-		}
-		if _, exact := kinds[family]; exact {
-			result[key] = false
-		}
-		if strings.HasPrefix(family, "sensor.") {
-			if _, sensor := kinds["sensor"]; sensor {
-				result[key] = false
-			}
-		}
-	}
-	return result
+	return nil
 }
 
-func (s graphSlice) ModeledFamilyIsVariable() bool {
-	return s.Mode == relationshipLegacy
-}
-
-func (c *protocolClient) reconcileGraphMembership(
-	parent *graphNode,
-	rel graphRelationship,
-	current []*graphNode,
-	complete bool,
-) ([]*graphNode, bool) {
-	return c.reconcileGraphMembershipWithinBudget(
-		parent,
-		rel,
-		current,
-		complete,
-		graphMembershipRetentionBudget,
-	)
-}
-
-func (c *protocolClient) reconcileGraphMembershipWithinBudget(
-	parent *graphNode,
-	rel graphRelationship,
-	current []*graphNode,
-	complete bool,
-	budget retainedStateBudget,
-) ([]*graphNode, bool) {
-	sliceKey := graphMembershipKey(parent.Key, rel)
+func (c *protocolClient) reconcileGraphMembership(parent *graphNode, rel graphRelationship, current []*graphNode, complete bool) []*graphNode {
+	key := graphMembershipKey(parent.Key, rel)
 	c.graphMu.Lock()
 	defer c.graphMu.Unlock()
-	c.ensureGraphMembershipUsageLocked()
-	if complete {
-		existing, exists := c.graphMembership[sliceKey]
-		baseMembers := c.graphMembershipSize - len(existing.Members)
-		baseEntries := len(c.graphMembership)
-		if exists {
-			baseEntries--
-		}
-		if len(current) == 0 {
-			if exists {
-				delete(c.graphMembership, sliceKey)
-				c.graphMembershipSize = baseMembers
-			}
-			return current, true
-		}
-		if !retainedStateFits(baseEntries, baseMembers, 1, len(current), budget) {
-			if exists {
-				delete(c.graphMembership, sliceKey)
-				c.graphMembershipSize = baseMembers
-			}
-			return current, false
-		}
-		c.graphMembership[sliceKey] = graphMembershipSnapshot{
-			ParentKey:    parent.Key,
-			Relationship: rel,
-			Members:      cloneGraphNodesStatic(current, false),
-		}
-		c.graphMembershipSize = baseMembers + len(current)
-		return current, true
-	}
-	snapshot := c.graphMembership[sliceKey]
-	byIdentity := make(map[string]struct{}, len(current))
-	previous := make(map[string]*graphNode, len(snapshot.Members))
-	for _, node := range snapshot.Members {
-		previous[node.Kind+"\x00"+node.Locator] = node
-	}
-	for _, node := range current {
-		identity := node.Kind + "\x00" + node.Locator
-		byIdentity[identity] = struct{}{}
-		if node.AcquisitionState != "readable" {
-			if retained := previous[identity]; retained != nil {
-				node.Doc = retained.Doc
-			}
-		}
-	}
-	for _, retained := range cloneGraphNodesStatic(snapshot.Members, true) {
-		if _, exists := byIdentity[retained.Kind+"\x00"+retained.Locator]; exists {
-			continue
-		}
-		retained.Parents = map[string]*graphNode{parent.Key: parent}
-		if rel.establishesRollupOwnership() {
-			retained.RollupParents = map[string]*graphNode{parent.Key: parent}
-		}
-		current = append(current, retained)
-	}
-	return current, true
-}
-
-func (c *protocolClient) ensureGraphMembershipUsageLocked() {
 	if c.graphMembership == nil {
 		c.graphMembership = make(map[string]graphMembershipSnapshot)
-		c.graphMembershipSize = 0
-		c.graphMembershipCounted = true
-		return
 	}
-	if c.graphMembershipCounted {
-		return
+	if !complete {
+		seen := make(map[string]*graphNode, len(current))
+		for _, node := range current {
+			seen[node.Key] = node
+		}
+		for _, retained := range cloneGraphNodesStatic(c.graphMembership[key].Members, true) {
+			if node := seen[retained.Key]; node != nil {
+				if node.AcquisitionState != "readable" {
+					node.Doc = retained.Doc
+				}
+			} else {
+				current = append(current, retained)
+			}
+		}
 	}
-	c.graphMembershipSize = 0
-	for _, snapshot := range c.graphMembership {
-		c.graphMembershipSize += len(snapshot.Members)
+	if len(current) == 0 {
+		delete(c.graphMembership, key)
+	} else {
+		c.graphMembership[key] = graphMembershipSnapshot{ParentKey: parent.Key, Relationship: rel, Members: cloneGraphNodesStatic(current, false)}
 	}
-	c.graphMembershipCounted = true
+	return current
 }
 
 func cloneGraphNodesStatic(nodes []*graphNode, unknown bool) []*graphNode {
@@ -872,17 +461,13 @@ func cloneGraphNodesStatic(nodes []*graphNode, unknown bool) []*graphNode {
 		}
 		node := *source
 		node.Data = nil
-		node.Typed = nil
 		node.Enrichment = nil
 		node.Doc.Status = genericStatus{}
 		node.Doc.PowerState = ""
 		node.Doc.FailurePredicted = nil
 		node.Parents = make(map[string]*graphNode)
-		node.RollupParents = make(map[string]*graphNode)
-		node.SystemOwners = make(map[string]*graphNode)
-		node.RollupOwner = nil
-		node.LogicalOwner = nil
-		node.SensorExcerpts = cloneSensorExcerptSources(source.SensorExcerpts)
+		node.SensorExcerpts = nil
+		node.Response = responseMetadata{}
 		if unknown {
 			node.AcquisitionState = "unknown"
 			node.ErrorClass = "protocol"
@@ -893,49 +478,31 @@ func cloneGraphNodesStatic(nodes []*graphNode, unknown bool) []*graphNode {
 	return result
 }
 
-func cloneCurrentGraphNode(source *graphNode) *graphNode {
-	return cloneGraphNode(source, true)
-}
-
-// Fetched JSON and typed models are immutable during a collection cycle.
+// Fetched JSON documents are immutable during a collection cycle.
 // Sharing them preserves request coalescing without duplicating the largest
 // part of every cached graph node.
 func cloneFetchedGraphNode(source *graphNode) *graphNode {
-	return cloneGraphNode(source, false)
+	return cloneGraphNode(source)
 }
 
-func cloneGraphNode(source *graphNode, cloneData bool) *graphNode {
+func cloneGraphNode(source *graphNode) *graphNode {
 	if source == nil {
 		return nil
 	}
 	node := *source
-	if cloneData {
-		node.Data = cloneJSONMap(source.Data)
-	}
 	node.Doc.Status.Conditions = append([]genericCondition(nil), source.Doc.Status.Conditions...)
 	node.Enrichment = make(map[string]map[string]any, len(source.Enrichment))
 	for key, value := range source.Enrichment {
 		node.Enrichment[key] = cloneJSONMap(value)
 	}
 	node.Parents = make(map[string]*graphNode)
-	node.RollupParents = make(map[string]*graphNode)
-	node.SystemOwners = make(map[string]*graphNode)
-	node.RollupOwner = nil
-	node.LogicalOwner = nil
 	node.SensorExcerpts = cloneSensorExcerptSources(source.SensorExcerpts)
 	return &node
-}
-
-func (r graphRelationship) establishesRollupOwnership() bool {
-	return (r.Mode == relationshipComponents || r.Mode == relationshipLegacy) && r.RollupRank >= 0
 }
 
 func (g *resourceGraph) add(node *graphNode) error {
 	if node == nil {
 		return errors.New("cannot add a nil Redfish graph node")
-	}
-	if len(g.Nodes) >= maxGraphResources {
-		return errors.New("Redfish resource graph exceeds the internal resource limit")
 	}
 	identity := node.Kind + "\x00" + node.Locator
 	if g.ByIdentity[identity] != nil {
@@ -962,9 +529,6 @@ func (g *resourceGraph) add(node *graphNode) error {
 	if g.ByURI == nil {
 		g.ByURI = make(map[string]*graphNode)
 	}
-	if g.ByAnyURI == nil {
-		g.ByAnyURI = make(map[string]*graphNode)
-	}
 	if g.KeySources == nil {
 		g.KeySources = make(map[string]string)
 	}
@@ -974,14 +538,6 @@ func (g *resourceGraph) add(node *graphNode) error {
 		uriKey := node.Kind + "\x00" + node.URI
 		if _, exists := g.ByURI[uriKey]; !exists {
 			g.ByURI[uriKey] = node
-		}
-		if _, exists := g.ByAnyURI[node.URI]; !exists {
-			g.ByAnyURI[node.URI] = node
-		}
-	}
-	if node.Locator != "" {
-		if _, exists := g.ByAnyURI[node.Locator]; !exists {
-			g.ByAnyURI[node.Locator] = node
 		}
 	}
 	g.KeySources[node.Key] = preimage
@@ -1064,9 +620,6 @@ func (c *protocolClient) acquireEmbeddedValues(
 	default:
 		return nil, false, fmt.Errorf("embedded value has unexpected type %T", value)
 	}
-	if err := consumeCollectionMemberBudget(ctx, len(values)); err != nil {
-		return nil, false, err
-	}
 
 	result := make([]*graphNode, 0, len(values))
 	positions := make([]int, 0, len(values))
@@ -1109,9 +662,6 @@ func (c *protocolClient) acquireLinkedValues(
 		}
 		return nil, false, errors.New("link object has no usable @odata.id")
 	case []any:
-		if err := consumeCollectionMemberBudget(ctx, len(typed)); err != nil {
-			return nil, false, err
-		}
 		result := make([]*graphNode, 0, len(typed))
 		complete := true
 		var failures boundedErrorAccumulator
@@ -1161,7 +711,6 @@ func (c *protocolClient) acquireLinkedURI(
 		return c.fetchGraphCollectionMembers(
 			ctx,
 			graphCollectionRequest{
-				cursorKey:          collectionIdentity,
 				parent:             parent,
 				relationship:       rel,
 				members:            members,
@@ -1193,7 +742,6 @@ func (c *protocolClient) acquireLinkedURI(
 			target,
 			response,
 			stats,
-			"ordinary\x00"+collectionIdentity,
 			rel.ChildKind,
 			false,
 		)
@@ -1201,7 +749,6 @@ func (c *protocolClient) acquireLinkedURI(
 		return c.fetchGraphCollectionMembers(
 			ctx,
 			graphCollectionRequest{
-				cursorKey:          collectionIdentity,
 				parent:             parent,
 				relationship:       rel,
 				members:            collectionMembers,
@@ -1250,14 +797,11 @@ func (c *protocolClient) fetchGraphCollectionMembers(
 		})
 	}
 	dispatchComplete := true
-	order := c.collectionMemberOrder("graph\x00"+request.cursorKey, len(members))
-	attemptedCount := 0
 dispatch:
-	for _, index := range order {
+	for index := range members {
 		select {
 		case jobs <- index:
 			attempted[index] = true
-			attemptedCount++
 		case <-ctx.Done():
 			dispatchComplete = false
 			break dispatch
@@ -1270,10 +814,6 @@ dispatch:
 		joined = errors.Join(joined, context.Cause(ctx))
 	}
 	memberFailures := 0
-	workComplete := dispatchComplete
-	if request.pageErr != nil && classifyError(request.pageErr) == "limit" {
-		workComplete = false
-	}
 	var firstMemberFailure error
 	for index, member := range members {
 		stats.merge(localStats[index])
@@ -1294,9 +834,6 @@ dispatch:
 			} else {
 				node = c.unknownGraphNode(request.relationship.ChildKind, member.Ref.ODataID, err)
 			}
-			if classifyError(err) == "limit" {
-				workComplete = false
-			}
 		}
 		result = append(result, node)
 	}
@@ -1308,12 +845,6 @@ dispatch:
 			firstMemberFailure,
 		))
 	}
-	c.advanceCollectionMemberCursor(
-		"graph\x00"+request.cursorKey,
-		len(members),
-		attemptedCount,
-		workComplete,
-	)
 	// A complete collection gives authoritative membership even when one
 	// member representation is temporarily unreadable. The unreadable node
 	// preserves that member and carries the per-resource failure.
@@ -1339,20 +870,15 @@ func (c *protocolClient) fetchGraphCollectionMember(
 	}
 	key := rel.ChildKind + "\x00" + member.Ref.ODataID
 	return graphFetchBrokerFrom(ctx).fetch(ctx, key, func() (*graphNode, error) {
-		typed, err := decodeTypedResource(rel.ChildKind, member.Raw)
-		if err != nil {
-			return nil, err
-		}
 		model := rel.Source
 		if model == "" {
-			model = "typed_resource"
+			model = "resource"
 		}
 		node := &graphNode{
 			Kind:             rel.ChildKind,
 			URI:              member.Ref.ODataID,
 			Locator:          member.Ref.ODataID,
 			Data:             cloneJSONMap(member.Data),
-			Typed:            typed,
 			Doc:              genericResourceFromMap(member.Data),
 			AcquisitionState: "readable",
 			Complete:         true,
@@ -1360,8 +886,6 @@ func (c *protocolClient) fetchGraphCollectionMember(
 			SourceModel:      model,
 			Response:         member.Response,
 			Parents:          make(map[string]*graphNode),
-			RollupParents:    make(map[string]*graphNode),
-			SystemOwners:     make(map[string]*graphNode),
 		}
 		node.Key = resourceKey(c.origin, rel.ChildKind, member.Ref.ODataID)
 		return node, nil
@@ -1377,10 +901,8 @@ func (c *protocolClient) unreadableGraphNode(kind, uri string, err error) *graph
 		ErrorClass:       classifyError(err),
 		Complete:         true,
 		IdentityQuality:  "addressable",
-		SourceModel:      "typed_resource",
+		SourceModel:      "resource",
 		Parents:          make(map[string]*graphNode),
-		RollupParents:    make(map[string]*graphNode),
-		SystemOwners:     make(map[string]*graphNode),
 	}
 	node.Key = resourceKey(c.origin, kind, uri)
 	return node
@@ -1434,11 +956,6 @@ func (c *protocolClient) graphNodeFromResponse(
 		response.finish(err)
 		return nil, err
 	}
-	typed, err := decodeTypedResource(kind, response.body)
-	if err != nil {
-		response.finish(err)
-		return nil, err
-	}
 	uri := canonicalResourceURI(response.url)
 	id, ok := stringValue(data["@odata.id"])
 	if !ok {
@@ -1455,14 +972,13 @@ func (c *protocolClient) graphNodeFromResponse(
 	doc := genericResourceFromMap(data)
 	model := source
 	if model == "" {
-		model = "typed_resource"
+		model = "resource"
 	}
 	node := &graphNode{
 		Kind:             kind,
 		URI:              uri,
 		Locator:          uri,
 		Data:             data,
-		Typed:            typed,
 		Doc:              doc,
 		AcquisitionState: "readable",
 		Complete:         true,
@@ -1470,8 +986,6 @@ func (c *protocolClient) graphNodeFromResponse(
 		SourceModel:      model,
 		Response:         metadataForResponse(response),
 		Parents:          make(map[string]*graphNode),
-		RollupParents:    make(map[string]*graphNode),
-		SystemOwners:     make(map[string]*graphNode),
 	}
 	node.Key = resourceKey(c.origin, kind, uri)
 	response.finish(nil)
@@ -1538,8 +1052,6 @@ func (c *protocolClient) embeddedNode(
 		SourceModel:      "embedded_excerpt",
 		Response:         parent.Response,
 		Parents:          map[string]*graphNode{parent.Key: parent},
-		RollupParents:    map[string]*graphNode{parent.Key: parent},
-		SystemOwners:     make(map[string]*graphNode),
 	}
 	node.Key = resourceKey(c.origin, node.Kind, locator)
 	return node, provenanceErr
@@ -1585,20 +1097,23 @@ func containingResourceURI(node *graphNode) string {
 	return ""
 }
 
-func mergeEquivalentGraphNode(existing, candidate *graphNode) {
+func mergeEquivalentGraphNode(existing, candidate *graphNode) bool {
 	if existing == nil || candidate == nil {
-		return
+		return false
 	}
-	if candidate.IdentityQuality == "addressable" && existing.IdentityQuality != "addressable" {
+	promoted := candidate.AcquisitionState == "readable" && candidate.Data != nil &&
+		(existing.AcquisitionState != "readable" || existing.Data == nil ||
+			(candidate.IdentityQuality == "addressable" && existing.IdentityQuality != "addressable"))
+	if promoted {
 		existing.URI = candidate.URI
 		existing.Data = candidate.Data
-		existing.Typed = candidate.Typed
 		existing.Doc = candidate.Doc
 		existing.AcquisitionState = candidate.AcquisitionState
 		existing.ErrorClass = candidate.ErrorClass
 		existing.Complete = candidate.Complete
 		existing.IdentityQuality = candidate.IdentityQuality
 		existing.SourceModel = candidate.SourceModel
+		existing.SourcePath = candidate.SourcePath
 		existing.Response = candidate.Response
 	}
 
@@ -1607,6 +1122,7 @@ func mergeEquivalentGraphNode(existing, candidate *graphNode) {
 		candidate.SensorExcerpts,
 	)
 	existing.Response = mergeResponseMetadata(existing.Response, candidate.Response)
+	return promoted
 }
 
 func cloneSensorExcerptSources(values []sensorExcerptSource) []sensorExcerptSource {
@@ -1721,16 +1237,16 @@ func (c *protocolClient) legacyComponents(
 	switch rel.ChildKind {
 	case "legacy_thermal":
 		relationships = []graphRelationship{
-			{Path: "Temperatures", ChildKind: "sensor", Source: "deprecated_thermal", RollupRank: 0},
-			{Path: "Fans", ChildKind: "fan", Source: "deprecated_thermal", RollupRank: 0},
-			{Path: "Redundancy", ChildKind: "redundancy", Source: "deprecated_thermal", RollupRank: 0},
+			{Path: "Temperatures", ChildKind: "sensor", Source: "deprecated_thermal"},
+			{Path: "Fans", ChildKind: "fan", Source: "deprecated_thermal"},
+			{Path: "Redundancy", ChildKind: "redundancy", Source: "deprecated_thermal"},
 		}
 	case "legacy_power":
 		relationships = []graphRelationship{
-			{Path: "PowerControl", ChildKind: "sensor", Source: "deprecated_power", RollupRank: 0},
-			{Path: "Voltages", ChildKind: "sensor", Source: "deprecated_power", RollupRank: 0},
-			{Path: "PowerSupplies", ChildKind: "power_supply", Source: "deprecated_power", RollupRank: 0},
-			{Path: "Redundancy", ChildKind: "redundancy", Source: "deprecated_power", RollupRank: 0},
+			{Path: "PowerControl", ChildKind: "sensor", Source: "deprecated_power"},
+			{Path: "Voltages", ChildKind: "sensor", Source: "deprecated_power"},
+			{Path: "PowerSupplies", ChildKind: "power_supply", Source: "deprecated_power"},
+			{Path: "Redundancy", ChildKind: "redundancy", Source: "deprecated_power"},
 		}
 	}
 	var result []*graphNode
@@ -1745,11 +1261,6 @@ func (c *protocolClient) legacyComponents(
 		if !ok {
 			complete = false
 			failures.Add(fmt.Errorf("%s is not an array", childRel.Path))
-			continue
-		}
-		if err := consumeCollectionMemberBudget(ctx, len(array)); err != nil {
-			complete = false
-			failures.Add(fmt.Errorf("%s: %w", childRel.Path, err))
 			continue
 		}
 		var nodes []*graphNode
@@ -1844,24 +1355,13 @@ func (c *protocolClient) addEmbeddedEnrichmentComponents(
 		for _, key := range enrichmentKeys {
 			data := enrichments[key]
 			identityParent := embeddedEnrichmentParent(parent, key)
-			raw, exists := jsonPath(data, path)
-			if exists {
-				array, ok := raw.([]any)
-				if !ok {
-					sliceComplete = false
-				} else if err := consumeCollectionMemberBudget(ctx, len(array)); err != nil {
-					sliceComplete = false
-					graph.addDiagnostic(err.Error())
-					continue
-				}
-			}
 			nodes, ok := c.embeddedArrayNodes(identityParent, path, kind, data)
 			current = append(current, nodes...)
 			sliceComplete = sliceComplete && ok
 		}
 		childRel := graphRelationship{
 			ParentKind: parent.Kind, Path: rel.Path + "." + path, ChildKind: kind,
-			Family: family, Mode: relationshipComponents, Source: "embedded_excerpt", RollupRank: 0,
+			Family: family, Mode: relationshipComponents, Source: "embedded_excerpt",
 		}
 		if err := c.addEmbeddedComponentSlice(
 			graph, parent, childRel, current, sliceComplete, queue,
@@ -1896,7 +1396,6 @@ func (c *protocolClient) addEmbeddedEnrichmentComponents(
 			Family:     rel.Family,
 			Mode:       relationshipComponents,
 			Source:     "embedded_sensor_excerpt",
-			RollupRank: 0,
 		}
 		if err := c.addEmbeddedComponentSlice(
 			graph, parent, childRel, current, sliceComplete, queue,
@@ -1936,35 +1435,14 @@ func (c *protocolClient) addEmbeddedComponentSlice(
 	if !complete {
 		graph.Complete = false
 	}
-	var retained bool
-	current, retained = c.reconcileGraphMembership(parent, rel, unique, complete)
-	if !retained {
-		graph.addDiagnostic("Redfish graph continuity state exceeded its internal retention budget")
-	}
-	slice := graphSlice{
-		ParentKey: parent.Key, Path: rel.Path, ChildKind: rel.ChildKind, Family: rel.Family,
-		Source: rel.Source, Mode: rel.Mode, Complete: complete,
-		Members: make([]string, 0, len(current)),
-	}
+	current = c.reconcileGraphMembership(parent, rel, unique, complete)
+
 	for _, node := range current {
-		slice.Members = append(slice.Members, node.Key)
-		node.Parents[parent.Key] = parent
-		node.TraversalDepth = parent.TraversalDepth + 1
-		if rel.establishesRollupOwnership() {
-			node.RollupParents[parent.Key] = parent
-		}
-		if existing := graph.ByIdentity[node.Kind+"\x00"+node.Locator]; existing != nil {
-			mergeEquivalentGraphNode(existing, node)
-			existing.Parents[parent.Key] = parent
-			existing.RollupParents[parent.Key] = parent
-			continue
-		}
-		if err := graph.add(node); err != nil {
+		if err := graph.addChild(parent, node, queue); err != nil {
 			return err
 		}
-		*queue = append(*queue, node)
 	}
-	graph.Slices = append(graph.Slices, slice)
+	graph.recordMembership(parent, rel, complete)
 	return nil
 }
 
@@ -1984,11 +1462,8 @@ func (c *protocolClient) sensorExcerptArrayNodes(
 	if !ok {
 		return nil, false, fmt.Errorf("%s is not a SensorExcerpt array", sourcePath)
 	}
-	if err := consumeCollectionMemberBudget(ctx, len(array)); err != nil {
-		return nil, false, err
-	}
 	rel := graphRelationship{
-		Path: sourcePath, ChildKind: "sensor", Source: "embedded_sensor_excerpt", RollupRank: 0,
+		Path: sourcePath, ChildKind: "sensor", Source: "embedded_sensor_excerpt",
 	}
 	result := make([]*graphNode, 0, len(array))
 	positions := make([]int, 0, len(array))
@@ -2052,7 +1527,7 @@ func (c *protocolClient) embeddedArrayNodes(
 	if !ok {
 		return nil, false
 	}
-	rel := graphRelationship{Path: path, ChildKind: kind, RollupRank: 0}
+	rel := graphRelationship{Path: path, ChildKind: kind}
 	result := make([]*graphNode, 0, len(array))
 	positions := make([]int, 0, len(array))
 	complete := true
@@ -2099,324 +1574,23 @@ func (c *protocolClient) makeDuplicateEmbeddedIDsPositional(
 	}
 }
 
-func (c *protocolClient) resolveGraphPlacement(graph *resourceGraph) {
-	placement := newPlacementResolver(graph)
-	// Seed the topology from both link directions before propagating it through
-	// direct acquisition parents.
-	for _, node := range graph.Nodes {
-		if node.Kind != "system" {
-			continue
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.Chassis") {
-			if chassis := placement.findURI("chassis", uri); chassis != nil {
-				placement.addOwner(chassis, node)
-			}
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.ManagedBy") {
-			if manager := placement.findURI("manager", uri); manager != nil {
-				placement.addOwner(manager, node)
-			}
-		}
-	}
-	for _, node := range graph.Nodes {
-		if node.Kind != "chassis" {
-			continue
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.ComputerSystems") {
-			if system := placement.findURI("system", uri); system != nil {
-				placement.addOwner(node, system)
-			}
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.Contains") {
-			if contained := placement.findURI("chassis", uri); contained != nil {
-				placement.addEdge(contained, node)
-			}
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.ContainedBy") {
-			if container := placement.findURI("chassis", uri); container != nil {
-				placement.addEdge(node, container)
-			}
-		}
-	}
-	placement.propagate()
-	placement.resetEdges()
-	for _, node := range graph.Nodes {
-		if node.Kind != "manager" {
-			continue
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.ManagerForServers") {
-			if system := placement.findURI("system", uri); system != nil {
-				placement.addOwner(node, system)
-			}
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.ManagerForChassis") {
-			if chassis := placement.findURI("chassis", uri); chassis != nil {
-				placement.copyOwners(node, chassis)
-			}
-		}
-	}
-	for _, node := range graph.Nodes {
-		if node.Kind != "chassis" {
-			continue
-		}
-		for _, uri := range c.canonicalLinkURIs(node.Data, "Links.ManagedBy") {
-			if manager := placement.findURI("manager", uri); manager != nil {
-				placement.copyOwners(manager, node)
-			}
-		}
-	}
-
-	for _, node := range graph.Nodes {
-		for _, parent := range node.Parents {
-			placement.addEdge(parent, node)
-		}
-	}
-	placement.propagate()
-	if placement.overflow {
-		graph.Complete = false
-		graph.addDiagnostic(
-			"Redfish placement exceeded the internal topology safety limit; retaining prior authoritative placement",
-		)
-		for _, node := range graph.Nodes {
-			if node.Kind != "system" {
-				node.SystemOwners = make(map[string]*graphNode)
-			}
-		}
-	}
-
-	c.graphMu.Lock()
-	if c.systemOwners == nil {
-		c.systemOwners = make(map[string][]string)
-	}
-	if graph.Complete {
-		for _, node := range graph.Nodes {
-			node.PlacementComplete = true
-		}
-	} else {
-		for _, node := range graph.Nodes {
-			prior, exists := c.systemOwners[node.Key]
-			if !exists {
-				node.PlacementComplete = !isSubordinate(node.Kind)
-				continue
-			}
-			restored := make(map[string]*graphNode, len(prior))
-			complete := true
-			for _, key := range prior {
-				system := graph.findKey(key)
-				if system == nil || system.Kind != "system" {
-					complete = false
-					continue
-				}
-				restored[key] = system
-			}
-			node.SystemOwners = restored
-			node.PlacementComplete = complete
-		}
-	}
-	c.graphMu.Unlock()
-
-	for _, node := range graph.Nodes {
-		node.RollupOwner = chooseRollupOwner(node)
-		node.LogicalOwner = c.chooseLogicalOwner(node, graph)
-	}
-
-	c.graphMu.Lock()
-	if c.logicalOwners == nil {
-		c.logicalOwners = make(map[string]logicalPlacementSnapshot)
-	}
-	active := make(map[string]struct{}, len(graph.Nodes))
-	for _, node := range graph.Nodes {
-		active[node.Key] = struct{}{}
-		if !graph.Complete {
-			if priorDecision, ok := c.logicalOwners[node.Key]; ok {
-				if prior := graph.findKey(priorDecision.OwnerKey); prior != nil {
-					node.LogicalOwner = prior
-				}
-			}
-			continue
-		}
-		ownerKeys := make([]string, 0, len(node.SystemOwners))
-		for key := range node.SystemOwners {
-			ownerKeys = append(ownerKeys, key)
-		}
-		sort.Strings(ownerKeys)
-		c.systemOwners[node.Key] = ownerKeys
-		if node.LogicalOwner != nil {
-			c.logicalOwners[node.Key] = logicalPlacementSnapshot{
-				OwnerKey: node.LogicalOwner.Key,
-			}
-		} else {
-			delete(c.logicalOwners, node.Key)
-		}
-	}
-	if graph.Complete {
-		for key := range c.logicalOwners {
-			if _, exists := active[key]; !exists {
-				delete(c.logicalOwners, key)
-			}
-		}
-		for key := range c.systemOwners {
-			if _, exists := active[key]; !exists {
-				delete(c.systemOwners, key)
-			}
-		}
-	}
-	c.graphMu.Unlock()
-}
-
-func chooseRollupOwner(node *graphNode) *graphNode {
-	if node.Kind == "service" || node.Kind == "system" || node.Kind == "chassis" || node.Kind == "manager" {
-		return nil
-	}
-	parents := make([]*graphNode, 0, len(node.RollupParents))
-	for _, parent := range node.RollupParents {
-		parents = append(parents, parent)
-	}
-	if len(parents) == 1 {
-		return parents[0]
-	}
-	if len(parents) == 0 {
-		return nil
-	}
-	sort.Slice(parents, func(i, j int) bool {
-		ri := rollupRank(node.Kind, parents[i].Kind)
-		rj := rollupRank(node.Kind, parents[j].Kind)
-		if ri != rj {
-			return ri < rj
-		}
-		return parents[i].Key < parents[j].Key
-	})
-	best := rollupRank(node.Kind, parents[0].Kind)
-	if len(parents) > 1 && rollupRank(node.Kind, parents[1].Kind) == best {
-		return nil
-	}
-	if best >= 100 {
-		return nil
-	}
-	return parents[0]
-}
-
-func rollupRank(child, parent string) int {
-	best := 100
-	for _, relationship := range graphRelationships {
-		if relationship.ChildKind == child &&
-			relationship.ParentKind == parent &&
-			relationship.establishesRollupOwnership() {
-			best = min(best, relationship.RollupRank)
-		}
-	}
-	return best
-}
-
-func (c *protocolClient) chooseLogicalOwner(
-	node *graphNode,
-	graph *resourceGraph,
-) *graphNode {
-	structural := structuralLogicalOwner(node, graph)
-	candidateMap := make(map[string]*graphNode)
-	for _, uri := range c.canonicalLinkURIs(node.Data, "RelatedItem") {
-		target := graph.findAnyURI(uri)
-		if target == nil {
-			continue
-		}
-		if target.Kind == "system" {
-			candidateMap[target.Key] = target
-		}
-		maps.Copy(candidateMap, target.SystemOwners)
-	}
-	candidateKeys := make([]string, 0, len(candidateMap))
-	for key := range candidateMap {
-		candidateKeys = append(candidateKeys, key)
-	}
-	sort.Strings(candidateKeys)
-	if len(candidateKeys) == 1 {
-		candidate := candidateMap[candidateKeys[0]]
-		compatible := structural == nil || structural.Kind == "service" ||
-			len(structural.SystemOwners) != 1
-		if structural != nil && structural.Kind == "system" {
-			compatible = structural.Key == candidate.Key
-		}
-		if structural != nil {
-			if _, ok := structural.SystemOwners[candidate.Key]; ok {
-				compatible = true
-			}
-		}
-		if compatible {
-			return candidate
-		}
-		return structural
-	}
-	return structural
-}
-
-func structuralLogicalOwner(node *graphNode, graph *resourceGraph) *graphNode {
-	for _, kind := range []string{"chassis", "system", "manager", "service"} {
-		candidates := make([]*graphNode, 0)
-		seenCandidates := make(map[string]struct{})
-		visited := make(map[string]struct{})
-		pending := []*graphNode{node}
-		for len(pending) > 0 {
-			current := pending[len(pending)-1]
-			pending = pending[:len(pending)-1]
-			if current == nil {
-				continue
-			}
-			if _, ok := visited[current.Key]; ok {
-				continue
-			}
-			visited[current.Key] = struct{}{}
-			if current.Kind == kind {
-				if _, ok := seenCandidates[current.Key]; !ok {
-					seenCandidates[current.Key] = struct{}{}
-					candidates = append(candidates, current)
-				}
-				continue
-			}
-			for _, parent := range current.RollupParents {
-				pending = append(pending, parent)
-			}
-		}
-		if len(candidates) == 1 {
-			return candidates[0]
-		}
-		// Several equally near structural owners are shared ownership, not a
-		// license to pick one by traversal order. Continue toward the next
-		// broader structural scope.
-	}
-	return graph.findURI("service", "/redfish/v1/")
-}
-
-func (g *resourceGraph) findAnyURI(uri string) *graphNode {
-	g.ensureLookupIndexes()
-	return g.ByAnyURI[uri]
-}
-
 func (g *resourceGraph) findURI(kind, uri string) *graphNode {
 	g.ensureLookupIndexes()
 	return g.ByURI[kind+"\x00"+uri]
 }
 
 func (g *resourceGraph) ensureLookupIndexes() {
-	if len(g.ByKey) == len(g.Nodes) && g.ByURI != nil && g.ByAnyURI != nil {
+	if len(g.ByKey) == len(g.Nodes) && g.ByURI != nil {
 		return
 	}
 	g.ByKey = make(map[string]*graphNode, len(g.Nodes))
 	g.ByURI = make(map[string]*graphNode, len(g.Nodes))
-	g.ByAnyURI = make(map[string]*graphNode, len(g.Nodes))
 	for _, node := range g.Nodes {
 		g.ByKey[node.Key] = node
 		if node.URI != "" {
 			uriKey := node.Kind + "\x00" + node.URI
 			if _, exists := g.ByURI[uriKey]; !exists {
 				g.ByURI[uriKey] = node
-			}
-			if _, exists := g.ByAnyURI[node.URI]; !exists {
-				g.ByAnyURI[node.URI] = node
-			}
-		}
-		if node.Locator != "" {
-			if _, exists := g.ByAnyURI[node.Locator]; !exists {
-				g.ByAnyURI[node.Locator] = node
 			}
 		}
 	}
@@ -2480,127 +1654,6 @@ func cloneJSONValue(value any) any {
 	}
 }
 
-type placementEdge struct {
-	from *graphNode
-	to   *graphNode
-}
-
-type placementBinding struct {
-	node   *graphNode
-	system *graphNode
-}
-
-type placementResolver struct {
-	byURI       map[string]*graphNode
-	edges       map[*graphNode][]*graphNode
-	edgeSet     map[placementEdge]struct{}
-	bindings    int
-	work        int
-	overflow    bool
-	maxEdges    int
-	maxBindings int
-	maxWork     int
-}
-
-func newPlacementResolver(graph *resourceGraph) *placementResolver {
-	graph.ensureLookupIndexes()
-	resolver := &placementResolver{
-		byURI:       graph.ByURI,
-		edges:       make(map[*graphNode][]*graphNode),
-		edgeSet:     make(map[placementEdge]struct{}),
-		maxEdges:    maxPlacementEdges,
-		maxBindings: maxPlacementOwnerBindings,
-		maxWork:     maxPlacementPropagationSteps,
-	}
-	for _, node := range graph.Nodes {
-		resolver.bindings += len(node.SystemOwners)
-	}
-	if resolver.bindings > resolver.maxBindings {
-		resolver.overflow = true
-	}
-	return resolver
-}
-
-func (r *placementResolver) findURI(kind, uri string) *graphNode {
-	return r.byURI[kind+"\x00"+uri]
-}
-
-func (r *placementResolver) addEdge(from, to *graphNode) {
-	if r.overflow || from == nil || to == nil {
-		return
-	}
-	edge := placementEdge{from: from, to: to}
-	if _, exists := r.edgeSet[edge]; exists {
-		return
-	}
-	if len(r.edgeSet) >= r.maxEdges {
-		r.overflow = true
-		return
-	}
-	r.edgeSet[edge] = struct{}{}
-	r.edges[from] = append(r.edges[from], to)
-}
-
-func (r *placementResolver) resetEdges() {
-	r.edges = make(map[*graphNode][]*graphNode)
-	r.edgeSet = make(map[placementEdge]struct{})
-}
-
-func (r *placementResolver) addOwner(node, system *graphNode) bool {
-	if r.overflow || node == nil || system == nil {
-		return false
-	}
-	if node.SystemOwners == nil {
-		node.SystemOwners = make(map[string]*graphNode)
-	}
-	if _, exists := node.SystemOwners[system.Key]; exists {
-		return false
-	}
-	if r.bindings >= r.maxBindings {
-		r.overflow = true
-		return false
-	}
-	node.SystemOwners[system.Key] = system
-	r.bindings++
-	return true
-}
-
-func (r *placementResolver) copyOwners(destination, source *graphNode) {
-	if destination == nil || source == nil {
-		return
-	}
-	for _, system := range source.SystemOwners {
-		r.addOwner(destination, system)
-	}
-}
-
-func (r *placementResolver) propagate() {
-	if r.overflow {
-		return
-	}
-	queue := make([]placementBinding, 0)
-	for source := range r.edges {
-		for _, system := range source.SystemOwners {
-			queue = append(queue, placementBinding{node: source, system: system})
-		}
-	}
-	for position := 0; position < len(queue) && !r.overflow; position++ {
-		binding := queue[position]
-		for _, destination := range r.edges[binding.node] {
-			if r.work >= r.maxWork {
-				r.overflow = true
-				break
-			}
-			r.work++
-			if r.addOwner(destination, binding.system) {
-				queue = append(queue, placementBinding{
-					node: destination, system: binding.system,
-				})
-			}
-		}
-	}
-}
-
 func jsonPath(data map[string]any, path string) (any, bool) {
 	var current any = data
 	for segment := range strings.SplitSeq(path, ".") {
@@ -2620,42 +1673,6 @@ func stringValue(value any) (string, bool) {
 	result, ok := value.(string)
 	result = strings.TrimSpace(result)
 	return result, ok && result != ""
-}
-
-func linkURIs(data map[string]any, path string) []string {
-	value, ok := jsonPath(data, path)
-	if !ok {
-		return nil
-	}
-	var result []string
-	switch value := value.(type) {
-	case map[string]any:
-		if uri, ok := stringValue(value["@odata.id"]); ok {
-			result = append(result, uri)
-		}
-	case []any:
-		for _, item := range value {
-			if object, ok := item.(map[string]any); ok {
-				if uri, ok := stringValue(object["@odata.id"]); ok {
-					result = append(result, uri)
-				}
-			}
-		}
-	}
-	return result
-}
-
-func (c *protocolClient) canonicalLinkURIs(data map[string]any, path string) []string {
-	raw := linkURIs(data, path)
-	result := make([]string, 0, len(raw))
-	for _, value := range raw {
-		target, err := c.resolveURI(c.root, value, false)
-		if err != nil {
-			continue
-		}
-		result = append(result, canonicalResourceURI(target))
-	}
-	return result
 }
 
 func boundedDiagnostic(value string) string {

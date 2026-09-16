@@ -5,19 +5,17 @@ package redfish
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 var (
-	collectionStates     = []string{"success", "partial", "unavailable"}
-	selectedSystemStates = []string{"present", "unreadable", "absent", "unknown"}
+	collectionStates = []string{"success", "partial", "unavailable"}
 )
 
 type collectorMetrics struct {
-	status         metrix.SnapshotStateSetVec
-	failures       map[string]metrix.SnapshotGaugeVec
-	duration       metrix.SnapshotGaugeVec
-	httpRequests   map[string]metrix.SnapshotGaugeVec
-	operations     map[string]metrix.SnapshotGaugeVec
-	traffic        metrix.SnapshotGaugeVec
-	resources      map[string]metrix.SnapshotGaugeVec
-	selectedSystem metrix.SnapshotStateSetVec
+	status       metrix.SnapshotStateSetVec
+	failures     map[string]metrix.SnapshotGaugeVec
+	duration     metrix.SnapshotGaugeVec
+	httpRequests map[string]metrix.SnapshotGaugeVec
+	operations   map[string]metrix.SnapshotGaugeVec
+	traffic      metrix.SnapshotGaugeVec
+	resources    map[string]metrix.SnapshotGaugeVec
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
@@ -40,11 +38,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		operations: gaugeMap(vec, "collection_operations", "successful", "failed"),
 		traffic:    vec.Gauge("collection_traffic_received_bytes"),
 		resources:  gaugeMap(vec, "collection_resources", "discovered", "readable", "unreadable", "unknown"),
-		selectedSystem: vec.StateSet(
-			"collection_selected_system",
-			metrix.WithStateSetMode(metrix.ModeEnum),
-			metrix.WithStateSetStates(selectedSystemStates...),
-		),
 	}
 }
 
@@ -57,14 +50,13 @@ func gaugeMap(vec metrix.SnapshotVecMeter, prefix string, names ...string) map[s
 }
 
 type cycleMetrics struct {
-	Status         string
-	Failures       map[string]int
-	Duration       float64
-	HTTPRequests   map[string]int
-	Operations     map[string]int
-	ReceivedBytes  int64
-	Resources      map[string]int
-	SelectedSystem string
+	Status        string
+	Failures      map[string]int
+	Duration      float64
+	HTTPRequests  map[string]int
+	Operations    map[string]int
+	ReceivedBytes int64
+	Resources     map[string]int
 }
 
 func (m *collectorMetrics) observe(endpointKey, endpointJob string, cycle cycleMetrics) {
@@ -78,9 +70,6 @@ func (m *collectorMetrics) observe(endpointKey, endpointJob string, cycle cycleM
 	observeGaugeMap(m.operations, labels, cycle.Operations)
 	m.traffic.WithLabelValues(labels...).Observe(float64(cycle.ReceivedBytes))
 	observeGaugeMap(m.resources, labels, cycle.Resources)
-	if cycle.SelectedSystem != "" {
-		m.selectedSystem.WithLabelValues(labels...).Enable(cycle.SelectedSystem)
-	}
 }
 
 func observeGaugeMap(writers map[string]metrix.SnapshotGaugeVec, labels []string, values map[string]int) {

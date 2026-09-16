@@ -24,7 +24,7 @@
       },
       "vnode": {
         "title": "Virtual Node",
-        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Used only when the node mode is `local`.",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
       },
       "url": {
@@ -32,20 +32,6 @@
         "description": "URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS.",
         "type": "string",
         "format": "uri"
-      },
-      "node_mode": {
-        "title": "Node mode",
-        "description": "Where the charts appear: `local` publishes them on the collecting node, `system_vnodes` creates one virtual node per ComputerSystem.",
-        "type": "string",
-        "enum": [
-          "local",
-          "system_vnodes"
-        ]
-      },
-      "system_uri": {
-        "title": "ComputerSystem URI",
-        "description": "Restricts collection to one ComputerSystem, given as its exact resource URI on the same origin. Leave empty to collect every system.",
-        "type": "string"
       },
       "auth_method": {
         "title": "Authentication method",
@@ -121,129 +107,12 @@
         "description": "Simple pattern selecting which component families to collect: base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware. Base is always collected.",
         "type": "string",
         "default": "*"
-      },
-      "charts": {
-        "title": "Charts",
-        "description": "Controls how many charts this job creates.",
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "aggregates": {
-            "title": "Aggregate charts",
-            "description": "Create one summary chart per component family, in addition to any detailed charts.",
-            "type": "boolean",
-            "default": true
-          },
-          "details": {
-            "title": "Detailed component charts",
-            "description": "Create one chart per individual component, such as each fan, sensor, or drive.",
-            "type": "boolean",
-            "default": true
-          },
-          "max_detailed_components_per_family": {
-            "title": "Detailed component cap",
-            "description": "Maximum number of components charted per family and per owner. Zero removes the limit.",
-            "type": "integer",
-            "minimum": 0,
-            "default": 100
-          }
-        }
-      },
-      "alarms": {
-        "title": "Alarms",
-        "description": "Controls how the health of a component is decided.",
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "evaluate_thresholds": {
-            "title": "Evaluate source thresholds",
-            "description": "Compare readings against the warning and critical thresholds the BMC reports, for components where the BMC reports no health state of its own. A health state reported by the BMC always wins.",
-            "type": "boolean",
-            "default": true
-          }
-        }
-      },
-      "host_scope_overrides": {
-        "title": "HostScope overrides",
-        "description": "Pins the generated virtual nodes to specific GUIDs or hostnames so they stay stable across BMC changes. Used only when the node mode is `system_vnodes`.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "items": {
-          "title": "Override",
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "resource_uri": {
-              "title": "Resource URI",
-              "description": "Exact ComputerSystem resource URI this override applies to.",
-              "type": "string",
-              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-            },
-            "guid": {
-              "title": "GUID",
-              "description": "GUID to assign to the generated virtual node. Set this or a hostname.",
-              "type": "string"
-            },
-            "hostname": {
-              "title": "Hostname",
-              "description": "Hostname to assign to the generated virtual node. Set this or a GUID.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "resource_uri"
-          ],
-          "anyOf": [
-            {
-              "properties": {
-                "guid": {
-                  "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-                }
-              },
-              "required": [
-                "guid"
-              ]
-            },
-            {
-              "properties": {
-                "hostname": {
-                  "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-                }
-              },
-              "required": [
-                "hostname"
-              ]
-            }
-          ]
-        }
       }
     },
     "required": [
-      "url",
-      "node_mode"
+      "url"
     ],
     "allOf": [
-      {
-        "if": {
-          "properties": {
-            "node_mode": {
-              "const": "local"
-            }
-          },
-          "required": [
-            "node_mode"
-          ]
-        },
-        "then": {
-          "properties": {
-            "host_scope_overrides": {
-              "maxItems": 0
-            }
-          }
-        }
-      },
       {
         "if": {
           "properties": {
@@ -325,16 +194,13 @@
         {
           "title": "Target",
           "fields": [
-            "url",
-            "system_uri"
+            "url"
           ]
         },
         {
           "title": "Virtual Node",
           "fields": [
-            "node_mode",
-            "vnode",
-            "host_scope_overrides"
+            "vnode"
           ]
         },
         {
@@ -362,18 +228,6 @@
             "tls_key",
             "tls_skip_verify"
           ]
-        },
-        {
-          "title": "Cardinality",
-          "fields": [
-            "charts"
-          ]
-        },
-        {
-          "title": "Alerts",
-          "fields": [
-            "alarms"
-          ]
         }
       ]
     },
@@ -387,9 +241,6 @@
     "password": {
       "ui:widget": "password",
       "ui:placeholder": "${env:REDFISH_PASSWORD}"
-    },
-    "host_scope_overrides": {
-      "ui:listFlavour": "list"
     }
   }
 }

@@ -3,7 +3,6 @@
 package redfish
 
 import (
-	"context"
 	"encoding/json"
 	"net/url"
 	"os"
@@ -46,17 +45,6 @@ func TestDMTF2026_1SchemaTypeCoverage(t *testing.T) {
 			require.Truef(t, ok, "missing DMTF schema evidence for %s", schema)
 			require.NoError(t, validateResourceSchemaType(kind, odataType))
 
-			document := map[string]any{
-				"@odata.type": odataType,
-				"@odata.id":   "/redfish/v1/Synthetic/" + schema,
-			}
-			if kind == "legacy_power" {
-				document["PowerControl"] = []any{}
-			}
-			raw, err := json.Marshal(document)
-			require.NoError(t, err)
-			_, err = decodeTypedResource(kind, raw)
-			require.NoErrorf(t, err, "decode %s as %s", kind, odataType)
 		}
 	}
 	require.Len(t, evidence, len(expected))
@@ -90,13 +78,6 @@ func TestDMTF2026_1EmbeddedRelationshipRegistry(t *testing.T) {
 func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	fixture := loadFixture(t, "dmtf-2026.1-embedded-components.min.json")
 	client := fixtureClient()
-	for _, kind := range []string{"thermal_subsystem", "leak_detection"} {
-		raw, err := json.Marshal(fixture[kind])
-		require.NoError(t, err)
-		typed, err := decodeTypedResource(kind, raw)
-		require.NoError(t, err)
-		require.NotNil(t, typed)
-	}
 
 	thermal := fixtureGraphParent(t, "thermal_subsystem", fixture["thermal_subsystem"])
 	redundancy, enrichment, complete, err := client.acquireRelationship(
@@ -212,7 +193,7 @@ func TestCompatibilityFixturesLegacyThermal(t *testing.T) {
 			client := fixtureClient()
 			parent := fixtureParent()
 			components, complete, err := client.legacyComponents(
-				withOperationBudget(context.Background()),
+				t.Context(),
 				parent,
 				graphRelationship{ChildKind: "legacy_thermal"},
 				loadFixture(t, test.file),
@@ -240,29 +221,20 @@ func TestCompatibilityFixturesLegacyThermal(t *testing.T) {
 	}
 }
 
-func TestCompatibilityFixtureManualThresholdEvaluationCanBeDisabled(t *testing.T) {
+func TestCompatibilityFixtureLegacySourceHealthIsAuthoritative(t *testing.T) {
 	client := fixtureClient()
-	parent := fixtureParent()
 	components, complete, err := client.legacyComponents(
-		withOperationBudget(context.Background()),
-		parent,
-		graphRelationship{ChildKind: "legacy_thermal"},
+		t.Context(), fixtureParent(), graphRelationship{ChildKind: "legacy_thermal"},
 		loadFixture(t, "otel-hpe-legacy-thermal.min.json"),
 	)
 	require.NoError(t, err)
 	require.True(t, complete)
 	temperature := fixtureComponentByName(t, components, "Synthetic Hot Intake")
-
 	readings := client.readingsForNode(temperature, time.Now())
 	require.Len(t, readings, 1)
-	require.Equal(t, "emergency", readings[0].EffectiveAlarm)
-
-	disabled := false
-	client.config.Alarms.EvaluateThresholds = &disabled
-	readings = client.readingsForNode(temperature, time.Now())
-	require.Len(t, readings, 1)
-	require.Equal(t, "clear", readings[0].EffectiveAlarm)
-
+	require.True(t, readings[0].Valid)
+	require.Equal(t, float64(70), readings[0].Value)
+	require.Equal(t, "clear", readings[0].SourceAlarm)
 }
 
 func TestCompatibilityFixturesModernReadings(t *testing.T) {
@@ -342,8 +314,6 @@ func TestCompatibilityFixtureModernStandaloneSensor(t *testing.T) {
 	require.Equal(t, "temperature", reading.Family)
 	require.Equal(t, "system.hw.sensor.temperature.input", reading.Context)
 	require.Equal(t, "clear", reading.SourceAlarm)
-	require.Equal(t, "critical", reading.DerivedAlarm)
-	require.Equal(t, "critical", reading.EffectiveAlarm)
 
 }
 
@@ -351,7 +321,7 @@ func TestCompatibilityFixtureLegacyPowerAndModernDrive(t *testing.T) {
 	client := fixtureClient()
 	parent := fixtureParent()
 	components, complete, err := client.legacyComponents(
-		withOperationBudget(context.Background()),
+		t.Context(),
 		parent,
 		graphRelationship{ChildKind: "legacy_power"},
 		loadFixture(t, "telegraf-dell-legacy-power.min.json"),
@@ -386,19 +356,15 @@ func TestCompatibilityFixtureLegacyPowerAndModernDrive(t *testing.T) {
 }
 
 func fixtureClient() *protocolClient {
-	enabled := true
 	root, err := url.Parse("https://fixture.example/redfish/v1/")
 	if err != nil {
 		panic(err)
 	}
 	client := &protocolClient{
-		origin: "https://fixture.example",
-		root:   root,
-		config: Config{
-			Alarms: AlarmsConfig{EvaluateThresholds: &enabled},
-		},
+		origin:        "https://fixture.example",
+		root:          root,
+		rateBaselines: make(map[string]rateBaseline),
 	}
-	client.hardwareState.initialize()
 	return client
 }
 

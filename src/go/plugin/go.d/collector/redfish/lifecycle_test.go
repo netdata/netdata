@@ -28,7 +28,7 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 	for _, format := range []string{"yaml", "json"} {
 		t.Run(format, func(t *testing.T) {
 			collector := creator.CreateV2()
-			config := map[string]any{"name": "endpoint-a", "url": server.URL, "node_mode": "local", "auth_method": "none"}
+			config := map[string]any{"name": "endpoint-a", "url": server.URL, "auth_method": "none"}
 			var payload []byte
 			var err error
 			if format == "json" {
@@ -76,7 +76,7 @@ func TestCollectorJobsOwnIndependentClients(t *testing.T) {
 	jobs := make([]collectorapi.CollectorV2, 2)
 	for i := range jobs {
 		jobs[i] = creator.CreateV2()
-		require.NoError(t, yaml.Unmarshal([]byte(fmt.Sprintf("name: endpoint-%d\nurl: %s\nnode_mode: local\nauth_method: none\n", i, server.URL)), jobs[i]))
+		require.NoError(t, yaml.Unmarshal([]byte(fmt.Sprintf("name: endpoint-%d\nurl: %s\nauth_method: none\n", i, server.URL)), jobs[i]))
 		t.Cleanup(func() { jobs[i].Cleanup(context.Background()) })
 		require.NoError(t, jobs[i].Init(context.Background()))
 		require.NoError(t, jobs[i].Check(context.Background()))
@@ -92,7 +92,7 @@ func TestCollectorJobsOwnIndependentClients(t *testing.T) {
 
 func TestCollectorCleanupAfterFailedInitialization(t *testing.T) {
 	collector := New()
-	require.NoError(t, yaml.Unmarshal([]byte("name: endpoint-a\nurl: https://bmc.example.test\nnode_mode: local\nauth_method: none\n"), collector))
+	require.NoError(t, yaml.Unmarshal([]byte("name: endpoint-a\nurl: https://bmc.example.test\nauth_method: none\n"), collector))
 	collector.newClient = func(Config, *http.Client) (endpointClient, error) {
 		return nil, fmt.Errorf("test client construction failure")
 	}
@@ -101,4 +101,27 @@ func TestCollectorCleanupAfterFailedInitialization(t *testing.T) {
 	collector.Cleanup(context.Background())
 	assert.Nil(t, collector.httpClient)
 	assert.Nil(t, collector.client)
+}
+
+func TestCollectorSessionStartsDuringRunningCollection(t *testing.T) {
+	server := newRedfishTestServer(t, redfishTestServerConfig{supportSession: true})
+	defer server.Close()
+	collector := New()
+	collector.Config = testConfig(server.URL, "session")
+	collector.Name = "endpoint"
+	defer collector.Cleanup(context.Background())
+	require.NoError(t, collector.Init(context.Background()))
+	require.NoError(t, collector.Check(context.Background()))
+	assert.Zero(t, server.sessionCreates.Load())
+	assert.Zero(t, server.sessionDeletes.Load())
+	managed, ok := metrix.AsCycleManagedStore(collector.MetricStore())
+	require.True(t, ok)
+	cycle := managed.CycleController()
+	cycle.BeginCycle()
+	require.NoError(t, collector.Collect(context.Background()))
+	require.NoError(t, cycle.CommitCycleSuccess())
+	assert.Equal(t, int64(1), server.sessionCreates.Load())
+	collector.Cleanup(context.Background())
+	collector.Cleanup(context.Background())
+	assert.Equal(t, int64(1), server.sessionDeletes.Load())
 }

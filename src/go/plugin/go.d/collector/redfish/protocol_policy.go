@@ -3,87 +3,10 @@
 package redfish
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"net/url"
 	"strings"
-	"sync/atomic"
 )
-
-const (
-	maxCycleRequests     = 100_000
-	maxCycleBodyBytes    = 1 << 30
-	maxCollectionPages   = 10_000
-	maxCollectionMembers = 100_000
-)
-
-type operationBudget struct {
-	requests atomic.Int64
-	bytes    atomic.Int64
-	pages    atomic.Int64
-	members  atomic.Int64
-}
-
-type operationBudgetContextKey struct{}
-
-func withOperationBudget(ctx context.Context) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if operationBudgetFrom(ctx) != nil {
-		return ctx
-	}
-	return context.WithValue(ctx, operationBudgetContextKey{}, &operationBudget{})
-}
-
-func operationBudgetFrom(ctx context.Context) *operationBudget {
-	if ctx == nil {
-		return nil
-	}
-	budget, _ := ctx.Value(operationBudgetContextKey{}).(*operationBudget)
-	return budget
-}
-
-func consumeBudget(value *atomic.Int64, amount, limit int64, subject string) error {
-	if value == nil || amount <= 0 {
-		return nil
-	}
-	current := value.Add(amount)
-	if current <= limit {
-		return nil
-	}
-	value.Add(-amount)
-	return fmt.Errorf("Redfish %s exceeds the internal safety limit", subject)
-}
-
-func consumeRequestBudget(ctx context.Context) error {
-	if budget := operationBudgetFrom(ctx); budget != nil {
-		return consumeBudget(&budget.requests, 1, maxCycleRequests, "request work")
-	}
-	return nil
-}
-
-func consumeBodyBudget(ctx context.Context, size int) error {
-	if budget := operationBudgetFrom(ctx); budget != nil {
-		return consumeBudget(&budget.bytes, int64(size), maxCycleBodyBytes, "response-body work")
-	}
-	return nil
-}
-
-func consumeCollectionPageBudget(ctx context.Context) error {
-	if budget := operationBudgetFrom(ctx); budget != nil {
-		return consumeBudget(&budget.pages, 1, maxCollectionPages, "collection page work")
-	}
-	return nil
-}
-
-func consumeCollectionMemberBudget(ctx context.Context, count int) error {
-	if budget := operationBudgetFrom(ctx); budget != nil {
-		return consumeBudget(&budget.members, int64(count), maxCollectionMembers, "collection member work")
-	}
-	return nil
-}
 
 type redfishURIMode uint8
 

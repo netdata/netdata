@@ -45,7 +45,6 @@ func TestCollectorLogsSelectedAuthenticationMethodOnce(t *testing.T) {
 	collector.Logger = logger.NewWithWriter(&output)
 	collector.Config = Config{
 		URL:        "https://bmc.example.test",
-		NodeMode:   "local",
 		AuthMethod: "none",
 	}
 	collector.Name = "endpoint-a"
@@ -56,7 +55,14 @@ func TestCollectorLogsSelectedAuthenticationMethodOnce(t *testing.T) {
 	t.Cleanup(func() { collector.Cleanup(context.Background()) })
 
 	require.NoError(t, collector.Check(context.Background()))
-	require.NoError(t, collector.Check(context.Background()))
+	require.NotContains(t, output.String(), "Redfish authentication method selected")
+	managed, ok := metrix.AsCycleManagedStore(collector.MetricStore())
+	require.True(t, ok)
+	for range 2 {
+		managed.CycleController().BeginCycle()
+		require.NoError(t, collector.Collect(context.Background()))
+		require.NoError(t, managed.CycleController().CommitCycleSuccess())
+	}
 	assert.Equal(t, 1, strings.Count(output.String(), "Redfish authentication method selected: basic"))
 }
 
@@ -82,7 +88,6 @@ func TestCollectorRejectsOversizedJobNameBeforeClientConstruction(t *testing.T) 
 	collector := New()
 	collector.Config = Config{
 		URL:        "https://bmc.example.test",
-		NodeMode:   "local",
 		AuthMethod: "none",
 	}
 	collector.Name = strings.Repeat("x", promotedLabelLimit+1)

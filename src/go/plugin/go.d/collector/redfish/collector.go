@@ -24,8 +24,6 @@ var chartTemplateYAML string
 
 const maxLoggedDiagnostics = 256
 
-//go:generate go run ./chartgen
-
 func init() {
 	collectorapi.Register("redfish", collectorapi.Creator{
 		JobConfigSchema: configSchema,
@@ -74,7 +72,12 @@ func New() *Collector {
 	store := metrix.NewCollectorStore()
 	return &Collector{
 		Config: Config{
-			UpdateEvery: defaultUpdateEvery,
+			UpdateEvery:           defaultUpdateEvery,
+			AuthMethod:            defaultAuthMethod,
+			Timeout:               defaultTimeout,
+			Retries:               new(defaultRetries),
+			MaxConcurrentRequests: defaultMaxConcurrentRequests,
+			Collect:               defaultCollect,
 		},
 		store:     store,
 		metrics:   newCollectorMetrics(store),
@@ -126,13 +129,7 @@ func (c *Collector) Check(ctx context.Context) error {
 	if err := c.client.Check(ctx); err != nil {
 		return fmt.Errorf("Redfish endpoint check: %w", err)
 	}
-	if reporter, ok := c.client.(interface{ selectedAuthenticationMethod() string }); ok {
-		if method := reporter.selectedAuthenticationMethod(); method != "" {
-			c.authSelectionOnce.Do(func() {
-				c.Infof("Redfish authentication method selected: %s", method)
-			})
-		}
-	}
+
 	return nil
 }
 
@@ -145,6 +142,13 @@ func (c *Collector) Collect(ctx context.Context) error {
 	cycleCtx, cancel := context.WithTimeout(ctx, time.Duration(c.UpdateEvery)*time.Second)
 	defer cancel()
 	result, err := c.client.Collect(cycleCtx)
+	if reporter, ok := c.client.(interface{ selectedAuthenticationMethod() string }); ok {
+		if method := reporter.selectedAuthenticationMethod(); method != "" {
+			c.authSelectionOnce.Do(func() {
+				c.Infof("Redfish authentication method selected: %s", method)
+			})
+		}
+	}
 	if result.Metrics.Duration == 0 {
 		result.Metrics.Duration = c.now().Sub(started).Seconds()
 	}

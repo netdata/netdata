@@ -30,92 +30,10 @@ func TestConfigSchemaMatchesMetadata(t *testing.T) {
 	collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")
 }
 
-func TestConfigSchemaHostScopeOverridesRequireSystemVnodes(t *testing.T) {
-	schema := compileConfigSchema(t)
-
-	valid := []any{
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "local", "auth_method": "none",
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "local", "auth_method": "none",
-			"host_scope_overrides": nil,
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "local", "auth_method": "none",
-			"host_scope_overrides": []any{},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": "/redfish/v1/Systems/1", "hostname": "system-one",
-			}},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": " /redfish/v1/Systems/1 ", "guid": "", "hostname": " system-one ",
-			}},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": "/redfish/v1/Systems/1", "guid": " 550e8400-e29b-41d4-a716-446655440000 ",
-				"hostname": "",
-			}},
-		},
-	}
-	for _, config := range valid {
-		require.NoError(t, schema.Validate(config))
-	}
-
-	invalid := []any{
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "local", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": "/redfish/v1/Systems/1", "hostname": "system-one",
-			}},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": "   ", "hostname": "system-one",
-			}},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": "/redfish/v1/Systems/1", "hostname": "\t",
-			}},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": "\v", "hostname": "system-one",
-			}},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": "/redfish/v1/Systems/1", "hostname": "\u00a0",
-			}},
-		},
-		map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "system_vnodes", "auth_method": "none",
-			"host_scope_overrides": []any{map[string]any{
-				"resource_uri": allTrimSpaceCharacters, "hostname": "system-one",
-			}},
-		},
-	}
-	for _, config := range invalid {
-		require.Error(t, schema.Validate(config))
-	}
-}
-
 func TestConfigSchemaAuthenticationMatchesRuntime(t *testing.T) {
 	schema := compileConfigSchema(t)
 	base := func() map[string]any {
-		return map[string]any{"url": "https://bmc.example.test", "node_mode": "local"}
+		return map[string]any{"url": "https://bmc.example.test"}
 	}
 	with := func(values map[string]any) map[string]any {
 		config := base()
@@ -216,7 +134,7 @@ func TestConfigSchemaTLSClientIdentityMatchesRuntime(t *testing.T) {
 	schema := compileConfigSchema(t)
 	base := func() map[string]any {
 		return map[string]any{
-			"url": "https://bmc.example.test", "node_mode": "local", "auth_method": "none",
+			"url": "https://bmc.example.test", "auth_method": "none",
 		}
 	}
 	with := func(values map[string]any) map[string]any {
@@ -281,18 +199,13 @@ func TestConfigDefaultsPreserveExplicitZeroSemantics(t *testing.T) {
 	zero := 0
 	cfg := Config{
 		URL:        "https://bmc.example.test",
-		NodeMode:   "local",
 		AuthMethod: "none",
 		Retries:    &zero,
-		Charts: ChartsConfig{
-			MaxDetailedComponentsPerFamily: &zero,
-		},
 	}
 
 	cfg.applyDefaults()
 
 	require.Zero(t, *cfg.Retries)
-	require.Zero(t, *cfg.Charts.MaxDetailedComponentsPerFamily)
 	require.NoError(t, cfg.validate())
 }
 
@@ -302,43 +215,28 @@ func TestConfigValidation(t *testing.T) {
 		wantErr string
 	}{
 		"valid HTTPS no auth": {
-			cfg: Config{URL: "https://BMC.EXAMPLE.TEST:443/redfish/v1/", NodeMode: "local", AuthMethod: "none"},
+			cfg: Config{URL: "https://BMC.EXAMPLE.TEST:443/redfish/v1/", AuthMethod: "none"},
 		},
 		"valid explicit HTTP": {
-			cfg: Config{URL: "http://bmc.example.test", NodeMode: "system_vnodes", AuthMethod: "none"},
-		},
-		"local mode rejects HostScope overrides": {
-			cfg: Config{
-				URL: "https://bmc.example.test", NodeMode: "local", AuthMethod: "none",
-				HostScopeOverrides: []HostScopeOverride{{
-					ResourceURI: "/redfish/v1/Systems/1",
-					Hostname:    "system-one",
-				}},
-			},
-			wantErr: "'host_scope_overrides' requires node_mode \"system_vnodes\"",
-		},
-		"node mode required": {
-			cfg:     Config{URL: "https://bmc.example.test", AuthMethod: "none"},
-			wantErr: "'node_mode'",
+			cfg: Config{URL: "http://bmc.example.test", AuthMethod: "none"},
 		},
 		"credentials required": {
-			cfg:     Config{URL: "https://bmc.example.test", NodeMode: "local", AuthMethod: "session"},
+			cfg:     Config{URL: "https://bmc.example.test", AuthMethod: "session"},
 			wantErr: "'username' and 'password'",
 		},
 		"none rejects credentials": {
 			cfg: Config{
-				URL: "https://bmc.example.test", NodeMode: "local", AuthMethod: "none", Username: "user",
+				URL: "https://bmc.example.test", AuthMethod: "none", Username: "user",
 			},
 			wantErr: "must be empty",
 		},
 		"link local requires zone": {
-			cfg:     Config{URL: "https://[fe80::1]/", NodeMode: "local", AuthMethod: "none"},
+			cfg:     Config{URL: "https://[fe80::1]/", AuthMethod: "none"},
 			wantErr: "requires an interface zone",
 		},
 		"malformed URL does not disclose user-info": {
 			cfg: Config{
 				URL:        "https://monitor:test-password@%zz/redfish/v1/",
-				NodeMode:   "local",
 				AuthMethod: "none",
 			},
 			wantErr: "invalid URL syntax",
@@ -399,19 +297,4 @@ func TestNormalizeServiceRootCanonicalizesIPv4MappedIPv6(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, plainURL, mappedURL)
 	require.Equal(t, plainOrigin, mappedOrigin)
-}
-
-func TestApplyDefaultsCanonicalizesHostScopeOverrideGUID(t *testing.T) {
-	const canonical = "00000000-0000-4000-8000-000000000010"
-	for _, raw := range []string{
-		"00000000000040008000000000000010",
-		"00000000-0000-4000-8000-000000000010",
-		"URN:UUID:00000000-0000-4000-8000-000000000010",
-	} {
-		t.Run(raw, func(t *testing.T) {
-			cfg := Config{HostScopeOverrides: []HostScopeOverride{{GUID: raw}}}
-			cfg.applyDefaults()
-			require.Equal(t, canonical, cfg.HostScopeOverrides[0].GUID)
-		})
-	}
 }

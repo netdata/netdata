@@ -8,27 +8,21 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
-	"path"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 )
 
 const (
-	defaultUpdateEvery                = 60
-	defaultAuthMethod                 = "auto"
-	defaultRetries                    = 2
-	defaultMaxConcurrentRequests      = 3
-	defaultCollect                    = "*"
-	defaultDetailedComponentsPerGroup = 100
+	defaultUpdateEvery           = 60
+	defaultAuthMethod            = "auto"
+	defaultRetries               = 2
+	defaultMaxConcurrentRequests = 3
+	defaultCollect               = "*"
 )
 
 var (
@@ -48,31 +42,13 @@ var collectionFamilies = []string{
 	"firmware",
 }
 
-type ChartsConfig struct {
-	Aggregates                     *bool `yaml:"aggregates,omitempty" json:"aggregates"`
-	Details                        *bool `yaml:"details,omitempty" json:"details"`
-	MaxDetailedComponentsPerFamily *int  `yaml:"max_detailed_components_per_family,omitempty" json:"max_detailed_components_per_family"`
-}
-
-type AlarmsConfig struct {
-	EvaluateThresholds *bool `yaml:"evaluate_thresholds,omitempty" json:"evaluate_thresholds"`
-}
-
-type HostScopeOverride struct {
-	ResourceURI string `yaml:"resource_uri" json:"resource_uri"`
-	GUID        string `yaml:"guid,omitempty" json:"guid"`
-	Hostname    string `yaml:"hostname,omitempty" json:"hostname"`
-}
-
 type Config struct {
 	Name               string `yaml:"name,omitempty" json:"name,omitempty"`
 	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 
-	URL       string `yaml:"url" json:"url"`
-	NodeMode  string `yaml:"node_mode" json:"node_mode"`
-	SystemURI string `yaml:"system_uri,omitempty" json:"system_uri"`
+	URL string `yaml:"url" json:"url"`
 
 	AuthMethod string `yaml:"auth_method,omitempty" json:"auth_method"`
 	Username   string `yaml:"username,omitempty" json:"username"`
@@ -87,16 +63,11 @@ type Config struct {
 	TLSKey                string           `yaml:"tls_key,omitempty" json:"tls_key"`
 	TLSSkipVerify         bool             `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify"`
 
-	Collect            string              `yaml:"collect,omitempty" json:"collect"`
-	Charts             ChartsConfig        `yaml:"charts,omitempty" json:"charts"`
-	Alarms             AlarmsConfig        `yaml:"alarms,omitempty" json:"alarms"`
-	HostScopeOverrides []HostScopeOverride `yaml:"host_scope_overrides,omitempty" json:"host_scope_overrides"`
+	Collect string `yaml:"collect,omitempty" json:"collect"`
 }
 
 func (c *Config) applyDefaults() {
 	c.URL = strings.TrimSpace(c.URL)
-	c.NodeMode = strings.ToLower(strings.TrimSpace(c.NodeMode))
-	c.SystemURI = strings.TrimSpace(c.SystemURI)
 	c.AuthMethod = strings.ToLower(strings.TrimSpace(c.AuthMethod))
 	c.Username = strings.TrimSpace(c.Username)
 	c.ProxyURL = strings.TrimSpace(c.ProxyURL)
@@ -123,43 +94,15 @@ func (c *Config) applyDefaults() {
 	if c.Collect == "" {
 		c.Collect = defaultCollect
 	}
-	if c.Charts.Aggregates == nil {
-		c.Charts.Aggregates = new(true)
-	}
-	if c.Charts.Details == nil {
-		c.Charts.Details = new(true)
-	}
-	if c.Charts.MaxDetailedComponentsPerFamily == nil {
-		c.Charts.MaxDetailedComponentsPerFamily = new(defaultDetailedComponentsPerGroup)
-	}
-	if c.Alarms.EvaluateThresholds == nil {
-		c.Alarms.EvaluateThresholds = new(true)
-	}
-	for i := range c.HostScopeOverrides {
-		override := &c.HostScopeOverrides[i]
-		override.ResourceURI = strings.TrimSpace(override.ResourceURI)
-		override.GUID = strings.TrimSpace(override.GUID)
-		if parsed, err := uuid.Parse(override.GUID); err == nil {
-			override.GUID = parsed.String()
-		}
-		override.Hostname = strings.TrimSpace(override.Hostname)
-	}
+
 }
 
 func (c Config) validate() error {
 	var errs []error
 
-	root, _, err := normalizeServiceRoot(c.URL)
+	_, _, err := normalizeServiceRoot(c.URL)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("'url': %w", err))
-	}
-	switch c.NodeMode {
-	case "local", "system_vnodes":
-	default:
-		errs = append(errs, errors.New("'node_mode' must be one of: local, system_vnodes"))
-	}
-	if c.NodeMode == "local" && len(c.HostScopeOverrides) > 0 {
-		errs = append(errs, errors.New("'host_scope_overrides' requires node_mode \"system_vnodes\""))
 	}
 	switch c.AuthMethod {
 	case "auto", "session", "basic":
@@ -194,34 +137,8 @@ func (c Config) validate() error {
 	if err := validateCollectionPattern(c.Collect); err != nil {
 		errs = append(errs, fmt.Errorf("'collect': %w", err))
 	}
-	if c.Charts.MaxDetailedComponentsPerFamily == nil || *c.Charts.MaxDetailedComponentsPerFamily < 0 {
-		errs = append(errs, errors.New("'charts.max_detailed_components_per_family' must be non-negative"))
-	}
-
-	if root != nil {
-		if c.SystemURI != "" {
-			if _, err := normalizeConfiguredResourceURI(root, c.SystemURI); err != nil {
-				errs = append(errs, fmt.Errorf("'system_uri': %w", err))
-			}
-		}
-		if err := validateHostScopeOverrides(root, c.HostScopeOverrides); err != nil {
-			errs = append(errs, err)
-		}
-	}
 
 	return errors.Join(errs...)
-}
-
-func (c ChartsConfig) aggregatesEnabled() bool {
-	return c.Aggregates == nil || *c.Aggregates
-}
-
-func (c ChartsConfig) detailsEnabled() bool {
-	return c.Details == nil || *c.Details
-}
-
-func (c AlarmsConfig) thresholdEvaluationEnabled() bool {
-	return c.EvaluateThresholds == nil || *c.EvaluateThresholds
 }
 
 func normalizeServiceRoot(raw string) (*url.URL, string, error) {
@@ -351,75 +268,4 @@ func validateCollectionPattern(expr string) error {
 		}
 	}
 	return nil
-}
-
-func normalizeConfiguredResourceURI(root *url.URL, raw string) (string, error) {
-	if root == nil {
-		return "", errors.New("missing ServiceRoot")
-	}
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
-		return "", errors.New("invalid URI")
-	}
-	if u.IsAbs() || u.Host != "" || u.User != nil {
-		return "", errors.New("must be an absolute-path URI on the configured origin")
-	}
-	if u.RawQuery != "" || u.Fragment != "" || u.RawPath != "" {
-		return "", errors.New("must not contain encoding, query, or fragment")
-	}
-	if !strings.HasPrefix(u.Path, "/redfish/") {
-		return "", errors.New("must be an absolute Redfish path")
-	}
-	cleaned := path.Clean(u.Path)
-	if cleaned != u.Path && cleaned+"/" != u.Path {
-		return "", errors.New("must not contain dot segments")
-	}
-	return cleaned, nil
-}
-
-func validateHostScopeOverrides(root *url.URL, overrides []HostScopeOverride) error {
-	var errs []error
-	uris := make(map[string]struct{}, len(overrides))
-	guids := make(map[string]struct{}, len(overrides))
-
-	for i, override := range overrides {
-		uri, err := normalizeConfiguredResourceURI(root, override.ResourceURI)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("'host_scope_overrides[%d].resource_uri': %w", i, err))
-			continue
-		}
-		if _, ok := uris[uri]; ok {
-			errs = append(errs, fmt.Errorf("'host_scope_overrides[%d].resource_uri' duplicates %q", i, uri))
-		}
-		uris[uri] = struct{}{}
-		if override.GUID == "" && override.Hostname == "" {
-			errs = append(errs, fmt.Errorf("'host_scope_overrides[%d]' must set guid or hostname", i))
-			continue
-		}
-
-		guid := override.GUID
-		if guid != "" {
-			parsed, err := uuid.Parse(guid)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("'host_scope_overrides[%d].guid' is invalid", i))
-				continue
-			}
-			guid = parsed.String()
-			if _, ok := guids[guid]; ok {
-				errs = append(errs, fmt.Errorf("'host_scope_overrides[%d].guid' duplicates %q", i, guid))
-			}
-			guids[guid] = struct{}{}
-		}
-		if guid == "" {
-			guid = uuid.NewSHA1(uuid.NameSpaceURL, []byte("netdata:redfish:host-scope-validation")).String()
-		}
-		hostname := override.Hostname
-		if hostname == "" {
-			hostname = "redfish-override"
-		}
-		if _, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{GUID: guid, Hostname: hostname}); err != nil {
-			errs = append(errs, fmt.Errorf("'host_scope_overrides[%d]': invalid HostScope identity: %w", i, err))
-		}
-	}
-	return errors.Join(errs...)
 }

@@ -28,14 +28,14 @@ func TestBoundedErrorAccumulatorPreservesControlFlowCauses(t *testing.T) {
 	require.Contains(t, err.Error(), "100002 Redfish operation failures")
 }
 
-func TestEmbeddedMemberFailuresRemainBoundedAtGraphLimit(t *testing.T) {
-	values := make([]any, maxCollectionMembers)
+func TestEmbeddedMemberFailuresKeepErrorOutputBounded(t *testing.T) {
+	values := make([]any, 100_000)
 	for index := range values {
 		values[index] = strings.Repeat("invalid", 8)
 	}
 	client := &protocolClient{}
 	nodes, complete, err := client.acquireEmbeddedValues(
-		withOperationBudget(context.Background()),
+		context.Background(),
 		fixtureParent(),
 		graphRelationship{Path: "Sensors", ChildKind: "sensor"},
 		values,
