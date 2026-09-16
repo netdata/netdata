@@ -134,7 +134,7 @@ func renderEmail(dst Destination, event Event) ([]string, []byte, error) {
 	fmt.Fprintf(&message, "Subject:\r\n %s\r\n", emailEncodedWords(subject))
 	fmt.Fprintf(&message, "Date: %s\r\n", time.Now().UTC().Format(time.RFC1123Z))
 	fmt.Fprintf(&message, "Message-ID: <%s@netdata.invalid>\r\n", rand.Text())
-	fmt.Fprintf(&message, "X-Netdata-Severity: %s\r\n", event.Status)
+	fmt.Fprintf(&message, "X-Netdata-Severity: %s\r\n", strings.ToLower(event.Status))
 	for _, field := range []struct{ name, value string }{
 		{"X-Netdata-Alert-Name", event.Alert}, {"X-Netdata-Chart", event.Chart}, {"X-Netdata-Host", event.Node},
 	} {

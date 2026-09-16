@@ -267,7 +267,7 @@ func TestRenderEmail(t *testing.T) {
 				"To":      {"=?UTF-8?B?T3BzIFRlYW0=?= <ops@example.com>, root"},
 				"Subject": {header.Get("Subject")}, "Date": {header.Get("Date")}, "Message-Id": {header.Get("Message-ID")},
 				"Mime-Version": {"1.0"}, "Content-Type": {header.Get("Content-Type")},
-				"X-Netdata-Severity": {test.status}, "X-Netdata-Alert-Name": {"=?UTF-8?B?dGVzdF9hbGVydA==?="},
+				"X-Netdata-Severity": {strings.ToLower(test.status)}, "X-Netdata-Alert-Name": {"=?UTF-8?B?dGVzdF9hbGVydA==?="},
 				"X-Netdata-Chart": {"=?UTF-8?B?dGVzdC5jaGFydA==?="}, "X-Netdata-Host": {"=?UTF-8?B?dGVzdC1ub2Rl?="},
 			}
 			wantArgs := []string{"-t", "-i"}
