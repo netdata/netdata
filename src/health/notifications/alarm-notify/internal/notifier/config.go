@@ -25,6 +25,8 @@ type Routing struct {
 }
 
 type Destination struct {
+	PlainTextOnly    *bool             `yaml:"plain_text_only,omitempty"`
+	Threading        *bool             `yaml:"threading,omitempty"`
 	SenderIP         string            `yaml:"sender_ip,omitempty"`
 	TargetARN        string            `yaml:"target_arn,omitempty"`
 	CredentialSource string            `yaml:"credential_source,omitempty"`
@@ -127,6 +129,12 @@ func readConfig(r io.Reader) (Config, error) {
 }
 
 func (dst Destination) validate() error {
+	if dst.Type == "email" {
+		return dst.validateEmail()
+	}
+	if dst.PlainTextOnly != nil || dst.Threading != nil {
+		return errors.New("destination contains fields for another provider: plain_text_only and threading require email")
+	}
 	if dst.Type == "kafka" {
 		return dst.validateKafka()
 	}
@@ -175,7 +183,7 @@ func (dst Destination) validate() error {
 		return dst.validateSMSEagle()
 	}
 	if dst.Recipients != nil || dst.MessageType != "" || dst.CallDuration != nil || dst.VoiceID != nil {
-		return errors.New("recipients, message_type, call_duration and voice_id require type: smseagle")
+		return errors.New("message_type, call_duration and voice_id require type: smseagle; recipients require smseagle or email")
 	}
 	if dst.Type == "prowl" || dst.Type == "kavenegar" {
 		return dst.validateFormProvider()
@@ -223,7 +231,7 @@ func (dst Destination) validate() error {
 		return dst.validateTwilio()
 	}
 	if dst.AccountSID != "" || dst.AuthToken != "" || dst.From != "" || dst.To != "" {
-		return errors.New("account_sid, auth_token, from and to require type: twilio")
+		return errors.New("account_sid, auth_token and to require type: twilio; from requires twilio or email")
 	}
 	if dst.Type == "pushbullet" {
 		return dst.validatePushbullet()
@@ -244,7 +252,7 @@ func (dst Destination) validate() error {
 	}
 	if dst.Type != "webhook" && dst.Type != "slack" && dst.Type != "discord" && dst.Type != "signl4" {
 		return errors.New(
-			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command, smstools3, syslog, awssns or kafka; other providers are not implemented yet",
+			"destination.type must be webhook, slack, discord, telegram, pushover, pushbullet, twilio, messagebird, gotify, ntfy, rocketchat, flock, fleep, ilert, signl4, alerta, dynatrace, prowl, kavenegar, smseagle, pagerduty, opsgenie, msteams, matrix, command, smstools3, syslog, awssns, kafka or email; other providers are not implemented yet",
 		)
 	}
 	if dst.BotToken != "" || dst.ChatID != "" || dst.MessageThreadID != nil || dst.APIURL != "" ||

@@ -53,7 +53,7 @@ func TestOpsgenieFieldIsolation(t *testing.T) {
 			case reflect.Slice:
 				v.Set(reflect.ValueOf([]string{"123"}))
 			default:
-				v.Set(reflect.ValueOf(new(configInteger(1))))
+				v.Set(reflect.New(v.Type().Elem()))
 			}
 			wantErr := "fields for another provider"
 			if field.Name == "APIVersion" {
