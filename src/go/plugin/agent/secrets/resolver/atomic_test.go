@@ -208,6 +208,61 @@ func TestResolverClonesMutableLeaves(t *testing.T) {
 	}
 }
 
+func TestCloneLiteralPreservesReferenceTextAndClonesMutableLeaves(t *testing.T) {
+	input := map[string]any{
+		"reference": "${store:invalid}",
+		"bytes":     []byte("value"),
+		"strings":   []string{"${fixture:value}"},
+	}
+
+	cloned, err := CloneLiteral(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := cloned.(map[string]any)
+	if output["reference"] != input["reference"] || output["strings"].([]string)[0] != "${fixture:value}" {
+		t.Fatalf("cloned=%#v", output)
+	}
+	output["bytes"].([]byte)[0] = 'X'
+	output["strings"].([]string)[0] = "changed"
+	if string(input["bytes"].([]byte)) != "value" || input["strings"].([]string)[0] != "${fixture:value}" {
+		t.Fatal("literal clone aliases caller-owned mutable leaves")
+	}
+}
+
+func TestCloneLiteralEnforcesAtomicBounds(t *testing.T) {
+	tests := map[string]struct {
+		input func() any
+		kind  AtomicErrorKind
+	}{
+		"cycle": {
+			input: func() any {
+				value := map[string]any{}
+				value["self"] = value
+				return value
+			},
+			kind: AtomicErrorCycle,
+		},
+		"depth": {
+			input: func() any { return atomicNestedMap(MaximumAtomicDepth + 1) },
+			kind:  AtomicErrorDepth,
+		},
+		"size": {
+			input: func() any { return strings.Repeat("x", MaximumAtomicResolvedBytes+1) },
+			kind:  AtomicErrorResultLimit,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			cloned, err := CloneLiteral(test.input())
+			if cloned != nil {
+				t.Fatalf("failure returned a result: %#v", cloned)
+			}
+			requireAtomicErrorKind(t, err, test.kind)
+		})
+	}
+}
+
 func TestResolverStoreScopeLinear(t *testing.T) {
 	resolver, err := NewAtomicResolver(nil)
 	if err != nil {

@@ -183,7 +183,7 @@ services:
                 },
                 {
                     "name": "`toYaml VALUE`",
-                    "description": "Serialize `VALUE` as a YAML string. Used by `http` discoverer rules that pass through items as collector job configs.",
+                    "description": "Serialize the complete value as YAML. Strings retain their exact contents and type; maps and sequences remain collections. Used by `http` discoverer rules that pass through items as collector job configs.",
                 },
             ],
             "notes": [
@@ -198,6 +198,7 @@ services:
     "config_template": {
         "heading": "## config_template rendering",
         "intro": [
+            "Discovered jobs treat `${env:...}`, `${file:...}`, `${cmd:...}`, and `${store:...}` as literal text, even when a reference comes from an operator-authored discovery rule or credential. To use secret references, adopt the collector job through Dynamic Configuration and review its complete configuration before saving.",
             "When a template rule matches, its `config_template` is executed with the target as the dot context. The rendered output is parsed as YAML to produce one or more collector jobs.",
         ],
         "rules": [
@@ -259,7 +260,7 @@ services:
             },
             {
                 "name": "YAML parse error after rendering",
-                "description": "`failed to parse services[N] template data` means the rendered output is not valid YAML. Common cause: a discovered string field contains a colon, hash, or other YAML special character. YAML-quote dynamic values (`name: \"{{ .X }}\"`) when they may be irregular.",
+                "description": "`failed to parse services[N] template data` means the rendered output is not valid YAML. Common cause: a discovered string field contains a colon, hash, or other YAML special character. Serialize complete dynamic values with `toYaml`, for example `name: {{ .X | toYaml }}`. Adding quotes around raw template text does not escape embedded quotes or newlines.",
             },
         ],
     },

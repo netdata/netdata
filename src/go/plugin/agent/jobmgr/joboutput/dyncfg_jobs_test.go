@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -305,6 +306,83 @@ func TestDynCfgAddCollisionIsReplayUpsert(t *testing.T) {
 	require.Equal(t, confgroup.TypeDyncfg, replayed.SourceType())
 	require.Equal(t, "replacement", replayed.Get("option"))
 	require.NotEmpty(t, *current.events)
+}
+
+func TestDynCfgAdoptionTransfersSecretAuthorityForFullPayload(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+	providerCalls := 0
+	resolver, err := secretresolver.NewAtomicResolver(map[string]secretresolver.AtomicProvider{
+		"fixture": secretresolver.AtomicProviderFunc(func(context.Context, string) ([]byte, error) {
+			providerCalls++
+			return []byte("resolved"), nil
+		}),
+	})
+	require.NoError(t, err)
+	controller.factory.config.ConfigModules.config.Resolver = resolver
+
+	discovered := factoryTestConfig(false)
+	discovered.SetSourceType(confgroup.TypeDiscovered)
+	discovered.SetSource("discovery-source")
+	discovered.SetProvider("discovery")
+	discovered.Set("option_str", "${fixture:value}")
+	discovered.Set("option_int", 1)
+	require.NoError(t, controller.factory.config.ConfigModules.Validate(context.Background(), discovered))
+	require.Zero(t, providerCalls)
+	seedDynCfgJobGraphRecord(t, graph, discovered, dyncfg.StatusRunning)
+
+	identity := lifecycle.ResourceIdentity{ID: discovered.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{identity: identity, events: new([]string)}
+	permit, tasks := issueTestJobPermit(t, discovered.FullName(), 2)
+	transaction, err := controller.Prepare(
+		context.Background(),
+		DynCfgJobRequest{
+			Args: []string{"go.d:collector:module:job", "update"},
+			Payload: []byte(`{
+				"option_str":"${fixture:value}",
+				"option_int":1
+			}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		current,
+		lifecycle.ResourceTransactionScope{
+			ID:        discovered.FullName(),
+			Current:   identity,
+			Successor: lifecycle.ResourceIdentity{ID: discovered.FullName(), Generation: 2},
+		},
+		permit,
+	)
+	require.NoError(t, err)
+
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, active := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionReplaced, disposition)
+	require.NotNil(t, active)
+	require.Equal(t, 200, applied.ResultStatus())
+	record, exists := graph.Lookup(discovered.FullName())
+	require.True(t, exists)
+	adopted, err := graphRecordConfig(record)
+	require.NoError(t, err)
+	require.Equal(t, confgroup.TypeDyncfg, adopted.SourceType())
+	require.Equal(t, "${fixture:value}", adopted.Get("option_str"))
+	callsAfterAdoption := providerCalls
+	require.Positive(t, callsAfterAdoption)
+
+	require.NoError(t, controller.factory.config.ConfigModules.Validate(context.Background(), adopted))
+	require.Greater(t, providerCalls, callsAfterAdoption)
+	require.NoError(t, active.Stop(context.Background()))
+	require.NoError(t, active.Finalize())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 func TestDiscoveredChangeCannotReplaceHigherPriorityGraphOwner(t *testing.T) {
@@ -1038,14 +1116,23 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func TestDiscoveredTransientConstructionFailureCommitsFailedAndSchedulesRetry(t *testing.T) {
+func TestDiscoveredSecretReferenceRemainsLiteralAndDoesNotScheduleRetry(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
 	installFailingFixtureResolver(t, controller)
 	commands := &autoDetectionRetryTestCommands{}
 	require.NoError(t, controller.BindBackgroundWorkers(commands, 1, func(error) {}))
 
 	config := factoryTestConfig(false)
-	config.Set("option", "${fixture:value}")
+	config.Set("option_str", "${fixture:value}")
+	config.Set("option_int", 1)
 	config.Set("autodetection_retry", 1)
 	config.SetSourceType(confgroup.TypeDiscovered)
 	config.SetSource("discovery-source")
@@ -1070,18 +1157,76 @@ func TestDiscoveredTransientConstructionFailureCommitsFailedAndSchedulesRetry(t 
 		permit,
 	)
 	require.NoError(t, err)
-	_, err = transaction.Apply(context.Background())
+	applied, err := transaction.Apply(context.Background())
 	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.NotNil(t, current)
 
 	record, ok := graph.Lookup(config.FullName())
 	require.True(t, ok)
-	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-	require.EqualValues(t, 1, state.collectorCleanup)
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.Zero(t, state.collectorCleanup)
 
 	require.NoError(t, controller.scheduler.Tick(context.Background(), 0))
 	require.NoError(t, controller.scheduler.Tick(context.Background(), 1))
-	commands.waitForSubmissions(t, 1)
+	submitted, _, _ := commands.snapshot()
+	require.Empty(t, submitted)
+
+	require.NoError(t, current.Stop(context.Background()))
+	require.NoError(t, current.Finalize())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
+func TestDiscoveredSecretReferenceRemainsLiteralInV2Construction(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = nil
+	creator.CreateV2 = func() collectorapi.CollectorV2 {
+		return &factoryTestV2{
+			state:    state,
+			store:    metrix.NewCollectorStore(),
+			template: factoryTestChartTemplate,
+		}
+	}
+	controller.modules["module"] = creator
+	installFailingFixtureResolver(t, controller)
+
+	config := factoryTestConfig(false)
+	config.Set("option_str", "${fixture:value}")
+	config.Set("option_int", 1)
+	config.SetSourceType(confgroup.TypeDiscovered)
+	config.SetSource("discovery-source")
+	config.SetProvider("discovery")
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning},
+		nil,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.NotNil(t, current)
+
+	record, ok := graph.Lookup(config.FullName())
+	require.True(t, ok)
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.NoError(t, current.Stop(context.Background()))
+	require.NoError(t, current.Finalize())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 func TestDiscoveredInvalidConfigurationIsProposalRejection(t *testing.T) {
