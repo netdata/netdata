@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -211,9 +212,14 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 	var resolved any
 	var references bool
 	var err error
-	if captureSnapshot {
-		resolved, references, snapshot, err =
-			cmf.config.Resolver.ResolveWithSnapshot(resolveCtx, map[string]any(config), cmf.config.StoreScope)
+	if !policy.SecretReferencesAllowed(config.SourceType()) {
+		resolved, err = secretresolver.CloneLiteral(map[string]any(config))
+	} else if captureSnapshot {
+		resolved, references, snapshot, err = cmf.config.Resolver.ResolveWithSnapshot(
+			resolveCtx,
+			map[string]any(config),
+			cmf.config.StoreScope,
+		)
 	} else {
 		resolved, references, err =
 			cmf.config.Resolver.ResolveWithReferences(resolveCtx, map[string]any(config), cmf.config.StoreScope)

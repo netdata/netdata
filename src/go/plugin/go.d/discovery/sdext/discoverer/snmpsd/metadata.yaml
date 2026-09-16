@@ -38,7 +38,8 @@ overview:
     - **Outbound interface**: probes use the host's default routing. There is no per-pipeline bind-address or VRF option — on multi-homed hosts, configure the OS routing table so the Netdata host reaches each target subnet via the correct interface.
     - The discoverer reads only the standard `system` MIB. Vendor-specific identification (`.SysInfo.Vendor`, `.Category`, `.Model`) is derived from `sysObjectID` and an enterprise-numbers table; values may be empty or `Unknown` for devices that are not in that table.
     - **SNMPv3 engine ID**: gosnmp negotiates the engine ID at the start of each probe (one extra round-trip per probe — usually irrelevant unless `parallel_scans_per_network` is high and the device is rate-limited). Engine IDs are not cached across probes, so devices that rotate engine IDs (rare; some HA pairs do this on failover) are handled transparently.
-    - **Credential storage**: community strings and SNMPv3 passphrases are stored in plaintext both in `/etc/netdata/go.d/sd/snmp.conf` (file-based pipelines) and in the agent's dynamic-configuration store under `/var/lib/netdata/dyncfg/` (UI-managed pipelines). To avoid plaintext credentials on disk in either path, reference them via `${env:VAR}` or `${file:/path}` (see [Secrets Management](/src/collectors/SECRETS.md)).
+    - **Credential storage**: discovery requires literal community strings and SNMPv3 passphrases. They are stored in plaintext in `/etc/netdata/go.d/sd/snmp.conf` (file-based pipelines) or the agent's dynamic-configuration store under `/var/lib/netdata/dyncfg/` (UI-managed pipelines). Secret references are not resolved in discovery credentials or generated collector jobs.
+    - **Collector job secrets**: to use [secret references](/src/collectors/SECRETS.md), adopt the collector job through Dynamic Configuration and review the complete configuration before saving. For reference-based fields, Netdata saves the reference text and resolves values only in memory; it does not persist the resolved values in the job configuration. `${env:...}` and `${file:...}` read operator-managed environment variables or files, whose credentials may already be stored on disk. Adoption does not remove literal credentials from the discovery configuration.
 setup:
   prerequisites:
     list:
@@ -103,7 +104,7 @@ setup:
 
             **Naming note:** the YAML keys are `auth_password` and `priv_password`. The same fields are exposed inside service rule templates as `.Credential.AuthPassphrase` and `.Credential.PrivacyPassphrase` (the Go struct names). Both refer to the same value.
 
-            **Avoid plaintext on disk:** any of these fields can be sourced from environment variables or files using `${env:VAR_NAME}` or `${file:/absolute/path}` — see [Secrets Management](/src/collectors/SECRETS.md).
+            **Literal values required:** use the credentials configured on your devices. Discovery does not resolve `${env:...}`, `${file:...}`, `${cmd:...}`, or `${store:...}`; those strings would be sent as credentials. To use secret references in a collector job, adopt it through Dynamic Configuration as described under [Limitations](#limitations).
         - name: 'networks'
           description: 'List of subnets to scan, each tagged with the credential name to use. At least one network is required.'
           default_value: ''
@@ -143,7 +144,7 @@ setup:
               - id: snmp
                 match: '{{ true }}'
         - name: 'Multiple subnets, mixed SNMPv2c and SNMPv3'
-          description: 'Mix SNMPv2c on one subnet with SNMPv3 (authPriv) on another. Credentials are referenced from environment variables to keep them out of plaintext on disk.'
+          description: 'Mix SNMPv2c on one subnet with SNMPv3 (authPriv) on another. Replace the placeholder strings with the literal credentials configured on your devices; secret references are not supported here.'
           config: |
             disabled: no
             discoverer:
@@ -152,15 +153,15 @@ setup:
                 credentials:
                   - name: public-v2c
                     version: 2c
-                    community: ${env:SNMP_V2C_COMMUNITY}
+                    community: "PLACEHOLDER"
                   - name: secure-v3
                     version: 3
                     security_level: authPriv
                     username: netdata-monitor
                     auth_protocol: sha256
-                    auth_password: ${env:SNMP_V3_AUTH}
+                    auth_password: "PLACEHOLDER_AUTH_PASSPHRASE"
                     priv_protocol: aes256
-                    priv_password: ${env:SNMP_V3_PRIV}
+                    priv_password: "PLACEHOLDER_PRIV_PASSPHRASE"
                 networks:
                   - subnet: 192.168.10.0/24
                     credential: public-v2c

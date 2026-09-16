@@ -717,6 +717,13 @@ Secrets keep credentials out of collector configs. A config value can carry a **
 - `${env:...}`, `${file:...}`, `${cmd:...}` — resolved from the plugin process's own environment variables, files, or
   command output.
 
+`policy.SecretReferencesAllowed` permits references only for `stock`, `user`, and `dyncfg` collector sources.
+`joboutput/config_factory.go` and `secrets/dependency.go` enforce the same policy before resolving or indexing
+references. Discovered, empty, and unknown sources keep every string literal, including malformed reference syntax,
+and create no SecretStore dependencies. Their application still uses the resolver's bounded literal clone.
+DynCfg adoption re-stamps the complete submitted configuration as `dyncfg`, enabling reference resolution throughout
+that payload. Operators must review the whole configuration when adopting a discovered job.
+
 Resolution happens only in memory, only when a job is built. The key property is that it is **atomic — all references
 resolve, or none do**. Picture a notary: photocopy the whole document, list every blank, check out the referenced
 files under one pass, fill every blank on the copy, check the files back in, and hand back a fully-filled copy or
