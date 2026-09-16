@@ -106,7 +106,9 @@ func TestSMSEagleFieldIsolation(t *testing.T) {
 		t.Run(field.Name, func(t *testing.T) {
 			dst := smseagleTestDestination()
 			v := reflect.ValueOf(&dst).Elem().Field(i)
-			if v.Kind() == reflect.String {
+			if v.Kind() == reflect.Map {
+				v.Set(reflect.ValueOf(map[string]string{"warning": "synthetic-private-value"}))
+			} else if v.Kind() == reflect.String {
 				v.SetString("synthetic-private-value")
 			} else {
 				n := configInteger(1)

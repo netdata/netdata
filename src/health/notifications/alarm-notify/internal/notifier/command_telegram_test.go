@@ -278,6 +278,7 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"matrix cancel": {provider: "matrix", cancel: true}, "matrix deadline": {provider: "matrix"},
 		"opsgenie create deadline": {provider: "opsgenie"}, "opsgenie create cancel": {provider: "opsgenie", cancel: true},
 		"opsgenie close deadline": {provider: "opsgenie-close"}, "opsgenie close cancel": {provider: "opsgenie-close", cancel: true},
 		"pagerduty v1 deadline": {provider: "pagerduty-v1"}, "pagerduty v1 cancel": {provider: "pagerduty-v1", cancel: true},
@@ -308,8 +309,12 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			var after atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case "/v2/alerts", "/v2/alerts/" + opsgenieTestAlias + "/close",
+				path := r.URL.Path
+				if strings.HasPrefix(path, "/_matrix/client/v3/rooms/") {
+					path = "/matrix"
+				}
+				switch path {
+				case "/matrix", "/v2/alerts", "/v2/alerts/" + opsgenieTestAlias + "/close",
 					"/generic/2010-04-15/create_event.json", "/v2/enqueue", "/api/v2/messages/sms",
 					"/add",
 					"/synthetic-key/sms/send.json",
@@ -353,6 +358,14 @@ func TestAcknowledgmentCancellation(t *testing.T) {
 				APIURL:   server.URL,
 				BotToken: "123:synthetic-private-value",
 				ChatID:   "1",
+			}
+			if test.provider == "matrix" {
+				dst = Destination{
+					Type:        "matrix",
+					APIURL:      server.URL,
+					AccessToken: "synthetic-token",
+					RoomID:      "!room:example.org",
+				}
 			}
 			if test.provider == "pushover" {
 				dst = Destination{

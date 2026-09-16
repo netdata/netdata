@@ -46,6 +46,8 @@ func TestOpsgenieFieldIsolation(t *testing.T) {
 			dst := opsgenieTestDestination()
 			v := reflect.ValueOf(&dst).Elem().Field(i)
 			switch v.Kind() {
+			case reflect.Map:
+				v.Set(reflect.ValueOf(map[string]string{"warning": "synthetic-private-value"}))
 			case reflect.String:
 				v.SetString("synthetic-private-value")
 			case reflect.Slice:

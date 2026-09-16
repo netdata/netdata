@@ -199,6 +199,8 @@ func TestRunFanoutCancellation(t *testing.T) {
 		provider string
 		cancel   bool
 	}{
+		"msteams cancel": {provider: "msteams", cancel: true}, "msteams deadline": {provider: "msteams"},
+		"matrix cancel": {provider: "matrix", cancel: true}, "matrix deadline": {provider: "matrix"},
 		"opsgenie create deadline": {provider: "opsgenie"}, "opsgenie create cancel": {provider: "opsgenie", cancel: true},
 		"opsgenie close deadline": {provider: "opsgenie-close"}, "opsgenie close cancel": {provider: "opsgenie-close", cancel: true},
 		"pagerduty v1 deadline": {provider: "pagerduty-v1"}, "pagerduty v1 cancel": {provider: "pagerduty-v1", cancel: true},
@@ -222,7 +224,11 @@ func TestRunFanoutCancellation(t *testing.T) {
 			var afterCalls atomic.Int32
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					switch r.URL.Path {
+					path := r.URL.Path
+					if strings.HasPrefix(path, "/blocked/_matrix/client/v3/rooms/") {
+						path = "/blocked"
+					}
+					switch path {
 					case "/blocked/v2/alerts", "/blocked/v2/alerts/" + opsgenieTestAlias + "/close",
 						"/blocked/generic/2010-04-15/create_event.json",
 						"/blocked/v2/enqueue",
@@ -251,6 +257,13 @@ func TestRunFanoutCancellation(t *testing.T) {
 			defer server.Close()
 			defer close(cleanup)
 			blocked := fmt.Sprintf("type: %s, url: %q", test.provider, server.URL+"/blocked")
+			if test.provider == "matrix" {
+				blocked = fmt.Sprintf(
+					"type: matrix, api_url: %q, access_token: synthetic-token, room_id: %q",
+					server.URL+"/blocked",
+					"!room:example.org",
+				)
+			}
 			if test.provider == "ilert" {
 				blocked = fmt.Sprintf("type: ilert, api_url: %q, integration_key: synthetic-key", server.URL+"/blocked")
 			}
