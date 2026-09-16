@@ -11,11 +11,13 @@ licensing:
       name: fgLicContractTable
     identity:
       id:
-        OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
-        name: fgLicContractDesc
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
+          name: fgLicContractDesc
       name:
-        OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
-        name: fgLicContractDesc
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
+          name: fgLicContractDesc
       component:
         value: device
     descriptors:
@@ -24,8 +26,9 @@ licensing:
     signals:
       expiry:
         timestamp:
-          OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.2
-          name: fgLicContractExpiry
+          symbol:
+            OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.2
+            name: fgLicContractExpiry
           format: text_date
 
   - MIB: FORTINET-FORTIGATE-MIB
@@ -35,14 +38,17 @@ licensing:
       name: fgLicVersionTable
     identity:
       id:
-        OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
-        name: fgLicVersionDesc
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
+          name: fgLicVersionDesc
       name:
-        OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
-        name: fgLicVersionDesc
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
+          name: fgLicVersionDesc
       feature:
-        OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.3
-        name: fgLicVersionNumber
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.3
+          name: fgLicVersionNumber
       component:
         value: fortiguard
     descriptors:
@@ -51,8 +57,9 @@ licensing:
     signals:
       expiry:
         timestamp:
-          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.2
-          name: fgLicVersionExpiry
+          symbol:
+            OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.2
+            name: fgLicVersionExpiry
           format: text_date
 
   - MIB: FORTINET-FORTIGATE-MIB
@@ -62,11 +69,13 @@ licensing:
       name: fgLicAlContractTable
     identity:
       id:
-        OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
-        name: fgLicAlContractDesc
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
+          name: fgLicAlContractDesc
       name:
-        OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
-        name: fgLicAlContractDesc
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
+          name: fgLicAlContractDesc
       component:
         value: account
     descriptors:
@@ -75,6 +84,7 @@ licensing:
     signals:
       expiry:
         timestamp:
-          OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.2
-          name: fgLicAlContractExpiry
+          symbol:
+            OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.2
+            name: fgLicAlContractExpiry
           format: text_date

@@ -219,6 +219,19 @@ func (fw FrameWriter) PoisonOutput(err error) {
 	}
 }
 
+func (fw FrameWriter) CommitBuiltJobOutput(
+	build func() ([]byte, error),
+	transaction jobruntime.OutputStateTransaction,
+) error {
+	if transaction == nil {
+		return errors.New("job output: invalid FrameOwner transaction")
+	}
+	if fw.Owner == nil {
+		return errors.Join(errors.New("job output: nil FrameOwner writer"), transaction.Abort())
+	}
+	return fw.Owner.CommitBuiltProtocolTransaction(build, transaction)
+}
+
 func finalizeProcessOwnedConstructed(constructed ConstructedJob) (resultErr error) {
 	defer func() {
 		if constructed.resolvedReferences {

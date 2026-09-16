@@ -253,24 +253,26 @@ jobs:
 
 ## Troubleshooting
 
-### Find the exact error
+### Other Problems
+
+#### Find the exact error
 
 Check the Netdata Agent logs when the collector starts or restarts. Vault resolver errors include messages such as `vault returned HTTP 403`, `vault path contains invalid characters`, `operand must be in format 'path#key'`, or `key 'password' not found in vault response`.
 
 
-### Vault returns permission denied or the token has expired
+#### Vault returns permission denied or the token has expired
 
 Check the Vault token policy and, if you use Vault Enterprise namespaces, confirm that `namespace` is correct. If you use a short-lived token, make sure the token is renewed or replaced before it expires.
 
 
-### The Dynamic Configuration Test fails
+#### The Dynamic Configuration Test fails
 
 The Test action makes a real authenticated request to Vault's token self-lookup endpoint. HTTP 200 is operational success by status; its response body is not inspected. An exact permission-only HTTP 403 body is reported as validation-only because it cannot reliably prove whether the token is valid. Invalid-token, ambiguous, malformed, or oversized HTTP 403 bodies fail. An unreachable endpoint and every other HTTP status also fail.
 
 Operational success proves only that the responding endpoint returned HTTP 200 for self-lookup at that time. It does not prove that Vault accepted the token or that the token can read a particular secret path. Check secret-path policies separately. A gateway or deployment allowlist can reject the self-lookup route even when configured secret reads would work.
 
 
-### Secret or key is not found
+#### Secret or key is not found
 
 Check the operand carefully:
 
@@ -279,11 +281,11 @@ Check the operand carefully:
 - Make sure the `key` exists in the returned secret payload.
 
 
-### TLS verification fails
+#### TLS verification fails
 
 Make sure the Netdata host trusts the CA that signed the Vault certificate. Use `tls_skip_verify: true` only as an insecure workaround.
 
 
-### Token file cannot be read
+#### Token file cannot be read
 
 Check the file path, file contents, and that the `netdata` user can read the file.

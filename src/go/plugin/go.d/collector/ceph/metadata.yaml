@@ -121,83 +121,78 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: >-
-                Periodic metric interval in seconds; it does not change the 5-second ceph-exporter default on Reef 18 and
-                later or the MGR Prometheus module's 15-second default cache refresh.
+              description: "Data collection interval, in seconds. It does not change the ceph-exporter or MGR Prometheus module refresh rates."
+              detailed_description: |
+                The standalone ceph-exporter refreshes every 5 seconds by default on Reef 18 and later, and the MGR Prometheus module
+                caches for 15 seconds by default; neither follows this interval.
               default_value: 10
               required: false
               group: Base
             - name: autodetection_retry
-              description: Retry interval in seconds for a failed auto-detected job; zero disables retries.
+              description: "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries."
               default_value: 60
               required: false
               group: Base
             - name: function_only
-              description: Run only on-demand Functions, without charts or periodic metric requests.
+              description: "Run only on-demand Functions, without creating charts or making periodic metric requests."
               default_value: false
               required: false
               group: Base
             - name: osd_selector
-              description: Simple-pattern selector matched against `osd.<id>` or OSD UUID before the cap.
+              description: "Simple-pattern selector matched against `osd.<id>` or OSD UUID before the cap."
               default_value: "*"
               required: false
               group: Metrics
             - name: max_osds
-              description: >-
-                Maximum selected OSDs with individual charts. If the selected set exceeds this operator policy, no
-                per-OSD metrics are collected.
+              description: "Maximum selected OSDs with individual charts. If the selected set exceeds this operator policy, no per-OSD metrics are collected."
               default_value: 100
               required: false
               group: Metrics
             - name: pool_selector
-              description: Simple-pattern selector matched against pool names before the cap.
+              description: "Simple-pattern selector matched against pool names before the cap."
               default_value: "*"
               required: false
               group: Metrics
             - name: max_pools
-              description: >-
-                Maximum selected pools with individual charts. If the selected set exceeds this operator policy, no
-                per-pool metrics are collected.
+              description: "Maximum selected pools with individual charts. If the selected set exceeds this operator policy, no per-pool metrics are collected."
               default_value: 100
               required: false
               group: Metrics
             - name: url
-              description: Base URL of a Ceph Dashboard API endpoint.
+              description: "Base URL of the Ceph Dashboard API. Redirects from a standby to the active MGR are followed securely."
               default_value: https://127.0.0.1:8443
               required: true
               group: Base
             - name: timeout
-              description: >-
-                Deadline in seconds for one logical Dashboard operation, including discovery, authentication, retries, and
-                response decoding; must be at least 0.5.
+              description: "Deadline for one Dashboard operation, in seconds, including discovery, login, retries, and decoding. At least 0.5."
               default_value: 2
               required: false
               group: Base
             - name: username
-              description: Username for Ceph Dashboard JSON login; required with `password` unless a bearer-token file is used.
+              description: "Username for the Ceph Dashboard JSON login, not HTTP basic authentication. Required with `password` unless a bearer token file is used."
               default_value: ""
               required: false
               group: Auth
             - name: password
-              description: Password for Ceph Dashboard JSON login; required with `username` unless a bearer-token file is used.
+              description: "Password for the Ceph Dashboard JSON login. Required with `username` unless a bearer token file is used."
               default_value: ""
               required: false
               group: Auth
             - name: bearer_token_file
-              description: >-
-                Externally managed bearer-token file; takes priority over username/password. Its owner must replace the token
-                before it expires. The collector rereads the file for every request, so replacements take effect without a
-                restart.
+              description: "Path to a bearer token file managed outside Netdata. It takes priority over username and password and is reread on every request."
+              detailed_description: |
+                The file owner must replace the token before it expires. Because the collector rereads the file for every request,
+                a replacement takes effect without a restart.
               default_value: ""
               required: false
               group: Auth
             - name: not_follow_redirects
-              description: Reject redirects instead of performing secure active-MGR discovery.
+              description: "Reject Dashboard redirects instead of following them to the active MGR."
               default_value: false
               required: false
               group: Base
             - name: allowed_redirect_origins
-              description: Exact trusted active-MGR origins; the configured URL origin is always trusted.
+              description: "Scheme and host origins that may receive credentials after active-MGR discovery. The configured URL's origin is always trusted."
               detailed_description: |
                 Cross-origin redirects are rejected unless the destination is listed as `scheme://host:port`. After a
                 credentialless discovery request, only a trusted origin may receive Dashboard login credentials or a
@@ -206,52 +201,52 @@ modules:
               required: false
               group: Base
             - name: headers
-              description: Additional HTTP headers; Authorization, Cookie, and Host are rejected.
+              description: "Additional HTTP headers. `Authorization`, `Cookie`, and `Host` are managed by the collector and rejected here."
               default_value: ""
               required: false
               group: Headers
             - name: force_http2
-              description: Force HTTP/2, including h2c over plain TCP.
+              description: "Force HTTP/2, including h2c over plain TCP."
               default_value: false
               required: false
               group: Base
             - name: tls_skip_verify
-              description: Skip server certificate and hostname verification; insecure.
+              description: "Skip TLS certificate and hostname verification. Insecure; on by default only for self-signed Dashboard deployments."
               default_value: true
               required: false
               group: TLS
             - name: tls_ca
-              description: Absolute path to a CA bundle used to validate the Dashboard certificate.
+              description: "Absolute path to a CA bundle used to validate the Dashboard certificate."
               default_value: ""
               required: false
               group: TLS
             - name: tls_cert
-              description: Absolute path to a client certificate for mTLS.
+              description: "Absolute path to a client certificate for mTLS."
               default_value: ""
               required: false
               group: TLS
             - name: tls_key
-              description: Absolute path to the client private key for mTLS.
+              description: "Absolute path to the client private key for mTLS."
               default_value: ""
               required: false
               group: TLS
             - name: proxy_url
-              description: HTTP proxy URL; empty uses standard proxy environment variables.
+              description: "HTTP proxy URL. Leave empty to use the proxy environment variables."
               default_value: ""
               required: false
               group: Proxy
             - name: proxy_username
-              description: Proxy authentication username.
+              description: "Username for proxy authentication."
               default_value: ""
               required: false
               group: Proxy
             - name: proxy_password
-              description: Proxy authentication password.
+              description: "Password for proxy authentication."
               default_value: ""
               required: false
               group: Proxy
             - name: vnode
-              description: Associate charts with a Virtual Node; Functions stay on the physical Agent job.
+              description: "Associates this once-per-cluster job with a Virtual Node. Functions stay attached to the physical Agent job."
               default_value: ""
               required: false
               group: Base

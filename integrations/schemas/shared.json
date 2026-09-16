@@ -297,11 +297,52 @@
           "required": [
             "list"
           ]
+        },
+        "errors": {
+          "type": "object",
+          "description": "Known errors: the exact messages an operator can hit while configuring or running the integration, each with its cause and fix. Written proactively for every failure path and extended from user reports.",
+          "properties": {
+            "list": {
+              "type": "array",
+              "description": "One entry per distinct error message, or per observed symptom when no stable message exists.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string",
+                    "description": "The literal message as emitted, with variable parts as backticked placeholders; or the observed symptom in the operator's words when no stable message exists. Rendered as the entry heading."
+                  },
+                  "when": {
+                    "type": "string",
+                    "description": "Optional. The situation in which the error appears: the mode, the option that was set, the deployment."
+                  },
+                  "cause": {
+                    "type": "string",
+                    "description": "What is actually wrong, in operator terms: the option, permission, network path, or service state that produces the message."
+                  },
+                  "fix": {
+                    "type": "string",
+                    "description": "The action that resolves it: the option and value, the command, the grant, or the change on the monitored system. Markdown."
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "Optional. Link to the user report this entry came from."
+                  }
+                },
+                "required": [
+                  "error",
+                  "cause",
+                  "fix"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "list"
+          ]
         }
-      },
-      "required": [
-        "problems"
-      ]
+      }
     },
     "_folding": {
       "type": "object",

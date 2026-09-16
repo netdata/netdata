@@ -70,8 +70,8 @@ The problems below are the ones that actually come up when polling network devic
 
 ## What's next
 
-- [Collect Troubleshooting Data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) — collect raw SNMP data without
-  including credentials when Netdata Support investigates metrics or topology.
+- [Collect Troubleshooting Data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) — include built-in SNMP evidence in a
+  support bundle for metrics, BGP, licensing, or topology investigations. Share it privately; SNMP evidence is unsanitized.
 - [Configuration](/docs/npm/device-metrics/configuration.md) — the options referenced above.
 - [Sizing and Scaling](/docs/npm/device-metrics/sizing-and-scaling.md) — fixing hub-side overload for good.
 - [Anti-patterns](/docs/npm/device-metrics/anti-patterns.md) — the mistakes that cause these problems in the first place.

@@ -314,23 +314,25 @@ In the Netdata UI go to `Collectors -> go.d -> <module>`. Job names follow your 
 
 ## Troubleshooting
 
-### Permission denied (RBAC)
+### Other Problems
+
+#### Permission denied (RBAC)
 
 The service account needs `get`, `list`, `watch` on `pods` (or `services`), and on `configmaps` + `secrets` for pod-role env enrichment. The Helm chart provisions this; out-of-Helm deployments must bind the equivalent role.
 
 
-### `local_mode` enabled but env "MY_NODE_NAME" not set
+#### `local_mode` enabled but env "MY_NODE_NAME" not set
 
 When `pod.local_mode: true` is set but `MY_NODE_NAME` is missing, the discoverer fails at startup with `local_mode is enabled, but env 'MY_NODE_NAME' not set`. Set the env via the downward API on the Netdata pod (the Helm chart does this).
 
 
-### No targets discovered
+#### No targets discovered
 
 - Confirm pods/services exist in the configured `namespaces[]`.
 - If `selector.label` or `selector.field` is set, verify the targets actually carry the matching labels/fields.
 - With `local_mode`, only pods on the same node as the Netdata pod are visible.
 
 
-### Generated jobs fail to start
+#### Generated jobs fail to start
 
 The Address resolves to the pod's CNI IP — the Netdata Agent must be able to reach pod IPs. Most CNIs allow this from a pod running in the same cluster, but flat-network requirements differ. For service-role targets, the cluster-internal DNS name (`<svc>.<ns>.svc`) is used and should always resolve from inside the cluster.

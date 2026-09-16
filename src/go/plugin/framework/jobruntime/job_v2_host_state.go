@@ -5,13 +5,11 @@ package jobruntime
 import (
 	"fmt"
 	"maps"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -30,9 +28,14 @@ type jobV2HostRef struct {
 
 func jobV2HostFromVnode(vnode vnodes.VirtualNode) jobV2HostRef {
 	if vnode.GUID == "" {
-		return jobV2HostRef{kind: jobV2HostGlobal}
+		return jobV2HostRef{
+			kind: jobV2HostGlobal,
+		}
 	}
-	return jobV2HostRef{kind: jobV2HostVnode, guid: vnode.GUID}
+	return jobV2HostRef{
+		kind: jobV2HostVnode,
+		guid: vnode.GUID,
+	}
 }
 
 func (r jobV2HostRef) isSet() bool    { return r.kind != jobV2HostUnset }
@@ -43,44 +46,17 @@ type jobV2EmissionDecision struct {
 	targetHost       jobV2HostRef
 	needEngineReload bool
 	hostScope        *chartemit.HostScope
-	defineInfo       netdataapi.HostInfo
-	registryOwner    vnoderegistry.Owner
-	observeRegistry  bool
+	owner            *hostoutput.Owner
+	definition       *hostoutput.Definition
 }
 
 type jobV2HostState struct {
-	definedHost   jobV2HostRef
-	definedInfo   netdataapi.HostInfo
-	engineHost    jobV2HostRef
-	cleanupOwner  jobV2HostRef
-	cleanupInfo   netdataapi.HostInfo
-	cleanupCharts map[string]chartengine.ChartMeta
-	// registryOwners tracks successfully emitted vnode owners so cleanup can
-	// release them after obsolete-chart emission.
-	registryOwners map[vnoderegistry.Owner]string
-}
-
-func (s *jobV2HostState) invalidateDefine() {
-	if s == nil {
-		return
-	}
-	s.definedHost = jobV2HostRef{}
-	s.definedInfo = netdataapi.HostInfo{}
-}
-
-func (s *jobV2HostState) needsDefinition(target jobV2HostRef, info netdataapi.HostInfo) bool {
-	return s == nil ||
-		s.definedHost != target ||
-		s.definedInfo.GUID != info.GUID ||
-		s.definedInfo.Hostname != info.Hostname ||
-		!maps.Equal(s.definedInfo.Labels, info.Labels)
-}
-
-func (s *jobV2HostState) tracksRegistryOwner(owner vnoderegistry.Owner, guid string) bool {
-	if s == nil || owner == "" || guid == "" {
-		return false
-	}
-	return s.registryOwners[owner] == guid
+	engineHost        jobV2HostRef
+	cleanupOwner      jobV2HostRef
+	cleanupDefinition *hostoutput.Definition
+	cleanupCharts     map[string]chartengine.ChartMeta
+	owner             *hostoutput.Owner
+	ownerGUID         string
 }
 
 func (s *jobV2HostState) prepareEmission(vnode vnodes.VirtualNode) (jobV2EmissionDecision, error) {
@@ -93,17 +69,24 @@ func (s *jobV2HostState) prepareEmission(vnode vnodes.VirtualNode) (jobV2Emissio
 		return decision, nil
 	}
 
-	scope := &chartemit.HostScope{GUID: target.guid}
+	scope := &chartemit.HostScope{
+		GUID: target.guid,
+	}
 	decision.hostScope = scope
 	return decision, nil
 }
 
 func (s *jobV2HostState) prepareScopedEmission(scope metrix.HostScope) (jobV2EmissionDecision, error) {
-	target := jobV2HostRef{kind: jobV2HostVnode, guid: scope.GUID}
+	target := jobV2HostRef{
+		kind: jobV2HostVnode,
+		guid: scope.GUID,
+	}
 	decision := jobV2EmissionDecision{
 		targetHost:       target,
 		needEngineReload: s != nil && s.engineHost.isSet() && s.engineHost != target,
-		hostScope:        &chartemit.HostScope{GUID: target.guid},
+		hostScope: &chartemit.HostScope{
+			GUID: target.guid,
+		},
 	}
 	return decision, nil
 }
@@ -119,17 +102,13 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 		}
 		return
 	}
+	if s.owner != decision.owner {
+		s.owner.Release()
+	}
+	s.owner = decision.owner
+	s.ownerGUID = decision.targetHost.guid
 	s.engineHost = decision.targetHost
-	if decision.hostScope != nil {
-		s.definedHost = decision.targetHost
-		s.definedInfo = decision.defineInfo
-	}
-	if decision.registryOwner != "" {
-		if s.registryOwners == nil {
-			s.registryOwners = make(map[vnoderegistry.Owner]string)
-		}
-		s.registryOwners[decision.registryOwner] = decision.targetHost.guid
-	}
+	s.cleanupDefinition = decision.definition
 	if s.cleanupCharts == nil {
 		s.cleanupCharts = make(map[string]chartengine.ChartMeta)
 	}
@@ -166,34 +145,6 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 	}
 
 	s.cleanupOwner = decision.targetHost
-	s.cleanupInfo = netdataapi.HostInfo{
-		GUID:     decision.defineInfo.GUID,
-		Hostname: decision.defineInfo.Hostname,
-		Labels:   maps.Clone(decision.defineInfo.Labels),
-	}
-}
-
-func (s *jobV2HostState) releaseRegistryOwners(registry *vnoderegistry.Registry) {
-	if s == nil || registry == nil || len(s.registryOwners) == 0 {
-		return
-	}
-	for owner, guid := range s.registryOwners {
-		registry.Release(owner, guid)
-		delete(s.registryOwners, owner)
-	}
-}
-
-func (s *jobV2HostState) releaseSupersededRegistryOwnersExcept(registry *vnoderegistry.Registry, current map[vnoderegistry.Owner]struct{}, ownerPrefix string) {
-	if s == nil || registry == nil || len(s.registryOwners) == 0 {
-		return
-	}
-	for owner, guid := range s.registryOwners {
-		if _, ok := current[owner]; ok || !strings.HasPrefix(string(owner), ownerPrefix) {
-			continue
-		}
-		registry.Release(owner, guid)
-		delete(s.registryOwners, owner)
-	}
 }
 
 func (r jobV2HostRef) String() string {

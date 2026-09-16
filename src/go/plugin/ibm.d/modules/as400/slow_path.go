@@ -630,7 +630,7 @@ func (c *Collector) countSubsystemsWith(doRow queryRowFunc, ctx context.Context)
 			}
 		}
 	})
-	return int(count), err
+	return int64ToCount(count), err
 }
 
 func (c *Collector) fetchSubsystems(ctx context.Context, beat time.Time, do queryFunc, doRow queryRowFunc) (subsystemSnapshot, error) {

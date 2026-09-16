@@ -1,6 +1,7 @@
 # Passive journal centralization without encryption
 
-This page will guide you through creating a passive journal centralization setup without the use of encryption.
+A passive journal centralization point receives the journals its clients push to it. In this setup the traffic is not
+encrypted, so it applies only to trusted networks.
 
 Once you centralize your infrastructure logs to a server, Netdata will automatically detect all the logs from all servers and organize them in sources.
 With the setup described in this document, journal files are identified by the IPs of the clients sending the logs. Netdata will automatically do

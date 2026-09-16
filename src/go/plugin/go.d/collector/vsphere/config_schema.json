@@ -243,14 +243,12 @@
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "bearer_token_file": {
         "title": "Bearer Token File",
@@ -261,23 +259,6 @@
         "title": "Force HTTP2",
         "description": "If set, forces the use of HTTP/2 protocol for all requests, even over plain TCP (h2c).",
         "type": "boolean"
-      },
-      "proxy_url": {
-        "title": "Proxy URL",
-        "description": "The URL of the proxy server.",
-        "type": "string"
-      },
-      "proxy_username": {
-        "title": "Proxy username",
-        "description": "The username for proxy authentication.",
-        "type": "string",
-        "sensitive": true
-      },
-      "proxy_password": {
-        "title": "Proxy password",
-        "description": "The password for proxy authentication.",
-        "type": "string",
-        "sensitive": true
       },
       "headers": {
         "title": "Headers",
@@ -329,9 +310,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -418,15 +396,6 @@
     "not_follow_redirects": {
       "ui:widget": "hidden"
     },
-    "proxy_url": {
-      "ui:widget": "hidden"
-    },
-    "proxy_username": {
-      "ui:widget": "hidden"
-    },
-    "proxy_password": {
-      "ui:widget": "hidden"
-    },
     "headers": {
       "ui:widget": "hidden"
     },
@@ -476,8 +445,7 @@
       "ui:listFlavour": "list"
     },
     "username": {
-      "ui:placeholder": "admin@vsphere.local",
-      "ui:widget": "password"
+      "ui:placeholder": "admin@vsphere.local"
     },
     "password": {
       "ui:widget": "password"

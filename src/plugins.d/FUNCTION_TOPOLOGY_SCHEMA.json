@@ -77,6 +77,13 @@
         "producer": {
           "$ref": "#/$defs/producer"
         },
+        "notifications": {
+          "type": "array",
+          "description": "Information and issues about this topology response. Omission or an empty array reports no notifications; notifications do not replace fatal Function errors.",
+          "items": {
+            "$ref": "#/$defs/notification"
+          }
+        },
         "collected_at": {
           "type": "string",
           "format": "date-time"
@@ -140,6 +147,44 @@
             "$ref": "#/$defs/scalar_or_array"
           },
           "default": {}
+        }
+      }
+    },
+    "notification": {
+      "type": "object",
+      "description": "A user-facing notice accompanying usable topology data, independent of topology kind or delivery path.",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "properties": {
+        "severity": {
+          "type": "string",
+          "description": "Info supplies context, warning identifies a limitation or uncertainty, and error reports a failure while usable topology data remains available. Severity does not change Function status.",
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "code": {
+          "$ref": "#/$defs/id",
+          "description": "Stable machine-readable notification code. Message text is not a merge identity."
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Non-empty user-facing explanation. Treat as untrusted plain text, never HTML, Markdown, or executable instructions; do not include secrets."
+        },
+        "origin": {
+          "$ref": "#/$defs/producer",
+          "description": "Producer that emitted the notification. Omission inherits the enclosing data.producer; aggregators must make inherited origins explicit before replacing that producer and preserve explicit origins."
+        },
+        "affected_node_id": {
+          "type": "string",
+          "description": "Agent node identifier the issue concerns, using the producer.node_id string convention. This identifies the affected Agent, not the notification emitter; omit when no single known Agent is affected."
         }
       }
     },

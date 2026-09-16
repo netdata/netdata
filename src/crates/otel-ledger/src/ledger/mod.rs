@@ -155,9 +155,13 @@ impl Ledger {
     /// construction (which sets up the handlers) and the ingestor accept: the
     /// supervisor configures workers sequentially, so the ingestor (which the
     /// ledger then waits for on `writer_socket_path`) can't start until the
-    /// supervisor has seen Ready — moving Ready any later deadlocks. A failure
-    /// before Ready leaves the worker un-advertised; a failure during
-    /// `accept_writer` after Ready surfaces as a dropped supervisor connection.
+    /// supervisor has seen Ready — moving Ready any later deadlocks. Ready here
+    /// is a report to the supervisor, not yet an advertisement: the supervisor
+    /// forwards these declarations to the agent only after the ingestor has
+    /// bound its gRPC endpoint (bind before declare), so a failure before Ready
+    /// or an ingestor bind failure both leave the plugin un-advertised. A
+    /// failure during `accept_writer` after Ready surfaces as a dropped
+    /// supervisor connection.
     pub async fn new(
         mut supervisor: Connection<LedgerResponse, LedgerRequest>,
         writer_socket_path: &str,
@@ -320,7 +324,8 @@ impl Ledger {
 
         // Signal Ready between pipeline construction and the ingestor accept;
         // see the method docstring for the full ordering rationale. Both
-        // Functions are advertised: `otel-logs` and `otel-traces`.
+        // Functions are reported: `otel-logs` and `otel-traces`. The supervisor
+        // advertises them once the ingestor is bound.
         let declarations = vec![
             pipelines.logs.declaration().clone(),
             pipelines.traces.declaration().clone(),

@@ -378,6 +378,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+            - name: cgroup.fd_open
+              description: Number of open files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: cgroup.fd_open_error
+              description: Fails to open files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: cgroup.fd_close
+              description: Files closed
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: cgroup.fd_close_error
+              description: Fails to close files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
             - name: cgroup.net_conn_ipv4
               description: TCP v4 outbound connections
               unit: "connections/s"
@@ -1159,6 +1183,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+            - name: systemd.service.fd_open
+              description: Number of open files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: systemd.service.fd_open_error
+              description: Fails to open files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: systemd.service.fd_close
+              description: Files closed
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: systemd.service.fd_close_error
+              description: Fails to close files
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: calls
             - name: systemd.service.net_conn_ipv4
               description: TCP v4 outbound connections
               unit: "connections/s"

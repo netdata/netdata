@@ -302,7 +302,7 @@ func forbiddenLinkMapCarrierUseError(
 }
 
 func isAllowedLinkMapCarrierUse(path, name string, node ast.Node) bool {
-	if strings.HasPrefix(filepath.Base(path), "topology_diagnostic_archive") && name == "Metrics" {
+	if filepath.ToSlash(path) == "internal/topologydiag/archive_acquisition.go" && name == "Metrics" {
 		return true
 	}
 	if filepath.Base(path) != "presentation.go" || name != "Metrics" {

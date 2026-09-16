@@ -13,15 +13,16 @@ import (
 )
 
 type routeBinding struct {
+	autogenGuard      *autogenRouteGuard
 	ChartTemplateID   string
 	ChartID           string
 	DimensionIndex    int
 	DimensionName     string
 	DimensionKeyLabel string
 	Algorithm         program.Algorithm
-	Hidden            bool
 	Multiplier        int
 	Divisor           int
+	Hidden            bool
 	Float             bool
 	Static            bool
 	Inferred          bool

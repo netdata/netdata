@@ -211,118 +211,118 @@ their objective, and all four are capped at `24h`.
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Mode** | [mode](#option-mode-mode) | Check to run: `lifecycle`, `ceph_multisite`, or `aws_replication`. | lifecycle | no |
+| **Mode** | [mode](#option-mode-mode) | Which check this job runs: `lifecycle`, `ceph_multisite`, or `aws_replication`. | lifecycle | no |
 | **Mode / Lifecycle** | [mode_lifecycle](#option-mode-lifecycle-mode-lifecycle) | Settings of the `lifecycle` mode. Required when `mode` is `lifecycle`. |  | no |
 |  | mode_lifecycle.prefix | Key prefix reserved for probe objects. Must end with `/`. | netdata-s3check/ | no |
-| **Mode / Lifecycle connection** | mode_lifecycle.source | The S3 endpoint to check. Required. |  | no |
-|  | mode_lifecycle.source.name | Label for this endpoint on charts (the `source` label). | source | no |
-|  | mode_lifecycle.source.endpoint | Service URL with scheme and host only. Empty uses the AWS regional endpoint. |  | no |
-|  | mode_lifecycle.source.region | Signing region such as `us-east-1`. Required, also for non-AWS services. |  | no |
-|  | mode_lifecycle.source.bucket | Bucket that holds the probe objects. Required. |  | no |
-|  | mode_lifecycle.source.path_style | Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3. | yes | no |
-|  | mode_lifecycle.source.credentials | Static access keys. Omit to use the AWS SDK default credential chain. |  | no |
-|  | mode_lifecycle.source.credentials.access_key_id | Access key ID. Required when `credentials` is set. |  | no |
-|  | mode_lifecycle.source.credentials.secret_access_key | Secret access key. Required when `credentials` is set. |  | no |
-|  | mode_lifecycle.source.credentials.session_token | Session token for temporary credentials. |  | no |
+| **Mode / Lifecycle connection** | mode_lifecycle.source | The S3 endpoint to check. |  | no |
+|  | mode_lifecycle.source.name | Label for this endpoint on charts. | source | no |
+|  | mode_lifecycle.source.endpoint | Service URL with scheme and host only. Leave empty for the AWS regional endpoint. |  | no |
+|  | mode_lifecycle.source.region | Signing region, for example `us-east-1`. Required, also for non-AWS services. |  | no |
+|  | mode_lifecycle.source.bucket | Bucket that holds the probe objects. |  | no |
+|  | mode_lifecycle.source.path_style | Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3. | yes | no |
+|  | mode_lifecycle.source.credentials | Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain. |  | no |
+|  | mode_lifecycle.source.credentials.access_key_id | Access key ID of the static credentials. |  | no |
+|  | mode_lifecycle.source.credentials.secret_access_key | Secret access key of the static credentials. |  | no |
+|  | mode_lifecycle.source.credentials.session_token | Session token for temporary credentials. Leave empty for long-lived keys. |  | no |
 |  | mode_lifecycle.source.assume_role | IAM role to assume with this endpoint's base credentials. |  | no |
-|  | mode_lifecycle.source.assume_role.role_arn | ARN of the role to assume. Required when `assume_role` is set. |  | no |
-|  | mode_lifecycle.source.assume_role.external_id | External ID expected by the role's trust policy. |  | no |
-|  | mode_lifecycle.source.timeout | Maximum duration of one S3 or STS request, up to `1m`. | 10s | no |
-|  | mode_lifecycle.source.proxy_url | HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment. |  | no |
-|  | mode_lifecycle.source.tls_skip_verify | Skip TLS certificate verification. Insecure. | no | no |
-|  | mode_lifecycle.source.tls_ca | Absolute path to a CA bundle for a private CA. |  | no |
-|  | mode_lifecycle.source.tls_cert | Absolute path to a client certificate. Requires `tls_key`. |  | no |
-|  | mode_lifecycle.source.tls_key | Absolute path to the client certificate key. Requires `tls_cert`. |  | no |
+|  | mode_lifecycle.source.assume_role.role_arn | ARN of the IAM role to assume. |  | no |
+|  | mode_lifecycle.source.assume_role.external_id | External ID expected by the role's trust policy, if any. |  | no |
+|  | mode_lifecycle.source.timeout | Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`. | 10s | no |
+|  | mode_lifecycle.source.proxy_url | HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables. |  | no |
+|  | mode_lifecycle.source.tls_skip_verify | Skip TLS certificate and hostname verification. Insecure. | no | no |
+|  | mode_lifecycle.source.tls_ca | Absolute path to a CA bundle for a private certificate authority. |  | no |
+|  | mode_lifecycle.source.tls_cert | Absolute path to the client certificate. Requires the client key. |  | no |
+|  | mode_lifecycle.source.tls_key | Absolute path to the client certificate key. Requires the client certificate. |  | no |
 | **Mode / Ceph multisite** | [mode_ceph_multisite](#option-mode-ceph-multisite-mode-ceph-multisite) | Settings of the `ceph_multisite` mode. Required when `mode` is `ceph_multisite`. |  | no |
 |  | mode_ceph_multisite.prefix | Key prefix reserved for probe objects. Must end with `/`. | netdata-s3check/ | no |
-| **Mode / Ceph multisite source** | mode_ceph_multisite.source | Where probe objects are written and deleted. Required. |  | no |
-|  | mode_ceph_multisite.source.name | Label for this endpoint on charts (the `source` label). | source | no |
-|  | mode_ceph_multisite.source.endpoint | Service URL with scheme and host only. Empty uses the AWS regional endpoint. |  | no |
-|  | mode_ceph_multisite.source.region | Signing region such as `us-east-1`. Required, also for non-AWS services. |  | no |
-|  | mode_ceph_multisite.source.bucket | Bucket that holds the probe objects. Required. |  | no |
-|  | mode_ceph_multisite.source.path_style | Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3. | yes | no |
-|  | mode_ceph_multisite.source.credentials | Static access keys. Omit to use the AWS SDK default credential chain. |  | no |
-|  | mode_ceph_multisite.source.credentials.access_key_id | Access key ID. Required when `credentials` is set. |  | no |
-|  | mode_ceph_multisite.source.credentials.secret_access_key | Secret access key. Required when `credentials` is set. |  | no |
-|  | mode_ceph_multisite.source.credentials.session_token | Session token for temporary credentials. |  | no |
+| **Mode / Ceph multisite source** | mode_ceph_multisite.source | Where probe objects are written and deleted. |  | no |
+|  | mode_ceph_multisite.source.name | Label for this endpoint on charts. | source | no |
+|  | mode_ceph_multisite.source.endpoint | Service URL with scheme and host only. Leave empty for the AWS regional endpoint. |  | no |
+|  | mode_ceph_multisite.source.region | Signing region, for example `us-east-1`. Required, also for non-AWS services. |  | no |
+|  | mode_ceph_multisite.source.bucket | Bucket that holds the probe objects. |  | no |
+|  | mode_ceph_multisite.source.path_style | Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3. | yes | no |
+|  | mode_ceph_multisite.source.credentials | Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain. |  | no |
+|  | mode_ceph_multisite.source.credentials.access_key_id | Access key ID of the static credentials. |  | no |
+|  | mode_ceph_multisite.source.credentials.secret_access_key | Secret access key of the static credentials. |  | no |
+|  | mode_ceph_multisite.source.credentials.session_token | Session token for temporary credentials. Leave empty for long-lived keys. |  | no |
 |  | mode_ceph_multisite.source.assume_role | IAM role to assume with this endpoint's base credentials. |  | no |
-|  | mode_ceph_multisite.source.assume_role.role_arn | ARN of the role to assume. Required when `assume_role` is set. |  | no |
-|  | mode_ceph_multisite.source.assume_role.external_id | External ID expected by the role's trust policy. |  | no |
-|  | mode_ceph_multisite.source.timeout | Maximum duration of one S3 or STS request, up to `1m`. | 10s | no |
-|  | mode_ceph_multisite.source.proxy_url | HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment. |  | no |
-|  | mode_ceph_multisite.source.tls_skip_verify | Skip TLS certificate verification. Insecure. | no | no |
-|  | mode_ceph_multisite.source.tls_ca | Absolute path to a CA bundle for a private CA. |  | no |
-|  | mode_ceph_multisite.source.tls_cert | Absolute path to a client certificate. Requires `tls_key`. |  | no |
-|  | mode_ceph_multisite.source.tls_key | Absolute path to the client certificate key. Requires `tls_cert`. |  | no |
-| **Mode / Ceph multisite destination** | mode_ceph_multisite.destination | Where replicated copies must appear. Never written by the collector. Required. |  | no |
-|  | mode_ceph_multisite.destination.name | Label for this endpoint on charts (the `destination` label). | destination | no |
-|  | mode_ceph_multisite.destination.endpoint | Service URL with scheme and host only. Empty uses the AWS regional endpoint. |  | no |
-|  | mode_ceph_multisite.destination.region | Signing region such as `us-east-1`. Required, also for non-AWS services. |  | no |
-|  | mode_ceph_multisite.destination.bucket | Bucket that holds the probe objects. Required. |  | no |
-|  | mode_ceph_multisite.destination.path_style | Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3. | yes | no |
-|  | mode_ceph_multisite.destination.credentials | Static access keys. Omit to use the AWS SDK default credential chain. |  | no |
-|  | mode_ceph_multisite.destination.credentials.access_key_id | Access key ID. Required when `credentials` is set. |  | no |
-|  | mode_ceph_multisite.destination.credentials.secret_access_key | Secret access key. Required when `credentials` is set. |  | no |
-|  | mode_ceph_multisite.destination.credentials.session_token | Session token for temporary credentials. |  | no |
+|  | mode_ceph_multisite.source.assume_role.role_arn | ARN of the IAM role to assume. |  | no |
+|  | mode_ceph_multisite.source.assume_role.external_id | External ID expected by the role's trust policy, if any. |  | no |
+|  | mode_ceph_multisite.source.timeout | Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`. | 10s | no |
+|  | mode_ceph_multisite.source.proxy_url | HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables. |  | no |
+|  | mode_ceph_multisite.source.tls_skip_verify | Skip TLS certificate and hostname verification. Insecure. | no | no |
+|  | mode_ceph_multisite.source.tls_ca | Absolute path to a CA bundle for a private certificate authority. |  | no |
+|  | mode_ceph_multisite.source.tls_cert | Absolute path to the client certificate. Requires the client key. |  | no |
+|  | mode_ceph_multisite.source.tls_key | Absolute path to the client certificate key. Requires the client certificate. |  | no |
+| **Mode / Ceph multisite destination** | mode_ceph_multisite.destination | Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects. |  | no |
+|  | mode_ceph_multisite.destination.name | Label for this endpoint on charts. | destination | no |
+|  | mode_ceph_multisite.destination.endpoint | Service URL with scheme and host only. Leave empty for the AWS regional endpoint. |  | no |
+|  | mode_ceph_multisite.destination.region | Signing region, for example `us-east-1`. Required, also for non-AWS services. |  | no |
+|  | mode_ceph_multisite.destination.bucket | Bucket that holds the probe objects. |  | no |
+|  | mode_ceph_multisite.destination.path_style | Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3. | yes | no |
+|  | mode_ceph_multisite.destination.credentials | Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain. |  | no |
+|  | mode_ceph_multisite.destination.credentials.access_key_id | Access key ID of the static credentials. |  | no |
+|  | mode_ceph_multisite.destination.credentials.secret_access_key | Secret access key of the static credentials. |  | no |
+|  | mode_ceph_multisite.destination.credentials.session_token | Session token for temporary credentials. Leave empty for long-lived keys. |  | no |
 |  | mode_ceph_multisite.destination.assume_role | IAM role to assume with this endpoint's base credentials. |  | no |
-|  | mode_ceph_multisite.destination.assume_role.role_arn | ARN of the role to assume. Required when `assume_role` is set. |  | no |
-|  | mode_ceph_multisite.destination.assume_role.external_id | External ID expected by the role's trust policy. |  | no |
-|  | mode_ceph_multisite.destination.timeout | Maximum duration of one S3 or STS request, up to `1m`. | 10s | no |
-|  | mode_ceph_multisite.destination.proxy_url | HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment. |  | no |
-|  | mode_ceph_multisite.destination.tls_skip_verify | Skip TLS certificate verification. Insecure. | no | no |
-|  | mode_ceph_multisite.destination.tls_ca | Absolute path to a CA bundle for a private CA. |  | no |
-|  | mode_ceph_multisite.destination.tls_cert | Absolute path to a client certificate. Requires `tls_key`. |  | no |
-|  | mode_ceph_multisite.destination.tls_key | Absolute path to the client certificate key. Requires `tls_cert`. |  | no |
-| **Mode / Ceph multisite objectives** | mode_ceph_multisite.write_objective | Healthy propagation time for a new object. Exceeding it flags the objective chart only. | 15m | no |
-|  | mode_ceph_multisite.write_timeout | Hard limit for a new object to appear at the destination. Exceeding it fails the probe. | 30m | no |
-|  | mode_ceph_multisite.delete_objective | Healthy time for a source delete to hide the destination copy. | 5m | no |
-|  | mode_ceph_multisite.delete_timeout | Hard limit for the destination copy to disappear. Exceeding it fails the probe. | 15m | no |
+|  | mode_ceph_multisite.destination.assume_role.role_arn | ARN of the IAM role to assume. |  | no |
+|  | mode_ceph_multisite.destination.assume_role.external_id | External ID expected by the role's trust policy, if any. |  | no |
+|  | mode_ceph_multisite.destination.timeout | Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`. | 10s | no |
+|  | mode_ceph_multisite.destination.proxy_url | HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables. |  | no |
+|  | mode_ceph_multisite.destination.tls_skip_verify | Skip TLS certificate and hostname verification. Insecure. | no | no |
+|  | mode_ceph_multisite.destination.tls_ca | Absolute path to a CA bundle for a private certificate authority. |  | no |
+|  | mode_ceph_multisite.destination.tls_cert | Absolute path to the client certificate. Requires the client key. |  | no |
+|  | mode_ceph_multisite.destination.tls_key | Absolute path to the client certificate key. Requires the client certificate. |  | no |
+| **Mode / Ceph multisite objectives** | mode_ceph_multisite.write_objective | Healthy time for a new object to appear at the destination, for example `15m`. Exceeding it flags the objective chart only. | 15m | no |
+|  | mode_ceph_multisite.write_timeout | Hard limit for a new object to appear at the destination, for example `30m`. Exceeding it fails the probe. | 30m | no |
+|  | mode_ceph_multisite.delete_objective | Healthy time for a source delete to hide the destination copy, for example `5m`. | 5m | no |
+|  | mode_ceph_multisite.delete_timeout | Hard limit for the destination copy to disappear, for example `15m`. Exceeding it fails the probe. | 15m | no |
 | **Mode / AWS replication** | [mode_aws_replication](#option-mode-aws-replication-mode-aws-replication) | Settings of the `aws_replication` mode. Required when `mode` is `aws_replication`. |  | no |
 |  | mode_aws_replication.prefix | Key prefix reserved for probe objects. Must end with `/`. | netdata-s3check/ | no |
-| **Mode / AWS replication source** | mode_aws_replication.source | Where probe objects are written and deleted. Required. |  | no |
-|  | mode_aws_replication.source.name | Label for this endpoint on charts (the `source` label). | source | no |
-|  | mode_aws_replication.source.endpoint | Service URL with scheme and host only. Empty uses the AWS regional endpoint. |  | no |
-|  | mode_aws_replication.source.region | Signing region such as `us-east-1`. Required, also for non-AWS services. |  | no |
-|  | mode_aws_replication.source.bucket | Bucket that holds the probe objects. Required. |  | no |
-|  | mode_aws_replication.source.path_style | Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3. | yes | no |
-|  | mode_aws_replication.source.credentials | Static access keys. Omit to use the AWS SDK default credential chain. |  | no |
-|  | mode_aws_replication.source.credentials.access_key_id | Access key ID. Required when `credentials` is set. |  | no |
-|  | mode_aws_replication.source.credentials.secret_access_key | Secret access key. Required when `credentials` is set. |  | no |
-|  | mode_aws_replication.source.credentials.session_token | Session token for temporary credentials. |  | no |
+| **Mode / AWS replication source** | mode_aws_replication.source | Where probe objects are written and deleted. |  | no |
+|  | mode_aws_replication.source.name | Label for this endpoint on charts. | source | no |
+|  | mode_aws_replication.source.endpoint | Service URL with scheme and host only. Leave empty for the AWS regional endpoint. |  | no |
+|  | mode_aws_replication.source.region | Signing region, for example `us-east-1`. Required, also for non-AWS services. |  | no |
+|  | mode_aws_replication.source.bucket | Bucket that holds the probe objects. |  | no |
+|  | mode_aws_replication.source.path_style | Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3. | yes | no |
+|  | mode_aws_replication.source.credentials | Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain. |  | no |
+|  | mode_aws_replication.source.credentials.access_key_id | Access key ID of the static credentials. |  | no |
+|  | mode_aws_replication.source.credentials.secret_access_key | Secret access key of the static credentials. |  | no |
+|  | mode_aws_replication.source.credentials.session_token | Session token for temporary credentials. Leave empty for long-lived keys. |  | no |
 |  | mode_aws_replication.source.assume_role | IAM role to assume with this endpoint's base credentials. |  | no |
-|  | mode_aws_replication.source.assume_role.role_arn | ARN of the role to assume. Required when `assume_role` is set. |  | no |
-|  | mode_aws_replication.source.assume_role.external_id | External ID expected by the role's trust policy. |  | no |
-|  | mode_aws_replication.source.timeout | Maximum duration of one S3 or STS request, up to `1m`. | 10s | no |
-|  | mode_aws_replication.source.proxy_url | HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment. |  | no |
-|  | mode_aws_replication.source.tls_skip_verify | Skip TLS certificate verification. Insecure. | no | no |
-|  | mode_aws_replication.source.tls_ca | Absolute path to a CA bundle for a private CA. |  | no |
-|  | mode_aws_replication.source.tls_cert | Absolute path to a client certificate. Requires `tls_key`. |  | no |
-|  | mode_aws_replication.source.tls_key | Absolute path to the client certificate key. Requires `tls_cert`. |  | no |
-| **Mode / AWS replication destination** | mode_aws_replication.destination | Where replicated copies must appear. Never written by the collector. Required. |  | no |
-|  | mode_aws_replication.destination.name | Label for this endpoint on charts (the `destination` label). | destination | no |
-|  | mode_aws_replication.destination.endpoint | Service URL with scheme and host only. Empty uses the AWS regional endpoint. |  | no |
-|  | mode_aws_replication.destination.region | Signing region such as `us-east-1`. Required, also for non-AWS services. |  | no |
-|  | mode_aws_replication.destination.bucket | Bucket that holds the probe objects. Required. |  | no |
-|  | mode_aws_replication.destination.path_style | Path-style addressing (`https://host/bucket/key`). Set to `no` for AWS S3. | yes | no |
-|  | mode_aws_replication.destination.credentials | Static access keys. Omit to use the AWS SDK default credential chain. |  | no |
-|  | mode_aws_replication.destination.credentials.access_key_id | Access key ID. Required when `credentials` is set. |  | no |
-|  | mode_aws_replication.destination.credentials.secret_access_key | Secret access key. Required when `credentials` is set. |  | no |
-|  | mode_aws_replication.destination.credentials.session_token | Session token for temporary credentials. |  | no |
+|  | mode_aws_replication.source.assume_role.role_arn | ARN of the IAM role to assume. |  | no |
+|  | mode_aws_replication.source.assume_role.external_id | External ID expected by the role's trust policy, if any. |  | no |
+|  | mode_aws_replication.source.timeout | Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`. | 10s | no |
+|  | mode_aws_replication.source.proxy_url | HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables. |  | no |
+|  | mode_aws_replication.source.tls_skip_verify | Skip TLS certificate and hostname verification. Insecure. | no | no |
+|  | mode_aws_replication.source.tls_ca | Absolute path to a CA bundle for a private certificate authority. |  | no |
+|  | mode_aws_replication.source.tls_cert | Absolute path to the client certificate. Requires the client key. |  | no |
+|  | mode_aws_replication.source.tls_key | Absolute path to the client certificate key. Requires the client certificate. |  | no |
+| **Mode / AWS replication destination** | mode_aws_replication.destination | Where replicated copies must appear. The collector only reads there and cleans up its own copies; it never creates objects. |  | no |
+|  | mode_aws_replication.destination.name | Label for this endpoint on charts. | destination | no |
+|  | mode_aws_replication.destination.endpoint | Service URL with scheme and host only. Leave empty for the AWS regional endpoint. |  | no |
+|  | mode_aws_replication.destination.region | Signing region, for example `us-east-1`. Required, also for non-AWS services. |  | no |
+|  | mode_aws_replication.destination.bucket | Bucket that holds the probe objects. |  | no |
+|  | mode_aws_replication.destination.path_style | Put the bucket in the request path (`https://host/bucket/key`) instead of the hostname. Turn off for AWS S3. | yes | no |
+|  | mode_aws_replication.destination.credentials | Static access keys for this endpoint. Leave empty to use the AWS SDK default credential chain. |  | no |
+|  | mode_aws_replication.destination.credentials.access_key_id | Access key ID of the static credentials. |  | no |
+|  | mode_aws_replication.destination.credentials.secret_access_key | Secret access key of the static credentials. |  | no |
+|  | mode_aws_replication.destination.credentials.session_token | Session token for temporary credentials. Leave empty for long-lived keys. |  | no |
 |  | mode_aws_replication.destination.assume_role | IAM role to assume with this endpoint's base credentials. |  | no |
-|  | mode_aws_replication.destination.assume_role.role_arn | ARN of the role to assume. Required when `assume_role` is set. |  | no |
-|  | mode_aws_replication.destination.assume_role.external_id | External ID expected by the role's trust policy. |  | no |
-|  | mode_aws_replication.destination.timeout | Maximum duration of one S3 or STS request, up to `1m`. | 10s | no |
-|  | mode_aws_replication.destination.proxy_url | HTTP proxy for this endpoint's S3 and STS requests. Empty uses the proxy environment. |  | no |
-|  | mode_aws_replication.destination.tls_skip_verify | Skip TLS certificate verification. Insecure. | no | no |
-|  | mode_aws_replication.destination.tls_ca | Absolute path to a CA bundle for a private CA. |  | no |
-|  | mode_aws_replication.destination.tls_cert | Absolute path to a client certificate. Requires `tls_key`. |  | no |
-|  | mode_aws_replication.destination.tls_key | Absolute path to the client certificate key. Requires `tls_cert`. |  | no |
-| **Mode / AWS replication objectives** | mode_aws_replication.write_objective | Healthy propagation time for a new object. Exceeding it flags the objective chart only. | 15m | no |
-|  | mode_aws_replication.write_timeout | Hard limit for a new object to appear at the destination. Exceeding it fails the probe. | 30m | no |
-|  | mode_aws_replication.delete_objective | Healthy time for a source delete to hide the destination copy. | 5m | no |
-|  | mode_aws_replication.delete_timeout | Hard limit for the destination copy to disappear. Exceeding it fails the probe. | 15m | no |
-| **Collection** | update_every | Collection interval in seconds. Replication modes poll the destination once per interval. | 120 | no |
-|  | autodetection_retry | Seconds between retries when the initial bucket check fails. `0` disables retries. | 0 | no |
+|  | mode_aws_replication.destination.assume_role.role_arn | ARN of the IAM role to assume. |  | no |
+|  | mode_aws_replication.destination.assume_role.external_id | External ID expected by the role's trust policy, if any. |  | no |
+|  | mode_aws_replication.destination.timeout | Maximum duration of one S3 or STS request, for example `10s`. Up to `1m`. | 10s | no |
+|  | mode_aws_replication.destination.proxy_url | HTTP proxy for this endpoint's requests. Leave empty to use the proxy environment variables. |  | no |
+|  | mode_aws_replication.destination.tls_skip_verify | Skip TLS certificate and hostname verification. Insecure. | no | no |
+|  | mode_aws_replication.destination.tls_ca | Absolute path to a CA bundle for a private certificate authority. |  | no |
+|  | mode_aws_replication.destination.tls_cert | Absolute path to the client certificate. Requires the client key. |  | no |
+|  | mode_aws_replication.destination.tls_key | Absolute path to the client certificate key. Requires the client certificate. |  | no |
+| **Mode / AWS replication objectives** | mode_aws_replication.write_objective | Healthy time for a new object to appear at the destination, for example `15m`. Exceeding it flags the objective chart only. | 15m | no |
+|  | mode_aws_replication.write_timeout | Hard limit for a new object to appear at the destination, for example `30m`. Exceeding it fails the probe. | 30m | no |
+|  | mode_aws_replication.delete_objective | Healthy time for a source delete to hide the destination copy, for example `5m`. | 5m | no |
+|  | mode_aws_replication.delete_timeout | Hard limit for the destination copy to disappear, for example `15m`. Exceeding it fails the probe. | 15m | no |
+| **Collection** | update_every | Data collection interval, in seconds. Replication modes poll the destination once per interval. | 120 | no |
+|  | autodetection_retry | How often to retry the initial bucket check when the job fails to start, in seconds. Zero disables retries. | 0 | no |
 | **Virtual Node** | vnode | Virtual Node that owns the charts of this job. |  | no |
 
 <a id="option-mode-mode"></a>
@@ -659,7 +659,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -691,14 +693,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m s3check -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `s3check` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -706,7 +708,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep s3check
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -716,7 +718,7 @@ grep s3check /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -724,7 +726,9 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep s3check
 ```
 
-### The job fails its initial check
+### Other Problems
+
+#### The job fails its initial check
 
 Before writing anything, the collector reads the bucket versioning state of every endpoint and, in
 `aws_replication` mode, the replication rules of the source bucket. A failure here means one of:
@@ -739,7 +743,7 @@ Before writing anything, the collector reads the bucket versioning state of ever
 Chart labels carry only a bounded `reason`; the exact provider error is in the collector log.
 
 
-### Objects remain pending cleanup or new probes are paused
+#### Objects remain pending cleanup or new probes are paused
 
 After an interrupted probe the collector deletes the objects it recorded a few per collection.
 `cleanup_pending_objects` shows the backlog and `mutation_backpressure` turns active when the backlog
@@ -754,7 +758,7 @@ permission problem; an `ownership` reason means the local state could not be loc
 collector log has the details.
 
 
-### Replication probes stay in waiting or time out
+#### Replication probes stay in waiting or time out
 
 A replication probe reports `waiting` until the destination serves the object (write) or stops serving
 it (delete), and fails with `visibility_timeout` or `delete_timeout` when the configured timeout passes.

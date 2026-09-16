@@ -149,12 +149,12 @@ func TestCollectorInitBuildsEnabledProfileMetricRuntime(t *testing.T) {
 }
 
 func TestCollectorCreatorDefaults(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	creator := Creator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	assert.False(t, creator.Defaults.Disabled)
 }
 
 func TestCollectorCreatorSharesPluginDependencies(t *testing.T) {
-	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	creator := Creator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	first := creator.CreateV2().(*Collector)
 	second := creator.CreateV2().(*Collector)
 
@@ -184,7 +184,7 @@ func TestCollectorCreatorResolvesProfilePathsOnFirstCollector(t *testing.T) {
 	earlyDir := filepath.Join(t.TempDir(), "before-plugin-config")
 	require.NoError(t, os.MkdirAll(earlyDir, 0o755))
 	executable.Directory = earlyDir
-	creator := newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	creator := Creator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 
 	root := t.TempDir()
 	executableDir := filepath.Join(root, "plugins.d")
@@ -269,14 +269,14 @@ func TestCollectorNewUsesIndependentHostIdentityService(t *testing.T) {
 }
 
 func TestCollectorCreatorRequiresSharedDependencies(t *testing.T) {
-	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil device store", func() {
-		_ = newCreator(nil, snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
+	require.PanicsWithValue(t, "snmp_traps Creator requires a non-nil device store", func() {
+		_ = Creator(nil, snmptopology.NewTrapEnrichmentHandle(), newTestReverseDNSResolver())
 	})
-	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil trap enrichment handle", func() {
-		_ = newCreator(ddsnmp.NewDeviceStore(), nil, newTestReverseDNSResolver())
+	require.PanicsWithValue(t, "snmp_traps Creator requires a non-nil trap enrichment handle", func() {
+		_ = Creator(ddsnmp.NewDeviceStore(), nil, newTestReverseDNSResolver())
 	})
-	require.PanicsWithValue(t, "snmp_traps Register requires a non-nil reverse DNS resolver", func() {
-		_ = newCreator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), nil)
+	require.PanicsWithValue(t, "snmp_traps Creator requires a non-nil reverse DNS resolver", func() {
+		_ = Creator(ddsnmp.NewDeviceStore(), snmptopology.NewTrapEnrichmentHandle(), nil)
 	})
 }
 

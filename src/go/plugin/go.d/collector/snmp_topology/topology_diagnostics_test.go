@@ -5,39 +5,45 @@ package snmptopology
 import (
 	"context"
 	"errors"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
-	"weak"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
-	"github.com/stretchr/testify/require"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/stretchr/testify/require"
 )
 
-func TestCollectorDiagnosticsReadsLifecycleIndependently(t *testing.T) {
+func TestCollectorDiagnosticCheckpointPreservesLifecycle(t *testing.T) {
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10", Port: 161})
-
-	first := coll.acquireTopologyDiagnostics()
-	require.Equal(t, diagnosticCaptureAvailable, first.lifecycle.state)
-	require.Len(t, first.lifecycle.cut.Entries, 1)
-	require.Nil(t, first.topology)
+	coll.refreshTopology(t.Context())
+	checkpoints := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 1)
+	first, err := checkpoints[0].Capture()
+	require.NoError(t, err)
+	require.Equal(t, "available", first.Lifecycle.State)
+	require.Len(t, first.Lifecycle.Cut.Entries, 1)
+	require.Equal(t, "unknown", first.Lifecycle.Cut.Entries[0].LastCompleted.Outcome)
 
 	store.RecordJobLifecycle("job-a", ddsnmp.DeviceLifecycleStatus{
 		Phase:       ddsnmp.DeviceLifecyclePhaseInit,
 		Outcome:     ddsnmp.DeviceLifecycleOutcomeFailed,
 		CompletedAt: time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC),
 	})
-	second := coll.acquireTopologyDiagnostics()
-	require.Greater(t, second.lifecycle.cut.Sequence, first.lifecycle.cut.Sequence)
-	require.Equal(t, ddsnmp.DeviceLifecycleOutcomeFailed, second.lifecycle.cut.Entries[0].LastCompleted.Outcome)
-	require.Same(t, first.topology, second.topology)
+	current := snmpdiag.CaptureLifecycle(store)
+	require.Greater(t, current.Cut.Sequence, first.Lifecycle.Cut.Sequence)
+	require.Equal(t, "failed", current.Cut.Entries[0].LastCompleted.Outcome)
+	coll.refreshTopology(t.Context())
+	require.Equal(t, checkpoints, coll.diagnosticProvider.Checkpoints(), "lifecycle alone must not replace historical topology")
+	preserved, err := checkpoints[0].Capture()
+	require.NoError(t, err)
+	require.Equal(t, first, preserved)
 }
 
 func TestCollectorDiagnosticsPublishesCommittedSweepCut(t *testing.T) {
@@ -66,44 +72,69 @@ func TestCollectorDiagnosticsPublishesCommittedSweepCut(t *testing.T) {
 	stats := coll.refreshTopology(context.Background())
 	require.Zero(t, stats.errors)
 	diagnostics := coll.acquireTopologyDiagnostics()
-	require.NotNil(t, diagnostics.topology)
-	require.Equal(t, diagnosticCaptureAvailable, diagnostics.topology.captureState)
-	require.Len(t, diagnostics.topology.devices, 1)
-	row := diagnostics.topology.devices[0]
-	require.Equal(t, registrationID, row.registrationID)
-	require.True(t, row.selected)
-	require.Equal(t, deviceRefreshOutcomeSuccess, row.outcome)
-	require.Equal(t, coll.deviceStates[registrationID].nextRetry, row.nextRetry)
-	require.True(t, row.hasRetainedSuccess)
-	require.Equal(t, coll.deviceStates[registrationID].generation.evidenceRef, row.retainedSuccess)
-	require.Equal(t, diagnosticCaptureAvailable, row.acquisition.state)
-	require.Same(t, row.acquisition, row.latestAttempt)
-	require.True(t, row.hasObservation)
-	require.True(t, row.renderable)
-	require.False(t, row.expired)
+	require.NotNil(t, diagnostics.Topology)
+	require.Equal(t, topologydiag.CaptureAvailable, diagnostics.Topology.CaptureState)
+	require.Len(t, diagnostics.Topology.Devices, 1)
+	row := diagnostics.Topology.Devices[0]
+	require.Equal(t, registrationID, row.RegistrationID)
+	require.True(t, row.Selected)
+	require.Equal(t, topologydiag.RefreshOutcomeSuccess, row.Outcome)
+	require.Equal(t, coll.deviceStates[registrationID].nextRetry, row.NextRetry)
+	require.True(t, row.HasRetainedSuccess)
+	require.Equal(t, coll.deviceStates[registrationID].generation.evidenceRef, row.RetainedSuccess)
+	require.Equal(t, topologydiag.CaptureAvailable, row.Acquisition.State)
+	require.Same(t, row.Acquisition, row.LatestAttempt)
+	require.True(t, row.HasObservation)
+	require.True(t, row.Renderable)
+	require.False(t, row.Expired)
+	checkpoints := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 1)
+	firstCheckpoint := checkpoints[0]
 
-	previousRef := row.retainedSuccess
+	previousRef := row.RetainedSuccess
 	base = base.Add(time.Minute)
 	stats = coll.refreshTopology(context.Background())
 	require.Zero(t, stats.errors)
 	diagnostics = coll.acquireTopologyDiagnostics()
-	require.Len(t, diagnostics.topology.devices, 1)
-	row = diagnostics.topology.devices[0]
-	require.False(t, row.selected)
-	require.True(t, row.hasRetainedSuccess)
-	require.Equal(t, previousRef, row.retainedSuccess)
+	require.Len(t, diagnostics.Topology.Devices, 1)
+	row = diagnostics.Topology.Devices[0]
+	require.False(t, row.Selected)
+	require.True(t, row.HasRetainedSuccess)
+	require.Equal(t, previousRef, row.RetainedSuccess)
+	checkpoints = coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 1, "unchanged minute check must not consume history")
+	require.Same(t, firstCheckpoint, checkpoints[0])
+	preserved, err := checkpoints[0].Capture()
+	require.NoError(t, err)
+	require.True(t, preserved.Topology.Devices[0].Selected, "retain the actual acquisition cut, not the following check")
 
-	previousCut := diagnostics.topology
+	previousCut := diagnostics.Topology
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	stats = coll.refreshTopology(ctx)
 	require.Zero(t, stats.errors)
 	diagnostics = coll.acquireTopologyDiagnostics()
-	require.Same(t, previousCut, diagnostics.topology)
-	require.NotNil(t, diagnostics.lastAborted)
-	require.Equal(t, topologyDiagnosticAbortCanceled, diagnostics.lastAborted.reason)
-	require.Equal(t, topologyDiagnosticSweepPhaseTargetResolution, diagnostics.lastAborted.phase)
-	require.False(t, diagnostics.lastAborted.hasActiveRegistration)
+	require.Same(t, previousCut, diagnostics.Topology)
+	require.NotNil(t, diagnostics.LastAborted)
+	require.Equal(t, topologydiag.DiagnosticAbortCanceled, diagnostics.LastAborted.Reason)
+	require.Equal(t, topologydiag.DiagnosticSweepPhaseTargetResolution, diagnostics.LastAborted.Phase)
+	require.False(t, diagnostics.LastAborted.HasActiveRegistration)
+	checkpoints = coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 2)
+	aborted, err := checkpoints[1].Capture()
+	require.NoError(t, err)
+	require.NotNil(t, aborted.LastAborted)
+	store.Unregister("job-a")
+	coll.refreshTopology(context.Background())
+	checkpoints = coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 3)
+	removed, err := checkpoints[2].Capture()
+	require.NoError(t, err)
+	require.Empty(t, removed.Topology.Devices)
+	require.Len(t, removed.Topology.Removed, 1)
+	base = base.Add(time.Minute)
+	coll.refreshTopology(context.Background())
+	require.Equal(t, checkpoints, coll.diagnosticProvider.Checkpoints(), "clearing one-sweep removal annotations is not a new checkpoint")
 }
 
 func TestCollectorPanicDiagnosticIdentifiesActiveDeviceRefresh(t *testing.T) {
@@ -115,37 +146,34 @@ func TestCollectorPanicDiagnosticIdentifiesActiveDeviceRefresh(t *testing.T) {
 	require.NotPanics(t, func() { coll.refreshTopologyRecovering(context.Background()) })
 
 	diagnostics := coll.acquireTopologyDiagnostics()
-	require.NotNil(t, diagnostics.lastAborted)
-	require.Equal(t, topologyDiagnosticAbortPanic, diagnostics.lastAborted.reason)
-	require.Equal(t, topologyDiagnosticSweepPhaseDeviceRefresh, diagnostics.lastAborted.phase)
-	require.True(t, diagnostics.lastAborted.hasActiveRegistration)
-	require.Equal(t, registrationID, diagnostics.lastAborted.activeRegistrationID)
-	require.Equal(t, 1, diagnostics.lastAborted.registrationCount)
-	require.Equal(t, 1, diagnostics.lastAborted.selectedCount)
+	require.NotNil(t, diagnostics.LastAborted)
+	require.Equal(t, topologydiag.DiagnosticAbortPanic, diagnostics.LastAborted.Reason)
+	require.Equal(t, topologydiag.DiagnosticSweepPhaseDeviceRefresh, diagnostics.LastAborted.Phase)
+	require.True(t, diagnostics.LastAborted.HasActiveRegistration)
+	require.Equal(t, registrationID, diagnostics.LastAborted.ActiveRegistrationID)
+	require.Equal(t, 1, diagnostics.LastAborted.RegistrationCount)
+	require.Equal(t, 1, diagnostics.LastAborted.SelectedCount)
 }
 
 func TestCollectorDiagnosticProjectionFailureDoesNotAffectTopologyCommit(t *testing.T) {
-	for _, tc := range []struct {
-		name      string
+	for name, tc := range map[string]struct {
 		projector topologyDiagnosticCutProjector
-		reason    diagnosticCaptureReason
+		reason    topologydiag.CaptureReason
 	}{
-		{
-			name: "error",
-			projector: func(topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error) {
+		"error": {
+			projector: func(topologyDiagnosticCutInput) (*topologydiag.SweepCut, error) {
 				return nil, errors.New("projection failed")
 			},
-			reason: diagnosticCaptureReasonProjectionError,
+			reason: topologydiag.CaptureReasonProjectionError,
 		},
-		{
-			name: "panic",
-			projector: func(topologyDiagnosticCutInput) (*topologySweepDiagnosticCut, error) {
+		"panic": {
+			projector: func(topologyDiagnosticCutInput) (*topologydiag.SweepCut, error) {
 				panic("projection failed")
 			},
-			reason: diagnosticCaptureReasonProjectionPanic,
+			reason: topologydiag.CaptureReasonProjectionPanic,
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -168,92 +196,11 @@ func TestCollectorDiagnosticProjectionFailureDoesNotAffectTopologyCommit(t *test
 			})
 			require.Equal(t, 1, coll.topologyRegistry.acquireGeneration().deviceCount())
 			diagnostics := coll.acquireTopologyDiagnostics()
-			require.NotNil(t, diagnostics.topology)
-			require.Equal(t, diagnosticCaptureUnavailable, diagnostics.topology.captureState)
-			require.Equal(t, tc.reason, diagnostics.topology.captureReason)
+			require.NotNil(t, diagnostics.Topology)
+			require.Equal(t, topologydiag.CaptureUnavailable, diagnostics.Topology.CaptureState)
+			require.Equal(t, tc.reason, diagnostics.Topology.CaptureReason)
 		})
 	}
-}
-
-func TestTopologyAcquisitionUsageBoundsAliasedRetainedEvidenceDeterministically(t *testing.T) {
-	firstCapture := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	secondCapture := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	first := &topologyDeviceGeneration{acquisition: firstCapture}
-	second := &topologyDeviceGeneration{acquisition: secondCapture}
-	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
-		2: {generation: second, latestAttempt: secondCapture},
-		1: {generation: first, latestAttempt: firstCapture},
-	}
-	entries := []ddsnmp.DeviceEntry{{RegistrationID: 1}, {RegistrationID: 2}}
-	seen := map[ddsnmp.DeviceRegistrationID]bool{1: true, 2: true}
-
-	usage := newTopologyAcquisitionUsage(entries, seen, nil, states, states, topologyAcquisitionLimits{
-		maxRecords:      10,
-		maxLogicalBytes: 1000,
-	})
-	require.Equal(t, diagnosticCaptureAvailable, states[1].generation.acquisition.state)
-	require.Same(t, states[1].generation.acquisition, states[1].latestAttempt)
-	require.Equal(t, diagnosticCaptureLimitExceeded, states[2].generation.acquisition.state)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, states[2].generation.acquisition.reason)
-	require.Nil(t, states[2].generation.acquisition.evidence)
-	require.Same(t, states[2].generation.acquisition, states[2].latestAttempt)
-	require.NotSame(t, second, states[2].generation)
-	require.Equal(t, uint64(9), usage.recordCount)
-	require.Equal(t, uint64(348), usage.logicalBytes)
-}
-
-func TestTopologyAcquisitionUsagePrioritizesRetainedSuccessOverLatestFailure(t *testing.T) {
-	retainedSuccess := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 6, logicalBytes: 60, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	latestFailure := &topologyAcquisitionCapture{
-		state: diagnosticCaptureAvailable, recordCount: 1, logicalBytes: 10, evidence: &topologyAcquisitionAttemptEvidence{},
-	}
-	generation := &topologyDeviceGeneration{acquisition: retainedSuccess}
-	states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
-		1: {generation: generation, latestAttempt: latestFailure},
-	}
-	entries := []ddsnmp.DeviceEntry{{RegistrationID: 1}}
-	seen := map[ddsnmp.DeviceRegistrationID]bool{1: true}
-
-	usage := newTopologyAcquisitionUsage(entries, seen, nil, states, states, topologyAcquisitionLimits{
-		maxRecords:      8,
-		maxLogicalBytes: 1000,
-	})
-	require.Equal(t, diagnosticCaptureAvailable, states[1].generation.acquisition.state)
-	require.Same(t, retainedSuccess, states[1].generation.acquisition)
-	require.Equal(t, diagnosticCaptureLimitExceeded, states[1].latestAttempt.state)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, states[1].latestAttempt.reason)
-	require.Nil(t, states[1].latestAttempt.evidence)
-	require.Equal(t, uint64(8), usage.recordCount)
-}
-
-func TestTopologyAcquisitionUsageDoesNotRetainGloballyRejectedCapture(t *testing.T) {
-	usage := topologyAcquisitionUsage{
-		limits: topologyAcquisitionLimits{maxRecords: 1, maxLogicalBytes: 1},
-	}
-	rejected := &topologyAcquisitionCapture{
-		state:        diagnosticCaptureAvailable,
-		recordCount:  2,
-		logicalBytes: 2,
-		evidence:     &topologyAcquisitionAttemptEvidence{},
-	}
-	pointer := weak.Make(rejected)
-	limited := usage.include(rejected)
-	require.Equal(t, diagnosticCaptureLimitExceeded, limited.state)
-	require.Nil(t, limited.evidence)
-	rejected = nil
-
-	for range 3 {
-		runtime.GC()
-		runtime.Gosched()
-	}
-	require.Nil(t, pointer.Value(), "global admission retained the rejected full capture")
-	runtime.KeepAlive(usage)
 }
 
 func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T) {
@@ -261,11 +208,11 @@ func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T
 	registrationID := ddsnmp.DeviceRegistrationID(1)
 	generation := &topologyDeviceGeneration{
 		registrationID: registrationID,
-		evidenceRef:    topologyEvidenceRef{registrationID: registrationID, generation: 1},
+		evidenceRef:    topologydiag.EvidenceRef{RegistrationID: registrationID, Generation: 1},
 		collectedAt:    base.Add(-time.Hour),
 		expiresAt:      base.Add(-time.Minute),
 		hasObservation: true,
-		acquisition:    &topologyAcquisitionCapture{state: diagnosticCaptureAvailable},
+		acquisition:    &topologydiag.AcquisitionCapture{State: topologydiag.CaptureAvailable},
 	}
 	cut, err := projectTopologyDiagnosticCut(topologyDiagnosticCutInput{
 		sequence:    2,
@@ -276,68 +223,36 @@ func TestProjectTopologyDiagnosticCutMarksExpiredRetainedGeneration(t *testing.T
 		states: map[ddsnmp.DeviceRegistrationID]deviceRefreshState{
 			registrationID: {generation: generation},
 		},
-		limits: defaultTopologyDiagnosticGlobalLimits,
 	})
 	require.NoError(t, err)
-	require.Len(t, cut.devices, 1)
-	require.True(t, cut.devices[0].expired)
-	require.False(t, cut.devices[0].renderable)
-	require.True(t, cut.devices[0].hasRetainedSuccess)
+	require.Len(t, cut.Devices, 1)
+	require.True(t, cut.Devices[0].Expired)
+	require.False(t, cut.Devices[0].Renderable)
+	require.True(t, cut.Devices[0].HasRetainedSuccess)
 }
 
-func TestAcquireTopologyDiagnosticsContainsLifecyclePanic(t *testing.T) {
+func TestDiagnosticCheckpointContainsLifecyclePanic(t *testing.T) {
 	coll := newTestSNMPTopologyCollector()
-	coll.deviceLifecycleSource = panickingTopologyLifecycleSource{}
+	coll.diagnosticProvider.source = panickingTopologyLifecycleSource{}
 
-	diagnostics := coll.acquireTopologyDiagnostics()
-	require.Equal(t, diagnosticCaptureUnavailable, diagnostics.lifecycle.state)
-	require.Equal(t, diagnosticCaptureReasonProjectionPanic, diagnostics.lifecycle.reason)
+	coll.refreshTopology(t.Context())
+	checkpoints := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, 1)
+	diagnostics, err := checkpoints[0].Capture()
+	require.NoError(t, err)
+	require.Equal(t, "unavailable", diagnostics.Lifecycle.State)
+	require.Equal(t, "projection_panic", diagnostics.Lifecycle.Reason)
 }
 
-func TestAcquireTopologyDiagnosticsBoundsLifecycleCut(t *testing.T) {
-	coll, store := newTestSNMPTopologyCollectorWithStore()
-	coll.diagnosticGlobalLimits = topologyAcquisitionLimits{maxRecords: 2, maxLogicalBytes: 1 << 20}
-	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10"})
-	store.RegisterJob("job-b", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.20"})
-
-	diagnostics := coll.acquireTopologyDiagnostics()
-	require.Equal(t, diagnosticCaptureLimitExceeded, diagnostics.lifecycle.state)
-	require.Equal(t, diagnosticCaptureReasonGlobalRecordLimit, diagnostics.lifecycle.reason)
-	require.NotZero(t, diagnostics.lifecycle.cut.Sequence)
-	require.Empty(t, diagnostics.lifecycle.cut.Entries)
-}
-
-func TestCollectorDiagnosticCutLimitDoesNotAffectTopologyCommit(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	dev := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
-	mockHandler := snmpmock.NewMockHandler(ctrl)
-	expectTopologyRefreshSNMPClient(mockHandler, dev)
-
-	coll, store := newTestSNMPTopologyCollectorWithStore()
-	store.Register("job-a", dev)
-	coll.diagnosticGlobalLimits = topologyAcquisitionLimits{maxRecords: 10, maxLogicalBytes: 64}
-	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
-	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
-	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
-		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
-	}
-
-	stats := coll.refreshTopology(context.Background())
-	require.Zero(t, stats.errors)
-	require.Equal(t, 1, coll.topologyRegistry.acquireGeneration().deviceCount())
-	diagnostics := coll.acquireTopologyDiagnostics()
-	require.NotNil(t, diagnostics.topology)
-	require.Equal(t, diagnosticCaptureLimitExceeded, diagnostics.topology.captureState)
-	require.Equal(t, diagnosticCaptureReasonByteLimit, diagnostics.topology.captureReason)
-	require.Empty(t, diagnostics.topology.devices)
-}
-
-func TestCollectorDiagnosticsConcurrentLifecycleAndGenerationReads(t *testing.T) {
+func TestCollectorDiagnosticsConcurrentLifecycleAndCheckpointReads(t *testing.T) {
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	store.RegisterJob("job-a", ddsnmp.DeviceLifecycleInfo{Hostname: "192.0.2.10"})
 
+	coll.refreshTopology(t.Context())
+	require.Len(t, coll.diagnosticProvider.Checkpoints(), 1)
+	// Aborted sweeps create meaningful history without querying a device.
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
 	const iterations = 500
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -349,36 +264,80 @@ func TestCollectorDiagnosticsConcurrentLifecycleAndGenerationReads(t *testing.T)
 				Outcome:     ddsnmp.DeviceLifecycleOutcomeSuccess,
 				CompletedAt: time.Unix(int64(i+1), 0),
 			})
-			cut := &topologySweepDiagnosticCut{
-				sequence:     uint64(i + 1),
-				captureState: diagnosticCaptureAvailable,
-				recordCount:  1,
-				logicalBytes: 32,
-			}
-			coll.topologyRegistry.publishGeneration(&topologyGeneration{sequence: uint64(i + 1), diagnostic: cut})
+			coll.refreshTopology(canceled)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		for range iterations {
-			diagnostics := coll.acquireTopologyDiagnostics()
-			if diagnostics.lifecycle.state != diagnosticCaptureAvailable {
-				t.Errorf("lifecycle capture state = %d", diagnostics.lifecycle.state)
-				return
-			}
-			if diagnostics.topology != nil {
-				if diagnostics.topology.sequence == 0 || diagnostics.topology.captureState != diagnosticCaptureAvailable {
-					t.Errorf("invalid topology cut: sequence=%d state=%d", diagnostics.topology.sequence, diagnostics.topology.captureState)
+			for _, checkpoint := range coll.diagnosticProvider.Checkpoints() {
+				diagnostics, err := checkpoint.Capture()
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				if diagnostics.Lifecycle.State != "available" {
+					t.Errorf("lifecycle capture state = %s", diagnostics.Lifecycle.State)
+					return
+				}
+				if diagnostics.Topology == nil || diagnostics.Topology.Sequence == 0 || diagnostics.Topology.CaptureState != "available" {
+					t.Errorf("invalid topology cut: %+v", diagnostics.Topology)
 					return
 				}
 			}
 		}
 	}()
 	wg.Wait()
+	checkpoints := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, checkpoints, snmpdiag.CheckpointRetention)
+	latest, err := checkpoints[len(checkpoints)-1].Capture()
+	require.NoError(t, err)
+	require.NotNil(t, latest.LastAborted)
 }
 
 type panickingTopologyLifecycleSource struct{}
 
 func (panickingTopologyLifecycleSource) LifecycleCut() ddsnmp.DeviceLifecycleCut {
 	panic("lifecycle cut")
+}
+
+func TestCollectorDiagnosticCheckpointOnExpiryWithoutAcquisition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dev := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
+	handlers := []*snmpmock.MockHandler{snmpmock.NewMockHandler(ctrl), snmpmock.NewMockHandler(ctrl), snmpmock.NewMockHandler(ctrl)}
+	expectTopologyRefreshSNMPClient(handlers[0], dev)
+	for _, handler := range handlers[1:] {
+		expectTopologyRefreshSNMPClientConnectError(handler, dev, errors.New("unreachable"))
+	}
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	store.Register("job-a", dev)
+	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
+	calls := 0
+	coll.newSnmpClient = func() gosnmp.Handler { handler := handlers[calls]; calls++; return handler }
+	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
+	}
+	base := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	now := base
+	coll.now = func() time.Time { return now }
+	for _, elapsed := range []time.Duration{0, 30 * time.Minute, 31 * time.Minute} {
+		now = base.Add(elapsed)
+		coll.refreshTopology(context.Background())
+	}
+	before := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, before, 3)
+	now = base.Add(32*time.Minute + time.Second)
+	coll.refreshTopology(context.Background())
+	after := coll.diagnosticProvider.Checkpoints()
+	require.Len(t, after, 3)
+	require.NotEqual(t, before[2].ID(), after[2].ID())
+	snapshot, err := after[2].Capture()
+	require.NoError(t, err)
+	require.False(t, snapshot.Topology.Devices[0].Selected)
+	require.True(t, snapshot.Topology.Devices[0].Expired)
+	require.False(t, snapshot.Topology.Devices[0].Renderable)
+	require.Equal(t, 3, calls)
+	now = now.Add(20 * time.Second)
+	coll.refreshTopology(context.Background())
+	require.Equal(t, after, coll.diagnosticProvider.Checkpoints())
 }

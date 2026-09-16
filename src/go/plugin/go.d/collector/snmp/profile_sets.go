@@ -23,7 +23,9 @@ func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 	matchedProfiles := resolved.Profiles()
 	c.logMatchedProfiles(matchedProfiles, si.SysObjectID)
 
-	profiles := resolved.Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP).Profiles()
+	view := resolved.Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP)
+	c.recordProfileContext(view.Context())
+	profiles := view.Profiles()
 	if profilesHaveBGP(profiles) {
 		c.enableBGPIntegration()
 	}
@@ -38,7 +40,7 @@ func (c *Collector) ensureDeviceProfile() error {
 
 	si, err := snmputils.GetSysInfo(c.snmpClient)
 	if err != nil {
-		return err
+		return snmputils.WithFailure(err, "system_identity", "")
 	}
 	c.Debugf("SNMP system identity: %s", formatSysInfoDiagnostic(si))
 
@@ -48,7 +50,7 @@ func (c *Collector) ensureDeviceProfile() error {
 	}
 
 	if len(profiles) == 0 && !c.PingOnly {
-		return noMetricProfilesError(si)
+		return snmputils.WithFailure(noMetricProfilesError(si), "profile_resolution", "no_profiles")
 	}
 
 	c.sysInfo = si

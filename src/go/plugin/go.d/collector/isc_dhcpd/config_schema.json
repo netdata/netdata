@@ -58,9 +58,5 @@
       "pools"
     ]
   },
-  "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    }
-  }
+  "uiSchema": {}
 }

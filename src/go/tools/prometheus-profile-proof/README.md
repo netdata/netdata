@@ -2,6 +2,11 @@
 
 # Prometheus profile proofs
 
+**Place in the documentation set.** The project skill `.agents/skills/collectors-prometheus-profiles/SKILL.md` names
+this document as the owner of the `evidence-dirs` and `verify` commands and points at it as a whole; if the skill ever
+cites a section by heading anchor, `.agents/sow/audit.sh` will fail when that heading disappears, so keep heading
+renames and the skill in one change.
+
 This developer tool discovers every
 `src/go/plugin/go.d/collector/prometheus/profile-proofs/*/proof.yaml` descriptor. It is the command-line adapter over
 `internal/promprofile/proof` and `internal/promprofile/validation`; it contains no independent proof contract or validation
@@ -24,7 +29,7 @@ go run ./tools/prometheus-profile-proof verify --repo-root ../..
 All commands accept `--profile <name>`. A targeted verification still compiles the complete proof catalog because support
 composition is resolved from that catalog, but it replays and checks coverage only for the requested candidate profile.
 
-The authoring-skill launcher `.agents/skills/project-prometheus-profiles/scripts/proof-bundle.py` resolves repository and Go
+The authoring-skill launcher `.agents/skills/collectors-prometheus-profiles/scripts/proof-bundle.py` resolves repository and Go
 tool paths, so it can be called from any directory.
 
 ## Verification contract

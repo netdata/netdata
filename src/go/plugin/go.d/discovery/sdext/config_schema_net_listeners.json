@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "Where discovery candidates come from.",
         "type": "object",
         "properties": {
           "net_listeners": {
             "title": "Net Listeners",
+            "description": "Scan of the local network listeners used to find services on this host.",
             "type": "object",
             "properties": {
               "interval": {
@@ -36,7 +38,7 @@
       },
       "services": {
         "title": "Service rules",
-        "description": "- Match discovered network listeners and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a listener matches, a data collection job is created.",
+        "description": "Rules that turn discovered network listeners into data collection jobs.",
         "type": "array",
         "minItems": 1,
         "items": {
@@ -71,9 +73,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -94,11 +93,9 @@
     "discoverer": {
       "net_listeners": {
         "interval": {
-          "ui:placeholder": "2m",
           "ui:help": "Examples: 30s, 2m, 5m, 1h"
         },
         "timeout": {
-          "ui:placeholder": "5",
           "ui:help": "Value in seconds. Examples: 5, 10, 0.5"
         }
       }
@@ -120,7 +117,8 @@
           "ui:widget": "textarea",
           "ui:placeholder": "module: nginx\nname: {{.TUID}}\nurl: http://{{.Address}}/stub_status"
         }
-      }
+      },
+      "ui:help": "- Match discovered network listeners and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a listener matches, a data collection job is created."
     }
   }
 }

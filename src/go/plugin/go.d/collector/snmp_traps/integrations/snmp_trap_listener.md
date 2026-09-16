@@ -598,7 +598,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -630,14 +632,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m snmp_traps -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `snmp_traps` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -645,7 +647,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep snmp_traps
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -655,7 +657,7 @@ grep snmp_traps /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -663,7 +665,9 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep snmp_traps
 ```
 
-### Port binding fails (permission denied)
+### Other Problems
+
+#### Port binding fails (permission denied)
 
 Standard SNMP trap port (UDP/162) requires `CAP_NET_BIND_SERVICE`.
 
@@ -675,7 +679,7 @@ sudo setcap CAP_NET_BIND_SERVICE=eip /usr/libexec/netdata/plugins.d/go.d.plugin
 Alternatively, use a port >= 1024 (e.g., `1062`) and redirect traffic through a firewall.
 
 
-### SNMPv3 traps not decoded (unknown_engine_id)
+#### SNMPv3 traps not decoded (unknown_engine_id)
 
 In static mode, the sender engine ID is not in `engine_id_whitelist`. Add the sender engine ID
 to the whitelist, or switch to `dynamic_engine_id_discovery: true` with an empty whitelist.
@@ -685,13 +689,13 @@ operator visibility. Repeated or rejected increments usually indicate cap exhaus
 invalid sender state, or an unauthorized sender.
 
 
-### USM authentication failures
+#### USM authentication failures
 
 Check that the USM user's `auth_proto`, `auth_key`, `priv_proto`, and `priv_key` match the
 sender device's configuration. Verify engine ID matches. Use Netdata secret references for keys.
 
 
-### journal retention eating disk space
+#### journal retention eating disk space
 
 The default direct journal retention uses size-based eviction (`max_size: 10GB`) with no time-based age limit.
 For high-trap environments, reduce `max_size` or enable `max_duration` to age-out old entries.

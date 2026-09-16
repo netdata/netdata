@@ -189,3 +189,27 @@ func TestManifestComponentsAreValid(t *testing.T) {
 		}
 	}
 }
+
+func TestWeightsLimitContractsRequireEveryMethodOptions(t *testing.T) {
+	for _, name := range []string{"W/limit-ranking", "W/limit-summaries"} {
+		for _, method := range []string{"value", "volume", "ks2", "anomaly-rate"} {
+			for _, options := range []string{"raw", "null2zero", "raw|anomaly-bit", "null2zero|anomaly-bit"} {
+				missing := method + "/" + options
+				t.Run(name+"/"+missing, func(t *testing.T) {
+					ledger := newContractLedger()
+					for _, component := range requiredContractComponents(manifest[name]) {
+						if component != missing {
+							ledger.record(name, component, true, false)
+						}
+					}
+					summary := ledger.summarize(map[string]ManifestCase{name: manifest[name]})
+					want := []string{name + "/" + missing}
+					if summary.evaluated != 0 || !reflect.DeepEqual(summary.incomplete, want) {
+						t.Fatalf("omitted %s: evaluated=%d incomplete=%v, want 0/%v",
+							missing, summary.evaluated, summary.incomplete, want)
+					}
+				})
+			}
+		}
+	}
+}

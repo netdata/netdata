@@ -53,6 +53,7 @@ var daemonFreeTests = map[string]struct{}{
 	"TestResolveCorpusPathsValidatesOneDeclaredEngine":            {},
 	"TestStrictDimensionStatsGuards":                              {},
 	"TestWeightsExpectedIDsExactlyOnce":                           {},
+	"TestWeightsLimitContractsRequireEveryMethodOptions":          {},
 	"TestWeightsTimeframeStatsRequireFiniteNumbers":               {},
 	"TestWeightsValueMultiNodeGuards":                             {},
 }

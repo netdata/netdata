@@ -175,9 +175,9 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.789.1.9.20
       name: snapmirrorStatusTable
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.789.1.9.20.1.11
+        metric_type: gauge
         name: snapmirrorTotalTransMBs
         chart_meta:
           description: Transfer size
@@ -185,24 +185,28 @@ metrics:
           unit: "By/s"
         scale_factor: 1048576
       - OID: 1.3.6.1.4.1.789.1.9.20.1.7
+        metric_type: gauge
         name: snapmirrorTotalSuccesses
         chart_meta:
           description: Successful transfers
           family: 'Storage/SnapMirror/Transfer/Success'
           unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.9.20.1.9
+        metric_type: gauge
         name: snapmirrorTotalFailures
         chart_meta:
           description: Failed or aborted transfers
           family: 'Storage/SnapMirror/Transfer/Failure'
           unit: "{transfer}/s"
       - OID: 1.3.6.1.4.1.789.1.9.20.1.6
+        metric_type: gauge
         name: snapmirrorLag
         chart_meta:
           description: How far behind from the source the destination is
           family: 'Storage/SnapMirror/Sync/Lag'
           unit: "cs"
       - OID: 1.3.6.1.4.1.789.1.9.20.1.4
+        metric_type: gauge
         name: snapmirrorStatus
         chart_meta:
           description: Current transfer status of the SnapMirror
@@ -216,6 +220,7 @@ metrics:
           5: source
           6: unknown
       - OID: 1.3.6.1.4.1.789.1.9.20.1.5
+        metric_type: gauge
         name: snapmirrorState
         chart_meta:
           description: Current state of the SnapMirror
@@ -247,9 +252,9 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.789.1.5.4
       name: dfTable
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.789.1.5.4.1.20
+        metric_type: gauge
         name: dfStatus
         chart_meta:
           description: The status of the file system
@@ -267,6 +272,7 @@ metrics:
           9: replaying
           10: replayed
       - OID: 1.3.6.1.4.1.789.1.5.4.1.21
+        metric_type: gauge
         name: dfMirrorStatus
         chart_meta:
           description: The status of the file system
@@ -284,6 +290,7 @@ metrics:
           9: failed
           10: limbo
       - OID: 1.3.6.1.4.1.789.1.5.4.1.14
+        metric_type: gauge
         name: dfHighTotalKBytes
         chart_meta:
           description: Total capacity for the referenced file system
@@ -291,6 +298,7 @@ metrics:
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.16
+        metric_type: gauge
         name: dfHighUsedKBytes
         chart_meta:
           description: The total disk space that is in use on the referenced file system
@@ -298,6 +306,7 @@ metrics:
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.18
+        metric_type: gauge
         name: dfHighAvailKBytes
         chart_meta:
           description: Total disk space that is free for use on the referenced file system
@@ -305,12 +314,14 @@ metrics:
           unit: "By"
         scale_factor: 1024
       - OID: 1.3.6.1.4.1.789.1.5.4.1.7
+        metric_type: gauge
         name: dfInodesUsed
         chart_meta:
           description: Total number of inodes in use on the referenced file system
           family: 'System/FileSystem/Inode/Used'
           unit: "{inode}"
       - OID: 1.3.6.1.4.1.789.1.5.4.1.8
+        metric_type: gauge
         name: dfInodesFree
         chart_meta:
           description: Total number of inodes that are available for use on the referenced file system

@@ -123,12 +123,17 @@ static void generate_dbengine_chart(void *arg)
             rrddim_set_by_pointer_fake_time(rd[j], value, time_current);
             ++thread_info->stored_metrics_nr;
         }
-        rrdset_done(st);
+        // drive the fake clock explicitly: rrdset_done() would stamp the sample with
+        // the wall clock and, via rrdset_timed_next(), overwrite the
+        // usec_since_last_update set above - so every sample landed at real "now"
+        // and the generated history collapsed to the run's own duration
+        struct timeval fake_now = { .tv_sec = time_current, .tv_usec = 0 };
+        rrdset_timed_done(st, fake_now, false);
         thread_info->time_max = time_current;
     }
-    for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize((rd[j])->tiers[0].sch);
-    }
+    // finalize through the rrdset API: it clears rd->tiers[].sch, so the later
+    // teardown of the host does not finalize (and free) the handles a second time
+    rrdset_finalize_collection(st, true);
 }
 
 void generate_dbengine_dataset(unsigned history_seconds)
@@ -186,8 +191,19 @@ void generate_dbengine_dataset(unsigned history_seconds)
         freez(thread_info[i]);
     }
     freez(thread_info);
+
+    // shut the dbengine instance down before freeing the host: rrdhost_free() does
+    // not do it, and destroying the charts under a live instance lets the flush
+    // workers touch freed memory. Same teardown as dbengine_stress_test() below.
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
+    rrdeng_quiesce(ctx);
+    rrdeng_exit(ctx);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    host->db[0].si = NULL;
+
+    // free the host we generated into, not localhost
     rrd_wrlock();
-    rrdhost_free___while_having_rrd_wrlock(localhost);
+    rrdhost_free___while_having_rrd_wrlock(host);
     rrd_wrunlock();
 }
 
@@ -350,7 +366,6 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
 
-    (void)sql_init_meta_database(DB_CHECK_NONE, 1);
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
     if (NULL == host)
         return;
@@ -448,10 +463,15 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         freez(query_threads[i]);
     }
     freez(query_threads);
+    // same teardown as generate_dbengine_dataset() above: rrdeng_exit() frees the
+    // ctx under unittest_running, so clear the host's pointer to it, and release
+    // the host we created before the caller tears the shared libraries down
     rrd_wrlock();
     rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    host->db[0].si = NULL;
+    rrdhost_free___while_having_rrd_wrlock(host);
     rrd_wrunlock();
 }
 

@@ -28,6 +28,15 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 );
 
+// Same contract as rrdmetric2value(), using a caller-owned OWA. The returned
+// value owns no arena-backed data, so the caller may reset the OWA immediately.
+QUERY_VALUE rrdmetric2value_with_owa(ONEWAYALLOC *owa, RRDHOST *host,
+                                     struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria,
+                                     struct rrdmetric_acquired *rma, time_t after, time_t before,
+                                     RRDR_OPTIONS options, RRDR_TIME_GROUPING time_group_method,
+                                     const char *time_group_options, size_t tier, time_t timeout,
+                                     QUERY_SOURCE query_source, STORAGE_PRIORITY priority);
+
 NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate);
 
 #endif //NETDATA_API_FORMATTER_VALUE_H

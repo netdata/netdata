@@ -222,6 +222,7 @@
                   },
                   "mode_exact": {
                     "title": "Exact profiles",
+                    "description": "Only the listed profile entries apply; nothing is matched automatically.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -261,6 +262,7 @@
                   },
                   "mode_combined": {
                     "title": "Combined profiles",
+                    "description": "Automatically matched profiles plus the listed profile entries.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -352,14 +354,12 @@
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "bearer_token_file": {
         "title": "Bearer token file",
@@ -374,14 +374,12 @@
       "proxy_username": {
         "title": "Proxy username",
         "description": "The username for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "proxy_password": {
         "title": "Proxy password",
         "description": "The password for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "headers": {
         "title": "Headers",
@@ -436,9 +434,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -533,12 +528,6 @@
     },
     "selector": {
       "ui:help": "The logic is as follows: `(allow1 OR allow2) AND !(deny1 OR deny2)`."
-    },
-    "username": {
-      "ui:widget": "password"
-    },
-    "proxy_username": {
-      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"

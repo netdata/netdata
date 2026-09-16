@@ -72,7 +72,7 @@ Now follow steps:
 
 #### Debug Filesystem
 
-This thread needs to attach a tracepoint to monitor when a process schedule an exit event. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).`
+This thread attaches tracepoints for software interrupts. To allow this specific feaure, it is necessary to mount `debugfs` (`mount -t debugfs none /sys/kernel/debug/`).
 
 
 

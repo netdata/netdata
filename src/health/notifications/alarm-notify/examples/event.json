@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "incident_id": "example-incident-1",
+  "timestamp": "2026-09-14T12:00:00Z",
+  "node": "example-node",
+  "alert": "example_temperature",
+  "chart": "example.temperature",
+  "context": "example.temperature",
+  "status": "WARNING",
+  "previous_status": "CLEAR",
+  "summary": "Temperature is high",
+  "info": "Synthetic event for local development",
+  "value": 42.5,
+  "previous_value": 30,
+  "units": "C",
+  "url": "https://example.com/alerts/test-incident"
+}

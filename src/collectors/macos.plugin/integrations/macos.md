@@ -502,14 +502,16 @@ Metrics:
 
 ## Troubleshooting
 
-### GPU charts are missing
+### Other Problems
+
+#### GPU charts are missing
 
 Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw charts require IOReport GPU channels. These channels are exposed by Apple Silicon GPU drivers and are not available on Intel Macs. The collector loads IOReport at runtime and disables the GPU module cleanly when the framework, DVFS table, or GPU channels are unavailable.
 
 GPU power may still appear from `powermetrics` on systems where the `gpu_power` sampler exposes a plist `gpu_power` value and IOReport GPU power is unavailable. GPU temperature uses direct SMC/IOHID reads from the GPU module when available; otherwise, the `powermetrics` SMC path can still provide the same GPU temperature metric.
 
 
-### Thermal and fan charts are missing
+#### Thermal and fan charts are missing
 
 Direct AppleSMC and IOHID hardware sensor charts do not depend on `powermetrics`. If temperature, fan, voltage, current, or power sensor charts are missing, the hardware or macOS driver may not expose readable AppleSMC or IOHID sensor values, or the `[plugin:macos:sensors]` module may be disabled.
 
@@ -518,7 +520,7 @@ The thermal pressure state chart depends on the native Apple `powermetrics` comm
 Battery, UPS power-source, and IOReport GPU charts do not depend on `powermetrics` and should still appear when macOS exposes their data.
 
 
-### NVMe health charts are missing
+#### NVMe health charts are missing
 
 Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit and allows the native SMART user client to open them. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
 

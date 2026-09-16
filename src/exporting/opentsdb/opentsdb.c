@@ -117,7 +117,7 @@ int init_opentsdb_http_instance(struct instance *instance)
  *
  * @param dst a destination string.
  * @param src a source string.
- * @param len the maximum number of characters copied.
+ * @param len the maximum number of bytes copied.
  */
 
 void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
@@ -134,11 +134,53 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
     *dst = '\0';
 }
 
+/**
+ * Copy a metric prefix or hostname, neutralizing only what must not reach an OpenTSDB telnet record
+ *
+ * A telnet record is `put <metric> <timestamp> <value> <tagk>=<tagv> ...\n`: whitespace-delimited
+ * fields, newline-terminated, with no quoting or escaping. Only whitespace and the record terminator
+ * can corrupt or inject a record, so those are replaced, along with the remaining control codepoints
+ * -- C0, DEL, and C1 -- which cannot break our framing but are never legitimate in a hostname or
+ * prefix: U+009B is the single-character CSI, the same escape hazard as U+001B.
+ *
+ * Everything else, punctuation included, is passed through byte for byte: none of `:`, `=` or `;`
+ * affects this record's framing, and relabelling metadata the user configured would store the point
+ * under a different host identity and split the host's history -- which is what netdata/netdata#23684
+ * reported. A destination with a stricter tag grammar (stock OpenTSDB has one) may reject such a point
+ * instead; that is the destination's rule and the operator's concern. This is therefore neither the Graphite
+ * metric-path policy (which passes the non-whitespace controls through, and replaces `;` for Carbon's
+ * tag syntax) nor the OpenTSDB label-value policy of sanitize_opentsdb_label_value().
+ *
+ * The replacement is byte-length preserving, which the callers below depend on for buffer sizing.
+ *
+ * @param dst a destination string.
+ * @param src a source string.
+ * @param len the maximum number of bytes copied.
+ */
+static void sanitize_opentsdb_telnet_metadata_value(char *dst, const char *src, size_t len) {
+    while(*src && len) {
+        uint32_t codepoint;
+        size_t bytes = exporting_utf8_decode(src, len, &codepoint);
+
+        if(codepoint < 0x20 || (codepoint >= 0x7F && codepoint <= 0x9F) ||
+           exporting_unicode_is_whitespace(codepoint))
+            memset(dst, '_', bytes);
+        else
+            memcpy(dst, src, bytes);
+
+        dst += bytes;
+        src += bytes;
+        len -= bytes;
+    }
+
+    *dst = '\0';
+}
+
 static void buffer_strcat_opentsdb_telnet_value(BUFFER *wb, const char *src) {
     size_t len = strlen(src);
 
     buffer_need_bytes(wb, len + 1);
-    sanitize_opentsdb_label_value(&wb->buffer[wb->len], src, len);
+    sanitize_opentsdb_telnet_metadata_value(&wb->buffer[wb->len], src, len);
     wb->len += len;
     buffer_overflow_check(wb);
 }
@@ -802,64 +844,83 @@ static int opentsdb_telnet_unittest_case(
     return errors;
 }
 
+static const struct {
+    const char *description;
+    const char *prefix;
+    const char *hostname;
+    const char *labels;
+    const char *expected;
+} opentsdb_telnet_cases[] = {
+    { "ordinary metadata", "netdata", "localhost", " label=value",
+      "put netdata.chart.name.dimension.name 42 1.5 host=localhost label=value\n" },
+    { "allowed punctuation", "Netdata-A_9/part.", "Host-A_9/path.example", " label=value",
+      "put Netdata-A_9/part..chart.name.dimension.name 42 1.5 host=Host-A_9/path.example label=value\n" },
+    { "hostile metadata", "pre fix\tbad\r\nput", "host name\tbad\r\nput", " label=value",
+      "put pre_fix_bad__put.chart.name.dimension.name 42 1.5 host=host_name_bad__put label=value\n" },
+    { "all-invalid metadata", " \t\r\n", " \t\r\n", " label=value",
+      "put ____.chart.name.dimension.name 42 1.5 host=____ label=value\n" },
+    { "empty metadata", "", "", "",
+      "put .chart.name.dimension.name 42 1.5 host=\n" },
+    { "colliding invalid metadata", "pre fix", "host name", "",
+      "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n" },
+    { "colliding valid metadata", "pre_fix", "host_name", "",
+      "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n" },
+    // netdata/netdata#23684: the configured hostname must survive intact. Only what can corrupt the
+    // record is replaced, so every printable byte the user configured reaches the destination.
+    { "colon in metadata", "net:data", "Dev::MyHost", " label=value",
+      "put net:data.chart.name.dimension.name 42 1.5 host=Dev::MyHost label=value\n" },
+    { "preserved punctuation", "pre=fix;a,b+c%d@e#f",
+      "host=name;a,b+c(d)e[f]!g~h*i?j&k$l|m<n>o^p{q}r'\"s\\t", " label=value",
+      "put pre=fix;a,b+c%d@e#f.chart.name.dimension.name 42 1.5 "
+      "host=host=name;a,b+c(d)e[f]!g~h*i?j&k$l|m<n>o^p{q}r'\"s\\t label=value\n" },
+    { "utf8 metadata", "pr\xc3\xa9""fix", "Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de", " label=value",
+      "put pr\xc3\xa9""fix.chart.name.dimension.name 42 1.5 "
+      "host=Dev::\xc3\x9c""n\xc3\xaf""c\xc3\xb8""de label=value\n" },
+    // an invalid sequence is copied byte for byte, so metadata we cannot interpret is not mangled,
+    // except where the lone byte value is itself a control or whitespace codepoint (0x80-0xA0)
+    { "malformed utf8 metadata", "pre\xc3""fix", "host\xff""name", " label=value",
+      "put pre\xc3""fix.chart.name.dimension.name 42 1.5 host=host\xff""name label=value\n" },
+    // non-breaking space: whitespace at the destination's splitter, replaced byte-length preserving
+    { "unicode whitespace metadata", "pre\xc2\xa0""fix", "host\xe2\x80\x83name", " label=value",
+      "put pre__fix.chart.name.dimension.name 42 1.5 host=host___name label=value\n" },
+    // C1 controls are the same hazard as C0 in their multi-byte form: U+009B is the
+    // single-character CSI. Two source bytes become two underscores, keeping the length.
+    { "c1 control in metadata", "pre\xc2\x9b""fix", "host\xc2\x80""name", " label=value",
+      "put pre__fix.chart.name.dimension.name 42 1.5 host=host__name label=value\n" },
+    // a lead byte with no continuation left in the buffer is consumed one byte at a time, so a
+    // truncated sequence is not silently rewritten. The orphan continuation byte in the hostname is
+    // the documented exception: 0x82 decodes to its own value, which is a C1 control.
+    { "truncated utf8 at end of metadata", "prefix\xc3", "hostname\xe2\x82", " label=value",
+      "put prefix\xc3.chart.name.dimension.name 42 1.5 host=hostname\xe2_ label=value\n" },
+    // the same exception, in the form most likely to occur: a lone 0x85 or 0xA0 decodes to its own
+    // byte value, which is the NEL and the NBSP codepoint
+    { "lone whitespace-valued bytes", "pre\x85""fix", "host\xa0""name", " label=value",
+      "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name label=value\n" },
+    // control bytes cannot break our framing, but are never legitimate metadata and would be
+    // interpreted by whatever consumes the record downstream
+    { "control bytes in metadata", "pre\x01\x1b""fix", "host\x0b\x7f""name", " label=value",
+      "put pre__fix.chart.name.dimension.name 42 1.5 host=host__name label=value\n" },
+};
+
 int exporting_opentsdb_telnet_unittest(void) {
     int errors = 0;
 
-    errors += opentsdb_telnet_unittest_case(
-        "ordinary metadata",
-        "netdata",
-        "localhost",
-        " label=value",
-        "put netdata.chart.name.dimension.name 42 1.5 host=localhost label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "allowed punctuation",
-        "Netdata-A_9/part.",
-        "Host-A_9/path.example",
-        " label=value",
-        "put Netdata-A_9/part..chart.name.dimension.name 42 1.5 host=Host-A_9/path.example label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "hostile metadata",
-        "pre fix\tbad\r\nput",
-        "host name\tbad\r\nput",
-        " label=value",
-        "put pre_fix_bad__put.chart.name.dimension.name 42 1.5 host=host_name_bad__put label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "all-invalid metadata",
-        " \t\r\n",
-        " \t\r\n",
-        " label=value",
-        "put ____.chart.name.dimension.name 42 1.5 host=____ label=value\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "empty metadata",
-        "",
-        "",
-        "",
-        "put .chart.name.dimension.name 42 1.5 host=\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "colliding invalid metadata",
-        "pre fix",
-        "host name",
-        "",
-        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n");
-
-    errors += opentsdb_telnet_unittest_case(
-        "colliding valid metadata",
-        "pre_fix",
-        "host_name",
-        "",
-        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n");
+    for(size_t i = 0; i < sizeof(opentsdb_telnet_cases) / sizeof(opentsdb_telnet_cases[0]); i++)
+        errors += opentsdb_telnet_unittest_case(
+            opentsdb_telnet_cases[i].description,
+            opentsdb_telnet_cases[i].prefix,
+            opentsdb_telnet_cases[i].hostname,
+            opentsdb_telnet_cases[i].labels,
+            opentsdb_telnet_cases[i].expected);
 
     char long_prefix[4097];
     char long_hostname[4097];
     memset(long_prefix, 'p', sizeof(long_prefix) - 1);
     memset(long_hostname, 'h', sizeof(long_hostname) - 1);
     long_prefix[1024] = '\n';
+    long_prefix[2048] = ':';
     long_hostname[3072] = '\t';
+    long_hostname[2048] = ':';
     long_prefix[sizeof(long_prefix) - 1] = '\0';
     long_hostname[sizeof(long_hostname) - 1] = '\0';
 
@@ -873,10 +934,21 @@ int exporting_opentsdb_telnet_unittest(void) {
 
     const size_t expected_length = strlen("put ") + strlen(long_prefix) + strlen(".chart.name.dimension.name 42 1.5 host=") +
                                    strlen(long_hostname) + 1;
-    if(buffer_strlen(wb) != expected_length || wb->buffer[sizeof("put ") - 1 + 1024] != '_' ||
+    const size_t prefix_offset = sizeof("put ") - 1;
+    const size_t hostname_offset =
+        prefix_offset + strlen(long_prefix) + strlen(".chart.name.dimension.name 42 1.5 host=");
+    if(buffer_strlen(wb) != expected_length || wb->buffer[prefix_offset + 1024] != '_' ||
        strchr(buffer_tostring(wb), '\t') || strchr(buffer_tostring(wb), '\r') ||
        strchr(buffer_tostring(wb), '\n') != &wb->buffer[wb->len - 1]) {
         fprintf(stderr, "OpenTSDB Telnet long metadata was truncated or retained a protocol delimiter\n");
+        errors++;
+    }
+
+    // the same length-preserving pass must leave configured punctuation alone at scale, not only in
+    // the short cases above
+    if(wb->buffer[prefix_offset + 2048] != ':' || wb->buffer[hostname_offset + 2048] != ':' ||
+       wb->buffer[hostname_offset + 3072] != '_') {
+        fprintf(stderr, "OpenTSDB Telnet long metadata lost a valid character or kept a delimiter\n");
         errors++;
     }
     buffer_free(wb);

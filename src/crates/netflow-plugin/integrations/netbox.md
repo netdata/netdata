@@ -292,7 +292,11 @@ enrichment:
 
 
 
-### Only first 50 prefixes loaded
+## Troubleshooting
+
+### Other Problems
+
+#### Only first 50 prefixes loaded
 
 NetBox's default `PAGINATE_COUNT` is 50 and the plugin does not follow `next`
 links. Pass `?limit=0` (NetBox removes the cap when `MAX_PAGE_SIZE` is
@@ -301,7 +305,7 @@ above the server's `MAX_PAGE_SIZE` (default 1000), expose a server-side
 aggregator endpoint.
 
 
-### 401 / 403 from NetBox
+#### 401 / 403 from NetBox
 
 Token missing, expired, or wrong format. Verify with one of:
 `curl -H "Authorization: Token <legacy-token>" https://netbox/api/ipam/prefixes/`
@@ -315,7 +319,7 @@ for `network-sources` warnings -- HTTP errors are logged there as
 refresh-failed warnings.
 
 
-### site is empty after upgrade to NetBox 4.2
+#### site is empty after upgrade to NetBox 4.2
 
 NetBox 4.2 removed `site` from the Prefix model and replaced it with `scope`
 (a generic foreign key that can reference region / site group / site /
@@ -324,7 +328,7 @@ Alternatively, key on `(.scope.name // .site.name // "")` so the same config
 works across the upgrade boundary.
 
 
-### VRF collisions (same CIDR in multiple VRFs)
+#### VRF collisions (same CIDR in multiple VRFs)
 
 The plugin's network-attributes trie keys on `prefix` only -- there is no VRF
 dimension on the flow side. If NetBox lists `10.0.0.0/24` in three VRFs, only
@@ -333,7 +337,7 @@ one named source per VRF, or fold the VRF name into the friendly `name` so
 dashboards disambiguate.
 
 
-### Empty result triggers backoff
+#### Empty result triggers backoff
 
 An empty `results` array (legitimate state for a freshly-installed NetBox)
 is treated as a fetch failure by the cross-cutting source loop and triggers

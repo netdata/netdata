@@ -87,12 +87,10 @@ func TestCollector_ConfigSchema(t *testing.T) {
 				_, hasCheckName := doc.JSONSchema.Properties["check_name"]
 				_, hasName := doc.JSONSchema.Properties["name"]
 				_, hasTimeoutState := doc.JSONSchema.Properties["timeout_state"]
-				_, hasUIOptions := doc.UISchema["uiOptions"]
 				assert.True(t, hasPlugin)
 				assert.True(t, hasCheckName)
 				assert.False(t, hasName)
 				assert.False(t, hasTimeoutState)
-				assert.True(t, hasUIOptions)
 			},
 		},
 	}

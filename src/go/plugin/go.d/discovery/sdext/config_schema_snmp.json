@@ -7,10 +7,12 @@
     "properties": {
       "discoverer": {
         "title": "Discoverer",
+        "description": "Where discovery candidates come from.",
         "type": "object",
         "properties": {
           "snmp": {
             "title": "SNMP",
+            "description": "SNMP network scan used to find devices.",
             "type": "object",
             "properties": {
               "rescan_interval": {
@@ -169,7 +171,7 @@
       },
       "services": {
         "title": "Service rules",
-        "description": "- Match discovered SNMP devices and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a device matches, a data collection job is created.\n- The **default service rule** is sufficient for most cases. It creates an SNMP data collection job for each discovered device and handles both SNMPv2 and SNMPv3.",
+        "description": "Rules that turn discovered SNMP devices into data collection jobs.",
         "type": "array",
         "minItems": 1,
         "items": {
@@ -207,9 +209,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -230,15 +229,12 @@
     "discoverer": {
       "snmp": {
         "rescan_interval": {
-          "ui:placeholder": "30m",
           "ui:help": "Examples: 30m, 1h, 2h"
         },
         "timeout": {
-          "ui:placeholder": "1",
           "ui:help": "Value in seconds. Examples: 1, 5, 0.5"
         },
         "device_cache_ttl": {
-          "ui:placeholder": "12h",
           "ui:help": "Examples: 12h, 24h, 1d, 1w"
         },
         "credentials": {
@@ -282,7 +278,8 @@
           "ui:widget": "textarea",
           "ui:placeholder": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
         }
-      }
+      },
+      "ui:help": "- Match discovered SNMP devices and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a device matches, a data collection job is created.\n- The **default service rule** is sufficient for most cases. It creates an SNMP data collection job for each discovered device and handles both SNMPv2 and SNMPv3."
     }
   }
 }

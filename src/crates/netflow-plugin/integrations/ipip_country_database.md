@@ -165,20 +165,24 @@ enrichment:
 
 
 
-### IPv6 country fields are empty
+## Troubleshooting
+
+### Other Problems
+
+#### IPv6 country fields are empty
 
 The currently validated IPIP `country.zip` source contains IPv4 prefixes.
 Use DB-IP, MaxMind, IP2Location, or a custom MMDB if IPv6 country
 enrichment is required.
 
 
-### ASN fields are empty
+#### ASN fields are empty
 
 IPIP country data carries country prefixes only. Configure a separate ASN
 provider in the downloader.
 
 
-### City or coordinates are empty
+#### City or coordinates are empty
 
 The supported IPIP source is country-only. Use DB-IP city-lite, MaxMind
 GeoLite2 City, GeoIP2 City, or a custom MMDB for richer geo fields.

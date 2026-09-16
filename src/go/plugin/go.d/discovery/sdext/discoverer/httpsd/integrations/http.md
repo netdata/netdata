@@ -347,21 +347,23 @@ In the Netdata UI go to `Collectors -> go.d -> <module>`. Pass-through jobs use 
 
 ## Troubleshooting
 
-### parse response as json: ...; parse response as yaml: ...
+### Other Problems
+
+#### parse response as json: ...; parse response as yaml: ...
 
 The response is neither valid JSON nor valid YAML. Common causes: the endpoint returned an HTML error page (check status code and `Content-Type`), the JSON has trailing garbage, or YAML indentation is wrong. Reproduce with `curl -i` to see the headers + body.
 
 
-### Items decoded but no jobs created
+#### Items decoded but no jobs created
 
 Your `services:` rules are not matching, or they match but the rendered template is empty. With pass-through (`{{ .Item | toYaml }}`), make sure each upstream item includes `module:` and `name:`. With curated rules, double-check the type checks (`kindIs`, `hasKey`).
 
 
-### TLS/certificate errors against an internal endpoint
+#### TLS/certificate errors against an internal endpoint
 
 Use `tls_skip_verify: yes` to bypass for testing, then mount the issuing CA and set `tls_ca: /path/to/ca.crt` for production.
 
 
-### Bearer token file not found
+#### Bearer token file not found
 
 When Netdata runs **outside** Kubernetes and the configured `bearer_token_file` points under `/var/run/secrets/`, missing tokens are silently ignored — this is intentional so the same config works in dev and in Helm. If you are inside k8s, the file must exist.

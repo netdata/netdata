@@ -37,35 +37,68 @@ type ResolveRequest struct {
 }
 
 type ResolvedProfileSet struct {
-	profiles []*Profile
+	sysObjectID           string
+	sysDescr              string
+	profiles              []*Profile
+	manualPolicy          ManualProfilePolicy
+	manualApplied         bool
+	manualProfiles        []string
+	missingManualProfiles []string
 }
 
 type ProjectedView struct {
-	profiles []*Profile
+	profiles      []*Profile
+	resolved      *ResolvedProfileSet
+	consumers     []ProfileConsumer
+	bgpMode       string
+	topologyKinds []string
 }
 
 func DefaultCatalog() *Catalog {
 	return &Catalog{}
 }
 
-func (c *Catalog) Resolve(req ResolveRequest) *ResolvedProfileSet {
+func (c *Catalog) Resolve(req ResolveRequest) (result *ResolvedProfileSet) {
 	available := c.catalogProfiles()
+	defer func() {
+		result.sysObjectID, result.sysDescr = req.SysObjectID, req.SysDescr
+		result.manualPolicy = req.ManualPolicy
+		result.manualApplied = req.ManualPolicy == ManualProfileOverride || req.ManualPolicy == ManualProfileAugment ||
+			req.SysObjectID == ""
+		for _, name := range req.ManualProfiles {
+			result.manualProfiles = append(result.manualProfiles, stripFileNameExt(name))
+			if !slices.ContainsFunc(
+				available,
+				func(p *Profile) bool { return stripFileNameExt(p.SourceFile) == stripFileNameExt(name) },
+			) {
+				result.missingManualProfiles = append(result.missingManualProfiles, stripFileNameExt(name))
+			}
+		}
+	}()
 
 	switch {
 	case req.ManualPolicy == ManualProfileOverride:
-		return &ResolvedProfileSet{profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles))}
+		return &ResolvedProfileSet{
+			profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles)),
+		}
 	case req.SysObjectID == "":
 		if len(req.ManualProfiles) == 0 {
-			log.Warning("No sysObjectID found and no manual_profiles configured. Either ensure the device provides sysObjectID or configure manual_profiles option.")
+			log.Warning(
+				"No sysObjectID found and no manual_profiles configured. Either ensure the device provides sysObjectID or configure manual_profiles option.",
+			)
 			return &ResolvedProfileSet{}
 		}
-		return &ResolvedProfileSet{profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles))}
+		return &ResolvedProfileSet{
+			profiles: finalizeResolvedProfiles(selectManualProfiles(available, req.ManualProfiles)),
+		}
 	default:
 		profiles := selectMatchedProfiles(available, req.SysObjectID, req.SysDescr)
 		if req.ManualPolicy == ManualProfileAugment {
 			profiles = appendMissingManualProfiles(profiles, req.ManualProfiles, available)
 		}
-		return &ResolvedProfileSet{profiles: finalizeResolvedProfiles(profiles)}
+		return &ResolvedProfileSet{
+			profiles: finalizeResolvedProfiles(profiles),
+		}
 	}
 }
 
@@ -84,12 +117,19 @@ func (r *ResolvedProfileSet) Profiles() []*Profile {
 	return r.profiles
 }
 
-func (r *ResolvedProfileSet) Project(consumer ProfileConsumer, consumers ...ProfileConsumer) ProjectedView {
+func (r *ResolvedProfileSet) Project(consumer ProfileConsumer, consumers ...ProfileConsumer) (view ProjectedView) {
+	requested := append([]ProfileConsumer{consumer}, consumers...)
+	defer func() {
+		view.resolved = r
+		view.consumers = requested
+		view.bgpMode = "absent"
+		if slices.Contains(requested, ConsumerBGP) {
+			view.bgpMode = "full"
+		}
+	}()
 	if r == nil || len(r.profiles) == 0 {
 		return ProjectedView{}
 	}
-
-	requested := append([]ProfileConsumer{consumer}, consumers...)
 	if len(requested) > 1 {
 		return r.project(func(prof *Profile) {
 			projectProfileForConsumers(prof, requested)
@@ -105,7 +145,10 @@ func (r *ResolvedProfileSet) Project(consumer ProfileConsumer, consumers ...Prof
 	})
 }
 
-func (r *ResolvedProfileSet) project(project func(*Profile), keep func(*ddprofiledefinition.ProfileDefinition) bool) ProjectedView {
+func (r *ResolvedProfileSet) project(
+	project func(*Profile),
+	keep func(*ddprofiledefinition.ProfileDefinition) bool,
+) ProjectedView {
 	profiles := make([]*Profile, 0, len(r.profiles))
 	for _, prof := range r.profiles {
 		projected := prof.clone()
@@ -114,7 +157,9 @@ func (r *ResolvedProfileSet) project(project func(*Profile), keep func(*ddprofil
 			profiles = append(profiles, projected)
 		}
 	}
-	return ProjectedView{profiles: profiles}
+	return ProjectedView{
+		profiles: profiles,
+	}
 }
 
 func (v ProjectedView) Profiles() []*Profile {
@@ -122,18 +167,30 @@ func (v ProjectedView) Profiles() []*Profile {
 }
 
 func (v ProjectedView) FilterByKind(kinds map[ddprofiledefinition.TopologyKind]bool) ProjectedView {
+	v.topologyKinds = nil
+	for kind, enabled := range kinds {
+		if enabled {
+			v.topologyKinds = append(v.topologyKinds, string(kind))
+		}
+	}
+	slices.Sort(v.topologyKinds)
 	for _, prof := range v.profiles {
 		if prof == nil || prof.Definition == nil {
 			continue
 		}
 		prof.Definition.Metrics = nil
-		prof.Definition.Topology = slices.DeleteFunc(prof.Definition.Topology, func(topo ddprofiledefinition.TopologyConfig) bool {
-			return !kinds[topo.Kind]
-		})
+		prof.Definition.Topology = slices.DeleteFunc(
+			prof.Definition.Topology,
+			func(topo ddprofiledefinition.TopologyConfig) bool {
+				return !kinds[topo.Kind]
+			},
+		)
 	}
-	return ProjectedView{profiles: slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
-		return prof == nil || prof.Definition == nil || (len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0)
-	})}
+	v.profiles = slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
+		return prof == nil || prof.Definition == nil ||
+			(len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0)
+	})
+	return v
 }
 
 func (v ProjectedView) FilterBGPByKind(kinds map[ddprofiledefinition.BGPRowKind]bool) ProjectedView {
@@ -145,15 +202,17 @@ func (v ProjectedView) FilterBGPByKind(kinds map[ddprofiledefinition.BGPRowKind]
 			return !kinds[row.Kind]
 		})
 	}
-	return ProjectedView{profiles: slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
+	v.profiles = slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
 		return prof == nil || prof.Definition == nil ||
 			(len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0 && len(prof.Definition.BGP) == 0)
-	})}
+	})
+	return v
 }
 
 // FilterBGPToTopologyPeers keeps BGP peer rows and prunes them to fields used
 // by SNMP topology, preserving one fallback row-anchor category when needed.
 func (v ProjectedView) FilterBGPToTopologyPeers() ProjectedView {
+	v.bgpMode = "topology_peers"
 	for _, prof := range v.profiles {
 		if prof == nil || prof.Definition == nil {
 			continue
@@ -168,10 +227,11 @@ func (v ProjectedView) FilterBGPToTopologyPeers() ProjectedView {
 			return !bgpConfigHasSignal(row)
 		})
 	}
-	return ProjectedView{profiles: slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
+	v.profiles = slices.DeleteFunc(v.profiles, func(prof *Profile) bool {
 		return prof == nil || prof.Definition == nil ||
 			(len(prof.Definition.Topology) == 0 && len(prof.Definition.Metrics) == 0 && len(prof.Definition.BGP) == 0)
-	})}
+	})
+	return v
 }
 
 func pruneBGPConfigToTopologyFields(row *ddprofiledefinition.BGPConfig) {
@@ -205,27 +265,49 @@ func restoreBGPTopologyRowAnchor(row *ddprofiledefinition.BGPConfig, original dd
 		return
 	}
 	switch {
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Previous: original.Previous}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Previous: original.Previous,
+	}):
 		row.Previous = original.Previous
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Transitions: original.Transitions}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Transitions: original.Transitions,
+	}):
 		row.Transitions = original.Transitions
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Traffic: original.Traffic}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Traffic: original.Traffic,
+	}):
 		row.Traffic = original.Traffic
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Timers: original.Timers}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Timers: original.Timers,
+	}):
 		row.Timers = original.Timers
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{LastError: original.LastError}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		LastError: original.LastError,
+	}):
 		row.LastError = original.LastError
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{LastNotify: original.LastNotify}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		LastNotify: original.LastNotify,
+	}):
 		row.LastNotify = original.LastNotify
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Reasons: original.Reasons}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Reasons: original.Reasons,
+	}):
 		row.Reasons = original.Reasons
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Restart: original.Restart}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Restart: original.Restart,
+	}):
 		row.Restart = original.Restart
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Routes: original.Routes}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Routes: original.Routes,
+	}):
 		row.Routes = original.Routes
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{RouteLimits: original.RouteLimits}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		RouteLimits: original.RouteLimits,
+	}):
 		row.RouteLimits = original.RouteLimits
-	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{Device: original.Device}):
+	case bgpConfigHasSignal(ddprofiledefinition.BGPConfig{
+		Device: original.Device,
+	}):
 		row.Device = original.Device
 	}
 }
@@ -244,6 +326,8 @@ func selectMatchedProfiles(available []*Profile, sysObjID, sysDescr string) []*P
 	for _, prof := range available {
 		if ok, matchedOid := prof.Definition.Selector.Matches(sysObjID, sysDescr); ok {
 			cloned := prof.clone()
+			cloned.selectionOrigin = "selector"
+			cloned.matchedSelector = matchedOid
 			selected = append(selected, cloned)
 			matchedOIDs[cloned] = matchedOid
 		}
@@ -257,7 +341,9 @@ func selectManualProfiles(available []*Profile, manualProfiles []string) []*Prof
 	for _, prof := range available {
 		name := stripFileNameExt(prof.SourceFile)
 		if slices.ContainsFunc(manualProfiles, func(p string) bool { return stripFileNameExt(p) == name }) {
-			selected = append(selected, prof.clone())
+			cloned := prof.clone()
+			cloned.selectionOrigin = "manual"
+			selected = append(selected, cloned)
 		}
 	}
 	return selected
@@ -353,7 +439,10 @@ func projectProfileForConsumers(prof *Profile, consumers []ProfileConsumer) {
 	}
 }
 
-func projectMetadata(meta ddprofiledefinition.MetadataConfig, consumer ProfileConsumer) ddprofiledefinition.MetadataConfig {
+func projectMetadata(
+	meta ddprofiledefinition.MetadataConfig,
+	consumer ProfileConsumer,
+) ddprofiledefinition.MetadataConfig {
 	if len(meta) == 0 {
 		return nil
 	}
@@ -365,13 +454,11 @@ func projectMetadata(meta ddprofiledefinition.MetadataConfig, consumer ProfileCo
 				fields[name] = field
 			}
 		}
-		idTags := projectMetricTagList(res.IDTags, consumer)
-		if len(fields) == 0 && len(idTags) == 0 {
+		if len(fields) == 0 {
 			continue
 		}
 		projected[resName] = ddprofiledefinition.MetadataResourceConfig{
 			Fields: fields,
-			IDTags: idTags,
 		}
 	}
 	if len(projected) == 0 {
@@ -380,7 +467,10 @@ func projectMetadata(meta ddprofiledefinition.MetadataConfig, consumer ProfileCo
 	return projected
 }
 
-func projectMetadataForConsumers(meta ddprofiledefinition.MetadataConfig, consumers []ProfileConsumer) ddprofiledefinition.MetadataConfig {
+func projectMetadataForConsumers(
+	meta ddprofiledefinition.MetadataConfig,
+	consumers []ProfileConsumer,
+) ddprofiledefinition.MetadataConfig {
 	if len(meta) == 0 {
 		return nil
 	}
@@ -392,13 +482,11 @@ func projectMetadataForConsumers(meta ddprofiledefinition.MetadataConfig, consum
 				fields[name] = field
 			}
 		}
-		idTags := projectMetricTagListForConsumers(res.IDTags, consumers)
-		if len(fields) == 0 && len(idTags) == 0 {
+		if len(fields) == 0 {
 			continue
 		}
 		projected[resName] = ddprofiledefinition.MetadataResourceConfig{
 			Fields: fields,
-			IDTags: idTags,
 		}
 	}
 	if len(projected) == 0 {
@@ -407,7 +495,10 @@ func projectMetadataForConsumers(meta ddprofiledefinition.MetadataConfig, consum
 	return projected
 }
 
-func projectSysobjectIDMetadata(entries []ddprofiledefinition.SysobjectIDMetadataEntryConfig, consumer ProfileConsumer) []ddprofiledefinition.SysobjectIDMetadataEntryConfig {
+func projectSysobjectIDMetadata(
+	entries []ddprofiledefinition.SysobjectIDMetadataEntryConfig,
+	consumer ProfileConsumer,
+) []ddprofiledefinition.SysobjectIDMetadataEntryConfig {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -433,7 +524,10 @@ func projectSysobjectIDMetadata(entries []ddprofiledefinition.SysobjectIDMetadat
 	return projected
 }
 
-func projectSysobjectIDMetadataForConsumers(entries []ddprofiledefinition.SysobjectIDMetadataEntryConfig, consumers []ProfileConsumer) []ddprofiledefinition.SysobjectIDMetadataEntryConfig {
+func projectSysobjectIDMetadataForConsumers(
+	entries []ddprofiledefinition.SysobjectIDMetadataEntryConfig,
+	consumers []ProfileConsumer,
+) []ddprofiledefinition.SysobjectIDMetadataEntryConfig {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -459,23 +553,10 @@ func projectSysobjectIDMetadataForConsumers(entries []ddprofiledefinition.Sysobj
 	return projected
 }
 
-func projectMetricTagList(tags []ddprofiledefinition.MetricTagConfig, consumer ProfileConsumer) []ddprofiledefinition.MetricTagConfig {
-	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
-	if consumer == ConsumerMetrics || consumer == ConsumerTopology || consumer == ConsumerBGP {
-		return tags
-	}
-	return nil
-}
-
-func projectMetricTagListForConsumers(tags []ddprofiledefinition.MetricTagConfig, consumers []ProfileConsumer) []ddprofiledefinition.MetricTagConfig {
-	// Metadata id_tags do not carry Consumers today. They inherit metadata defaults.
-	if profileConsumersInclude(consumers, ConsumerMetrics) || profileConsumersInclude(consumers, ConsumerTopology) || profileConsumersInclude(consumers, ConsumerBGP) {
-		return tags
-	}
-	return nil
-}
-
-func projectGlobalMetricTags(tags []ddprofiledefinition.GlobalMetricTagConfig, consumer ProfileConsumer) []ddprofiledefinition.GlobalMetricTagConfig {
+func projectGlobalMetricTags(
+	tags []ddprofiledefinition.GlobalMetricTagConfig,
+	consumer ProfileConsumer,
+) []ddprofiledefinition.GlobalMetricTagConfig {
 	filtered := tags[:0]
 	for _, tag := range tags {
 		if consumersInclude(tag.Consumers, consumer) {
@@ -488,7 +569,10 @@ func projectGlobalMetricTags(tags []ddprofiledefinition.GlobalMetricTagConfig, c
 	return filtered
 }
 
-func projectGlobalMetricTagsForConsumers(tags []ddprofiledefinition.GlobalMetricTagConfig, consumers []ProfileConsumer) []ddprofiledefinition.GlobalMetricTagConfig {
+func projectGlobalMetricTagsForConsumers(
+	tags []ddprofiledefinition.GlobalMetricTagConfig,
+	consumers []ProfileConsumer,
+) []ddprofiledefinition.GlobalMetricTagConfig {
 	filtered := tags[:0]
 	for _, tag := range tags {
 		if consumersIncludeAny(tag.Consumers, consumers) {

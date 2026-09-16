@@ -923,7 +923,7 @@ func (pjc *preparedJobCandidate) run(
 	stageErr := factory.stageCandidateHandlers(&candidate)
 	factory = nil
 	if stageErr != nil {
-		failure := autoDetectionFailureFor(candidate, stageErr)
+		failure := autoDetectionFailureFor(candidate, withJobConfigFailure(stageErr, "functions", ""))
 		captureJobConfigLifecycle(&candidate)
 		failure.jobConfigLifecycle = candidate.jobConfigSnapshot
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
@@ -1042,27 +1042,23 @@ func validateStoreSnapshot(snapshot secretresolver.AtomicScopeSnapshot) (err err
 	return nil
 }
 
-func candidatePreparationBusy(err error) bool {
-	return errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-		errors.Is(err, ErrStaleStoreGeneration)
-}
-
 func (dcjc *DynCfgJobController) prepareContainedJob(
 	ctx context.Context,
 	config confgroup.Config,
 	identity lifecycle.ResourceIdentity,
 	permit lifecycle.LongLivedPermit,
-) (PreparedJob, *autoDetectionFailure, error) {
+) (PreparedJob, *autoDetectionFailure, activationFailure) {
 	if dcjc == nil || dcjc.factory == nil {
-		return PreparedJob{}, nil, errors.New("job output: invalid contained job preparation")
+		return PreparedJob{}, nil, classifyActivationError(errors.New("job output: invalid contained job preparation"))
 	}
 	stage, err := dcjc.factory.newCandidate(config)
 	if err != nil {
-		return PreparedJob{}, nil, err
+		return PreparedJob{}, nil, classifyActivationError(err)
 	}
 	defer stage.Release()
 	if err := dcjc.factory.awaitCandidate(ctx, stage); err != nil {
-		return PreparedJob{}, nil, err
+		return PreparedJob{}, nil, classifyActivationError(err)
 	}
-	return dcjc.factory.prepareCandidate(identity, permit, stage)
+	prepared, probeFailure, err := dcjc.factory.prepareCandidate(identity, permit, stage)
+	return prepared, probeFailure, classifyActivationError(err)
 }

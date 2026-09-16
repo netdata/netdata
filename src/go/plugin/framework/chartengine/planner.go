@@ -225,7 +225,9 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	if e.state.outstanding != 0 {
 		return Plan{}, materializedState{}, 0, 0, 0, false, ErrOutstandingPlanAttempt
 	}
-	sample := PlanRuntimeSample{startedAt: time.Now()}
+	sample := PlanRuntimeSample{
+		startedAt: time.Now(),
+	}
 	defer func() { e.observeBuildSample(sample) }()
 	// Failed attempt must not trigger lifecycle transitions.
 	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
@@ -528,6 +530,13 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				ctx.routeCacheMisses++
 			}
 		}
+		if len(routes) > 0 && routes[0].Autogen && !routes[0].autogenGuard.valid(ctx.reader, meta) {
+			routes = nil
+			// Release obsolete discovery even if autogen rebuilding is rejected.
+			if ctx.routeCacheEnabled {
+				ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, nil)
+			}
+		}
 		if len(routes) == 0 {
 			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
 			if err != nil {
@@ -536,6 +545,9 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			}
 			if ok {
 				routes = autoRoutes
+				if ctx.routeCacheEnabled {
+					ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, routes)
+				}
 				if trackStats {
 					ctx.seriesAutogenMatched++
 					ctx.seriesMatched++
@@ -562,6 +574,9 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				return
 			}
 		} else if trackStats {
+			if routes[0].Autogen {
+				ctx.seriesAutogenMatched++
+			}
 			ctx.seriesMatched++
 		}
 
@@ -876,7 +891,10 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				if math.IsNaN(entry.value) || math.IsInf(entry.value, 0) {
 					// A non-finite value (e.g. a summary quantile with no observations this
 					// cycle) must render as a gap, not 0: emit SETEMPTY rather than carry NaN.
-					values = append(values, UpdateDimensionValue{Name: name, IsEmpty: true})
+					values = append(values, UpdateDimensionValue{
+						Name:    name,
+						IsEmpty: true,
+					})
 					continue
 				}
 				values = append(values, UpdateDimensionValue{
@@ -999,7 +1017,10 @@ func sortInferredDimensions(in []InferredDimension) {
 		if lhs.DimensionIndex != rhs.DimensionIndex {
 			return lhs.DimensionIndex < rhs.DimensionIndex
 		}
-		if histogramGroups[inferredDimensionGroup{chartTemplateID: lhs.ChartTemplateID, dimensionIndex: lhs.DimensionIndex}] {
+		if histogramGroups[inferredDimensionGroup{
+			chartTemplateID: lhs.ChartTemplateID,
+			dimensionIndex:  lhs.DimensionIndex,
+		}] {
 			lhsBound, lhsOK := parseHistogramBucketUpperBound(lhs.Name)
 			rhsBound, rhsOK := parseHistogramBucketUpperBound(rhs.Name)
 			if lhsOK && rhsOK && lhsBound != rhsBound {

@@ -38,9 +38,5 @@
       "conf_path"
     ]
   },
-  "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    }
-  }
+  "uiSchema": {}
 }

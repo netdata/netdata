@@ -35,10 +35,12 @@ metadata:
 
 metric_tags:
   - tag: _agent_inventory_machine_model
-    OID: 1.3.6.1.4.1.4526.10.1.1.1.3.0
-    symbol: agentInventoryMachineModel
+    symbol:
+      OID: 1.3.6.1.4.1.4526.10.1.1.1.3.0
+      name: agentInventoryMachineModel
   - tag: _agent_inventory_software_version
-    OID: 1.3.6.1.4.1.4526.10.1.1.1.13.0
-    symbol: agentInventorySoftwareVersion
+    symbol:
+      OID: 1.3.6.1.4.1.4526.10.1.1.1.13.0
+      name: agentInventorySoftwareVersion
 
 # TODO: find metrics

@@ -217,7 +217,11 @@ enrichment:
 
 
 
-### ASN names not appearing
+## Troubleshooting
+
+### Other Problems
+
+#### ASN names not appearing
 
 IPtoASN's `AS_description` column is sometimes empty for less-common
 ASNs (the upstream derives names from RIRs and the chain occasionally
@@ -230,7 +234,7 @@ wins" composition (see
 means MaxMind names override IPtoASN's empty entries.
 
 
-### Country empty although IPtoASN was selected
+#### Country empty although IPtoASN was selected
 
 IPtoASN's combined TSV publishes country only when it is known. Public
 IPs that the upstream cannot attribute will have an empty
@@ -239,7 +243,7 @@ IPs that the upstream cannot attribute will have an empty
 plugin reads any combination.
 
 
-### Outdated ASN attribution
+#### Outdated ASN attribution
 
 IPtoASN rebuilds hourly upstream. A daily cron of the downloader is
 the recommended cadence for flow enrichment; weekly is too slow

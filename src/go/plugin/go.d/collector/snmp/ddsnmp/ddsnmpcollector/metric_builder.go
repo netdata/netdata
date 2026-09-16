@@ -71,7 +71,12 @@ func (mb *metricBuilder) build() ddsnmp.Metric {
 	return mb.metric
 }
 
-func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string) (*ddsnmp.Metric, error) {
+func buildScalarMetric(
+	cfg ddprofiledefinition.SymbolConfig,
+	pdu gosnmp.SnmpPDU,
+	value int64,
+	tags, staticTags map[string]string,
+) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
 		withTags(tags).
 		withStaticTags(staticTags).
@@ -87,7 +92,13 @@ func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU,
 	return &metric, nil
 }
 
-func buildTableMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string, tableName string) (*ddsnmp.Metric, error) {
+func buildTableMetric(
+	cfg ddprofiledefinition.SymbolConfig,
+	pdu gosnmp.SnmpPDU,
+	value int64,
+	tags, staticTags map[string]string,
+	tableName string,
+) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
 		withTags(tags).
 		withStaticTags(staticTags).
@@ -167,19 +178,19 @@ func buildBitmaskMultiValue(value int64, mappings map[string]string) map[string]
 	multiValue := make(map[string]int64)
 
 	for k, v := range mappings {
-		bit, err := strconv.ParseInt(k, 10, 64)
+		bit, err := strconv.ParseUint(k, 10, 64)
 		if err != nil {
 			continue
 		}
 
 		active := false
-		// Bitmask mappings are intended for non-negative flag values. If multiple
-		// bits map to the same dimension, we OR them by keeping the active state.
+		// The int64 carrier retains all 64 raw bits. Multiple bits mapped to
+		// one dimension are ORed by retaining any active state.
 		switch {
 		case bit == 0:
 			active = value == 0
 		default:
-			active = value&bit == bit
+			active = uint64(value)&bit == bit
 		}
 
 		if _, ok := multiValue[v]; !ok || active {

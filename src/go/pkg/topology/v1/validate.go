@@ -56,6 +56,10 @@ func ValidateDecodedResponse(payload any) error {
 }
 
 func ValidateDecodedData(data map[string]any) error {
+	if err := validateNotifications(data); err != nil {
+		return err
+	}
+
 	dictionaries, ok := data["dictionaries"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("data.dictionaries is not an object")

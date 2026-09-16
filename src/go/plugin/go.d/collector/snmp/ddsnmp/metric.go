@@ -35,6 +35,7 @@ type Metric struct {
 
 	TopologyKind ddprofiledefinition.TopologyKind
 	IsTable      bool
+	IsVirtual    bool
 }
 
 type MetaTag struct {

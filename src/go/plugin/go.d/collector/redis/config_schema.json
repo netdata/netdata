@@ -46,14 +46,12 @@
       "username": {
         "title": "Username",
         "description": "The username for authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "tls_skip_verify": {
         "title": "Skip TLS verification",
@@ -77,10 +75,12 @@
       },
       "functions": {
         "title": "Functions",
+        "description": "Settings of the interactive Functions this job exposes in the UI.",
         "type": "object",
         "properties": {
           "top_queries": {
             "title": "Top Queries",
+            "description": "Settings of the Top Queries function, which lists the slowest recent commands from the Redis slow log.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -113,9 +113,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
@@ -124,13 +121,11 @@
     },
     "address": {
       "ui:placeholder": "redis://user:password@host:port",
-      "ui:help": "Tcp connection: `redis://user:password@host:port`. Unix connection: `unix://user:password@/path/to/redis.sock`."
+      "ui:help": "Tcp connection: `redis://user:password@host:port`. Unix connection: `unix://user:password@/path/to/redis.sock`.",
+      "ui:widget": "password"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
-    },
-    "username": {
-      "ui:widget": "password"
     },
     "password": {
       "ui:widget": "password"
@@ -172,6 +167,11 @@
           ]
         }
       ]
+    },
+    "functions": {
+      "top_queries": {
+        "ui:help": "Command arguments in the results may contain unmasked literals, including personal data."
+      }
     }
   }
 }

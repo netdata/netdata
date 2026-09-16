@@ -40,14 +40,12 @@
       "username": {
         "title": "Username",
         "description": "The username for PowerVault MCI API authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for PowerVault MCI API authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "auth_digest": {
         "title": "Auth digest",
@@ -73,14 +71,12 @@
       "proxy_username": {
         "title": "Proxy username",
         "description": "The username for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "proxy_password": {
         "title": "Proxy password",
         "description": "The password for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "headers": {
         "title": "Headers",
@@ -133,12 +129,6 @@
     }
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
-    "url": {
-      "ui:placeholder": "https://127.0.0.1"
-    },
     "timeout": {
       "ui:help": "Accepts decimals for sub-second values (e.g., 0.5 = 500ms)."
     },

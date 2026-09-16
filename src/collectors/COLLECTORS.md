@@ -229,6 +229,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Systemd Services](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/systemd_services.md) | Monitor systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups. |
 | [Systemd Units](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/systemdunits/integrations/systemd_units.md) | This collector monitors the state of Systemd units and unit files. |
 | [systemd-logind users](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/logind/integrations/systemd-logind_users.md) | This collector monitors number of sessions and users as reported by the `org.freedesktop.login1` DBus API. |
+| [Terminal Services sessions](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/terminal_services_sessions.md) | Monitor aggregate active and inactive Terminal Services sessions on Windows hosts. |
 | [uptime](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/uptime.md) | Show period of time server is up. |
 | [User Groups](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/user_groups.md) | This integration monitors resource utilization on a user groups context. |
 | [Users](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/users.md) | This integration monitors resource utilization on a user context. |

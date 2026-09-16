@@ -268,6 +268,18 @@ set at the end.
 | L8/null2zero-post-processing | options=null2zero converts gap cells to numeric zero without altering non-gap values | n/a |  |
 | L8/nonzero-all-zero | nonzero filtering self-neutralizes when every selected dimension is all-zero so the result is not emptied | n/a |  |
 | L8/cardinality-limit | cardinality limiting keeps the top N-1 dimensions by absolute view sum and folds every remaining per-row value into one named remainder column | n/a |  |
+| W/limit-aliases | weights limit and cardinality_limit select the strongest physical dimensions with explicit cardinality_limit precedence | n/a |  |
+| W/limit-boundaries | weights omitted and zero caps preserve unlimited shape while exact and above-population caps report no truncation | n/a |  |
+| W/limit-invalid | weights HTTP endpoints reject malformed or overflowing supplied limits | n/a |  |
+| W/limit-ranking | limited weights retain the strongest entries and their complete-population raw or normalized score vectors; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled | n/a |  |
+| W/limit-summaries | limited weights preserve complete-query parent summary vectors and full correlated and examined counts; value, volume, ks2 and anomaly-rate must each run with raw enabled and disabled, and with anomaly-bit enabled and disabled | n/a |  |
+| W/limit-legacy | legacy weights and metric_correlations formats honor result limits without changing full population counts | n/a |  |
+| W/limit-grouped | weights group limits select complete final group objects by the requested aggregate without changing their vectors | n/a |  |
+| W/limit-complete-groups | weights limits rank multi-dimension groups by the requested raw or normalized aggregate after complete aggregation | n/a |  |
+| W/limit-thousand | a weights cap of 1000 retains exactly the strongest 1000 of 1005 physical metrics while preserving complete parent means | n/a |  |
+| W/limit-hierarchy | weights limiting preserves complete shared ancestors and emits only dictionaries and ancestor rows reachable from retained metrics | n/a |  |
+| W/limit-node-ties | equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics | n/a |  |
+| W/limit-mcp | MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully | n/a |  |
 
 ## Corpus-wide pusher discipline
 

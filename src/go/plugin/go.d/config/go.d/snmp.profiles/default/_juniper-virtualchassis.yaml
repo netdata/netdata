@@ -8,87 +8,100 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2
       name: jnxVirtualChassisPortTable
-    metric_type: monotonic_count
     symbols:
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.5
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortInPkts
         chart_meta:
           family: 'Network/VirtualChassis/Port/Packet/Total/In'
           description: Total number of packets received on the virtual-chassis port
           unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.11
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortInPkts1secRate
         chart_meta:
           family: 'Network/VirtualChassis/Port/Packet/Total/In'
           description: Total number of packets received per second on the virtual-chassis port
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.6
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortOutPkts
         chart_meta:
           family: 'Network/VirtualChassis/Port/Packet/Total/Out'
           description: Total number of packets sent from the virtual-chassis port
           unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.12
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortOutPkts1secRate
         chart_meta:
           family: 'Network/VirtualChassis/Port/Packet/Total/Out'
           description: Total number of packets sent per second from the virtual-chassis port
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.7
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortInOctets
         chart_meta:
           family: 'Network/VirtualChassis/Port/Traffic/Total/In'
           description: Total number of octets received on the virtual-chassis port
           unit: "By"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.13
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortInOctets1secRate
         chart_meta:
           family: 'Network/VirtualChassis/Port/Traffic/Total/In'
           description: Total number of octets received per second on the virtual-chassis port
           unit: "By/s"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.8
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortOutOctets
         chart_meta:
           family: 'Network/VirtualChassis/Port/Traffic/Total/Out'
           description: Total number of octets sent on the virtual-chassis port
           unit: "By"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.14
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortOutOctets1secRate
         chart_meta:
           family: 'Network/VirtualChassis/Port/Traffic/Total/Out'
           description: Total number of octets sent per second on the virtual-chassis port
           unit: "By/s"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.9
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortInMcasts
         chart_meta:
           family: 'Network/VirtualChassis/Port/Packet/Multicast/In'
           description: Total number of multicast packets received on the virtual-chassis port
           unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.10
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortOutMcasts
         chart_meta:
           family: 'Network/VirtualChassis/Port/Packet/Multicast/Out'
           description: Total number of multicast packets sent from the virtual-chassis port
           unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.15
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortCarrierTrans
         chart_meta:
           family: 'Network/VirtualChassis/Port/Error/CarrierTransition'
           description: Total number of Carrier errors on the virtual-chassis port
           unit: "{error}"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.16
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortInCRCAlignErrors
         chart_meta:
           family: 'Network/VirtualChassis/Port/Error/CRCAlign/In'
           description: Total number of Input CRC Alignment errors on the virtual-chassis port
           unit: "{error}"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.17
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortUndersizePkts
         chart_meta:
           family: 'Network/VirtualChassis/Port/Packet/Undersize'
           description: Total number of Undersize Packets on the virtual-chassis port
           unit: "{packet}"
       - OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.18
+        metric_type: monotonic_count
         name: jnxVirtualChassisPortCollisions
         chart_meta:
           family: 'Network/VirtualChassis/Port/Error/Collision'

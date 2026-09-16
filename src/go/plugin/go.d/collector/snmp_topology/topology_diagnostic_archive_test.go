@@ -16,7 +16,8 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/stretchr/testify/require"
 )
@@ -38,67 +39,31 @@ func TestTopologyDiagnosticArchiveRoundTripPreservesReplayAndInspection(t *testi
 		diagnostics,
 		"v-test",
 	))
-	archive, err := readTopologyDiagnosticArchive(
+	archive, err := readTestDiagnosticArchive(
 		bytes.NewReader(encoded.Bytes()),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
-	require.Equal(t, "v-test", archive.producerVersion)
-
-	beforeDocument, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "v-test")
-	require.NoError(t, err)
-	afterDocument, err := newTopologyDiagnosticArchiveDocumentV1(archive.diagnostics, "v-test")
-	require.NoError(t, err)
-	require.JSONEq(t, archiveDocumentJSON(t, beforeDocument), archiveDocumentJSON(t, afterDocument))
-
-	require.NotSame(t,
-		archive.diagnostics.topology.devices[0].latestAttempt,
-		archive.diagnostics.topology.devices[0].acquisition,
-	)
-	require.Same(t,
-		archive.diagnostics.topology.devices[1].latestAttempt,
-		archive.diagnostics.topology.devices[1].acquisition,
-	)
+	require.Equal(t, "v-test", archive.Identity().ProducerAgentVersion)
 
 	live, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(scenario.opts)
 	require.NoError(t, err)
 	require.True(t, ok)
-	replayed, ok, err := replayTopologyDiagnostics(archive.diagnostics, scenario.opts)
+	replayed, err := archive.Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
-	require.True(t, ok)
 	require.Equal(t, topologyv1test.NormalizeData(t, live), topologyv1test.NormalizeData(t, replayed))
 
-	beforeDevice, err := inspectTopologyDevice(diagnostics, scenario.opts, 1)
+	beforeDevice, err := openTestDiagnosticCut(t, diagnostics).InspectDevice(testDiagnosticQuery(scenario.opts), 1)
 	require.NoError(t, err)
-	afterDevice, err := inspectTopologyDevice(archive.diagnostics, scenario.opts, 1)
+	afterDevice, err := archive.InspectDevice(testDiagnosticQuery(scenario.opts), 1)
 	require.NoError(t, err)
 	require.Equal(t, beforeDevice, afterDevice)
 
-	stages := replayTopologyDiagnosticStages(diagnostics, scenario.opts)
-	require.NotEmpty(t, stages.data.Links)
-	subject, ok := topologyInspectionSubjectFromLink(stages.data, 0)
-	require.True(t, ok)
-	beforeLink, err := inspectTopologyLink(diagnostics, scenario.opts, subject)
+	beforeLink, err := openTestDiagnosticCut(t, diagnostics).InspectLinkAt(testDiagnosticQuery(scenario.opts), 0)
 	require.NoError(t, err)
-	afterLink, err := inspectTopologyLink(archive.diagnostics, scenario.opts, subject)
+	afterLink, err := archive.InspectLinkAt(testDiagnosticQuery(scenario.opts), 0)
 	require.NoError(t, err)
 	require.Equal(t, beforeLink, afterLink)
-}
-
-func TestTopologyDiagnosticArchiveV1GoldenDocument(t *testing.T) {
-	raw, err := os.ReadFile("testdata/topology-diagnostic-archive-v1.json")
-	require.NoError(t, err)
-
-	archive, err := readTopologyDiagnosticArchive(
-		bytes.NewReader(compressArchiveJSON(t, string(raw))),
-		defaultTopologyDiagnosticArchiveReadLimits(),
-	)
-	require.NoError(t, err)
-	require.Equal(t, "v1.2.3", archive.producerVersion)
-
-	document, err := newTopologyDiagnosticArchiveDocumentV1(archive.diagnostics, archive.producerVersion)
-	require.NoError(t, err)
-	require.JSONEq(t, string(raw), archiveDocumentJSON(t, document))
 }
 
 func TestTopologyDiagnosticArchiveReplayFixture(t *testing.T) {
@@ -123,31 +88,43 @@ func TestTopologyDiagnosticArchiveRejectsMalformedAndUnsupportedInput(t *testing
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		mutate func(*topologyDiagnosticArchiveDocumentV1)
+		mutate func(*snmpdiag.Document)
 		want   string
 	}{
 		"format": {
-			mutate: func(document *topologyDiagnosticArchiveDocumentV1) { document.Format = "other" },
+			mutate: func(document *snmpdiag.Document) { document.Format = "other" },
 			want:   "unsupported format",
 		},
+		"legacy envelope": {
+			mutate: func(document *snmpdiag.Document) { document.Format = "netdata.snmp_topology.diagnostics" },
+			want:   "unsupported format",
+		},
+		"missing kind": {
+			mutate: func(document *snmpdiag.Document) { document.Kind = "" },
+			want:   "unsupported document kind",
+		},
+		"topology in lifecycle file": {
+			mutate: func(document *snmpdiag.Document) { document.Kind = snmpdiag.KindLifecycle },
+			want:   "lifecycle document contains topology",
+		},
 		"version": {
-			mutate: func(document *topologyDiagnosticArchiveDocumentV1) { document.Version++ },
+			mutate: func(document *snmpdiag.Document) { document.Version++ },
 			want:   "unsupported version",
 		},
 		"retained reference": {
-			mutate: func(document *topologyDiagnosticArchiveDocumentV1) {
+			mutate: func(document *snmpdiag.Document) {
 				document.Snapshot.Topology.Devices[0].RetainedSuccess.RegistrationID++
 			},
 			want: "does not match owner",
 		},
 		"capture role": {
-			mutate: func(document *topologyDiagnosticArchiveDocumentV1) {
+			mutate: func(document *snmpdiag.Document) {
 				document.Snapshot.Topology.Devices[0].Captures[0].Roles[0] = "other"
 			},
 			want: "unknown capture role",
 		},
 		"route reference": {
-			mutate: func(document *topologyDiagnosticArchiveDocumentV1) {
+			mutate: func(document *snmpdiag.Document) {
 				profile := &document.Snapshot.Topology.Devices[0].Captures[0].Evidence.CollectionContexts[0].Profiles[0]
 				require.NotEmpty(t, profile.Values.Metrics)
 				profile.Values.Metrics[0].RouteOrdinal = ^uint32(0)
@@ -155,7 +132,7 @@ func TestTopologyDiagnosticArchiveRejectsMalformedAndUnsupportedInput(t *testing
 			want: "references unknown route ordinal",
 		},
 		"target address": {
-			mutate: func(document *topologyDiagnosticArchiveDocumentV1) {
+			mutate: func(document *snmpdiag.Document) {
 				document.Snapshot.Topology.Devices[0].Captures[0].Evidence.Target.Addresses = []string{"not-an-address"}
 			},
 			want: "target address",
@@ -165,13 +142,13 @@ func TestTopologyDiagnosticArchiveRejectsMalformedAndUnsupportedInput(t *testing
 		t.Run(name, func(t *testing.T) {
 			encoded, err := json.Marshal(document)
 			require.NoError(t, err)
-			var mutated topologyDiagnosticArchiveDocumentV1
+			var mutated snmpdiag.Document
 			require.NoError(t, json.Unmarshal(encoded, &mutated))
 			tc.mutate(&mutated)
 
-			_, err = readTopologyDiagnosticArchive(
+			_, err = readTestDiagnosticArchive(
 				bytes.NewReader(compressArchiveJSON(t, archiveDocumentJSON(t, mutated))),
-				defaultTopologyDiagnosticArchiveReadLimits(),
+				snmpdiag.DefaultReadLimits(),
 			)
 			require.ErrorContains(t, err, tc.want)
 		})
@@ -188,14 +165,26 @@ func TestTopologyDiagnosticArchivePreservesOpenBGPPeerState(t *testing.T) {
 	row.StateHas = true
 	row.State = state
 
-	archive, err := readTopologyDiagnosticArchive(
+	archive, err := readTestDiagnosticArchive(
 		bytes.NewReader(compressArchiveJSON(t, archiveDocumentJSON(t, document))),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
-	restored, err := newTopologyDiagnosticArchiveDocumentV1(archive.diagnostics, archive.producerVersion)
+	report, err := archive.InspectLink(testDiagnosticQuery(newMixedL2L3ControlScenario().opts), DiagnosticLinkSubject{
+		SourceIdentity: "actor:unknown-a", DestinationIdentity: "actor:unknown-b", Family: "bgp_adjacency", Protocol: "bgp", Direction: "bidirectional",
+	})
 	require.NoError(t, err)
-	require.Equal(t, state, firstTopologyDiagnosticArchiveBGPRow(t, &restored).State)
+	var found bool
+	for _, context := range report.Source.Contexts {
+		for _, capture := range context.Captures {
+			for _, fact := range capture.Facts {
+				if fact.BGP != nil && fact.BGP.State == state {
+					found = true
+				}
+			}
+		}
+	}
+	require.True(t, found, "open BGP state survives archive restoration and inspection")
 }
 
 func TestTopologyDiagnosticArchiveRejectsRetainedReferenceCaptureMismatch(t *testing.T) {
@@ -206,26 +195,26 @@ func TestTopologyDiagnosticArchiveRejectsRetainedReferenceCaptureMismatch(t *tes
 	require.GreaterOrEqual(t, len(document.Snapshot.Topology.Devices), 2)
 
 	tests := map[string]struct {
-		mutate func(*topologyDiagnosticArchiveDeviceV1, uint64)
+		mutate func(*snmpdiag.Device, uint64)
 		want   string
 	}{
 		"reference without role": {
-			mutate: func(device *topologyDiagnosticArchiveDeviceV1, _ uint64) {
+			mutate: func(device *snmpdiag.Device, _ uint64) {
 				require.NotNil(t, device.RetainedSuccess)
 				require.Len(t, device.Captures, 1)
-				device.Captures[0].Roles = []string{topologyDiagnosticArchiveCaptureRoleLatestAttempt}
+				device.Captures[0].Roles = []string{"latest_attempt"}
 			},
 			want: "retained-success reference and capture role disagree",
 		},
 		"role without reference": {
-			mutate: func(device *topologyDiagnosticArchiveDeviceV1, _ uint64) {
+			mutate: func(device *snmpdiag.Device, _ uint64) {
 				require.NotNil(t, device.RetainedSuccess)
 				device.RetainedSuccess = nil
 			},
 			want: "retained-success reference and capture role disagree",
 		},
 		"generation newer than sweep": {
-			mutate: func(device *topologyDiagnosticArchiveDeviceV1, sequence uint64) {
+			mutate: func(device *snmpdiag.Device, sequence uint64) {
 				require.NotNil(t, device.RetainedSuccess)
 				device.RetainedSuccess.Generation = sequence + 1
 			},
@@ -239,9 +228,9 @@ func TestTopologyDiagnosticArchiveRejectsRetainedReferenceCaptureMismatch(t *tes
 			device := &mutated.Snapshot.Topology.Devices[1]
 			mutate.mutate(device, mutated.Snapshot.Topology.Sequence)
 
-			_, err := readTopologyDiagnosticArchive(
+			_, err := readTestDiagnosticArchive(
 				bytes.NewReader(compressArchiveJSON(t, archiveDocumentJSON(t, mutated))),
-				defaultTopologyDiagnosticArchiveReadLimits(),
+				snmpdiag.DefaultReadLimits(),
 			)
 			require.ErrorContains(t, err, mutate.want)
 		})
@@ -257,9 +246,9 @@ func TestTopologyDiagnosticArchiveRejectsDuplicateCaptureAttemptOrdinal(t *testi
 	require.Len(t, device.Captures, 2)
 	device.Captures[1].AttemptOrdinal = device.Captures[0].AttemptOrdinal
 
-	_, err = readTopologyDiagnosticArchive(
+	_, err = readTestDiagnosticArchive(
 		bytes.NewReader(compressArchiveJSON(t, archiveDocumentJSON(t, document))),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.ErrorContains(t, err, "duplicate capture attempt ordinal")
 }
@@ -270,33 +259,33 @@ func TestTopologyDiagnosticArchiveRejectsTrailingAndTruncatedContent(t *testing.
 	require.NoError(t, err)
 	validJSON := archiveDocumentJSON(t, document)
 
-	_, err = readTopologyDiagnosticArchive(
+	_, err = readTestDiagnosticArchive(
 		bytes.NewReader(compressArchiveJSON(t, validJSON+"{}")),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.Error(t, err)
 
 	encoded := compressArchiveJSON(t, validJSON)
 	require.Greater(t, len(encoded), 8)
-	_, err = readTopologyDiagnosticArchive(
+	_, err = readTestDiagnosticArchive(
 		bytes.NewReader(encoded[:len(encoded)-4]),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.Error(t, err)
 
 	corrupt := append([]byte(nil), encoded...)
 	corrupt[len(corrupt)-1] ^= 0xff
-	_, err = readTopologyDiagnosticArchive(
+	_, err = readTestDiagnosticArchive(
 		bytes.NewReader(corrupt),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.Error(t, err)
 }
 
 func TestTopologyDiagnosticArchiveReadLimitsHaveGenerousDefaults(t *testing.T) {
-	limits := defaultTopologyDiagnosticArchiveReadLimits()
-	require.Equal(t, int64(128<<20), limits.maxCompressedBytes)
-	require.Equal(t, int64(512<<20), limits.maxDecodedBytes)
+	limits := snmpdiag.DefaultReadLimits()
+	require.Equal(t, int64(128<<20), limits.MaxCompressedBytes)
+	require.Equal(t, int64(512<<20), limits.MaxDecodedBytes)
 }
 
 func TestTopologyDiagnosticArchiveEnforcesCallerByteLimits(t *testing.T) {
@@ -307,16 +296,16 @@ func TestTopologyDiagnosticArchiveEnforcesCallerByteLimits(t *testing.T) {
 	encoded := compressArchiveJSON(t, archiveDocumentJSON(t, document))
 
 	for _, limit := range []int64{1, int64(len(encoded) - 1)} {
-		limits := defaultTopologyDiagnosticArchiveReadLimits()
-		limits.maxCompressedBytes = limit
-		_, err = readTopologyDiagnosticArchive(bytes.NewReader(encoded), limits)
-		require.ErrorIs(t, err, errTopologyDiagnosticArchiveCompressedLimit)
+		limits := snmpdiag.DefaultReadLimits()
+		limits.MaxCompressedBytes = limit
+		_, err = readTestDiagnosticArchive(bytes.NewReader(encoded), limits)
+		require.ErrorIs(t, err, snmpdiag.ErrCompressedLimit)
 	}
 
-	limits := defaultTopologyDiagnosticArchiveReadLimits()
-	limits.maxDecodedBytes = 64
-	_, err = readTopologyDiagnosticArchive(bytes.NewReader(encoded), limits)
-	require.ErrorIs(t, err, errTopologyDiagnosticArchiveDecodedLimit)
+	limits := snmpdiag.DefaultReadLimits()
+	limits.MaxDecodedBytes = 64
+	_, err = readTestDiagnosticArchive(bytes.NewReader(encoded), limits)
+	require.ErrorIs(t, err, snmpdiag.ErrDecodedLimit)
 }
 
 func TestTopologyDiagnosticArchiveWriterPropagatesDestinationFailure(t *testing.T) {
@@ -340,9 +329,9 @@ func TestTopologyDiagnosticArchiveUsesStandardJSONFieldSemantics(t *testing.T) {
 	raw = strings.Replace(raw, `"version":1`, `"version":99,"version":1`, 1)
 	raw = strings.Replace(raw, `"format":`, `"FoRmAt":`, 1)
 
-	_, err = readTopologyDiagnosticArchive(
+	_, err = readTestDiagnosticArchive(
 		bytes.NewReader(compressArchiveJSON(t, raw)),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
 }
@@ -354,9 +343,9 @@ func TestTopologyDiagnosticArchiveRejectsInvalidWireUTF8(t *testing.T) {
 	raw := archiveDocumentJSON(t, document)
 
 	invalidUTF8 := strings.Replace(raw, `"v-test"`, `"`+string([]byte{0xff})+`"`, 1)
-	_, err = readTopologyDiagnosticArchive(
+	_, err = readTestDiagnosticArchive(
 		bytes.NewReader(compressArchiveJSON(t, invalidUTF8)),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.ErrorContains(t, err, "invalid UTF-8")
 }
@@ -372,60 +361,18 @@ func TestTopologyDiagnosticArchiveWriterPreservesV1StringSemantics(t *testing.T)
 	require.NotContains(t, raw, `\u003c`)
 	require.NotContains(t, raw, `\u003e`)
 	require.NotContains(t, raw, `\u0026`)
-	archive, err := readTopologyDiagnosticArchive(
+	archive, err := readTestDiagnosticArchive(
 		bytes.NewReader(encoded.Bytes()),
-		defaultTopologyDiagnosticArchiveReadLimits(),
+		snmpdiag.DefaultReadLimits(),
 	)
 	require.NoError(t, err)
-	require.Equal(t, "v<&>\ufffd", archive.producerVersion)
-}
-
-func TestTopologyDiagnosticArchiveEnumTablesAreCompleteAndRoundTrip(t *testing.T) {
-	tables := []struct {
-		name  string
-		names []string
-		last  uint8
-	}{
-		{"capture state", topologyDiagnosticArchiveCaptureStateNames, uint8(diagnosticCaptureUnavailable)},
-		{"capture reason", topologyDiagnosticArchiveCaptureReasonNames, uint8(diagnosticCaptureReasonGlobalByteLimit)},
-		{"lifecycle phase", topologyDiagnosticArchiveLifecyclePhaseNames, uint8(ddsnmp.DeviceLifecyclePhaseCollect)},
-		{"lifecycle outcome", topologyDiagnosticArchiveLifecycleOutcomeNames, uint8(ddsnmp.DeviceLifecycleOutcomeFailed)},
-		{"device outcome", topologyDiagnosticArchiveDeviceOutcomeNames, uint8(deviceRefreshOutcomeFailed)},
-		{"abort reason", topologyDiagnosticArchiveAbortReasonNames, uint8(topologyDiagnosticAbortPanic)},
-		{"sweep phase", topologyDiagnosticArchiveSweepPhaseNames, uint8(topologyDiagnosticSweepPhaseCommit)},
-		{"target outcome", topologyDiagnosticArchiveTargetOutcomeNames, uint8(topologyTargetResolutionFailed)},
-		{"phase outcome", topologyDiagnosticArchivePhaseOutcomeNames, uint8(topologyAcquisitionPhaseNotObserved)},
-		{"phase failure", topologyDiagnosticArchivePhaseFailureNames, uint8(topologyAcquisitionFailureVLANIdentifier)},
-		{"profile outcome", topologyDiagnosticArchiveProfileOutcomeNames, uint8(ddsnmpcollector.AcquisitionProfileOutcomeFailed)},
-		{"profile failure", topologyDiagnosticArchiveProfileFailurePhaseNames, uint8(ddsnmpcollector.AcquisitionFailurePhaseTables)},
-		{"route kind", topologyDiagnosticArchiveRouteKindNames, uint8(ddsnmpcollector.AcquisitionRouteKindBGPTable)},
-		{"route source", topologyDiagnosticArchiveRouteSourceNames, uint8(ddsnmpcollector.AcquisitionRouteSourceCache)},
-		{"route outcome", topologyDiagnosticArchiveRouteOutcomeNames, uint8(ddsnmpcollector.AcquisitionRouteOutcomePartial)},
-		{"route failure", topologyDiagnosticArchiveRouteFailureClassNames, uint8(ddsnmpcollector.AcquisitionFailureClassDependency)},
-	}
-	for _, table := range tables {
-		t.Run(table.name, func(t *testing.T) {
-			require.Len(t, table.names, int(table.last)+1)
-			seen := make(map[string]struct{}, len(table.names))
-			for index, name := range table.names {
-				require.NotEmpty(t, name)
-				_, duplicate := seen[name]
-				require.False(t, duplicate)
-				seen[name] = struct{}{}
-				encoded, err := topologyDiagnosticArchiveEnumName(uint8(index), table.names)
-				require.NoError(t, err)
-				require.Equal(t, name, encoded)
-				decoded, err := topologyDiagnosticArchiveParseEnum[uint8](encoded, table.names)
-				require.NoError(t, err)
-				require.Equal(t, uint8(index), decoded)
-			}
-		})
-	}
+	require.Equal(t, "v<&>\ufffd", archive.Identity().ProducerAgentVersion)
 }
 
 func FuzzReadTopologyDiagnosticArchive(f *testing.F) {
 	seed := compressArchiveJSON(f, `{
-		"format":"netdata.snmp_topology.diagnostics",
+		"format":"netdata.snmp.diagnostics",
+        "kind":"topology",
 		"version":1,
 		"producer":{"agent_version":"v-test"},
 		"snapshot":{
@@ -435,33 +382,33 @@ func FuzzReadTopologyDiagnosticArchive(f *testing.F) {
 	}`)
 	f.Add(seed)
 	f.Fuzz(func(t *testing.T, input []byte) {
-		limits := topologyDiagnosticArchiveReadLimits{
-			maxCompressedBytes: 1 << 20,
-			maxDecodedBytes:    4 << 20,
+		limits := snmpdiag.ReadLimits{
+			MaxCompressedBytes: 1 << 20,
+			MaxDecodedBytes:    4 << 20,
 		}
-		_, _ = readTopologyDiagnosticArchive(bytes.NewReader(input), limits)
+		_, _ = readTestDiagnosticArchive(bytes.NewReader(input), limits)
 	})
 }
 
-func completeTopologyDiagnosticArchiveFixture(diagnostics *topologyDiagnostics) {
-	if diagnostics == nil || diagnostics.topology == nil {
+func completeTopologyDiagnosticArchiveFixture(diagnostics *topologydiag.Cut) {
+	if diagnostics == nil || diagnostics.Topology == nil {
 		return
 	}
-	capturedAt := diagnostics.topology.publishedAt.Add(time.Second)
-	diagnostics.lifecycle = topologyJobLifecycleDiagnosticCut{
-		state:  diagnosticCaptureAvailable,
-		reason: diagnosticCaptureReasonNone,
-		cut: ddsnmp.DeviceLifecycleCut{
+	capturedAt := diagnostics.Topology.PublishedAt.Add(time.Second)
+	diagnostics.Lifecycle = topologydiag.LifecycleCut{
+		State:  topologydiag.CaptureAvailable,
+		Reason: topologydiag.CaptureReasonNone,
+		Cut: ddsnmp.DeviceLifecycleCut{
 			Sequence:   7,
 			CapturedAt: capturedAt,
-			Entries:    make([]ddsnmp.DeviceLifecycleEntry, 0, len(diagnostics.topology.devices)),
+			Entries:    make([]ddsnmp.DeviceLifecycleEntry, 0, len(diagnostics.Topology.Devices)),
 		},
 	}
-	for _, device := range diagnostics.topology.devices {
-		diagnostics.lifecycle.cut.Entries = append(diagnostics.lifecycle.cut.Entries, ddsnmp.DeviceLifecycleEntry{
-			RegistrationID: device.registrationID,
+	for _, device := range diagnostics.Topology.Devices {
+		diagnostics.Lifecycle.Cut.Entries = append(diagnostics.Lifecycle.Cut.Entries, ddsnmp.DeviceLifecycleEntry{
+			RegistrationID: device.RegistrationID,
 			Info: ddsnmp.DeviceLifecycleInfo{
-				Hostname:    "192.0.2." + device.registrationID.String(),
+				Hostname:    "192.0.2." + device.RegistrationID.String(),
 				Port:        161,
 				SNMPVersion: "2c",
 			},
@@ -473,27 +420,27 @@ func completeTopologyDiagnosticArchiveFixture(diagnostics *topologyDiagnostics) 
 			TopologyReady: true,
 		})
 	}
-	if len(diagnostics.topology.devices) > 0 {
-		device := &diagnostics.topology.devices[0]
-		device.latestAttempt = &topologyAcquisitionCapture{
-			attemptID: topologyAcquisitionAttemptID{
-				registrationID: device.registrationID,
-				ordinal:        device.acquisition.attemptID.ordinal + 1,
+	if len(diagnostics.Topology.Devices) > 0 {
+		device := &diagnostics.Topology.Devices[0]
+		device.LatestAttempt = &topologydiag.AcquisitionCapture{
+			AttemptID: topologydiag.AcquisitionAttemptID{
+				RegistrationID: device.RegistrationID,
+				Ordinal:        device.Acquisition.AttemptID.Ordinal + 1,
 			},
-			state:  diagnosticCaptureUnavailable,
-			reason: diagnosticCaptureReasonProjectionError,
+			State:  topologydiag.CaptureUnavailable,
+			Reason: topologydiag.CaptureReasonProjectionError,
 		}
 	}
-	diagnostics.lastAborted = &topologyAbortedSweepDiagnostic{
-		sequence:              3,
-		startedAt:             capturedAt.Add(time.Minute),
-		abortedAt:             capturedAt.Add(time.Minute + time.Second),
-		reason:                topologyDiagnosticAbortCanceled,
-		phase:                 topologyDiagnosticSweepPhaseDeviceRefresh,
-		activeRegistrationID:  diagnostics.topology.devices[0].registrationID,
-		hasActiveRegistration: true,
-		registrationCount:     len(diagnostics.topology.devices),
-		selectedCount:         len(diagnostics.topology.devices),
+	diagnostics.LastAborted = &topologydiag.AbortedSweep{
+		Sequence:              3,
+		StartedAt:             capturedAt.Add(time.Minute),
+		AbortedAt:             capturedAt.Add(time.Minute + time.Second),
+		Reason:                topologydiag.DiagnosticAbortCanceled,
+		Phase:                 topologydiag.DiagnosticSweepPhaseDeviceRefresh,
+		ActiveRegistrationID:  diagnostics.Topology.Devices[0].RegistrationID,
+		HasActiveRegistration: true,
+		RegistrationCount:     len(diagnostics.Topology.Devices),
+		SelectedCount:         len(diagnostics.Topology.Devices),
 	}
 }
 
@@ -537,8 +484,8 @@ func decompressArchiveJSON(t testing.TB, encoded []byte) string {
 
 func firstTopologyDiagnosticArchiveBGPRow(
 	t testing.TB,
-	document *topologyDiagnosticArchiveDocumentV1,
-) *topologyDiagnosticArchiveBGPRowValueV1 {
+	document *snmpdiag.Document,
+) *snmpdiag.BGPRowValue {
 	t.Helper()
 	require.NotNil(t, document)
 	require.NotNil(t, document.Snapshot.Topology)
@@ -566,13 +513,13 @@ func firstTopologyDiagnosticArchiveBGPRow(
 
 func cloneTopologyDiagnosticArchiveSweepV1(
 	t testing.TB,
-	sweep *topologyDiagnosticArchiveSweepV1,
-) *topologyDiagnosticArchiveSweepV1 {
+	sweep *snmpdiag.Sweep,
+) *snmpdiag.Sweep {
 	t.Helper()
 	require.NotNil(t, sweep)
 	raw, err := json.Marshal(sweep)
 	require.NoError(t, err)
-	var cloned topologyDiagnosticArchiveSweepV1
+	var cloned snmpdiag.Sweep
 	require.NoError(t, json.Unmarshal(raw, &cloned))
 	return &cloned
 }

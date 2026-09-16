@@ -112,11 +112,7 @@ func cloneEmitEnv(env chartemit.EmitEnv) chartemit.EmitEnv {
 		out.HostScope = &chartemit.HostScope{
 			GUID: env.HostScope.GUID,
 		}
-		if env.HostScope.Define != nil {
-			define := *env.HostScope.Define
-			define.Labels = maps.Clone(env.HostScope.Define.Labels)
-			out.HostScope.Define = &define
-		}
+
 	}
 	return out
 }
@@ -132,7 +128,10 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 	templateYAML := cfg.TemplateYAML
 	if len(templateYAML) == 0 {
 		if !cfg.Autogen.Enabled {
-			return componentSpec{}, fmt.Errorf("runtimemgr: runtime component %q template is required when autogen is disabled", name)
+			return componentSpec{}, fmt.Errorf(
+				"runtimemgr: runtime component %q template is required when autogen is disabled",
+				name,
+			)
 		}
 		templateYAML = []byte(defaultAutogenTemplateYAML)
 	}

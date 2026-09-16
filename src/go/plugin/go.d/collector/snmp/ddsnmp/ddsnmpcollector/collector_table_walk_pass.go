@@ -9,8 +9,9 @@ import (
 )
 
 type tableWalkOutcome struct {
-	pdus map[string]gosnmp.SnmpPDU
-	err  error
+	sourceOperation uint64
+	pdus            map[string]gosnmp.SnmpPDU
+	err             error
 }
 
 type tableWalkPass struct {
@@ -53,7 +54,7 @@ func (p *tableWalkPass) walk(
 	}
 
 	pdus, err := walkTableWithStats(tc, oid, stats, p.execution)
-	outcome := tableWalkOutcome{pdus: pdus, err: err}
+	outcome := tableWalkOutcome{pdus: pdus, err: err, sourceOperation: sourceRecorder(tc.snmpClient).Cursor()}
 	p.outcomes[oid] = outcome
 	if err != nil {
 		return outcome

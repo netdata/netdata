@@ -132,6 +132,8 @@ typedef struct {
 } cmd_data_t;
 
 typedef struct {
+    bool closed;                // set by close_cmd_pool(): refuse pushes, wake anyone waiting
+    int producers;              // producers currently inside the pool; close_cmd_pool() waits for 0
     cmd_data_t *buffer;
     int size;
     int head;
@@ -140,6 +142,7 @@ typedef struct {
 
     netdata_mutex_t lock;
     netdata_cond_t not_full;
+    netdata_cond_t no_producers;   // signalled when the last producer leaves a closed pool
 } CmdPool;
 
 
@@ -151,9 +154,27 @@ worker_data_t *get_worker(WorkerPool *pool);
 void return_worker(WorkerPool *pool, worker_data_t *worker);
 
 void init_cmd_pool(CmdPool *pool, int size);
+
+// Stops the pool accepting commands, atomically with respect to push_cmd(): after this returns, no
+// push can succeed and none is still waiting for space. A consumer that is shutting down calls this
+// before draining, so a producer either got its command in - and the consumer will see it - or was
+// refused and knows not to wait for it.
+void close_cmd_pool(CmdPool *pool);
+
+// Extends a producer's "inside the pool" window past push_cmd(), for a caller that must finish
+// something else before the owner may tear the pool down - notifying the consumer, typically.
+// enter() fails if the pool is already closed; on success the caller MUST pair it with leave().
+bool cmd_pool_producer_enter(CmdPool *pool);
+void cmd_pool_producer_leave(CmdPool *pool);
+
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full);
 bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd);
 void release_cmd_pool(CmdPool *pool);
+
+// Destroys the pool's lock and conditions. release_cmd_pool() deliberately does not, because it
+// cannot rule out a producer that is still blocked acquiring the lock. Call this ONLY when that is
+// provable - every producer thread joined - and only if the pool's storage is to be reused.
+void destroy_cmd_pool(CmdPool *pool);
 int test_cmd_pool_fifo();
 
 #endif //NETDATA_EVENT_LOOP_H

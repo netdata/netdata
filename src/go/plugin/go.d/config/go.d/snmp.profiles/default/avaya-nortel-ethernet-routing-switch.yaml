@@ -16,12 +16,14 @@ metadata:
 
 metric_tags:
   - tag: avaya_s5_chas_ver
-    OID: 1.3.6.1.4.1.45.1.6.3.1.5.0
-    symbol: s5ChasVer
+    symbol:
+      OID: 1.3.6.1.4.1.45.1.6.3.1.5.0
+      name: s5ChasVer
     description: Version of the chassis in the form major.minor.maintenance letters
   - tag: avaya_s5_chas_ser_num
-    OID: 1.3.6.1.4.1.45.1.6.3.1.6.0
-    symbol: s5ChasSerNum
+    symbol:
+      OID: 1.3.6.1.4.1.45.1.6.3.1.6.0
+      name: s5ChasSerNum
     description: Serial number of the chassis
 
 metrics:

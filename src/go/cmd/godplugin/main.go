@@ -11,12 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
-	"github.com/netdata/netdata/go/plugins/plugin/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
-	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/net/http/httpproxy"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
@@ -24,9 +18,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
+	govnode "github.com/netdata/netdata/go/plugins/plugin/go.d/vnode"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/net/http/httpproxy"
 )
 
 func init() {
@@ -59,11 +60,17 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 	isInsideK8s := hostinfo.IsInsideK8sCluster()
-	moduleRegistry := moduleRegistryWithSystemdPolicy(collectorapi.DefaultRegistry, hostinfo.SystemdVersion)
+	baseRegistry, publisher := collector.NewRegistry(pluginconfig.VarLibDir())
+	moduleRegistry := moduleRegistryWithSystemdPolicy(baseRegistry, hostinfo.SystemdVersion)
+	var services []composition.ProcessService
+	if !isTerminal {
+		services = append(services, publisher)
+	}
 
 	runModePolicy := policy.Agent(isTerminal)
 
 	a := agent.New(agent.Config{
+		SNMPVnodeAcquirer:         govnode.SNMP{},
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
@@ -71,6 +78,7 @@ func main() {
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            moduleRegistry,
+		Services:                  services,
 		IsInsideK8s:               isInsideK8s,
 		RunModePolicy:             runModePolicy,
 		DiscoveryProviders: []discovery.ProviderFactory{

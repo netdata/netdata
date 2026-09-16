@@ -102,7 +102,7 @@ func BenchmarkTableCollectorCachedAuxiliaryRoutingScaling(b *testing.B) {
 					},
 				}
 				configs = append(configs, cfg)
-				cache.cacheMarker(cfg)
+				cache.cacheMarker(cfg, nil)
 			}
 
 			profile := createTestProfile("cached-auxiliary-scaling.yaml", configs)

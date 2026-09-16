@@ -2,6 +2,12 @@
 
 # Prometheus profile validation
 
+**Place in the documentation set.** The project skill
+`.agents/skills/collectors-prometheus-profiles/SKILL.md` cites sections of this
+document by heading anchor, and `.agents/sow/audit.sh` fails when a cited
+heading no longer exists, so renaming or removing a heading here updates the
+skill in the same change.
+
 This developer tool validates one candidate `go.d/prometheus.profiles` file,
 with optional supporting profiles, against one captured Prometheus exposition
 dump. It exercises the production
