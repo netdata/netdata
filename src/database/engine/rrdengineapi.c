@@ -1243,7 +1243,11 @@ size_t dbengine_destroy(void) {
             fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
             finalize_rrd_files(ctx);
         }
-        // back to the constructor's state: a tier that never came up is already there
+        // back to the constructor's state. The lock is destroyed first: re-initialising a live rwlock is undefined
+        // and leaks what the platform allocated for it; every slot's lock is initialised (by the constructor at
+        // least) and nothing holds it any more. The memset stays: it drops the pointers to any datafile the
+        // finalization had to skip, so a leak checker reports them instead of seeing them reachable from here.
+        netdata_rwlock_destroy(&ctx->datafiles.rwlock);
         initialize_single_ctx(ctx);
     }
 
