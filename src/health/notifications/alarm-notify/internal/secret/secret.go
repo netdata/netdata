@@ -5,10 +5,13 @@ package secret
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+const maxFileSize = 1 << 20
 
 // IsReference checks whole-value secret reference syntax without resolving it.
 func IsReference(value string) (bool, error) {
@@ -58,9 +61,12 @@ func Resolve(ctx context.Context, value string) (string, error) {
 			return "", errors.New("secret environment variable is not set")
 		}
 	} else {
-		data, err := os.ReadFile(operand)
+		data, err := readFile(operand)
 		if err != nil {
 			return "", errors.New("could not read secret file; check its path and access permissions")
+		}
+		if len(data) > maxFileSize {
+			return "", errors.New("secret file exceeds the 1 MiB limit")
 		}
 		text = string(data)
 	}
@@ -72,4 +78,14 @@ func Resolve(ctx context.Context, value string) (string, error) {
 		return "", errors.New("secret resolved to an empty value")
 	}
 	return text, nil
+}
+
+func readFile(path string) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	// Bound the actual read, including growing files and streams, before allocating a string.
+	return io.ReadAll(io.LimitReader(file, maxFileSize+1))
 }

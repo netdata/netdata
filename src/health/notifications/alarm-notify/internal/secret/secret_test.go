@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,32 @@ func TestResolveSecret(t *testing.T) {
 			if test.err != "" {
 				require.ErrorContains(t, err, test.err)
 				assert.NotContains(t, err.Error(), "synthetic-private-value")
+				assert.Empty(t, got)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.want, got)
+			}
+		})
+	}
+}
+
+func TestResolveFileSize(t *testing.T) {
+	const limit = 1 << 20
+	for name, test := range map[string]struct {
+		content, want, err string
+	}{
+		"trimmed":               {content: " \tsynthetic-value\n", want: "synthetic-value"},
+		"empty":                 {err: "secret resolved to an empty value"},
+		"at limit":              {content: strings.Repeat("x", limit), want: strings.Repeat("x", limit)},
+		"over limit":            {content: strings.Repeat("x", limit+1), err: "secret file exceeds the 1 MiB limit"},
+		"limit before trimming": {content: strings.Repeat(" ", limit+1), err: "secret file exceeds the 1 MiB limit"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "synthetic-secret")
+			require.NoError(t, os.WriteFile(path, []byte(test.content), 0600))
+			got, err := Resolve(t.Context(), "${file:"+path+"}")
+			if test.err != "" {
+				require.EqualError(t, err, test.err)
 				assert.Empty(t, got)
 			} else {
 				require.NoError(t, err)

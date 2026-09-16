@@ -163,7 +163,8 @@ MessageBird access keys, Gotify app tokens, ntfy credentials, ilert/PagerDuty in
 and Opsgenie API keys, Dynatrace API tokens, SMSEagle/Matrix access tokens and command environment values accept literal strings or a whole `${env:VARIABLE}` or
 `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
-identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
+identity and reject content larger than 1 MiB, measured before trimming whitespace. Resolved values have surrounding
+whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
 `validate` checks reference syntax only; `send` resolves and validates eligible selected destinations before sending.
 Destinations skipped by status policy do not resolve secret references.
