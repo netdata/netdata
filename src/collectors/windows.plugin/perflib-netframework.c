@@ -183,7 +183,6 @@ struct net_framework_instances {
 
     COUNTER_DATA NETFrameworkCLRJITMethods;
     COUNTER_DATA NETFrameworkCLRJITPercentTime;
-    COUNTER_DATA NETFrameworkCLRJITFrequencyTime;
     COUNTER_DATA NETFrameworkCLRJITStandardFailures;
     COUNTER_DATA NETFrameworkCLRJITIlBytes;
 
@@ -226,7 +225,6 @@ struct net_framework_instances {
 
     COUNTER_DATA NETFrameworkCLRSecurityLinkTimeChecks;
     COUNTER_DATA NETFrameworkCLRSecurityPercentTimeinRTChecks;
-    COUNTER_DATA NETFrameworkCLRSecurityFrequency_PerfTime;
     COUNTER_DATA NETFrameworkCLRSecurityStackWalkDepth;
     COUNTER_DATA NETFrameworkCLRSecurityRunTimeChecks;
 
@@ -255,7 +253,6 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
 
     p->NETFrameworkCLRJITMethods.key = "# of Methods Jitted";
     p->NETFrameworkCLRJITPercentTime.key = "% Time in Jit";
-    p->NETFrameworkCLRJITFrequencyTime.key = "IL Bytes Jitted / sec";
     p->NETFrameworkCLRJITStandardFailures.key = "Standard Jit Failures";
     p->NETFrameworkCLRJITIlBytes.key = "# of IL Bytes Jitted";
 
@@ -297,8 +294,7 @@ static inline void initialize_net_framework_processes_keys(struct net_framework_
     p->NETFrameworkCLRRemotingRemoteCalls.key = "Total Remote Calls";
 
     p->NETFrameworkCLRSecurityLinkTimeChecks.key = "# Link Time Checks";
-    p->NETFrameworkCLRSecurityPercentTimeinRTChecks.key = "% Time Sig. Authenticating";
-    p->NETFrameworkCLRSecurityFrequency_PerfTime.key = "% Time in RT checks";
+    p->NETFrameworkCLRSecurityPercentTimeinRTChecks.key = "% Time in RT checks";
     p->NETFrameworkCLRSecurityStackWalkDepth.key = "Stack Walk Depth";
     p->NETFrameworkCLRSecurityRunTimeChecks.key = "Total Runtime Checks";
 
@@ -656,7 +652,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     "interop",
                     "netframework.clrinterop_interop_marshallings",
                     "Arguments and return values marshallings",
-                    "marshalling/s",
+                    "marshallings/s",
                     PLUGIN_WINDOWS_NAME,
                     "PerflibNetFramework",
                     PRIO_NETFRAMEWORK_CLR_INTEROP_MARSHALLING,
@@ -762,8 +758,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
             rrdset_done(p->st_clrjit_methods);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITFrequencyTime) &&
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITPercentTime)) {
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITPercentTime)) {
             if (!p->st_clrjit_time) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_time", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -786,10 +781,11 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
                 rrdlabels_add(p->st_clrjit_time->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
-            double percTime = (double)p->NETFrameworkCLRJITPercentTime.current.Data;
-            percTime /= (double)p->NETFrameworkCLRJITFrequencyTime.current.Data;
-            percTime *= 100;
-            rrddim_set_by_pointer(p->st_clrjit_time, p->rd_clrjit_time, (collected_number)percTime);
+            double percTime = 0;
+            if (p->NETFrameworkCLRJITPercentTime.current.Time)
+                percTime = 100.0 * (double)p->NETFrameworkCLRJITPercentTime.current.Data /
+                           (double)p->NETFrameworkCLRJITPercentTime.current.Time;
+            rrddim_set_by_pointer(p->st_clrjit_time, p->rd_clrjit_time, (collected_number)(percTime * 100));
             rrdset_done(p->st_clrjit_time);
         }
 
@@ -1662,7 +1658,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 value = 100.0 * (NETDATA_DOUBLE)p->NETFrameworkCLRMemoryTimeInGC.current.Data /
                         (NETDATA_DOUBLE)p->NETFrameworkCLRMemoryTimeInGC.current.Time;
 
-            rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time, (collected_number)value);
+            rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time, (collected_number)(value * 100));
             rrdset_done(p->st_clrmemory_gc_time);
         }
 
@@ -1936,8 +1932,7 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             rrdset_done(p->st_clrsecurity_link_time_checks);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityPercentTimeinRTChecks) &&
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityFrequency_PerfTime)) {
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityPercentTimeinRTChecks)) {
             if (!p->st_clrsecurity_rt_checks_time) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_checks_time", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1962,8 +1957,10 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     p->st_clrsecurity_rt_checks_time->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
-            NETDATA_DOUBLE value = (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Data;
-            value /= (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityFrequency_PerfTime.current.Data;
+            NETDATA_DOUBLE value = 0;
+            if (p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Time)
+                value = 100.0 * (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Data /
+                        (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Time;
 
             rrddim_set_by_pointer(
                 p->st_clrsecurity_rt_checks_time,
