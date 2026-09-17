@@ -195,3 +195,19 @@ func TestRunLegacySNSPreflight(t *testing.T) {
 		})
 	}
 }
+
+func TestRunLegacySNSProducerContextDuplicates(t *testing.T) {
+	for name, input := range duplicateProducerContextInputs(t) {
+		t.Run(name, func(t *testing.T) {
+			dst, capture := snsHelperDestination(t, "")
+			config := fmt.Sprintf("aws='%s'; AWSSNS_CREDENTIAL_SOURCE=imds; DEFAULT_RECIPIENT_AWSSNS='%s'; ", dst["executable"], testSNSARN) + `AWSSNS_MESSAGE_FORMAT="$src $unique_id $value_string"`
+			var stdout, stderr bytes.Buffer
+			code := Run(context.Background(), []string{"send-legacy", "--config", writeConfig(t, config), "--method", "awssns", "--role", "ops"}, strings.NewReader(input), &stdout, &stderr)
+			assert.Equal(t, 1, code, stderr.String())
+			assert.Empty(t, stdout.String())
+			assert.Contains(t, stderr.String(), "invalid JSON event")
+			assert.NotContains(t, stderr.String(), "synthetic-private-value")
+			assert.NoFileExists(t, capture)
+		})
+	}
+}

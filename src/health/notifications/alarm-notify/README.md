@@ -2379,6 +2379,8 @@ Both `send` and `send-legacy` accept an optional top-level `producer_context` ob
 It carries additional caller-supplied facts for legacy settings and the future Bash custom-function adapter.
 Omitting it, using `null`, or using `{}` keeps existing input valid. All members are optional; unknown members or
 wrong JSON types reject the entire invocation before delivery, even when no destination needs these facts.
+Repeated `producer_context` fields and duplicate member names are rejected, including case-insensitive or
+JSON-escape-equivalent spellings.
 
 | Members | JSON type | Meaning / Bash scalar names |
 |---|---|---|

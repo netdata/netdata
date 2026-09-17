@@ -25,6 +25,9 @@ func TestReadProducerContext(t *testing.T) {
 		bad   bool
 	}{
 		"omitted": {}, "null": {input: "null"}, "empty": {input: "{}"},
+		"single case aliases":   {input: `{"SRC":"source","UNIQUE_ID":42}`, want: notifier.ProducerContext{Source: "source", UniqueID: new(uint32(42))}},
+		"single Unicode alias":  {input: `{"ſrc":"source"}`, want: notifier.ProducerContext{Source: "source"}},
+		"single escaped member": {input: `{"s\u0072c":"source"}`, want: notifier.ProducerContext{Source: "source"}},
 		"complete": {input: testutil.ProducerContextJSON, want: notifier.ProducerContext{
 			UniqueID: new(uint32(42)), AlarmID: new(uint32(7)), EventID: new(uint32(3)),
 			Source:      "line=12,file=/etc/netdata/health.d/example.conf",
@@ -192,11 +195,19 @@ func TestReadProducerContextStrings(t *testing.T) {
 }
 
 func TestRunProducerContextPreflight(t *testing.T) {
-	for name, tt := range map[string]struct{ input, err string }{
+	tests := map[string]struct{ input, err string }{
 		"bad number":    {input: `{"unique_id":"synthetic-private-value"}`, err: "invalid JSON event"},
 		"unknown field": {input: `{"synthetic-private-value":true}`, err: "invalid JSON event"},
 		"NUL":           {input: `{"src":"synthetic-private-value\u0000"}`, err: "producer_context.src must not contain NUL"},
-	} {
+	}
+	for name, tt := range tests {
+		tt.input = testutil.WithProducerContext(testutil.ValidEvent, tt.input)
+		tests[name] = tt
+	}
+	for name, input := range duplicateProducerContextInputs(t) {
+		tests["duplicate "+name] = struct{ input, err string }{input: input, err: "invalid JSON event"}
+	}
+	for name, tt := range tests {
 		for _, mode := range []string{"send", "send-legacy"} {
 			t.Run(mode+"/"+name, func(t *testing.T) {
 				var calls atomic.Int32
@@ -207,7 +218,7 @@ func TestRunProducerContextPreflight(t *testing.T) {
 					cfg = "DISCORD_WEBHOOK_URL='" + server.URL + "'; DEFAULT_RECIPIENT_DISCORD=channel"
 				}
 				var stdout, stderr bytes.Buffer
-				input := testutil.WithProducerContext(testutil.ValidEvent, tt.input)
+				input := tt.input
 				assert.Equal(t, 1, Run(context.Background(), []string{mode, "--config", writeConfig(t, cfg), "--role", "ops"}, strings.NewReader(input), &stdout, &stderr))
 				assert.Empty(t, stdout.String())
 				assert.Contains(t, stderr.String(), tt.err)
@@ -216,5 +227,46 @@ func TestRunProducerContextPreflight(t *testing.T) {
 				assert.Zero(t, calls.Load())
 			})
 		}
+	}
+}
+
+func duplicateProducerContextInputs(t *testing.T) map[string]string {
+	t.Helper()
+	tests := map[string]string{
+		"object then null":           `"producer_context":{"src":"synthetic-private-value","unique_id":42,"value_string":"stale"},"producer_context":null`,
+		"object then empty":          `"producer_context":{"src":"synthetic-private-value"},"producer_context":{}`,
+		"object then object":         `"producer_context":{"src":"synthetic-private-value"},"producer_context":{"unique_id":42}`,
+		"null then object":           `"producer_context":null,"producer_context":{"src":"synthetic-private-value"}`,
+		"invalid type before null":   `"producer_context":{"unique_id":"synthetic-private-value"},"producer_context":null`,
+		"unknown before null":        `"producer_context":{"synthetic-private-value":true},"producer_context":null`,
+		"invalid member before null": `"producer_context":{"unique_id":"synthetic-private-value","unique_id":null}`,
+		"two nulls":                  `"producer_context":null,"producer_context":null`,
+		"context case variant":       `"producer_context":{"src":"synthetic-private-value"},"PRODUCER_CONTEXT":null`,
+		"escaped context":            `"producer_context":{"src":"synthetic-private-value"},"producer_\u0063ontext":null`,
+		"member case variant":        `"producer_context":{"src":"synthetic-private-value","SRC":null}`,
+		"escaped member":             `"producer_context":{"src":"synthetic-private-value","s\u0072c":null}`,
+		"member Unicode fold":        `"producer_context":{"src":"synthetic-private-value","ſrc":null}`,
+		"member null first":          `"producer_context":{"src":null,"src":"synthetic-private-value"}`,
+		"identical member values":    `"producer_context":{"src":"synthetic-private-value","src":"synthetic-private-value"}`,
+	}
+	var members map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(testutil.ProducerContextJSON), &members))
+	for field, value := range members {
+		tests[field+" then null"] = `"producer_context":{"` + field + `":` + string(value) + `,"` + field + `":null}`
+	}
+	for name, fields := range tests {
+		tests[name] = strings.TrimSuffix(testutil.ValidEvent, "}") + "," + fields + "}"
+	}
+	return tests
+}
+
+func TestReadProducerContextDuplicates(t *testing.T) {
+	for name, input := range duplicateProducerContextInputs(t) {
+		t.Run(name, func(t *testing.T) {
+			got, err := readNotification(strings.NewReader(input))
+			require.ErrorContains(t, err, "invalid JSON event")
+			assert.NotContains(t, err.Error(), "synthetic-private-value")
+			assert.Equal(t, notifier.Notification{}, got)
+		})
 	}
 }
