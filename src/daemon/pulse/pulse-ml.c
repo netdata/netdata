@@ -47,7 +47,27 @@ void pulse_ml_memory_allocated(size_t n)
 
 void pulse_ml_memory_freed(size_t n)
 {
-    __atomic_fetch_sub(&ml_statistics.ml_memory_consumption, n, __ATOMIC_RELAXED);
+    // Skip the CAS loop when there is nothing to subtract. Hit on the
+    // unsized-delete fallback for platforms without malloc_usable_size,
+    // where the size of the freed block is not recoverable.
+    if (n == 0) {
+        __atomic_fetch_add(&ml_statistics.ml_memory_delete, 1, __ATOMIC_RELAXED);
+        return;
+    }
+
+    // Clamp at zero so the counter can never wrap. The global new/delete
+    // overrides account every allocation symmetrically, so a counted free
+    // always has a matching counted allocation; this saturation is defensive
+    // against a free whose allocation bypassed the overrides (for example
+    // memory handed in from a foreign allocator).
+    uint64_t cur = __atomic_load_n(&ml_statistics.ml_memory_consumption, __ATOMIC_RELAXED);
+    while (true) {
+        uint64_t next = (n > cur) ? 0 : (cur - n);
+        if (__atomic_compare_exchange_n(&ml_statistics.ml_memory_consumption,
+                                        &cur, next, true,
+                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            break;
+    }
     __atomic_fetch_add(&ml_statistics.ml_memory_delete, 1, __ATOMIC_RELAXED);
 }
 
