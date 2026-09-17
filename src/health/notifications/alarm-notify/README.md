@@ -250,8 +250,9 @@ attempted successes and failures; filtering happens before the plan is built, so
 | `kafka` | `KAFKA_URL`, `KAFKA_SENDER_IP`; global send |
 | `signl4` | `SIGNL4_WEBHOOK_URL`; global send |
 
-Commands use an explicit absolute executable path or discovery in the invoking process's `PATH`. A missing discovered
-tool disables its method; an explicit path is validated by the native provider and attempted during delivery.
+The four implemented command mappings (email, SMS, syslog and IRC) use an explicit absolute executable path or
+discovery in the invoking process's `PATH`. A missing discovered tool disables its method; an explicit path is
+validated by the native provider and attempted during delivery.
 `SEND_EMAIL=AUTO` checks sendmail availability. Child processes retain the native isolated environment, not the parent
 or configuration's arbitrary variables. `logger_options` splits on spaces, tabs and newlines into literal arguments;
 there is no second quoting pass, expansion or globbing. Native command delivery currently supports Linux/macOS.
@@ -277,7 +278,9 @@ scalars above. Use the native event/configuration contract for those capabilitie
 
 Seven retained legacy mappings remain pending: Slack overrides, Teams Workflows setup/overrides, ilert API alert-source
 setup, Opsgenie Alert API v2 integration setup, Dynatrace Events v2 settings, AWS SNS credentials/message templates,
-and Unix `custom_sender()` execution. Their eligible configurations fail before any sends; old singular `MSTEAM`
+and Unix `custom_sender()` execution. Their enabled, configured, recipient-eligible selections fail before any sends;
+the check does not probe AWS CLI availability or require a custom global default when a role already selects a custom
+recipient. It exposes pending work rather than attempting those unimplemented runtime checks. Old singular `MSTEAM`
 aliases are recognized for that check. HipChat is explicitly excluded and also errors when eligible. Function bodies
 remain inert, including `custom_sender()` and helpers; no original configuration file is sourced.
 
