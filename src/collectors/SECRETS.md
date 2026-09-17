@@ -185,10 +185,13 @@ Use the backend README for provider-specific authentication, operand rules, conf
 
 ## Execution Privileges
 
-Resolving `${file:...}` or `${cmd:...}`, and reading credential files such as `bearer_token_file`, `tls_key`, or a Secretstore `token_file`/`service_account_file`, runs with reduced privileges where the platform supports it:
+Resolving `${file:...}` or `${cmd:...}`, and reading credential files such as `bearer_token_file`, `tls_key`, or a Secretstore `token_file`/`service_account_file`, runs with reduced privileges where the platform supports it. On **Linux/Unix** the file read and command execution run as the unprivileged `netdata` service account, with the plugin's elevated file-read capability (`cap_dac_read_search`, or a setuid-root fallback) dropped for the operation — so a referenced file or command must be accessible to the `netdata` user, and the plugin's elevated rights do not apply to secret resolution.
 
-- **Linux/Unix**: the file read and command execution run as the unprivileged `netdata` service account, with the plugin's elevated file-read capability (`cap_dac_read_search`, or a setuid-root fallback) dropped for the operation. A referenced file or command must therefore be accessible to the `netdata` user — the plugin's elevated rights do not apply to secret resolution — which bounds a reference to what `netdata` itself can read or run.
-- **Windows**: the Netdata service runs as `LocalSystem` (`NT AUTHORITY\SYSTEM`) and there is no equivalent privilege drop, so `${file:...}` reads and `${cmd:...}` commands run with that full authority. A secret reference on Windows can read any local file the system account can read, or run any command as `SYSTEM`.
+:::warning On Windows secret resolution runs as LocalSystem
+
+The Netdata service on Windows runs as `LocalSystem` (`NT AUTHORITY\SYSTEM`) and there is no equivalent privilege drop, so `${file:...}` reads and `${cmd:...}` commands run with that full authority — a secret reference can read any local file the system account can read, or run any command as `SYSTEM`. Only operator-authored configurations resolve references (`stock`, `user`, `dyncfg`, or a service-discovery pipeline explicitly marked `trust_discovered_targets`), so on Windows treat the ability to write a collector config file or hold Dynamic Configuration edit rights as machine-administrator-equivalent, and restrict it to administrators.
+
+:::
 
 ## Security Notes
 
@@ -197,8 +200,7 @@ Resolving `${file:...}` or `${cmd:...}`, and reading credential files such as `b
 - Secretstore configuration values (such as tokens and client secrets) also support `${env:...}`, `${file:...}`, and `${cmd:...}` resolvers. Use them to avoid storing backend credentials in plain text. Note that `${store:...}` references are not supported inside secretstore configurations.
 - Keep local secret material readable only by the `netdata` user, including token files, service account files, and any files used with `${file:...}`.
 - Use `${cmd:...}` only with trusted local commands and absolute paths.
-- Only operator-authored configurations resolve secret references: `stock`, `user`, `dyncfg`, and a service-discovery pipeline explicitly marked `trust_discovered_targets`. Configurations discovered from monitored targets keep reference syntax literal by default, so a monitored target cannot inject a reference.
-- A secret reference makes Netdata read a file or run a command on its behalf, so anyone who can author or edit a resolving configuration — write a collector config file, or hold Dynamic Configuration edit rights — can direct those reads. On Windows this runs as `LocalSystem` (see [Execution Privileges](#execution-privileges)); treat config-file write access and Dynamic Configuration edit rights as machine-administrator-equivalent there, and restrict them to administrators.
+- Only operator-authored configurations resolve secret references: `stock`, `user`, `dyncfg`, and a service-discovery pipeline explicitly marked `trust_discovered_targets`. Configurations discovered from monitored targets keep reference syntax literal by default, so a monitored target cannot inject a reference. A secret reference makes Netdata read a file or run a command on its behalf, so anyone who can author or edit a resolving configuration can direct those reads (see [Execution Privileges](#execution-privileges) for the Windows implication).
 
 ## Troubleshooting
 
