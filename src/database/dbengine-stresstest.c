@@ -191,8 +191,8 @@ void generate_dbengine_dataset(unsigned history_seconds)
     }
     freez(thread_info);
 
-    // shut the dbengine instance down before freeing the host: rrdhost_free() does
-    // not do it, and destroying the charts under a live instance lets the flush
+    // shut the dbengine tier down before freeing the host: rrdhost_free() does
+    // not do it, and destroying the charts under a live tier lets the flush
     // workers touch freed memory. Same teardown as dbengine_stress_test() below.
     DBENGINE_TIER *ctx = (DBENGINE_TIER *)host->db[0].si;
     dbengine_quiesce(ctx);

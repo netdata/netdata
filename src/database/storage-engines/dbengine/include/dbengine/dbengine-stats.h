@@ -66,11 +66,11 @@ struct dbengine_size_stats {
     double average_page_size_bytes;
 };
 
-struct dbengine_size_stats dbengine_get_size_stats(DBENGINE_TIER *ctx);
+struct dbengine_size_stats dbengine_get_size_stats(DBENGINE_TIER *tier);
 
 // the legacy per-tier counters array (DBENGINE_STATS_COUNT entries)
 #define DBENGINE_STATS_COUNT (38)
-void dbengine_get_stats(DBENGINE_TIER *ctx, unsigned long long *array);
+void dbengine_get_stats(DBENGINE_TIER *tier, unsigned long long *array);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // page cache statistics: the engine runs three caches (pages, open datafiles, extents), each reports this
@@ -228,7 +228,7 @@ size_t dbengine_page_padding_bytes(void);
 // metrics registry statistics
 
 struct dbengine_metrics_registry_stats {
-    // --- sampled lock-free by mrg_get_statistics() ---
+    // --- sampled lock-free by dbengine_get_metrics_registry_stats() ---
     // Writers use relaxed atomics. The padded fields below are updated on hotter reader/writer paths.
 
     size_t entries;

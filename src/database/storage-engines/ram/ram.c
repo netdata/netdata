@@ -4,15 +4,15 @@
 #include "ram.h"
 #include "Judy.h"
 
-static Pvoid_t rrddim_Judy_array = NULL;
-static netdata_rwlock_t rrddim_Judy_rwlock;
+static Pvoid_t ram_metrics_judy = NULL;
+static netdata_rwlock_t ram_metrics_judy_rwlock;
 
 static void __attribute__((constructor)) init_lock(void) {
-    netdata_rwlock_init(&rrddim_Judy_rwlock);
+    netdata_rwlock_init(&ram_metrics_judy_rwlock);
 }
 
 static void __attribute__((destructor)) destroy_lock(void) {
-    netdata_rwlock_destroy(&rrddim_Judy_rwlock);
+    netdata_rwlock_destroy(&ram_metrics_judy_rwlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -28,7 +28,7 @@ void ram_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_METR
 }
 
 // ----------------------------------------------------------------------------
-// RRDDIM legacy data collection functions
+// RAM engine data collection functions
 
 struct ram_metric_handle {
     RRDDIM *rd;
@@ -159,14 +159,14 @@ static void check_metric_handle_from_rrddim(struct ram_metric_handle *mh) {
 static int64_t ram_metric_remove_from_index(struct ram_metric_handle *mh) {
     int64_t judy_mem = 0;
 
-    netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+    netdata_rwlock_wrlock(&ram_metrics_judy_rwlock);
     if(mh->indexed) {
         JudyAllocThreadPulseReset();
-        JudyLDel(&rrddim_Judy_array, mh->uuid_id, PJE0);
+        JudyLDel(&ram_metrics_judy, mh->uuid_id, PJE0);
         judy_mem = JudyAllocThreadPulseGetAndReset();
         mh->indexed = false;
     }
-    netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+    netdata_rwlock_wrunlock(&ram_metrics_judy_rwlock);
 
     return judy_mem;
 }
@@ -200,9 +200,9 @@ STORAGE_METRIC_HANDLE *ram_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si
         struct ram_metric_handle *mh = (struct ram_metric_handle *)ram_metric_get_by_id(si, rd->uuid);
 
         if(!mh) {
-            netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+            netdata_rwlock_wrlock(&ram_metrics_judy_rwlock);
             JudyAllocThreadPulseReset();
-            Pvoid_t *PValue = JudyLIns(&rrddim_Judy_array, rd->uuid, PJE0);
+            Pvoid_t *PValue = JudyLIns(&ram_metrics_judy, rd->uuid, PJE0);
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             mh = *PValue;
             if(!mh) {
@@ -219,7 +219,7 @@ STORAGE_METRIC_HANDLE *ram_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si
                 if(!refcount_acquire(&mh->refcount))
                     mh = NULL;
             }
-            netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+            netdata_rwlock_wrunlock(&ram_metrics_judy_rwlock);
 
             // The indexed handle is being deleted concurrently (acquire failed);
             // retry the lookup. Do NOT re-run get_by_id here: mh already carries
@@ -234,19 +234,19 @@ STORAGE_METRIC_HANDLE *ram_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si
             bool retry = false;
             int64_t judy_mem = 0;
 
-            netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+            netdata_rwlock_wrlock(&ram_metrics_judy_rwlock);
             if(ram_metric_handle_rrddim_load(mh) != rd) {
                 // this can happen when the old RRDDIM is being deleted,
                 // but the dictionary has not yet run the destructors
                 if(mh->indexed) {
                     JudyAllocThreadPulseReset();
-                    JudyLDel(&rrddim_Judy_array, mh->uuid_id, PJE0);
+                    JudyLDel(&ram_metrics_judy, mh->uuid_id, PJE0);
                     judy_mem = JudyAllocThreadPulseGetAndReset();
                     mh->indexed = false;
                 }
                 retry = true;
             }
-            netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+            netdata_rwlock_wrunlock(&ram_metrics_judy_rwlock);
 
             if(judy_mem)
                 pulse_db_rrd_memory_change(judy_mem);
@@ -264,9 +264,9 @@ STORAGE_METRIC_HANDLE *ram_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si
 STORAGE_METRIC_HANDLE *ram_metric_get_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_ID id) {
     struct ram_metric_handle *mh = NULL;
 
-    netdata_rwlock_rdlock(&rrddim_Judy_rwlock);
+    netdata_rwlock_rdlock(&ram_metrics_judy_rwlock);
     {
-        Pvoid_t *PValue = JudyLGet(rrddim_Judy_array, id, PJE0);
+        Pvoid_t *PValue = JudyLGet(ram_metrics_judy, id, PJE0);
         if (unlikely(PValue == PJERR))
             fatal("DB_RAM_ALLOC: corrupted judy array!");
 
@@ -276,7 +276,7 @@ STORAGE_METRIC_HANDLE *ram_metric_get_by_id(STORAGE_INSTANCE *si __maybe_unused,
                 mh = NULL;
         }
     }
-    netdata_rwlock_rdunlock(&rrddim_Judy_rwlock);
+    netdata_rwlock_rdunlock(&ram_metrics_judy_rwlock);
 
     return (STORAGE_METRIC_HANDLE *)mh;
 }
@@ -309,19 +309,19 @@ bool ram_metric_release_from_rrddim(STORAGE_METRIC_HANDLE *smh, RRDDIM *rd) {
     bool data_transferred = false;
     int64_t judy_mem = 0;
 
-    netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
+    netdata_rwlock_wrlock(&ram_metrics_judy_rwlock);
     if(ram_metric_handle_rrddim_load(mh) == rd) {
         ram_metric_handle_rrddim_store(mh, NULL);
         data_transferred = (ram_metric_handle_data_load(mh) == rd->db.data);
 
         if(mh->indexed) {
             JudyAllocThreadPulseReset();
-            JudyLDel(&rrddim_Judy_array, mh->uuid_id, PJE0);
+            JudyLDel(&ram_metrics_judy, mh->uuid_id, PJE0);
             judy_mem = JudyAllocThreadPulseGetAndReset();
             mh->indexed = false;
         }
     }
-    netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
+    netdata_rwlock_wrunlock(&ram_metrics_judy_rwlock);
 
     if(judy_mem)
         pulse_db_rrd_memory_change(judy_mem);
@@ -556,7 +556,7 @@ static inline time_t ram_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
 }
 
 // ----------------------------------------------------------------------------
-// RRDDIM legacy database query functions
+// RAM engine query functions
 
 void ram_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority __maybe_unused) {
     struct ram_metric_handle *mh = (struct ram_metric_handle *)smh;

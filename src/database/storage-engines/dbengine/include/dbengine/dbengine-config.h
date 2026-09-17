@@ -14,7 +14,7 @@ typedef struct dbengine_tier DBENGINE_TIER;
 
 // Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
 // the engine.
-typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *ctx, nd_uuid_t *uuid);
+typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *tier, nd_uuid_t *uuid);
 
 // The storage engine's process-wide configuration.
 //
@@ -45,7 +45,7 @@ struct dbengine_config {
     // runtime
     time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1, < 0 is fatal
     int libuv_worker_threads;                   // size of the libuv thread pool the engine dispatches work into;
-                                                // 0 = the engine's default (16, or 8 on 32-bit)
+                                                // 0 = the engine's compiled default
     int reserved_libuv_worker_threads;          // pool threads the engine must leave free for the embedder's own work
 
     // services the embedder may provide; NULL = not provided

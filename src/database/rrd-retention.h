@@ -9,7 +9,7 @@
 // Structure to hold information about each storage tier
 typedef struct rrd_storage_tier {
     size_t tier;                      // Tier number
-    STORAGE_ENGINE_BACKEND backend;   // Storage engine backend (RRDDIM or DBENGINE)
+    STORAGE_ENGINE_BACKEND backend;   // Storage engine backend (RAM or DBENGINE)
     size_t group_seconds;             // Granularity in seconds
     char granularity_human[32];       // Human-readable granularity string
 

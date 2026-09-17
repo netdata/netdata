@@ -14,7 +14,7 @@
 //   MRG, the metric registry          process-wide: every metric's uuid, section (its ctx) and retention (mrg.h)
 //   PGC, the page cache               process-wide caches shared by all ctxs (cache.h, pagecache.h)
 //   PDC, the page details control     the plan of one query: which pages, from cache or disk, in what order (pdc.h)
-//   the event loop (dbengine_main)      the single libuv thread that owns datafile I/O, flushing and rotation
+//   the event loop (dbengine_main)    the single libuv thread that owns datafile I/O, flushing and rotation
 //
 // The daemon drives the engine through dbengine-api.h behind the storage-engine vtable, hands it its
 // configuration and optional services through dbengine-config.h, and reads what the engine publishes
@@ -391,7 +391,7 @@ void wal_release(WAL *wal);
 
 /*
  * Debug statistics not used by code logic.
- * They only describe operations since DB engine instance load time.
+ * They only describe operations since the tier was loaded.
  */
 struct dbengine_statistics {
     PAD64(dbengine_stats_t) before_decompress_bytes;
@@ -642,7 +642,7 @@ static inline void ctx_last_flush_fileno_set(struct dbengine_tier *ctx, unsigned
 
 bool dbengine_ctx_tier_cap_exceeded(struct dbengine_tier *ctx);
 int init_rrd_files(struct dbengine_tier *ctx);
-bool dbengine_dbengine_spawn(struct dbengine_tier *ctx);
+bool dbengine_spawn(struct dbengine_tier *ctx);
 void dbengine_event_loop(void *arg);
 
 typedef void (*enqueue_callback_t)(struct dbengine_cmd *cmd);

@@ -98,8 +98,8 @@ void cancel_main_threads(void) {
 
 #ifdef ENABLE_DBENGINE
 static void dbengine_tier_exit_background(void *ptr) {
-    DBENGINE_TIER *ctx = ptr;
-    dbengine_tier_exit(ctx);
+    DBENGINE_TIER *tier = ptr;
+    dbengine_tier_exit(tier);
 }
 
 // the tier count in nd_profile is lowered when a tier fails to start, hiding any tier above it that did start;

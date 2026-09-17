@@ -2607,7 +2607,7 @@ static void dbengine_initialize_structures(void) {
     extent_io_descriptor_init();
 }
 
-bool dbengine_dbengine_spawn(struct dbengine_tier *ctx __maybe_unused) {
+bool dbengine_spawn(struct dbengine_tier *ctx __maybe_unused) {
     // Every exit must release the spinlock: the other tier init threads are
     // waiting on it, and a failed attempt leaves spawned == false so the next
     // caller retries the setup rather than spinning forever.

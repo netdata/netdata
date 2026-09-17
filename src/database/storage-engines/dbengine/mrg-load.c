@@ -12,7 +12,7 @@ static void mrg_metric_prepopulate(void *mrg_ptr, struct dbengine_tier *ctx, nd_
     MRG *mrg = mrg_ptr;
     MRG_ENTRY entry = {
         .uuid = uuid,
-        .section = (Word_t)ctx,    // the registry sections are the engine instances
+        .section = (Word_t)ctx,    // the registry sections are the tiers
         .first_time_s = 0,
         .last_time_s = 0,
         .latest_update_every_s = 0,

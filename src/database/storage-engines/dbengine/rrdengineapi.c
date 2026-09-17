@@ -206,7 +206,7 @@ static inline bool check_completed_page_consistency(struct dbengine_collect_hand
 
 /*
  * Gets a handle for storing metrics to the database.
- * The handle must be released with dbengine_store_metric_final().
+ * The handle must be released with dbengine_store_finalize().
  */
 STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
     METRIC *metric = (METRIC *)smh;
@@ -705,7 +705,7 @@ static void unregister_query_handle(struct dbengine_query_handle *handle __maybe
 
 /*
  * Gets a handle for loading metrics from the database.
- * The handle must be released with dbengine_load_metric_final().
+ * The handle must be released with dbengine_query_finalize().
  */
 ALWAYS_INLINE_HOT void dbengine_query_init(
     STORAGE_METRIC_HANDLE *smh,
@@ -1187,7 +1187,7 @@ int dbengine_tier_init(struct dbengine_tier **ctxp, const struct dbengine_tier_c
     // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
     dbengine_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
-    if (!dbengine_dbengine_spawn(ctx))
+    if (!dbengine_spawn(ctx))
         netdata_log_error("DBENGINE: tier %zu: the engine is not running and could not be started, the tier cannot be initialized",
                           (size_t)tc->tier);
     else if (!init_rrd_files(ctx)) {
@@ -1339,7 +1339,7 @@ int dbengine_tier_exit(struct dbengine_tier *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    // the static multidb contexts are never freed; anything else was allocated by
+    // the static multidb tiers are never freed; anything else was allocated by
     // dbengine_tier_init() for its caller (ctxp != NULL) and is released here
     int tier = ctx->config.tier;
     if(tier < 0 || tier >= RRD_STORAGE_TIERS || dbengine_multidb_tiers[tier] != ctx)

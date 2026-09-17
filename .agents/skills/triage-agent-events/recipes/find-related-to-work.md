@@ -27,7 +27,7 @@ Working on dbengine page eviction:
 ```bash
 # 1. Try by function -- the obvious symbols.
 .agents/skills/triage-agent-events/scripts/get-events.sh \
-    --function 'rrdeng_page_descr_t,dbengine_page_descr_t,rrdeng_evict_pages,dbengine_evict_pages,evict_main' \
+    --function 'rrdeng_deq_cmd,dbengine_deq_cmd,evict_pages_with_filter,evict_main' \
     --since '14d ago' \
     --version auto \
     --output /tmp/related-pass1.json

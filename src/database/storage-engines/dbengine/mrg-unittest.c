@@ -4,7 +4,7 @@
 #include "rrdengine.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
-// Global dummy dbengine_instances for tests
+// Global dummy tiers for tests
 static struct dbengine_tier test_ctx_0 = {0};
 static struct dbengine_tier test_ctx_1 = {0};
 static struct dbengine_tier test_ctx_tier[4] = { 0 }; // For stress test tiers
@@ -1666,7 +1666,7 @@ static int mrg_jv2_real_writer_unittest(void) {
     // A zeroed fixture is NOT enough: activation validates the datafile and takes
     // locks that must be constructed, not merely zeroed. Mirror what production does.
     //
-    //   - initialize_tier() (rrdengineapi.c) builds the two ctx locks. It is
+    //   - initialize_tier() (rrdengineapi.c) builds the two tier locks. It is
     //     static, so they are constructed here: njfv2idx.spinlock is taken by
     //     njfv2idx_add(), which journalfile_v2_data_set() calls on activation.
     //   - datafile_alloc_and_init() (datafile.c) stamps DATAFILE_MAGIC and builds the

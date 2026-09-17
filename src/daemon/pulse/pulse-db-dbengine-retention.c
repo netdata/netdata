@@ -5,15 +5,15 @@
 #include "database/rrd.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 
-typedef struct dbengine_tier_stats {
+typedef struct dbengine_retention_charts {
     RRDSET *st;
     RRDDIM *rd_space;
     RRDDIM *rd_time;
-} DBENGINE_TIER_STATS;
+} DBENGINE_RETENTION_CHARTS;
 
 void dbengine_retention_statistics(bool extended __maybe_unused) {
 
-    static DBENGINE_TIER_STATS stats[RRD_STORAGE_TIERS];
+    static DBENGINE_RETENTION_CHARTS stats[RRD_STORAGE_TIERS];
 
     if (!localhost)
         return;
