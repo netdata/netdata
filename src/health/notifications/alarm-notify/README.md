@@ -199,7 +199,8 @@ the remaining time. Cancellation stops the
 invocation even after earlier successful deliveries; no further destinations are started once it is observed.
 
 Each completed delivery reports its quoted destination name and outcome to stderr. Filtered destinations report
-`skipped: nowarn` or `skipped: noclear`. The final summary counts `succeeded`, `failed`, and `skipped` separately.
+`skipped: nowarn`, `skipped: noclear`, or `skipped: critical`. The final summary counts `succeeded`, `failed`, and
+`skipped` separately.
 Partial failure returns `0` when another delivery succeeded, matching Bash's any-success behavior; inspect the
 individual results to see failures. If all attempted deliveries fail, the command returns `1` even when other
 destinations were skipped. No selected destinations or all selected destinations skipped returns `0` after successful
