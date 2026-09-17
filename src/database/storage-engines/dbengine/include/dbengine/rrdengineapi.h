@@ -87,7 +87,6 @@ void rrdeng_flush_all(struct rrdengine_instance *ctx);
 size_t dbengine_destroy(void);
 
 // what the embedder reads about the tiers
-size_t rrdeng_active_tiers(void);
 time_t rrdeng_max_retention_s(struct rrdengine_instance *ctx);   // the tier's configured time limit; 0 = none
 uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si);             // the tier's configured disk quota; 0 = none
 uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si);

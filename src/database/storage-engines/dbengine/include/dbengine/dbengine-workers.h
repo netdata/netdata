@@ -13,7 +13,7 @@ extern "C" {
 // embeds it in the same process. Worker utilization is charted per job id, and every user of the pool
 // registers its own job names on each pool thread it runs on; the ids therefore live in one shared
 // space. The engine's block starts at 1; an embedder numbers its own jobs from RRDENG_WORKER_JOB_MAX.
-enum rrdeng_worker_job {
+enum {
     RRDENG_WORKER_JOB_NONE = 0,
 
     RRDENG_WORKER_JOB_INIT,
@@ -55,10 +55,6 @@ enum rrdeng_worker_job {
     // terminator: the first id available to the embedder
     RRDENG_WORKER_JOB_MAX,
 };
-
-// Prepares the calling pool thread for engine work: pool-thread setup (once per thread) and the
-// engine's job names. Idempotent per thread; the engine calls it at the start of every work item.
-void rrdeng_worker_jobs_register(void);
 
 #ifdef __cplusplus
 }

@@ -240,7 +240,9 @@ static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx
     }
 }
 
-void rrdeng_worker_jobs_register(void) {
+// Prepares the calling pool thread for engine work: pool-thread setup (once per thread) and the
+// engine's job names. Idempotent per thread; called at the start of every work item.
+static void rrdeng_worker_jobs_register(void) {
     static __thread bool registered = false;
     if(likely(registered))
         return;
@@ -469,6 +471,14 @@ static struct {
                 .allocated = 0,
         },
 };
+
+static size_t rrdeng_active_tiers(void) {
+    size_t active = 0;
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        if(rrdeng_ctx_is_active(multidb_ctx[tier]))
+            active++;
+    return active;
+}
 
 static void wal_cleanup1(void) {
     WAL *wal = NULL;

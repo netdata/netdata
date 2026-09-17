@@ -32,8 +32,11 @@
 
 // the process-wide configuration, copied once by dbengine_init() and read-only afterwards
 extern struct dbengine_config dbengine_cfg;
+bool dbengine_initialized(void);
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
+
+#define RRDENG_PAGE_TYPE_MAX (2) // Maximum page type (inclusive)
 
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
@@ -50,6 +53,10 @@ extern size_t tier_page_size[];
 #include "pdc.h"
 #include "page.h"
 
+static ALWAYS_INLINE void time_and_count_add(struct time_and_count *tc, usec_t dt) {
+    __atomic_add_fetch(&tc->count, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&tc->usec, dt, __ATOMIC_RELAXED);
+}
 
 #define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
 #define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)

@@ -18,7 +18,7 @@ struct rrdengine_instance;
 // ---------------------------------------------------------------------------------------------------------------------
 // per-tier size and shape statistics
 
-typedef struct rrdengine_size_statistics {
+typedef struct {
     size_t default_granularity_secs;
 
     size_t sizeof_datafile;
@@ -265,11 +265,6 @@ struct time_and_count {
     usec_t usec;
 };
 
-static ALWAYS_INLINE void time_and_count_add(struct time_and_count *tc, usec_t dt) {
-    __atomic_add_fetch(&tc->count, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&tc->usec, dt, __ATOMIC_RELAXED);
-}
-
 struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) queries_planned_with_gaps;
     PAD64(size_t) queries_executed_with_gaps;
@@ -353,7 +348,7 @@ struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 // ---------------------------------------------------------------------------------------------------------------------
 // memory: the engine's ARAL statistics, one per RRDENG_MEM slot, plus its non-ARAL buffers
 
-typedef enum rrdeng_mem {
+typedef enum {
     RRDENG_MEM_PGC = 0,
     RRDENG_MEM_PGD,
     RRDENG_MEM_MRG,
