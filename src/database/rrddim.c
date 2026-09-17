@@ -46,7 +46,7 @@ static void rrddim_reinitialize_collection(RRDDIM *rd) {
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         if (!rd->tiers[tier].sch)
             rd->tiers[tier].sch =
-                storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
+                storage_engine_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
     }
 }
 
@@ -137,7 +137,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
                 rd->tiers[tier].last_completed_point_flush_modulo = rrddim_collection_modulo(st, tier_update_every);
 
                 rd->tiers[tier].sch =
-                        storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
+                        storage_engine_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
 
                 initialized++;
             }
