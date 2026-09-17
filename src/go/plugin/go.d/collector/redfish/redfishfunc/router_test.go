@@ -78,6 +78,12 @@ func TestTablesAndMissingData(t *testing.T) {
 			require.Equal(t, 200, response.Status)
 			assert.Contains(t, response.Help, "Partial")
 			validateTableSchema(t, response)
+			require.Contains(t, response.Columns, "rowOptions", "the UI reads row styling by this exact column key")
+			optionsIndex := response.Columns["rowOptions"].(map[string]any)["index"].(int)
+			for _, row := range response.Data.([][]any) {
+				options := row[optionsIndex].(map[string]any)
+				assert.Contains(t, []string{"normal", "notice", "warning", "critical"}, options["severity"])
+			}
 			for _, row := range response.Data.([][]any) {
 				assert.Len(t, row, len(response.Columns))
 			}

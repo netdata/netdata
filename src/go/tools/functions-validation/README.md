@@ -7,7 +7,7 @@ renaming or removing a heading here updates the skill in the same change.
 ## TL;DR
 - Bring up databases with Docker Compose.
 - Start `go.d.plugin` normally and send Function requests through its stdin protocol.
-- The current CLI has no `--function`, `--function-args` or `--config-dir` flags.
+- The current CLI has no `--function` or `--function-args` flags. `--config-dir` remains available as `-c`.
 - Config files live under `./config/go.d`.
 - Extract each Function JSON result and validate it against the canonical schema.
 - The container E2E scripts still use the removed CLI flags and need migration before they can validate current builds.

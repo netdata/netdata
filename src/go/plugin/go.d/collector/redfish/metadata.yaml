@@ -703,7 +703,8 @@ modules:
     functions:
       description: |
         Inspect sensor readings and hardware health for one configured endpoint using the Instance selector.
-        Both views use the latest completed collection, normally every 60 seconds or the configured `update_every`.
+        Both tables refresh every 60 seconds and show the latest completed collection. Collection timing follows the
+        job's `update_every` (60 seconds by default); the Observed column shows when each row was collected.
         Opening a table does not query the BMC. Partial collections show current available data and identify gaps;
         a total collection failure makes both Functions unavailable instead of showing old readings.
       list:
@@ -786,7 +787,7 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: "Whether this value was reported or calculated."
-              - name: "Row options"
+              - name: "rowOptions"
                 type: none
                 unit: ""
                 visibility: hidden
@@ -906,7 +907,7 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: "Source resource address."
-              - name: "Row options"
+              - name: "rowOptions"
                 type: none
                 unit: ""
                 visibility: hidden

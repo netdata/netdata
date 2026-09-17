@@ -56,7 +56,7 @@ func identityColumns() []funcapi.ColumnMeta {
 
 func rowOptionsColumn() funcapi.ColumnMeta {
 	return funcapi.ColumnMeta{
-		Name:          "Row options",
+		Name:          "rowOptions",
 		Tooltip:       "Row presentation",
 		Type:          funcapi.FieldTypeNone,
 		Visualization: funcapi.FieldVisualRowOptions,

@@ -56,6 +56,7 @@ func TestFunctionsFollowRealCollection(t *testing.T) {
 					"State":        "Enabled",
 					"Conditions": []any{
 						map[string]any{"Message": "Fan redundancy lost", "Severity": "Warning"},
+						map[string]any{"Severity": "Critical"},
 					},
 				},
 			}))
@@ -112,6 +113,7 @@ func TestFunctionsFollowRealCollection(t *testing.T) {
 	assert.Equal(t, "OK", enclosure["Health"])
 	assert.Equal(t, "Warning", enclosure["Health rollup"])
 	assert.Contains(t, enclosure["Reported issue"], "Fan redundancy lost")
+	assert.Contains(t, enclosure["Reported issue"], "Condition: Critical")
 	assert.Equal(t, "fixture-serial", enclosure["Serial number"])
 	oldResponse, err := json.Marshal(sensorsResponse)
 	require.NoError(t, err)

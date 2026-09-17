@@ -93,13 +93,16 @@ func componentIssue(component measurement.Component) (string, int) {
 	}
 	for _, condition := range component.Conditions {
 		rank = minReportedRank(rank, condition.Severity)
-		if condition.Message != "" {
-			message := condition.Message
-			if condition.Severity != "" {
-				message = displayHealth(condition.Severity) + ": " + message
+		message := strings.TrimSpace(condition.Message)
+		if message == "" {
+			if condition.Severity == "" {
+				continue
 			}
-			issues = append(issues, message)
+			message = "Condition: " + displayHealth(condition.Severity)
+		} else if condition.Severity != "" {
+			message = displayHealth(condition.Severity) + ": " + message
 		}
+		issues = append(issues, message)
 	}
 	if component.Availability != "readable" {
 		rank = min(rank, 2)
