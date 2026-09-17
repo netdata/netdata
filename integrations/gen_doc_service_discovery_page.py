@@ -71,6 +71,7 @@ SD_PAGE = {
         ],
         "skeleton": """```yaml
 disabled: no                  # set to yes to disable this pipeline
+trust_discovered_targets: no  # keep secret-reference syntax literal in generated jobs
 
 discoverer:
   <kind>:                     # discoverer kind (must match filename)
@@ -84,6 +85,9 @@ services:
 ```""",
         "notes": [
             "`disabled: yes` keeps the file on disk but turns the pipeline off.",
+            "`trust_discovered_targets` defaults to `no`. Setting it to `yes` lets generated collector jobs resolve `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}`, including references in target-controlled values copied by service rules. Those references can make Netdata read local files, run commands, or fetch stored secrets with the secret providers' permissions; collectors may send the results back to a target.",
+            "Enable only if you control and trust every target this pipeline can discover. Enabling accepts that risk for the whole pipeline: one untrusted target is enough to abuse it. Other pipelines remain unchanged.",
+            "Trust the inputs used by your service rules: Docker container metadata and commands, local process command lines, Kubernetes workload labels/annotations/environment, HTTP response items, or SNMP device system information. Custom rules can expose additional target-controlled values. The option does not resolve credentials used by the discoverer itself; SNMP scanning still requires literal credentials.",
             "Editing a stock file requires restarting the agent. UI-managed pipelines apply live.",
             "Where each discoverer's stock conf ships (with the Netdata package, with the Helm chart, or not at all) is documented on its per-discoverer page.",
         ],
@@ -198,7 +202,7 @@ services:
     "config_template": {
         "heading": "## config_template rendering",
         "intro": [
-            "Discovered jobs treat `${env:...}`, `${file:...}`, `${cmd:...}`, and `${store:...}` as literal text, even when a reference comes from an operator-authored discovery rule or credential. To use secret references, adopt the collector job through Dynamic Configuration and review its complete configuration before saving.",
+            "By default, discovered jobs treat `${env:...}`, `${file:...}`, `${cmd:...}`, and `${store:...}` as literal text, even when a reference comes from an operator-authored discovery rule or credential. A pipeline with `trust_discovered_targets: yes` allows these references in all its generated collector jobs. Alternatively, adopt an individual collector job through Dynamic Configuration and review its complete configuration before saving.",
             "When a template rule matches, its `config_template` is executed with the target as the dot context. The rendered output is parsed as YAML to produce one or more collector jobs.",
         ],
         "rules": [

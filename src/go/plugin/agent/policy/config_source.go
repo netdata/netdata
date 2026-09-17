@@ -4,12 +4,13 @@ package policy
 
 import "github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
-// SecretReferencesAllowed reports whether a collector configuration source is
-// trusted to exercise secret-reference providers.
-func SecretReferencesAllowed(sourceType string) bool {
-	switch sourceType {
+// SecretReferencesAllowed checks collector source authority and the pipeline's trust stamp.
+func SecretReferencesAllowed(config confgroup.Config) bool {
+	switch config.SourceType() {
 	case confgroup.TypeStock, confgroup.TypeUser, confgroup.TypeDyncfg:
 		return true
+	case confgroup.TypeDiscovered:
+		return config.TrustDiscoveredTargets()
 	default:
 		return false
 	}

@@ -218,6 +218,7 @@ func (d *ServiceDiscovery) testDyncfgConfig(
 				return false, err
 			}
 			pipelineConfig.Name = naming.Sanitize(name)
+			pipelineConfig.PipelineID = pipelineID
 			pipelineConfig.Source = "dyncfg=" + fn.Source()
 			prepared, err := d.constructPipeline(pipelineConfig)
 			if err != nil {

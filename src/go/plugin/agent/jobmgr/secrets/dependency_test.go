@@ -180,14 +180,16 @@ func TestSecretDependencyIndexAcceptsMixedReferenceProviders(t *testing.T) {
 func TestSecretDependencyIndexSourcePolicy(t *testing.T) {
 	tests := map[string]struct {
 		sourceType string
+		trust      bool
 		allowed    bool
 	}{
-		"stock":      {sourceType: confgroup.TypeStock, allowed: true},
-		"user":       {sourceType: confgroup.TypeUser, allowed: true},
-		"dyncfg":     {sourceType: confgroup.TypeDyncfg, allowed: true},
-		"discovered": {sourceType: confgroup.TypeDiscovered},
-		"empty":      {},
-		"unknown":    {sourceType: "future-source"},
+		"stock":              {sourceType: confgroup.TypeStock, allowed: true},
+		"user":               {sourceType: confgroup.TypeUser, allowed: true},
+		"dyncfg":             {sourceType: confgroup.TypeDyncfg, allowed: true},
+		"trusted discovered": {sourceType: confgroup.TypeDiscovered, trust: true, allowed: true},
+		"discovered":         {sourceType: confgroup.TypeDiscovered},
+		"empty":              {},
+		"unknown":            {sourceType: "future-source"},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -213,7 +215,7 @@ func TestSecretDependencyIndexSourcePolicy(t *testing.T) {
 			commit()
 			require.Equal(t, expected, index.Affected("vault:main", true))
 
-			config.SetSourceType(test.sourceType)
+			config.SetSourceType(test.sourceType).SetTrustDiscoveredTargets(test.trust)
 			if !test.allowed {
 				config["malformed"] = "${store:invalid}|${env:}"
 			}

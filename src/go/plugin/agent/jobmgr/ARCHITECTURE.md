@@ -717,10 +717,23 @@ Secrets keep credentials out of collector configs. A config value can carry a **
 - `${env:...}`, `${file:...}`, `${cmd:...}` — resolved from the plugin process's own environment variables, files, or
   command output.
 
-`policy.SecretReferencesAllowed` permits references only for `stock`, `user`, and `dyncfg` collector sources.
+`policy.SecretReferencesAllowed` permits references for `stock`, `user`, and `dyncfg` collector sources. A discovered
+source requires the strict boolean `__trust_discovered_targets__` stamp. The discovery pipeline overwrites that stamp
+on every rendered job using its own `trust_discovered_targets` option (default false); rendered content cannot grant
+itself authority. It also stamps `__discovery_pipeline_id__` from the manager-owned pipeline key, independently of
+target source text. Enabled discovered trust and its pipeline ID participate in `confgroup.Config.Hash` so changing
+the setting or trusted owner reconciles jobs even when their other values are unchanged. Absent/false trust stamps
+preserve the default hash. Cloning and graph payload serialization preserve both stamps.
+When opting out makes a literal field invalid, discovery commits the replacement as failed and removes the old
+trusted runtime and its dependencies only if both configs carry the same nonempty pipeline ID. Invalid proposals
+from a different or unidentified pipeline retain ordinary rejection behavior, preserving the trusted incumbent.
+Rejected discovered candidates are scoped by pipeline ID too, so a competing candidate's rejection cannot suppress
+a later opt-out from the actual owner, even when their untrusted hashes match.
+
 `joboutput/config_factory.go` and `secrets/dependency.go` enforce the same policy before resolving or indexing
-references. Discovered, empty, and unknown sources keep every string literal, including malformed reference syntax,
-and create no SecretStore dependencies. Their application still uses the resolver's bounded literal clone.
+references. Untrusted discovered, empty, and unknown sources keep every string literal, including malformed reference
+syntax, and create no SecretStore dependencies. Their application still uses the resolver's bounded literal clone.
+The pipeline option does not resolve discovery connection credentials.
 DynCfg adoption re-stamps the complete submitted configuration as `dyncfg`, enabling reference resolution throughout
 that payload. Operators must review the whole configuration when adopting a discovered job.
 

@@ -56,7 +56,7 @@ func (sdi *SecretDependencyIndex) PrepareJobChange(id string, postimage *dyncfg.
 			return nil, errors.New("jobmgr secrets: dependency configuration identity differs")
 		}
 		var keys []string
-		if policy.SecretReferencesAllowed(config.SourceType()) {
+		if policy.SecretReferencesAllowed(config) {
 			var referenceErr error
 			keys, referenceErr = secretresolver.StoreReferences(map[string]any(config))
 			if referenceErr != nil {
