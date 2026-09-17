@@ -38,9 +38,9 @@ payload=$(jq -nc '{
   "__logs_sources": "agent-events",
   "selections": {
     "AE_FATAL_FILENAME": [
-      "src/database/engine/cache.c",
-      "src/database/engine/pdc.c",
-      "src/database/engine/rrdengine.c"
+      "src/database/storage-engines/dbengine/cache.c",
+      "src/database/storage-engines/dbengine/pdc.c",
+      "src/database/storage-engines/dbengine/rrdengine.c"
     ]
   }
 }')

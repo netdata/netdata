@@ -3,7 +3,7 @@
 #define DBENGINE_METRIC_H
 
 #include "libnetdata/libnetdata.h"
-#include "database/engine/include/dbengine/dbengine-stats.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-stats.h"
 
 typedef struct metric METRIC;
 typedef struct mrg MRG;

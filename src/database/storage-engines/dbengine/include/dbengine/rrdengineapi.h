@@ -5,8 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 #include "database/storage-engines/storage-engine-types.h"
-#include "database/engine/include/dbengine/dbengine-config.h"
-#include "database/engine/include/dbengine/dbengine-stats.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-stats.h"
 
 #ifdef __cplusplus
 extern "C" {

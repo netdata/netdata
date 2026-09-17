@@ -192,9 +192,10 @@ DBENGINE uses 150 bytes of memory for every metric for which retention is mainta
 ## Boundary with the rest of Netdata
 
 The engine is a component of the `netdata` binary, sealed in both directions. Its sources under
-`src/database/engine/` include or call nothing of the daemon, and the daemon sees the engine only through its public
-headers under `include/dbengine/`, included from the source root as `database/engine/include/dbengine/<name>.h`;
-`rrdengineapi.h` does not include the private `rrdengine.h`, so an engine instance is an opaque pointer outside this
+`src/database/storage-engines/dbengine/` include or call nothing of the daemon, and the daemon sees the engine only
+through its public headers under `include/dbengine/`, included from the source root as
+`database/storage-engines/dbengine/include/dbengine/<name>.h`; `rrdengineapi.h` does not include the private
+`rrdengine.h`, so an engine instance is an opaque pointer outside this
 directory (the storage vtable's `STORAGE_INSTANCE` is that pointer). The engine is built as its own object library
 target, `dbengine`, linked into `netdata`; the target declares no include directories, so the layout states the
 public surface and the build compiles the engine as one unit. The public headers:

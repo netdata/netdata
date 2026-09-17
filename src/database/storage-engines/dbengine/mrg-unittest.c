@@ -2,7 +2,7 @@
 
 #include "mrg-internals.h"
 #include "rrdengine.h"
-#include "database/engine/include/dbengine/dbengine-tests.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
 // Global dummy rrdengine_instances for tests
 static struct rrdengine_instance test_ctx_0 = {0};

@@ -108,7 +108,7 @@ static inline uint32_t get_uint32_id() {
 #include "contexts/rrdcontext.h"
 #include "nrpc/nrpc.h"
 #ifdef ENABLE_DBENGINE
-#include "database/engine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
 #endif
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_context.h"

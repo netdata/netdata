@@ -103,7 +103,7 @@ action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98
 ### Storing historical metrics on your Raspberry Pi
 
 By default, Netdata allocates 256 MiB in disk space to store historical metrics inside the [database
-engine](/src/database/engine/README.md). On the Raspberry Pi used for this guide, Netdata collects 1,500 metrics every
+engine](/src/database/storage-engines/dbengine/README.md). On the Raspberry Pi used for this guide, Netdata collects 1,500 metrics every
 second, which equates to storing 3.5 days worth of historical metrics.
 
 You can increase this allocation by editing `netdata.conf` and increasing the `dbengine multihost disk space` setting to

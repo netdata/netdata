@@ -27,8 +27,8 @@
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "database/engine/include/dbengine/dbengine-config.h"
-#include "database/engine/include/dbengine/dbengine-workers.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
 
 // the process-wide configuration, copied once by dbengine_init() and read-only afterwards
 extern struct dbengine_config dbengine_cfg;
@@ -43,7 +43,7 @@ extern size_t tier_page_size[];
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
-#include "database/engine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
 #include "pagecache.h"
 #include "mrg.h"
 #include "cache.h"

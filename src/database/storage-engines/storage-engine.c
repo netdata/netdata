@@ -4,7 +4,7 @@
 #include "storage-engine.h"
 #include "ram/rrddim_mem.h"
 #ifdef ENABLE_DBENGINE
-#include "database/engine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
 
 // The vtable hands over the RRDDIM because the RAM backend keeps a reference to it;
 // dbengine only ever needs the dimension's uuid.
