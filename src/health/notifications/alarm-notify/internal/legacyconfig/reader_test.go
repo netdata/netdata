@@ -298,3 +298,48 @@ func TestEvaluationLimitsAndErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestRecipientKeyContinuations(t *testing.T) {
+	forms := map[string]string{
+		"entry":                "role_recipients_email[%s]=value",
+		"initializer":          "role_recipients_email=([%s]=value)",
+		"declared initializer": "declare -A role_recipients_email=([%s]=value)",
+	}
+	keys := map[string]struct {
+		source string
+		want   string
+		reject bool
+	}{
+		"leading continuation":              {source: "\\\nfoo", want: "foo"},
+		"trailing continuation":             {source: "foo\\\n", want: "foo"},
+		"multiple continuations":            {source: "\\\n\\\nfoo\\\n", want: "foo"},
+		"leading CRLF continuation":         {source: "\\\r\nfoo", want: "foo"},
+		"middle continuation":               {source: "fo\\\no", want: "foo"},
+		"quoted padding after continuation": {source: "\\\n\" foo \"", want: " foo "},
+		"punctuation after continuation":    {source: "\\\ndb-admin", want: "db-admin"},
+		"space after continuation":          {source: "\\\n foo", reject: true},
+		"space before continuation":         {source: " \\\nfoo", reject: true},
+		"space after trailing continuation": {source: "foo\\\n ", reject: true},
+	}
+	for form, format := range forms {
+		t.Run(form, func(t *testing.T) {
+			for name, key := range keys {
+				t.Run(name, func(t *testing.T) {
+					program, err := Parse(strings.NewReader(fmt.Sprintf(format, key.source)))
+					if key.reject {
+						require.Error(t, err)
+						assert.Nil(t, program)
+						return
+					}
+					require.NoError(t, err)
+					got, err := Evaluate(nil, program)
+					require.NoError(t, err)
+					assert.Equal(t, Settings{
+						Variables: map[string]string{}, Functions: map[string]string{},
+						Recipients: map[string]map[string]string{"role_recipients_email": {key.want: "value"}},
+					}, got)
+				})
+			}
+		})
+	}
+}

@@ -172,8 +172,28 @@ func (p *Program) entry(name string, index syntax.ArithmExpr, value *syntax.Word
 		return pos.error("recipient map keys must be nonempty literal strings")
 	}
 	start, end := index.Pos().Offset(), index.End().Offset()
-	// Arithmetic parsing omits surrounding whitespace, but associative keys retain it.
-	// Require padding to be quoted so an accepted entry cannot silently change keys.
+	// The parser omits continuations as well as whitespace at key boundaries.
+	// Continuations add no key bytes; actual padding must be quoted to preserve it.
+	for start >= 2 && source[start-1] == '\n' {
+		length := uint(2)
+		if source[start-2] == '\r' {
+			length++
+		}
+		if start < length || source[start-length] != '\\' {
+			break
+		}
+		start -= length
+	}
+	for end < uint(len(source)) && source[end] == '\\' {
+		next := end + 1
+		if next < uint(len(source)) && source[next] == '\r' {
+			next++
+		}
+		if next >= uint(len(source)) || source[next] != '\n' {
+			break
+		}
+		end = next + 1
+	}
 	if start == 0 || end >= uint(len(source)) || source[start-1] != '[' || source[end] != ']' {
 		return pos.error("recipient key padding must be quoted")
 	}
