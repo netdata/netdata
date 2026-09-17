@@ -44,7 +44,7 @@ func buildDynatrace(b *builder, _ []string) ([]notifier.Sender, error) {
 	}
 	selector := `type(HOST),tag("` + strings.ReplaceAll(tag, ":", `\:`) + `")`
 	return one(dynatrace.New(dynatrace.Config{
-		Secrets: secret.LiteralInput, APIURL: strings.TrimRight(server, "/") + "/e/" + url.PathEscape(space),
+		Secrets: secret.LiteralInput, APIURL: strings.TrimSuffix(server, "/") + "/e/" + url.PathEscape(space),
 		APIToken: b.values["DYNATRACE_TOKEN"], EntitySelector: selector,
 		EventType: b.values["DYNATRACE_EVENT"], Source: b.values["DYNATRACE_ANNOTATION_TYPE"],
 	}, b.client))

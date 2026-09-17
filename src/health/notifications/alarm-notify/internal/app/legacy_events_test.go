@@ -119,6 +119,43 @@ func TestRunLegacyEventMappings(t *testing.T) {
 	}
 }
 
+func TestRunLegacyDynatraceServerPrefix(t *testing.T) {
+	for name, tt := range map[string]struct{ prefix, path string }{
+		"no trailing slash":       {"/proxy", "/proxy/e/space/api/v2/events/ingest"},
+		"one trailing slash":      {"/proxy/", "/proxy/e/space/api/v2/events/ingest"},
+		"two trailing slashes":    {"/proxy//", "/proxy//e/space/api/v2/events/ingest"},
+		"three trailing slashes":  {"/proxy///", "/proxy///e/space/api/v2/events/ingest"},
+		"encoded prefix retained": {"/proxy%2Ftenant//", "/proxy%2Ftenant//e/space/api/v2/events/ingest"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			requests := make(chan string, 2)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				path := r.URL.EscapedPath()
+				select {
+				case requests <- path:
+				default:
+					t.Error("unexpected extra request")
+				}
+				if path != tt.path {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				w.WriteHeader(http.StatusCreated)
+				_, _ = io.WriteString(w, dynatraceTestAck)
+			}))
+			defer server.Close()
+			settings := fmt.Sprintf(`SEND_DYNATRACE=YES; DYNATRACE_SERVER='%s%s'; DYNATRACE_SPACE=space; DYNATRACE_TOKEN=synthetic-key; DYNATRACE_TAG_VALUE=netdata; DYNATRACE_EVENT=CUSTOM_INFO`, server.URL, tt.prefix)
+			args := []string{"send-legacy", "--config", writeConfig(t, settings), "--role", "silent", "--method", "dynatrace"}
+			var stdout, stderr bytes.Buffer
+			assert.Equal(t, 0, Run(context.Background(), args, strings.NewReader(testutil.ValidEvent), &stdout, &stderr), stderr.String())
+			assert.Contains(t, stderr.String(), "1 succeeded, 0 failed")
+			assert.Empty(t, stdout.String())
+			require.Len(t, requests, 1)
+			assert.Equal(t, tt.path, <-requests)
+		})
+	}
+}
+
 func TestRunLegacyEventPreflight(t *testing.T) {
 	for name, tt := range map[string]struct {
 		overlay, err string

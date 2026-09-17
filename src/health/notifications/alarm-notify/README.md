@@ -333,8 +333,9 @@ WARNING/CRITICAL create P3/P1 alerts; CLEAR closes the stable incident alias. AP
 uses the same acknowledgment checks as native delivery.
 
 For [Dynatrace](#dynatrace), the API token needs `events.ingest`. The existing server/space settings form the environment
-base `DYNATRACE_SERVER/e/DYNATRACE_SPACE`, followed by `/api/v2/events/ingest`. Any server path prefix is retained;
-no hostname or SaaS URL is inferred. Use native YAML's explicit `api_url` for a different environment URL layout.
+base `DYNATRACE_SERVER/e/DYNATRACE_SPACE`, followed by `/api/v2/events/ingest`. One optional trailing slash on the
+server is reused as the separator; additional slashes and encoded path segments are retained. No hostname or SaaS
+URL is inferred. Use native YAML's explicit `api_url` for a different environment URL layout.
 
 ```sh
 SEND_DYNATRACE=YES
