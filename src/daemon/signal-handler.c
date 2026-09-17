@@ -160,6 +160,9 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
 // Unmask all signals the netdata main signal handler uses.
 // All other signals remain masked.
 static void posix_unmask_my_signals(void) {
+#if defined(OS_WINDOWS)
+    return;
+#else
     sigset_t sigset;
     sigemptyset(&sigset);
 
@@ -168,9 +171,13 @@ static void posix_unmask_my_signals(void) {
 
     if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
         netdata_log_error("SIGNAL: cannot unmask netdata signals");
+#endif
 }
 
 void nd_cleanup_deadly_signals(void) {
+#if defined(OS_WINDOWS)
+    return;
+#else
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));
 
@@ -192,9 +199,14 @@ void nd_cleanup_deadly_signals(void) {
         __atomic_store_n(&original_handlers[signo], (SIGNAL_HANDLER)0, __ATOMIC_RELEASE);
         __atomic_store_n(&original_sigactions[signo], (SIGNAL_SIGACTION)0, __ATOMIC_RELEASE);
     }
+#endif
 }
 
 void nd_initialize_signals(bool chain_existing) {
+#if defined(OS_WINDOWS)
+    (void)chain_existing;
+    return;
+#else
     signals_block_all_except_deadly();
     
     // Set the signal handler name for stack trace filtering
@@ -239,6 +251,7 @@ void nd_initialize_signals(bool chain_existing) {
         if (sigaction(signals_waiting[i].signo, &act, NULL) == -1)
             netdata_log_error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
     }
+#endif
 }
 
 NEVER_INLINE

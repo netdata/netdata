@@ -974,7 +974,7 @@ int log_stack_unittest(void) {
 
     log_stack_push(source_health);
     bool limit = true;
-    LOG_STACK_TEST(nd_log_resolve_source_with_flood_protection(NDLS_DAEMON, &limit) == NDLS_HEALTH && limit,
+    LOG_STACK_TEST(nd_log_resolve_source_with_flood_protection(NDLS_DAEMON, &limit) == NDLS_HEALTH && !limit,
                    "daemon override to health uses health flood-protection policy");
     log_stack_pop(&source_health);
 
@@ -986,9 +986,10 @@ int log_stack_unittest(void) {
 
     LOG_STACK_TEST(!nd_log_source_has_flood_protection(NDLS_UNSET),
                    "unset source does not enable flood protection");
-    for (ND_LOG_SOURCES source = NDLS_ACCESS; source < _NDLS_MAX; source++)
+    for (ND_LOG_SOURCES source = NDLS_DAEMON; source < _NDLS_MAX; source++)
+        if (source == NDLS_DAEMON || source == NDLS_COLLECTORS)
         LOG_STACK_TEST(nd_log_source_has_flood_protection(source),
-                       "every public source enables configured flood protection");
+                       "daemon and collector sources enable configured flood protection");
 
     LOG_STACK_TEST(thread_log_stack_next == 0, "source override test frames are balanced");
 

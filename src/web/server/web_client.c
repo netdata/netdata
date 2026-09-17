@@ -1487,7 +1487,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_BAD_REQUEST;
         }
         else if(unlikely(hash == url_hashes->mirror && strcmp(tok, "mirror") == 0)) {
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(web_client_startup_gate()))
                 return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
@@ -1564,12 +1564,12 @@ bool web_client_resume_startup_wait(struct web_client *w) {
     if(!w->startup_waiting)
         return false;
 
-    if(!netdata_ready_load() && !web_client_timeout_checkpoint_and_check(w, NULL))
+    if(web_client_startup_gate() && !web_client_timeout_checkpoint_and_check(w, NULL))
         return false;
 
     w->startup_waiting = false;
 
-    if(netdata_ready_load()) {
+    if(!web_client_startup_gate()) {
         char path[FILENAME_MAX + 1];
         strncpyz(path, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
         w->response.code = (short)web_client_process_url(localhost, w, path);
@@ -1640,7 +1640,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     // a raw recv() and byte-matches (stream_connect_validate_first_response()).
                     // Emitting an HTTP status line and headers here would make every child fail
                     // the match and report the parent's answer as not understood.
-                    if(unlikely(!netdata_ready_load())) {
+                    if(unlikely(web_client_startup_gate())) {
                         w->response.code = stream_receiver_response_initializing(w);
                         return;
                     }
@@ -1654,7 +1654,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     return;
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
-                    if(unlikely(!netdata_ready_load())) {
+                    if(unlikely(web_client_startup_gate())) {
                         // Unlike STREAM, the WebSocket handshake is plain HTTP: break so the
                         // response gets its status line, headers, and a send scheduled.
                         web_client_service_unavailable(w);

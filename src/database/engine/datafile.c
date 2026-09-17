@@ -430,6 +430,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         // Journals can be left behind without a matching datafile. Keep their
         // file numbers reserved so the next journal cannot truncate an orphan.
         ctx_fileno_initialize_from_scan(ctx, 0, max_seen_fileno);
+        (void) JudyLFreeArray(&journafile_JudyL, NULL);
+        (void) JudyLFreeArray(&datafiles_JudyL, NULL);
         freez(datafiles);
         return 0;
     }

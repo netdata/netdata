@@ -77,7 +77,12 @@ cmake_make_program=()
 # whereas MSYS2 ninja uses /bin/sh which strips backslashes from Windows-style paths,
 # causing "command not found" failures at exit code 127.
 native_ninja=""
-if native_ninja="$(command -v ninja.exe 2>/dev/null || true)" && [ -n "${native_ninja}" ]; then
+if [ -x /ucrt64/bin/ninja.exe ]; then
+    native_ninja=/ucrt64/bin/ninja.exe
+    generator="Ninja"
+    build_args="-k 1"
+    cmake_make_program=("-DCMAKE_MAKE_PROGRAM=${native_ninja}")
+elif native_ninja="$(command -v ninja.exe 2>/dev/null || true)" && [[ "${native_ninja,,}" == */ucrt64/bin/ninja.exe ]]; then
     generator="Ninja"
     build_args="-k 1"
     cmake_make_program=("-DCMAKE_MAKE_PROGRAM=${native_ninja}")
@@ -118,7 +123,13 @@ COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64"
 # initial compiler-test link. The flag is kept only in the BFD fallback.
 linker_cmake_flags=()
 native_lld=""
-if native_lld="$(command -v ld.lld.exe 2>/dev/null || true)" && [ -n "${native_lld}" ]; then
+if [ -x /ucrt64/bin/ld.lld.exe ]; then
+    native_lld=/ucrt64/bin/ld.lld.exe
+    linker_cmake_flags=("-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
+                        "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
+                        "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"
+                        "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld")
+elif native_lld="$(command -v ld.lld.exe 2>/dev/null || true)" && [[ "${native_lld,,}" == */ucrt64/bin/ld.lld.exe ]]; then
     linker_cmake_flags=("-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
                         "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
                         "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"

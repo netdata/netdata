@@ -226,7 +226,9 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
             // translate to Windows form (C:\...) so the log file is actually created.
 #if defined(OS_WINDOWS)
             char win_log_path[FILENAME_MAX + 1];
-            const char *log_path = os_translate_path(win_log_path, e->filename, sizeof(win_log_path));
+            const char *log_path = e->method == NDLM_DEVNULL
+                ? "NUL"
+                : os_translate_path(win_log_path, e->filename, sizeof(win_log_path));
 #else
             const char *log_path = e->filename;
 #endif

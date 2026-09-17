@@ -1089,7 +1089,7 @@ int netdata_main(int argc, char **argv) {
         }
     }
 
-#if !defined(FSANITIZE_ADDRESS)
+#if !defined(FSANITIZE_ADDRESS) && !defined(OS_WINDOWS)
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)

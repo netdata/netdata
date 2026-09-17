@@ -292,10 +292,18 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
 
     spinlock_lock(&ctx->deletion.spinlock);
     if (unlikely(__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED) == 0)) {
+        struct rrdeng_file_deletion *next = ctx->deletion.head;
+        if (next) {
+            ctx->deletion.head = next->next;
+            if (!ctx->deletion.head)
+                ctx->deletion.tail = NULL;
+        }
+        else
+            ctx->deletion.running = false;
         spinlock_unlock(&ctx->deletion.spinlock);
         netdata_log_error("DBENGINE: deletion queue accounting underflow for '%s'", deletion->path);
         freez(deletion);
-        return NULL;
+        return next;
     }
     struct rrdeng_file_deletion *next = ctx->deletion.head;
     if (next) {
@@ -308,16 +316,14 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
     spinlock_unlock(&ctx->deletion.spinlock);
 
     freez(deletion);
-
-    if (next)
-        rrdeng_file_deletion_start(next);
-
     __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELEASE);
-    return NULL;
+    return next;
 }
 
 static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused) {
-    (void)rrdeng_file_deletion_finish(work->data);
+    struct rrdeng_file_deletion *next = rrdeng_file_deletion_finish(work->data);
+    if (next)
+        rrdeng_file_deletion_start(next);
 }
 
 int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *path, size_t bytes, bool datafile) {

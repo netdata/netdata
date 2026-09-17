@@ -131,7 +131,7 @@ static bool etw_register_provider(void) {
 }
 #endif
 
-static void etw_queue_init(void);
+static bool etw_queue_init(void);
 
 bool nd_log_init_windows(void) {
     if(nd_log.eventlog.initialized)
@@ -243,6 +243,10 @@ static struct {
     bool                    initialized;
 } etw_queue;
 
+// EventWrite() failures can happen repeatedly while Event Log is unavailable.
+// Keep the fallback observable without flooding the daemon's stderr.
+static volatile uint64_t etw_last_write_error_usec = 0;
+
 // Mirror the fields_buffers[] layout: return the right buffer from a queue entry.
 static inline const wchar_t *etw_entry_field(const struct etw_queue_entry *e, size_t i) {
     if(i == NDF_NIDL_INSTANCE) return e->medium[0];
@@ -280,7 +284,13 @@ static bool etw_entry_process(struct etw_queue_entry *e) {
     if(status != ERROR_SUCCESS) {
         // The producer has already released its queue slot by this point.  Keep
         // the failure observable instead of silently losing the event.
-        fprintf(stderr, "Netdata ETW EventWrite failed: %lu\n", (unsigned long)status);
+        uint64_t now = now_monotonic_usec();
+        uint64_t previous = __atomic_load_n(&etw_last_write_error_usec, __ATOMIC_RELAXED);
+        if(now - previous >= 60ULL * USEC_PER_SEC &&
+           __atomic_compare_exchange_n(&etw_last_write_error_usec, &previous, now, false,
+                                       __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            fprintf(stderr, "Netdata ETW EventWrite failed: %lu (further errors suppressed for 60s)\n",
+                    (unsigned long)status);
         return false;
     }
 
@@ -430,7 +440,7 @@ static void etw_replace_percent_with_unicode(wchar_t *s, size_t size) {
     // Bounded length keeps the read inside the buffer even if `s` was not
     // null-terminated within `size`; etw_wcslen_bounded() returns 0 on a
     // malformed buffer rather than overrunning it.
-    size_t original_len = etw_wcslen_bounded(s, size - 1);
+    size_t original_len = etw_wcslen_bounded(s, size);
 
     // Traverse the string, replacing '%' with the Unicode fullwidth percent sign
     for (size_t i = 0; i < original_len && i < size - 1; i++) {

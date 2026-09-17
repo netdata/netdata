@@ -85,7 +85,9 @@ static void nd_env_set_required(const char *name, const char *value) {
     nd_setenv(name, value ? value : "", 1);
 
     const char *actual = getenv(name);
-    if (!actual || strcmp(actual, value ? value : "") != 0)
+    // _putenv removes an empty variable on Windows; getenv() returning NULL is
+    // therefore the expected representation of an intentionally empty value.
+    if ((value && *value && !actual) || (actual && strcmp(actual, value ? value : "") != 0))
         fatal("Failed to publish required environment variable '%s'", name);
 }
 #endif
@@ -272,7 +274,6 @@ void set_environment_for_plugins_and_scripts(void) {
 #if defined(OS_WINDOWS)
     CLEAN_CHAR_P *native_path = nd_env_native_path_list(configured_path);
     nd_env_set_required("PATH", native_path);
-    freez(native_path);
 #else
     setenv("PATH", configured_path, 1);
 #endif
@@ -284,7 +285,6 @@ void set_environment_for_plugins_and_scripts(void) {
 #if defined(OS_WINDOWS)
     CLEAN_CHAR_P *native_pythonpath = nd_env_native_path_list(configured_pythonpath);
     nd_env_set_required("PYTHONPATH", native_pythonpath);
-    freez(native_pythonpath);
 #else
     setenv("PYTHONPATH", configured_pythonpath, 1);
 #endif

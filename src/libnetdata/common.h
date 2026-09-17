@@ -441,7 +441,9 @@ static inline char *strptime(const char *s, const char *format, struct tm *t) {
 #define MADV_DONTFORK   0
 #define MADV_DONTDUMP   0
 #define MADV_HUGEPAGE   0
-#define MADV_MERGEABLE  0
+// Windows has no KSM equivalent.  Do not define MADV_MERGEABLE here: its
+// presence controls the KSM capability probe in nd-mmap.c, and defining it
+// would incorrectly advertise support for a no-op madvise() shim.
 void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
 int   munmap(void *ptr, size_t len);
 int   madvise(void *addr, size_t len, int advice);
@@ -865,49 +867,6 @@ static inline int statfs(const char *path __maybe_unused, struct statfs *buf __m
 #define DT_LNK      10
 #endif
 
-// Return entry type portably; UCRT64 has no dirent::d_type member.
-#if defined(OS_WINDOWS)
-// Implemented by os.c; declared here because this low-level inline helper is
-// used before os.h is included by the library umbrella headers.
-char *os_translate_msys_to_windows_path(const char *src);
-#endif
-static inline unsigned char nd_dirent_type(const char *directory, const struct dirent *entry) {
-#if defined(OS_WINDOWS)
-    if (!directory || !entry)
-        return DT_UNKNOWN;
-    char path[FILENAME_MAX + 1];
-    int n = snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-    if (n < 0 || (size_t)n >= sizeof(path))
-        return DT_UNKNOWN;
-#if defined(_WIN32)
-    // readdir() returns MSYS-style paths on UCRT64. Win32 APIs do not
-    // understand /c/... syntax, so translate before querying attributes.
-    CLEAN_CHAR_P *native_path = os_translate_msys_to_windows_path(path);
-    DWORD attrs = native_path ? GetFileAttributesA(native_path) : INVALID_FILE_ATTRIBUTES;
-    freez(native_path);
-    if (attrs == INVALID_FILE_ATTRIBUTES)
-        return DT_UNKNOWN;
-    if (attrs & FILE_ATTRIBUTE_REPARSE_POINT)
-        return DT_LNK;
-    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
-        return DT_DIR;
-    return DT_REG;
-#else
-    struct stat st;
-    if (stat(path, &st) != 0)
-        return DT_UNKNOWN;
-    if (S_ISDIR(st.st_mode)) return DT_DIR;
-    if (S_ISREG(st.st_mode)) return DT_REG;
-#ifdef S_ISLNK
-    if (S_ISLNK(st.st_mode)) return DT_LNK;
-#endif
-    return DT_UNKNOWN;
-#endif
-#else
-    return entry->d_type;
-#endif
-}
-
 // ── strerror_r() ── POSIX XSI variant, absent from UCRT64 ────────────────────
 // Windows provides strerror_s() with reversed argument order and returns errno.
 static inline int strerror_r(int errnum, char *buf, size_t buflen) {
@@ -1191,6 +1150,37 @@ static inline int link(const char *oldpath, const char *newpath) {
 }
 
 #endif // OS_WINDOWS
+
+// Return entry type portably; UCRT64 has no dirent::d_type member.
+#if defined(OS_WINDOWS)
+char *os_translate_msys_to_windows_path(const char *src);
+#endif
+static inline unsigned char nd_dirent_type(const char *directory, const struct dirent *entry) {
+    if (!directory || !entry)
+        return DT_UNKNOWN;
+
+    char path[FILENAME_MAX + 1];
+    int n = snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+    if (n < 0 || (size_t)n >= sizeof(path))
+        return DT_UNKNOWN;
+
+#if defined(OS_WINDOWS)
+    // readdir() receives MSYS-style paths; Win32 APIs require native paths.
+    char *native_path = os_translate_msys_to_windows_path(path);
+    DWORD attrs = native_path ? GetFileAttributesA(native_path) : INVALID_FILE_ATTRIBUTES;
+    free(native_path);
+    if (attrs == INVALID_FILE_ATTRIBUTES)
+        return DT_UNKNOWN;
+    // Do not recurse through reparse points (symlinks and junctions).
+    if (attrs & FILE_ATTRIBUTE_REPARSE_POINT)
+        return DT_LNK;
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
+        return DT_DIR;
+    return DT_REG;
+#else
+    return entry->d_type;
+#endif
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 

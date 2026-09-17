@@ -53,6 +53,9 @@ function(netdata_bundle_sqlite3)
                                    "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
                              NO_DEFAULT_PATH)
                 if(NOT _ND_SQLITE_BASH)
+                        find_program(_ND_SQLITE_BASH NAMES bash.exe bash)
+                endif()
+                if(NOT _ND_SQLITE_BASH)
                         message(FATAL_ERROR
                                 "bash not found — required to build the SQLite amalgamation on Windows. "
                                 "Install MSYS2 and run: pacman -S bash make tcl")
@@ -62,6 +65,12 @@ function(netdata_bundle_sqlite3)
                              HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
                 find_program(_ND_SQLITE_TCLSH NAMES tclsh.exe tclsh
                              HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
+                if(NOT _ND_SQLITE_MAKE)
+                        find_program(_ND_SQLITE_MAKE NAMES make.exe make)
+                endif()
+                if(NOT _ND_SQLITE_TCLSH)
+                        find_program(_ND_SQLITE_TCLSH NAMES tclsh.exe tclsh)
+                endif()
                 if(NOT _ND_SQLITE_MAKE OR NOT _ND_SQLITE_TCLSH)
                         message(FATAL_ERROR "MSYS2 make and tclsh are required to build SQLite")
                 endif()

@@ -41,16 +41,8 @@ int os_get_fd_open_max(void) {
 
 void os_close_range(int first, int last, int flags) {
 #if defined(OS_WINDOWS)
-    // The explicit handle list protects spawned children, but the daemon's
-    // startup path also uses this helper to close descriptors inherited by the
-    // current process.  UCRT descriptors can be closed safely by _close();
-    // close-on-exec is not meaningful for the CreateProcess handle-list path.
-    if (flags & CLOSE_RANGE_CLOEXEC)
-        return;
-    if (last == CLOSE_RANGE_FD_MAX || last >= _getmaxstdio())
-        last = _getmaxstdio() - 1;
-    for (int fd = first; fd <= last; fd++)
-        (void)_close(fd);
+    // Windows child processes use an explicit handle list; there is no safe
+    // portable equivalent of close_range() for arbitrary inherited handles.
     return;
 #endif
 #if defined(HAVE_CLOSE_RANGE)

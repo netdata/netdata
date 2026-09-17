@@ -46,7 +46,6 @@ static void config_dir_print_available(void) {
         }
     }
 
-    freez(native_path);
     closedir(dir);
     printf("\n"); // Add a newline at the end
 }
