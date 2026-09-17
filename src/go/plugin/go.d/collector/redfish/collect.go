@@ -8,11 +8,15 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/redfishfunc"
 )
 
 func (c *Collector) collect(ctx context.Context) (result collectionResult, err error) {
 	started := c.now()
 	result.ObservedAt = started.UTC()
+	result.Snapshot = &redfishfunc.Snapshot{
+		CollectedAt: result.ObservedAt,
+	}
 	defer func() { result.Metrics.Duration = c.now().Sub(started).Seconds() }()
 	acquired, err := c.client.Acquire(ctx)
 	result.AuthMethod = acquired.AuthMethod
@@ -30,6 +34,11 @@ func (c *Collector) collect(ctx context.Context) (result collectionResult, err e
 	}
 	projected, hardwareErr := c.measurement.Project(acquired.Resources, acquired.GraphComplete, result.ObservedAt)
 	result.Hardware = projected.Observations
+	if hardwareErr == nil {
+		result.Snapshot.Available = true
+		result.Snapshot.Components = projected.Components
+		result.Snapshot.Sensors = projected.Sensors
+	}
 	for _, diagnostic := range projected.Diagnostics {
 		acquired.Diagnostics.Add(diagnostic)
 	}
@@ -45,5 +54,6 @@ func (c *Collector) collect(ctx context.Context) (result collectionResult, err e
 	if result.Complete {
 		result.Metrics.Status = "success"
 	}
+	result.Snapshot.Complete = result.Complete
 	return result, err
 }

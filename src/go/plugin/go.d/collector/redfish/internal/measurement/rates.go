@@ -127,6 +127,7 @@ func (c *Projector) derivedPowerReading(
 	derived.AlarmMetric = ""
 	derived.SemanticSourceClass = "energy_rate"
 	derived.SourceAlarm = ""
+	derived.Health = ""
 	derived.SourceAlarmDiagnostic = ""
 	return derived, true
 }
