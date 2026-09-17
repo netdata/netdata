@@ -16,7 +16,7 @@
 //   PDC, the page details control     the plan of one query: which pages, from cache or disk, in what order (pdc.h)
 //   the event loop (dbengine_main)      the single libuv thread that owns datafile I/O, flushing and rotation
 //
-// The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable, hands it its
+// The daemon drives the engine through dbengine-api.h behind the storage-engine vtable, hands it its
 // configuration and optional services through dbengine-config.h, and reads what the engine publishes
 // (statistics, worker job ids) through the engine's own headers. Those public headers include nothing
 // of this file: this header and everything it pulls in are the engine's private side. The engine, in
@@ -46,7 +46,7 @@ extern size_t tier_page_size[];
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
-#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 #include "pagecache.h"
 #include "mrg.h"
 #include "cache.h"

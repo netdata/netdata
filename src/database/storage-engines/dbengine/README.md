@@ -194,13 +194,13 @@ DBENGINE uses 150 bytes of memory for every metric for which retention is mainta
 The engine is a component of the `netdata` binary, sealed in both directions. Its sources under
 `src/database/storage-engines/dbengine/` include or call nothing of the daemon, and the daemon sees the engine only
 through its public headers under `include/dbengine/`, included from the source root as
-`database/storage-engines/dbengine/include/dbengine/<name>.h`; `rrdengineapi.h` does not include the private
+`database/storage-engines/dbengine/include/dbengine/<name>.h`; `dbengine-api.h` does not include the private
 `rrdengine.h`, so a tier is an opaque pointer outside this directory (the storage vtable's
 `STORAGE_INSTANCE` is that pointer). The engine is built as its own object library target, `dbengine`, linked into
 `netdata`; the target declares no include directories, so the layout states the public surface and the build
 compiles the engine as one unit. The public headers:
 
-- **`rrdengineapi.h`**: the metric, collection and query operations behind the storage-engine vtable; the tier
+- **`dbengine-api.h`**: the metric, collection and query operations behind the storage-engine vtable; the tier
   lifecycle (`dbengine_tier_init()`, `dbengine_readiness_wait()`, `dbengine_tier_exit()`, `dbengine_tier_is_active()`,
   `dbengine_shutdown()`, and `dbengine_destroy()` for a leak-checking exit); what the embedder reads about a tier
   (retention limit, disk space, metrics, samples, first time); `dbengine_dir_has_datafiles()` to learn, before any tier

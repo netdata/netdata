@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_RRDENGINEAPI_H
-#define NETDATA_RRDENGINEAPI_H
+#ifndef NETDATA_DBENGINE_API_H
+#define NETDATA_DBENGINE_API_H
 
 #include "libnetdata/libnetdata.h"
 #include "database/storage-engines/storage-engine-types.h"
@@ -131,4 +131,4 @@ size_t dbengine_collectors_running(DBENGINE_TIER *ctx);
 }
 #endif
 
-#endif /* NETDATA_RRDENGINEAPI_H */
+#endif /* NETDATA_DBENGINE_API_H */

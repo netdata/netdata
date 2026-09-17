@@ -1929,7 +1929,7 @@ if(ENABLE_DBENGINE)
     # target a definition the other does not get, or the snapshots pulse copies across the boundary silently
     # misalign.
     set(DBENGINE_FILES
-            src/database/storage-engines/dbengine/include/dbengine/rrdengineapi.h
+            src/database/storage-engines/dbengine/include/dbengine/dbengine-api.h
             src/database/storage-engines/dbengine/include/dbengine/dbengine-config.h
             src/database/storage-engines/dbengine/include/dbengine/dbengine-stats.h
             src/database/storage-engines/dbengine/include/dbengine/dbengine-workers.h

@@ -10,7 +10,7 @@
 // the engine functions the dispatchers below call are declared by the engines, not here
 #include "ram/ram.h"
 #ifdef ENABLE_DBENGINE
-#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 #endif
 
 #define is_valid_backend(backend) ((backend) >= STORAGE_ENGINE_BACKEND_RAM && (backend) <= STORAGE_ENGINE_BACKEND_DBENGINE)
