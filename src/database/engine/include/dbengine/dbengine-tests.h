@@ -8,8 +8,9 @@
 // pgc_unittest() and mrg_unittest() create a page cache, which reads the process-wide configuration, so
 // dbengine_init() must have run before them; mrg_retention_benchmark() needs nothing.
 //
-// rrdeng_zero_page_cadence_unittest() is the exception: it collects into and queries a tier the embedder brought
-// up and hands it, and returns the number of failed checks, for a test driver that adds it to its own count.
+// Two are for a test driver that adds their failed-check counts to its own: rrdeng_cache_floor_unittest() runs
+// before the engine is up (it checks what the caches fall back to without a main cache), and
+// rrdeng_zero_page_cadence_unittest() collects into and queries a tier the embedder brought up and hands it.
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,6 +20,7 @@ int pgd_test(int argc, char *argv[]);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int mrg_retention_benchmark(void);
+int rrdeng_cache_floor_unittest(void);
 int rrdeng_zero_page_cadence_unittest(STORAGE_INSTANCE *si);
 
 #ifdef __cplusplus

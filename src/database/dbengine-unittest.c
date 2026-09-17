@@ -600,6 +600,9 @@ int test_dbengine(void) {
     nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
+    // before any tier is up: the caches do not exist yet, which is the state this check needs
+    errors += (size_t)rrdeng_cache_floor_unittest();
+
     default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
     RRDHOST *host = dbengine_rrdhost_find_or_create("unittest-dbengine");

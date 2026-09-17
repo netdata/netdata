@@ -10,6 +10,13 @@ extern struct pgc *main_cache;
 extern struct pgc *open_cache;
 extern struct pgc *extent_cache;
 
+// the least the open and extent caches size themselves to, whatever the main cache reports, and what they
+// settle on once the main cache is gone; the extent floor is also the least the engine reserves for it at start
+#define OPEN_CACHE_MIN_SIZE   (2 * 1024 * 1024)
+#define EXTENT_CACHE_MIN_SIZE (5 * 1024 * 1024)
+int64_t dynamic_open_cache_size(void);
+int64_t dynamic_extent_cache_size(void);
+
 /* Forward declarations */
 struct rrdengine_instance;
 

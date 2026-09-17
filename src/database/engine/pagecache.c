@@ -1147,11 +1147,6 @@ void pgc_open_add_hot_page(
     pgc_page_release(open_cache, (PGC_PAGE *)page);
 }
 
-// the least the open and extent caches size themselves to, whatever the main cache reports, and what they
-// settle on once the main cache is gone; the extent floor is also the least the engine reserves for it at start
-#define OPEN_CACHE_MIN_SIZE   (2 * 1024 * 1024)
-#define EXTENT_CACHE_MIN_SIZE (5 * 1024 * 1024)
-
 int64_t dynamic_open_cache_size(void) {
     // a cache that dbengine_destroy() had to leave allocated is still asked for space by whoever releases its
     // pages, and by the finalization of its datafiles, after the main cache was freed: it then sizes itself from
