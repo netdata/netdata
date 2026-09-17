@@ -18,9 +18,9 @@ struct rrdeng_cmd;
 #define PDCJudyLFreeArray       JudyLFreeArray
 
 typedef struct extent_page_details_list EPDL;
-typedef void (*execute_extent_page_details_list_t)(struct rrdengine_instance *ctx, EPDL *epdl, enum storage_priority priority);
-void pdc_to_epdl_router(struct rrdengine_instance *ctx, struct page_details_control *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list);
-void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker);
+typedef void (*execute_extent_page_details_list_t)(struct dbengine_tier *ctx, EPDL *epdl, enum storage_priority priority);
+void pdc_to_epdl_router(struct dbengine_tier *ctx, struct page_details_control *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list);
+void epdl_find_extent_and_populate_pages(struct dbengine_tier *ctx, EPDL *epdl, bool worker);
 
 struct aral_statistics *pdc_aral_stats(void);
 struct aral_statistics *pd_aral_stats(void);

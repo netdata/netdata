@@ -194,9 +194,9 @@ void generate_dbengine_dataset(unsigned history_seconds)
     // shut the dbengine instance down before freeing the host: rrdhost_free() does
     // not do it, and destroying the charts under a live instance lets the flush
     // workers touch freed memory. Same teardown as dbengine_stress_test() below.
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
+    DBENGINE_TIER *ctx = (DBENGINE_TIER *)host->db[0].si;
     dbengine_quiesce(ctx);
-    dbengine_exit(ctx);
+    dbengine_tier_exit(ctx);
     dbengine_shutdown();
     host->db[0].si = NULL;
 
@@ -459,12 +459,12 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         freez(query_threads[i]);
     }
     freez(query_threads);
-    // same teardown as generate_dbengine_dataset() above: dbengine_exit() frees a
+    // same teardown as generate_dbengine_dataset() above: dbengine_tier_exit() frees a
     // ctx that is not a multidb tier, so clear the host's pointer to it, and release
     // the host we created before the caller tears the shared libraries down
     rrd_wrlock();
-    dbengine_quiesce((struct rrdengine_instance *)host->db[0].si);
-    dbengine_exit((struct rrdengine_instance *)host->db[0].si);
+    dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
+    dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
     dbengine_shutdown();
     host->db[0].si = NULL;
     rrdhost_free___while_having_rrd_wrlock(host);

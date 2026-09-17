@@ -65,17 +65,17 @@ static PRINTFLIKE(2, 3) void pgd_fatal(const PGD *pg, const char *fmt, ...) {
         buffer_strcat(wb, "type: ");
         bool added = false;
 
-        if (pg->type == RRDENG_PAGE_TYPE_ARRAY_32BIT) {
+        if (pg->type == DBENGINE_PAGE_TYPE_ARRAY_32BIT) {
             buffer_sprintf(wb, "%s", "ARRAY_32BIT");
             added = true;
         }
 
-        if (pg->type == RRDENG_PAGE_TYPE_ARRAY_TIER1) {
+        if (pg->type == DBENGINE_PAGE_TYPE_ARRAY_TIER1) {
             buffer_sprintf(wb, added ? "|%s" : "%s", "ARRAY_TIER1");
             added = true;
         }
 
-        if (pg->type == RRDENG_PAGE_TYPE_GORILLA_32BIT) {
+        if (pg->type == DBENGINE_PAGE_TYPE_GORILLA_32BIT) {
             buffer_sprintf(wb, added ? "|%s" : "%s", "GORILLA_32BIT");
             added = true;
         }
@@ -258,8 +258,8 @@ static inline void gorilla_stats_tier0_page_flush(uint32_t actual, uint32_t opti
     __atomic_fetch_add(&gorilla_stats.tier0_disk_original_bytes, original, __ATOMIC_RELAXED);
 }
 
-struct rrdeng_gorilla_stats dbengine_get_gorilla_stats(void) {
-    return (struct rrdeng_gorilla_stats) {
+struct dbengine_gorilla_stats dbengine_get_gorilla_stats(void) {
+    return (struct dbengine_gorilla_stats) {
         .hot_buffers_added         = __atomic_load_n(&gorilla_stats.hot_buffers_added, __ATOMIC_RELAXED),
         .tier0_disk_actual_bytes   = __atomic_load_n(&gorilla_stats.tier0_disk_actual_bytes, __ATOMIC_RELAXED),
         .tier0_disk_optimal_bytes  = __atomic_load_n(&gorilla_stats.tier0_disk_optimal_bytes, __ATOMIC_RELAXED),
@@ -515,7 +515,7 @@ ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
     pg->slots = slots;
 
     switch (type) {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             internal_fatal(slots == 1,
                       "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
 
@@ -533,8 +533,8 @@ ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1: {
             uint32_t size = slots * page_type_size[type];
 
             internal_fatal(!size || slots == 1,
@@ -567,7 +567,7 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
 
     switch (type)
     {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT:
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT:
             internal_fatal(size == 0, "Asked to create page with 0 data!!!");
             internal_fatal(size % sizeof(uint32_t), "Unaligned gorilla buffer size");
             internal_fatal(size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
@@ -591,8 +591,8 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
             pg->slots = pg->used;
             break;
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
             pg->used = size / page_type_size[type];
             pg->slots = pg->used;
 
@@ -620,7 +620,7 @@ void pgd_free(PGD *pg) {
 
     switch (pg->type)
     {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
             {
                 internal_fatal(pg->raw.data == NULL, "Tried to free gorilla PGD loaded from disk with NULL data");
@@ -668,8 +668,8 @@ void pgd_free(PGD *pg) {
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
             pgd_data_free(pg->raw.data, pg->raw.size, pg->partition);
             break;
 
@@ -697,7 +697,7 @@ static void pgd_aral_unmark(PGD *pg) {
 
     switch (pg->type)
     {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 pgd_data_unmark(pg->raw.data, pg->raw.size, pg->partition);
 
@@ -721,8 +721,8 @@ static void pgd_aral_unmark(PGD *pg) {
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
             pgd_data_unmark(pg->raw.data, pg->raw.size, pg->partition);
             break;
 
@@ -795,7 +795,7 @@ ALWAYS_INLINE uint32_t pgd_memory_footprint(PGD *pg)
     size_t footprint = pgd_alloc_globals.sizeof_pgd;
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 footprint += pgd_data_footprint(pg->raw.size, pg->partition);
 
@@ -806,8 +806,8 @@ ALWAYS_INLINE uint32_t pgd_memory_footprint(PGD *pg)
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
             footprint += pgd_data_footprint(pg->raw.size, pg->partition);
             break;
 
@@ -831,7 +831,7 @@ uint32_t pgd_buffer_memory_footprint(PGD *pg)
     size_t footprint = 0;
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 footprint = pg->raw.size;
 
@@ -840,8 +840,8 @@ uint32_t pgd_buffer_memory_footprint(PGD *pg)
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
             footprint = pg->raw.size;
             break;
 
@@ -864,7 +864,7 @@ uint32_t pgd_disk_footprint(PGD *pg)
     pgd_aral_unmark(pg);
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR ||
                 pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING ||
                 pg->states & PGD_STATE_FLUSHED_TO_DISK)
@@ -892,8 +892,8 @@ uint32_t pgd_disk_footprint(PGD *pg)
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1: {
             uint32_t used_size = pg->used * page_type_size[pg->type];
             internal_fatal(used_size > pg->raw.size, "Wrong disk footprint page size");
             size = used_size;
@@ -919,7 +919,7 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
                    pgd_disk_footprint(pg), dst_size);
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             if ((pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) == 0)
                 fatal("Copying to extent is supported only for PGDs that are scheduled for flushing.");
 
@@ -937,8 +937,8 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
             memcpy(dst, pg->raw.data, dst_size);
             break;
 
@@ -989,7 +989,7 @@ size_t pgd_append_point(
               pg->type, pg->slots, pg->used /* FIXME:, pg->size */);
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             pg->used++;
             storage_number t = pack_storage_number(n, flags);
 
@@ -1013,7 +1013,7 @@ size_t pgd_append_point(
 
             break;
         }
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1: {
             storage_number_tier1_t *tier12_metric_data = (storage_number_tier1_t *)pg->raw.data;
             storage_number_tier1_t t;
             t.sum_value = (float) n;
@@ -1028,7 +1028,7 @@ size_t pgd_append_point(
 
             break;
         }
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT: {
             storage_number *tier0_metric_data = (storage_number *)pg->raw.data;
             storage_number t = pack_storage_number(n, flags);
             tier0_metric_data[pg->used++] = t;
@@ -1054,7 +1054,7 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
     PGD *pg = pgdc->pgd;
 
     switch (pg->type) {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
                 pgdc->slots = pgdc->pgd->slots;
                 pgdc->gr = gorilla_reader_init((void *) pg->raw.data);
@@ -1087,8 +1087,8 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
             break;
         }
 
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
             pgdc->slots = pgdc->pgd->used;
             break;
 
@@ -1130,7 +1130,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
     switch (pgdc->pgd->type)
     {
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT: {
             pgdc->position++;
 
             uint32_t n = 666666666;
@@ -1147,7 +1147,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
             return ok;
         }
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1: {
             storage_number_tier1_t *array = (storage_number_tier1_t *) pgdc->pgd->raw.data;
             storage_number_tier1_t n = array[pgdc->position++];
 
@@ -1160,7 +1160,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
             return true;
         }
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT: {
             storage_number *array = (storage_number *) pgdc->pgd->raw.data;
             storage_number n = array[pgdc->position++];
 

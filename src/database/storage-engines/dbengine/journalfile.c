@@ -2,7 +2,7 @@
 #include "rrdengine.h"
 
 /* Careful to always call this before creating a new journal file */
-int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal)
+int journalfile_v1_extent_write(struct dbengine_tier *ctx, struct rrdengine_datafile *datafile, WAL *wal)
 {
     uv_fs_t request;
     struct rrdengine_journalfile *journalfile = datafile->journalfile;
@@ -192,7 +192,7 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
     if(unlikely(!datafile))
         fatal("DBENGINE: NJFV2IDX trying to index a journal file with no datafile");
 
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     time_t last_time_s = datafile->journalfile->v2.last_time_s;
 
     if(unlikely(last_time_s <= 0))
@@ -227,7 +227,7 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
 }
 
 static bool njfv2idx_remove_internal(struct rrdengine_datafile *datafile, bool required) {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
 
     if(!datafile->journalfile->njfv2idx.indexed_as) {
@@ -276,7 +276,7 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
             ctx_fs_error(datafile_ctx(journalfile->datafile));
         }
         else {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_mapped, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&dbengine_cache_efficiency_stats.journal_v2_mapped, 1, __ATOMIC_RELAXED);
 
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
@@ -330,7 +330,7 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
                 ctx_fs_error(datafile_ctx(journalfile->datafile));
             }
             else {
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&dbengine_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
                 journalfile->mmap.data = NULL;
                 journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_MOUNTED;
             }
@@ -350,8 +350,8 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        struct rrdengine_instance *ctx = dbengine_multidb_ctx[tier];
-        if(!dbengine_ctx_is_active(ctx)) continue;
+        struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
+        if(!dbengine_tier_is_active(ctx)) continue;
 
         struct rrdengine_datafile *datafile;
         if(netdata_rwlock_tryrdlock(&ctx->datafiles.rwlock) != 0)
@@ -624,7 +624,7 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
     int ret;
     char path[RRDENG_PATH_MAX];
 
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
     CLOSE_FILE(ctx, path, file, ret);
@@ -644,7 +644,7 @@ int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengin
 int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 {
     struct rrdengine_datafile *datafile = journalfile->datafile;
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
 
     char path[RRDENG_PATH_MAX];
@@ -659,7 +659,7 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
 
 uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
     uv_fs_t req_v2 = { 0 };
     uv_fs_t req_v1 = { 0 };
@@ -705,7 +705,7 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
 
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     uv_file file;
     int ret, fd;
@@ -791,7 +791,7 @@ static int journalfile_check_superblock(uv_file file)
     return ret;
 }
 
-static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, void *buf, unsigned max_size)
+static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile, void *buf, unsigned max_size)
 {
     static bool page_error_map[UINT8_MAX + 1];
     unsigned i, count, payload_length, descr_size;
@@ -893,7 +893,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
  * Sets id to the current transaction id or to 0 if unknown.
  * Returns size of transaction record or 0 for unknown size.
  */
-static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
+static unsigned journalfile_replay_transaction(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile,
                                                void *buf, uint64_t *id, unsigned max_size)
 {
     unsigned payload_length, size_bytes;
@@ -949,7 +949,7 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
  * Page cache must already be initialized.
  * Returns the maximum transaction id it discovered.
  */
-static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile)
+static uint64_t journalfile_iterate_transactions(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile)
 {
     uv_file file;
     uint64_t file_size;
@@ -1188,7 +1188,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     return 0;
 }
 
-void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
+void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile) {
     usec_t started_ut = now_monotonic_usec();
 
     size_t data_size = 0;
@@ -1348,7 +1348,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     }
 }
 
-int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
+int journalfile_v2_load(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     int ret, fd;
     char path_v1[RRDENG_PATH_MAX];
@@ -1609,7 +1609,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     char path[RRDENG_PATH_MAX];
     Pvoid_t *PValue;
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
+    struct dbengine_tier *ctx = (struct dbengine_tier *) section;
     struct rrdengine_journalfile *journalfile = (struct rrdengine_journalfile *) user_data;
     struct rrdengine_datafile *datafile = journalfile->datafile;
     time_t min_time_s = LONG_MAX;
@@ -1843,7 +1843,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     return false;
 }
 
-int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
+int journalfile_load(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile)
 {
     uv_file file;

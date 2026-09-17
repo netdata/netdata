@@ -16,12 +16,14 @@ extern "C" {
 // headers (dbengine-config.h, dbengine-stats.h, dbengine-workers.h, dbengine-tests.h); the rest of this directory
 // is private and no header here includes it.
 //
-// An engine instance is one tier of one database. Outside the engine it is an opaque pointer: the storage vtable's
-// STORAGE_INSTANCE is this very pointer, cast by the engine on either side, and the daemon only passes instances
-// around and indexes dbengine_multidb_ctx[], the static tiers of the daemon's multi-host database.
-struct rrdengine_instance;
+// A tier (struct dbengine_tier) is one tier of one database: a directory of datafiles and their journals. The engine
+// itself is process-wide (its event loop, caches and metrics registry) and has no handle; the tier is the only object
+// the embedder holds. Outside the engine it is an opaque pointer: the storage vtable's STORAGE_INSTANCE is this very
+// pointer, cast by the engine on either side, and the daemon only passes tiers around and indexes
+// dbengine_multidb_tiers[], the static tiers of the daemon's multi-host database.
+struct dbengine_tier;
 
-extern struct rrdengine_instance *dbengine_multidb_ctx[RRD_STORAGE_TIERS];
+extern DBENGINE_TIER *dbengine_multidb_tiers[RRD_STORAGE_TIERS];
 
 // true when dbfiles_path holds at least one datafile named the way this engine names and scans
 // them. Reads the directory only, touches no engine state, so it can be called before any tier
@@ -56,46 +58,46 @@ time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
 // bring a tier up; the first one spawns the engine's event loop. Once dbengine_shutdown() has run, the engine
-// cannot be started again in this process: a later dbengine_instance_init() fails with UV_EIO. A tier init and the
+// cannot be started again in this process: a later dbengine_tier_init() fails with UV_EIO. A tier init and the
 // shutdown must not overlap: the check is made when the tier starts, so an init that is still in flight when the
 // shutdown begins would wait on a loop that is gone (the daemon joins its tier inits at startup, long before any
 // shutdown)
-int dbengine_instance_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_config *tc);
+int dbengine_tier_init(DBENGINE_TIER **ctxp, const struct dbengine_tier_config *tc);
 
-void dbengine_readiness_wait(struct rrdengine_instance *ctx);
+void dbengine_readiness_wait(DBENGINE_TIER *ctx);
 
-int dbengine_exit(struct rrdengine_instance *ctx);
+int dbengine_tier_exit(DBENGINE_TIER *ctx);
 
-// a tier that came up and has not been shut down (dbengine_exit() clears it first); the engine's
+// a tier that came up and has not been shut down (dbengine_tier_exit() clears it first); the engine's
 // periodic work covers exactly these tiers, and the embedder uses it to skip tiers that never
 // started or already stopped
-bool dbengine_ctx_is_active(struct rrdengine_instance *ctx);
+bool dbengine_tier_is_active(DBENGINE_TIER *ctx);
 
-// stop the engine's event loop and join its thread; after every tier's dbengine_exit(), and never while a
-// dbengine_instance_init() is in flight. Nothing may be enqueued to the engine afterwards, and the engine cannot be
-// started again in this process (dbengine_instance_init() fails). On an engine that never spawned, or on a second
+// stop the engine's event loop and join its thread; after every tier's dbengine_tier_exit(), and never while a
+// dbengine_tier_init() is in flight. Nothing may be enqueued to the engine afterwards, and the engine cannot be
+// started again in this process (dbengine_tier_init() fails). On an engine that never spawned, or on a second
 // call, it returns at once; a second call does not wait for the first to finish
 void dbengine_shutdown(void);
-void dbengine_quiesce(struct rrdengine_instance *ctx);
-void dbengine_flush_dirty(struct rrdengine_instance *ctx);
-void dbengine_flush_all(struct rrdengine_instance *ctx);
+void dbengine_quiesce(DBENGINE_TIER *ctx);
+void dbengine_flush_dirty(DBENGINE_TIER *ctx);
+void dbengine_flush_all(DBENGINE_TIER *ctx);
 
 // Tear down the engine's process-wide state, for an embedder that checks for leaks at exit: the caches, the
 // metrics registry, then every static tier's datafiles, in the order their dependencies allow. Only after every
-// tier's dbengine_exit() and dbengine_shutdown(); never on an exit that skipped them (the loop is still running).
+// tier's dbengine_tier_exit() and dbengine_shutdown(); never on an exit that skipped them (the loop is still running).
 // A cache or the registry with live references stays allocated and reachable. Returns the registry metrics
-// still referenced, 0 when everything was freed. Caller-allocated contexts are freed by dbengine_exit() already.
+// still referenced, 0 when everything was freed. Caller-allocated contexts are freed by dbengine_tier_exit() already.
 size_t dbengine_destroy(void);
 
 // what the embedder reads about the tiers
-time_t dbengine_max_retention_s(struct rrdengine_instance *ctx);   // the tier's configured time limit; 0 = none
+time_t dbengine_max_retention_s(DBENGINE_TIER *ctx);   // the tier's configured time limit; 0 = none
 uint64_t dbengine_disk_space_max(STORAGE_INSTANCE *si);             // the tier's configured disk quota; 0 = none
 uint64_t dbengine_disk_space_used(STORAGE_INSTANCE *si);
 uint64_t dbengine_metrics(STORAGE_INSTANCE *si);
 uint64_t dbengine_samples(STORAGE_INSTANCE *si);
 time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si);          // 0 while the tier holds no data
-uint64_t dbengine_get_used_disk_space(struct rrdengine_instance *ctx);
-uint64_t dbengine_get_directory_free_bytes_space(struct rrdengine_instance *ctx);
+uint64_t dbengine_get_used_disk_space(DBENGINE_TIER *ctx);
+uint64_t dbengine_get_directory_free_bytes_space(DBENGINE_TIER *ctx);
 
 bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s);
 bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
@@ -109,21 +111,21 @@ extern void dbengine_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS
 // completion when it returns. fn is responsible for its own worker_is_busy() attribution, including registering
 // the job names it reports: the pool threads register only the engine's own names.
 //
-// The engine takes work only while it is serving: from the moment the first tier's dbengine_instance_init() spawned the
+// The engine takes work only while it is serving: from the moment the first tier's dbengine_tier_init() spawned the
 // event loop until dbengine_shutdown() starts. Outside that window dbengine_enq_work() returns false having done
 // nothing the caller can observe (no queueing, no wake-up, the completion is not touched), and the caller runs or
 // drops the work itself; dbengine_work_available() answers the same question up front, for a caller that wants to
 // plan a batch. Once the engine serves, the only later change is to stopped, so a request accepted is always
 // completed. Only this entry point is gated; the engine's own commands are not.
-struct rrdeng_work_request {
+struct dbengine_work_request {
     void (*fn)(void *data);
     void *data;
     struct completion completion;
 };
-bool dbengine_enq_work(struct rrdeng_work_request *req);
+bool dbengine_enq_work(struct dbengine_work_request *req);
 bool dbengine_work_available(void);
 
-size_t dbengine_collectors_running(struct rrdengine_instance *ctx);
+size_t dbengine_collectors_running(DBENGINE_TIER *ctx);
 
 #ifdef __cplusplus
 }

@@ -119,7 +119,7 @@ void pgc_set_nominal_page_size_callback(PGC *cache, nominal_page_size_callback c
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);
 bool pgc_flush_pages(PGC *cache);
 
-struct pgc_statistics pgc_get_statistics(PGC *cache);
+struct dbengine_cache_stats pgc_get_statistics(PGC *cache);
 size_t pgc_hot_and_dirty_entries(PGC *cache);
 
 struct aral_statistics *pgc_aral_stats(void);

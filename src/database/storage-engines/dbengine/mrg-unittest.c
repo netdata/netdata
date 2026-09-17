@@ -5,9 +5,9 @@
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
 // Global dummy rrdengine_instances for tests
-static struct rrdengine_instance test_ctx_0 = {0};
-static struct rrdengine_instance test_ctx_1 = {0};
-static struct rrdengine_instance test_ctx_tier[4] = { 0 }; // For stress test tiers
+static struct dbengine_tier test_ctx_0 = {0};
+static struct dbengine_tier test_ctx_1 = {0};
+static struct dbengine_tier test_ctx_tier[4] = { 0 }; // For stress test tiers
 
 static int mrg_allocation_alignment_unittest(MRG *mrg) {
     if((uintptr_t)mrg % _Alignof(MRG) == 0)
@@ -63,7 +63,7 @@ static void mrg_stress(void *ptr) {
 }
 
 static int mrg_unittest_expect_samples_delta(
-    struct rrdengine_instance *ctx,
+    struct dbengine_tier *ctx,
     time_t first_time_s,
     time_t last_time_s,
     uint32_t update_every_s,
@@ -89,7 +89,7 @@ static int mrg_unittest_expect_samples_delta(
 }
 
 static int mrg_unittest_expect_counter_sub(
-    struct rrdengine_instance *ctx,
+    struct dbengine_tier *ctx,
     uint64_t initial,
     uint64_t decrement,
     bool expected_rc,
@@ -115,7 +115,7 @@ static int mrg_unittest_expect_counter_sub(
 
 static int dbengine_accounting_helpers_unittest(void) {
     int errors = 0;
-    struct rrdengine_instance ctx = {0};
+    struct dbengine_tier ctx = {0};
     ctx.config.tier = 1;
 
     errors += mrg_unittest_expect_samples_delta(&ctx, 10, 70, 10, true, 6, "normal positive interval");
@@ -248,7 +248,7 @@ static int mrg_entries_acquired_counter_unittest(MRG *mrg) {
     nd_uuid_t uuid;
     uuid_generate(uuid);
 
-    struct mrg_statistics baseline;
+    struct dbengine_metrics_registry_stats baseline;
     mrg_get_statistics(mrg, &baseline);
 
     MRG_ENTRY entry = {
@@ -266,7 +266,7 @@ static int mrg_entries_acquired_counter_unittest(MRG *mrg) {
         return 1;
     }
 
-    struct mrg_statistics stats;
+    struct dbengine_metrics_registry_stats stats;
     mrg_get_statistics(mrg, &stats);
     if(stats.entries != baseline.entries + 1 ||
        stats.entries_acquired != baseline.entries_acquired + 1 ||
@@ -1677,7 +1677,7 @@ static int mrg_jv2_real_writer_unittest(void) {
     //     hand-rolled: it builds data_spinlock (taken by journalfile_v2_data_set()),
     //     builds unsafe.spinlock (read by journalfile_current_size()), sets
     //     mmap.fd = -1, and links itself to the datafile.
-    struct rrdengine_instance ctx;
+    struct dbengine_tier ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.config.tier = 0;
     strncpyz(ctx.config.dbfiles_path, dbpath, sizeof(ctx.config.dbfiles_path) - 1);
@@ -2054,7 +2054,7 @@ int dbengine_metrics_registry_unittest(void) {
 
     usec_t ended_ut = now_monotonic_usec();
 
-    struct mrg_statistics stats;
+    struct dbengine_metrics_registry_stats stats;
     mrg_get_statistics(mrg, &stats);
 
     fprintf(stderr, "DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
@@ -2076,7 +2076,7 @@ int dbengine_metrics_registry_unittest(void) {
                      stats.deletions, stats.deletions + stats.delete_misses);
 
     // Phase 3: Measure final statistics
-    struct mrg_statistics final_stats;
+    struct dbengine_metrics_registry_stats final_stats;
     mrg_get_statistics(mrg, &final_stats);
     fprintf(stderr, "DBENGINE METRIC: final MRG state - %zu entries, %zd acquired\n",
                      final_stats.entries, final_stats.entries_acquired);

@@ -840,8 +840,8 @@ int netdata_main(int argc, char **argv) {
 
                             // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
                             // before this option can still override it
-                            if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
-                                page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+                            if (page_cache_mb < DBENGINE_MIN_PAGE_CACHE_SIZE_MB)
+                                page_cache_mb = DBENGINE_MIN_PAGE_CACHE_SIZE_MB;
                             netdata_conf_dbengine.page_cache_mb = page_cache_mb;
 
                             char workers_str[16];

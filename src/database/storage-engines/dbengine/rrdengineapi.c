@@ -5,18 +5,18 @@
 #include "dbengine-compression.h"
 
 /* Default global database instance */
-struct rrdengine_instance multidb_ctx_storage_tier0 = { 0 };
-struct rrdengine_instance multidb_ctx_storage_tier1 = { 0 };
-struct rrdengine_instance multidb_ctx_storage_tier2 = { 0 };
-struct rrdengine_instance multidb_ctx_storage_tier3 = { 0 };
-struct rrdengine_instance multidb_ctx_storage_tier4 = { 0 };
+struct dbengine_tier multidb_ctx_storage_tier0 = { 0 };
+struct dbengine_tier multidb_ctx_storage_tier1 = { 0 };
+struct dbengine_tier multidb_ctx_storage_tier2 = { 0 };
+struct dbengine_tier multidb_ctx_storage_tier3 = { 0 };
+struct dbengine_tier multidb_ctx_storage_tier4 = { 0 };
 
-#define mrg_metric_ctx(metric) (struct rrdengine_instance *)mrg_metric_section(main_mrg, metric)
+#define mrg_metric_ctx(metric) (struct dbengine_tier *)mrg_metric_section(main_mrg, metric)
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
-struct rrdengine_instance *dbengine_multidb_ctx[RRD_STORAGE_TIERS] = { 0 };
+struct dbengine_tier *dbengine_multidb_tiers[RRD_STORAGE_TIERS] = { 0 };
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
@@ -29,26 +29,26 @@ size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
 #endif
 
 size_t page_type_size[256] = {
-        [RRDENG_PAGE_TYPE_ARRAY_32BIT] = sizeof(storage_number),
-        [RRDENG_PAGE_TYPE_ARRAY_TIER1] = sizeof(storage_number_tier1_t),
-        [RRDENG_PAGE_TYPE_GORILLA_32BIT] = sizeof(storage_number)
+        [DBENGINE_PAGE_TYPE_ARRAY_32BIT] = sizeof(storage_number),
+        [DBENGINE_PAGE_TYPE_ARRAY_TIER1] = sizeof(storage_number_tier1_t),
+        [DBENGINE_PAGE_TYPE_GORILLA_32BIT] = sizeof(storage_number)
 };
 
-static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
+static inline void initialize_single_ctx(struct dbengine_tier *ctx) {
     memset(ctx, 0, sizeof(*ctx));
     netdata_rwlock_init(&ctx->datafiles.rwlock);
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
 }
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
-    dbengine_multidb_ctx[0] = &multidb_ctx_storage_tier0;
-    dbengine_multidb_ctx[1] = &multidb_ctx_storage_tier1;
-    dbengine_multidb_ctx[2] = &multidb_ctx_storage_tier2;
-    dbengine_multidb_ctx[3] = &multidb_ctx_storage_tier3;
-    dbengine_multidb_ctx[4] = &multidb_ctx_storage_tier4;
+    dbengine_multidb_tiers[0] = &multidb_ctx_storage_tier0;
+    dbengine_multidb_tiers[1] = &multidb_ctx_storage_tier1;
+    dbengine_multidb_tiers[2] = &multidb_ctx_storage_tier2;
+    dbengine_multidb_tiers[3] = &multidb_ctx_storage_tier3;
+    dbengine_multidb_tiers[4] = &multidb_ctx_storage_tier4;
 
     for(int i = 0; i < RRD_STORAGE_TIERS ; i++)
-        initialize_single_ctx(dbengine_multidb_ctx[i]);
+        initialize_single_ctx(dbengine_multidb_tiers[i]);
 }
 
 // ----------------------------------------------------------------------------
@@ -99,19 +99,19 @@ STORAGE_METRIC_HANDLE *dbengine_metric_dup(STORAGE_METRIC_HANDLE *smh) {
 }
 
 STORAGE_METRIC_HANDLE *dbengine_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_uuid(main_mrg, uuid, (Word_t)ctx);
 }
 
 STORAGE_METRIC_HANDLE *dbengine_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
 }
 
 static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     internal_fatal(!si, "DBENGINE: STORAGE_INSTANCE is NULL");
 
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     MRG_ENTRY entry = {
             .uuid = uuid,
             .section = (Word_t)ctx,
@@ -126,7 +126,7 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
 }
 
 STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
 
     METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t) ctx);
     if(unlikely(!metric))
@@ -171,7 +171,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     if (unlikely(!handle->pgc_page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
         return false;
 
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
 
     nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
@@ -210,7 +210,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
  */
 STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
     METRIC *metric = (METRIC *)smh;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
+    struct dbengine_tier *ctx = mrg_metric_ctx(metric);
 
     RRDENG_COLLECT_HANDLE_OPTIONS options = 0;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -285,7 +285,7 @@ void dbengine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
         check_completed_page_consistency(handle);
         mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
 
-        struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+        struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
         time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
         time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
         uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, handle->metric);
@@ -317,7 +317,7 @@ void dbengine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
 }
 
 static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle,
-                                                struct rrdengine_instance *ctx,
+                                                struct dbengine_tier *ctx,
                                                 usec_t point_in_time_ut,
                                                 PGD *data) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
@@ -400,7 +400,7 @@ static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, t
 }
 
 static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, usec_t point_in_time_ut) {
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
 
     PGD *d = NULL;
     
@@ -427,9 +427,9 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
 
     switch (ctx->config.page_type) {
-        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
-        case RRDENG_PAGE_TYPE_GORILLA_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_32BIT:
+        case DBENGINE_PAGE_TYPE_ARRAY_TIER1:
+        case DBENGINE_PAGE_TYPE_GORILLA_32BIT:
             d = pgd_create(ctx->config.page_type, slots);
             break;
         default:
@@ -465,7 +465,7 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
                                              const SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
 
     if(unlikely(!handle->page_data))
         handle->page_data = rrdeng_alloc_new_page_data(handle, point_in_time_ut);
@@ -631,7 +631,7 @@ ALWAYS_INLINE_HOT void dbengine_store_next(
  */
 int dbengine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
 
     handle->page_flags |= RRDENG_PAGE_COLLECT_FINALIZE;
     dbengine_store_flush(sch);
@@ -717,7 +717,7 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
     usec_t started_ut = now_monotonic_usec();
 
     METRIC *metric = (METRIC *)smh;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
+    struct dbengine_tier *ctx = mrg_metric_ctx(metric);
     struct rrdeng_query_handle *handle;
 
     handle = rrdeng_query_handle_get();
@@ -761,7 +761,7 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
 
         pg_cache_preload(handle);
 
-        time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut);
+        time_and_count_add(&dbengine_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut);
     }
     else {
         handle->start_time_s = start_time_s;
@@ -779,7 +779,7 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
 
 static ALWAYS_INLINE_HOT bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
 
     if (likely(handle->page)) {
         // we have a page to release
@@ -942,7 +942,7 @@ ALWAYS_INLINE time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh) {
 }
 
 bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     if (unlikely(!ctx)) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
@@ -960,7 +960,7 @@ bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid
 }
 
 bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     if (unlikely(!ctx)) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
@@ -978,7 +978,7 @@ bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t
 }
 
 void dbengine_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     if (unlikely(!ctx)) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return;
@@ -993,27 +993,27 @@ void dbengine_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id)
 }
 
 uint64_t dbengine_disk_space_max(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     return ctx->config.max_disk_space;
 }
 
 uint64_t dbengine_disk_space_used(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
 }
 
 uint64_t dbengine_metrics(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     return __atomic_load_n(&ctx->atomic.metrics, __ATOMIC_RELAXED);
 }
 
 uint64_t dbengine_samples(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     return __atomic_load_n(&ctx->atomic.samples, __ATOMIC_RELAXED);
 }
 
 time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)si;
 
     time_t t = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
     if(t == LONG_MAX || t < 0)
@@ -1026,9 +1026,9 @@ time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si) {
  * Gathers Database Engine statistics.
  * Careful when modifying this function.
  * You must not change the indices of the statistics or user code will break.
- * You must not exceed RRDENG_NR_STATS or it will crash.
+ * You must not exceed DBENGINE_STATS_COUNT or it will crash.
  */
-void dbengine_get_stats(struct rrdengine_instance *ctx, unsigned long long *array)
+void dbengine_get_stats(struct dbengine_tier *ctx, unsigned long long *array)
 {
     if (ctx == NULL)
         return;
@@ -1072,10 +1072,10 @@ void dbengine_get_stats(struct rrdengine_instance *ctx, unsigned long long *arra
     array[36] = (uint64_t)__atomic_load_n(&global_stats.global_flushing_pressure_page_deletions, __ATOMIC_RELAXED); // used
     array[37] = 0; //(uint64_t)pg_cache->active_descriptors;
 
-    fatal_assert(RRDENG_NR_STATS == 38);
+    fatal_assert(DBENGINE_STATS_COUNT == 38);
 }
 
-static void rrdeng_populate_mrg(struct rrdengine_instance *ctx)
+static void rrdeng_populate_mrg(struct dbengine_tier *ctx)
 {
     size_t datafiles = datafile_count(ctx, false);
 
@@ -1094,7 +1094,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx)
         NULL);
 }
 
-void dbengine_readiness_wait(struct rrdengine_instance *ctx) {
+void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     completion_wait_for(&ctx->loading.load_mrg);
     completion_destroy(&ctx->loading.load_mrg);
 
@@ -1111,7 +1111,7 @@ void dbengine_readiness_wait(struct rrdengine_instance *ctx) {
 /*
  * Returns 0 on success, negative on error
  */
-static void rrdeng_tier_config_validate(const struct rrdeng_tier_config *tc) {
+static void rrdeng_tier_config_validate(const struct dbengine_tier_config *tc) {
     if(tc->tier >= RRD_STORAGE_TIERS)
         fatal("DBENGINE: tier %zu does not exist (the engine has %d tiers)", tc->tier, RRD_STORAGE_TIERS);
 
@@ -1120,8 +1120,8 @@ static void rrdeng_tier_config_validate(const struct rrdeng_tier_config *tc) {
 
     // tier 0 stores samples; the tiers above it store aggregates, which only one page type can hold
     bool valid_page_type = tc->tier == 0 ?
-        (tc->page_type == RRDENG_PAGE_TYPE_GORILLA_32BIT || tc->page_type == RRDENG_PAGE_TYPE_ARRAY_32BIT) :
-        (tc->page_type == RRDENG_PAGE_TYPE_ARRAY_TIER1);
+        (tc->page_type == DBENGINE_PAGE_TYPE_GORILLA_32BIT || tc->page_type == DBENGINE_PAGE_TYPE_ARRAY_32BIT) :
+        (tc->page_type == DBENGINE_PAGE_TYPE_ARRAY_TIER1);
     if(!valid_page_type)
         fatal("DBENGINE: page type %u is not valid for tier %zu", (unsigned)tc->page_type, tc->tier);
 
@@ -1129,14 +1129,14 @@ static void rrdeng_tier_config_validate(const struct rrdeng_tier_config *tc) {
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
 }
 
-int dbengine_instance_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_config *tc)
+int dbengine_tier_init(struct dbengine_tier **ctxp, const struct dbengine_tier_config *tc)
 {
-    struct rrdengine_instance *ctx;
+    struct dbengine_tier *ctx;
     uint32_t max_open_files;
     bool freshly_initialized_ctx = false;
 
     if(!dbengine_initialized())
-        fatal("DBENGINE: dbengine_instance_init() for tier %zu called before dbengine_init()", tc->tier);
+        fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
 
     rrdeng_tier_config_validate(tc);
     size_t tier = tc->tier;
@@ -1163,7 +1163,7 @@ int dbengine_instance_init(struct rrdengine_instance **ctxp, const struct rrdeng
         freshly_initialized_ctx = true;
     }
     else
-        ctx = dbengine_multidb_ctx[tier];
+        ctx = dbengine_multidb_tiers[tier];
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tc->page_type;
@@ -1173,8 +1173,8 @@ int dbengine_instance_init(struct rrdengine_instance **ctxp, const struct rrdeng
     strncpyz(ctx->config.dbfiles_path, tc->dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
     ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';
 
-    if (disk_space_mb && disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
-        disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
+    if (disk_space_mb && disk_space_mb < DBENGINE_MIN_DISK_SPACE_MB)
+        disk_space_mb = DBENGINE_MIN_DISK_SPACE_MB;
 
     ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
 
@@ -1240,7 +1240,7 @@ size_t dbengine_destroy(void) {
     }
 
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        struct rrdengine_instance *ctx = dbengine_multidb_ctx[tier];
+        struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
         if(ctx->datafiles.JudyL) {
             fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
             finalize_rrd_files(ctx);
@@ -1261,12 +1261,12 @@ void dbengine_preload_release(void) {
         mrg_metric_prepopulate_cleanup(main_mrg);
 }
 
-bool dbengine_get_cache_stats(RRDENG_CACHE which, struct pgc_statistics *out) {
+bool dbengine_get_cache_stats(DBENGINE_CACHE which, struct dbengine_cache_stats *out) {
     PGC *cache = NULL;
     switch(which) {
-        case RRDENG_CACHE_MAIN:   cache = main_cache;   break;
-        case RRDENG_CACHE_OPEN:   cache = open_cache;   break;
-        case RRDENG_CACHE_EXTENT: cache = extent_cache; break;
+        case DBENGINE_CACHE_MAIN:   cache = main_cache;   break;
+        case DBENGINE_CACHE_OPEN:   cache = open_cache;   break;
+        case DBENGINE_CACHE_EXTENT: cache = extent_cache; break;
     }
     if(!cache) {
         memset(out, 0, sizeof(*out));
@@ -1280,7 +1280,7 @@ size_t dbengine_pages_pending_flush(void) {
     return main_cache ? pgc_hot_and_dirty_entries(main_cache) : 0;
 }
 
-bool dbengine_get_metrics_registry_stats(struct mrg_statistics *out) {
+bool dbengine_get_metrics_registry_stats(struct dbengine_metrics_registry_stats *out) {
     if(!main_mrg) {
         memset(out, 0, sizeof(*out));
         return false;
@@ -1289,22 +1289,22 @@ bool dbengine_get_metrics_registry_stats(struct mrg_statistics *out) {
     return true;
 }
 
-bool dbengine_ctx_is_active(struct rrdengine_instance *ctx) {
+bool dbengine_tier_is_active(struct dbengine_tier *ctx) {
     return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
 }
 
-time_t dbengine_max_retention_s(struct rrdengine_instance *ctx) {
+time_t dbengine_max_retention_s(struct dbengine_tier *ctx) {
     return ctx->config.max_retention_s;
 }
 
-size_t dbengine_collectors_running(struct rrdengine_instance *ctx) {
+size_t dbengine_collectors_running(struct dbengine_tier *ctx) {
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
 
 /*
  * Returns 0 on success, 1 on error
  */
-int dbengine_exit(struct rrdengine_instance *ctx) {
+int dbengine_tier_exit(struct dbengine_tier *ctx) {
     if (NULL == ctx)
         return 1;
 
@@ -1340,16 +1340,16 @@ int dbengine_exit(struct rrdengine_instance *ctx) {
     completion_destroy(&completion);
 
     // the static multidb contexts are never freed; anything else was allocated by
-    // dbengine_instance_init() for its caller (ctxp != NULL) and is released here
+    // dbengine_tier_init() for its caller (ctxp != NULL) and is released here
     int tier = ctx->config.tier;
-    if(tier < 0 || tier >= RRD_STORAGE_TIERS || dbengine_multidb_ctx[tier] != ctx)
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS || dbengine_multidb_tiers[tier] != ctx)
         freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
 }
 
-void dbengine_flush_dirty(struct rrdengine_instance *ctx)
+void dbengine_flush_dirty(struct dbengine_tier *ctx)
 {
     if (NULL == ctx)
         return;
@@ -1357,7 +1357,7 @@ void dbengine_flush_dirty(struct rrdengine_instance *ctx)
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_FLUSH_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
-void dbengine_flush_all(struct rrdengine_instance *ctx)
+void dbengine_flush_all(struct dbengine_tier *ctx)
 {
     if (NULL == ctx)
         return;
@@ -1365,7 +1365,7 @@ void dbengine_flush_all(struct rrdengine_instance *ctx)
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
-void dbengine_quiesce(struct rrdengine_instance *ctx)
+void dbengine_quiesce(struct dbengine_tier *ctx)
 {
     if (NULL == ctx)
         return;
@@ -1373,7 +1373,7 @@ void dbengine_quiesce(struct rrdengine_instance *ctx)
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
-static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
+static void populate_v2_statistics(struct rrdengine_datafile *datafile, struct dbengine_size_stats *stats)
 {
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
     uint8_t *data_start = (uint8_t *)j2_header;
@@ -1494,8 +1494,8 @@ release:
     journalfile_v2_data_release(datafile->journalfile);
 }
 
-RRDENG_SIZE_STATS dbengine_get_size_stats(struct rrdengine_instance *ctx) {
-    RRDENG_SIZE_STATS stats = { 0 };
+struct dbengine_size_stats dbengine_get_size_stats(struct dbengine_tier *ctx) {
+    struct dbengine_size_stats stats = { 0 };
 
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *df = NULL;
@@ -1556,7 +1556,7 @@ RRDENG_SIZE_STATS dbengine_get_size_stats(struct rrdengine_instance *ctx) {
     return stats;
 }
 
-struct rrdeng_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void) {
+struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void) {
     // FIXME - make cache efficiency stats atomic
-    return rrdeng_cache_efficiency_stats;
+    return dbengine_cache_efficiency_stats;
 }

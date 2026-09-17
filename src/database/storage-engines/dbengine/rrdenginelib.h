@@ -6,7 +6,7 @@
 #include "libnetdata/libnetdata.h"
 
 /* Forward declarations */
-struct rrdengine_instance;
+struct dbengine_tier;
 
 #define ALIGN_BYTES_FLOOR(x) (((x) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
 #define ALIGN_BYTES_CEILING(x) ((((x) + RRDENG_BLOCK_SIZE - 1) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)

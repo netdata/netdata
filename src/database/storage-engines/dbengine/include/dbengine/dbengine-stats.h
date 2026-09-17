@@ -4,6 +4,7 @@
 #define NETDATA_DBENGINE_STATS_H
 
 #include "libnetdata/libnetdata.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,12 +14,10 @@ extern "C" {
 // it reads them through the getters below, as snapshots, whenever it wants to chart or report them.
 // Nothing here is pushed: the engine has no idea who reads it.
 
-struct rrdengine_instance;
-
 // ---------------------------------------------------------------------------------------------------------------------
 // per-tier size and shape statistics
 
-typedef struct {
+struct dbengine_size_stats {
     size_t default_granularity_secs;
 
     size_t sizeof_datafile;
@@ -65,13 +64,13 @@ typedef struct {
     double ephemeral_metrics_per_day_percent;
 
     double average_page_size_bytes;
-} RRDENG_SIZE_STATS;
+};
 
-RRDENG_SIZE_STATS dbengine_get_size_stats(struct rrdengine_instance *ctx);
+struct dbengine_size_stats dbengine_get_size_stats(DBENGINE_TIER *ctx);
 
-// the legacy per-tier counters array (RRDENG_NR_STATS entries)
-#define RRDENG_NR_STATS (38)
-void dbengine_get_stats(struct rrdengine_instance *ctx, unsigned long long *array);
+// the legacy per-tier counters array (DBENGINE_STATS_COUNT entries)
+#define DBENGINE_STATS_COUNT (38)
+void dbengine_get_stats(DBENGINE_TIER *ctx, unsigned long long *array);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // page cache statistics: the engine runs three caches (pages, open datafiles, extents), each reports this
@@ -79,22 +78,22 @@ void dbengine_get_stats(struct rrdengine_instance *ctx, unsigned long long *arra
 // CACHE COMPILE TIME CONFIGURATION (the struct below depends on it, so it lives with the struct)
 // #define PGC_COUNT_POINTS_COLLECTED 1
 
-struct pgc_size_histogram_entry {
+struct dbengine_cache_size_histogram_entry {
     size_t upto;
     size_t count;
 };
 
-#define PGC_SIZE_HISTOGRAM_ENTRIES 15
-#define PGC_QUEUE_HOT   0
-#define PGC_QUEUE_DIRTY 1
-#define PGC_QUEUE_CLEAN 2
+#define DBENGINE_CACHE_SIZE_HISTOGRAM_ENTRIES 15
+#define DBENGINE_CACHE_QUEUE_HOT   0
+#define DBENGINE_CACHE_QUEUE_DIRTY 1
+#define DBENGINE_CACHE_QUEUE_CLEAN 2
 
-struct pgc_size_histogram {
-    struct pgc_size_histogram_entry array[PGC_SIZE_HISTOGRAM_ENTRIES];
+struct dbengine_cache_size_histogram {
+    struct dbengine_cache_size_histogram_entry array[DBENGINE_CACHE_SIZE_HISTOGRAM_ENTRIES];
 };
 
-struct pgc_queue_statistics {
-    struct pgc_size_histogram size_histogram;
+struct dbengine_cache_queue_stats {
+    struct dbengine_cache_size_histogram size_histogram;
 
     PAD64(size_t) entries;
     PAD64(int64_t) size;
@@ -109,7 +108,7 @@ struct pgc_queue_statistics {
     PAD64(int64_t) removed_size;
 };
 
-struct pgc_statistics {
+struct dbengine_cache_stats {
     PAD64(int64_t) wanted_cache_size;
     PAD64(int64_t) current_cache_size;
 
@@ -205,19 +204,19 @@ struct pgc_statistics {
     // ----------------------------------------------------------------------------------------------------------------
     // per queue statistics
 
-    struct pgc_queue_statistics queues[3];
+    struct dbengine_cache_queue_stats queues[3];
 };
 
-typedef enum {
-    RRDENG_CACHE_MAIN = 0,      // the pages
-    RRDENG_CACHE_OPEN,          // the open datafiles
-    RRDENG_CACHE_EXTENT,        // the compressed extents
-} RRDENG_CACHE;
+typedef enum dbengine_cache {
+    DBENGINE_CACHE_MAIN = 0,      // the pages
+    DBENGINE_CACHE_OPEN,          // the open datafiles
+    DBENGINE_CACHE_EXTENT,        // the compressed extents
+} DBENGINE_CACHE;
 
 // A snapshot of one cache; false, with *out zeroed, when that cache does not exist (no tier came up yet, or the
 // caches were destroyed). The counters are copied as a whole, not under a lock and not atomically: a counter may
 // be mid-update, and on a 32-bit target a 64-bit one may tear. Good enough for charts, not for accounting.
-bool dbengine_get_cache_stats(RRDENG_CACHE which, struct pgc_statistics *out);
+bool dbengine_get_cache_stats(DBENGINE_CACHE which, struct dbengine_cache_stats *out);
 
 // pages of the main cache still to be written: hot (collected) plus dirty (waiting for a flush); 0 without a cache
 size_t dbengine_pages_pending_flush(void);
@@ -228,7 +227,7 @@ size_t dbengine_page_padding_bytes(void);
 // ---------------------------------------------------------------------------------------------------------------------
 // metrics registry statistics
 
-struct mrg_statistics {
+struct dbengine_metrics_registry_stats {
     // --- sampled lock-free by mrg_get_statistics() ---
     // Writers use relaxed atomics. The padded fields below are updated on hotter reader/writer paths.
 
@@ -255,17 +254,17 @@ struct mrg_statistics {
 };
 
 // A snapshot of the registry; false, with *out zeroed, when it does not exist
-bool dbengine_get_metrics_registry_stats(struct mrg_statistics *out);
+bool dbengine_get_metrics_registry_stats(struct dbengine_metrics_registry_stats *out);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // query / cache efficiency (process-wide, running totals)
 
-struct time_and_count {
+struct dbengine_time_and_count {
     size_t count;
     usec_t usec;
 };
 
-struct rrdeng_cache_efficiency_stats {
+struct dbengine_cache_efficiency_stats {
     PAD64(size_t) queries_planned_with_gaps;
     PAD64(size_t) queries_executed_with_gaps;
 
@@ -309,21 +308,21 @@ struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) pages_load_fail_cancelled;
 
     // count of queries and times spent in them
-    PAD64(struct time_and_count) prep_time_to_route_sync;
-    PAD64(struct time_and_count) prep_time_to_route_syncfirst;
-    PAD64(struct time_and_count) prep_time_to_route_async;
-    PAD64(struct time_and_count) prep_time_in_main_cache_lookup;
-    PAD64(struct time_and_count) prep_time_in_open_cache_lookup;
-    PAD64(struct time_and_count) prep_time_in_journal_v2_lookup;
-    PAD64(struct time_and_count) prep_time_in_pass4_lookup;
+    PAD64(struct dbengine_time_and_count) prep_time_to_route_sync;
+    PAD64(struct dbengine_time_and_count) prep_time_to_route_syncfirst;
+    PAD64(struct dbengine_time_and_count) prep_time_to_route_async;
+    PAD64(struct dbengine_time_and_count) prep_time_in_main_cache_lookup;
+    PAD64(struct dbengine_time_and_count) prep_time_in_open_cache_lookup;
+    PAD64(struct dbengine_time_and_count) prep_time_in_journal_v2_lookup;
+    PAD64(struct dbengine_time_and_count) prep_time_in_pass4_lookup;
 
     // timings the query thread experiences
-    PAD64(struct time_and_count) query_time_init;
-    PAD64(struct time_and_count) query_time_wait_for_prep;
-    PAD64(struct time_and_count) query_time_to_slow_disk_next_page;
-    PAD64(struct time_and_count) query_time_to_fast_disk_next_page;
-    PAD64(struct time_and_count) query_time_to_slow_preload_next_page;
-    PAD64(struct time_and_count) query_time_to_fast_preload_next_page;
+    PAD64(struct dbengine_time_and_count) query_time_init;
+    PAD64(struct dbengine_time_and_count) query_time_wait_for_prep;
+    PAD64(struct dbengine_time_and_count) query_time_to_slow_disk_next_page;
+    PAD64(struct dbengine_time_and_count) query_time_to_fast_disk_next_page;
+    PAD64(struct dbengine_time_and_count) query_time_to_slow_preload_next_page;
+    PAD64(struct dbengine_time_and_count) query_time_to_fast_preload_next_page;
 
     // query issues
     PAD64(size_t) pages_zero_time_skipped;
@@ -343,50 +342,50 @@ struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) metrics_retention_started;
 };
 
-struct rrdeng_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void);
+struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void);
 
 // ---------------------------------------------------------------------------------------------------------------------
-// memory: the engine's ARAL statistics, one per RRDENG_MEM slot, plus its non-ARAL buffers
+// memory: the engine's ARAL statistics, one per DBENGINE_MEM slot, plus its non-ARAL buffers
 
-typedef enum {
-    RRDENG_MEM_PGC = 0,
-    RRDENG_MEM_PGD,
-    RRDENG_MEM_MRG,
-    RRDENG_MEM_OPCODES,
-    RRDENG_MEM_HANDLES,
-    RRDENG_MEM_DESCRIPTORS,
-    RRDENG_MEM_WORKERS,
-    RRDENG_MEM_PDC,
-    RRDENG_MEM_XT_IO,
-    RRDENG_MEM_EPDL,
-    RRDENG_MEM_DEOL,
-    RRDENG_MEM_PD,
-    RRDENG_MEM_EPDL_EXTENT,
+typedef enum dbengine_mem {
+    DBENGINE_MEM_PGC = 0,
+    DBENGINE_MEM_PGD,
+    DBENGINE_MEM_MRG,
+    DBENGINE_MEM_OPCODES,
+    DBENGINE_MEM_HANDLES,
+    DBENGINE_MEM_DESCRIPTORS,
+    DBENGINE_MEM_WORKERS,
+    DBENGINE_MEM_PDC,
+    DBENGINE_MEM_XT_IO,
+    DBENGINE_MEM_EPDL,
+    DBENGINE_MEM_DEOL,
+    DBENGINE_MEM_PD,
+    DBENGINE_MEM_EPDL_EXTENT,
 
     // terminator
-    RRDENG_MEM_MAX,
-} RRDENG_MEM;
+    DBENGINE_MEM_MAX,
+} DBENGINE_MEM;
 
-struct rrdeng_buffer_sizes {
-    struct aral_statistics *as[RRDENG_MEM_MAX];
+struct dbengine_buffer_sizes {
+    struct aral_statistics *as[DBENGINE_MEM_MAX];
 
     size_t wal;
     size_t xt_buf;
 };
 
-struct rrdeng_buffer_sizes dbengine_get_memory_sizes(void);
-const char *dbengine_mem_name(RRDENG_MEM idx);   // the chart name of each slot
+struct dbengine_buffer_sizes dbengine_get_memory_sizes(void);
+const char *dbengine_mem_name(DBENGINE_MEM idx);   // the chart name of each slot
 
 // ---------------------------------------------------------------------------------------------------------------------
 // tier-0 gorilla compression counters, kept by the engine while compression_statistics is set; a snapshot
 // of the running totals (the daemon charts the buffer count incrementally and the byte totals as they are)
-struct rrdeng_gorilla_stats {
+struct dbengine_gorilla_stats {
     uint64_t hot_buffers_added;         // gorilla buffers allocated for pages being collected
     uint64_t tier0_disk_actual_bytes;   // bytes the flushed pages occupy on disk
     uint64_t tier0_disk_optimal_bytes;  // bytes they would occupy with perfectly sized buffers
     uint64_t tier0_disk_original_bytes; // bytes of the uncompressed samples they hold
 };
-struct rrdeng_gorilla_stats dbengine_get_gorilla_stats(void);
+struct dbengine_gorilla_stats dbengine_get_gorilla_stats(void);
 
 #ifdef __cplusplus
 }

@@ -7,9 +7,9 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(!extended) return;
 
-    struct rrdeng_gorilla_stats gs = dbengine_get_gorilla_stats();
+    struct dbengine_gorilla_stats gs = dbengine_get_gorilla_stats();
 
-    if (netdata_conf_dbengine_page_type(0) == RRDENG_PAGE_TYPE_GORILLA_32BIT)
+    if (netdata_conf_dbengine_page_type(0) == DBENGINE_PAGE_TYPE_GORILLA_32BIT)
     {
         static RRDSET *st_tier0_gorilla_pages = NULL;
         static RRDDIM *rd_num_gorilla_pages = NULL;
@@ -38,7 +38,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
         rrdset_done(st_tier0_gorilla_pages);
     }
 
-    if (netdata_conf_dbengine_page_type(0) == RRDENG_PAGE_TYPE_GORILLA_32BIT)
+    if (netdata_conf_dbengine_page_type(0) == DBENGINE_PAGE_TYPE_GORILLA_32BIT)
     {
         static RRDSET *st_tier0_compression_info = NULL;
 

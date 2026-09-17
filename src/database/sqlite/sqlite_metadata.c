@@ -1325,7 +1325,7 @@ static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3
         bool no_retention = true;
         for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
             time_t first_time_t = 0, last_time_t = 0;
-            if (dbengine_metric_retention_by_uuid((void *) dbengine_multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
+            if (dbengine_metric_retention_by_uuid((void *) dbengine_multidb_tiers[tier], dim_uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0) {
                     no_retention = false;
                     break;
@@ -2284,10 +2284,10 @@ size_t populate_metrics_from_database(void *mrg, dbengine_preload_add_fn add)
         if (!sqlite3_column_uuid_copy(res, 0, uuid))
             continue;
 
-        // the configured count is right here: this runs inside the first dbengine_instance_init(), before any tier
+        // the configured count is right here: this runs inside the first dbengine_tier_init(), before any tier
         // could fail
         for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++)
-            add(mrg, dbengine_multidb_ctx[tier], &uuid);
+            add(mrg, dbengine_multidb_tiers[tier], &uuid);
         count++;
     }
 

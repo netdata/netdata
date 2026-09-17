@@ -6,7 +6,7 @@
 #include "rrdengine.h"
 
 /* Forward declarations */
-struct rrdengine_instance;
+struct dbengine_tier;
 struct rrdengine_datafile;
 struct rrdengine_journalfile;
 
@@ -259,7 +259,7 @@ struct wal;
 void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafile *datafile);
-int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
+int journalfile_v1_extent_write(struct dbengine_tier *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_unlink(struct rrdengine_journalfile *journalfile);
 #define JOURNALFILE_DELETED_V1  (1u << 0) // .njf was deleted
@@ -272,9 +272,9 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile);
  */
 uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
-int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
+int journalfile_load(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
-void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
+void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile);
 
 bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
@@ -294,7 +294,7 @@ typedef struct {
     Word_t last;
     time_t wanted_start_time_s;
     time_t wanted_end_time_s;
-    struct rrdengine_instance *ctx;
+    struct dbengine_tier *ctx;
     struct journal_v2_header *j2_header_acquired;
 } NJFV2IDX_FIND_STATE;
 

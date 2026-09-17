@@ -97,9 +97,9 @@ void cancel_main_threads(void) {
 }
 
 #ifdef ENABLE_DBENGINE
-static void dbengine_exit_background(void *ptr) {
-    struct rrdengine_instance *ctx = ptr;
-    dbengine_exit(ctx);
+static void dbengine_tier_exit_background(void *ptr) {
+    DBENGINE_TIER *ctx = ptr;
+    dbengine_tier_exit(ctx);
 }
 
 // the tier count in nd_profile is lowered when a tier fails to start, hiding any tier above it that did start;
@@ -107,8 +107,8 @@ static void dbengine_exit_background(void *ptr) {
 static void dbengine_quiesce_all()
 {
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if (dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
-            dbengine_quiesce(dbengine_multidb_ctx[tier]);
+        if (dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
+            dbengine_quiesce(dbengine_multidb_tiers[tier]);
 }
 
 static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
@@ -119,19 +119,19 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        if (!dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
+        if (!dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
             continue;
 
         if (dirty_only)
-            dbengine_flush_dirty(dbengine_multidb_ctx[tier]);
+            dbengine_flush_dirty(dbengine_multidb_tiers[tier]);
         else
-            dbengine_flush_all(dbengine_multidb_ctx[tier]);
+            dbengine_flush_all(dbengine_multidb_tiers[tier]);
     }
 
-    struct pgc_statistics pgc_main_stats;
-    dbengine_get_cache_stats(RRDENG_CACHE_MAIN, &pgc_main_stats);
-    size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
-    size_t entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
+    struct dbengine_cache_stats pgc_main_stats;
+    dbengine_get_cache_stats(DBENGINE_CACHE_MAIN, &pgc_main_stats);
+    size_t size_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].size + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].size;
+    size_t entries_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].entries + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].entries;
     if(size_to_flush > starting_size_to_flush || !starting_size_to_flush)
         starting_size_to_flush = size_to_flush;
 
@@ -141,8 +141,8 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
         while (running && count) {
             running = 0;
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-                if (dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
-                    running += dbengine_collectors_running(dbengine_multidb_ctx[tier]);
+                if (dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
+                    running += dbengine_collectors_running(dbengine_multidb_tiers[tier]);
 
             if (running) {
                 nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
@@ -156,9 +156,9 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
         return;
 
     for(size_t iterations = 0; true ;iterations++) {
-        dbengine_get_cache_stats(RRDENG_CACHE_MAIN, &pgc_main_stats);
-        size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
-        entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
+        dbengine_get_cache_stats(DBENGINE_CACHE_MAIN, &pgc_main_stats);
+        size_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].size + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].size;
+        entries_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].entries + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].entries;
         if(!starting_size_to_flush || size_to_flush > starting_size_to_flush)
             starting_size_to_flush = size_to_flush;
 
@@ -169,8 +169,8 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
 
         if(iterations % 10 == 0) {
             char hot[64], dirty[64];
-            size_snprintf(hot, sizeof(hot), pgc_main_stats.queues[PGC_QUEUE_HOT].size, "B", false);
-            size_snprintf(dirty, sizeof(hot), pgc_main_stats.queues[PGC_QUEUE_DIRTY].size, "B", false);
+            size_snprintf(hot, sizeof(hot), pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].size, "B", false);
+            size_snprintf(dirty, sizeof(hot), pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].size, "B", false);
 
             nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: flushing at %.2f%% { hot: %s, dirty: %s }...",
                    (double)flushed * 100.0 / (double)starting_size_to_flush,
@@ -309,7 +309,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // remembered before any tier exits (exiting clears the engine's active flag), for the exit and the finalize loops
     bool dbengine_tier_up[RRD_STORAGE_TIERS];
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        dbengine_tier_up[tier] = dbengine_enabled && dbengine_ctx_is_active(dbengine_multidb_ctx[tier]);
+        dbengine_tier_up[tier] = dbengine_enabled && dbengine_tier_is_active(dbengine_multidb_tiers[tier]);
 #endif
 
     if (abnormal) {
@@ -333,7 +333,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             ND_THREAD *th[RRD_STORAGE_TIERS] = { 0 };
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 if (dbengine_tier_up[tier])
-                    th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, dbengine_exit_background, dbengine_multidb_ctx[tier]);
+                    th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, dbengine_tier_exit_background, dbengine_multidb_tiers[tier]);
 
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 if (th[tier])

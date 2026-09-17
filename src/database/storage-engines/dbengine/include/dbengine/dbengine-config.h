@@ -9,18 +9,19 @@
 extern "C" {
 #endif
 
-struct rrdengine_instance;
+struct dbengine_tier;
+typedef struct dbengine_tier DBENGINE_TIER;
 
 // Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
 // the engine.
-typedef void (*dbengine_preload_add_fn)(void *mrg, struct rrdengine_instance *ctx, nd_uuid_t *uuid);
+typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *ctx, nd_uuid_t *uuid);
 
 // The storage engine's process-wide configuration.
 //
 // Whoever embeds the engine (the daemon; a test) fills one of these from its own sources and
-// hands it to dbengine_init() exactly once, before the first dbengine_instance_init(). The engine keeps a
+// hands it to dbengine_init() exactly once, before the first dbengine_tier_init(). The engine keeps a
 // private copy and reads nothing else afterwards. Per-tier settings (path, quota, retention,
-// page type) travel with dbengine_instance_init() instead.
+// page type) travel with dbengine_tier_init() instead.
 struct dbengine_config {
     // caches - read once, when the first tier brings up the caches shared by all tiers
     size_t page_cache_mb;                       // [db] dbengine page cache size
@@ -60,16 +61,16 @@ struct dbengine_config {
 
 // Page types. The value is the page-type byte of the on-disk format (rrddiskprotocol.h), so an
 // existing type is never renumbered; a new one takes the next value.
-#define RRDENG_PAGE_TYPE_ARRAY_32BIT    (0)
-#define RRDENG_PAGE_TYPE_ARRAY_TIER1    (1)
-#define RRDENG_PAGE_TYPE_GORILLA_32BIT  (2)
+#define DBENGINE_PAGE_TYPE_ARRAY_32BIT    (0)
+#define DBENGINE_PAGE_TYPE_ARRAY_TIER1    (1)
+#define DBENGINE_PAGE_TYPE_GORILLA_32BIT  (2)
 
-// the floor the engine enforces on a tier's disk space (dbengine_instance_init() raises a smaller value), the floor
+// the floor the engine enforces on a tier's disk space (dbengine_tier_init() raises a smaller value), the floor
 // the embedder is expected to keep the page cache above (the engine does not check it: below it the cache split
 // underflows), and the disk-space default the engine leaves to the embedder
-#define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
-#define RRDENG_MIN_DISK_SPACE_MB (25)
-#define RRDENG_DEFAULT_TIER_DISK_SPACE_MB (1024)
+#define DBENGINE_MIN_PAGE_CACHE_SIZE_MB (8)
+#define DBENGINE_MIN_DISK_SPACE_MB (25)
+#define DBENGINE_DEFAULT_TIER_DISK_SPACE_MB (1024)
 
 #if defined(ENV32BIT)
 #define DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB (16)
@@ -99,21 +100,22 @@ struct dbengine_config {
     .preload_metrics = NULL,                                    \
 }
 
-// One tier's configuration, handed to dbengine_instance_init(); the engine copies what it needs.
-struct rrdeng_tier_config {
+// One tier's configuration, handed to dbengine_tier_init(); the engine copies what it needs.
+struct dbengine_tier_config {
     size_t tier;                                // 0 is the tier collectors write to; higher tiers aggregate the one below
     const char *dbfiles_path;                   // directory of this tier's datafiles and journals
     unsigned disk_space_mb;                     // 0 = no disk quota
     time_t max_retention_s;                     // 0 = no time limit
-    uint8_t page_type;                          // tier 0: RRDENG_PAGE_TYPE_GORILLA_32BIT or RRDENG_PAGE_TYPE_ARRAY_32BIT;
-                                                // higher tiers hold aggregates and must use RRDENG_PAGE_TYPE_ARRAY_TIER1
+    uint8_t page_type;                          // tier 0: DBENGINE_PAGE_TYPE_GORILLA_32BIT or
+                                                // DBENGINE_PAGE_TYPE_ARRAY_32BIT; higher tiers hold aggregates and
+                                                // must use DBENGINE_PAGE_TYPE_ARRAY_TIER1
     size_t grouping;                            // points of tier 0 that make one point of this tier (1 for tier 0)
 };
 
 // Copy cfg into the engine, resolving the 0-means-default fields (cpus, default_update_every_s,
 // pages_per_extent, libuv_worker_threads). Fatal when the libuv pool is not larger than the threads
 // reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or when
-// default_update_every_s is negative. Call it once, from one thread, before the first dbengine_instance_init();
+// default_update_every_s is negative. Call it once, from one thread, before the first dbengine_tier_init();
 // a second call with an equal configuration is a no-op, with a different one it is fatal.
 void dbengine_init(const struct dbengine_config *cfg);
 

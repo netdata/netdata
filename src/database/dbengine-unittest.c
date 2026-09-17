@@ -657,9 +657,9 @@ int test_dbengine(void) {
     sleep(5);
 
     rrd_wrlock();
-    dbengine_quiesce((struct rrdengine_instance *)host->db[0].si);
-    dbengine_flush_all((struct rrdengine_instance *)host->db[0].si);
-    dbengine_exit((struct rrdengine_instance *)host->db[0].si);
+    dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
+    dbengine_flush_all((DBENGINE_TIER *)host->db[0].si);
+    dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
     dbengine_shutdown();
     rrd_wrunlock();
 

@@ -39,10 +39,6 @@ typedef struct alarm_entry ALARM_ENTRY;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
 
-#ifdef ENABLE_DBENGINE
-struct rrdengine_instance;
-#endif
-
 // --------------------------------------------------------------------------------------------------------------------
 
 #define UPDATE_EVERY_MIN 1

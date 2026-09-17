@@ -410,16 +410,16 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
             host->db[0].eng = storage_engine_get(host->db[0].mode);
             host->db[0].tier_grouping = get_tier_grouping(0);
 
-            struct rrdeng_tier_config tc;
+            struct dbengine_tier_config tc;
             netdata_conf_dbengine_tier_config(0, &tc);
             tc.dbfiles_path = dbenginepath;
             tc.disk_space_mb = default_dbengine_disk_quota_mb;
-            ret = dbengine_instance_init((struct rrdengine_instance **)&host->db[0].si, &tc);
+            ret = dbengine_tier_init((DBENGINE_TIER **)&host->db[0].si, &tc);
 
             initialized = (ret == 0);
 
             if (initialized)
-                dbengine_readiness_wait((struct rrdengine_instance *)host->db[0].si);
+                dbengine_readiness_wait((DBENGINE_TIER *)host->db[0].si);
         }
     }
 
@@ -567,7 +567,7 @@ RRDHOST *rrdhost_create(
             for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
                 host->db[tier].mode = RRD_DB_MODE_DBENGINE;
                 host->db[tier].eng = storage_engine_get(host->db[tier].mode);
-                host->db[tier].si = (STORAGE_INSTANCE *)dbengine_multidb_ctx[tier];
+                host->db[tier].si = (STORAGE_INSTANCE *)dbengine_multidb_tiers[tier];
                 host->db[tier].tier_grouping = get_tier_grouping(tier);
             }
         }
@@ -586,7 +586,7 @@ RRDHOST *rrdhost_create(
         for(size_t tier = 1; tier < nd_profile.storage_tiers; tier++) {
             host->db[tier].mode = RRD_DB_MODE_DBENGINE;
             host->db[tier].eng = storage_engine_get(host->db[tier].mode);
-            host->db[tier].si = (STORAGE_INSTANCE *) dbengine_multidb_ctx[tier];
+            host->db[tier].si = (STORAGE_INSTANCE *) dbengine_multidb_tiers[tier];
             host->db[tier].tier_grouping = get_tier_grouping(tier);
         }
 #endif

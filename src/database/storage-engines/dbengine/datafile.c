@@ -10,7 +10,7 @@ void sync_uv_file_data(uv_file file)
 }
 #endif
 
-void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
+void datafile_list_insert(struct dbengine_tier *ctx, struct rrdengine_datafile *datafile)
 {
     netdata_rwlock_wrlock(&ctx->datafiles.rwlock);
     Pvoid_t *Pvalue = JudyLIns(&ctx->datafiles.JudyL, (Word_t ) datafile->fileno, PJE0);
@@ -28,13 +28,13 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
     netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
-void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
+void datafile_list_delete_unsafe(struct dbengine_tier *ctx, struct rrdengine_datafile *datafile)
 {
     (void) JudyLDel(&ctx->datafiles.JudyL, (Word_t)datafile->fileno, PJE0);
 }
 
 
-static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno)
+static struct rrdengine_datafile *datafile_alloc_and_init(struct dbengine_tier *ctx, unsigned tier, unsigned fileno)
 {
     fatal_assert(tier == 1);
 
@@ -198,7 +198,7 @@ void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_
 
 int close_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
     char path[RRDENG_PATH_MAX];
     generate_datafilepath(datafile, path, sizeof(path));
@@ -208,7 +208,7 @@ int close_data_file(struct rrdengine_datafile *datafile)
 
 int unlink_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
     char path[RRDENG_PATH_MAX];
 
@@ -223,7 +223,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
 
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
     char path[RRDENG_PATH_MAX];
 
@@ -237,7 +237,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 
 int create_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     uv_file file;
     int ret, fd;
@@ -323,7 +323,7 @@ static int check_data_file_superblock(uv_file file)
 
 static int load_data_file(struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     uv_file file;
     int ret, fd, error;
     uint64_t file_size;
@@ -401,7 +401,7 @@ bool dbengine_dir_has_datafiles(const char *dbfiles_path)
 }
 
 /* Returns number of datafiles that were loaded or < 0 on error */
-static int scan_data_files(struct rrdengine_instance *ctx)
+static int scan_data_files(struct dbengine_tier *ctx)
 {
     int ret, matched_files, failed_to_load, i;
     unsigned tier, fileno;
@@ -569,9 +569,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 }
 
 /* Creates a datafile and a journalfile pair */
-int create_new_datafile_pair(struct rrdengine_instance *ctx)
+int create_new_datafile_pair(struct dbengine_tier *ctx)
 {
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
 
     struct rrdengine_datafile *datafile;
     struct rrdengine_journalfile *journalfile;
@@ -614,7 +614,7 @@ error_after_datafile:
 /* Page cache must already be initialized.
  * Return 0 on success.
  */
-int init_data_files(struct rrdengine_instance *ctx)
+int init_data_files(struct dbengine_tier *ctx)
 {
     int ret;
 
@@ -657,7 +657,7 @@ void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile)
     rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
 }
 
-void finalize_data_files(struct rrdengine_instance *ctx)
+void finalize_data_files(struct dbengine_tier *ctx)
 {
     bool logged = false;
 

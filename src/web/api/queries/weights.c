@@ -555,7 +555,7 @@ struct query_weights_thread_data {
     size_t local_examined_dimensions;
     struct query_versions local_versions;
     RRDHOST **hosts;
-    struct rrdeng_work_request work;    // runs query_weights_worker_thread(this) on the engine's pool
+    struct dbengine_work_request work;    // runs query_weights_worker_thread(this) on the engine's pool
     size_t host_count;
     size_t thread_id;
 };
