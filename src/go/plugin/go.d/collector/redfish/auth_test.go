@@ -62,7 +62,7 @@ func TestProtocolClientCheckOnlyReadsServiceRoot(t *testing.T) {
 	}
 }
 
-func TestProtocolClientReconnectsOnNextCycle(t *testing.T) {
+func TestProtocolClientReconnectsWithinCycle(t *testing.T) {
 	var expire atomic.Bool
 	server := newRedfishTestServer(t, redfishTestServerConfig{
 		supportSession:      true,
@@ -73,13 +73,13 @@ func TestProtocolClientReconnectsOnNextCycle(t *testing.T) {
 	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
 	for cycle := range 3 {
 		result, err := client.Collect(t.Context())
+		require.NoError(t, err)
+		assert.True(t, result.Complete)
+		assert.Equal(t, "success", result.Metrics.Status)
 		if cycle == 1 {
-			require.Error(t, err)
-			assert.Equal(t, "unavailable", result.Metrics.Status)
-			assert.Equal(t, int64(1), server.sessionCreates.Load(), "no refresh/replay within the failed cycle")
-		} else {
-			require.NoError(t, err)
-			assert.True(t, result.Complete)
+			assert.Equal(t, int64(2), server.sessionCreates.Load())
+			assert.Equal(t, map[string]int{"auth": 1}, result.Metrics.Failures)
+			assert.Equal(t, 1, result.Metrics.Operations["failed"])
 		}
 		if cycle == 0 {
 			expire.Store(true)

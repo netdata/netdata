@@ -27,6 +27,7 @@ type redfishTestServerConfig struct {
 	expireSessionOnce    *atomic.Bool
 	malformedSessionBody bool
 	sessionDeleteStatus  int
+	handleRequest        func(http.ResponseWriter, *http.Request) bool
 }
 
 type redfishTestServer struct {
@@ -45,6 +46,9 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 	sessions := map[string]string{}
 	issuedSessions := map[string]string{}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if cfg.handleRequest != nil && cfg.handleRequest(w, r) {
+			return
+		}
 		if token := r.Header.Get("X-Auth-Token"); token != "" && cfg.expireSessionOnce != nil &&
 			cfg.expireSessionOnce.CompareAndSwap(true, false) {
 			http.Error(w, "expired", http.StatusUnauthorized)

@@ -177,14 +177,21 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 		"endpoint_key": stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars),
 		"endpoint_job": "session",
 	}
-	for _, status := range []string{"success", "unavailable", "success"} {
+	for cycle := range 3 {
 		managed.CycleController().BeginCycle()
 		require.NoError(t, collector.Collect(t.Context()))
 		require.NoError(t, managed.CycleController().CommitCycleSuccess())
 		point, ok := collector.MetricStore().Read().StateSet("collection_status", labels)
 		require.True(t, ok)
-		assert.True(t, point.States[status])
-		if status == "success" && server.sessionCreates.Load() == 1 {
+		assert.True(t, point.States["success"])
+		var hardwareSeries int
+		collector.MetricStore().
+			Read(metrix.ReadFlatten()).
+			ForEachByName("system_health", func(metrix.LabelView, metrix.SampleValue) {
+				hardwareSeries++
+			})
+		assert.Positive(t, hardwareSeries, "session recovery must not leave a hardware gap")
+		if cycle == 0 {
 			expire.Store(true)
 		}
 	}
