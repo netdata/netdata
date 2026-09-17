@@ -633,7 +633,7 @@ int ram_query_is_finished(struct storage_engine_query_handle *seqh) {
 void ram_query_finalize(struct storage_engine_query_handle *seqh) {
 #ifdef NETDATA_INTERNAL_CHECKS
     internal_error(!ram_query_is_finished(seqh),
-                   "QUERY: query for RRDDIM storage has been stopped unfinished");
+                   "QUERY: query for RAM storage has been stopped unfinished");
 
 #endif
     freez(seqh->handle);

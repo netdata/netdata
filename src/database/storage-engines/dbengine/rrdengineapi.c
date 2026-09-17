@@ -134,7 +134,7 @@ STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create_by_id(STORAGE_INSTANCE *si,
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(mrg_metric_ctx(metric) != ctx)
-        fatal("DBENGINE: mixed up db instances, asked for metric from %p, got from %p",
+        fatal("DBENGINE: mixed up db tiers, asked for metric from %p, got from %p",
               ctx, mrg_metric_ctx(metric));
 
     if(!uuid_eq(*uuidmap_uuid_ptr(id), *mrg_metric_uuid(main_mrg, metric))) {
@@ -1148,7 +1148,7 @@ int dbengine_tier_init(struct dbengine_tier **ctxp, const struct dbengine_tier_c
     rrd_stat_atomic_add(&global_stats.dbengine_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
     if (global_stats.dbengine_reserved_file_descriptors > max_open_files) {
         netdata_log_error(
-            "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
+            "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine tier.",
             (unsigned)global_stats.dbengine_reserved_file_descriptors,
             (unsigned)max_open_files);
 
