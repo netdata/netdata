@@ -24,6 +24,7 @@ From this directory, using the Go version in `go.mod`:
 
 ```sh
 go build -o /tmp/alarm-notify .
+/tmp/alarm-notify check-legacy --config ../health_alarm_notify.conf
 /tmp/alarm-notify validate --config examples/notify.yaml
 /tmp/alarm-notify send --config examples/notify.yaml --destination local < examples/event.json
 /tmp/alarm-notify send --config examples/notify.yaml --role sysadmin --role dba < examples/event.json
@@ -110,6 +111,54 @@ The result is `build/alarm-notify` (`alarm-notify.exe` on Windows). `ENABLE_ALAR
 independently of `DEFAULT_FEATURE_STATE`; even with it enabled there is no notifier install rule. CMake requires the
 normal Agent configuration dependencies. Direct Go builds require only this module and its dependencies.
 
+## Legacy configuration reader
+
+The experimental `check-legacy` command checks whether old `health_alarm_notify.conf` files use the supported
+configuration syntax. It runs natively without Bash, including on Windows. Supply files explicitly in load order;
+there is no automatic stock-file discovery:
+
+```sh
+/tmp/alarm-notify check-legacy --config ../health_alarm_notify.conf --config /path/to/user/health_alarm_notify.conf
+```
+
+A successful check means **syntax support only**. It does not evaluate variable values, validate provider names,
+credentials, recipients or routing, or establish that a custom function will work. It reads no event from stdin,
+resolves no secrets and executes no configuration code. `send` and `validate` continue to accept YAML only.
+Old-format delivery mapping, legacy routing and the optional Unix Bash custom-function runtime are later increments.
+
+The reader supports this declarative subset:
+
+| Construct | Supported behavior |
+|---|---|
+| Comments and separators | Blank lines, shell comments, newlines, semicolons and backslash-newline continuation |
+| Scalars | `NAME=value`, including empty values, single/double quotes, adjacent quoted parts and shell backslash escaping |
+| References | `$NAME` and `${NAME}` referring to scalar variables; no special/positional variables or array references |
+| Recipient entries | `role_recipients_email[sysadmin]="ops@example.com"`; map names must start with `role_recipients_`, and keys must be nonempty literal strings; quote keys with punctuation or spaces |
+| Recipient maps | `role_recipients_email=([sysadmin]=ops@example.com [dba]=db@example.com)`, `=()` to reset, and optional `declare -A` declarations of these maps |
+| Functions | Plain `name() { ...; }` or `function name { ...; }` declarations, including helpers; bodies must parse as Bash and are retained without execution |
+
+Top-level commands, `source`, conditionals, loops, redirects, pipelines, background work and command/process
+substitution are rejected. So are arithmetic, advanced parameter expansion, unquoted tilde expansion, ANSI-C/localized
+quoting, `export`/`readonly`, append assignments, indexed arrays and arbitrary associative maps. Quote a literal tilde
+where Bash would otherwise expand it. These restrictions apply to declarative settings; function bodies are retained
+as Bash code and are not checked against the settings subset. Function declarations themselves must have a plain
+brace body without attached redirections or command modifiers.
+
+The internal evaluator applies files and assignments in order using explicitly supplied initial scalar variables.
+It never reads the process environment. Undefined variables expand to empty strings. Expansion happens once at
+assignment time: changing `DEFAULT_RECIPIENT_EMAIL` later does not retroactively change a role entry assigned from it.
+Expanded values remain literal, including strings resembling native `${env:...}` or `${file:...}` secret references.
+Later files replace only assigned scalars, recipient keys and functions. A whole-map initializer replaces that map;
+`declare -A` without an initializer preserves its entries. Recipient modifiers remain uninterpreted strings until
+legacy routing is implemented. Function text is retained exactly, including internal comments.
+
+Each input file is limited to 1 MiB. Evaluation also limits individual values to 1 MiB and total stored names/values
+and function source to 4 MiB, preventing repeated expansion from growing without bounds. The syntax check does not
+perform evaluation and therefore does not check those evaluated-value limits. Errors identify the input file by its
+one-based argument order and, where available, a line/column; they do not print configuration text or values. All
+specified files must be readable and pass the check. `check-legacy` accepts the same positive `--timeout` as the other
+commands and returns `0` on supported syntax or `1` on errors/cancellation.
+
 ## Command and configuration contract
 
 - `validate --config FILE` checks one YAML document. Unknown fields, duplicate keys, unsupported provider types, and
@@ -119,10 +168,10 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
 - `send --config FILE --role ROLE [--role ROLE ...]` uses YAML routing to select destinations. Choose either an explicit
   destination or roles; mixing the selectors fails. Roles are exact, case-sensitive names, without comma splitting,
   wildcards, or implicit role selection. They do not become fields in the webhook payload.
-- Both commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
+- All three commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
   Deadline expiration, Ctrl-C, or SIGTERM stops the invocation. Run this developer tool as an ordinary user.
-- Exit status is `0` when at least one delivery succeeds, no destinations are eligible, validation succeeds, or help
-  is requested. Invalid options/configuration/input, all attempted deliveries failing, or command cancellation/timeout
+- Exit status is `0` when at least one delivery succeeds, no destinations are eligible, validation or the syntax check
+  succeeds, or help is requested. Invalid options/configuration/input, all attempted deliveries failing, or command cancellation/timeout
   return `1`. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
 
 Configuration has `version: 1` and a `destinations` mapping. Webhook, Slack and Discord destinations require `type`
