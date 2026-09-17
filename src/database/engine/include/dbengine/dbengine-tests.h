@@ -4,6 +4,7 @@
 #define NETDATA_DBENGINE_TESTS_H
 
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/storage-engine-types.h"
 
 // The engine's self-tests and benchmarks. Each runs to completion on the calling thread.
 //

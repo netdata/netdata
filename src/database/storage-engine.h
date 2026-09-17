@@ -4,6 +4,7 @@
 #define NETDATA_STORAGEENGINEAPI_H
 
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/storage-engine-types.h"
 #include "rrd-database-mode.h"
 
 // the dbengine functions the dispatchers below call are declared by the engine, not here

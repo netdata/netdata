@@ -4,6 +4,7 @@
 #define NETDATA_RRDENGINEAPI_H
 
 #include "libnetdata/libnetdata.h"
+#include "libnetdata/storage-engine-types.h"
 #include "database/engine/include/dbengine/dbengine-config.h"
 #include "database/engine/include/dbengine/dbengine-stats.h"
 
