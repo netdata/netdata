@@ -12,8 +12,8 @@ import (
 )
 
 func buildSlack(b *builder, recipients []string) ([]notifier.Sender, error) {
-	images, configured := b.values["images_base_url"]
-	if !configured {
+	images := b.values["images_base_url"]
+	if images == "" {
 		images = "https://registry.my-netdata.io"
 	}
 	return each(recipients, func(r string) (notifier.Sender, error) {

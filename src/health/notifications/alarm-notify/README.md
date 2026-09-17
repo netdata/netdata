@@ -416,9 +416,9 @@ DEFAULT_RECIPIENT_SLACK='#operations @oncall #'
 
 Each distinct eligible recipient produces a request. A bare name becomes `#name`, `#channel` and `@user` remain intact,
 and `#` omits the channel field to use the webhook's default. The sender name is `netdata on <event node>`. The icon is
-`https://registry.my-netdata.io/images/banner-icon-144x144.png`; setting `images_base_url` replaces its base. The final
-icon URL must be absolute HTTP(S) and at most 255 characters. This customization is currently supported only when
-Slack is the sole eligible method; artwork for other providers remains pending. Slack keeps the native alert content,
+`https://registry.my-netdata.io/images/banner-icon-144x144.png`; a nonempty `images_base_url` replaces its base.
+An unset or empty value uses the default. The final icon URL must be absolute HTTP(S) and at most 255 characters.
+This customization is currently supported only when Slack is the sole eligible method; artwork for other providers remains pending. Slack keeps the native alert content,
 status colors and escaping. These legacy overrides are internal to `send-legacy`, not new YAML fields.
 
 Teams uses the already supported [Workflows setup](#microsoft-teams-workflows), with its trigger set to **Anyone**.
