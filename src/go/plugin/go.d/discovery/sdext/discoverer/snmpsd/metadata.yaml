@@ -40,6 +40,12 @@ overview:
     - **SNMPv3 engine ID**: gosnmp negotiates the engine ID at the start of each probe (one extra round-trip per probe — usually irrelevant unless `parallel_scans_per_network` is high and the device is rate-limited). Engine IDs are not cached across probes, so devices that rotate engine IDs (rare; some HA pairs do this on failover) are handled transparently.
     - **Credential storage**: discovery requires literal community strings and SNMPv3 passphrases. They are stored in plaintext in `/etc/netdata/go.d/sd/snmp.conf` (file-based pipelines) or the agent's dynamic-configuration store under `/var/lib/netdata/dyncfg/` (UI-managed pipelines). Secret references are not resolved in discovery credentials. Generated collector jobs keep them literal by default.
     - **Collector job secrets**: to use [secret references](/src/collectors/SECRETS.md), explicitly enable `trust_discovered_targets` for a trusted pipeline, or adopt an individual collector job through Dynamic Configuration and review the complete configuration before saving. For reference-based fields, Netdata saves the reference text and resolves values only in memory; it does not persist the resolved values in the job configuration. `${env:...}` and `${file:...}` read operator-managed environment variables or files, whose credentials may already be stored on disk. Adoption does not remove literal credentials from the discovery configuration.
+
+    :::warning Discovery credentials reach every host that answers
+
+    To identify a device, discovery presents the configured credential to whatever responds on a scanned IP, so any host on a scanned subnet — including a rogue or spoofed device — receives it. This is inherent to credentialed network scanning, not specific to Netdata. SNMPv1/v2c sends the community string in cleartext; SNMPv3 discloses the USM username and an authentication MAC (offline-crackable if the passphrase is weak), not the passphrase itself. Scan only networks you trust, prefer SNMPv3 `authPriv` with strong passphrases, and avoid reusing sensitive community strings on segments where untrusted hosts can appear.
+
+    :::
 setup:
   prerequisites:
     list:
