@@ -116,6 +116,10 @@ Metrics:
 | app.ebpf_dc_reference | Count file access. | files | files |
 | app.ebpf_dc_not_cache | Files not present inside directory cache. | files | files |
 | app.ebpf_dc_not_found | Files not found. | files | files |
+| app.ebpf_file_open | Number of open files | calls | calls/s |
+| app.ebpf_file_open_error | Fails to open files. | calls | calls/s |
+| app.ebpf_file_closed | Files closed. | calls | calls/s |
+| app.ebpf_file_close_error | Fails to close files. | calls | calls/s |
 | app.swap_usage | Apps swap usage | swap | MiB |
 | app.disk_physical_io | Apps disk physical IO | reads, writes | KiB/s |
 | app.disk_logical_io | Apps disk logical IO | reads, writes | KiB/s |
