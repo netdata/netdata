@@ -32,7 +32,8 @@ type FunctionConfig struct {
 	// HasHistory advertises time-range support in managed info and data responses.
 	HasHistory bool
 	// AcceptedParams advertises inputs in addition to required selector IDs.
-	// The handler owns their parsing and validation.
+	// Requires RawRequest; structured handlers receive only resolved selectors.
+	// The raw handler owns parsing and validation of these extra inputs.
 	AcceptedParams []string
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
 	// FIXME: Presentation is intentionally untyped here, while the shared UI schema

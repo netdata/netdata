@@ -1036,6 +1036,9 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 		if method.ManagedInfo && !method.RawRequest {
 			return nil, fmt.Errorf("jobmgr Function controller: method %q ManagedInfo requires RawRequest", method.ID)
 		}
+		if len(method.AcceptedParams) != 0 && !method.RawRequest {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q AcceptedParams requires RawRequest", method.ID)
+		}
 		if !validQuotedProtocolField(method.Help) {
 			return nil, errors.New("jobmgr Function controller: invalid Function help")
 		}

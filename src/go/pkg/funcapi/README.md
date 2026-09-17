@@ -27,8 +27,9 @@ framework job selector.
 
 `HasHistory` advertises time-range support in managed info and data responses;
 it defaults to false. `AcceptedParams` advertises additional input names, such as
-`after`, `before` and `query`. The framework combines those names with required
-selector IDs without duplicates. These declarations do not implement filtering,
+`after`, `before` and `query`. It requires `RawRequest`: structured handlers receive
+only resolved selector values and cannot access these extra inputs. The framework
+combines those names with required selector IDs without duplicates. These declarations do not implement filtering,
 storage, parsing or validation of extra inputs; the handler owns those semantics.
 
 ## Info for payload-aware methods

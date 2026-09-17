@@ -343,19 +343,41 @@ func TestManagedInfoRawResponsePassthrough(t *testing.T) {
 	}
 }
 
-func TestManagedInfoRequiresRawRequest(t *testing.T) {
-	_, _, err := newContainedControllerTest(t, 1, collectorapi.Registry{
-		"module": {
-			AgentFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{{ID: "events", ManagedInfo: true}} },
-			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				t.Error("invalid declarations must be rejected before constructing a handler")
-				return &managedInfoHandler{
-					t: t,
-				}
+func TestFunctionConfigRequiresRawRequest(t *testing.T) {
+	for name, test := range map[string]struct {
+		method funcapi.FunctionConfig
+		want   string
+	}{
+		"managed info": {
+			method: funcapi.FunctionConfig{
+				ID:          "events",
+				ManagedInfo: true,
 			},
+			want: "ManagedInfo requires RawRequest",
 		},
-	})
-	require.ErrorContains(t, err, "ManagedInfo requires RawRequest")
+		"extra accepted inputs": {
+			method: funcapi.FunctionConfig{
+				ID:             "events",
+				AcceptedParams: []string{"after", "query"},
+			},
+			want: "AcceptedParams requires RawRequest",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := newContainedControllerTest(t, 1, collectorapi.Registry{
+				"module": {
+					AgentFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{test.method} },
+					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+						t.Error("invalid declarations must be rejected before constructing a handler")
+						return &managedInfoHandler{
+							t: t,
+						}
+					},
+				},
+			})
+			require.ErrorContains(t, err, test.want)
+		})
+	}
 }
 
 func managedInfoTestMethod() funcapi.FunctionConfig {
