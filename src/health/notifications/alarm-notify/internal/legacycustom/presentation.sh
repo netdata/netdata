@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck shell=bash
 # Compute presentation only from supplied facts; missing durations remain unknown.
 urlencode "$args_host" >/dev/null; url_host=$REPLY
 urlencode "$chart" >/dev/null; url_chart=$REPLY

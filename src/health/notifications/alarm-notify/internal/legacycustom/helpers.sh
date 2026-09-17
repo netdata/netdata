@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck shell=bash
 # Embedded legacy helpers. Child output is discarded by the foreground runner.
 info() { printf '%s\n' "$*" >&2; }
 error() { printf '%s\n' "$*" >&2; }
