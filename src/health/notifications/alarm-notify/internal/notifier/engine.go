@@ -41,7 +41,7 @@ func (p Plan) Deliver(ctx context.Context, names []string, notification Notifica
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		reason, err := p.Routing.Policies[name].skipReason(notification)
+		reason, err := p.Routing.Policies[name].SkipReason(notification)
 		if err != nil {
 			return err
 		}
