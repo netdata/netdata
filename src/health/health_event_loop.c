@@ -805,6 +805,61 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         // walks and sorts its whole alert list
 
         // process repeating alarms
+        //
+        // Notifications are COLLECTED here and dispatched after the traversal, never inside it:
+        // health_send_notification() spawns a process and health_alarm_wait_for_execution() waits
+        // for it, so doing that in the loop body holds the alert dictionary read lock for
+        // (number of repeating alerts) x (notification duration), with no aggregate bound - the
+        // per-notification timeout bounds each notification, not the traversal, and a timeout of 0
+        // means wait forever. Anything needing this dictionary's WRITE lock - a DynCfg alert edit,
+        // a health config reload, an alert unlink - stalls for that whole time. The worst of these
+        // is the cleanup of an obsolete chart: it unlinks the chart's alerts while holding the
+        // chart dictionary's write lock, so ML, collectors and the web API stall behind it too,
+        // until the deadlock detector aborts the agent after an hour.
+        //
+        // This shortens the LOCK HOLD only. The health thread is busy for exactly as long as
+        // before: the drain below still sends and waits one alert at a time, so per-host and
+        // cross-host health cycle time is unchanged. Two earlier traversals in this function still
+        // do synchronous DB and SQLite work under the same lock, and are not addressed here.
+        //
+        // The queue is bounded, and collection therefore runs in ROUNDS: collect up to
+        // HEALTH_REPEAT_NOTIFY_BATCH_MAX, release the lock, drain, and repeat while a round filled
+        // the batch. A single capped pass would starve alerts past the cap: every traversal restarts
+        // at the dictionary head, so under sustained load the same leading alerts would be admitted
+        // every cycle and later ones never reached. Rounds cannot loop forever because `now` is
+        // fixed for this call: an admitted alert gets last_repeat = now, so
+        // `last_repeat + repeat_every <= now` is false for it for the rest of this call, and the due
+        // set strictly shrinks by one full batch per round.
+        // sizeof(ALARM_ENTRY) is 320 bytes (strings are interned and only refcounted, not copied),
+        // so the transient is bounded at ~320 KB per host regardless of how many alerts are due.
+        //
+        // ACCEPTED BEHAVIOUR: the state below (rc->last_repeat, times_repeat, RRDCALC_FLAG_RUN_ONCE)
+        // is updated during COLLECTION, for the whole batch, before anything is dispatched. If the
+        // host stops being eligible part-way through the drain - rrdhost_should_run_health() goes
+        // false the moment the collector goes offline or ingestion stops, i.e. a streaming child
+        // disconnecting - the remaining entries are freed without notifying, yet their state already
+        // says the repeat happened. The consequence is a reminder DELAYED by up to one repeat_every
+        // (last_repeat was advanced, so it is not lost) and an over-counted times_repeat. Before
+        // this refactor the mutation and the send were adjacent statements, so the window was
+        // microseconds rather than a whole drain. This is accepted deliberately: the skip only
+        // occurs when the host is not being collected, which is when notifying it is questionable
+        // anyway, and moving the mutations into the drain would invalidate the rounds-termination
+        // argument above (an alert unlinked but not yet deleted could be re-collected every round).
+        #define HEALTH_REPEAT_NOTIFY_BATCH_MAX 1000
+
+        // Each deferred entry carries a reference to its alert's dictionary item, so the RRDCALC
+        // stays alive (it may be marked deleted, but not freed) and can be re-tested at dispatch.
+        struct deferred_notification {
+            ALARM_ENTRY *ae;
+            const DICTIONARY_ITEM *rca;
+        };
+
+        bool repeat_batch_was_full = true;
+
+        while(repeat_batch_was_full) {
+        struct deferred_notification *deferred = NULL;
+        size_t deferred_used = 0, deferred_size = 0;
+
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
             if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
                 break;
@@ -834,6 +889,15 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
             if(unlikely(repeat_every > 0 && nd_time_t_add_compare(rc->last_repeat, repeat_every, now) <= 0)) {
                 RRDSET *st = NULL;
+                // Batch full - leave this alert for the NEXT ROUND of this same call (see the
+                // rounds loop above). This check MUST stay above the state mutations below
+                // (rc->last_repeat, times_repeat, RRDCALC_FLAG_RUN_ONCE): skipping after those
+                // would mark the alert as repeated without ever notifying it, i.e. silently drop a
+                // notification. Skipping here mutates nothing, so the alert is still due when the
+                // next round traverses.
+                if(unlikely(deferred_used >= HEALTH_REPEAT_NOTIFY_BATCH_MAX))
+                    continue;
+
                 RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(host, rc, &st);
                 if(unlikely(!rsa))
                     continue;
@@ -875,13 +939,67 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 }
                 rc->run_flags |= RRDCALC_FLAG_RUN_ONCE;
                 rrdcalc_runtime_snapshot_publish_repeat_state(rc);
-                health_send_notification(host, ae, hrm);
-                netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
-                health_alarm_wait_for_execution(ae);
-                health_alarm_log_free_one_nochecks_nounlink(ae);
+
+                // Carry the entry out of the traversal. This is safe because `ae` is NOT owned by
+                // the dictionary and is not reachable from anywhere else: health_alarm_log_add_entry()
+                // is the only function that links an entry into host->health_log.alarms, and this
+                // repeating path never calls it - it only assigns an id and logs. (The "nounlink" in
+                // the free below means that function does not unlink; it does not by itself prove
+                // the entry was never linked. The free asserts ae->next/ae->prev are NULL, which
+                // holds here.) `ae` also borrows no RRDCALC*/RRDSET*: every field is a scalar or a
+                // refcounted STRING. Everything touching `rc`, which IS dictionary-owned, stays
+                // above this point.
+                if(deferred_used == deferred_size) {
+                    deferred_size = deferred_size ? deferred_size * 2 : 64;
+                    deferred = reallocz(deferred, deferred_size * sizeof(*deferred));
+                }
+                deferred[deferred_used].ae = ae;
+                deferred[deferred_used].rca =
+                    dictionary_acquired_item_dup(host->rrdcalc_root_index, rc_dfe.item);
+                deferred_used++;
             }
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
+
+        // Another round is needed only if this one filled the batch.
+        repeat_batch_was_full = (deferred_used == HEALTH_REPEAT_NOTIFY_BATCH_MAX);
+
+        // ---- the alert dictionary is no longer held ----
+        for(size_t i = 0; i < deferred_used ; i++) {
+            ALARM_ENTRY *ae = deferred[i].ae;
+            RRDCALC *drc = dictionary_acquired_item_value(deferred[i].rca);
+
+            // Same guard the traversal above uses: stop dispatching if health is shutting down or
+            // this host stopped being eligible (e.g. a child disconnected while we were draining).
+            // Skipping the send also skips the wait - health_alarm_wait_for_execution() on an entry
+            // that never spawned anything logs an error and marks it EXEC_FAILED. Only wait for
+            // what we actually started. Every entry is still freed either way.
+            if(likely(service_running(SERVICE_HEALTH) && rrdhost_should_run_health(host))) {
+                // Re-test that the alert is still linked to its chart. Now that the dictionary lock
+                // is released, it can be deleted while an earlier notification is still running -
+                // rrdcalc_unlink_from_rrdset() clears rc->rrdset, which is exactly what this returns
+                // NULL for, so no reminder goes out for an alert that no longer exists. This narrows
+                // the window rather than closing it - an unlink landing between this check and the
+                // send still gets through.
+                RRDSET *dst = NULL;
+                RRDSET_ACQUIRED *drsa = rrdcalc_rrdset_acquire_linked(host, drc, &dst);
+                if(likely(drsa)) {
+                    rrdset_acquired_release(drsa);
+                    health_send_notification(host, ae, hrm);
+                    netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
+                    health_alarm_wait_for_execution(ae);
+                }
+            }
+
+            health_alarm_log_free_one_nochecks_nounlink(ae);
+            dictionary_acquired_item_release(host->rrdcalc_root_index, deferred[i].rca);
+        }
+        freez(deferred);
+
+        // Stop rounds if we are shutting down or this host stopped being eligible.
+        if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
+            break;
+        }
     }
 
     if(likely(snapshot_complete)) {
@@ -963,7 +1081,19 @@ static void health_event_loop(void) {
             if(unlikely(!service_running(SERVICE_HEALTH)))
                 break;
 
+            // Pin the host for the whole pass. The index reference held by this traversal does not
+            // keep the RRDHOST allocated, and the pass waits for notifications with no alert
+            // dictionary lock held, so a remover (orphan cleanup, remove-stale-node) could otherwise
+            // free the host under us. The lookup and the pin happen under the rrd read lock, as
+            // rrdhost_pin_try() requires; a host being removed fails the pin and is skipped.
+            rrd_rdlock();
+            bool pinned = rrdhost_find_by_guid(host_dfe.name) == host && rrdhost_pin_try(host);
+            rrd_rdunlock();
+            if(unlikely(!pinned))
+                continue;
+
             health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run, iter_owa);
+            rrdhost_pin_release(host);
         }
         dfe_done(host);
 
