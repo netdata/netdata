@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/kavenegar"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/matrix"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/messagebird"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/msteams"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/ntfy"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/pagerduty"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/prowl"
@@ -24,6 +25,7 @@ import (
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/pushover"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/rocketchat"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/signl4"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/slack"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/smseagle"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/telegram"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/twilio"
@@ -41,6 +43,7 @@ func TestProviderInputModeCannotBeSetThroughYAML(t *testing.T) {
 		"kavenegar":   {factory: config.Factory(func(kavenegar.Config) (notifier.Sender, error) { return nil, nil })},
 		"matrix":      {factory: config.Factory(func(matrix.Config) (notifier.Sender, error) { return nil, nil })},
 		"messagebird": {factory: config.Factory(func(messagebird.Config) (notifier.Sender, error) { return nil, nil })},
+		"msteams":     {factory: config.Factory(func(msteams.Config) (notifier.Sender, error) { return nil, nil })},
 		"ntfy":        {factory: config.Factory(func(ntfy.Config) (notifier.Sender, error) { return nil, nil })},
 		"pagerduty":   {factory: config.Factory(func(pagerduty.Config) (notifier.Sender, error) { return nil, nil })},
 		"prowl":       {factory: config.Factory(func(prowl.Config) (notifier.Sender, error) { return nil, nil })},
@@ -52,6 +55,7 @@ func TestProviderInputModeCannotBeSetThroughYAML(t *testing.T) {
 		"smseagle":    {factory: config.Factory(func(smseagle.Config) (notifier.Sender, error) { return nil, nil })},
 		"kafka":       {factory: config.Factory(func(kafka.Config) (notifier.Sender, error) { return nil, nil })},
 		"signl4":      {factory: config.Factory(func(signl4.Config) (notifier.Sender, error) { return nil, nil })},
+		"slack":       {factory: config.Factory(func(slack.Config) (notifier.Sender, error) { return nil, nil })},
 	} {
 		t.Run(name, func(t *testing.T) {
 			for key, value := range map[string]string{"secrets": "1", "Secrets": "1", "input_mode": "1"} {

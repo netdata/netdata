@@ -32,11 +32,11 @@ func TestRunLegacyDelivery(t *testing.T) {
 	}{
 		"ordered files":               {overlay: `role_recipients_discord[ops]=selected; DEFAULT_RECIPIENT_DISCORD=disabled`, calls: 1, summary: "1 succeeded, 0 failed"},
 		"all methods by default":      {calls: 1, summary: "1 succeeded, 0 failed"},
-		"eligible gap rejects all":    {overlay: `SLACK_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_SLACK=channel`, code: 1, err: "legacy slack", summary: "0 succeeded, 0 failed"},
+		"eligible gap rejects all":    {overlay: `SEND_OPSGENIE=YES; OPSGENIE_API_KEY=synthetic-private-value`, code: 1, err: "legacy opsgenie", summary: "0 succeeded, 0 failed"},
 		"dynatrace gap rejects all":   {overlay: dynatrace, code: 1, err: "legacy dynatrace", summary: "0 succeeded, 0 failed"},
 		"filter excludes dynatrace":   {overlay: dynatrace, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
 		"disabled dynatrace":          {overlay: dynatrace + "; SEND_DYNATRACE=NO", calls: 1, summary: "1 succeeded, 0 failed"},
-		"filter excludes gap":         {overlay: `SLACK_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_SLACK=channel`, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
+		"filter excludes gap":         {overlay: `SEND_OPSGENIE=YES; OPSGENIE_API_KEY=synthetic-private-value`, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
 		"missing history rejects all": {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|critical'`, code: 1, err: "critical_seen_since_clear", summary: "0 succeeded, 0 failed"},
 		"stateless skip":              {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|nowarn|critical'`, summary: "0 succeeded, 0 failed"},
 		"history permits":             {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|critical'`, input: strings.Replace(testutil.ValidEvent, `"version": 1`, `"version": 1, "critical_seen_since_clear": true`, 1), calls: 1, summary: "1 succeeded, 0 failed"},
