@@ -67,9 +67,6 @@ func syslogTarget(target string) (syslog.Config, error) {
 		cfg.Facility, cfg.Level = facility, level
 	}
 	if hasRemote {
-		if remote == "" {
-			return cfg, errors.New("syslog remote host must not be empty")
-		}
 		switch {
 		case strings.HasPrefix(remote, "[") && strings.HasSuffix(remote, "]"):
 			cfg.Host = strings.TrimSuffix(strings.TrimPrefix(remote, "["), "]")
@@ -85,6 +82,9 @@ func syslogTarget(target string) (syslog.Config, error) {
 			}
 		default:
 			cfg.Host = remote
+		}
+		if cfg.Host == "" {
+			return cfg, errors.New("syslog remote host must not be empty")
 		}
 	}
 	return cfg, nil

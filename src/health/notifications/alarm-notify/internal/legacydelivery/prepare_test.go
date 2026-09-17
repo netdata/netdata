@@ -27,6 +27,7 @@ func parsedPrograms(t *testing.T, texts ...string) []*legacyconfig.Program {
 }
 
 func TestPrepareSelection(t *testing.T) {
+	const dynatrace = `SEND_DYNATRACE=YES; DYNATRACE_SPACE=space; DYNATRACE_SERVER=https://example.org; DYNATRACE_TOKEN=synthetic-private-value; DYNATRACE_TAG_VALUE=tag; DYNATRACE_EVENT=CUSTOM_INFO`
 	tests := map[string]struct {
 		config         []string
 		methods, roles []string
@@ -65,6 +66,10 @@ func TestPrepareSelection(t *testing.T) {
 		"global disabled":               {config: []string{`SEND_KAFKA=NO; KAFKA_URL=https://example.org; KAFKA_SENDER_IP=192.0.2.1`}},
 		"signl4 not implicitly enabled": {config: []string{`SIGNL4_WEBHOOK_URL=https://example.org`}},
 		"global unsupported":            {config: []string{`SEND_OPSGENIE=YES; OPSGENIE_API_KEY=synthetic-private-value`}, err: "Opsgenie Alert API"},
+		"dynatrace no recipients":       {config: []string{dynatrace}, err: "Dynatrace Events v2"},
+		"dynatrace ignores silent role": {config: []string{dynatrace}, roles: []string{"silent"}, err: "Dynatrace Events v2"},
+		"dynatrace disabled":            {config: []string{dynatrace, `SEND_DYNATRACE=NO`}},
+		"dynatrace missing token":       {config: []string{dynatrace, `DYNATRACE_TOKEN=''`}},
 		"old Teams aliases":             {config: []string{`SEND_MSTEAMS=NO; MSTEAM_WEBHOOK_URL=https://example.org; SEND_MSTEAM=YES; role_recipients_msteam[ops]=channel`}, err: "Teams Workflows"},
 		"old Teams disabling alias":     {config: []string{`SEND_MSTEAM=NO; MSTEAMS_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_MSTEAMS=channel`}},
 		"unknown modifier safe":         {config: []string{`DISCORD_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_DISCORD='synthetic-private-value|unknown'`}, err: "unknown recipient modifier"},

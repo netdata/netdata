@@ -210,11 +210,11 @@ Repeat `--role` or `--method` as needed. Without `--method`, all configured meth
 those methods are considered; names use the Bash suffixes below (`pd` and `sms`, not `pagerduty` and `smstools3`).
 Explicitly selecting an unknown or unimplemented method is an error. All files must parse even when selection is narrowed.
 
-Activation requires exact `SEND_<METHOD>=YES` (also `AUTO` for email), the method's nonempty prerequisites and an
-eligible recipient. Without stock configuration, recipient-based methods default to `YES` except Dynatrace; Kafka
-also defaults to `YES`. SIGNL4, Opsgenie and ilert need an explicit `YES`, normally supplied by the stock file.
-Missing credentials or recipients disable that method. Kafka and SIGNL4 are global: they send once when enabled and
-configured, regardless of roles, including reserved roles. Gotify, Discord and Flock send once only when at least one
+Activation requires exact `SEND_<METHOD>=YES` (also `AUTO` for email), the method's nonempty prerequisites and,
+for recipient-based methods, an eligible recipient. Without stock configuration, recipient-based methods and Kafka
+default to `YES`. Dynatrace, SIGNL4, Opsgenie and ilert need an explicit `YES`, normally supplied by the stock file.
+Missing prerequisites or required recipients disable that method. Kafka and SIGNL4 are global: they send once when
+enabled and configured, regardless of roles, including reserved roles. Gotify, Discord and Flock send once only when at least one
 recipient survives filtering. Email, Prowl and SMSEagle batch their final eligible recipients. Other mappings send
 once per distinct eligible target.
 
@@ -258,7 +258,8 @@ or configuration's arbitrary variables. `logger_options` splits on spaces, tabs 
 there is no second quoting pass, expansion or globbing. Native command delivery currently supports Linux/macOS.
 
 Evaluated values remain literal through validation and sending, even when resembling `${env:...}` or `${file:...}`.
-Quote such strings in shell-format files to prevent the settings parser from treating them as parameter expansion.
+Use single quotes, such as `'${env:NAME}'`, to preserve these strings as literals in shell-format files. Unquoted
+and double-quoted forms are parsed as unsupported shell parameter expansion and rejected.
 Native field validation still applies; for example, an invalid token is rejected rather than interpreted as a secret
 reference. Native YAML retains its existing lazy secret-reference behavior. The internal input-mode setting is not a
 YAML option.
@@ -272,15 +273,18 @@ have no independent delivery effect.
 
 These configured behaviors are rejected when applicable to eligible delivery: nonempty `curl`/`curl_options` for
 HTTP methods; non-UTF-8 `EMAIL_CHARSET` for email; configured nonempty `PATH` for command methods; nonempty
-`date_format`/`images_base_url`; `use_fqdn=YES`/`clear_alarm_always=YES`; and assignments changing the initial event
-scalars above. Use the native event/configuration contract for those capabilities. Empty charset, `UTF-8` and `UTF8`
-(case-insensitive) use the existing UTF-8 email implementation.
+`date_format`/`images_base_url`; `use_fqdn=YES`/`clear_alarm_always=YES`; and final evaluated values of the event scalars
+above that differ from their initial values. Temporary assignments are allowed if those values are restored;
+settings derived during evaluation retain their assignment-time expansions. Use the native event/configuration
+contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
+implementation.
 
 Seven retained legacy mappings remain pending: Slack overrides, Teams Workflows setup/overrides, ilert API alert-source
 setup, Opsgenie Alert API v2 integration setup, Dynatrace Events v2 settings, AWS SNS credentials/message templates,
-and Unix `custom_sender()` execution. Their enabled, configured, recipient-eligible selections fail before any sends;
-the check does not probe AWS CLI availability or require a custom global default when a role already selects a custom
-recipient. It exposes pending work rather than attempting those unimplemented runtime checks. Old singular `MSTEAM`
+and Unix `custom_sender()` execution. Enabled, configured selections fail before any sends once applicable recipient
+requirements are met. Dynatrace, Opsgenie and ilert are global and require no recipients. The check does not probe
+AWS CLI availability or require a custom global default when a role already selects a custom recipient. It exposes
+pending work rather than attempting those unimplemented runtime checks. Old singular `MSTEAM`
 aliases are recognized for that check. HipChat is explicitly excluded and also errors when eligible. Function bodies
 remain inert, including `custom_sender()` and helpers; no original configuration file is sourced.
 

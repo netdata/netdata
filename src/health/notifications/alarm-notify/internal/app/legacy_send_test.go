@@ -22,6 +22,7 @@ import (
 )
 
 func TestRunLegacyDelivery(t *testing.T) {
+	const dynatrace = `SEND_DYNATRACE=YES; DYNATRACE_SPACE=space; DYNATRACE_SERVER=https://example.org; DYNATRACE_TOKEN=synthetic-private-value; DYNATRACE_TAG_VALUE=tag; DYNATRACE_EVENT=CUSTOM_INFO`
 	for name, tt := range map[string]struct {
 		overlay      string
 		methods      []string
@@ -32,6 +33,9 @@ func TestRunLegacyDelivery(t *testing.T) {
 		"ordered files":               {overlay: `role_recipients_discord[ops]=selected; DEFAULT_RECIPIENT_DISCORD=disabled`, calls: 1, summary: "1 succeeded, 0 failed"},
 		"all methods by default":      {calls: 1, summary: "1 succeeded, 0 failed"},
 		"eligible gap rejects all":    {overlay: `SLACK_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_SLACK=channel`, code: 1, err: "legacy slack", summary: "0 succeeded, 0 failed"},
+		"dynatrace gap rejects all":   {overlay: dynatrace, code: 1, err: "legacy dynatrace", summary: "0 succeeded, 0 failed"},
+		"filter excludes dynatrace":   {overlay: dynatrace, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
+		"disabled dynatrace":          {overlay: dynatrace + "; SEND_DYNATRACE=NO", calls: 1, summary: "1 succeeded, 0 failed"},
 		"filter excludes gap":         {overlay: `SLACK_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_SLACK=channel`, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
 		"missing history rejects all": {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|critical'`, code: 1, err: "critical_seen_since_clear", summary: "0 succeeded, 0 failed"},
 		"stateless skip":              {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|nowarn|critical'`, summary: "0 succeeded, 0 failed"},
