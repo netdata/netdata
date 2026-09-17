@@ -105,7 +105,7 @@ void pgc_open_cache_to_journal_v2(
     migrate_to_v2_callback cb,
     void *data,
     bool startup);
-void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile);
+void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct dbengine_datafile *datafile);
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 

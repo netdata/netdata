@@ -123,7 +123,7 @@ int dbengine_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
     store_point(sch, t + 100, 1);
     store_point(sch, t + 110, 2);
 
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
+    struct dbengine_collect_handle *handle = (struct dbengine_collect_handle *)sch;
     if(!handle->pgc_page || pgc_page_data(handle->pgc_page) == PGD_EMPTY ||
        pgd_slots_used(pgc_page_data(handle->pgc_page)) != 2 ||
        pgc_page_start_time_s(handle->pgc_page) != t + 100 ||

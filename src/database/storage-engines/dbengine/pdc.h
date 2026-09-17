@@ -5,7 +5,7 @@
 
 #include "rrdengine.h"
 
-struct rrdeng_cmd;
+struct dbengine_cmd;
 
 #define PDCJudyLIns             JudyLIns
 #define PDCJudyLGet             JudyLGet
@@ -38,7 +38,7 @@ void epdl_extent_init(void);
 void extent_buffer_cleanup1(void);
 
 void epdl_cmd_dequeued(void *epdl_ptr);
-void epdl_cmd_queued(void *epdl_ptr, struct rrdeng_cmd *cmd);
+void epdl_cmd_queued(void *epdl_ptr, struct dbengine_cmd *cmd);
 
 struct extent_buffer {
     size_t bytes;

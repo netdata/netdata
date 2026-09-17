@@ -8,9 +8,9 @@ struct extent_page_details_list {
     uint32_t extent_size;
     Pvoid_t page_details_by_metric_id_JudyL;
     struct page_details_control *pdc;
-    struct rrdengine_datafile *datafile;
+    struct dbengine_datafile *datafile;
 
-    struct rrdeng_cmd *cmd;
+    struct dbengine_cmd *cmd;
     EPDL_EXTENT *extent_base; // the extent this epdl is merged onto - resolved once by epdl_pending_add()
     bool head_to_datafile_extent_queries_pending_for_extent;
 
@@ -475,7 +475,7 @@ ALWAYS_INLINE bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker
     return false;
 }
 
-ALWAYS_INLINE void epdl_cmd_queued(void *epdl_ptr, struct rrdeng_cmd *cmd) {
+ALWAYS_INLINE void epdl_cmd_queued(void *epdl_ptr, struct dbengine_cmd *cmd) {
     EPDL *epdl = epdl_ptr;
     epdl->cmd = cmd;
 }
@@ -485,7 +485,7 @@ ALWAYS_INLINE void epdl_cmd_dequeued(void *epdl_ptr) {
     epdl->cmd = NULL;
 }
 
-static ALWAYS_INLINE struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
+static ALWAYS_INLINE struct dbengine_cmd *epdl_get_cmd(void *epdl_ptr) {
     EPDL *epdl = epdl_ptr;
     return epdl->cmd;
 }
@@ -540,7 +540,7 @@ static ALWAYS_INLINE bool epdl_pending_add(EPDL *epdl) {
 
 //        if(e->base->pdc->priority > epdl->pdc->priority) {
 //            e->base->pdc->priority = epdl->pdc->priority;
-//            rrdeng_req_cmd(epdl_get_cmd, e->base, epdl->pdc->priority);
+//            dbengine_req_cmd(epdl_get_cmd, e->base, epdl->pdc->priority);
 //        }
     }
     else {
@@ -703,40 +703,40 @@ ALWAYS_INLINE_HOT void pdc_to_epdl_router(struct dbengine_tier *ctx, PDC *pdc, e
     pdc_release_and_destroy_if_unreferenced(pdc, true, true);
 }
 
-void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
-    if(flags & RRDENG_PAGE_PAST_COLLECTION)
+void collect_page_flags_to_buffer(BUFFER *wb, DBENGINE_COLLECT_PAGE_FLAGS flags) {
+    if(flags & DBENGINE_PAGE_PAST_COLLECTION)
         buffer_strcat(wb, "PAST_COLLECTION ");
-    if(flags & RRDENG_PAGE_REPEATED_COLLECTION)
+    if(flags & DBENGINE_PAGE_REPEATED_COLLECTION)
         buffer_strcat(wb, "REPEATED_COLLECTION ");
-    if(flags & RRDENG_PAGE_BIG_GAP)
+    if(flags & DBENGINE_PAGE_BIG_GAP)
         buffer_strcat(wb, "BIG_GAP ");
-    if(flags & RRDENG_PAGE_GAP)
+    if(flags & DBENGINE_PAGE_GAP)
         buffer_strcat(wb, "GAP ");
-    if(flags & RRDENG_PAGE_FUTURE_POINT)
+    if(flags & DBENGINE_PAGE_FUTURE_POINT)
         buffer_strcat(wb, "FUTURE_POINT ");
-    if(flags & RRDENG_PAGE_CREATED_IN_FUTURE)
+    if(flags & DBENGINE_PAGE_CREATED_IN_FUTURE)
         buffer_strcat(wb, "CREATED_IN_FUTURE ");
-    if(flags & RRDENG_PAGE_COMPLETED_IN_FUTURE)
+    if(flags & DBENGINE_PAGE_COMPLETED_IN_FUTURE)
         buffer_strcat(wb, "COMPLETED_IN_FUTURE ");
-    if(flags & RRDENG_PAGE_UNALIGNED)
+    if(flags & DBENGINE_PAGE_UNALIGNED)
         buffer_strcat(wb, "UNALIGNED ");
-    if(flags & RRDENG_PAGE_CONFLICT)
+    if(flags & DBENGINE_PAGE_CONFLICT)
         buffer_strcat(wb, "CONFLICT ");
-    if(flags & RRDENG_PAGE_FULL)
+    if(flags & DBENGINE_PAGE_FULL)
         buffer_strcat(wb, "PAGE_FULL ");
-    if(flags & RRDENG_PAGE_COLLECT_FINALIZE)
+    if(flags & DBENGINE_PAGE_COLLECT_FINALIZE)
         buffer_strcat(wb, "COLLECT_FINALIZE ");
-    if(flags & RRDENG_PAGE_UPDATE_EVERY_CHANGE)
+    if(flags & DBENGINE_PAGE_UPDATE_EVERY_CHANGE)
         buffer_strcat(wb, "UPDATE_EVERY_CHANGE ");
-    if(flags & RRDENG_PAGE_STEP_TOO_SMALL)
+    if(flags & DBENGINE_PAGE_STEP_TOO_SMALL)
         buffer_strcat(wb, "STEP_TOO_SMALL ");
-    if(flags & RRDENG_PAGE_STEP_UNALIGNED)
+    if(flags & DBENGINE_PAGE_STEP_UNALIGNED)
         buffer_strcat(wb, "STEP_UNALIGNED ");
-    if(flags & RRDENG_PAGE_RETENTION_RECORDED)
+    if(flags & DBENGINE_PAGE_RETENTION_RECORDED)
         buffer_strcat(wb, "RETENTION_RECORDED ");
 }
 
-ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
+ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
     time_t start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
 
     time_t end_time_s = 0;
@@ -779,7 +779,7 @@ static void validate_page_log(nd_uuid_t *uuid,
                               size_t entries,
                               time_t now_s,
                               const char *msg,
-                              RRDENG_COLLECT_PAGE_FLAGS flags,
+                              DBENGINE_COLLECT_PAGE_FLAGS flags,
                               VALIDATED_PAGE_DESCRIPTOR vd) {
 #ifndef NETDATA_INTERNAL_CHECKS
     nd_log_limit_static_global_var(erl, 1, 0);
@@ -868,7 +868,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         uint32_t overwrite_zero_update_every_s,   // can be zero, if unknown
         bool have_read_error,
         const char *msg,
-        RRDENG_COLLECT_PAGE_FLAGS flags)
+        DBENGINE_COLLECT_PAGE_FLAGS flags)
 {
     VALIDATED_PAGE_DESCRIPTOR vd = {
             .start_time_s = start_time_s,
@@ -913,7 +913,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 
     bool updated = false;
 
-    size_t max_page_length = RRDENG_BLOCK_SIZE;
+    size_t max_page_length = DBENGINE_BLOCK_SIZE;
 
     // If gorilla can not compress the data we might end up needing slightly more
     // than 4KiB. However, gorilla pages extend the page length by increments of
@@ -1004,7 +1004,7 @@ static ALWAYS_INLINE struct page_details *epdl_get_pd_load_link_list_from_metric
     return pd_list;
 }
 
-static void epdl_extent_loading_error_log(struct dbengine_tier *ctx, EPDL *epdl, struct rrdeng_extent_page_descr *descr, const char *msg, ND_LOG_FIELD_PRIORITY priority) {
+static void epdl_extent_loading_error_log(struct dbengine_tier *ctx, EPDL *epdl, struct dbengine_extent_page_descr *descr, const char *msg, ND_LOG_FIELD_PRIORITY priority) {
     char uuid[UUID_STR_LEN] = "";
     time_t start_time_s = 0;
     time_t end_time_s = 0;
@@ -1087,13 +1087,13 @@ static bool epdl_populate_pages_from_extent_data(
     uint32_t uncompressed_payload_length = 0;
     bool have_read_error = false;
     /* persistent structures */
-    struct rrdeng_df_extent_header *header;
-    struct rrdeng_df_extent_trailer *trailer;
+    struct dbengine_df_extent_header *header;
+    struct dbengine_df_extent_trailer *trailer;
     struct extent_buffer *eb = NULL;
     uLong crc;
 
     bool can_use_data = true;
-    if(!rrdeng_valid_extent_disk_size(data_length)) {
+    if(!dbengine_valid_extent_disk_size(data_length)) {
         can_use_data = false;
 
         // added to satisfy the requirements of older compilers (prevent warnings)
@@ -1135,15 +1135,15 @@ static bool epdl_populate_pages_from_extent_data(
     if(worker)
         worker_is_busy(DBENGINE_WORKER_JOB_EXTENT_DECOMPRESSION);
 
-    if (likely(!have_read_error && RRDENG_COMPRESSION_NONE != header->compression_algorithm)) {
+    if (likely(!have_read_error && DBENGINE_COMPRESSION_NONE != header->compression_algorithm)) {
         // find the uncompressed extent size
         uncompressed_payload_length = 0;
         for (i = 0; i < count; ++i) {
             size_t page_length = header->descr[i].page_length;
-            if (page_length > RRDENG_BLOCK_SIZE &&
+            if (page_length > DBENGINE_BLOCK_SIZE &&
                 (header->descr[i].type != DBENGINE_PAGE_TYPE_GORILLA_32BIT ||
                  (header->descr[i].type == DBENGINE_PAGE_TYPE_GORILLA_32BIT &&
-                  (page_length - RRDENG_BLOCK_SIZE) % RRDENG_GORILLA_32BIT_BUFFER_SIZE))) {
+                  (page_length - DBENGINE_BLOCK_SIZE) % RRDENG_GORILLA_32BIT_BUFFER_SIZE))) {
                 have_read_error = true;
                 break;
             }
@@ -1223,7 +1223,7 @@ static bool epdl_populate_pages_from_extent_data(
             stats_load_invalid_page++;
         }
         else {
-            if (RRDENG_COMPRESSION_NONE == header->compression_algorithm) {
+            if (DBENGINE_COMPRESSION_NONE == header->compression_algorithm) {
                 if (unlikely(vd.page_length > payload_length ||
                              page_offset > payload_length - vd.page_length)) {
                     char log[200 + 1];
@@ -1300,7 +1300,7 @@ static bool epdl_populate_pages_from_extent_data(
         // (pagecache.c, "page = pd->page" before any completion check) and only falls back to
         // completion_wait_for_a_job() when it is still NULL. Having taken it, it sets
         // PDC_PAGE_RELEASED to take ownership of our reference (pdc_destroy() then skips it),
-        // and releases it from rrdeng_load_page_next() when it moves to the next page.
+        // and releases it from dbengine_load_page_next() when it moves to the next page.
         //
         // That release is NOT gated by the pdc refcount this worker holds - that only blocks
         // pdc_destroy().
@@ -1367,7 +1367,7 @@ static bool epdl_populate_pages_from_extent_data(
 
 static inline void *datafile_extent_read(struct dbengine_tier *ctx, uv_file file, uint32_t block, unsigned size_bytes)
 {
-    if (unlikely(!rrdeng_valid_extent_disk_size(size_bytes))) {
+    if (unlikely(!dbengine_valid_extent_disk_size(size_bytes))) {
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "DBENGINE: refusing to read extent at offset %" PRIu64 " with invalid size %u",

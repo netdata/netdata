@@ -5,46 +5,46 @@
 
 #include <stdint.h>
 
-#define RRDENG_BLOCK_SIZE (4096)
-#define RRDFILE_ALIGNMENT RRDENG_BLOCK_SIZE
+#define DBENGINE_BLOCK_SIZE (4096)
+#define RRDFILE_ALIGNMENT DBENGINE_BLOCK_SIZE
 
-#define RRDENG_MAGIC_SZ (32)
-#define RRDENG_DF_MAGIC "netdata-data-file"
-#define RRDENG_JF_MAGIC "netdata-journal-file"
+#define DBENGINE_MAGIC_SZ (32)
+#define DBENGINE_DF_MAGIC "netdata-data-file"
+#define DBENGINE_JF_MAGIC "netdata-journal-file"
 
-#define RRDENG_VER_SZ (16)
-#define RRDENG_DF_VER "1.0"
-#define RRDENG_JF_VER "1.0"
+#define DBENGINE_VER_SZ (16)
+#define DBENGINE_DF_VER "1.0"
+#define DBENGINE_JF_VER "1.0"
 
 #define UUID_SZ (16)
 #define CHECKSUM_SZ (4) /* CRC32 */
 
-#define RRDENG_COMPRESSION_NONE (0)
-#define RRDENG_COMPRESSION_LZ4  (1)
-#define RRDENG_COMPRESSION_ZSTD (2)
+#define DBENGINE_COMPRESSION_NONE (0)
+#define DBENGINE_COMPRESSION_LZ4  (1)
+#define DBENGINE_COMPRESSION_ZSTD (2)
 
-#define RRDENG_DF_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + RRDENG_VER_SZ + sizeof(uint8_t)))
+#define DBENGINE_DF_SB_PADDING_SZ (DBENGINE_BLOCK_SIZE - (DBENGINE_MAGIC_SZ + DBENGINE_VER_SZ + sizeof(uint8_t)))
 
 /*
  * Data file persistent super-block
  */
 
-struct rrdeng_df_sb {
-    char magic_number[RRDENG_MAGIC_SZ];
-    char version[RRDENG_VER_SZ];
+struct dbengine_df_sb {
+    char magic_number[DBENGINE_MAGIC_SZ];
+    char version[DBENGINE_VER_SZ];
     uint8_t tier;
-    uint8_t padding[RRDENG_DF_SB_PADDING_SZ];
+    uint8_t padding[DBENGINE_DF_SB_PADDING_SZ];
 } __attribute__ ((packed));
 
 /*
- * Page types (the type byte of the page descriptor below): RRDENG_PAGE_TYPE_* in dbengine-config.h,
+ * Page types (the type byte of the page descriptor below): DBENGINE_PAGE_TYPE_* in dbengine-config.h,
  * where the embedder picks a tier's type.
  */
 
 /*
  * Data file page descriptor
  */
-struct rrdeng_extent_page_descr {
+struct dbengine_extent_page_descr {
     uint8_t type;
 
     uint8_t uuid[UUID_SZ];
@@ -63,29 +63,29 @@ struct rrdeng_extent_page_descr {
 /*
  * Data file extent header
  */
-struct rrdeng_df_extent_header {
+struct dbengine_df_extent_header {
     uint32_t payload_length;
     uint8_t compression_algorithm;
     uint8_t number_of_pages;
     /* #number_of_pages page descriptors follow */
-    struct rrdeng_extent_page_descr descr[];
+    struct dbengine_extent_page_descr descr[];
 } __attribute__ ((packed));
 
 /*
  * Data file extent trailer
  */
-struct rrdeng_df_extent_trailer {
+struct dbengine_df_extent_trailer {
     uint8_t checksum[CHECKSUM_SZ]; /* CRC32 */
 } __attribute__ ((packed));
 
-#define RRDENG_JF_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + RRDENG_VER_SZ))
+#define DBENGINE_JF_SB_PADDING_SZ (DBENGINE_BLOCK_SIZE - (DBENGINE_MAGIC_SZ + DBENGINE_VER_SZ))
 /*
  * Journal file super-block
  */
-struct rrdeng_jf_sb {
-    char magic_number[RRDENG_MAGIC_SZ];
-    char version[RRDENG_VER_SZ];
-    uint8_t padding[RRDENG_JF_SB_PADDING_SZ];
+struct dbengine_jf_sb {
+    char magic_number[DBENGINE_MAGIC_SZ];
+    char version[DBENGINE_VER_SZ];
+    uint8_t padding[DBENGINE_JF_SB_PADDING_SZ];
 } __attribute__ ((packed));
 
 /*
@@ -98,7 +98,7 @@ struct rrdeng_jf_sb {
 /*
  * Journal file transaction record header
  */
-struct rrdeng_jf_transaction_header {
+struct dbengine_jf_transaction_header {
     /* when set to STORE_PADDING jump to start of next block */
     uint8_t type;
 
@@ -110,21 +110,21 @@ struct rrdeng_jf_transaction_header {
 /*
  * Journal file transaction record trailer
  */
-struct rrdeng_jf_transaction_trailer {
+struct dbengine_jf_transaction_trailer {
     uint8_t checksum[CHECKSUM_SZ]; /* CRC32 */
 } __attribute__ ((packed));
 
 /*
  * Journal file STORE_DATA action
  */
-struct rrdeng_jf_store_data {
+struct dbengine_jf_store_data {
     /* data file extent information */
     uint64_t extent_offset;
     uint32_t extent_size;
 
     uint8_t number_of_pages;
     /* #number_of_pages page descriptors follow */
-    struct rrdeng_extent_page_descr descr[];
+    struct dbengine_extent_page_descr descr[];
 } __attribute__ ((packed));
 
 #endif /* NETDATA_RRDDISKPROTOCOL_H */

@@ -44,12 +44,12 @@ struct pg_alignment {
     uint32_t refcount;
 };
 
-struct rrdeng_query_handle;
+struct dbengine_query_handle;
 struct page_details_control;
 
-void rrdeng_prep_wait(struct page_details_control *pdc);
-void rrdeng_prep_query(struct page_details_control *pdc, bool worker);
-void pg_cache_preload(struct rrdeng_query_handle *handle);
+void dbengine_prep_wait(struct page_details_control *pdc);
+void dbengine_prep_query(struct page_details_control *pdc, bool worker);
+void pg_cache_preload(struct dbengine_query_handle *handle);
 struct pgc_page *pg_cache_lookup_next(struct dbengine_tier *ctx, struct page_details_control *pdc, time_t now_s, uint32_t last_update_every_s, size_t *entries);
 void pgc_and_mrg_initialize(void);
 
@@ -60,7 +60,7 @@ void pgc_open_add_hot_page(
     time_t start_time_s,
     time_t end_time_s,
     uint32_t update_every_s,
-    struct rrdengine_datafile *datafile,
+    struct dbengine_datafile *datafile,
     uint64_t extent_offset,
     unsigned extent_size);
 

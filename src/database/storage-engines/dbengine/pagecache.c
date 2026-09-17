@@ -50,14 +50,14 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
     struct completion completion;
     completion_init(&completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_EXTENT_WRITE, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    dbengine_enq_cmd(ctx, DBENGINE_OPCODE_EXTENT_WRITE, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 }
 
 static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
-    struct rrdengine_datafile *datafile = entry.data;
+    struct dbengine_datafile *datafile = entry.data;
     datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
     timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_OPEN);
 }
@@ -292,7 +292,7 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metri
             }
 
             if(open_cache_mode) {
-                struct rrdengine_datafile *datafile = pgc_page_data(page);
+                struct dbengine_datafile *datafile = pgc_page_data(page);
                 if(datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) { // for pd
                     struct extent_io_data *xio = (struct extent_io_data *) pgc_page_custom_data(cache, page);
                     pd->datafile.ptr = pgc_page_data(page);
@@ -511,7 +511,7 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
             .j2_header_acquired = NULL,
     };
 
-    struct rrdengine_datafile *datafile;
+    struct dbengine_datafile *datafile;
     while((datafile = njfv2idx_find_and_acquire_j2_header(&state))) {
         struct journal_v2_header *j2_header = state.j2_header_acquired;
 
@@ -520,7 +520,7 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
             continue;
         }
 
-        char file_path[RRDENG_PATH_MAX];
+        char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
         if(no_signal_received) {
@@ -663,7 +663,7 @@ release_journal:
 }
 
 void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
-    struct rrdengine_datafile *datafile = pgc_page_data(page);
+    struct dbengine_datafile *datafile = pgc_page_data(page);
 
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) // for pd
         return;
@@ -825,7 +825,7 @@ we_are_done:
     return JudyL_page_array;
 }
 
-ALWAYS_INLINE void rrdeng_prep_wait(PDC *pdc) {
+ALWAYS_INLINE void dbengine_prep_wait(PDC *pdc) {
     if (unlikely(pdc && !pdc->prep_done)) {
         usec_t started_ut = now_monotonic_usec();
         completion_wait_for(&pdc->prep_completion);
@@ -834,7 +834,7 @@ ALWAYS_INLINE void rrdeng_prep_wait(PDC *pdc) {
     }
 }
 
-ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
+ALWAYS_INLINE_HOT void dbengine_prep_query(struct page_details_control *pdc, bool worker) {
     if(worker)
         worker_is_busy(DBENGINE_WORKER_JOB_QUERY);
 
@@ -889,7 +889,7 @@ ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool 
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
+ALWAYS_INLINE_HOT void pg_cache_preload(struct dbengine_query_handle *handle) {
     if (unlikely(!handle || !handle->metric))
         return;
 
@@ -923,9 +923,9 @@ ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
 
         if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS || handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS_FIRST))
-            rrdeng_prep_query(handle->pdc, false);
+            dbengine_prep_query(handle->pdc, false);
         else
-            rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
+            dbengine_enq_cmd(handle->ctx, DBENGINE_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }
     else {
         completion_mark_complete(&handle->pdc->prep_completion);
@@ -948,7 +948,7 @@ struct pgc_page *pg_cache_lookup_next(
     if (unlikely(!pdc))
         return NULL;
 
-    rrdeng_prep_wait(pdc);
+    dbengine_prep_wait(pdc);
 
     if (unlikely(!pdc->page_list_JudyL))
         return NULL;
@@ -1087,11 +1087,11 @@ void pgc_open_add_hot_page(
     time_t start_time_s,
     time_t end_time_s,
     uint32_t update_every_s,
-    struct rrdengine_datafile *datafile,
+    struct dbengine_datafile *datafile,
     uint64_t extent_offset,
     unsigned extent_size)
 {
-    if (unlikely(!rrdeng_valid_extent_disk_size(extent_size))) {
+    if (unlikely(!dbengine_valid_extent_disk_size(extent_size))) {
         nd_log_limit_static_thread_var(erl, 10, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "DBENGINE: skipped adding open-cache page for datafile %u of tier %u, "

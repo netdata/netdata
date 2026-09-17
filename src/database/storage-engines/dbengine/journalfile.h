@@ -7,8 +7,8 @@
 
 /* Forward declarations */
 struct dbengine_tier;
-struct rrdengine_datafile;
-struct rrdengine_journalfile;
+struct dbengine_datafile;
+struct dbengine_journalfile;
 
 #define WALFILE_PREFIX "journalfile-"
 #define WALFILE_EXTENSION ".njf"
@@ -29,7 +29,7 @@ typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY,
 } JOURNALFILE_V2_ACCESS_HINT;
 
-struct rrdengine_journalfile {
+struct dbengine_journalfile {
     SPINLOCK_TRACKED data_spinlock;  // tracked: journalfile_v2_data_acquire 3600s deadlocks need holder identity
     struct {
         void *data;                    // MMAPed file of journal v2
@@ -56,10 +56,10 @@ struct rrdengine_journalfile {
     } unsafe;
 
     uv_file file;
-    struct rrdengine_datafile *datafile;
+    struct dbengine_datafile *datafile;
 };
 
-static inline uint64_t journalfile_current_size(struct rrdengine_journalfile *journalfile) {
+static inline uint64_t journalfile_current_size(struct dbengine_journalfile *journalfile) {
     spinlock_lock(&journalfile->unsafe.spinlock);
     uint64_t size = journalfile->unsafe.pos;
     spinlock_unlock(&journalfile->unsafe.spinlock);
@@ -172,7 +172,7 @@ struct journal_v2_header {
 };
 
 // Reserve the first 4 KiB for the journal v2 header
-#define JOURNAL_V2_HEADER_PADDING_SZ (RRDENG_BLOCK_SIZE - (sizeof(struct journal_v2_header)))
+#define JOURNAL_V2_HEADER_PADDING_SZ (DBENGINE_BLOCK_SIZE - (sizeof(struct journal_v2_header)))
 
 // Extent section item (16 bytes)
 struct journal_extent_list {
@@ -256,12 +256,12 @@ struct journal_page_list {
 
 struct wal;
 
-void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
-void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
-struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafile *datafile);
-int journalfile_v1_extent_write(struct dbengine_tier *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
-int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
-int journalfile_unlink(struct rrdengine_journalfile *journalfile);
+void journalfile_v1_generate_path(struct dbengine_datafile *datafile, char *str, size_t maxlen);
+void journalfile_v2_generate_path(struct dbengine_datafile *datafile, char *str, size_t maxlen);
+struct dbengine_journalfile *journalfile_alloc_and_init(struct dbengine_datafile *datafile);
+int journalfile_v1_extent_write(struct dbengine_tier *ctx, struct dbengine_datafile *datafile, struct wal *wal);
+int journalfile_close(struct dbengine_journalfile *journalfile, struct dbengine_datafile *datafile);
+int journalfile_unlink(struct dbengine_journalfile *journalfile);
 #define JOURNALFILE_DELETED_V1  (1u << 0) // .njf was deleted
 #define JOURNALFILE_DELETED_V2  (1u << 1) // .njfv2 was deleted
 #define JOURNALFILE_DELETED_ALL (JOURNALFILE_DELETED_V1 | JOURNALFILE_DELETED_V2)
@@ -270,23 +270,23 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile);
  * indicating which on-disk journal files were deleted. This is not a
  * 0 / -errno style status code.
  */
-uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
-int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
-int journalfile_load(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile,
-                     struct rrdengine_datafile *datafile);
-void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct rrdengine_journalfile *journalfile);
+uint8_t journalfile_destroy_unsafe(struct dbengine_journalfile *journalfile, struct dbengine_datafile *datafile);
+int journalfile_create(struct dbengine_journalfile *journalfile, struct dbengine_datafile *datafile);
+int journalfile_load(struct dbengine_tier *ctx, struct dbengine_journalfile *journalfile,
+                     struct dbengine_datafile *datafile);
+void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct dbengine_journalfile *journalfile);
 
 bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                         size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data);
 
 
-bool journalfile_v2_data_available(struct rrdengine_journalfile *journalfile);
-size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile);
-void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size);
-struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
-struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint);
-void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile);
+bool journalfile_v2_data_available(struct dbengine_journalfile *journalfile);
+size_t journalfile_v2_data_size_get(struct dbengine_journalfile *journalfile);
+void journalfile_v2_data_set(struct dbengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size);
+struct journal_v2_header *journalfile_v2_data_acquire(struct dbengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
+struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct dbengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint);
+void journalfile_v2_data_release(struct dbengine_journalfile *journalfile);
 void journalfile_v2_data_unmount_cleanup(time_t now_s);
 
 typedef struct {
@@ -298,6 +298,6 @@ typedef struct {
     struct journal_v2_header *j2_header_acquired;
 } NJFV2IDX_FIND_STATE;
 
-struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s);
+struct dbengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s);
 
 #endif /* NETDATA_JOURNALFILE_H */

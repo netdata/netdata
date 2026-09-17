@@ -4,7 +4,7 @@
 #include "rrdengine.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
-// Global dummy rrdengine_instances for tests
+// Global dummy dbengine_instances for tests
 static struct dbengine_tier test_ctx_0 = {0};
 static struct dbengine_tier test_ctx_1 = {0};
 static struct dbengine_tier test_ctx_tier[4] = { 0 }; // For stress test tiers
@@ -72,7 +72,7 @@ static int mrg_unittest_expect_samples_delta(
     const char *name)
 {
     uint64_t samples = UINT64_MAX;
-    bool rc = rrdeng_retention_samples_delta(ctx, first_time_s, last_time_s, update_every_s, name, &samples);
+    bool rc = dbengine_retention_samples_delta(ctx, first_time_s, last_time_s, update_every_s, name, &samples);
 
     if(rc == expected_rc && samples == expected_samples)
         return 0;
@@ -97,7 +97,7 @@ static int mrg_unittest_expect_counter_sub(
     const char *name)
 {
     uint64_t counter = initial;
-    bool rc = rrdeng_atomic_uint64_sub_saturating(ctx, &counter, decrement, "unittest", name);
+    bool rc = dbengine_atomic_uint64_sub_saturating(ctx, &counter, decrement, "unittest", name);
 
     if(rc == expected_rc && counter == expected_value)
         return 0;
@@ -136,7 +136,7 @@ static int dbengine_accounting_helpers_unittest(void) {
 
     ctx.atomic.metrics = 11;
     ctx.atomic.samples = 22;
-    rrdeng_reset_accounting_if_fresh(&ctx, false);
+    dbengine_reset_accounting_if_fresh(&ctx, false);
     if(ctx.atomic.metrics != 11 || ctx.atomic.samples != 22) {
         fprintf(stderr,
                 "DBENGINE METRIC: global-context accounting reset policy failed, expected 11/22 got %"PRIu64"/%"PRIu64"\n",
@@ -145,7 +145,7 @@ static int dbengine_accounting_helpers_unittest(void) {
         errors++;
     }
 
-    rrdeng_reset_accounting_if_fresh(&ctx, true);
+    dbengine_reset_accounting_if_fresh(&ctx, true);
     if(ctx.atomic.metrics != 0 || ctx.atomic.samples != 0) {
         fprintf(stderr,
                 "DBENGINE METRIC: fresh-context accounting reset policy failed, expected 0/0 got %"PRIu64"/%"PRIu64"\n",
@@ -1550,7 +1550,7 @@ cleanup_early:
 #define JV2_TMPDIR_TEMPLATE "/netdata-jv2-writer-XXXXXX"
 
 // Longest name journalfile_v2_generate_path() appends to dbfiles_path:
-// "/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 is ~31 bytes.
+// "/" WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 is ~31 bytes.
 // Round up generously - being wrong here means a silently truncated journal path.
 #define JV2_JOURNAL_NAME_MAX 64
 
@@ -1587,7 +1587,7 @@ static bool jv2_tmpdir_is_usable(const char *dir, size_t dst_size) {
 
     const size_t len = strlen(dir);
     const size_t needed = len + sizeof(JV2_TMPDIR_TEMPLATE) + JV2_JOURNAL_NAME_MAX;
-    if(needed > dst_size || needed > RRDENG_PATH_MAX || needed > FILENAME_MAX)
+    if(needed > dst_size || needed > DBENGINE_PATH_MAX || needed > FILENAME_MAX)
         return false;
 
     for(size_t i = 0; i < len; i++) {
@@ -1666,7 +1666,7 @@ static int mrg_jv2_real_writer_unittest(void) {
     // A zeroed fixture is NOT enough: activation validates the datafile and takes
     // locks that must be constructed, not merely zeroed. Mirror what production does.
     //
-    //   - initialize_single_ctx() (rrdengineapi.c) builds the two ctx locks. It is
+    //   - initialize_tier() (rrdengineapi.c) builds the two ctx locks. It is
     //     static, so they are constructed here: njfv2idx.spinlock is taken by
     //     njfv2idx_add(), which journalfile_v2_data_set() calls on activation.
     //   - datafile_alloc_and_init() (datafile.c) stamps DATAFILE_MAGIC and builds the
@@ -1684,7 +1684,7 @@ static int mrg_jv2_real_writer_unittest(void) {
     fatal_assert(0 == netdata_rwlock_init(&ctx.datafiles.rwlock));
     rw_spinlock_init(&ctx.njfv2idx.spinlock);
 
-    struct rrdengine_datafile datafile;
+    struct dbengine_datafile datafile;
     memset(&datafile, 0, sizeof(datafile));
     datafile.tier = 1;              // datafile_alloc_and_init() asserts exactly this
     datafile.fileno = TEST_FILENO;
@@ -1696,7 +1696,7 @@ static int mrg_jv2_real_writer_unittest(void) {
     spinlock_init(&datafile.writers.spinlock);
     rw_spinlock_init(&datafile.extent_epdl.spinlock);
 
-    struct rrdengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
+    struct dbengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
 
     const Word_t section = (Word_t)&ctx;
 

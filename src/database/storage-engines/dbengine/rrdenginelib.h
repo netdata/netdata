@@ -8,10 +8,10 @@
 /* Forward declarations */
 struct dbengine_tier;
 
-#define ALIGN_BYTES_FLOOR(x) (((x) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
-#define ALIGN_BYTES_CEILING(x) ((((x) + RRDENG_BLOCK_SIZE - 1) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
+#define ALIGN_BYTES_FLOOR(x) (((x) / DBENGINE_BLOCK_SIZE) * DBENGINE_BLOCK_SIZE)
+#define ALIGN_BYTES_CEILING(x) ((((x) + DBENGINE_BLOCK_SIZE - 1) / DBENGINE_BLOCK_SIZE) * DBENGINE_BLOCK_SIZE)
 
-typedef uintptr_t rrdeng_stats_t;
+typedef uintptr_t dbengine_stats_t;
 
 #ifdef __ATOMIC_RELAXED
 #define rrd_atomic_fetch_add(p, n) __atomic_fetch_add(p, n, __ATOMIC_RELAXED)
@@ -51,7 +51,7 @@ static inline void modify_bit(unsigned *x, unsigned pos, uint8_t val)
     }
 }
 
-#define RRDENG_PATH_MAX (FILENAME_MAX + 1)
+#define DBENGINE_PATH_MAX (FILENAME_MAX + 1)
 
 /* returns old *ptr value */
 static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,
