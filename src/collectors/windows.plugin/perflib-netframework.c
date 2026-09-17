@@ -19,6 +19,8 @@ enum netdata_netframework_metrics {
 
 struct net_framework_instances {
     usec_t last_collected;
+    ULONGLONG last_process_id;
+    bool process_id_label_initialized;
 
     RRDSET *st_clrexception_thrown;
     RRDDIM *rd_clrexception_thrown;
@@ -383,9 +385,9 @@ static void netframework_update_memory_process_id_labels(struct net_framework_in
     if (!has_process_id)
         return;
 
+    ULONGLONG current_process_id = p->NETFrameworkCLRMemoryProcessId.current.Data;
     char process_id[UINT64_MAX_LENGTH];
-    snprintfz(process_id, sizeof(process_id), "%llu",
-              (unsigned long long)p->NETFrameworkCLRMemoryProcessId.current.Data);
+    snprintfz(process_id, sizeof(process_id), "%llu", (unsigned long long)current_process_id);
 
 #define UPDATE_PROCESS_ID_LABEL(st) \
     do { \
@@ -405,6 +407,9 @@ static void netframework_update_memory_process_id_labels(struct net_framework_in
     UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_committed_bytes);
     UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_reserved_bytes);
     UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_gc_time);
+
+    p->last_process_id = current_process_id;
+    p->process_id_label_initialized = true;
 
 #undef UPDATE_PROCESS_ID_LABEL
 }
@@ -1656,7 +1661,10 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             rrdset_done(p->st_clrmemory_gc_time);
         }
 
-        netframework_update_memory_process_id_labels(p, has_process_id);
+        if (has_process_id &&
+            (!p->process_id_label_initialized ||
+             p->last_process_id != p->NETFrameworkCLRMemoryProcessId.current.Data))
+            netframework_update_memory_process_id_labels(p, has_process_id);
     }
 }
 
