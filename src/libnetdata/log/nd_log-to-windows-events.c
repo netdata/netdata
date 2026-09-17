@@ -178,9 +178,6 @@ bool nd_log_init_etw(void) {
 #define SMALL_WIDE_BUFFERS_SIZE 256
 #define MEDIUM_WIDE_BUFFERS_SIZE 2048
 #define BIG_WIDE_BUFFERS_SIZE 16384
-// Largest per-field wide-char buffer (incl. null terminator). Used by
-// etw_wcslen_bounded() to satisfy SonarQube S5813 at ETW write sites.
-#define NDF_FIELD_MAX_CHARS BIG_WIDE_BUFFERS_SIZE
 static wchar_t small_wide_buffers[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
 static wchar_t medium_wide_buffers[2][MEDIUM_WIDE_BUFFERS_SIZE];
 static wchar_t big_wide_buffers[2][BIG_WIDE_BUFFERS_SIZE];
@@ -254,6 +251,12 @@ static inline const wchar_t *etw_entry_field(const struct etw_queue_entry *e, si
     return e->small[i];
 }
 
+static inline size_t etw_entry_field_capacity(size_t i) {
+    if(i == NDF_NIDL_INSTANCE) return MEDIUM_WIDE_BUFFERS_SIZE;
+    if(i == NDF_REQUEST || i == NDF_MESSAGE) return BIG_WIDE_BUFFERS_SIZE;
+    return SMALL_WIDE_BUFFERS_SIZE;
+}
+
 static bool etw_entry_process(struct etw_queue_entry *e) {
     EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
     for(size_t i = 1; i < _NDF_MAX; i++) {
@@ -262,7 +265,7 @@ static bool etw_entry_process(struct etw_queue_entry *e) {
         // when populated; the bounded helper is only here to satisfy SonarQube S5813
         // and to return 0 on a malformed buffer rather than overread it.
         EventDataDescCreate(&desc[i - 1], buf,
-                            (ULONG)((etw_wcslen_bounded(buf, NDF_FIELD_MAX_CHARS) + 1) * sizeof(WCHAR)));
+                            (ULONG)((etw_wcslen_bounded(buf, etw_entry_field_capacity(i)) + 1) * sizeof(WCHAR)));
     }
     EVENT_DESCRIPTOR ed = {
         .Id      = e->eventID & EVENT_ID_CODE_MASK,

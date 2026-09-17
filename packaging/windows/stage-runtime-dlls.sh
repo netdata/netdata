@@ -111,8 +111,11 @@ copy_missing_dlls_once() {
                     continue
                 fi
 
-                if [ ! -f "${destination}/${dll}" ]; then
-                    cp "${source}" "${destination}/${dll}"
+                # Refresh managed copies after runtime updates, but avoid copying a
+                # file onto itself when the runtime directory is the destination.
+                if [ ! -f "${destination}/${dll}" ] ||
+                    [ ! "${source}" -ef "${destination}/${dll}" ]; then
+                    cp -f "${source}" "${destination}/${dll}"
                     copied=$((copied + 1))
                     echo "Staged Windows runtime DLL: ${dll}"
                 fi
