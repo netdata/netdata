@@ -221,10 +221,10 @@ public surface and the build compiles the engine as one unit. The public headers
   libnetdata.
 - **`dbengine-tests.h`**: the self-tests and benchmarks the daemon offers as command-line modes.
 
-Tests: `mrg-unittest.c` and `page_test.cc` live here and use engine headers only; the daemon-side tests
-(`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through `RRDHOST`,
-`RRDSET` and `RRDDIM`. `dbengine-unittest.c` is, for now, the one translation unit outside this directory that
-includes the private `rrdengine.h`: its zero-page-cadence test inspects the collect handle's current page.
+Tests: `mrg-unittest.c`, `page_test.cc` and `rrdengineapi-unittest.c` live here and use engine headers only; the
+daemon-side tests (`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through
+`RRDHOST`, `RRDSET` and `RRDDIM` and its public headers. A check that needs an engine object, such as the page a
+collect handle holds, belongs in `rrdengineapi-unittest.c`, which the daemon driver calls with the tier it brought up.
 
 The daemon depends on the engine, not the other way round, and owns `netdata.conf` parsing, sqlite, streaming and the
 charts. The seal is enforced by review, not by the build: libnetdata exports the whole `src/` tree as an include
