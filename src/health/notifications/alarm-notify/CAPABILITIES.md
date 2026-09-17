@@ -16,9 +16,10 @@ Teams uses Workflows MessageCards by explicit approval, with full URLs per desti
 unsupported buttons; configurable status icons/colors are retained.
 Custom commands require foreground execution and waiting for their children by explicit approval; detached/background
 work is unsupported. Native executable/argv/JSON input replaces Bash function/global syntax; legacy adapters remain later work.
-SNS preserves message customization through native Event placeholders by explicit approval; Bash shell syntax and
-richer event facts remain later work. Kafka HTTP bridges use valid JSON with the existing payload field names and
-HTTP 204 acknowledgment by explicit approval, correcting Bash's hand-built JSON-like body and form content type.
+SNS preserves message customization through native Event placeholders by explicit approval. Legacy SNS assignments
+expand once using core event and optional producer-context scalars; arbitrary shell evaluation remains unsupported.
+Kafka HTTP bridges use valid JSON with the existing payload field names and HTTP 204 acknowledgment by explicit approval,
+correcting Bash's hand-built JSON-like body and form content type.
 Optional duration facts preserve unknown versus zero and are available to public Event consumers and SNS templates.
 Email uses correct UTF-8 MIME and separate threading headers by explicit approval, replacing Bash's ineffective
 charset-label override. Current native facts and durations ship first; richer email content remains tracked below
@@ -51,6 +52,10 @@ HipChat is excluded from the Go migration by explicit approval following its
   payloads and global delivery semantics are retained.
 - Legacy AWS SNS credential-mode/settings and ARN recipient mapping through the existing isolated CLI sender;
   once-expanded literal messages and initialized date/value/status facts. Ambient AWS profiles remain unsupported.
+- Optional input-only producer context carries remaining raw Bash notification facts: IDs, source/expressions,
+  formatted values, other-alert counts/lists and classification/identity metadata. Strict typed validation preserves
+  unknown versus zero, and native legacy evaluation exposes immutable scalar aliases. Native provider payloads remain
+  unchanged; custom execution/derived helpers and Agent JSON integration remain pending.
 - Configuration validation, literal/environment/file secrets, request timeout/cancellation, and safe diagnostics.
 - Central role-to-destination routing, defaults for unmapped roles, explicit suppression, reserved roles, and
   deduplication by destination name. Sequential fan-out records individual results and preserves any-success exits.
@@ -150,7 +155,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | ntfy | `send_ntfy` | Topic URLs, anonymous/Basic/token auth, text messages, priorities/tags/navigation and acknowledgment checks implemented |
 | ilert | `send_ilert` | Event API/API alert source, integration key/API base, ALERT/RESOLVE, stable encoded incident key, complete event details and navigation implemented; extended artwork/presentation pending |
 | SIGNL4 | `send_signl4` | Team webhook URL, current event content/navigation and new/resolved events with stable incident_id implemented; Bash per-event identity corrected by explicit decision; extended artwork/presentation pending |
-| Custom | `send_custom` / `custom_sender` | Native JSON webhook and foreground command/argv/env destinations implemented; detached work excluded by approval, old Bash function/global adapters and richer event facts remain later work |
+| Custom | `send_custom` / `custom_sender` | Native JSON webhook and foreground command/argv/env destinations implemented; detached work excluded by approval, raw producer-context input and legacy scalar expansion implemented; Bash function/global execution and derived helpers remain later work |
 
 ## Other functionality
 
@@ -176,4 +181,5 @@ The internal redesign is complete: shared event, formatting, secret, HTTP and pr
 packages, and every provider owns typed configuration and delivery behind the sender interface. Critical-history
 filtering builds on that central routing boundary. Native legacy settings reading is the first compatibility increment;
 legacy recipient routing, activation and CLI delivery now cover 29 methods. Remaining legacy work
-is optional Unix Bash custom execution. Remaining capabilities stay pending until delivered or explicitly excluded.
+is optional Unix Bash custom execution using the now-available producer-context input; derived presentation/helpers
+and Agent JSON integration remain pending. Remaining capabilities stay pending until delivered or explicitly excluded.

@@ -21,12 +21,6 @@ type Plan struct {
 	Routing      Routing
 }
 
-// Notification keeps input-only policy facts separate from the public provider event.
-type Notification struct {
-	Event                  event.Event
-	CriticalSeenSinceClear *bool
-}
-
 type Result struct {
 	Destination string
 	SkipReason  string
