@@ -159,10 +159,8 @@ int rrdeng_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
     }
 
 cleanup:
-    if(sch) {
-        rrdeng_store_metric_flush_current_page(sch);
-        rrdeng_store_metric_finalize(sch);
-    }
+    if(sch)
+        rrdeng_store_metric_finalize(sch); // flushes the page it holds
     if(smg)
         rrdeng_metrics_group_release(si, smg);
     if(smh)
