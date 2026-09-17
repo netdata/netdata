@@ -92,7 +92,10 @@ func (a *boundedErrorAccumulator) Err() error {
 		return nil
 	}
 	representatives := append([]boundedErrorRepresentative(nil), a.representatives...)
-	return &boundedOperationError{total: a.total, representatives: representatives}
+	return &boundedOperationError{
+		total:           a.total,
+		representatives: representatives,
+	}
 }
 
 func boundedErrorClass(err error) string {

@@ -35,9 +35,11 @@ func TestEmbeddedMemberFailuresKeepErrorOutputBounded(t *testing.T) {
 	}
 	client := &protocolClient{}
 	nodes, complete, err := client.acquireEmbeddedValues(
-		context.Background(),
 		fixtureParent(),
-		graphRelationship{Path: "Sensors", ChildKind: "sensor"},
+		graphRelationship{
+			Path:      "Sensors",
+			ChildKind: "sensor",
+		},
 		values,
 	)
 

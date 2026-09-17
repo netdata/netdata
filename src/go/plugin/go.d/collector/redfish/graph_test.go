@@ -22,12 +22,13 @@ func TestGraphRelationshipsRejectObjectsWithoutLinkIdentity(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	defer server.Close()
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-	parent := fixtureParent()
-	rel := graphRelationship{Path: "Processors", ChildKind: "processor"}
+	rel := graphRelationship{
+		Path:      "Processors",
+		ChildKind: "processor",
+	}
 
 	nodes, complete, err := client.acquireLinkedValues(
 		context.Background(),
-		parent,
 		rel,
 		map[string]any{},
 		nil,
@@ -52,10 +53,9 @@ func TestDuplicateEmbeddedIDsMakeEveryMemberPositional(t *testing.T) {
 	})
 	require.True(t, complete)
 	require.Len(t, nodes, 2)
-	for _, node := range nodes {
+	for index, node := range nodes {
 		assert.Equal(t, "positional", node.IdentityQuality)
-
-		assert.Contains(t, node.Locator, "position:")
+		assert.Equal(t, embeddedLocator(parent.URI, "Fans", "", index), node.Locator)
 	}
 	assert.NotEqual(t, nodes[0].Locator, nodes[1].Locator)
 }
@@ -63,7 +63,9 @@ func TestDuplicateEmbeddedIDsMakeEveryMemberPositional(t *testing.T) {
 func TestDuplicateEmbeddedComponentMakesGraphAndSliceIncomplete(t *testing.T) {
 	t.Parallel()
 
-	client := &protocolClient{graphMembership: make(map[string]graphMembershipSnapshot)}
+	client := &protocolClient{
+		graphMembership: make(map[string]graphMembershipSnapshot),
+	}
 	graph := &resourceGraph{
 		ByIdentity: make(map[string]*graphNode),
 		KeySources: make(map[string]string),
@@ -98,7 +100,6 @@ func TestDuplicateEmbeddedComponentMakesGraphAndSliceIncomplete(t *testing.T) {
 	))
 	require.False(t, graph.Complete)
 	require.Len(t, graph.Slices, 1)
-	assert.False(t, graph.Slices[0].Complete)
 	assert.Len(t, queue, 1)
 	require.Len(t, graph.Diagnostics, 1)
 	assert.Contains(t, graph.Diagnostics[0], "duplicate embedded component identity")
@@ -144,7 +145,10 @@ func TestEmbeddedProvenanceResolvesFragmentAgainstContainingResource(t *testing.
 	parent := fixtureParent()
 	node, err := client.embeddedNode(
 		parent,
-		graphRelationship{Path: "Sensor", ChildKind: "sensor"},
+		graphRelationship{
+			Path:      "Sensor",
+			ChildKind: "sensor",
+		},
 		map[string]any{
 			"Id":            "vendor-id-that-must-not-drive-a-singleton",
 			"DataSourceUri": "#/Reading",
@@ -166,7 +170,10 @@ func TestEmbeddedSingletonLocatorDoesNotDependOnOptionalID(t *testing.T) {
 	defer server.Close()
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	parent := fixtureParent()
-	rel := graphRelationship{Path: "Sensor", ChildKind: "sensor"}
+	rel := graphRelationship{
+		Path:      "Sensor",
+		ChildKind: "sensor",
+	}
 
 	first, err := client.embeddedNode(parent, rel, map[string]any{"Id": "first"}, -1)
 	require.NoError(t, err)
@@ -174,7 +181,7 @@ func TestEmbeddedSingletonLocatorDoesNotDependOnOptionalID(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, first.Locator, second.Locator)
-	assert.Contains(t, first.Locator, ":singleton")
+	assert.Equal(t, embeddedLocator(parent.URI, "Sensor", "", -1), first.Locator)
 }
 
 func TestNestedEmbeddedIdentityUsesImmediateContainerAndResourceProvenance(t *testing.T) {
@@ -197,7 +204,10 @@ func TestNestedEmbeddedIdentityUsesImmediateContainerAndResourceProvenance(t *te
 	for _, group := range groups {
 		node, err := client.embeddedNode(
 			group,
-			graphRelationship{Path: "Members", ChildKind: "sensor"},
+			graphRelationship{
+				Path:      "Members",
+				ChildKind: "sensor",
+			},
 			map[string]any{"MemberId": "same"},
 			0,
 		)
@@ -208,7 +218,10 @@ func TestNestedEmbeddedIdentityUsesImmediateContainerAndResourceProvenance(t *te
 	require.NotEqual(t, children[0].Key, children[1].Key)
 	provenance, err := client.embeddedNode(
 		groups[0],
-		graphRelationship{Path: "Members", ChildKind: "sensor"},
+		graphRelationship{
+			Path:      "Members",
+			ChildKind: "sensor",
+		},
 		map[string]any{"MemberId": "provenance", "DataSourceUri": "#/Reading"},
 		0,
 	)
@@ -229,46 +242,68 @@ func TestPartialGraphRestoresUnvisitedMembershipRecursively(t *testing.T) {
 		Complete:   false,
 	}
 	service := &graphNode{
-		Kind: "service", URI: "/redfish/v1/", Locator: "/redfish/v1/", Key: "service",
-		AcquisitionState: "readable", IdentityQuality: "addressable",
-		Parents: make(map[string]*graphNode),
+		Kind:             "service",
+		URI:              "/redfish/v1/",
+		Locator:          "/redfish/v1/",
+		Key:              "service",
+		AcquisitionState: "readable",
+		IdentityQuality:  "addressable",
+		Parents:          make(map[string]*graphNode),
 	}
 	system := &graphNode{
-		Kind: "system", URI: "/redfish/v1/Systems/1", Locator: "/redfish/v1/Systems/1", Key: "system",
-		AcquisitionState: "readable", IdentityQuality: "addressable",
-		Parents: map[string]*graphNode{service.Key: service},
+		Kind:             "system",
+		URI:              "/redfish/v1/Systems/1",
+		Locator:          "/redfish/v1/Systems/1",
+		Key:              "system",
+		AcquisitionState: "readable",
+		IdentityQuality:  "addressable",
+		Parents:          map[string]*graphNode{service.Key: service},
 	}
 	require.NoError(t, graph.add(service))
 	require.NoError(t, graph.add(system))
 
 	processorRel := graphRelationship{
-		ParentKind: "system", Path: "Processors", ChildKind: "processor",
-		Mode: relationshipComponents,
+		ParentKind: "system",
+		Path:       "Processors",
+		ChildKind:  "processor",
+		Mode:       relationshipComponents,
 	}
 	sensorRel := graphRelationship{
-		ParentKind: "processor", Path: "Sensors", ChildKind: "sensor",
-		Mode: relationshipComponents,
+		ParentKind: "processor",
+		Path:       "Sensors",
+		ChildKind:  "sensor",
+		Mode:       relationshipComponents,
 	}
 	processor := &graphNode{
-		Kind: "processor", URI: "/redfish/v1/Systems/1/Processors/1",
-		Locator: "/redfish/v1/Systems/1/Processors/1", Key: "processor",
-		AcquisitionState: "readable", IdentityQuality: "addressable",
-		Parents: make(map[string]*graphNode),
+		Kind:             "processor",
+		URI:              "/redfish/v1/Systems/1/Processors/1",
+		Locator:          "/redfish/v1/Systems/1/Processors/1",
+		Key:              "processor",
+		AcquisitionState: "readable",
+		IdentityQuality:  "addressable",
+		Parents:          make(map[string]*graphNode),
 	}
 	sensor := &graphNode{
-		Kind: "sensor", URI: "/redfish/v1/Systems/1/Processors/1/Sensors/1",
-		Locator: "/redfish/v1/Systems/1/Processors/1/Sensors/1", Key: "sensor",
-		AcquisitionState: "readable", IdentityQuality: "addressable",
-		Parents: make(map[string]*graphNode),
+		Kind:             "sensor",
+		URI:              "/redfish/v1/Systems/1/Processors/1/Sensors/1",
+		Locator:          "/redfish/v1/Systems/1/Processors/1/Sensors/1",
+		Key:              "sensor",
+		AcquisitionState: "readable",
+		IdentityQuality:  "addressable",
+		Parents:          make(map[string]*graphNode),
 	}
 	client.graphMembership[graphMembershipKey(system.Key, processorRel)] = graphMembershipSnapshot{
-		ParentKey: system.Key, Relationship: processorRel, Members: []*graphNode{processor},
+		ParentKey:    system.Key,
+		Relationship: processorRel,
+		Members:      snapshotGraphMembers([]*graphNode{processor}),
 	}
 	client.graphMembership[graphMembershipKey(processor.Key, sensorRel)] = graphMembershipSnapshot{
-		ParentKey: processor.Key, Relationship: sensorRel, Members: []*graphNode{sensor},
+		ParentKey:    processor.Key,
+		Relationship: sensorRel,
+		Members:      snapshotGraphMembers([]*graphNode{sensor}),
 	}
 
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	restoredProcessor := graph.findKey(processor.Key)
 	restoredSensor := graph.findKey(sensor.Key)
 	require.NotNil(t, restoredProcessor)
@@ -278,14 +313,13 @@ func TestPartialGraphRestoresUnvisitedMembershipRecursively(t *testing.T) {
 	assert.Contains(t, restoredProcessor.Parents, system.Key)
 	assert.Contains(t, restoredSensor.Parents, processor.Key)
 	require.Len(t, graph.Slices, 2)
-	for _, slice := range graph.Slices {
-		assert.False(t, slice.Complete)
-	}
 }
 
 func TestPartialGraphRestoresReverseOrderedRetainedChainInOneWorklistPass(t *testing.T) {
 	const depth = 2048
-	client := &protocolClient{graphMembership: make(map[string]graphMembershipSnapshot)}
+	client := &protocolClient{
+		graphMembership: make(map[string]graphMembershipSnapshot),
+	}
 	graph := &resourceGraph{
 		ByIdentity: make(map[string]*graphNode),
 		KeySources: make(map[string]string),
@@ -299,22 +333,28 @@ func TestPartialGraphRestoresReverseOrderedRetainedChainInOneWorklistPass(t *tes
 		key := fmt.Sprintf("node-%04d", index)
 		child := graphTestNode("sensor", key, fmt.Sprintf("/redfish/v1/Sensors/%d", index), nil)
 		relationship := graphRelationship{
-			ParentKind: "sensor", Path: "Children", ChildKind: "sensor",
-			Mode: relationshipComponents,
+			ParentKind: "sensor",
+			Path:       "Children",
+			ChildKind:  "sensor",
+			Mode:       relationshipComponents,
 		}
 		client.graphMembership[fmt.Sprintf("%04d", depth-index)] = graphMembershipSnapshot{
-			ParentKey: parentKey, Relationship: relationship, Members: []*graphNode{child},
+			ParentKey:    parentKey,
+			Relationship: relationship,
+			Members:      snapshotGraphMembers([]*graphNode{child}),
 		}
 		parentKey = child.Key
 	}
 
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	require.Len(t, graph.Nodes, depth+1)
 	require.NotNil(t, graph.findKey(parentKey))
 }
 
 func TestPartialGraphRetainedCycleWithoutRootTerminatesWithoutRestoration(t *testing.T) {
-	client := &protocolClient{graphMembership: make(map[string]graphMembershipSnapshot)}
+	client := &protocolClient{
+		graphMembership: make(map[string]graphMembershipSnapshot),
+	}
 	graph := &resourceGraph{
 		ByIdentity: make(map[string]*graphNode),
 		KeySources: make(map[string]string),
@@ -323,17 +363,25 @@ func TestPartialGraphRetainedCycleWithoutRootTerminatesWithoutRestoration(t *tes
 	root := graphTestNode("service", "root", "/redfish/v1/", nil)
 	require.NoError(t, graph.add(root))
 
-	relationship := graphRelationship{Path: "Children", ChildKind: "sensor", Mode: relationshipComponents}
+	relationship := graphRelationship{
+		Path:      "Children",
+		ChildKind: "sensor",
+		Mode:      relationshipComponents,
+	}
 	first := graphTestNode("sensor", "first", "/redfish/v1/Sensors/first", nil)
 	second := graphTestNode("sensor", "second", "/redfish/v1/Sensors/second", nil)
 	client.graphMembership["first"] = graphMembershipSnapshot{
-		ParentKey: second.Key, Relationship: relationship, Members: []*graphNode{first},
+		ParentKey:    second.Key,
+		Relationship: relationship,
+		Members:      snapshotGraphMembers([]*graphNode{first}),
 	}
 	client.graphMembership["second"] = graphMembershipSnapshot{
-		ParentKey: first.Key, Relationship: relationship, Members: []*graphNode{second},
+		ParentKey:    first.Key,
+		Relationship: relationship,
+		Members:      snapshotGraphMembers([]*graphNode{second}),
 	}
 
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	require.Len(t, graph.Nodes, 1)
 	require.Empty(t, graph.Slices)
 }
@@ -344,33 +392,45 @@ func TestCompleteGraphPrunesUnseenRetainedMembership(t *testing.T) {
 			"stale": {
 				ParentKey: "old-parent",
 				Relationship: graphRelationship{
-					ParentKind: "system", Path: "Processors", ChildKind: "processor",
+					ParentKind: "system",
+					Path:       "Processors",
+					ChildKind:  "processor",
 				},
 			},
 		},
 	}
-	graph := &resourceGraph{Complete: true}
-	require.NoError(t, client.finalizeGraphMembership(graph))
+	graph := &resourceGraph{
+		Complete: true,
+	}
+	require.NoError(t, client.finalizeGraphMembership(graph, true))
 	assert.Empty(t, client.graphMembership)
 }
 
-func TestEarlyGraphIntegrityFailureStillFinalizesRetainedStateAndDiagnostics(t *testing.T) {
+func TestEarlyGraphIntegrityFailureStillFinalizesRetainedState(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	defer server.Close()
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	serviceKey := resourceKey(client.origin, "service", "/redfish/v1/")
 	rel := graphRelationship{
-		ParentKind: "service", Path: "Retained", ChildKind: "fan",
-		Family: "thermal", Mode: relationshipComponents,
+		ParentKind: "service",
+		Path:       "Retained",
+		ChildKind:  "fan",
+		Family:     "thermal",
+		Mode:       relationshipComponents,
 	}
 	retained := &graphNode{
-		Kind: "fan", URI: "/redfish/v1/Chassis/1/Fans/retained",
-		Locator: "/redfish/v1/Chassis/1/Fans/retained", Key: "retained",
-		IdentityQuality: "addressable", AcquisitionState: "readable",
-		Parents: make(map[string]*graphNode),
+		Kind:             "fan",
+		URI:              "/redfish/v1/Chassis/1/Fans/retained",
+		Locator:          "/redfish/v1/Chassis/1/Fans/retained",
+		Key:              "retained",
+		IdentityQuality:  "addressable",
+		AcquisitionState: "readable",
+		Parents:          make(map[string]*graphNode),
 	}
 	client.graphMembership[graphMembershipKey(serviceKey, rel)] = graphMembershipSnapshot{
-		ParentKey: serviceKey, Relationship: rel, Members: []*graphNode{retained},
+		ParentKey:    serviceKey,
+		Relationship: rel,
+		Members:      snapshotGraphMembers([]*graphNode{retained}),
 	}
 
 	baseURI := "/redfish/v1/Systems/1"
@@ -383,18 +443,15 @@ func TestEarlyGraphIntegrityFailureStillFinalizesRetainedStateAndDiagnostics(t *
 			"@odata.id": "/redfish/v1/", "@odata.type": "#ServiceRoot.v1_19_0.ServiceRoot",
 			"Id": "RootService", "Name": "Root Service", "RedfishVersion": "1.19.0",
 		},
-		Response: responseMetadata{ContentTypeState: "missing", ODataVersionState: "missing"},
 	}
 	graph, err := client.collectResourceGraph(context.Background(), root, []baseResource{{
-		Kind: "system", URI: baseURI, AcquisitionState: "readable", MembershipComplete: true,
+		Kind: "system", URI: baseURI, AcquisitionState: "readable",
 	}}, nil)
 	require.ErrorIs(t, err, errIdentityIntegrity)
 	require.False(t, graph.Complete)
 	restored := graph.findKey(retained.Key)
 	require.NotNil(t, restored)
 	assert.Equal(t, "unknown", restored.AcquisitionState)
-	assert.Contains(t, graph.Diagnostics, "Redfish compatibility: response Content-Type header is missing")
-	assert.Contains(t, graph.Diagnostics, "Redfish compatibility: response OData-Version header is missing")
 }
 
 func TestGraphResourceRequiresExactTypeAndFinalIdentity(t *testing.T) {
@@ -426,7 +483,10 @@ func graphTestNode(kind, key, uri string, links map[string]any) *graphNode {
 		links = make(map[string]any)
 	}
 	return &graphNode{
-		Kind: kind, Key: key, URI: uri, Locator: uri,
+		Kind:    kind,
+		Key:     key,
+		URI:     uri,
+		Locator: uri,
 		Data:    map[string]any{"Links": links},
 		Parents: make(map[string]*graphNode),
 	}
@@ -448,14 +508,16 @@ func TestGraphFetchBrokerCoalescesCanonicalResource(t *testing.T) {
 	defer server.Close()
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	ctx := withGraphFetchBroker(context.Background())
-	rel := graphRelationship{ChildKind: "fan", Source: "resource"}
+	rel := graphRelationship{
+		ChildKind: "fan",
+		Source:    "resource",
+	}
 
 	first, err := client.fetchGraphNode(
 		ctx,
 		"fan",
 		"/redfish/v1/Chassis/1/Fans/1",
 		rel,
-		fixtureParent(),
 		nil,
 	)
 	require.NoError(t, err)
@@ -464,7 +526,6 @@ func TestGraphFetchBrokerCoalescesCanonicalResource(t *testing.T) {
 		"fan",
 		server.URL+"/redfish/v1/Chassis/1/Fans/1",
 		rel,
-		fixtureParent(),
 		nil,
 	)
 	require.NoError(t, err)
@@ -486,15 +547,21 @@ func TestCompleteCollectionMembershipSurvivesMemberAcquisitionFailure(t *testing
 	defer cancel()
 	cancel()
 	members := []collectionMember{
-		{Ref: redfishLink{ODataID: "/redfish/v1/Chassis/1/Fans/1"}},
-		{Ref: redfishLink{ODataID: "/redfish/v1/Chassis/1/Fans/2"}},
+		{Ref: redfishLink{
+			ODataID: "/redfish/v1/Chassis/1/Fans/1",
+		}},
+		{Ref: redfishLink{
+			ODataID: "/redfish/v1/Chassis/1/Fans/2",
+		}},
 	}
 
 	nodes, membershipComplete, err := client.fetchGraphCollectionMembers(
 		ctx,
 		graphCollectionRequest{
-			parent:             fixtureParent(),
-			relationship:       graphRelationship{ChildKind: "fan", Source: "resource"},
+			relationship: graphRelationship{
+				ChildKind: "fan",
+				Source:    "resource",
+			},
 			members:            members,
 			membershipComplete: true,
 		},
@@ -503,4 +570,38 @@ func TestCompleteCollectionMembershipSurvivesMemberAcquisitionFailure(t *testing
 	require.Error(t, err)
 	assert.True(t, membershipComplete)
 	assert.Len(t, nodes, 2)
+}
+
+func (g *resourceGraph) findKey(key string) *graphNode {
+	for _, node := range g.Nodes {
+		if node.Key == key {
+			return node
+		}
+	}
+	return nil
+}
+
+func TestEmbeddedLocatorSeparatesModesAndTupleBoundaries(t *testing.T) {
+	type location struct {
+		container, path, id string
+		index               int
+	}
+	for _, test := range []struct {
+		name        string
+		left, right location
+	}{
+		{"id versus position", location{"/redfish/v1/C", "Members", "position:0", 1}, location{"/redfish/v1/C", "Members", "", 0}},
+		{"id versus singleton", location{"/redfish/v1/C", "Members", "singleton", 0}, location{"/redfish/v1/C", "Members", "", -1}},
+		{"container boundary", location{"/redfish/v1/C:Members", "Members", "one", 0}, location{"/redfish/v1/C", "Members", "Members:one", 0}},
+		{"path boundary", location{"/redfish/v1/C", "Members:Sub", "one", 0}, location{"/redfish/v1/C", "Members", "Sub:one", 0}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			left, right := test.left, test.right
+			assert.NotEqual(
+				t,
+				embeddedLocator(left.container, left.path, left.id, left.index),
+				embeddedLocator(right.container, right.path, right.id, right.index),
+			)
+		})
+	}
 }

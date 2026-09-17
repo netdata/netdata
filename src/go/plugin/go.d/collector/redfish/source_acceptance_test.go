@@ -47,7 +47,11 @@ func TestEverySourceReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
 
 	client := &protocolClient{}
 	if readings := client.readingsForNode(
-		&graphNode{Kind: "sensor", Key: "absent", Data: make(map[string]any)},
+		&graphNode{
+			Kind: "sensor",
+			Key:  "absent",
+			Data: make(map[string]any),
+		},
 		time.Unix(100, 0),
 	); len(readings) != 0 {
 		t.Fatalf("absent source produced %d reading rows", len(readings))
@@ -102,10 +106,18 @@ func TestEverySourceNumericConversionUsesItsDeclaredScale(t *testing.T) {
 	for key, readingType := range readingTypes {
 		t.Run("reading/"+key.SourceType, func(t *testing.T) {
 			reading := normalizeReading(
-				&graphNode{Kind: "sensor", Key: key.SourceType},
+				&graphNode{
+					Kind: "sensor",
+					Key:  key.SourceType,
+				},
 				rawReading{
-					Path: "Reading", Type: key.SourceType, Units: key.Units,
-					Basis: "Zero", Role: "input", Value: json.Number("2"), Primary: true,
+					Path:    "Reading",
+					Type:    key.SourceType,
+					Units:   key.Units,
+					Basis:   "Zero",
+					Role:    "input",
+					Value:   json.Number("2"),
+					Primary: true,
 				},
 			)
 			if !reading.Valid {
@@ -139,8 +151,10 @@ func TestEverySourceScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
 			}
 
 			absent := &graphNode{
-				Kind: string(descriptor.Kind), Key: descriptor.ID,
-				Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
+				Kind:       string(descriptor.Kind),
+				Key:        descriptor.ID,
+				Data:       make(map[string]any),
+				Enrichment: make(map[string]enrichmentResource),
 			}
 			if _, ok := scalarValueByID(client.scalarValues(absent, time.Unix(100, 0)), descriptor.ID); ok {
 				t.Fatal("absent source produced a scalar value")
@@ -169,8 +183,10 @@ func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T
 		for selectedIndex := range descriptor.Candidates {
 			t.Run(fmt.Sprintf("%s/source-%d", descriptor.ID, selectedIndex), func(t *testing.T) {
 				node := &graphNode{
-					Kind: string(descriptor.Kind), Key: descriptor.ID,
-					Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
+					Kind:       string(descriptor.Kind),
+					Key:        descriptor.ID,
+					Data:       make(map[string]any),
+					Enrichment: make(map[string]enrichmentResource),
 				}
 				for index, source := range descriptor.Candidates {
 					document := sourceTestDocument(node, source.Document)
@@ -214,7 +230,11 @@ func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T
 					want *= 2 * float64(multiplierScale.Num) / float64(multiplierScale.Den)
 				}
 				if descriptor.Algorithm != algorithmAbsolute {
-					setSourceTestPath(sourceTestDocument(node, source.Document), source.Path, json.Number(fmt.Sprint(2*(selectedIndex+10))))
+					setSourceTestPath(
+						sourceTestDocument(node, source.Document),
+						source.Path,
+						json.Number(fmt.Sprint(2*(selectedIndex+10))),
+					)
 					next := time.Unix(101, 0)
 					if descriptor.Algorithm == algorithmDurationPercent {
 						next = time.Unix(1100, 0)
@@ -233,7 +253,11 @@ func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T
 					}
 				}
 				if len(value.SourceFailures) != expectedFailures {
-					t.Fatalf("preferred failure provenance = %v, want %d entries", value.SourceFailures, expectedFailures)
+					t.Fatalf(
+						"preferred failure provenance = %v, want %d entries",
+						value.SourceFailures,
+						expectedFailures,
+					)
 				}
 				count := 0
 				for _, candidate := range values {
@@ -311,27 +335,89 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 		name       string
 		kind       string
 		data       map[string]any
-		enrichment map[string]map[string]any
+		enrichment map[string]enrichmentResource
 	}{
-		{"ambiguous memory speed", "memory", map[string]any{"OperatingSpeedMhz": 3200}, map[string]map[string]any{"memory_metrics": {"OperatingSpeedMHz": 3200}}},
-		{"undefined processor bandwidth", "processor", nil, map[string]map[string]any{"processor_metrics": {"LocalMemoryBandwidthBytes": 1, "RemoteMemoryBandwidthBytes": 1}}},
-		{"generic lifetime reading", "sensor", map[string]any{"LifetimeReading": 1, "ReadingType": "EnergyJoules", "ReadingUnits": "J"}, nil},
-		{"rated efficiency curve", "power_supply", map[string]any{"EfficiencyRatings": []any{map[string]any{"EfficiencyPercent": 90}}}, nil},
-		{"battery ratings", "battery", map[string]any{"NominalVoltage": 12, "RatedCapacity": 100, "MaxChargeRateWatts": 20}, nil},
+		{
+			"ambiguous memory speed",
+			"memory",
+			map[string]any{"OperatingSpeedMhz": 3200},
+			map[string]enrichmentResource{"memory_metrics": {Data: map[string]any{"OperatingSpeedMHz": 3200}}},
+		},
+		{
+			"undefined processor bandwidth",
+			"processor",
+			nil,
+			map[string]enrichmentResource{
+				"processor_metrics": {
+					Data: map[string]any{"LocalMemoryBandwidthBytes": 1, "RemoteMemoryBandwidthBytes": 1},
+				},
+			},
+		},
+		{
+			"generic lifetime reading",
+			"sensor",
+			map[string]any{"LifetimeReading": 1, "ReadingType": "EnergyJoules", "ReadingUnits": "J"},
+			nil,
+		},
+		{
+			"rated efficiency curve",
+			"power_supply",
+			map[string]any{"EfficiencyRatings": []any{map[string]any{"EfficiencyPercent": 90}}},
+			nil,
+		},
+		{
+			"battery ratings",
+			"battery",
+			map[string]any{"NominalVoltage": 12, "RatedCapacity": 100, "MaxChargeRateWatts": 20},
+			nil,
+		},
 		{"pcie identifiers", "pcie_function", map[string]any{"FunctionId": 1, "DeviceId": 2, "VendorId": 3}, nil},
 		{"ethernet traffic", "ethernet_interface", map[string]any{"BytesReceived": 1, "BytesSent": 2}, nil},
 		{"network port traffic", "network_port", map[string]any{"PacketsReceived": 1, "PacketsSent": 2}, nil},
-		{"open processor cache arrays", "processor", nil, map[string]map[string]any{"processor_metrics": {"Cache": []any{map[string]any{"Level": 1}}, "CacheMetricsTotal": map[string]any{"HitRatio": 1}}}},
-		{"nested fabric arrays", "network_adapter", map[string]any{"FibreChannel": []any{map[string]any{"Errors": 1}}, "SAS": []any{map[string]any{"Errors": 1}}}, nil},
+		{
+			"open processor cache arrays",
+			"processor",
+			nil,
+			map[string]enrichmentResource{
+				"processor_metrics": {Data: map[string]any{
+					"Cache":             []any{map[string]any{"Level": 1}},
+					"CacheMetricsTotal": map[string]any{"HitRatio": 1},
+				}},
+			},
+		},
+		{
+			"nested fabric arrays",
+			"network_adapter",
+			map[string]any{
+				"FibreChannel": []any{map[string]any{"Errors": 1}},
+				"SAS":          []any{map[string]any{"Errors": 1}},
+			},
+			nil,
+		},
 		{"firmware size", "firmware", map[string]any{"SizeBytes": 1, "DeviceCount": 2}, nil},
-		{"configuration", "system", map[string]any{"Boot": map[string]any{"BootSourceOverrideEnabled": "Once"}, "Actions": map[string]any{"Reset": true}}, nil},
-		{"oem unknown", "drive", map[string]any{"Oem": map[string]any{"VendorMetric": 1}, "FutureStandardMetric": 2}, nil},
+		{
+			"configuration",
+			"system",
+			map[string]any{
+				"Boot":    map[string]any{"BootSourceOverrideEnabled": "Once"},
+				"Actions": map[string]any{"Reset": true},
+			},
+			nil,
+		},
+		{
+			"oem unknown",
+			"drive",
+			map[string]any{"Oem": map[string]any{"VendorMetric": 1}, "FutureStandardMetric": 2},
+			nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			node := &graphNode{
-				Kind: test.kind, Key: test.name,
-				Data: test.data, Enrichment: test.enrichment,
+				Kind:       test.kind,
+				Key:        test.name,
+				Data:       test.data,
+				Enrichment: test.enrichment,
 			}
 			client := &protocolClient{}
 			client.hardwareState.initialize()
@@ -370,7 +456,11 @@ func syntheticRawReadingForSurface(
 	if fixed {
 		raw.FixedFamily = key.Family
 	}
-	node := &graphNode{Kind: "sensor", Key: raw.IdentitySource, Data: make(map[string]any)}
+	node := &graphNode{
+		Kind: "sensor",
+		Key:  raw.IdentitySource,
+		Data: make(map[string]any),
+	}
 	if key.SemanticClass == "fan" {
 		node.Kind = "fan"
 	}
@@ -379,8 +469,10 @@ func syntheticRawReadingForSurface(
 
 func scalarTestNode(descriptor sourceField, source scalarSource, value any) *graphNode {
 	node := &graphNode{
-		Kind: string(descriptor.Kind), Key: descriptor.ID,
-		Data: make(map[string]any), Enrichment: make(map[string]map[string]any),
+		Kind:       string(descriptor.Kind),
+		Key:        descriptor.ID,
+		Data:       make(map[string]any),
+		Enrichment: make(map[string]enrichmentResource),
 	}
 	document := sourceTestDocument(node, source.Document)
 	for _, requirement := range source.Requires {
@@ -428,7 +520,12 @@ func BenchmarkMatchReadingSurface(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				benchmarkReading, benchmarkReadingFound = matchReading(key.Family, key.Basis, key.Role, key.SemanticClass)
+				benchmarkReading, benchmarkReadingFound = matchReading(
+					key.Family,
+					key.Basis,
+					key.Role,
+					key.SemanticClass,
+				)
 			}
 			if !benchmarkReadingFound {
 				b.Fatal("source mapping missing")
@@ -437,10 +534,18 @@ func BenchmarkMatchReadingSurface(b *testing.B) {
 	}
 }
 
+// Scalar selection is linear in the fixed per-kind candidate inventory.
+// Allocations track observations and diagnostics; ns/op is a local-machine trend.
 func BenchmarkHardwareScalarValues(b *testing.B) {
 	client := &protocolClient{}
 	client.hardwareState.initialize()
-	node := &graphNode{Kind: "memory", Key: "dimm-1", Enrichment: map[string]map[string]any{"memory_metrics": {"CapacityUtilizationPercent": json.Number("50")}}}
+	node := &graphNode{
+		Kind: "memory",
+		Key:  "dimm-1",
+		Enrichment: map[string]enrichmentResource{
+			"memory_metrics": {Data: map[string]any{"CapacityUtilizationPercent": json.Number("50")}},
+		},
+	}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		values := client.scalarValues(node, time.Unix(int64(i)+1, 0))

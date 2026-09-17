@@ -164,14 +164,6 @@ func parseODataType(value string) (name, namespace string, ok bool) {
 	return parts[len(parts)-1], strings.Join(parts[:len(parts)-1], "."), true
 }
 
-func sameResourceIdentity(left, right string) bool {
-	if left == right {
-		return true
-	}
-	return strings.TrimSuffix(left, "/") == strings.TrimSuffix(right, "/") &&
-		strings.TrimSuffix(left, "/") == "/redfish/v1"
-}
-
 func validRedfishVersion(value string) bool {
 	if len(value) > maxRedfishVersionTokenBytes {
 		return false

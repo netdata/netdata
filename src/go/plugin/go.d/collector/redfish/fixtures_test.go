@@ -80,12 +80,13 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	client := fixtureClient()
 
 	thermal := fixtureGraphParent(t, "thermal_subsystem", fixture["thermal_subsystem"])
-	redundancy, enrichment, complete, err := client.acquireRelationship(
+	acquired := client.acquireRelationship(
 		t.Context(),
 		thermal,
 		fixtureRelationship(t, "thermal_subsystem", "FanRedundancy"),
 		&wireStats{},
 	)
+	redundancy, enrichment, complete, err := acquired.children, acquired.enrichments, acquired.complete, acquired.err
 	require.NoError(t, err)
 	require.True(t, complete)
 	require.Nil(t, enrichment)
@@ -94,7 +95,7 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, "positional", redundancy[0].IdentityQuality)
 	require.Equal(t, "Synthetic Fan Group", redundancy[0].Doc.Name)
 	require.Equal(t, "OK", redundancy[0].Doc.Status.Health)
-	require.Contains(t, redundancy[0].Locator, ":position:0")
+	require.Equal(t, embeddedLocator(thermal.Locator, "FanRedundancy", "", 0), redundancy[0].Locator)
 	scalars := make(map[string]scalarValue)
 	for _, scalar := range client.scalarValues(redundancy[0], time.Now()) {
 		scalars[scalar.Descriptor.ID] = scalar
@@ -114,12 +115,13 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	}
 
 	leakDetection := fixtureGraphParent(t, "leak_detection", fixture["leak_detection"])
-	groups, enrichment, complete, err := client.acquireRelationship(
+	acquired = client.acquireRelationship(
 		t.Context(),
 		leakDetection,
 		fixtureRelationship(t, "leak_detection", "LeakDetectorGroups"),
 		&wireStats{},
 	)
+	groups, enrichment, complete, err := acquired.children, acquired.enrichments, acquired.complete, acquired.err
 	require.NoError(t, err)
 	require.True(t, complete)
 	require.Nil(t, enrichment)
@@ -129,12 +131,13 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, "Synthetic Detector Group", groups[0].Doc.Name)
 	require.Equal(t, "Warning", groups[0].Doc.Status.Health)
 
-	detectors, enrichment, complete, err := client.acquireRelationship(
+	acquired = client.acquireRelationship(
 		t.Context(),
 		groups[0],
 		fixtureRelationship(t, "leak_detector_group", "Detectors"),
 		&wireStats{},
 	)
+	detectors, enrichment, complete, err := acquired.children, acquired.enrichments, acquired.complete, acquired.err
 	require.NoError(t, err)
 	require.True(t, complete)
 	require.Nil(t, enrichment)
@@ -142,7 +145,7 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, "data_source_uri", detectors[0].IdentityQuality)
 	require.Equal(t, "/redfish/v1/Chassis/Synthetic/LeakDetectors/1", detectors[0].URI)
 	require.Equal(t, "positional", detectors[1].IdentityQuality)
-	require.Contains(t, detectors[1].Locator, ":position:1")
+	require.Equal(t, embeddedLocator(groups[0].Locator, "Detectors", "", 1), detectors[1].Locator)
 }
 
 func TestEmbeddedComponentsPublishValidSiblings(t *testing.T) {
@@ -154,12 +157,13 @@ func TestEmbeddedComponentsPublishValidSiblings(t *testing.T) {
 			map[string]any{"GroupName": "Duplicate", "Status": map[string]any{"Health": "Warning"}},
 		},
 	})
-	nodes, _, complete, err := client.acquireRelationship(
+	acquired := client.acquireRelationship(
 		t.Context(),
 		parent,
 		fixtureRelationship(t, "thermal_subsystem", "FanRedundancy"),
 		&wireStats{},
 	)
+	nodes, _, complete, err := acquired.children, acquired.enrichments, acquired.complete, acquired.err
 	require.Error(t, err)
 	require.False(t, complete)
 	require.Len(t, nodes, 2)
@@ -193,9 +197,10 @@ func TestCompatibilityFixturesLegacyThermal(t *testing.T) {
 			client := fixtureClient()
 			parent := fixtureParent()
 			components, complete, err := client.legacyComponents(
-				t.Context(),
 				parent,
-				graphRelationship{ChildKind: "legacy_thermal"},
+				graphRelationship{
+					ChildKind: "legacy_thermal",
+				},
 				loadFixture(t, test.file),
 			)
 			require.NoError(t, err)
@@ -224,7 +229,10 @@ func TestCompatibilityFixturesLegacyThermal(t *testing.T) {
 func TestCompatibilityFixtureLegacySourceHealthIsAuthoritative(t *testing.T) {
 	client := fixtureClient()
 	components, complete, err := client.legacyComponents(
-		t.Context(), fixtureParent(), graphRelationship{ChildKind: "legacy_thermal"},
+		fixtureParent(),
+		graphRelationship{
+			ChildKind: "legacy_thermal",
+		},
 		loadFixture(t, "otel-hpe-legacy-thermal.min.json"),
 	)
 	require.NoError(t, err)
@@ -247,11 +255,11 @@ func TestCompatibilityFixturesModernReadings(t *testing.T) {
 			node: &graphNode{
 				Kind: "thermal_subsystem",
 				Key:  "thermal-subsystem",
-				Enrichment: map[string]map[string]any{
-					"thermal_metrics:0": loadFixture(
+				Enrichment: map[string]enrichmentResource{
+					"thermal_metrics:0": {Data: loadFixture(
 						t,
 						"telegraf-hpe-modern-thermal-metrics.min.json",
-					),
+					)},
 				},
 			},
 			wantFamilies: map[string]int{"temperature": 1},
@@ -268,11 +276,11 @@ func TestCompatibilityFixturesModernReadings(t *testing.T) {
 			node: &graphNode{
 				Kind: "power_supply",
 				Key:  "power-supply",
-				Enrichment: map[string]map[string]any{
-					"power_supply_metrics:0": loadFixture(
+				Enrichment: map[string]enrichmentResource{
+					"power_supply_metrics:0": {Data: loadFixture(
 						t,
 						"telegraf-hpe-modern-power-supply-metrics.min.json",
-					),
+					)},
 				},
 			},
 			wantFamilies: map[string]int{
@@ -312,7 +320,6 @@ func TestCompatibilityFixtureModernStandaloneSensor(t *testing.T) {
 	reading := readings[0]
 	require.True(t, reading.Valid)
 	require.Equal(t, "temperature", reading.Family)
-	require.Equal(t, "system.hw.sensor.temperature.input", reading.Context)
 	require.Equal(t, "clear", reading.SourceAlarm)
 
 }
@@ -321,9 +328,10 @@ func TestCompatibilityFixtureLegacyPowerAndModernDrive(t *testing.T) {
 	client := fixtureClient()
 	parent := fixtureParent()
 	components, complete, err := client.legacyComponents(
-		t.Context(),
 		parent,
-		graphRelationship{ChildKind: "legacy_power"},
+		graphRelationship{
+			ChildKind: "legacy_power",
+		},
 		loadFixture(t, "telegraf-dell-legacy-power.min.json"),
 	)
 	require.NoError(t, err)
@@ -383,7 +391,6 @@ func fixtureGraphParent(t *testing.T, kind string, value any) *graphNode {
 		Locator:          uri,
 		Data:             data,
 		AcquisitionState: "readable",
-		Complete:         true,
 		IdentityQuality:  "addressable",
 	}
 }

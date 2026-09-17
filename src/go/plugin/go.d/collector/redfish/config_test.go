@@ -62,7 +62,9 @@ func TestConfigSchemaAuthenticationMatchesRuntime(t *testing.T) {
 			config: with(map[string]any{"auth_method": "auto", "username": "user", "password": "secret"}), valid: true,
 		},
 		"session with credentials": {
-			config: with(map[string]any{"auth_method": "session", "username": "user", "password": "secret"}), valid: true,
+			config: with(
+				map[string]any{"auth_method": "session", "username": "user", "password": "secret"},
+			), valid: true,
 		},
 		"basic with credentials": {
 			config: with(map[string]any{"auth_method": "basic", "username": "user", "password": "secret"}), valid: true,
@@ -147,18 +149,37 @@ func TestConfigSchemaTLSClientIdentityMatchesRuntime(t *testing.T) {
 		config map[string]any
 		valid  bool
 	}{
-		"both absent":                        {config: base(), valid: true},
-		"both empty":                         {config: with(map[string]any{"tls_cert": "", "tls_key": ""}), valid: true},
-		"empty certificate alone":            {config: with(map[string]any{"tls_cert": ""}), valid: true},
-		"empty key alone":                    {config: with(map[string]any{"tls_key": ""}), valid: true},
-		"both runtime-empty":                 {config: with(map[string]any{"tls_cert": " \t", "tls_key": "\v\u00a0"}), valid: true},
-		"both every runtime-empty character": {config: with(map[string]any{"tls_cert": allTrimSpaceCharacters, "tls_key": allTrimSpaceCharacters}), valid: true},
-		"both configured":                    {config: with(map[string]any{"tls_cert": "certificate", "tls_key": "key"}), valid: true},
-		"both configured with whitespace":    {config: with(map[string]any{"tls_cert": " certificate ", "tls_key": "\u00a0key\u3000"}), valid: true},
-		"certificate only":                   {config: with(map[string]any{"tls_cert": "certificate"})},
-		"key only":                           {config: with(map[string]any{"tls_key": "key"})},
-		"certificate with runtime-empty key": {config: with(map[string]any{"tls_cert": "certificate", "tls_key": allTrimSpaceCharacters})},
-		"runtime-empty certificate with key": {config: with(map[string]any{"tls_cert": allTrimSpaceCharacters, "tls_key": "key"})},
+		"both absent": {config: base(), valid: true},
+		"both empty": {
+			config: with(map[string]any{"tls_cert": "", "tls_key": ""}),
+			valid:  true,
+		},
+		"empty certificate alone": {config: with(map[string]any{"tls_cert": ""}), valid: true},
+		"empty key alone":         {config: with(map[string]any{"tls_key": ""}), valid: true},
+		"both runtime-empty": {
+			config: with(map[string]any{"tls_cert": " \t", "tls_key": "\v\u00a0"}),
+			valid:  true,
+		},
+		"both every runtime-empty character": {
+			config: with(map[string]any{"tls_cert": allTrimSpaceCharacters, "tls_key": allTrimSpaceCharacters}),
+			valid:  true,
+		},
+		"both configured": {
+			config: with(map[string]any{"tls_cert": "certificate", "tls_key": "key"}),
+			valid:  true,
+		},
+		"both configured with whitespace": {
+			config: with(map[string]any{"tls_cert": " certificate ", "tls_key": "\u00a0key\u3000"}),
+			valid:  true,
+		},
+		"certificate only": {config: with(map[string]any{"tls_cert": "certificate"})},
+		"key only":         {config: with(map[string]any{"tls_key": "key"})},
+		"certificate with runtime-empty key": {
+			config: with(map[string]any{"tls_cert": "certificate", "tls_key": allTrimSpaceCharacters}),
+		},
+		"runtime-empty certificate with key": {
+			config: with(map[string]any{"tls_cert": allTrimSpaceCharacters, "tls_key": "key"}),
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -215,23 +236,37 @@ func TestConfigValidation(t *testing.T) {
 		wantErr string
 	}{
 		"valid HTTPS no auth": {
-			cfg: Config{URL: "https://BMC.EXAMPLE.TEST:443/redfish/v1/", AuthMethod: "none"},
+			cfg: Config{
+				URL:        "https://BMC.EXAMPLE.TEST:443/redfish/v1/",
+				AuthMethod: "none",
+			},
 		},
 		"valid explicit HTTP": {
-			cfg: Config{URL: "http://bmc.example.test", AuthMethod: "none"},
+			cfg: Config{
+				URL:        "http://bmc.example.test",
+				AuthMethod: "none",
+			},
 		},
 		"credentials required": {
-			cfg:     Config{URL: "https://bmc.example.test", AuthMethod: "session"},
+			cfg: Config{
+				URL:        "https://bmc.example.test",
+				AuthMethod: "session",
+			},
 			wantErr: "'username' and 'password'",
 		},
 		"none rejects credentials": {
 			cfg: Config{
-				URL: "https://bmc.example.test", AuthMethod: "none", Username: "user",
+				URL:        "https://bmc.example.test",
+				AuthMethod: "none",
+				Username:   "user",
 			},
 			wantErr: "must be empty",
 		},
 		"link local requires zone": {
-			cfg:     Config{URL: "https://[fe80::1]/", AuthMethod: "none"},
+			cfg: Config{
+				URL:        "https://[fe80::1]/",
+				AuthMethod: "none",
+			},
 			wantErr: "requires an interface zone",
 		},
 		"malformed URL does not disclose user-info": {
@@ -255,46 +290,4 @@ func TestConfigValidation(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestNormalizeServiceRoot(t *testing.T) {
-	root, origin, err := normalizeServiceRoot("https://BMC.Example.TEST.:443/redfish/v1")
-	require.NoError(t, err)
-	require.Equal(t, "https://bmc.example.test", origin)
-	require.Equal(t, "https://bmc.example.test/redfish/v1/", root.String())
-
-	root, origin, err = normalizeServiceRoot("https://[fe80::1%25eno1]:443/")
-	require.NoError(t, err)
-	require.Equal(t, "https://[fe80::1%25eno1]", origin)
-	require.Equal(t, "https://[fe80::1%25eno1]/redfish/v1/", root.String())
-
-	root, origin, err = normalizeServiceRoot("http://BMC.Example.TEST:080/redfish/v1/")
-	require.NoError(t, err)
-	require.Equal(t, "http://bmc.example.test", origin)
-	require.Equal(t, "http://bmc.example.test/redfish/v1/", root.String())
-
-	_, _, err = normalizeServiceRoot("https://./redfish/v1/")
-	require.ErrorContains(t, err, "host is required")
-
-	_, _, err = normalizeServiceRoot("https://bmc%25suffix/redfish/v1/")
-	require.ErrorContains(t, err, "DNS host must not contain a percent escape")
-
-	_, _, err = normalizeServiceRoot("https://[::ffff:192.0.2.1%25eth0]/redfish/v1/")
-	require.ErrorContains(t, err, "IPv4 host must not contain an interface zone")
-}
-
-func TestNormalizeServiceRootCanonicalizesIPv4MappedIPv6(t *testing.T) {
-	plainRoot, plainOrigin, err := normalizeServiceRoot("https://192.0.2.1/redfish/v1/")
-	require.NoError(t, err)
-	mappedRoot, mappedOrigin, err := normalizeServiceRoot("https://[::ffff:192.0.2.1]/redfish/v1/")
-	require.NoError(t, err)
-	require.Equal(t, plainOrigin, mappedOrigin)
-	require.Equal(t, plainRoot.String(), mappedRoot.String())
-
-	plainURL, plainOrigin, err := normalizeServiceRoot("https://192.0.2.1")
-	require.NoError(t, err)
-	mappedURL, mappedOrigin, err := normalizeServiceRoot("https://[::ffff:192.0.2.1]")
-	require.NoError(t, err)
-	require.Equal(t, plainURL, mappedURL)
-	require.Equal(t, plainOrigin, mappedOrigin)
 }

@@ -51,17 +51,22 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			require.NoError(t, cycle.CommitCycleSuccess())
 			_, origin, err := normalizeServiceRoot(server.URL)
 			require.NoError(t, err)
-			labels := metrix.Labels{"endpoint_key": stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars), "endpoint_job": "endpoint-a"}
+			labels := metrix.Labels{
+				"endpoint_key": stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars),
+				"endpoint_job": "endpoint-a",
+			}
 			point, ok := collector.MetricStore().Read().StateSet("collection_status", labels)
 			require.True(t, ok)
 			assert.True(t, point.States["success"])
 			hardwareSeries := 0
-			collector.MetricStore().Read(metrix.ReadFlatten()).ForEachByName("system_health", func(labels metrix.LabelView, value metrix.SampleValue) {
-				hardwareSeries++
-				job, found := labels.Get("endpoint_job")
-				require.True(t, found)
-				assert.Equal(t, "endpoint-a", job)
-			})
+			collector.MetricStore().
+				Read(metrix.ReadFlatten()).
+				ForEachByName("system_health", func(labels metrix.LabelView, value metrix.SampleValue) {
+					hardwareSeries++
+					job, found := labels.Get("endpoint_job")
+					require.True(t, found)
+					assert.Equal(t, "endpoint-a", job)
+				})
 			assert.Positive(t, hardwareSeries)
 			collecttest.AssertChartCoverage(t, collector, collecttest.ChartCoverageExpectation{})
 			collector.Cleanup(context.Background())
@@ -76,7 +81,13 @@ func TestCollectorJobsOwnIndependentClients(t *testing.T) {
 	jobs := make([]collectorapi.CollectorV2, 2)
 	for i := range jobs {
 		jobs[i] = creator.CreateV2()
-		require.NoError(t, yaml.Unmarshal([]byte(fmt.Sprintf("name: endpoint-%d\nurl: %s\nauth_method: none\n", i, server.URL)), jobs[i]))
+		require.NoError(
+			t,
+			yaml.Unmarshal(
+				[]byte(fmt.Sprintf("name: endpoint-%d\nurl: %s\nauth_method: none\n", i, server.URL)),
+				jobs[i],
+			),
+		)
 		t.Cleanup(func() { jobs[i].Cleanup(context.Background()) })
 		require.NoError(t, jobs[i].Init(context.Background()))
 		require.NoError(t, jobs[i].Check(context.Background()))
@@ -92,7 +103,10 @@ func TestCollectorJobsOwnIndependentClients(t *testing.T) {
 
 func TestCollectorCleanupAfterFailedInitialization(t *testing.T) {
 	collector := New()
-	require.NoError(t, yaml.Unmarshal([]byte("name: endpoint-a\nurl: https://bmc.example.test\nauth_method: none\n"), collector))
+	require.NoError(
+		t,
+		yaml.Unmarshal([]byte("name: endpoint-a\nurl: https://bmc.example.test\nauth_method: none\n"), collector),
+	)
 	collector.newClient = func(Config, *http.Client) (endpointClient, error) {
 		return nil, fmt.Errorf("test client construction failure")
 	}
@@ -104,7 +118,9 @@ func TestCollectorCleanupAfterFailedInitialization(t *testing.T) {
 }
 
 func TestCollectorSessionStartsDuringRunningCollection(t *testing.T) {
-	server := newRedfishTestServer(t, redfishTestServerConfig{supportSession: true})
+	server := newRedfishTestServer(t, redfishTestServerConfig{
+		supportSession: true,
+	})
 	defer server.Close()
 	collector := New()
 	collector.Config = testConfig(server.URL, "session")

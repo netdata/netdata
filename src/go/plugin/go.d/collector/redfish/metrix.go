@@ -26,7 +26,17 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			metrix.WithStateSetMode(metrix.ModeEnum),
 			metrix.WithStateSetStates(collectionStates...),
 		),
-		failures: gaugeMap(vec, "collection_failures", "auth", "tls", "transport", "timeout", "protocol", "limit", "internal"),
+		failures: gaugeMap(
+			vec,
+			"collection_failures",
+			"auth",
+			"tls",
+			"transport",
+			"timeout",
+			"protocol",
+			"limit",
+			"internal",
+		),
 		duration: vec.Gauge("collection_duration_seconds"),
 		httpRequests: gaugeMap(
 			vec,
@@ -75,5 +85,85 @@ func (m *collectorMetrics) observe(endpointKey, endpointJob string, cycle cycleM
 func observeGaugeMap(writers map[string]metrix.SnapshotGaugeVec, labels []string, values map[string]int) {
 	for name, writer := range writers {
 		writer.WithLabelValues(labels...).Observe(float64(values[name]))
+	}
+}
+
+type hardwareMetrics struct {
+	meter  metrix.SnapshotMeter
+	gauges map[string]metrix.SnapshotGauge
+	states map[string]metrix.StateSetInstrument
+}
+
+func newHardwareMetrics(store metrix.CollectorStore) *hardwareMetrics {
+	meter := store.Write().SnapshotMeter("")
+	result := &hardwareMetrics{
+		meter:  meter,
+		gauges: make(map[string]metrix.SnapshotGauge),
+		states: make(map[string]metrix.StateSetInstrument),
+	}
+	gauge := func(metric string) {
+		if _, exists := result.gauges[metric]; !exists {
+			result.gauges[metric] = meter.Gauge(metric)
+		}
+	}
+	states := func(metric string, values []string) {
+		if _, exists := result.states[metric]; !exists {
+			result.states[metric] = meter.StateSet(
+				metric,
+				metrix.WithStateSetMode(metrix.ModeEnum),
+				metrix.WithStateSetStates(values...),
+			)
+		}
+	}
+	for _, field := range scalarFields {
+		gauge(field.Metric)
+	}
+	for _, reading := range readingDescriptors {
+		gauge(reading.Metric)
+		if reading.AlarmMetric != "" {
+			states(reading.AlarmMetric, alarmStates)
+		}
+	}
+	for kind, status := range sourceStatusByKind {
+		states(kind+"_acquisition_state", acquisitionStates)
+		if status.Status {
+			states(kind+"_health", healthStates)
+			states(kind+"_health_rollup", healthStates)
+			states(kind+"_state", resourceStates)
+			for _, state := range healthStates {
+				gauge(kind + "_conditions_" + state)
+			}
+		}
+		if status.PowerState {
+			states(kind+"_power_state", powerStates)
+		}
+		if status.FailurePredicted {
+			states(kind+"_failure_predicted", failureStates)
+		}
+	}
+	for _, source := range additionalStateSources {
+		states(source.Metric, source.States)
+	}
+	for _, set := range sourceFlagSets {
+		for _, member := range set.Members {
+			gauge(set.Metric + "_" + member.Role)
+		}
+	}
+	return result
+}
+
+func (m *hardwareMetrics) observe(observations []hardwareObservation) {
+	for _, observation := range observations {
+		labels := m.meter.LabelSet(observation.Labels...)
+		if observation.State != "" {
+			m.states[observation.Metric].ObserveStateSet(
+				metrix.StateSetPoint{
+					States: map[string]bool{observation.State: true},
+				},
+				labels,
+			)
+		} else {
+			m.gauges[observation.Metric].Observe(observation.Value, labels)
+		}
 	}
 }

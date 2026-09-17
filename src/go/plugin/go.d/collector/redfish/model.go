@@ -57,7 +57,6 @@ type collectionPage struct {
 type collectionMember struct {
 	Ref      redfishLink
 	Data     map[string]any
-	Raw      []byte
 	Response responseMetadata
 }
 
@@ -163,4 +162,37 @@ func dereferenceInt(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+// resourceDecodeError marks malformed optional typed properties. Base resources
+// reject it; descendant and embedded adapters retain the partial document.
+type resourceDecodeError struct{ cause error }
+
+func (err *resourceDecodeError) Error() string { return err.cause.Error() }
+func (err *resourceDecodeError) Unwrap() error { return err.cause }
+
+// decodeGenericResource projects only the generic envelope before conversion.
+// encoding/json retains its case-insensitive, null, and partial-decode behavior;
+// unrelated source fields and potentially large OEM payloads are not serialized.
+func decodeGenericResource(data map[string]any) (genericResource, error) {
+	envelope := make(map[string]any, 6)
+	for key, value := range data {
+		for _, property := range []string{"@odata.id", "Id", "Name", "Status", "PowerState", "FailurePredicted"} {
+			if strings.EqualFold(key, property) {
+				envelope[key] = value
+				break
+			}
+		}
+	}
+	var doc genericResource
+	raw, err := json.Marshal(envelope)
+	if err == nil {
+		err = json.Unmarshal(raw, &doc)
+	}
+	if err != nil {
+		return doc, &resourceDecodeError{
+			cause: err,
+		}
+	}
+	return doc, nil
 }
