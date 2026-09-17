@@ -18,9 +18,9 @@ Kiro reads MCP definitions from a `mcpServers` object in a JSON file. A server i
 
 1. **Kiro installed** - see [Installation](https://kiro.dev/docs/getting-started/installation/).
 2. **MCP enabled** - in the Kiro IDE, enable MCP support in Settings (see [enabling MCP support](https://kiro.dev/docs/mcp/configuration/#enabling-mcp-support)).
-3. **Netdata v2.6.0 or later** with MCP support. Prefer a Netdata Parent for infrastructure-level visibility. The machine running Kiro needs network access to the Netdata IP and port (usually 19999).
-   - **v2.6.0 - v2.7.1**: connect through the `nd-mcp` bridge (local server).
-   - **v2.7.2+**: connect to a Netdata HTTP endpoint directly (remote server) when that endpoint is on `localhost` or behind HTTPS, or keep using `nd-mcp` for everything else.
+3. **Something to connect to** - either a self-hosted Agent or Parent, or Netdata Cloud:
+   - **Self-hosted Agent or Parent**: **Netdata v2.6.0 or later** with MCP support. Prefer a Netdata Parent for infrastructure-level visibility. The machine running Kiro needs network access to the Netdata IP and port (usually 19999). On v2.6.0 - v2.7.1, connect through the `nd-mcp` bridge (local server). From v2.7.2 you can also connect to the HTTP endpoint directly (remote server) when that endpoint is on `localhost` or behind HTTPS, or keep using `nd-mcp` for everything else.
+   - **Netdata Cloud**: no Agent version requirement. See the Netdata Cloud prerequisites below.
 4. **Netdata MCP API key**. Each Netdata Agent or Parent has its own key - [find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key). Keep the key in an environment variable rather than hardcoding it, and reference it as `${VAR}` from the `env` or `headers` object - those are the fields where Kiro documents expansion (see [environment variables](https://kiro.dev/docs/mcp/configuration/#environment-variables)). Kiro does not document `${VAR}` expansion in `args` or `url`, so never place a `${VAR}` reference in an argument list. Kiro only expands variables you have approved: when you add a config with an unapproved `${VAR}`, Kiro shows a security warning listing the variables - approve them in Settings under "Mcp Approved Env Vars".
 
 ## Configuration file locations
@@ -61,7 +61,7 @@ Export `NETDATA_CLOUD_API_TOKEN` with a token that has `scope:mcp`, then approve
 
 ### Local Agent or Parent - stdio bridge (all Netdata versions)
 
-Launch a Netdata Agent or Parent on your network through the `nd-mcp` bridge. This is a **local** server (`command`), so it works on every Netdata version with MCP support, over any network, with no scheme restriction on the Netdata endpoint.
+Launch a Netdata Agent or Parent on your network through the `nd-mcp` bridge. This is a **local** server (`command`), so it works on every Netdata version with MCP support, and it is also how you reach an Agent that Kiro's remote `url` scheme rules exclude (see the remote endpoint section below).
 
 The bridge reads the MCP API key from the `ND_MCP_BEARER_TOKEN` environment variable, so pass it through Kiro's `env` object, where `${VAR}` expansion is supported:
 
@@ -83,6 +83,8 @@ Export `NETDATA_MCP_API_KEY` in the environment Kiro starts from, then approve i
 
 The bridge also accepts the key as a `--bearer TOKEN` argument, but Kiro does not expand `${VAR}` inside `args`, so use `--bearer` only with a literal key.
 
+`nd-mcp` sends the key as an `Authorization` header over the WebSocket connection, and `ws://` is unencrypted - the key and everything you query travel in cleartext. Use `ws://` only on loopback or a network you explicitly trust. To cross an untrusted network, put Netdata behind a TLS-terminating reverse proxy and point the bridge at the proxy with a `wss://` URL instead.
+
 Replace `YOUR_NETDATA_IP` with your Netdata Agent or Parent address. On Linux the bridge is usually at `/usr/sbin/nd-mcp`; see [finding the nd-mcp bridge](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge) for other paths. You can read the key with:
 
 ```bash
@@ -98,7 +100,7 @@ Kiro's `url` field accepts an HTTPS endpoint, or a plain HTTP endpoint only when
 - **Netdata on the same machine as Kiro** - use `http://localhost:19999/mcp`.
 - **Netdata behind a TLS-terminating reverse proxy** - use the proxy's `https://` URL.
 
-For a remote Agent or Parent reachable only over plain HTTP across your LAN, use the stdio bridge above instead - `nd-mcp` has no such scheme restriction.
+For a remote Agent or Parent reachable only over plain HTTP across your LAN, use the stdio bridge above instead - `nd-mcp` does not enforce this scheme restriction, but the connection is then unencrypted, so treat it as trusted-network only.
 
 ```json
 {
@@ -162,6 +164,7 @@ Define one server per environment and disable the ones you are not using with `d
 ## Best practices
 
 - Keep API keys in environment variables and reference them as `${VAR}` from `env` or `headers`; never commit config files with credentials. See [MCP security best practices](https://kiro.dev/docs/mcp/security/).
+- Encrypt the connection whenever it leaves the machine or a trusted network. Plain `ws://` and `http://` send the API key and your query results in cleartext, so terminate TLS in front of Netdata and use `wss://` (bridge) or `https://` (remote `url`).
 - Prefer connecting to a Netdata Parent so a single server covers your whole infrastructure.
 - Name servers clearly (`netdata-prod`, `netdata-dev`) and disable the ones you are not querying, so Kiro does not send a question to the wrong environment.
 
