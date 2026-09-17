@@ -2,6 +2,7 @@
 
 #include "windows_plugin.h"
 #include "windows-internals.h"
+#include "perflib-rrd.h"
 
 enum netdata_netframework_metrics {
     NETDATA_NETFRAMEWORK_EXCEPTIONS,
@@ -776,16 +777,13 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_clrjit_time = rrddim_add(p->st_clrjit_time, "time", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_clrjit_time = perflib_rrddim_add(
+                    p->st_clrjit_time, "time", NULL, 1, 1, &p->NETFrameworkCLRJITPercentTime);
 
                 rrdlabels_add(p->st_clrjit_time->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
-            double percTime = 0;
-            if (p->NETFrameworkCLRJITPercentTime.current.Time)
-                percTime = 100.0 * (double)p->NETFrameworkCLRJITPercentTime.current.Data /
-                           (double)p->NETFrameworkCLRJITPercentTime.current.Time;
-            rrddim_set_by_pointer(p->st_clrjit_time, p->rd_clrjit_time, (collected_number)(percTime * 100));
+            perflib_rrddim_set_by_pointer(p->st_clrjit_time, p->rd_clrjit_time, &p->NETFrameworkCLRJITPercentTime);
             rrdset_done(p->st_clrjit_time);
         }
 
@@ -1647,18 +1645,14 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_clrmemory_gc_time =
-                    rrddim_add(p->st_clrmemory_gc_time, "time", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_clrmemory_gc_time = perflib_rrddim_add(
+                    p->st_clrmemory_gc_time, "time", NULL, 1, 1, &p->NETFrameworkCLRMemoryTimeInGC);
 
                 rrdlabels_add(p->st_clrmemory_gc_time->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
-            NETDATA_DOUBLE value = 0;
-            if (p->NETFrameworkCLRMemoryTimeInGC.current.Time)
-                value = 100.0 * (NETDATA_DOUBLE)p->NETFrameworkCLRMemoryTimeInGC.current.Data /
-                        (NETDATA_DOUBLE)p->NETFrameworkCLRMemoryTimeInGC.current.Time;
-
-            rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time, (collected_number)(value * 100));
+            perflib_rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time,
+                                          &p->NETFrameworkCLRMemoryTimeInGC);
             rrdset_done(p->st_clrmemory_gc_time);
         }
 
@@ -1950,22 +1944,17 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_clrsecurity_rt_checks_time =
-                    rrddim_add(p->st_clrsecurity_rt_checks_time, "time", "time", 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_clrsecurity_rt_checks_time = perflib_rrddim_add(
+                    p->st_clrsecurity_rt_checks_time, "time", "time", 1, 1,
+                    &p->NETFrameworkCLRSecurityPercentTimeinRTChecks);
 
                 rrdlabels_add(
                     p->st_clrsecurity_rt_checks_time->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
-            NETDATA_DOUBLE value = 0;
-            if (p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Time)
-                value = 100.0 * (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Data /
-                        (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Time;
-
-            rrddim_set_by_pointer(
-                p->st_clrsecurity_rt_checks_time,
-                p->rd_clrsecurity_rt_checks_time,
-                (collected_number)(value * 100.0));
+            perflib_rrddim_set_by_pointer(
+                p->st_clrsecurity_rt_checks_time, p->rd_clrsecurity_rt_checks_time,
+                &p->NETFrameworkCLRSecurityPercentTimeinRTChecks);
             rrdset_done(p->st_clrsecurity_rt_checks_time);
         }
 
