@@ -976,7 +976,7 @@ get_current_version() {
 }
 
 get_latest_version() {
-  parse_version "$(get_latest_tag)"
+  parse_version "$(get_latest_tag "${RELEASE_CHANNEL}")"
 }
 
 update_available() {
