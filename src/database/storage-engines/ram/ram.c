@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "database/rrd.h"
-#include "rrddim_mem.h"
+#include "ram.h"
 #include "Judy.h"
 
 static Pvoid_t rrddim_Judy_array = NULL;

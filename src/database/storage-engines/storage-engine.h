@@ -8,7 +8,7 @@
 #include "database/rrd-database-mode.h"
 
 // the engine functions the dispatchers below call are declared by the engines, not here
-#include "ram/rrddim_mem.h"
+#include "ram/ram.h"
 #ifdef ENABLE_DBENGINE
 #include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
 #endif

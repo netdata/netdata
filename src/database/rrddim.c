@@ -3,7 +3,7 @@
 #include "rrd.h"
 #include "storage-engines/storage-engine.h"
 #include "rrddim-collection.h"
-#include "storage-engines/ram/rrddim_mem.h"
+#include "storage-engines/ram/ram.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
