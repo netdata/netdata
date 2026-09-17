@@ -189,7 +189,7 @@ Resolving `${file:...}` or `${cmd:...}`, and reading credential files such as `b
 
 :::warning On Windows secret resolution runs as LocalSystem
 
-The Netdata service on Windows runs as `LocalSystem` (`NT AUTHORITY\SYSTEM`) and there is no equivalent privilege drop, so `${file:...}` reads and `${cmd:...}` commands run with that full authority — a secret reference can read any local file the system account can read, or run any command as `SYSTEM`. Only operator-authored configurations resolve references (`stock`, `user`, `dyncfg`, or a service-discovery pipeline explicitly marked `trust_discovered_targets`), so on Windows treat the ability to write a collector config file or hold Dynamic Configuration edit rights as machine-administrator-equivalent, and restrict it to administrators.
+The Netdata service on Windows runs as `LocalSystem` (`NT AUTHORITY\SYSTEM`) and there is no equivalent privilege drop, so `${file:...}` reads and `${cmd:...}` commands run with that full authority — a secret reference can read any local file the system account can read, or run any command as `SYSTEM`. Secret references are resolved only for trusted configuration sources — `stock` (shipped with Netdata), `user`, and `dyncfg` configurations, plus a service-discovery pipeline explicitly marked `trust_discovered_targets` — so on Windows treat the ability to write a collector config file or hold Dynamic Configuration edit rights as machine-administrator-equivalent, and restrict it to administrators.
 
 :::
 
@@ -200,7 +200,7 @@ The Netdata service on Windows runs as `LocalSystem` (`NT AUTHORITY\SYSTEM`) and
 - Secretstore configuration values (such as tokens and client secrets) also support `${env:...}`, `${file:...}`, and `${cmd:...}` resolvers. Use them to avoid storing backend credentials in plain text. Note that `${store:...}` references are not supported inside secretstore configurations.
 - Keep local secret material readable only by the `netdata` user, including token files, service account files, and any files used with `${file:...}`.
 - Use `${cmd:...}` only with trusted local commands and absolute paths.
-- Only operator-authored configurations resolve secret references: `stock`, `user`, `dyncfg`, and a service-discovery pipeline explicitly marked `trust_discovered_targets`. Configurations discovered from monitored targets keep reference syntax literal by default, so a monitored target cannot inject a reference. A secret reference makes Netdata read a file or run a command on its behalf, so anyone who can author or edit a resolving configuration can direct those reads (see [Execution Privileges](#execution-privileges) for the Windows implication).
+- Secret references are resolved only for trusted configuration sources — `stock` (shipped with Netdata), `user`, and `dyncfg` configurations, plus a service-discovery pipeline explicitly marked `trust_discovered_targets`. Configurations discovered from monitored targets keep reference syntax literal by default, so a monitored target cannot inject a reference. A secret reference makes Netdata read a file or run a command on its behalf, so anyone who can author or edit a resolving configuration can direct those reads (see [Execution Privileges](#execution-privileges) for the Windows implication).
 
 ## Troubleshooting
 
