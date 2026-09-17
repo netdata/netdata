@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"encoding/json"
@@ -45,9 +45,9 @@ func TestEverySourceReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
 		})
 	}
 
-	client := &protocolClient{}
+	client := New("", "", nil)
 	if readings := client.readingsForNode(
-		&graphNode{
+		&Resource{
 			Kind: "sensor",
 			Key:  "absent",
 			Data: make(map[string]any),
@@ -67,8 +67,7 @@ func TestEverySourceNumericConversionUsesItsDeclaredScale(t *testing.T) {
 		t.Run("scalar/"+descriptor.ID, func(t *testing.T) {
 			source := descriptor.Candidates[0]
 			node := scalarTestNode(descriptor, source, json.Number("2"))
-			client := &protocolClient{}
-			client.hardwareState.initialize()
+			client := New("", "", nil)
 			value, ok := scalarValueByID(client.scalarValues(node, time.Unix(100, 0)), descriptor.ID)
 			if !ok || !value.Valid {
 				t.Fatalf("scaled source did not normalize: %+v present=%t", value, ok)
@@ -106,7 +105,7 @@ func TestEverySourceNumericConversionUsesItsDeclaredScale(t *testing.T) {
 	for key, readingType := range readingTypes {
 		t.Run("reading/"+key.SourceType, func(t *testing.T) {
 			reading := normalizeReading(
-				&graphNode{
+				&Resource{
 					Kind: "sensor",
 					Key:  key.SourceType,
 				},
@@ -143,18 +142,17 @@ func TestEverySourceScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
 		t.Run(descriptor.ID, func(t *testing.T) {
 			source := descriptor.Candidates[0]
 			node := scalarTestNode(descriptor, source, json.Number("0"))
-			client := &protocolClient{}
-			client.hardwareState.initialize()
+			client := New("", "", nil)
 			value, ok := scalarValueByID(client.scalarValues(node, time.Unix(100, 0)), descriptor.ID)
 			if !ok || !value.Present || !value.Valid || value.Value != 0 {
 				t.Fatalf("valid zero source = %+v present=%t", value, ok)
 			}
 
-			absent := &graphNode{
+			absent := &Resource{
 				Kind:       string(descriptor.Kind),
 				Key:        descriptor.ID,
 				Data:       make(map[string]any),
-				Enrichment: make(map[string]enrichmentResource),
+				Enrichment: make(map[string]Enrichment),
 			}
 			if _, ok := scalarValueByID(client.scalarValues(absent, time.Unix(100, 0)), descriptor.ID); ok {
 				t.Fatal("absent source produced a scalar value")
@@ -182,11 +180,11 @@ func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T
 		}
 		for selectedIndex := range descriptor.Candidates {
 			t.Run(fmt.Sprintf("%s/source-%d", descriptor.ID, selectedIndex), func(t *testing.T) {
-				node := &graphNode{
+				node := &Resource{
 					Kind:       string(descriptor.Kind),
 					Key:        descriptor.ID,
 					Data:       make(map[string]any),
-					Enrichment: make(map[string]enrichmentResource),
+					Enrichment: make(map[string]Enrichment),
 				}
 				for index, source := range descriptor.Candidates {
 					document := sourceTestDocument(node, source.Document)
@@ -209,8 +207,7 @@ func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T
 				setSourceTestPath(selectedDocument, selected.Path, json.Number(fmt.Sprint(selectedIndex+10)))
 				setScalarTestMultiplier(node, selected)
 
-				client := &protocolClient{}
-				client.hardwareState.initialize()
+				client := New("", "", nil)
 				values := client.scalarValues(node, time.Unix(100, 0))
 				value, ok := scalarValueByID(values, descriptor.ID)
 				if !ok || !value.Valid {
@@ -282,8 +279,7 @@ func TestEverySourceRateFieldResetsOnDecreaseAndEpochChange(t *testing.T) {
 			source := descriptor.Candidates[0]
 			node := scalarTestNode(descriptor, source, json.Number("10"))
 			document := sourceTestDocument(node, source.Document)
-			client := &protocolClient{}
-			client.hardwareState.initialize()
+			client := New("", "", nil)
 			at := time.Unix(100, 0)
 
 			if value := requireScalarValue(t, client, node, descriptor.ID, at); value.Emit {
@@ -335,19 +331,19 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 		name       string
 		kind       string
 		data       map[string]any
-		enrichment map[string]enrichmentResource
+		enrichment map[string]Enrichment
 	}{
 		{
 			"ambiguous memory speed",
 			"memory",
 			map[string]any{"OperatingSpeedMhz": 3200},
-			map[string]enrichmentResource{"memory_metrics": {Data: map[string]any{"OperatingSpeedMHz": 3200}}},
+			map[string]Enrichment{"memory_metrics": {Data: map[string]any{"OperatingSpeedMHz": 3200}}},
 		},
 		{
 			"undefined processor bandwidth",
 			"processor",
 			nil,
-			map[string]enrichmentResource{
+			map[string]Enrichment{
 				"processor_metrics": {
 					Data: map[string]any{"LocalMemoryBandwidthBytes": 1, "RemoteMemoryBandwidthBytes": 1},
 				},
@@ -378,7 +374,7 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 			"open processor cache arrays",
 			"processor",
 			nil,
-			map[string]enrichmentResource{
+			map[string]Enrichment{
 				"processor_metrics": {Data: map[string]any{
 					"Cache":             []any{map[string]any{"Level": 1}},
 					"CacheMetricsTotal": map[string]any{"HitRatio": 1},
@@ -413,14 +409,13 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &graphNode{
+			node := &Resource{
 				Kind:       test.kind,
 				Key:        test.name,
 				Data:       test.data,
 				Enrichment: test.enrichment,
 			}
-			client := &protocolClient{}
-			client.hardwareState.initialize()
+			client := New("", "", nil)
 			for _, value := range client.scalarValues(node, time.Unix(100, 0)) {
 				if value.Emit {
 					t.Errorf("rejected class emitted scalar metric %q", value.Descriptor.Metric)
@@ -439,7 +434,7 @@ func syntheticRawReadingForSurface(
 	key readingKey,
 	surface readingDescriptor,
 	value any,
-) (rawReading, *graphNode) {
+) (rawReading, *Resource) {
 	sourceType, sourceUnits, fixed := sourceReadingSource(key.Family)
 	raw := rawReading{
 		Path:           "Synthetic." + key.Family + "." + key.Basis + "." + key.Role,
@@ -456,7 +451,7 @@ func syntheticRawReadingForSurface(
 	if fixed {
 		raw.FixedFamily = key.Family
 	}
-	node := &graphNode{
+	node := &Resource{
 		Kind: "sensor",
 		Key:  raw.IdentitySource,
 		Data: make(map[string]any),
@@ -467,12 +462,12 @@ func syntheticRawReadingForSurface(
 	return raw, node
 }
 
-func scalarTestNode(descriptor sourceField, source scalarSource, value any) *graphNode {
-	node := &graphNode{
+func scalarTestNode(descriptor sourceField, source scalarSource, value any) *Resource {
+	node := &Resource{
 		Kind:       string(descriptor.Kind),
 		Key:        descriptor.ID,
 		Data:       make(map[string]any),
-		Enrichment: make(map[string]enrichmentResource),
+		Enrichment: make(map[string]Enrichment),
 	}
 	document := sourceTestDocument(node, source.Document)
 	for _, requirement := range source.Requires {
@@ -483,7 +478,7 @@ func scalarTestNode(descriptor sourceField, source scalarSource, value any) *gra
 	return node
 }
 
-func setScalarTestMultiplier(node *graphNode, source scalarSource) {
+func setScalarTestMultiplier(node *Resource, source scalarSource) {
 	if source.MultiplierPath == "" {
 		return
 	}
@@ -496,8 +491,8 @@ func setScalarTestMultiplier(node *graphNode, source scalarSource) {
 
 func requireScalarValue(
 	t *testing.T,
-	client *protocolClient,
-	node *graphNode,
+	client *Projector,
+	node *Resource,
 	id string,
 	at time.Time,
 ) scalarValue {
@@ -537,12 +532,11 @@ func BenchmarkMatchReadingSurface(b *testing.B) {
 // Scalar selection is linear in the fixed per-kind candidate inventory.
 // Allocations track observations and diagnostics; ns/op is a local-machine trend.
 func BenchmarkHardwareScalarValues(b *testing.B) {
-	client := &protocolClient{}
-	client.hardwareState.initialize()
-	node := &graphNode{
+	client := New("", "", nil)
+	node := &Resource{
 		Kind: "memory",
 		Key:  "dimm-1",
-		Enrichment: map[string]enrichmentResource{
+		Enrichment: map[string]Enrichment{
 			"memory_metrics": {Data: map[string]any{"CapacityUtilizationPercent": json.Number("50")}},
 		},
 	}

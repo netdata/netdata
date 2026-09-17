@@ -253,3 +253,25 @@ func canonicalResourceURI(target *url.URL) string {
 }
 
 const maxURIBytes = 8192
+
+// readingProvenanceResolver captures only endpoint identity, never session or
+// transport state. Measurement reuses the same URI policy without a client handle.
+func readingProvenanceResolver(root *url.URL, origin string) func(baseURI, raw string) (string, bool) {
+	return func(baseURI, raw string) (string, bool) {
+		if raw == "" || root == nil {
+			return "", false
+		}
+		base := root
+		if baseURI != "" {
+			if target, err := resolveRedfishURI(origin, root, baseURI, uriResource); err == nil {
+				base = target
+			}
+		}
+		target, err := resolveRedfishURI(origin, base, raw, uriProvenance)
+		if err != nil {
+			return "", false
+		}
+		return canonicalProvenanceURI(target), true
+	}
+
+}

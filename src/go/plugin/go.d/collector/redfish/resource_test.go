@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +28,7 @@ func TestResourceMapDecodePreservesTypedJSONPolicy(t *testing.T) {
 			require.NoError(t, decodeJSONBytes([]byte(body), &data))
 			sorted, err := json.Marshal(data)
 			require.NoError(t, err)
-			var expected genericResource
+			var expected measurement.Document
 			expectedErr := json.Unmarshal(sorted, &expected)
 			actual, actualErr := decodeGenericResource(data)
 			assert.Equal(t, expected, actual)
@@ -53,11 +54,11 @@ func TestResourceValidationPreservesPartialDescendantPolicy(t *testing.T) {
 	doc, err := client.validateResourceData("sensor", data, target)
 	var decodeErr *resourceDecodeError
 	require.ErrorAs(t, err, &decodeErr, "strict base acquisition rejects malformed optional typed fields")
-	expected := genericResource{
+	expected := measurement.Document{
 		ODataID: "/redfish/v1/Sensors/1",
 		ID:      "1",
 		Name:    "Sensor",
-		Status: genericStatus{
+		Status: measurement.Status{
 			State: "Enabled",
 		},
 	}

@@ -221,10 +221,15 @@ func TestSDKAcquisitionPreservesCounterTokensAndResponseTime(t *testing.T) {
 	assert.Equal(t, json.Number("0"), node.Data["TXBytes"])
 	node, err = client.fetchGraphNode(t.Context(), "manager", "/redfish/v1/Manager", graphRelationship{}, nil)
 	require.NoError(t, err)
-	clock, present, diagnostic := managerClockValue(node)
-	require.True(t, present)
-	require.True(t, clock.Valid, diagnostic)
-	assert.InDelta(t, 60, clock.Value, 5)
+	observations := measurementTestProject(t, client, node)
+	var offsets []float64
+	for _, observation := range observations {
+		if observation.Metric == "manager_clock_offset" {
+			offsets = append(offsets, observation.Value)
+		}
+	}
+	require.Len(t, offsets, 1)
+	assert.InDelta(t, 60, offsets[0], 5)
 }
 
 func TestSDKCollectionHonorsRequestConcurrency(t *testing.T) {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"math"
@@ -96,7 +96,7 @@ type scalarCandidate struct {
 	Epoch      string
 }
 
-func decodeScalarCandidate(node *graphNode, descriptor sourceField, source scalarSource) (scalarCandidate, string) {
+func decodeScalarCandidate(node *Resource, descriptor sourceField, source scalarSource) (scalarCandidate, string) {
 	document := node.Data
 	if source.Document != "" {
 		document = findEnrichment(node, string(source.Document))
@@ -139,7 +139,7 @@ func decodeScalarCandidate(node *graphNode, descriptor sourceField, source scala
 }
 
 func scalarMultiplier(
-	node *graphNode,
+	node *Resource,
 	document map[string]any,
 	descriptor sourceField,
 	source scalarSource,

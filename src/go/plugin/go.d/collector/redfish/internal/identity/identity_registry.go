@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package identity
 
 import (
 	"crypto/sha256"
@@ -10,20 +10,20 @@ import (
 	"sync"
 )
 
-var errIdentityIntegrity = errors.New("Redfish identity integrity failure")
+var ErrIntegrity = errors.New("Redfish identity integrity failure")
 
-type identityBinding struct {
+type Binding struct {
 	Domain   string
 	Key      string
 	Preimage string
 }
 
-type identityRegistry struct {
+type Registry struct {
 	mu       sync.Mutex
 	bindings map[string][sha256.Size]byte
 }
 
-func (r *identityRegistry) register(values []identityBinding) error {
+func (r *Registry) Register(values []Binding) error {
 	if len(values) == 0 {
 		return nil
 	}
@@ -35,15 +35,15 @@ func (r *identityRegistry) register(values []identityBinding) error {
 	pending := make(map[string][sha256.Size]byte, len(values))
 	for _, value := range values {
 		if value.Domain == "" || value.Key == "" || value.Preimage == "" {
-			return fmt.Errorf("%w: incomplete identity binding", errIdentityIntegrity)
+			return fmt.Errorf("%w: incomplete identity binding", ErrIntegrity)
 		}
 		key := value.Domain + "\x00" + value.Key
 		digest := sha256.Sum256([]byte(value.Domain + "\x00" + value.Preimage))
 		if previous, exists := r.bindings[key]; exists && previous != digest {
-			return fmt.Errorf("%w: %s key collision", errIdentityIntegrity, value.Domain)
+			return fmt.Errorf("%w: %s key collision", ErrIntegrity, value.Domain)
 		}
 		if previous, exists := pending[key]; exists && previous != digest {
-			return fmt.Errorf("%w: %s key collision", errIdentityIntegrity, value.Domain)
+			return fmt.Errorf("%w: %s key collision", ErrIntegrity, value.Domain)
 		}
 		pending[key] = digest
 	}
@@ -51,6 +51,6 @@ func (r *identityRegistry) register(values []identityBinding) error {
 	return nil
 }
 
-func identityIntegrityError(err error) bool {
-	return errors.Is(err, errIdentityIntegrity)
+func IsIntegrityError(err error) bool {
+	return errors.Is(err, ErrIntegrity)
 }

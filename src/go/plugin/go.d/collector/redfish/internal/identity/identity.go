@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package identity
 
 import (
 	"crypto/sha256"
@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	endpointKeyHexChars = 32
-	resourceKeyHexChars = 32
+	EndpointKeyHexChars = 32
+	ResourceKeyHexChars = 32
 	digestHexChars      = sha256.Size * 2
 )
 
-func stableKey(domain string, value string, hexChars int) string {
+func Key(domain string, value string, hexChars int) string {
 	digest := sha256.Sum256([]byte(domain + "\x00" + value))
 	encoded := hex.EncodeToString(digest[:])
 	if hexChars <= 0 || hexChars >= len(encoded) {
@@ -23,7 +23,7 @@ func stableKey(domain string, value string, hexChars int) string {
 	return encoded[:hexChars]
 }
 
-func structuralTuple(parts ...string) string {
+func Tuple(parts ...string) string {
 	var encoded []byte
 	for _, part := range parts {
 		encoded = binary.AppendUvarint(encoded, uint64(len(part)))
@@ -32,7 +32,7 @@ func structuralTuple(parts ...string) string {
 	return string(encoded)
 }
 
-func stableTupleDigest(domain string, parts ...string) string {
+func TupleDigest(domain string, parts ...string) string {
 	hash := sha256.New()
 	writePart := func(part string) {
 		var length [binary.MaxVarintLen64]byte
@@ -47,10 +47,10 @@ func stableTupleDigest(domain string, parts ...string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func resourceKey(origin, kind, locator string) string {
-	return stableKey(
+func ResourceKey(origin, kind, locator string) string {
+	return Key(
 		"netdata:redfish:resource:v1",
-		structuralTuple(origin, kind, locator),
-		resourceKeyHexChars,
+		Tuple(origin, kind, locator),
+		ResourceKeyHexChars,
 	)
 }

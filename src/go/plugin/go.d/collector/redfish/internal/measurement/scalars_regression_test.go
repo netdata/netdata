@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ func TestScalarFallbackOnlyDiagnosesPresentInvalidSources(t *testing.T) {
 		"malformed":       {preferred: map[string]any{"BandwidthPercent": false}, diagnostic: "malformed"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			node := &graphNode{
+			node := &Resource{
 				Kind: "system",
 				Key:  "system",
 				Data: map[string]any{
@@ -29,7 +29,7 @@ func TestScalarFallbackOnlyDiagnosesPresentInvalidSources(t *testing.T) {
 						"Metrics": map[string]any{"BandwidthPercent": json.Number("42")},
 					},
 				},
-				Enrichment: map[string]enrichmentResource{"processor_summary_metrics": {Data: test.preferred}},
+				Enrichment: map[string]Enrichment{"processor_summary_metrics": {Data: test.preferred}},
 			}
 			values := fixtureClient().scalarValues(node, time.Unix(10, 0))
 			require.Len(t, values, 1)
@@ -46,15 +46,15 @@ func TestScalarFallbackOnlyDiagnosesPresentInvalidSources(t *testing.T) {
 }
 
 func TestScalarFallbackRetainsAllInvalidSourceDiagnostics(t *testing.T) {
-	node := &graphNode{
+	node := &Resource{
 		Kind: "system",
 		Key:  "system",
 		Data: map[string]any{"ProcessorSummary": map[string]any{"Metrics": map[string]any{"BandwidthPercent": false}}},
-		Enrichment: map[string]enrichmentResource{
+		Enrichment: map[string]Enrichment{
 			"processor_summary_metrics": {Data: map[string]any{"BandwidthPercent": nil}},
 		},
 	}
-	values := (&protocolClient{}).scalarValues(node, time.Now())
+	values := (New("", "", nil)).scalarValues(node, time.Now())
 	require.Len(t, values, 1)
 	require.False(t, values[0].Valid)
 	require.False(t, values[0].Emit)

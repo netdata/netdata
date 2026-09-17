@@ -55,47 +55,6 @@ func TestDecodedCollectorPreservesEndpointJobIdentity(t *testing.T) {
 	}
 }
 
-func TestComponentFamilyLabelUsesKnownKindsOnly(t *testing.T) {
-	client := &protocolClient{}
-	for kind := range sourceStatusByKind {
-		require.Equal(t, kind, observationLabel(client.metricLabels(&graphNode{
-			Kind: kind,
-		}, nil), "component_family"))
-	}
-	require.Empty(
-		t,
-		observationLabel(client.metricLabels(&graphNode{
-			Kind: "vendor_extension",
-		}, nil), "component_family"),
-	)
-}
-
-// Label construction is O(the fixed label inventory); timing is a local trend,
-// while allocation counts measure the per-observation overhead.
-func BenchmarkMetricLabels(b *testing.B) {
-	client := fixtureClient()
-	client.endpointJob = "hardware"
-	node := &graphNode{
-		Kind: "sensor",
-		Key:  "sensor",
-		Doc: genericResource{
-			Name: "Temperature",
-		},
-	}
-	reading := &normalizedReading{
-		Key:    "reading",
-		Family: "temperature",
-		Basis:  "zero",
-		Role:   "input",
-	}
-	b.ReportAllocs()
-	for b.Loop() {
-		if len(client.metricLabels(node, reading)) != 10 {
-			b.Fatal("labels missing")
-		}
-	}
-}
-
 func TestDecodedCollectorPreservesServiceName(t *testing.T) {
 	const root = "/redfish/v1/"
 	docs := map[string]map[string]any{

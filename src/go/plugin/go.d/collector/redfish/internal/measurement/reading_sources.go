@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 type readingTypeKey struct{ SourceType, Units string }
 type readingTypeDescriptor struct {

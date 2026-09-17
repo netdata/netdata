@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,7 +97,7 @@ func TestGraphLinkedEnrichmentUsesItsOwnFragmentBase(t *testing.T) {
 				c := sourceTestDecodedCollector(t, sourceTestServeDocuments(t, docs))
 				sourceTestCollectCycle(t, c)
 				client := c.(*Collector).client.(*protocolClient)
-				expected := resourceKey(client.origin, test.kind, test.locator)
+				expected := identity.ResourceKey(client.origin, test.kind, test.locator)
 				samples := 0
 				c.MetricStore().
 					Read(metrix.ReadFlatten()).
@@ -108,7 +109,7 @@ func TestGraphLinkedEnrichmentUsesItsOwnFragmentBase(t *testing.T) {
 						key, _ = labels.Get("reading_key")
 						assert.Equal(
 							t,
-							stableKey(
+							identity.Key(
 								"netdata:redfish:reading:v1",
 								expected+"\x00"+uri+test.pointer+"\x00"+test.role,
 								32,
@@ -190,8 +191,8 @@ func TestGraphMembershipPrunesRemovedSubtreesAndRetainsUnknown(t *testing.T) {
 				current = b + "Chassis/C0"
 			}
 			parents := map[string]bool{
-				resourceKey(client.origin, "chassis", current):             true,
-				resourceKey(client.origin, "sensor", current+"/Sensors/1"): true,
+				identity.ResourceKey(client.origin, "chassis", current):             true,
+				identity.ResourceKey(client.origin, "sensor", current+"/Sensors/1"): true,
 			}
 			for _, snapshot := range client.graphMembership {
 				assert.True(t, parents[snapshot.ParentKey], "removed-parent snapshot survived")
@@ -301,7 +302,7 @@ func TestGraphSensorAddressabilitySurvivesExcerptFallback(t *testing.T) {
 				t.Cleanup(server.Close)
 				c := sourceTestDecodedCollector(t, server.URL)
 				client := c.(*Collector).client.(*protocolClient)
-				expected := resourceKey(client.origin, "sensor", b+"Chassis/B/Sensors/1")
+				expected := identity.ResourceKey(client.origin, "sensor", b+"Chassis/B/Sensors/1")
 				for p := int32(0); p <= 4; p++ {
 					if p == 1 && !fallback {
 						continue

@@ -8,38 +8,16 @@ import (
 	"fmt"
 	"maps"
 	"sort"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 type graphNode struct {
-	Kind             string
-	URI              string
-	Locator          string
-	Key              string
-	Data             map[string]any
-	Enrichment       map[string]enrichmentResource
-	Doc              genericResource
-	AcquisitionState string
-	IdentityQuality  string
-	SourcePath       string
-	SourceModel      string
-	Response         responseMetadata
-	SensorExcerpts   []sensorExcerptSource
-
-	Parents map[string]*graphNode
-}
-
-// Enrichment values keep their document URI separate from the owning component.
-// Relative provenance belongs to the fetched document, not its graph parent.
-type enrichmentResource struct {
-	Data map[string]any
-	URI  string
-}
-
-type sensorExcerptSource struct {
-	Path  string
-	Type  string
-	Units string
-	Data  map[string]any
+	measurement.Resource
+	Locator         string
+	IdentityQuality string
+	Parents         map[string]*graphNode
 }
 
 type resourceGraph struct {
@@ -50,7 +28,7 @@ type resourceGraph struct {
 	Complete    bool
 	Diagnostics []string
 	diagnostics boundedDiagnosticAccumulator
-	register    func([]identityBinding) error
+	register    func([]identity.Binding) error
 }
 
 func (g *resourceGraph) addDiagnostic(value string) {
@@ -89,7 +67,7 @@ func (c *protocolClient) collectResourceGraph(
 	ctx = withGraphFetchBroker(ctx)
 	graph = &resourceGraph{
 		Complete: true,
-		register: c.identities.register,
+		register: c.identities.Register,
 	}
 	defer func() {
 		if resultErr != nil {
@@ -148,7 +126,7 @@ func (c *protocolClient) applyRelationship(
 ) error {
 	if len(acquired.enrichments) > 0 {
 		if parent.Enrichment == nil {
-			parent.Enrichment = make(map[string]enrichmentResource)
+			parent.Enrichment = make(map[string]measurement.Enrichment)
 		}
 		maps.Copy(parent.Enrichment, acquired.enrichments)
 		parent.Response = mergeResponseMetadata(parent.Response, acquired.response)
@@ -209,16 +187,16 @@ func (g *resourceGraph) add(node *graphNode) error {
 	if node == nil {
 		return errors.New("cannot add a nil Redfish graph node")
 	}
-	identity := node.Kind + "\x00" + node.Locator
-	if g.ByIdentity[identity] != nil {
+	resourceIdentity := node.Kind + "\x00" + node.Locator
+	if g.ByIdentity[resourceIdentity] != nil {
 		return errors.New("duplicate Redfish graph resource identity")
 	}
-	preimage := identity
+	preimage := resourceIdentity
 	if existing, ok := g.KeySources[node.Key]; ok && existing != preimage {
-		return fmt.Errorf("%w: resource key collision", errIdentityIntegrity)
+		return fmt.Errorf("%w: resource key collision", identity.ErrIntegrity)
 	}
 	if g.register != nil {
-		if err := g.register([]identityBinding{{
+		if err := g.register([]identity.Binding{{
 			Domain: "resource", Key: node.Key, Preimage: preimage,
 		}}); err != nil {
 			return err
@@ -231,7 +209,7 @@ func (g *resourceGraph) add(node *graphNode) error {
 	if g.KeySources == nil {
 		g.KeySources = make(map[string]string)
 	}
-	g.ByIdentity[identity] = node
+	g.ByIdentity[resourceIdentity] = node
 
 	g.KeySources[node.Key] = preimage
 	return nil
@@ -239,8 +217,8 @@ func (g *resourceGraph) add(node *graphNode) error {
 
 type acquiredRelationship struct {
 	children    []*graphNode
-	enrichments map[string]enrichmentResource
-	response    responseMetadata
+	enrichments map[string]measurement.Enrichment
+	response    measurement.ResponseTiming
 	complete    bool
 	err         error
 }
@@ -251,7 +229,7 @@ func (c *protocolClient) acquireRelationship(
 	rel graphRelationship,
 	stats *wireStats,
 ) acquiredRelationship {
-	value, ok := jsonPath(parent.Data, rel.Path)
+	value, ok := measurement.Properties(parent.Data).Lookup(rel.Path)
 	if !ok || value == nil {
 		return acquiredRelationship{
 			complete: true,
@@ -269,11 +247,11 @@ func (c *protocolClient) acquireRelationship(
 
 	items, complete, err := c.acquireLinkedValues(ctx, rel, value, stats)
 	if rel.Mode == relationshipEnrichment {
-		result := make(map[string]enrichmentResource)
-		var response responseMetadata
+		result := make(map[string]measurement.Enrichment)
+		var response measurement.ResponseTiming
 		for i, item := range items {
 			identity := firstNonEmpty(item.Locator, item.URI, fmt.Sprintf("position:%d", i))
-			result[rel.ChildKind+":"+identity] = enrichmentResource{
+			result[rel.ChildKind+":"+identity] = measurement.Enrichment{
 				Data: item.Data,
 				URI:  item.URI,
 			}
@@ -341,8 +319,8 @@ func mergeEquivalentGraphNode(existing, candidate *graphNode) bool {
 	return promoted
 }
 
-func cloneSensorExcerptSources(values []sensorExcerptSource) []sensorExcerptSource {
-	result := make([]sensorExcerptSource, len(values))
+func cloneSensorExcerptSources(values []measurement.SensorExcerpt) []measurement.SensorExcerpt {
+	result := make([]measurement.SensorExcerpt, len(values))
 	for index, value := range values {
 		result[index] = value
 		result[index].Data = cloneJSONMap(value.Data)
@@ -350,8 +328,8 @@ func cloneSensorExcerptSources(values []sensorExcerptSource) []sensorExcerptSour
 	return result
 }
 
-func mergeSensorExcerptSources(sets ...[]sensorExcerptSource) []sensorExcerptSource {
-	byKey := make(map[string]sensorExcerptSource)
+func mergeSensorExcerptSources(sets ...[]measurement.SensorExcerpt) []measurement.SensorExcerpt {
+	byKey := make(map[string]measurement.SensorExcerpt)
 	for _, values := range sets {
 		for _, value := range values {
 			key := value.Path + "\x00" + value.Type + "\x00" + value.Units
@@ -367,7 +345,7 @@ func mergeSensorExcerptSources(sets ...[]sensorExcerptSource) []sensorExcerptSou
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	result := make([]sensorExcerptSource, 0, len(keys))
+	result := make([]measurement.SensorExcerpt, 0, len(keys))
 	for _, key := range keys {
 		result = append(result, byKey[key])
 	}
@@ -384,7 +362,7 @@ func (c *protocolClient) seedResourceGraph(
 		URI:     "/redfish/v1/",
 		Locator: "/redfish/v1/",
 		Data:    cloneJSONMap(root.Raw),
-		Doc: genericResource{
+		Doc: measurement.Document{
 			Name: stringAt(root.Raw, "Name"),
 		},
 		AcquisitionState: "readable",
@@ -393,7 +371,7 @@ func (c *protocolClient) seedResourceGraph(
 		Response:         root.Response,
 		Parents:          make(map[string]*graphNode),
 	}
-	service.Key = resourceKey(c.origin, service.Kind, service.Locator)
+	service.Key = identity.ResourceKey(c.origin, service.Kind, service.Locator)
 	if err := graph.add(service); err != nil {
 		return nil, err
 	}
@@ -411,11 +389,21 @@ func (c *protocolClient) seedResourceGraph(
 			Response:         item.Response,
 			Parents:          map[string]*graphNode{service.Key: service},
 		}
-		node.Key = resourceKey(c.origin, node.Kind, node.Locator)
+		node.Key = identity.ResourceKey(c.origin, node.Kind, node.Locator)
 		if err := graph.add(node); err != nil {
 			return nil, err
 		}
 		queue = append(queue, node)
 	}
 	return queue, nil
+}
+
+func (g *resourceGraph) measurementResources() []*measurement.Resource {
+	resources := make([]*measurement.Resource, 0, len(g.Nodes))
+	for _, node := range g.Nodes {
+		if node.Kind != "update_service" {
+			resources = append(resources, &node.Resource)
+		}
+	}
+	return resources
 }

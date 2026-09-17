@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 type wireStats struct {
@@ -66,11 +68,6 @@ func (r *responseData) finish(err error) {
 	r.stats.failures[classifyError(err)]++
 }
 
-type responseMetadata struct {
-	StartedAt  time.Time
-	FinishedAt time.Time
-}
-
 func decodeJSON(response *responseData, target any) error {
 	if response == nil {
 		return errors.New("nil Redfish response")
@@ -94,25 +91,25 @@ func decodeJSONBytes(raw []byte, target any) error {
 	return nil
 }
 
-func metadataForResponse(response *responseData) responseMetadata {
+func metadataForResponse(response *responseData) measurement.ResponseTiming {
 	if response == nil {
-		return responseMetadata{}
+		return measurement.ResponseTiming{}
 	}
-	return responseMetadata{
+	return measurement.ResponseTiming{
 		StartedAt:  response.startedAt,
 		FinishedAt: response.finishedAt,
 	}
 }
 
 func linkAt(data map[string]any, path string) string {
-	value, _ := jsonPath(data, path)
+	value, _ := measurement.Properties(data).Lookup(path)
 	link, _ := value.(map[string]any)
-	uri, _ := stringValue(link["@odata.id"])
+	uri, _ := measurement.Properties(link).Text("@odata.id")
 	return uri
 }
 
 func stringAt(data map[string]any, path string) string {
-	value, _ := stringValueAt(data, path)
+	value, _ := measurement.Properties(data).String(path)
 	return value
 }
 
@@ -125,7 +122,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func mergeResponseMetadata(left, right responseMetadata) responseMetadata {
+func mergeResponseMetadata(left, right measurement.ResponseTiming) measurement.ResponseTiming {
 	if left.StartedAt.IsZero() {
 		return right
 	}

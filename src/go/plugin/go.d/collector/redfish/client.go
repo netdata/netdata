@@ -9,16 +9,17 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 	"github.com/stmcginnis/gofish"
 )
 
 type protocolClient struct {
-	config      Config
-	http        *http.Client
-	root        *url.URL
-	origin      string
-	endpointJob string
-	hardwareState
+	config       Config
+	http         *http.Client
+	root         *url.URL
+	origin       string
+	measurement  *measurement.Projector
 	sdk          *gofish.APIClient
 	authMode     string
 	requestLimit int
@@ -29,7 +30,7 @@ type protocolClient struct {
 	graphMu         sync.Mutex
 	graphMembership map[string]graphMembershipSnapshot
 
-	identities identityRegistry
+	identities identity.Registry
 }
 
 func newEndpointClient(cfg Config, client *http.Client) (endpointClient, error) {
@@ -47,7 +48,6 @@ func newEndpointClient(cfg Config, client *http.Client) (endpointClient, error) 
 	}
 	result := &protocolClient{
 		config:          cfg,
-		endpointJob:     cfg.Name,
 		http:            client,
 		root:            root,
 		origin:          origin,
@@ -56,7 +56,7 @@ func newEndpointClient(cfg Config, client *http.Client) (endpointClient, error) 
 		requestLimit:    cfg.MaxConcurrentRequests,
 		families:        families,
 	}
-	result.hardwareState.initialize()
+	result.measurement = measurement.New(origin, cfg.Name, readingProvenanceResolver(root, origin))
 	return result, nil
 }
 

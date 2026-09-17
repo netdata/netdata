@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"strings"
@@ -13,7 +13,7 @@ type excerptReadingSource struct {
 	Keys                    []string
 }
 
-func excerptReadings(node *graphNode) []rawReading {
+func excerptReadings(node *Resource) []rawReading {
 	result := excerptDocumentReadings(nil, node.Kind, node.Data, "", []excerptReadingSource{
 		{"SpeedPercent", "Percent", "%", "speed", nil},
 		{"SecondarySpeedPercent", "Percent", "%", "speed", nil},
@@ -202,7 +202,7 @@ func excerptValueReadings(
 		}
 		return append(result, reading)
 	}
-	readings := sensorExcerptReadings(sensorExcerptSource{
+	readings := sensorExcerptReadings(SensorExcerpt{
 		Path:  path,
 		Type:  source.Type,
 		Units: source.Units,

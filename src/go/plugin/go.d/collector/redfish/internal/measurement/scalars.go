@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"regexp"
@@ -20,7 +20,7 @@ type scalarValue struct {
 
 // scalarValues selects candidates in source priority order. Invalid present
 // sources retain their diagnostics until a fully decoded fallback is selected.
-func (c *protocolClient) scalarValues(node *graphNode, at time.Time) []scalarValue {
+func (c *Projector) scalarValues(node *Resource, at time.Time) []scalarValue {
 	result := make([]scalarValue, 0)
 	for _, descriptor := range scalarFieldsByKind[node.Kind] {
 		if descriptor.ID == managerClockDescriptor.ID {
@@ -82,7 +82,7 @@ func sourceRequirementsMatch(document map[string]any, requirements []sourceRequi
 	return true
 }
 
-func managerClockValue(node *graphNode) (scalarValue, bool, string) {
+func managerClockValue(node *Resource) (scalarValue, bool, string) {
 	if node == nil || node.Kind != "manager" || node.Data == nil {
 		return scalarValue{}, false, ""
 	}
@@ -135,7 +135,7 @@ func sourcePath(source scalarSource) string {
 	return string(source.Document) + "." + source.Path
 }
 
-func findEnrichment(node *graphNode, kind string) map[string]any {
+func findEnrichment(node *Resource, kind string) map[string]any {
 	var match map[string]any
 	found := false
 	for key, value := range node.Enrichment {
@@ -151,7 +151,7 @@ func findEnrichment(node *graphNode, kind string) map[string]any {
 }
 
 func stringValueAt(data map[string]any, path string) (string, bool) {
-	value, ok := jsonPath(data, path)
+	value, ok := Properties(data).Lookup(path)
 	if !ok {
 		return "", false
 	}
@@ -167,7 +167,7 @@ func registeredValueAt(data map[string]any, path string) (any, bool) {
 		propertyPath := before
 		parent := data
 		if index := strings.LastIndexByte(propertyPath, '.'); index >= 0 {
-			value, ok := jsonPath(data, propertyPath[:index])
+			value, ok := Properties(data).Lookup(propertyPath[:index])
 			if !ok {
 				return nil, false
 			}
@@ -180,7 +180,7 @@ func registeredValueAt(data map[string]any, path string) (any, bool) {
 		value, ok := parent[propertyPath+"@odata.count"]
 		return value, ok
 	}
-	return jsonPath(data, path)
+	return Properties(data).Lookup(path)
 }
 
 var managerDateTimeOffsetPattern = regexp.MustCompile(`[+-][0-9]{2}:[0-9]{2}$`)
