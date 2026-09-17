@@ -559,6 +559,146 @@ void update_mem_failcnt_chart(struct cgroup *cg) {
     rrdset_done(chart);
 }
 
+void update_mem_events_chart(struct cgroup *cg) {
+    RRDSET *chart = cg->st_mem_events;
+
+    if (unlikely(!cg->st_mem_events)) {
+        char *title;
+        char *context;
+        int prio;
+        if (is_cgroup_systemd_service(cg)) {
+            title = "Systemd Services Memory Usage Events";
+            context = "systemd.service.memory.events";
+            prio = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 12;
+        } else {
+            title = "Memory Usage Events";
+            context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_events" : "cgroup.mem_events";
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 260;
+        }
+
+        char buff[RRD_ID_LENGTH_MAX + 1];
+        chart = cg->st_mem_events = rrdset_create_localhost(
+            cgroup_chart_type(buff, cg),
+            "mem_events",
+            NULL,
+            "mem",
+            context,
+            title,
+            "events/s",
+            PLUGIN_CGROUPS_NAME,
+            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
+            prio,
+            cgroup_update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdset_update_rrdlabels(chart, cg->chart_labels);
+        rrddim_add(chart, "low", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(chart, "high", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(chart, "max", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if (cg->memory.events_has_sock_throttled)
+            rrddim_add(chart, "sock_throttled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set(chart, "low", (collected_number)cg->memory.events_low);
+    rrddim_set(chart, "high", (collected_number)cg->memory.events_high);
+    rrddim_set(chart, "max", (collected_number)cg->memory.events_max);
+    if (cg->memory.events_has_sock_throttled)
+        rrddim_set(chart, "sock_throttled", (collected_number)cg->memory.events_sock_throttled);
+    rrdset_done(chart);
+}
+
+void update_mem_events_oom_chart(struct cgroup *cg) {
+    RRDSET *chart = cg->st_mem_events_oom;
+
+    if (unlikely(!cg->st_mem_events_oom)) {
+        char *title;
+        char *context;
+        int prio;
+        if (is_cgroup_systemd_service(cg)) {
+            title = "Systemd Services Out of Memory Events";
+            context = "systemd.service.memory.oom_events";
+            prio = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 11;
+        } else {
+            title = "Out of Memory Events";
+            context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_events_oom" : "cgroup.mem_events_oom";
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 255;
+        }
+
+        char buff[RRD_ID_LENGTH_MAX + 1];
+        chart = cg->st_mem_events_oom = rrdset_create_localhost(
+            cgroup_chart_type(buff, cg),
+            "mem_events_oom",
+            NULL,
+            "mem",
+            context,
+            title,
+            "events/s",
+            PLUGIN_CGROUPS_NAME,
+            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
+            prio,
+            cgroup_update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdset_update_rrdlabels(chart, cg->chart_labels);
+        rrddim_add(chart, "oom", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(chart, "oom_kill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        if (cg->memory.events_has_oom_group_kill)
+            rrddim_add(chart, "oom_group_kill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set(chart, "oom", (collected_number)cg->memory.events_oom);
+    rrddim_set(chart, "oom_kill", (collected_number)cg->memory.events_oom_kill);
+    if (cg->memory.events_has_oom_group_kill)
+        rrddim_set(chart, "oom_group_kill", (collected_number)cg->memory.events_oom_group_kill);
+    rrdset_done(chart);
+}
+
+void update_mem_events_swap_chart(struct cgroup *cg) {
+    RRDSET *chart = cg->st_mem_events_swap;
+
+    if (unlikely(!cg->st_mem_events_swap)) {
+        char *title;
+        char *context;
+        int prio;
+        if (is_cgroup_systemd_service(cg)) {
+            title = "Systemd Services Swap Usage Events";
+            context = "systemd.service.memory.swap_events";
+            prio = NETDATA_CHART_PRIO_CGROUPS_SYSTEMD + 13;
+        } else {
+            title = "Swap Usage Events";
+            context = k8s_is_kubepod(cg) ? "k8s.cgroup.mem_events_swap" : "cgroup.mem_events_swap";
+            prio = NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 265;
+        }
+
+        char buff[RRD_ID_LENGTH_MAX + 1];
+        chart = cg->st_mem_events_swap = rrdset_create_localhost(
+            cgroup_chart_type(buff, cg),
+            "mem_events_swap",
+            NULL,
+            "mem",
+            context,
+            title,
+            "events/s",
+            PLUGIN_CGROUPS_NAME,
+            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
+            prio,
+            cgroup_update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdset_update_rrdlabels(chart, cg->chart_labels);
+        if (cg->memory.swap_events_has_high)
+            rrddim_add(chart, "high", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(chart, "max", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rrddim_add(chart, "fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    if (cg->memory.swap_events_has_high)
+        rrddim_set(chart, "high", (collected_number)cg->memory.swap_events_high);
+    rrddim_set(chart, "max", (collected_number)cg->memory.swap_events_max);
+    rrddim_set(chart, "fail", (collected_number)cg->memory.swap_events_fail);
+    rrdset_done(chart);
+}
+
 void update_mem_usage_chart(struct cgroup *cg) {
     RRDSET *chart = cg->st_mem_usage;
 
