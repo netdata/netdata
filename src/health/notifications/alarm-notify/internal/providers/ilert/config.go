@@ -4,11 +4,14 @@ package ilert
 
 import (
 	"net/http"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
-	IntegrationKey string `yaml:"integration_key,omitempty"`
-	APIURL         string `yaml:"api_url,omitempty"`
+	Secrets        secret.InputMode `yaml:"-"`
+	IntegrationKey string           `yaml:"integration_key,omitempty"`
+	APIURL         string           `yaml:"api_url,omitempty"`
 }
 
 type Sender struct {

@@ -15,7 +15,6 @@ import (
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
 	notifymsg "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
@@ -24,7 +23,7 @@ const opsgenieDefaultAPI = "https://api.opsgenie.com"
 
 func (dst Config) validate() error {
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"api_key", dst.APIKey}} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("opsgenie %s: %w", field.name, err)
 		}
@@ -117,7 +116,7 @@ func (s *Sender) Send(ctx context.Context, event notifyevent.Event) error {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"api_key", &dst.APIKey}} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("opsgenie %s: %w", field.name, err)
 		}

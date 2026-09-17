@@ -30,20 +30,20 @@ func TestRunLegacyDelivery(t *testing.T) {
 		code, calls  int
 		summary, err string
 	}{
-		"ordered files":               {overlay: `role_recipients_discord[ops]=selected; DEFAULT_RECIPIENT_DISCORD=disabled`, calls: 1, summary: "1 succeeded, 0 failed"},
-		"all methods by default":      {calls: 1, summary: "1 succeeded, 0 failed"},
-		"eligible gap rejects all":    {overlay: `SEND_OPSGENIE=YES; OPSGENIE_API_KEY=synthetic-private-value`, code: 1, err: "legacy opsgenie", summary: "0 succeeded, 0 failed"},
-		"dynatrace gap rejects all":   {overlay: dynatrace, code: 1, err: "legacy dynatrace", summary: "0 succeeded, 0 failed"},
-		"filter excludes dynatrace":   {overlay: dynatrace, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
-		"disabled dynatrace":          {overlay: dynatrace + "; SEND_DYNATRACE=NO", calls: 1, summary: "1 succeeded, 0 failed"},
-		"filter excludes gap":         {overlay: `SEND_OPSGENIE=YES; OPSGENIE_API_KEY=synthetic-private-value`, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
-		"missing history rejects all": {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|critical'`, code: 1, err: "critical_seen_since_clear", summary: "0 succeeded, 0 failed"},
-		"stateless skip":              {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|nowarn|critical'`, summary: "0 succeeded, 0 failed"},
-		"history permits":             {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|critical'`, input: strings.Replace(testutil.ValidEvent, `"version": 1`, `"version": 1, "critical_seen_since_clear": true`, 1), calls: 1, summary: "1 succeeded, 0 failed"},
-		"bad overlay":                 {overlay: `source synthetic-private-value`, code: 1, err: "file 2:", summary: "0 succeeded, 0 failed"},
-		"curl customization":          {overlay: `curl_options='--header synthetic-private-value'`, code: 1, err: "curl_options", summary: "0 succeeded, 0 failed"},
-		"invalid event":               {input: `{"version": "synthetic-private-value"}`, code: 1, err: "invalid JSON event", summary: "0 succeeded, 0 failed"},
-		"unknown method":              {methods: []string{"synthetic-private-value"}, code: 1, err: "unknown legacy method", summary: "0 succeeded, 0 failed"},
+		"ordered files":                 {overlay: `role_recipients_discord[ops]=selected; DEFAULT_RECIPIENT_DISCORD=disabled`, calls: 1, summary: "1 succeeded, 0 failed"},
+		"all methods by default":        {calls: 1, summary: "1 succeeded, 0 failed"},
+		"eligible gap rejects all":      {overlay: `SEND_CUSTOM=YES; DEFAULT_RECIPIENT_CUSTOM=recipient`, code: 1, err: "legacy custom", summary: "0 succeeded, 0 failed"},
+		"invalid dynatrace rejects all": {overlay: dynatrace + "; DYNATRACE_EVENT=invalid", code: 1, err: "legacy dynatrace", summary: "0 succeeded, 0 failed"},
+		"filter excludes dynatrace":     {overlay: dynatrace, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
+		"disabled dynatrace":            {overlay: dynatrace + "; SEND_DYNATRACE=NO", calls: 1, summary: "1 succeeded, 0 failed"},
+		"filter excludes gap":           {overlay: `SEND_CUSTOM=YES; DEFAULT_RECIPIENT_CUSTOM=recipient`, methods: []string{"discord"}, calls: 1, summary: "1 succeeded, 0 failed"},
+		"missing history rejects all":   {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|critical'`, code: 1, err: "critical_seen_since_clear", summary: "0 succeeded, 0 failed"},
+		"stateless skip":                {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|nowarn|critical'`, summary: "0 succeeded, 0 failed"},
+		"history permits":               {overlay: `DEFAULT_RECIPIENT_DISCORD='channel|critical'`, input: strings.Replace(testutil.ValidEvent, `"version": 1`, `"version": 1, "critical_seen_since_clear": true`, 1), calls: 1, summary: "1 succeeded, 0 failed"},
+		"bad overlay":                   {overlay: `source synthetic-private-value`, code: 1, err: "file 2:", summary: "0 succeeded, 0 failed"},
+		"curl customization":            {overlay: `curl_options='--header synthetic-private-value'`, code: 1, err: "curl_options", summary: "0 succeeded, 0 failed"},
+		"invalid event":                 {input: `{"version": "synthetic-private-value"}`, code: 1, err: "invalid JSON event", summary: "0 succeeded, 0 failed"},
+		"unknown method":                {methods: []string{"synthetic-private-value"}, code: 1, err: "unknown legacy method", summary: "0 succeeded, 0 failed"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var calls atomic.Int32

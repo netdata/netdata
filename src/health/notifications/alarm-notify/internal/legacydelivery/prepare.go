@@ -40,7 +40,7 @@ var methods = []method{
 	{name: "awssns", gap: "AWS SNS credential and message-template mapping is not implemented"},
 	{name: "custom", gap: "Unix custom_sender execution is not implemented"},
 	{name: "discord", required: []string{"DISCORD_WEBHOOK_URL"}, build: buildDiscord},
-	{name: "dynatrace", required: []string{"DYNATRACE_SPACE", "DYNATRACE_SERVER", "DYNATRACE_TOKEN", "DYNATRACE_TAG_VALUE", "DYNATRACE_EVENT"}, global: true, gap: "Dynatrace Events v2 configuration mapping is not implemented"},
+	{name: "dynatrace", required: []string{"DYNATRACE_SPACE", "DYNATRACE_SERVER", "DYNATRACE_TOKEN", "DYNATRACE_TAG_VALUE", "DYNATRACE_EVENT"}, global: true, build: buildDynatrace},
 	{name: "email", tool: "sendmail", build: buildEmail},
 	{name: "fleep", required: []string{"FLEEP_SENDER"}, build: buildFleep},
 	{name: "flock", required: []string{"FLOCK_WEBHOOK_URL"}, build: buildFlock},
@@ -64,8 +64,8 @@ var methods = []method{
 	{name: "twilio", required: []string{"TWILIO_ACCOUNT_SID", "TWILIO_ACCOUNT_TOKEN", "TWILIO_NUMBER"}, build: buildTwilio},
 	{name: "smseagle", required: []string{"SMSEAGLE_API_URL", "SMSEAGLE_API_ACCESSTOKEN", "SMSEAGLE_MSG_TYPE"}, build: buildSMSEagle},
 	{name: "kafka", required: []string{"KAFKA_URL", "KAFKA_SENDER_IP"}, global: true, build: buildKafka},
-	{name: "opsgenie", required: []string{"OPSGENIE_API_KEY"}, global: true, gap: "Opsgenie Alert API v2 integration mapping is not implemented"},
-	{name: "ilert", required: []string{"ILERT_ALERT_SOURCE_URL"}, global: true, gap: "ilert API alert-source mapping is not implemented"},
+	{name: "opsgenie", required: []string{"OPSGENIE_API_KEY"}, global: true, build: buildOpsgenie},
+	{name: "ilert", required: []string{"ILERT_INTEGRATION_KEY"}, global: true, build: buildIlert},
 	{name: "signl4", required: []string{"SIGNL4_WEBHOOK_URL"}, global: true, build: buildSIGNL4},
 }
 
@@ -93,6 +93,10 @@ func Prepare(ctx context.Context, programs []*legacyconfig.Program, requested, r
 		flag := b.values["SEND_"+strings.ToUpper(m.name)]
 		if flag != "YES" && !(m.name == "email" && flag == "AUTO") {
 			continue
+		}
+		// Check the retired setting before prerequisites can silently disable ilert.
+		if m.name == "ilert" && b.values["ILERT_ALERT_SOURCE_URL"] != "" {
+			return fail(errors.New("legacy ilert: remove or clear ILERT_ALERT_SOURCE_URL and configure ILERT_INTEGRATION_KEY from an API alert source; optionally set ILERT_API_URL"))
 		}
 		ready := true
 		for _, key := range m.required {
