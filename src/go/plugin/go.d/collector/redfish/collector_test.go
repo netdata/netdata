@@ -5,12 +5,13 @@ package redfish
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -20,7 +21,7 @@ import (
 )
 
 type staticEndpointClient struct {
-	result      collectionResult
+	result      acquisition.Result
 	err         error
 	closed      bool
 	deadline    time.Time
@@ -29,14 +30,15 @@ type staticEndpointClient struct {
 }
 
 func (c *staticEndpointClient) Check(context.Context) error { return c.err }
-func (c *staticEndpointClient) Collect(ctx context.Context) (collectionResult, error) {
+func (c *staticEndpointClient) Acquire(ctx context.Context) (acquisition.Result, error) {
 	c.deadline, c.hasDeadline = ctx.Deadline()
-	return c.result, c.err
+	result := c.result
+	result.AuthMethod = c.auth
+	return result, c.err
 }
 func (c *staticEndpointClient) Close() {
 	c.closed = true
 }
-func (c *staticEndpointClient) selectedAuthenticationMethod() string { return c.auth }
 
 func TestCollectorLogsSelectedAuthenticationMethodOnce(t *testing.T) {
 	var output bytes.Buffer
@@ -50,7 +52,7 @@ func TestCollectorLogsSelectedAuthenticationMethodOnce(t *testing.T) {
 		AuthMethod: "none",
 	}
 	collector.Name = "endpoint-a"
-	collector.newClient = func(Config, *http.Client) (endpointClient, error) {
+	collector.newClient = func(acquisition.Options, *http.Client) (endpointClient, error) {
 		return client, nil
 	}
 	require.NoError(t, collector.Init(context.Background()))
@@ -93,7 +95,7 @@ func TestCollectorRejectsOversizedJobNameBeforeClientConstruction(t *testing.T) 
 		AuthMethod: "none",
 	}
 	collector.Name = strings.Repeat("x", measurement.MaxLabelValueBytes+1)
-	collector.newClient = func(Config, *http.Client) (endpointClient, error) {
+	collector.newClient = func(acquisition.Options, *http.Client) (endpointClient, error) {
 		t.Fatal("oversized job name reached client construction")
 		return nil, nil
 	}
@@ -103,29 +105,20 @@ func TestCollectorRejectsOversizedJobNameBeforeClientConstruction(t *testing.T) 
 }
 
 func TestCollectorCollectionErrorCanAbortMetricCycle(t *testing.T) {
-	sentinel := errors.New("endpoint unavailable")
 	collector := New()
-	collector.Name = "endpoint-a"
-	collector.endpointKey = "endpoint-key"
-	collector.client = &staticEndpointClient{
-		err: sentinel,
-	}
-
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
 	require.True(t, ok)
 	cycle := managed.CycleController()
 	cycle.BeginCycle()
-	err := collector.Collect(context.Background())
-	require.ErrorIs(t, err, sentinel)
+	require.ErrorContains(t, collector.Collect(t.Context()), "not initialized")
 	cycle.AbortCycle()
 }
 
 func TestCollectorDerivesCollectionDeadlineFromUpdateEvery(t *testing.T) {
 	client := &staticEndpointClient{
-		result: collectionResult{
-			Metrics: cycleMetrics{
-				Status: "success",
-			},
+		result: acquisition.Result{
+			Available: true,
+			Complete:  true,
 		},
 	}
 	collector := New()
@@ -133,6 +126,7 @@ func TestCollectorDerivesCollectionDeadlineFromUpdateEvery(t *testing.T) {
 	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
+	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
 
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
 	require.True(t, ok)
@@ -148,11 +142,9 @@ func TestCollectorDerivesCollectionDeadlineFromUpdateEvery(t *testing.T) {
 
 func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 	client := &staticEndpointClient{
-		result: collectionResult{
-			ObservedAt: time.Now(),
-			Metrics: cycleMetrics{
-				Status: "partial",
-			},
+		result: acquisition.Result{
+			Available: true,
+			Complete:  false,
 		},
 		err: context.DeadlineExceeded,
 	}
@@ -160,6 +152,7 @@ func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
+	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
 
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
 	require.True(t, ok)
@@ -178,16 +171,16 @@ func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 
 func TestCollectorParentCancellationAbortsPartialResult(t *testing.T) {
 	client := &staticEndpointClient{
-		result: collectionResult{
-			Metrics: cycleMetrics{
-				Status: "partial",
-			},
+		result: acquisition.Result{
+			Available: true,
+			Complete:  false,
 		},
 	}
 	collector := New()
 	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
+	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

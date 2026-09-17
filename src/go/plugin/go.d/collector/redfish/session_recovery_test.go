@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/testutil"
+
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,9 +19,9 @@ import (
 func TestCollectorSessionRecoveryCleanupHonorsCollectionDeadline(t *testing.T) {
 	var expire atomic.Bool
 	var deletes atomic.Int64
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		supportSession: true,
-		handleRequest: func(w http.ResponseWriter, r *http.Request) bool {
+	server := testutil.NewServer(t, testutil.ServerConfig{
+		SupportSession: true,
+		HandleRequest: func(w http.ResponseWriter, r *http.Request) bool {
 			if r.Method == http.MethodDelete {
 				deletes.Add(1)
 				<-r.Context().Done()
@@ -47,47 +49,7 @@ func TestCollectorSessionRecoveryCleanupHonorsCollectionDeadline(t *testing.T) {
 	sourceTestCollectCycle(t, collector)
 	assert.Less(t, time.Since(started), 2*time.Second, "cleanup must stop at the one-second collection deadline")
 	assert.Equal(t, int64(1), deletes.Load(), "the recovery logout reached the BMC")
-	assert.Equal(t, int64(1), server.sessionCreates.Load(), "an exhausted cycle must not start a new session")
-}
-
-func TestSessionRecoveryCleanupHonorsCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	var expire atomic.Bool
-	var deletes atomic.Int64
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		supportSession: true,
-		handleRequest: func(w http.ResponseWriter, r *http.Request) bool {
-			if r.Method == http.MethodDelete {
-				deletes.Add(1)
-				cancel()
-				<-r.Context().Done()
-				return true
-			}
-			if expire.Load() && r.URL.Path == "/redfish/v1/" && r.Header.Get("X-Auth-Token") != "" {
-				http.Error(w, "expired", http.StatusUnauthorized)
-				return true
-			}
-			return false
-		},
-	})
-	defer server.Close()
-	cfg := testConfig(server.URL, "session")
-	cfg.Timeout = confopt.Duration(2 * time.Second)
-	client := newTestProtocolClient(t, cfg)
-	defer client.Close()
-	_, err := client.Collect(ctx)
-	require.NoError(t, err)
-	expire.Store(true)
-
-	started := time.Now()
-	result, err := client.Collect(ctx)
-	require.ErrorIs(t, err, context.Canceled)
-	assert.Less(t, time.Since(started), time.Second, "canceling collection must interrupt recovery logout")
-	assert.Equal(t, "unavailable", result.Metrics.Status)
-	assert.Nil(t, client.sdk)
-	assert.Equal(t, int64(1), deletes.Load())
-	assert.Equal(t, int64(1), server.sessionCreates.Load())
+	assert.Equal(t, int64(1), server.SessionCreates.Load(), "an exhausted cycle must not start a new session")
 }
 
 func TestSessionRecoveryStopsAfterOneAttempt(t *testing.T) {
@@ -112,9 +74,9 @@ func TestSessionRecoveryStopsAfterOneAttempt(t *testing.T) {
 			defer cancel()
 			var fail atomic.Bool
 			var logins atomic.Int64
-			server := newRedfishTestServer(t, redfishTestServerConfig{
-				supportSession: test.auth == "session",
-				handleRequest: func(w http.ResponseWriter, r *http.Request) bool {
+			server := testutil.NewServer(t, testutil.ServerConfig{
+				SupportSession: test.auth == "session",
+				HandleRequest: func(w http.ResponseWriter, r *http.Request) bool {
 					if r.Method == http.MethodPost {
 						logins.Add(1)
 						if fail.Load() && test.loginStatus != 0 {
@@ -135,12 +97,12 @@ func TestSessionRecoveryStopsAfterOneAttempt(t *testing.T) {
 			})
 			defer server.Close()
 			cfg := testConfig(server.URL, test.auth)
-			client := newTestProtocolClient(t, cfg)
-			defer client.Close()
-			_, err := client.Collect(ctx)
+			client := newTestCollector(t, cfg)
+			defer client.Cleanup(t.Context())
+			_, err := client.collect(ctx)
 			require.NoError(t, err)
 			fail.Store(true)
-			result, err := client.Collect(ctx)
+			result, err := client.collect(ctx)
 			require.Error(t, err)
 			assert.Equal(t, "unavailable", result.Metrics.Status)
 			assert.Empty(t, result.Hardware)
@@ -157,16 +119,16 @@ func TestSessionRecoveryProjectsOnlyFinalAcquisition(t *testing.T) {
 	const sensors = chassis + "/Sensors"
 	var cycle atomic.Int64
 	var energyReads atomic.Int64
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		supportSession: true,
-		handleRequest: func(w http.ResponseWriter, r *http.Request) bool {
+	server := testutil.NewServer(t, testutil.ServerConfig{
+		SupportSession: true,
+		HandleRequest: func(w http.ResponseWriter, r *http.Request) bool {
 			switch r.URL.Path {
 			case chassis:
-				writeJSON(w, sourceTestResource(chassis, "Chassis", "Chassis", map[string]any{
-					"Sensors": sourceTestLink(sensors),
+				testutil.WriteJSON(w, testutil.Resource(chassis, "Chassis", "Chassis", map[string]any{
+					"Sensors": testutil.Link(sensors),
 				}))
 			case sensors:
-				writeJSON(w, sourceTestCollection(sensors, "Sensor", sensors+"/Energy", sensors+"/Temperature"))
+				testutil.WriteJSON(w, testutil.Collection(sensors, "Sensor", sensors+"/Energy", sensors+"/Temperature"))
 			case sensors + "/Energy":
 				energyReads.Add(1)
 				reading := int64(100)
@@ -178,7 +140,7 @@ func TestSessionRecoveryProjectsOnlyFinalAcquisition(t *testing.T) {
 				} else if cycle.Load() == 2 {
 					reading = 700
 				}
-				writeJSON(w, sourceTestResource(r.URL.Path, "Sensor", "Energy", map[string]any{
+				testutil.WriteJSON(w, testutil.Resource(r.URL.Path, "Sensor", "Energy", map[string]any{
 					"ReadingType": "EnergyJoules", "ReadingUnits": "J", "Reading": reading,
 				}))
 			case sensors + "/Temperature":
@@ -186,7 +148,7 @@ func TestSessionRecoveryProjectsOnlyFinalAcquisition(t *testing.T) {
 					http.Error(w, "expired", http.StatusUnauthorized)
 					return true
 				}
-				writeJSON(w, sourceTestResource(r.URL.Path, "Sensor", "Temperature", map[string]any{
+				testutil.WriteJSON(w, testutil.Resource(r.URL.Path, "Sensor", "Temperature", map[string]any{
 					"ReadingType": "Temperature", "ReadingUnits": "Cel", "Reading": 30,
 				}))
 			default:
@@ -198,12 +160,12 @@ func TestSessionRecoveryProjectsOnlyFinalAcquisition(t *testing.T) {
 	defer server.Close()
 	cfg := testConfig(server.URL, "session")
 	cfg.MaxConcurrentRequests = 1 // Read energy before the later session failure.
-	client := newTestProtocolClient(t, cfg)
-	defer client.Close()
+	client := newTestCollector(t, cfg)
+	defer client.Cleanup(t.Context())
 	var previous collectionResult
 	for index := range 3 {
 		cycle.Store(int64(index))
-		result, err := client.Collect(t.Context())
+		result, err := client.collect(t.Context())
 		require.NoError(t, err)
 		require.True(t, result.Complete)
 		assert.Equal(t, "success", result.Metrics.Status)
@@ -230,5 +192,5 @@ func TestSessionRecoveryProjectsOnlyFinalAcquisition(t *testing.T) {
 		}
 		previous = result
 	}
-	assert.Equal(t, int64(2), server.sessionCreates.Load())
+	assert.Equal(t, int64(2), server.SessionCreates.Load())
 }

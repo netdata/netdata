@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/testutil"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -23,29 +24,29 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 	var phase atomic.Int32
 	const base = "/redfish/v1/"
 	documents := map[string]map[string]any{
-		base: sourceTestResource(base, "ServiceRoot", "Service", map[string]any{
-			"RedfishVersion": "1.20.0", "Systems": sourceTestLink(base + "Systems"), "Chassis": sourceTestLink(base + "Chassis"), "Managers": sourceTestLink(base + "Managers"),
+		base: testutil.Resource(base, "ServiceRoot", "Service", map[string]any{
+			"RedfishVersion": "1.20.0", "Systems": testutil.Link(base + "Systems"), "Chassis": testutil.Link(base + "Chassis"), "Managers": testutil.Link(base + "Managers"),
 		}),
-		base + "Systems":  sourceTestCollection(base+"Systems", "ComputerSystem", base+"Systems/A", base+"Systems/B"),
-		base + "Managers": sourceTestCollection(base+"Managers", "Manager"),
-		base + "Chassis":  sourceTestCollection(base+"Chassis", "Chassis", base+"Chassis/1"),
-		base + "Systems/A": sourceTestResource(base+"Systems/A", "ComputerSystem", "System A", map[string]any{
+		base + "Systems":  testutil.Collection(base+"Systems", "ComputerSystem", base+"Systems/A", base+"Systems/B"),
+		base + "Managers": testutil.Collection(base+"Managers", "Manager"),
+		base + "Chassis":  testutil.Collection(base+"Chassis", "Chassis", base+"Chassis/1"),
+		base + "Systems/A": testutil.Resource(base+"Systems/A", "ComputerSystem", "System A", map[string]any{
 			"Status": map[string]any{
 				"Health": "OK",
-			}, "Storage": sourceTestLink(base + "Storage"), "Memory": sourceTestLink(base + "Memory"),
+			}, "Storage": testutil.Link(base + "Storage"), "Memory": testutil.Link(base + "Memory"),
 		}),
-		base + "Systems/B": sourceTestResource(base+"Systems/B", "ComputerSystem", "System B", map[string]any{
+		base + "Systems/B": testutil.Resource(base+"Systems/B", "ComputerSystem", "System B", map[string]any{
 			"Status": map[string]any{
 				"Health": "Warning",
-			}, "EthernetInterfaces": sourceTestLink(base + "EthernetInterfaces"),
+			}, "EthernetInterfaces": testutil.Link(base + "EthernetInterfaces"),
 		}),
-		base + "Memory":  sourceTestCollection(base+"Memory", "Memory"),
-		base + "Storage": sourceTestCollection(base+"Storage", "Storage", base+"Storage/1"),
-		base + "Storage/1": sourceTestResource(base+"Storage/1", "Storage", "Storage", map[string]any{
-			"Controllers": sourceTestLink(base + "Controllers"), "Volumes": sourceTestLink(base + "Volumes"),
+		base + "Memory":  testutil.Collection(base+"Memory", "Memory"),
+		base + "Storage": testutil.Collection(base+"Storage", "Storage", base+"Storage/1"),
+		base + "Storage/1": testutil.Resource(base+"Storage/1", "Storage", "Storage", map[string]any{
+			"Controllers": testutil.Link(base + "Controllers"), "Volumes": testutil.Link(base + "Volumes"),
 		}),
-		base + "Controllers": sourceTestCollection(base+"Controllers", "StorageController", base+"Controllers/1"),
-		base + "Controllers/1": sourceTestResource(
+		base + "Controllers": testutil.Collection(base+"Controllers", "StorageController", base+"Controllers/1"),
+		base + "Controllers/1": testutil.Resource(
 			base+"Controllers/1",
 			"StorageController",
 			"Controller",
@@ -53,40 +54,40 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 				"PCIeInterface": map[string]any{"LanesInUse": 8}, "Status": map[string]any{"Health": "Warning"},
 			},
 		),
-		base + "Volumes": sourceTestCollection(base+"Volumes", "Volume", base+"Volumes/1"),
-		base + "Volumes/1": sourceTestResource(
+		base + "Volumes": testutil.Collection(base+"Volumes", "Volume", base+"Volumes/1"),
+		base + "Volumes/1": testutil.Resource(
 			base+"Volumes/1",
 			"Volume",
 			"Volume",
 			map[string]any{"RemainingCapacityPercent": 37},
 		),
-		base + "EthernetInterfaces": sourceTestCollection(
+		base + "EthernetInterfaces": testutil.Collection(
 			base+"EthernetInterfaces",
 			"EthernetInterface",
 			base+"EthernetInterfaces/1",
 		),
-		base + "EthernetInterfaces/1": sourceTestResource(
+		base + "EthernetInterfaces/1": testutil.Resource(
 			base+"EthernetInterfaces/1",
 			"EthernetInterface",
 			"NIC",
 			map[string]any{"SpeedMbps": 2500},
 		),
-		base + "Chassis/1": sourceTestResource(base+"Chassis/1", "Chassis", "Chassis", map[string]any{
-			"PowerSubsystem": sourceTestLink(
+		base + "Chassis/1": testutil.Resource(base+"Chassis/1", "Chassis", "Chassis", map[string]any{
+			"PowerSubsystem": testutil.Link(
 				base + "PowerSubsystem",
-			), "ThermalSubsystem": sourceTestLink(base + "ThermalSubsystem"), "Sensors": sourceTestLink(base + "Sensors"),
+			), "ThermalSubsystem": testutil.Link(base + "ThermalSubsystem"), "Sensors": testutil.Link(base + "Sensors"),
 		}),
-		base + "PowerSubsystem": sourceTestResource(
+		base + "PowerSubsystem": testutil.Resource(
 			base+"PowerSubsystem",
 			"PowerSubsystem",
 			"Power",
-			map[string]any{"Batteries": sourceTestLink(base + "Batteries")},
+			map[string]any{"Batteries": testutil.Link(base + "Batteries")},
 		),
-		base + "Batteries": sourceTestCollection(base+"Batteries", "Battery", base+"Batteries/1"),
-		base + "Batteries/1": sourceTestResource(base+"Batteries/1", "Battery", "Battery", map[string]any{
-			"CapacityActualWattHours": 480, "Metrics": sourceTestLink(base + "Batteries/1/Metrics"),
+		base + "Batteries": testutil.Collection(base+"Batteries", "Battery", base+"Batteries/1"),
+		base + "Batteries/1": testutil.Resource(base+"Batteries/1", "Battery", "Battery", map[string]any{
+			"CapacityActualWattHours": 480, "Metrics": testutil.Link(base + "Batteries/1/Metrics"),
 		}),
-		base + "Batteries/1/Metrics": sourceTestResource(
+		base + "Batteries/1/Metrics": testutil.Resource(
 			base+"Batteries/1/Metrics",
 			"BatteryMetrics",
 			"Battery metrics",
@@ -95,13 +96,13 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 				"StoredEnergyWattHours": map[string]any{"Reading": 0},
 			},
 		),
-		base + "ThermalSubsystem": sourceTestResource(
+		base + "ThermalSubsystem": testutil.Resource(
 			base+"ThermalSubsystem",
 			"ThermalSubsystem",
 			"Thermal",
-			map[string]any{"ThermalMetrics": sourceTestLink(base + "ThermalMetrics")},
+			map[string]any{"ThermalMetrics": testutil.Link(base + "ThermalMetrics")},
 		),
-		base + "ThermalMetrics": sourceTestResource(
+		base + "ThermalMetrics": testutil.Resource(
 			base+"ThermalMetrics",
 			"ThermalMetrics",
 			"Thermal metrics",
@@ -128,7 +129,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 		switch r.URL.Path {
 		case base + "ThermalMetrics":
 			if current >= 2 {
-				document = sourceTestResource(
+				document = testutil.Resource(
 					r.URL.Path,
 					"ThermalMetrics",
 					"Thermal metrics",
@@ -143,9 +144,9 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 			if current == 1 || current == 2 {
 				members = append(members, base+"Sensors/New")
 			}
-			document = sourceTestCollection(r.URL.Path, "Sensor", members...)
+			document = testutil.Collection(r.URL.Path, "Sensor", members...)
 		case base + "Sensors/Old":
-			document = sourceTestResource(
+			document = testutil.Resource(
 				r.URL.Path,
 				"Sensor",
 				"Old sensor",
@@ -162,7 +163,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 			if current == 2 {
 				value, health = nil, "Warning"
 			}
-			document = sourceTestResource(
+			document = testutil.Resource(
 				r.URL.Path,
 				"Sensor",
 				"New sensor",
@@ -323,34 +324,34 @@ func TestDecodedCollectorPublishesEverySensorAboveFormerDetailCap(t *testing.T) 
 		var document map[string]any
 		switch r.URL.Path {
 		case base:
-			document = sourceTestResource(
+			document = testutil.Resource(
 				base,
 				"ServiceRoot",
 				"Service",
-				map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(base + "Chassis")},
+				map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(base + "Chassis")},
 			)
 		case base + "Chassis":
-			document = sourceTestCollection(r.URL.Path, "Chassis", base+"Chassis/1")
+			document = testutil.Collection(r.URL.Path, "Chassis", base+"Chassis/1")
 		case base + "Chassis/1":
-			document = sourceTestResource(
+			document = testutil.Resource(
 				r.URL.Path,
 				"Chassis",
 				"Chassis",
-				map[string]any{"Sensors": sourceTestLink(base + "Sensors")},
+				map[string]any{"Sensors": testutil.Link(base + "Sensors")},
 			)
 		case base + "Sensors":
 			members := make([]string, count)
 			for i := range members {
 				members[i] = fmt.Sprintf("%sSensors/%d", base, i)
 			}
-			document = sourceTestCollection(r.URL.Path, "Sensor", members...)
+			document = testutil.Collection(r.URL.Path, "Sensor", members...)
 		default:
 			var i int
 			if _, err := fmt.Sscanf(r.URL.Path, base+"Sensors/%d", &i); err != nil {
 				http.NotFound(w, r)
 				return
 			}
-			document = sourceTestResource(
+			document = testutil.Resource(
 				r.URL.Path,
 				"Sensor",
 				fmt.Sprintf("Sensor %d", i),
@@ -446,66 +447,37 @@ func sourceTestStateValues(states map[string]string, allowed []string) map[strin
 	return result
 }
 
-func sourceTestLink(uri string) map[string]any { return map[string]any{"@odata.id": uri} }
-
-func sourceTestResource(uri, schema, name string, properties map[string]any) map[string]any {
-	document := map[string]any{
-		"@odata.id":   uri,
-		"@odata.type": "#" + schema + ".v1_0_0." + schema,
-		"Id":          name,
-		"Name":        name,
-	}
-	for key, value := range properties {
-		document[key] = value
-	}
-	return document
-}
-
-func sourceTestCollection(uri, schema string, members ...string) map[string]any {
-	values := make([]any, 0, len(members))
-	for _, member := range members {
-		values = append(values, sourceTestLink(member))
-	}
-	return map[string]any{
-		"@odata.id":           uri,
-		"@odata.type":         "#" + schema + "Collection." + schema + "Collection",
-		"Members@odata.count": len(values),
-		"Members":             values,
-		"Name":                strings.TrimPrefix(uri, "/redfish/v1/"),
-	}
-}
-
 func TestDecodedCollectorKeepsSharedResourceAfterEarlierBranchFailure(t *testing.T) {
 	var phase atomic.Int32
 	const b = "/redfish/v1/"
 	docs := map[string]map[string]any{
-		b: sourceTestResource(
+		b: testutil.Resource(
 			b,
 			"ServiceRoot",
 			"Service",
 			map[string]any{
 				"RedfishVersion": "1.20.0",
-				"Systems":        sourceTestLink(b + "Systems"),
-				"Chassis":        sourceTestLink(b + "Chassis"),
+				"Systems":        testutil.Link(b + "Systems"),
+				"Chassis":        testutil.Link(b + "Chassis"),
 			},
 		),
-		b + "Systems": sourceTestCollection(b+"Systems", "ComputerSystem", b+"Systems/1"),
-		b + "Chassis": sourceTestCollection(b+"Chassis", "Chassis", b+"Chassis/1"),
-		b + "Systems/1": sourceTestResource(
+		b + "Systems": testutil.Collection(b+"Systems", "ComputerSystem", b+"Systems/1"),
+		b + "Chassis": testutil.Collection(b+"Chassis", "Chassis", b+"Chassis/1"),
+		b + "Systems/1": testutil.Resource(
 			b+"Systems/1",
 			"ComputerSystem",
 			"System",
-			map[string]any{"Memory": sourceTestLink(b + "Systems/1/Memory")},
+			map[string]any{"Memory": testutil.Link(b + "Systems/1/Memory")},
 		),
-		b + "Chassis/1": sourceTestResource(
+		b + "Chassis/1": testutil.Resource(
 			b+"Chassis/1",
 			"Chassis",
 			"Chassis",
-			map[string]any{"Memory": sourceTestLink(b + "Chassis/1/Memory")},
+			map[string]any{"Memory": testutil.Link(b + "Chassis/1/Memory")},
 		),
-		b + "Systems/1/Memory": sourceTestCollection(b+"Systems/1/Memory", "Memory", b+"Memory/1"),
-		b + "Chassis/1/Memory": sourceTestCollection(b+"Chassis/1/Memory", "Memory", b+"Memory/1"),
-		b + "Memory/1": sourceTestResource(
+		b + "Systems/1/Memory": testutil.Collection(b+"Systems/1/Memory", "Memory", b+"Memory/1"),
+		b + "Chassis/1/Memory": testutil.Collection(b+"Chassis/1/Memory", "Memory", b+"Memory/1"),
+		b + "Memory/1": testutil.Resource(
 			b+"Memory/1",
 			"Memory",
 			"Shared memory",
@@ -562,7 +534,7 @@ func TestDecodedCollectorMergesSensorExcerptWhenReadingIsAbsent(t *testing.T) {
 		{name: "zero", present: true, value: 0, want: map[string]float64{"Sensor": 0}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			sensor := sourceTestResource(
+			sensor := testutil.Resource(
 				b+"Sensors/1",
 				"Sensor",
 				"Sensor",
@@ -576,31 +548,31 @@ func TestDecodedCollectorMergesSensorExcerptWhenReadingIsAbsent(t *testing.T) {
 				sensor["Reading"] = test.value
 			}
 			documents := map[string]map[string]any{
-				b: sourceTestResource(
+				b: testutil.Resource(
 					b,
 					"ServiceRoot",
 					"Service",
-					map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(b + "Chassis")},
+					map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(b + "Chassis")},
 				),
-				b + "Chassis": sourceTestCollection(b+"Chassis", "Chassis", b+"Chassis/1"),
-				b + "Chassis/1": sourceTestResource(
+				b + "Chassis": testutil.Collection(b+"Chassis", "Chassis", b+"Chassis/1"),
+				b + "Chassis/1": testutil.Resource(
 					b+"Chassis/1",
 					"Chassis",
 					"Chassis",
 					map[string]any{
-						"Sensors":          sourceTestLink(b + "Sensors"),
-						"ThermalSubsystem": sourceTestLink(b + "ThermalSubsystem"),
+						"Sensors":          testutil.Link(b + "Sensors"),
+						"ThermalSubsystem": testutil.Link(b + "ThermalSubsystem"),
 					},
 				),
-				b + "Sensors":   sourceTestCollection(b+"Sensors", "Sensor", b+"Sensors/1"),
+				b + "Sensors":   testutil.Collection(b+"Sensors", "Sensor", b+"Sensors/1"),
 				b + "Sensors/1": sensor,
-				b + "ThermalSubsystem": sourceTestResource(
+				b + "ThermalSubsystem": testutil.Resource(
 					b+"ThermalSubsystem",
 					"ThermalSubsystem",
 					"Thermal",
-					map[string]any{"ThermalMetrics": sourceTestLink(b + "ThermalMetrics")},
+					map[string]any{"ThermalMetrics": testutil.Link(b + "ThermalMetrics")},
 				),
-				b + "ThermalMetrics": sourceTestResource(
+				b + "ThermalMetrics": testutil.Resource(
 					b+"ThermalMetrics",
 					"ThermalMetrics",
 					"Metrics",
@@ -648,49 +620,49 @@ func TestDecodedCollectorTraversesSharedResourceAfterEarlierUnknownVisit(t *test
 	var phase atomic.Int32
 	const b = "/redfish/v1/"
 	documents := map[string]map[string]any{
-		b: sourceTestResource(
+		b: testutil.Resource(
 			b,
 			"ServiceRoot",
 			"Service",
-			map[string]any{"RedfishVersion": "1.20.0", "Systems": sourceTestLink(b + "Systems")},
+			map[string]any{"RedfishVersion": "1.20.0", "Systems": testutil.Link(b + "Systems")},
 		),
-		b + "Systems": sourceTestCollection(b+"Systems", "ComputerSystem", b+"Systems/1"),
-		b + "Systems/1": sourceTestResource(
+		b + "Systems": testutil.Collection(b+"Systems", "ComputerSystem", b+"Systems/1"),
+		b + "Systems/1": testutil.Resource(
 			b+"Systems/1",
 			"ComputerSystem",
 			"System",
-			map[string]any{"Processors": sourceTestLink(b + "Processors"), "Storage": sourceTestLink(b + "Storage")},
+			map[string]any{"Processors": testutil.Link(b + "Processors"), "Storage": testutil.Link(b + "Storage")},
 		),
-		b + "Processors": sourceTestCollection(b+"Processors", "Processor", b+"Processors/1"),
-		b + "Processors/1": sourceTestResource(
+		b + "Processors": testutil.Collection(b+"Processors", "Processor", b+"Processors/1"),
+		b + "Processors/1": testutil.Resource(
 			b+"Processors/1",
 			"Processor",
 			"Processor",
-			map[string]any{"Ports": sourceTestLink(b + "Processors/1/Ports")},
+			map[string]any{"Ports": testutil.Link(b + "Processors/1/Ports")},
 		),
-		b + "Processors/1/Ports": sourceTestCollection(b+"Processors/1/Ports", "Port", b+"Ports/1"),
-		b + "Storage":            sourceTestCollection(b+"Storage", "Storage", b+"Storage/1"),
-		b + "Storage/1": sourceTestResource(
+		b + "Processors/1/Ports": testutil.Collection(b+"Processors/1/Ports", "Port", b+"Ports/1"),
+		b + "Storage":            testutil.Collection(b+"Storage", "Storage", b+"Storage/1"),
+		b + "Storage/1": testutil.Resource(
 			b+"Storage/1",
 			"Storage",
 			"Storage",
-			map[string]any{"Controllers": sourceTestLink(b + "Controllers")},
+			map[string]any{"Controllers": testutil.Link(b + "Controllers")},
 		),
-		b + "Controllers": sourceTestCollection(b+"Controllers", "StorageController", b+"Controllers/1"),
-		b + "Controllers/1": sourceTestResource(
+		b + "Controllers": testutil.Collection(b+"Controllers", "StorageController", b+"Controllers/1"),
+		b + "Controllers/1": testutil.Resource(
 			b+"Controllers/1",
 			"StorageController",
 			"Controller",
-			map[string]any{"Ports": sourceTestLink(b + "Controllers/1/Ports")},
+			map[string]any{"Ports": testutil.Link(b + "Controllers/1/Ports")},
 		),
-		b + "Controllers/1/Ports": sourceTestCollection(b+"Controllers/1/Ports", "Port", b+"Ports/1"),
-		b + "Ports/1": sourceTestResource(
+		b + "Controllers/1/Ports": testutil.Collection(b+"Controllers/1/Ports", "Port", b+"Ports/1"),
+		b + "Ports/1": testutil.Resource(
 			b+"Ports/1",
 			"Port",
 			"Shared port",
 			map[string]any{
 				"CurrentSpeedGbps":   10,
-				"EnvironmentMetrics": sourceTestLink(b + "Ports/1/EnvironmentMetrics"),
+				"EnvironmentMetrics": testutil.Link(b + "Ports/1/EnvironmentMetrics"),
 			},
 		),
 	}
@@ -703,7 +675,7 @@ func TestDecodedCollectorTraversesSharedResourceAfterEarlierUnknownVisit(t *test
 		document := documents[r.URL.Path]
 		if r.URL.Path == b+"Ports/1/EnvironmentMetrics" {
 			metricsRequests.Add(1)
-			document = sourceTestResource(
+			document = testutil.Resource(
 				r.URL.Path,
 				"EnvironmentMetrics",
 				"Environment",
@@ -744,40 +716,24 @@ func TestDecodedCollectorTraversesSharedResourceAfterEarlierUnknownVisit(t *test
 	}
 }
 
-func sourceTestServeDocuments(t *testing.T, docs map[string]map[string]any) string {
-	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		doc := docs[r.URL.Path]
-		if doc == nil {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("OData-Version", "4.0")
-		_ = json.NewEncoder(w).Encode(doc)
-	}))
-	t.Cleanup(server.Close)
-	return server.URL
-}
-
 func TestDecodedCollectorRejectsWrongDescendantSchema(t *testing.T) {
 	const b = "/redfish/v1/"
 	docs := map[string]map[string]any{
-		b: sourceTestResource(
+		b: testutil.Resource(
 			b,
 			"ServiceRoot",
 			"Service",
-			map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(b + "Chassis")},
+			map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(b + "Chassis")},
 		),
-		b + "Chassis": sourceTestCollection(b+"Chassis", "Chassis", b+"Chassis/1"),
-		b + "Chassis/1": sourceTestResource(
+		b + "Chassis": testutil.Collection(b+"Chassis", "Chassis", b+"Chassis/1"),
+		b + "Chassis/1": testutil.Resource(
 			b+"Chassis/1",
 			"Chassis",
 			"Chassis",
-			map[string]any{"Sensors": sourceTestLink(b + "Sensors")},
+			map[string]any{"Sensors": testutil.Link(b + "Sensors")},
 		),
-		b + "Sensors": sourceTestCollection(b+"Sensors", "Sensor", b+"Sensors/1", b+"Sensors/2"),
-		b + "Sensors/2": sourceTestResource(
+		b + "Sensors": testutil.Collection(b+"Sensors", "Sensor", b+"Sensors/1", b+"Sensors/2"),
+		b + "Sensors/2": testutil.Resource(
 			b+"Sensors/2",
 			"Sensor",
 			"Valid sensor",
@@ -788,7 +744,7 @@ func TestDecodedCollectorRejectsWrongDescendantSchema(t *testing.T) {
 				"Status":       map[string]any{"Health": "OK"},
 			},
 		),
-		b + "Sensors/1": sourceTestResource(
+		b + "Sensors/1": testutil.Resource(
 			b+"Sensors/1",
 			"Memory",
 			"Wrong schema",
@@ -800,7 +756,7 @@ func TestDecodedCollectorRejectsWrongDescendantSchema(t *testing.T) {
 			},
 		),
 	}
-	c := sourceTestDecodedCollector(t, sourceTestServeDocuments(t, docs))
+	c := sourceTestDecodedCollector(t, testutil.ServeDocuments(t, docs))
 	sourceTestCollectCycle(t, c)
 	got := sourceTestMetricByResource(
 		t,
@@ -829,7 +785,7 @@ func TestDecodedCollectorSensorExcerptIdentityIsOrderIndependent(t *testing.T) {
 				if first == "B" {
 					order[0], order[1] = order[1], order[0]
 				}
-				sensor := sourceTestResource(
+				sensor := testutil.Resource(
 					b+"Chassis/B/Sensors/1",
 					"Sensor",
 					"Sensor",
@@ -843,26 +799,26 @@ func TestDecodedCollectorSensorExcerptIdentityIsOrderIndependent(t *testing.T) {
 					sensor["Reading"] = test.value
 				}
 				docs := map[string]map[string]any{
-					b: sourceTestResource(
+					b: testutil.Resource(
 						b,
 						"ServiceRoot",
 						"Service",
-						map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(b + "Chassis")},
+						map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(b + "Chassis")},
 					),
-					b + "Chassis": sourceTestCollection(b+"Chassis", "Chassis", order...),
-					b + "Chassis/A": sourceTestResource(
+					b + "Chassis": testutil.Collection(b+"Chassis", "Chassis", order...),
+					b + "Chassis/A": testutil.Resource(
 						b+"Chassis/A",
 						"Chassis",
 						"Chassis A",
-						map[string]any{"EnvironmentMetrics": sourceTestLink(b + "Chassis/A/EnvironmentMetrics")},
+						map[string]any{"EnvironmentMetrics": testutil.Link(b + "Chassis/A/EnvironmentMetrics")},
 					),
-					b + "Chassis/B": sourceTestResource(
+					b + "Chassis/B": testutil.Resource(
 						b+"Chassis/B",
 						"Chassis",
 						"Chassis B",
-						map[string]any{"Sensors": sourceTestLink(b + "Chassis/B/Sensors")},
+						map[string]any{"Sensors": testutil.Link(b + "Chassis/B/Sensors")},
 					),
-					b + "Chassis/A/EnvironmentMetrics": sourceTestResource(
+					b + "Chassis/A/EnvironmentMetrics": testutil.Resource(
 						b+"Chassis/A/EnvironmentMetrics",
 						"EnvironmentMetrics",
 						"Environment",
@@ -878,7 +834,7 @@ func TestDecodedCollectorSensorExcerptIdentityIsOrderIndependent(t *testing.T) {
 							},
 						},
 					),
-					b + "Chassis/B/Sensors": sourceTestCollection(
+					b + "Chassis/B/Sensors": testutil.Collection(
 						b+"Chassis/B/Sensors",
 						"Sensor",
 						b+"Chassis/B/Sensors/1",
@@ -945,21 +901,21 @@ func TestDecodedCollectorSensorExcerptIdentityIsOrderIndependent(t *testing.T) {
 func TestDecodedCollectorReadsLargeDriveFixture(t *testing.T) {
 	const root = "/redfish/v1/"
 	const chassis = root + "Chassis/Fixture-1"
-	drive := loadFixture(t, "telegraf-hpe-modern-drive.min.json")
+	drive := testutil.LoadFixture(t, "testdata/"+"telegraf-hpe-modern-drive.min.json")
 	driveURI := drive["@odata.id"].(string)
-	endpoint := sourceTestServeDocuments(t, map[string]map[string]any{
-		root: sourceTestResource(
+	endpoint := testutil.ServeDocuments(t, map[string]map[string]any{
+		root: testutil.Resource(
 			root,
 			"ServiceRoot",
 			"Root",
-			map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(root + "Chassis")},
+			map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(root + "Chassis")},
 		),
-		root + "Chassis": sourceTestCollection(root+"Chassis", "Chassis", chassis),
-		chassis: sourceTestResource(
+		root + "Chassis": testutil.Collection(root+"Chassis", "Chassis", chassis),
+		chassis: testutil.Resource(
 			chassis,
 			"Chassis",
 			"Chassis",
-			map[string]any{"Drives": []any{sourceTestLink(driveURI)}},
+			map[string]any{"Drives": []any{testutil.Link(driveURI)}},
 		),
 		driveURI: drive,
 	})

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/testutil"
 )
 
 // Measure a complete HTTP walk and metric projection. Work should scale with
@@ -17,49 +19,47 @@ func BenchmarkCollectionCycle(b *testing.B) {
 	const chassis = root + "Chassis/1"
 	const sensors = chassis + "/Sensors"
 	docs := map[string]map[string]any{
-		root: sourceTestResource(
+		root: testutil.Resource(
 			root,
 			"ServiceRoot",
 			"Root",
-			map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(root + "Chassis")},
+			map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(root + "Chassis")},
 		),
-		root + "Chassis": sourceTestCollection(root+"Chassis", "Chassis", chassis),
-		chassis: sourceTestResource(
+		root + "Chassis": testutil.Collection(root+"Chassis", "Chassis", chassis),
+		chassis: testutil.Resource(
 			chassis,
 			"Chassis",
 			"Chassis",
-			map[string]any{"Sensors": sourceTestLink(sensors)},
+			map[string]any{"Sensors": testutil.Link(sensors)},
 		),
 	}
 	var members []string
 	for index := range 32 {
 		uri := fmt.Sprintf("%s/%d", sensors, index)
 		members = append(members, uri)
-		docs[uri] = sourceTestResource(uri, "Sensor", fmt.Sprintf("Sensor %d", index), map[string]any{
+		docs[uri] = testutil.Resource(uri, "Sensor", fmt.Sprintf("Sensor %d", index), map[string]any{
 			"Reading": index, "ReadingType": "Temperature", "ReadingUnits": "Cel", "Status": map[string]any{"Health": "OK", "State": "Enabled"},
 		})
 	}
-	docs[sensors] = sourceTestCollection(sensors, "Sensor", members...)
+	docs[sensors] = testutil.Collection(sensors, "Sensor", members...)
 	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { writeJSON(w, docs[r.URL.Path]) }),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { testutil.WriteJSON(w, docs[r.URL.Path]) }),
 	)
 	b.Cleanup(server.Close)
 	cfg := testConfig(server.URL, "none")
-	httpClient, err := newHTTPClient(b.Context(), cfg)
-	if err != nil {
+	client := New()
+	client.Config = cfg
+	client.Name = "test-job"
+	if err := client.Init(b.Context()); err != nil {
 		b.Fatal(err)
 	}
-	b.Cleanup(httpClient.CloseIdleConnections)
-	client, err := newEndpointClient(cfg, httpClient)
-	if err != nil {
-		b.Fatal(err)
-	}
-	if _, err = client.Collect(b.Context()); err != nil {
+	b.Cleanup(func() { client.Cleanup(b.Context()) })
+	if _, err := client.collect(b.Context()); err != nil {
 		b.Fatal(err)
 	}
 	b.ReportAllocs()
 	for b.Loop() {
-		result, err := client.Collect(b.Context())
+		result, err := client.collect(b.Context())
 		if err != nil || !result.Complete {
 			b.Fatalf("complete=%v err=%v", result.Complete, err)
 		}

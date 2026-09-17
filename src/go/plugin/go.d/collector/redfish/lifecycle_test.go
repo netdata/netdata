@@ -10,6 +10,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/testutil"
+
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
@@ -24,7 +28,7 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 	require.True(t, ok)
 	require.Nil(t, creator.AgentFunctions)
 	require.Nil(t, creator.MethodHandler)
-	server := newRedfishTestServer(t, redfishTestServerConfig{})
+	server := testutil.NewServer(t, testutil.ServerConfig{})
 	defer server.Close()
 
 	for _, format := range []string{"yaml", "json"} {
@@ -51,7 +55,7 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			cycle.BeginCycle()
 			require.NoError(t, collector.Collect(context.Background()))
 			require.NoError(t, cycle.CommitCycleSuccess())
-			_, origin, err := normalizeServiceRoot(server.URL)
+			_, origin, err := acquisition.NormalizeServiceRoot(server.URL)
 			require.NoError(t, err)
 			labels := metrix.Labels{
 				"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
@@ -77,7 +81,7 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 }
 
 func TestCollectorJobsOwnIndependentClients(t *testing.T) {
-	server := newRedfishTestServer(t, redfishTestServerConfig{})
+	server := testutil.NewServer(t, testutil.ServerConfig{})
 	defer server.Close()
 	creator := collectorapi.DefaultRegistry["redfish"]
 	jobs := make([]collectorapi.CollectorV2, 2)
@@ -109,7 +113,7 @@ func TestCollectorCleanupAfterFailedInitialization(t *testing.T) {
 		t,
 		yaml.Unmarshal([]byte("name: endpoint-a\nurl: https://bmc.example.test\nauth_method: none\n"), collector),
 	)
-	collector.newClient = func(Config, *http.Client) (endpointClient, error) {
+	collector.newClient = func(acquisition.Options, *http.Client) (endpointClient, error) {
 		return nil, fmt.Errorf("test client construction failure")
 	}
 	require.ErrorContains(t, collector.Init(context.Background()), "test client construction failure")
@@ -120,8 +124,8 @@ func TestCollectorCleanupAfterFailedInitialization(t *testing.T) {
 }
 
 func TestCollectorSessionStartsDuringRunningCollection(t *testing.T) {
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		supportSession: true,
+	server := testutil.NewServer(t, testutil.ServerConfig{
+		SupportSession: true,
 	})
 	defer server.Close()
 	collector := New()
@@ -130,27 +134,27 @@ func TestCollectorSessionStartsDuringRunningCollection(t *testing.T) {
 	defer collector.Cleanup(context.Background())
 	require.NoError(t, collector.Init(context.Background()))
 	require.NoError(t, collector.Check(context.Background()))
-	assert.Zero(t, server.sessionCreates.Load())
-	assert.Zero(t, server.sessionDeletes.Load())
+	assert.Zero(t, server.SessionCreates.Load())
+	assert.Zero(t, server.SessionDeletes.Load())
 	managed, ok := metrix.AsCycleManagedStore(collector.MetricStore())
 	require.True(t, ok)
 	cycle := managed.CycleController()
 	cycle.BeginCycle()
 	require.NoError(t, collector.Collect(context.Background()))
 	require.NoError(t, cycle.CommitCycleSuccess())
-	assert.Equal(t, int64(1), server.sessionCreates.Load())
+	assert.Equal(t, int64(1), server.SessionCreates.Load())
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	collector.Cleanup(ctx)
 	collector.Cleanup(ctx)
-	assert.Equal(t, int64(1), server.sessionDeletes.Load())
+	assert.Equal(t, int64(1), server.SessionDeletes.Load())
 }
 
 func TestDecodedCollectorSessionRecovery(t *testing.T) {
 	var expire atomic.Bool
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		supportSession:    true,
-		expireSessionOnce: &expire,
+	server := testutil.NewServer(t, testutil.ServerConfig{
+		SupportSession:    true,
+		ExpireSessionOnce: &expire,
 	})
 	defer server.Close()
 	collector := collectorapi.DefaultRegistry["redfish"].CreateV2()
@@ -169,10 +173,10 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 	require.NoError(t, collector.Init(t.Context()))
 	defer collector.Cleanup(context.Background())
 	require.NoError(t, collector.Check(t.Context()))
-	assert.Zero(t, server.sessionCreates.Load())
+	assert.Zero(t, server.SessionCreates.Load())
 	managed, ok := metrix.AsCycleManagedStore(collector.MetricStore())
 	require.True(t, ok)
-	_, origin, err := normalizeServiceRoot(server.URL)
+	_, origin, err := acquisition.NormalizeServiceRoot(server.URL)
 	require.NoError(t, err)
 	labels := metrix.Labels{
 		"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
@@ -196,7 +200,7 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 			expire.Store(true)
 		}
 	}
-	assert.Equal(t, int64(2), server.sessionCreates.Load())
+	assert.Equal(t, int64(2), server.SessionCreates.Load())
 	collector.Cleanup(t.Context())
-	assert.Zero(t, server.activeSessions.Load())
+	assert.Zero(t, server.ActiveSessions.Load())
 }

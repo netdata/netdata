@@ -4,6 +4,7 @@ package redfish
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
@@ -62,13 +63,9 @@ func gaugeMap(vec metrix.SnapshotVecMeter, prefix string, names ...string) map[s
 }
 
 type cycleMetrics struct {
-	Status        string
-	Failures      map[string]int
-	Duration      float64
-	HTTPRequests  map[string]int
-	Operations    map[string]int
-	ReceivedBytes int64
-	Resources     map[string]int
+	acquisition.Statistics
+	Status   string
+	Duration float64
 }
 
 func (m *collectorMetrics) observe(endpointKey, endpointJob string, cycle cycleMetrics) {

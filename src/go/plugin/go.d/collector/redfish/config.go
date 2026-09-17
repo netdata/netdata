@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 )
 
 const (
@@ -24,19 +23,6 @@ const (
 var (
 	defaultTimeout = confopt.Duration(15 * time.Second)
 )
-
-var collectionFamilies = []string{
-	"base",
-	"compute",
-	"memory",
-	"thermal",
-	"power",
-	"storage",
-	"network",
-	"pcie",
-	"sensors",
-	"firmware",
-}
 
 type Config struct {
 	Name               string `yaml:"name,omitempty"                json:"name,omitempty"`
@@ -92,7 +78,7 @@ func (c *Config) applyDefaults() {
 func (c Config) validate() error {
 	var errs []error
 
-	_, _, err := normalizeServiceRoot(c.URL)
+	_, _, err := acquisition.NormalizeServiceRoot(c.URL)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("'url': %w", err))
 	}
@@ -123,7 +109,7 @@ func (c Config) validate() error {
 	if err := validateProxyURL(c.ProxyURL); err != nil {
 		errs = append(errs, fmt.Errorf("'proxy_url': %w", err))
 	}
-	if err := validateCollectionPattern(c.Collect); err != nil {
+	if err := acquisition.ValidateCollectionPattern(c.Collect); err != nil {
 		errs = append(errs, fmt.Errorf("'collect': %w", err))
 	}
 
@@ -146,26 +132,6 @@ func validateProxyURL(raw string) error {
 	}
 	if u.RawQuery != "" || u.Fragment != "" {
 		return errors.New("must not contain a query or fragment")
-	}
-	return nil
-}
-
-func validateCollectionPattern(expr string) error {
-	if _, err := matcher.NewSimplePatternsMatcher(expr); err != nil {
-		return err
-	}
-	for term := range strings.FieldsSeq(expr) {
-		term = strings.TrimPrefix(term, "!")
-		if term == "" {
-			return errors.New("contains an empty pattern")
-		}
-		m, err := matcher.NewSimplePatternsMatcher(term)
-		if err != nil {
-			return err
-		}
-		if !slices.ContainsFunc(collectionFamilies, m.MatchString) {
-			return fmt.Errorf("pattern %q matches no supported collection family", term)
-		}
 	}
 	return nil
 }

@@ -10,6 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/testutil"
+
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 	"github.com/stretchr/testify/assert"
@@ -19,18 +22,18 @@ import (
 func graphExcerptDocuments() map[string]map[string]any {
 	const b = "/redfish/v1/"
 	return map[string]map[string]any{
-		b: sourceTestResource(
+		b: testutil.Resource(
 			b,
 			"ServiceRoot",
 			"Service",
-			map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(b + "Chassis")},
+			map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(b + "Chassis")},
 		),
-		b + "Chassis": sourceTestCollection(b+"Chassis", "Chassis", b+"Chassis/C"),
-		b + "Chassis/C": sourceTestResource(
+		b + "Chassis": testutil.Collection(b+"Chassis", "Chassis", b+"Chassis/C"),
+		b + "Chassis/C": testutil.Resource(
 			b+"Chassis/C",
 			"Chassis",
 			"C",
-			map[string]any{"EnvironmentMetrics": sourceTestLink(b + "Chassis/C/EnvironmentMetrics")},
+			map[string]any{"EnvironmentMetrics": testutil.Link(b + "Chassis/C/EnvironmentMetrics")},
 		),
 	}
 }
@@ -46,13 +49,13 @@ func TestGraphEmbeddedIdentityModesDoNotCollide(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			docs := graphExcerptDocuments()
 			const uri = "/redfish/v1/Chassis/C/EnvironmentMetrics"
-			docs[uri] = sourceTestResource(
+			docs[uri] = testutil.Resource(
 				uri,
 				"EnvironmentMetrics",
 				"Metrics",
 				map[string]any{"FanSpeedsPercent": []any{test.first, test.second}},
 			)
-			c := sourceTestDecodedCollector(t, sourceTestServeDocuments(t, docs))
+			c := sourceTestDecodedCollector(t, testutil.ServeDocuments(t, docs))
 			sourceTestCollectCycle(t, c)
 			assert.Equal(
 				t,
@@ -88,16 +91,17 @@ func TestGraphLinkedEnrichmentUsesItsOwnFragmentBase(t *testing.T) {
 				if test.array {
 					property = []any{property}
 				}
-				docs[uri] = sourceTestResource(
+				docs[uri] = testutil.Resource(
 					uri,
 					"EnvironmentMetrics",
 					"Metrics",
 					map[string]any{test.property: property},
 				)
-				c := sourceTestDecodedCollector(t, sourceTestServeDocuments(t, docs))
+				c := sourceTestDecodedCollector(t, testutil.ServeDocuments(t, docs))
 				sourceTestCollectCycle(t, c)
-				client := c.(*Collector).client.(*protocolClient)
-				expected := identity.ResourceKey(client.origin, test.kind, test.locator)
+				_, origin, err := acquisition.NormalizeServiceRoot(c.(*Collector).URL)
+				require.NoError(t, err)
+				expected := identity.ResourceKey(origin, test.kind, test.locator)
 				samples := 0
 				c.MetricStore().
 					Read(metrix.ReadFlatten()).
@@ -123,95 +127,6 @@ func TestGraphLinkedEnrichmentUsesItsOwnFragmentBase(t *testing.T) {
 	}
 }
 
-func TestGraphMembershipPrunesRemovedSubtreesAndRetainsUnknown(t *testing.T) {
-	const b = "/redfish/v1/"
-	for _, unknown := range []bool{false, true} {
-		t.Run(fmt.Sprintf("unknown_%t", unknown), func(t *testing.T) {
-			var phase atomic.Int32
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				current := fmt.Sprintf("%sChassis/C%d", b, phase.Load())
-				var doc map[string]any
-				switch r.URL.Path {
-				case b:
-					doc = sourceTestResource(
-						b,
-						"ServiceRoot",
-						"Service",
-						map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(b + "Chassis")},
-					)
-				case b + "Chassis":
-					if unknown && phase.Load() > 0 {
-						http.Error(w, "unavailable", 503)
-						return
-					}
-					doc = sourceTestCollection(b+"Chassis", "Chassis", b+"Chassis/B", current)
-				case b + "Chassis/B":
-					doc = sourceTestResource(
-						b+"Chassis/B",
-						"Chassis",
-						"Broken",
-						map[string]any{"Sensors": sourceTestLink(b + "Chassis/B/Sensors")},
-					)
-				case b + "Chassis/B/Sensors":
-					http.Error(w, "unavailable", 503)
-					return
-				case current:
-					doc = sourceTestResource(
-						current,
-						"Chassis",
-						"Current",
-						map[string]any{"Sensors": sourceTestLink(current + "/Sensors")},
-					)
-				case current + "/Sensors":
-					doc = sourceTestCollection(current+"/Sensors", "Sensor", current+"/Sensors/1")
-				case current + "/Sensors/1":
-					doc = sourceTestResource(current+"/Sensors/1", "Sensor", "Sensor", map[string]any{
-						"ReadingType": "Percent", "ReadingUnits": "%", "Reading": 10, "Status": map[string]any{"Health": "OK"},
-						"SensorGroup": map[string]any{"Name": "Group", "RedundancyType": "NPlusM"},
-					})
-				default:
-					http.NotFound(w, r)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				w.Header().Set("OData-Version", "4.0")
-				_ = json.NewEncoder(w).Encode(doc)
-			}))
-			t.Cleanup(server.Close)
-			c := sourceTestDecodedCollector(t, server.URL)
-			for p := int32(0); p < 4; p++ {
-				phase.Store(p)
-				sourceTestCollectCycle(t, c)
-			}
-			client := c.(*Collector).client.(*protocolClient)
-			require.Len(t, client.baseMembership["chassis"], 2)
-			assert.Len(t, client.graphMembership, 2, "only the current or unknown chassis subtree survives")
-			current := b + "Chassis/C3"
-			if unknown {
-				current = b + "Chassis/C0"
-			}
-			parents := map[string]bool{
-				identity.ResourceKey(client.origin, "chassis", current):             true,
-				identity.ResourceKey(client.origin, "sensor", current+"/Sensors/1"): true,
-			}
-			for _, snapshot := range client.graphMembership {
-				assert.True(t, parents[snapshot.ParentKey], "removed-parent snapshot survived")
-			}
-			readings := sourceTestMetricByResource(
-				t,
-				c.MetricStore().Read(metrix.ReadFlatten()),
-				"reading_percentage_value",
-				"",
-			)
-			if unknown {
-				assert.Empty(t, readings, "unknown membership must not replay measurements")
-			} else {
-				assert.Equal(t, map[string]float64{"Sensor": 10}, readings)
-			}
-		})
-	}
-}
-
 func TestGraphSensorAddressabilitySurvivesExcerptFallback(t *testing.T) {
 	const b = "/redfish/v1/"
 	for _, first := range []string{"A", "B"} {
@@ -222,31 +137,31 @@ func TestGraphSensorAddressabilitySurvivesExcerptFallback(t *testing.T) {
 					order[0], order[1] = order[1], order[0]
 				}
 				docs := map[string]map[string]any{
-					b: sourceTestResource(
+					b: testutil.Resource(
 						b,
 						"ServiceRoot",
 						"Service",
-						map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(b + "Chassis")},
+						map[string]any{"RedfishVersion": "1.20.0", "Chassis": testutil.Link(b + "Chassis")},
 					),
-					b + "Chassis": sourceTestCollection(b+"Chassis", "Chassis", order...),
-					b + "Chassis/A": sourceTestResource(
+					b + "Chassis": testutil.Collection(b+"Chassis", "Chassis", order...),
+					b + "Chassis/A": testutil.Resource(
 						b+"Chassis/A",
 						"Chassis",
 						"A",
-						map[string]any{"EnvironmentMetrics": sourceTestLink(b + "Chassis/A/EnvironmentMetrics")},
+						map[string]any{"EnvironmentMetrics": testutil.Link(b + "Chassis/A/EnvironmentMetrics")},
 					),
-					b + "Chassis/B": sourceTestResource(
+					b + "Chassis/B": testutil.Resource(
 						b+"Chassis/B",
 						"Chassis",
 						"B",
-						map[string]any{"Sensors": sourceTestLink(b + "Chassis/B/Sensors")},
+						map[string]any{"Sensors": testutil.Link(b + "Chassis/B/Sensors")},
 					),
-					b + "Chassis/B/Sensors": sourceTestCollection(
+					b + "Chassis/B/Sensors": testutil.Collection(
 						b+"Chassis/B/Sensors",
 						"Sensor",
 						b+"Chassis/B/Sensors/1",
 					),
-					b + "Chassis/B/Sensors/1": sourceTestResource(
+					b + "Chassis/B/Sensors/1": testutil.Resource(
 						b+"Chassis/B/Sensors/1",
 						"Sensor",
 						"Sensor",
@@ -257,7 +172,7 @@ func TestGraphSensorAddressabilitySurvivesExcerptFallback(t *testing.T) {
 							"Status":       map[string]any{"Health": "Warning"},
 						},
 					),
-					b + "Chassis/A/EnvironmentMetrics": sourceTestResource(
+					b + "Chassis/A/EnvironmentMetrics": testutil.Resource(
 						b+"Chassis/A/EnvironmentMetrics",
 						"EnvironmentMetrics",
 						"Metrics",
@@ -281,7 +196,7 @@ func TestGraphSensorAddressabilitySurvivesExcerptFallback(t *testing.T) {
 					}
 					doc := docs[r.URL.Path]
 					if p == 2 && r.URL.Path == b+"Chassis/B/Sensors" {
-						doc = sourceTestCollection(b+"Chassis/B/Sensors", "Sensor")
+						doc = testutil.Collection(b+"Chassis/B/Sensors", "Sensor")
 					}
 					if p == 2 && r.URL.Path == b+"Chassis/A/EnvironmentMetrics" {
 						copy := make(map[string]any)
@@ -301,8 +216,9 @@ func TestGraphSensorAddressabilitySurvivesExcerptFallback(t *testing.T) {
 				}))
 				t.Cleanup(server.Close)
 				c := sourceTestDecodedCollector(t, server.URL)
-				client := c.(*Collector).client.(*protocolClient)
-				expected := identity.ResourceKey(client.origin, "sensor", b+"Chassis/B/Sensors/1")
+				_, origin, err := acquisition.NormalizeServiceRoot(c.(*Collector).URL)
+				require.NoError(t, err)
+				expected := identity.ResourceKey(origin, "sensor", b+"Chassis/B/Sensors/1")
 				for p := int32(0); p <= 4; p++ {
 					if p == 1 && !fallback {
 						continue

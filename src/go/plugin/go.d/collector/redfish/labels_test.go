@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/testutil"
+
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -20,7 +22,7 @@ func TestDecodedCollectorPreservesEndpointJobIdentity(t *testing.T) {
 		"maximum length":     strings.Repeat("j", 256),
 	} {
 		t.Run(name, func(t *testing.T) {
-			server := newRedfishTestServer(t, redfishTestServerConfig{})
+			server := testutil.NewServer(t, testutil.ServerConfig{})
 			t.Cleanup(server.Close)
 			cfg := confgroup.Config{
 				"name":        job,
@@ -58,13 +60,13 @@ func TestDecodedCollectorPreservesEndpointJobIdentity(t *testing.T) {
 func TestDecodedCollectorPreservesServiceName(t *testing.T) {
 	const root = "/redfish/v1/"
 	docs := map[string]map[string]any{
-		root: sourceTestResource(root, "ServiceRoot", "Named BMC service", map[string]any{
-			"RedfishVersion": "1.20.0", "Systems": sourceTestLink(root + "Systems"),
+		root: testutil.Resource(root, "ServiceRoot", "Named BMC service", map[string]any{
+			"RedfishVersion": "1.20.0", "Systems": testutil.Link(root + "Systems"),
 		}),
-		root + "Systems":   sourceTestCollection(root+"Systems", "ComputerSystem", root+"Systems/1"),
-		root + "Systems/1": sourceTestResource(root+"Systems/1", "ComputerSystem", "System", nil),
+		root + "Systems":   testutil.Collection(root+"Systems", "ComputerSystem", root+"Systems/1"),
+		root + "Systems/1": testutil.Resource(root+"Systems/1", "ComputerSystem", "System", nil),
 	}
-	collector := sourceTestDecodedCollector(t, sourceTestServeDocuments(t, docs))
+	collector := sourceTestDecodedCollector(t, testutil.ServeDocuments(t, docs))
 	sourceTestCollectCycle(t, collector)
 	count := 0
 	collector.MetricStore().
