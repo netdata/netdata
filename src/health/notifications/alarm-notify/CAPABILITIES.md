@@ -34,6 +34,10 @@ HipChat is excluded from the Go migration by explicit approval following its
 - Native legacy configuration reader and `check-legacy` syntax check: supported assignments/recipient maps, ordered
   evaluation and overlays, inert function preservation, explicit rejection of unsupported top-level shell. This does
   not yet enable old-format notification delivery or validate provider settings/custom-function behavior.
+- Internal legacy recipient resolution: role/default fallback, literal tokenization, reserved-role suppression,
+  per-occurrence policy unions and deduplication by method/recipient, reusing native alert-global history. Unknown
+  modifiers fail and wildcard patterns stay literal by approval. Provider activation/mapping, CLI delivery and Unix
+  custom_sender execution remain pending; check-legacy is still syntax-only.
 - Configuration validation, literal/environment/file secrets, request timeout/cancellation, and safe diagnostics.
 - Central role-to-destination routing, defaults for unmapped roles, explicit suppression, reserved roles, and
   deduplication by destination name. Sequential fan-out records individual results and preserves any-success exits.
@@ -139,7 +143,7 @@ is scoped. This is not a claim that all legacy remote services remain available.
 
 | Area | Functional baseline | Go migration |
 |---|---|---|
-| Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-specific native targets implemented; legacy recipient syntax/adapters remain pending |
+| Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-specific native targets implemented; internal legacy recipient resolution implemented; provider mapping and CLI adapter remain pending |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Native destination `critical`/`nowarn`/`noclear` booleans and all combinations implemented for direct/role sends; stateless filters take precedence and missing required history rejects the invocation before delivery. Initial-CLEAR eligibility/override belongs to future producer integration |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Stateless filtering with producer-supplied alert-global history implemented by approval; new destinations may receive later WARNING/CLEAR, and history does not imply successful delivery. Input-only fact is excluded from all provider payloads. Producer calculation/reset and Agent wiring remain later work |
 | Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar, SMSEagle, PagerDuty, Opsgenie, Teams and Matrix content/link/status formatting plus SMS Server Tools/syslog compact text, SNS subject/body templates and Kafka bridge payloads plus email MIME/threading/native content and IRC plain text implemented; optional duration facts are available, with richer presentation pending |
@@ -158,4 +162,4 @@ Legacy Slack override support remains pending; choosing modern webhooks first do
 The internal redesign is complete: shared event, formatting, secret, HTTP and process mechanisms have separate
 packages, and every provider owns typed configuration and delivery behind the sender interface. Critical-history
 filtering builds on that central routing boundary. Native legacy settings reading is the first compatibility increment;
-legacy routing/provider mapping and optional Unix Bash custom execution follow separately. Remaining capabilities stay pending until delivered or explicitly excluded.
+internal legacy recipient routing is implemented; provider mapping/activation, CLI delivery and optional Unix Bash custom execution follow separately. Remaining capabilities stay pending until delivered or explicitly excluded.

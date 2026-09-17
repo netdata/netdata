@@ -47,7 +47,9 @@ func (policy *DestinationPolicy) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-func (policy *DestinationPolicy) skipReason(notification Notification) (string, error) {
+// SkipReason evaluates a policy for a validated notification. An empty reason
+// permits delivery; an error means a required input-only history fact is missing.
+func (policy *DestinationPolicy) SkipReason(notification Notification) (string, error) {
 	if policy == nil {
 		return "", nil
 	}

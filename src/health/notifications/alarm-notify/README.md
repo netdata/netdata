@@ -124,7 +124,8 @@ there is no automatic stock-file discovery:
 A successful check means **syntax support only**. It does not evaluate variable values, validate provider names,
 credentials, recipients or routing, or establish that a custom function will work. It reads no event from stdin,
 resolves no secrets and executes no configuration code. `send` and `validate` continue to accept YAML only.
-Old-format delivery mapping, legacy routing and the optional Unix Bash custom-function runtime are later increments.
+The internal recipient resolver below is available for future adapters. Old-format delivery mapping and the optional
+Unix Bash custom-function runtime remain later increments.
 
 The reader supports this declarative subset:
 
@@ -150,8 +151,8 @@ It never reads the process environment. Undefined variables expand to empty stri
 assignment time: changing `DEFAULT_RECIPIENT_EMAIL` later does not retroactively change a role entry assigned from it.
 Expanded values remain literal, including strings resembling native `${env:...}` or `${file:...}` secret references.
 Later files replace only assigned scalars, recipient keys and functions. A whole-map initializer replaces that map;
-`declare -A` without an initializer preserves its entries. Recipient modifiers remain uninterpreted strings until
-legacy routing is implemented. Function text is retained exactly, including internal comments.
+`declare -A` without an initializer preserves its entries. The reader retains recipient modifiers as literal strings;
+the separate legacy resolver interprets them. Function text is retained exactly, including internal comments.
 
 Each input file is limited to 1 MiB. Evaluation also limits individual values to 1 MiB and total stored names/values
 and function source to 4 MiB, preventing repeated expansion from growing without bounds. The syntax check does not
@@ -160,6 +161,39 @@ one-based argument order and, where available, a line/column; they do not print 
 File-open errors retain the filesystem cause while omitting the configured path. All specified files must be readable
 and pass the check. `check-legacy` accepts the same positive `--timeout` as the other
 commands and returns `0` on supported syntax or `1` on errors/cancellation.
+
+## Legacy recipient routing
+
+`internal/legacyrouting.Resolve` resolves evaluated legacy settings for an explicit list of applicable method names
+and requested roles. It returns eligible method/recipient pairs; it does not enable old-format sending in the CLI.
+Provider mapping, `SEND_*` flags, credential prerequisites, executable discovery and custom-function execution remain
+separate adapter work. In particular, `check-legacy` still checks syntax only and does not invoke this resolver.
+
+The resolver uses `role_recipients_<method>` and `DEFAULT_RECIPIENT_<METHOD>`. Its rules preserve the legacy format
+without changing native YAML routing:
+
+- Roles and recipient lists split on commas, spaces, tabs and newlines. Other whitespace remains literal. There is no
+  shell quoting pass or filename globbing after evaluation, and strings resembling native secret references stay literal.
+- A missing or exactly empty role entry falls back to that method's default. A whitespace-only entry selects nobody;
+  it does not fall back. The exact roles `silent` and `disabled` are ignored individually. The exact recipient token
+  `disabled` is omitted; other selected roles and recipients still apply. These names are case-sensitive.
+- Recipient suffixes `|nowarn`, `|noclear` and `|critical` are case-insensitive and may be combined. Empty/repeated
+  modifier segments are tolerated as in Bash. Unknown modifiers and an empty base recipient are errors. An error
+  returns no partial targets and never echoes recipient or modifier values, which can contain credentials.
+- Multiple occurrences of the same recipient within one method form a union: if any occurrence permits the alert,
+  select that recipient once. Different methods remain distinct. Results follow method order, role order and first
+  recipient appearance, including an earlier filtered occurrence that a later role permits.
+- Policies reuse the native status/history evaluator. `critical` uses the producer-supplied
+  `critical_seen_since_clear` fact; there are no per-recipient state files. Stateless skips need no history. An
+  unrestricted permitting occurrence also makes history unnecessary for that recipient. If eligibility still depends
+  on missing history, the whole resolution fails before returning any targets.
+- No eligible recipients is a successful empty result. Resolution never constructs senders, resolves credentials,
+  executes functions or performs transport operations. Returned recipients may themselves be secrets and must not be
+  used as diagnostic labels by later adapters.
+
+Two intentional corrections to Bash apply: unknown modifiers fail instead of logging and permitting delivery, and
+role/recipient wildcard characters are literal instead of expanding against local filenames. Production Bash remains
+unchanged. Unix `custom_sender()` support, including helpers, event context and final-recipient batching, remains pending.
 
 ## Command and configuration contract
 
