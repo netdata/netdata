@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrd.h"
-#include "storage-engine.h"
+#include "storage-engines/storage-engine.h"
 #include "rrddim-collection.h"
-#include "ram/rrddim_mem.h"
+#include "storage-engines/ram/rrddim_mem.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);

@@ -3,7 +3,8 @@
 #ifndef NETDATA_RRDDIMMEM_H
 #define NETDATA_RRDDIMMEM_H
 
-#include "database/rrd.h"
+#include "libnetdata/libnetdata.h"
+#include "database/storage-engines/storage-engine-types.h"
 
 struct mem_collect_handle {
     struct storage_collect_handle common; // has to be first item

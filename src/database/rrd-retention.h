@@ -4,7 +4,7 @@
 #define NETDATA_RRD_RETENTION_H
 
 #include "libnetdata/libnetdata.h"
-#include "storage-engine.h"
+#include "storage-engines/storage-engine.h"
 
 // Structure to hold information about each storage tier
 typedef struct rrd_storage_tier {

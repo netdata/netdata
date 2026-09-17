@@ -83,7 +83,7 @@ static inline uint32_t get_uint32_id() {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-#include "storage-engine.h"
+#include "storage-engines/storage-engine.h"
 
 #include "rrdhost.h"
 #include "rrdset.h"
