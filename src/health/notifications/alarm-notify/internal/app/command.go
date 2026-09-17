@@ -29,7 +29,8 @@ Usage:
 
 send reads one JSON event and delivers it to the selected destinations.
 Use either one explicit destination or roles resolved through YAML routing.
-Destination nowarn/noclear policies skip matching statuses before delivery.
+Destination critical/nowarn/noclear policies filter delivery. Missing required
+critical_seen_since_clear history rejects the invocation before any delivery.
 validate checks configuration without resolving secrets or sending requests.
 The positive timeout covers the whole invocation, including input reads.
 Exit status: 0 on any successful delivery, no eligible destinations, validation, or help;
@@ -196,12 +197,12 @@ func execute(
 	if err != nil {
 		return err
 	}
-	event, err := readEvent(stdin)
+	notification, err := readNotification(stdin)
 	if err != nil {
 		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return cfg.Deliver(ctx, destinations, event, report)
+	return cfg.Deliver(ctx, destinations, notification, report)
 }

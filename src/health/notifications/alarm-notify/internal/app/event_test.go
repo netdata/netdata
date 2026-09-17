@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
@@ -37,11 +38,11 @@ func TestEventDurations(t *testing.T) {
 				if test.input != "" {
 					input = strings.Replace(input, `"version": 1`, `"version": 1, "`+field+`": `+test.input, 1)
 				}
-				got, err := readEvent(strings.NewReader(input))
+				got, err := readNotification(strings.NewReader(input))
 				if test.err {
 					require.ErrorContains(t, err, "invalid JSON event")
 					assert.NotContains(t, err.Error(), "synthetic-private-value")
-					assert.Equal(t, notifyevent.Event{}, got)
+					assert.Equal(t, notifier.Notification{}, got)
 					return
 				}
 				require.NoError(t, err)
@@ -51,9 +52,9 @@ func TestEventDurations(t *testing.T) {
 				} else {
 					want.NonClearDuration = test.want
 				}
-				assert.Equal(t, want, got)
+				assert.Equal(t, notifier.Notification{Event: want}, got)
 				// Public Event consumers omit unknown durations and retain explicit zero.
-				encoded, err := json.Marshal(got)
+				encoded, err := json.Marshal(got.Event)
 				require.NoError(t, err)
 				wantJSON := testutil.ValidEvent
 				if test.want != nil {
@@ -82,17 +83,17 @@ func TestReadEventURL(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			input := strings.Replace(testutil.ValidEvent, `"version": 1`, fmt.Sprintf(`"version": 1, "url": %q`, test.url), 1)
-			got, err := readEvent(strings.NewReader(input))
+			got, err := readNotification(strings.NewReader(input))
 			if !test.valid {
 				require.ErrorContains(t, err, "event url must be")
-				assert.Equal(t, notifyevent.Event{}, got)
+				assert.Equal(t, notifier.Notification{}, got)
 				assert.NotContains(t, err.Error(), "synthetic-private-value")
 				return
 			}
 			require.NoError(t, err)
 			want := testutil.ExpectedEvent()
 			want.URL = test.url
-			assert.Equal(t, want, got)
+			assert.Equal(t, notifier.Notification{Event: want}, got)
 		})
 	}
 }
@@ -151,15 +152,48 @@ func TestReadEvent(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := readEvent(strings.NewReader(test.input))
+			got, err := readNotification(strings.NewReader(test.input))
 			if test.err != "" {
 				require.ErrorContains(t, err, test.err)
 				assert.NotContains(t, err.Error(), "synthetic-private-value")
-				assert.Equal(t, notifyevent.Event{}, got)
+				assert.Equal(t, notifier.Notification{}, got)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, test.want, got)
+			assert.Equal(t, notifier.Notification{Event: test.want}, got)
+		})
+	}
+}
+
+func TestReadCriticalHistory(t *testing.T) {
+	for name, test := range map[string]struct {
+		value string
+		want  *bool
+		bad   bool
+	}{
+		"omitted": {}, "null": {value: "null"},
+		"false": {value: "false", want: new(false)}, "true": {value: "true", want: new(true)},
+		"string": {value: `"synthetic-private-value"`, bad: true}, "quoted boolean": {value: `"true"`, bad: true},
+		"integer": {value: "1", bad: true}, "zero": {value: "0", bad: true}, "fraction": {value: "0.5", bad: true},
+		"array": {value: "[true]", bad: true}, "object": {value: "{}", bad: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			input := testutil.ValidEvent
+			if test.value != "" {
+				input = strings.Replace(input, `"version": 1`, `"version": 1, "critical_seen_since_clear": `+test.value, 1)
+			}
+			got, err := readNotification(strings.NewReader(input))
+			if test.bad {
+				require.ErrorContains(t, err, "invalid JSON event")
+				assert.NotContains(t, err.Error(), "synthetic-private-value")
+				assert.Equal(t, notifier.Notification{}, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, notifier.Notification{Event: testutil.ExpectedEvent(), CriticalSeenSinceClear: test.want}, got)
+			public, err := json.Marshal(got.Event)
+			require.NoError(t, err)
+			assert.JSONEq(t, testutil.ValidEvent, string(public))
 		})
 	}
 }

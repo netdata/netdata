@@ -21,20 +21,38 @@ type Plan struct {
 	Routing      Routing
 }
 
+// Notification keeps input-only policy facts separate from the public provider event.
+type Notification struct {
+	Event                  event.Event
+	CriticalSeenSinceClear *bool
+}
+
 type Result struct {
 	Destination string
 	SkipReason  string
 	Err         error
 }
 
-// Deliver attempts selected destinations sequentially within the invocation deadline.
-func (p Plan) Deliver(ctx context.Context, names []string, notification event.Event, report func(Result)) error {
-	succeeded, attempted := 0, 0
-	for _, name := range names {
+// Deliver validates all selected policies before attempting destinations sequentially.
+func (p Plan) Deliver(ctx context.Context, names []string, notification Notification, report func(Result)) error {
+	// Missing required history must not leave an invocation partially delivered.
+	skips := make([]string, len(names))
+	for i, name := range names {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if reason := p.Routing.Policies[name].skipReason(notification.Status); reason != "" {
+		reason, err := p.Routing.Policies[name].skipReason(notification)
+		if err != nil {
+			return err
+		}
+		skips[i] = reason
+	}
+	succeeded, attempted := 0, 0
+	for i, name := range names {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if reason := skips[i]; reason != "" {
 			report(Result{Destination: name, SkipReason: reason})
 			continue
 		}
@@ -43,7 +61,7 @@ func (p Plan) Deliver(ctx context.Context, names []string, notification event.Ev
 		if !ok {
 			return errors.New("selected destination is not configured")
 		}
-		err := sender.Send(ctx, notification)
+		err := sender.Send(ctx, notification.Event)
 		report(Result{Destination: name, Err: err})
 		if err == nil {
 			succeeded++

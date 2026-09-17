@@ -48,7 +48,7 @@ func TestPlanDelivery(t *testing.T) {
 				plan.Destinations[name] = recordingSender{&calls, name, test.fail[name]}
 			}
 			results := 0
-			err := plan.Deliver(context.Background(), test.names, event.Event{Status: "WARNING"}, func(r Result) {
+			err := plan.Deliver(context.Background(), test.names, Notification{Event: event.Event{Status: "WARNING"}}, func(r Result) {
 				results++
 				if r.SkipReason != "" {
 					skipped = append(skipped, r.Destination+":"+r.SkipReason)
