@@ -2,10 +2,8 @@
 
 #include "database/rrd.h"
 #include "storage-engine.h"
-#include "ram/rrddim_mem.h"
-#ifdef ENABLE_DBENGINE
-#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
 
+#ifdef ENABLE_DBENGINE
 // The vtable hands over the RRDDIM because the RAM backend keeps a reference to it;
 // dbengine only ever needs the dimension's uuid.
 static STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
