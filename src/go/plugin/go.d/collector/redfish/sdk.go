@@ -30,7 +30,7 @@ func (c *protocolClient) connectSDK(
 	}
 	client, err := gofish.ConnectContext(context.WithValue(ctx, requestTraceKey{}, trace), cfg)
 	err = sdkError(err, trace)
-	if trace.last != nil {
+	if trace.last != nil && !trace.last.finished {
 		trace.last.finish(err)
 	} else if err != nil {
 		recordWireFailure(stats, classifyError(err))
@@ -68,6 +68,11 @@ func (c *protocolClient) getWithClient(
 // SDK errors can include response bodies and credential-bearing URLs. Keep the
 // status and failure class without logging untrusted remote diagnostics.
 func sdkError(err error, trace *requestTrace) error {
+	// http.Client may add timeout information after the transport returns.
+	var network *url.Error
+	if errors.As(err, &network) && network.Timeout() {
+		return sanitizeTransportError(err)
+	}
 	if trace.failure != nil {
 		return trace.failure
 	}
@@ -84,7 +89,6 @@ func sdkError(err error, trace *requestTrace) error {
 			path:   last.url.EscapedPath(),
 		}
 	}
-	var network *url.Error
 	if errors.As(err, &network) {
 		return sanitizeTransportError(err)
 	}

@@ -3,10 +3,14 @@
 package redfish
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,4 +129,39 @@ func TestProtocolClientSessionDoesNotFallBackToBasic(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, "unavailable", result.Metrics.Status)
 	assert.Zero(t, server.basicRequests.Load())
+}
+
+func TestProtocolClientSessionTransportFailureMetrics(t *testing.T) {
+	for name, fail := range map[string]http.HandlerFunc{
+		"transport": func(http.ResponseWriter, *http.Request) {
+			panic(http.ErrAbortHandler)
+		},
+		"timeout": func(_ http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					serveServiceRoot(w, true)
+					return
+				}
+				assert.Equal(t, http.MethodPost, r.Method)
+				_, _ = io.Copy(io.Discard, r.Body)
+				fail(w, r)
+			}))
+			defer server.Close()
+			cfg := testConfig(server.URL, "session")
+			cfg.Timeout = confopt.Duration(time.Second)
+			client := newTestProtocolClient(t, cfg)
+			defer client.Close()
+
+			result, err := client.Collect(t.Context())
+			require.Error(t, err)
+			assert.Equal(t, "unavailable", result.Metrics.Status)
+			assert.Equal(t, map[string]int{"started": 2, "redirected": 0}, result.Metrics.HTTPRequests)
+			assert.Equal(t, map[string]int{"successful": 1, "failed": 1}, result.Metrics.Operations)
+			assert.Equal(t, map[string]int{name: 1}, result.Metrics.Failures)
+		})
+	}
 }
