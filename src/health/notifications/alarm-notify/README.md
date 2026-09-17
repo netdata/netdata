@@ -13,7 +13,7 @@ Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/Mes
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
 Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
 Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog,
-AWS SNS, Kafka HTTP bridges, email through sendmail, IRC through nc and destination status filters.
+AWS SNS, Kafka HTTP bridges, email through sendmail, IRC through nc and destination status/history filters.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
 before production adoption. Shared mechanisms have separate packages, and each provider owns its typed configuration
 and delivery implementation behind a common sender interface.
@@ -199,7 +199,8 @@ the remaining time. Cancellation stops the
 invocation even after earlier successful deliveries; no further destinations are started once it is observed.
 
 Each completed delivery reports its quoted destination name and outcome to stderr. Filtered destinations report
-`skipped: nowarn` or `skipped: noclear`. The final summary counts `succeeded`, `failed`, and `skipped` separately.
+`skipped: nowarn`, `skipped: noclear`, or `skipped: critical`. The final summary counts `succeeded`, `failed`, and
+`skipped` separately.
 Partial failure returns `0` when another delivery succeeded, matching Bash's any-success behavior; inspect the
 individual results to see failures. If all attempted deliveries fail, the command returns `1` even when other
 destinations were skipped. No selected destinations or all selected destinations skipped returns `0` after successful
@@ -210,7 +211,7 @@ an outcome for interrupted or unstarted deliveries.
 
 Optional `routing.policies` entries apply to named destinations for both `--destination` and `--role` sends, after
 selection and deduplication. They apply to every provider, including commands. Each entry must name a configured
-destination and contain only the optional boolean flags `nowarn` and `noclear`, both defaulting to `false`.
+destination and contain only the optional boolean flags `critical`, `nowarn` and `noclear`, all defaulting to `false`.
 Use YAML `true` or `false`; strings, null flags and unknown options are rejected. An empty mapping `{}` means no
 filters; a null policy entry is rejected.
 
@@ -234,19 +235,49 @@ routing:
 
 | Policy | WARNING | CRITICAL | CLEAR |
 |---|---|---|---|
-| Omitted or both false | Send | Send | Send |
+| All flags omitted or false | Send | Send | Send |
 | `nowarn: true` | Skip | Send | Send |
 | `noclear: true` | Send | Send | Skip |
-| Both true | Skip | Send | Skip |
+| `nowarn: true` and `noclear: true` | Skip | Send | Skip |
 
 In the example, a WARNING sent to `sysadmin` reaches only `audit`; a CRITICAL reaches both destinations.
 A WARNING sent directly to `critical_alerts` is a successful no-op. Filtering happens before secret resolution,
 HTTP requests or subprocess startup, so skipped destinations do not require their referenced secrets to be available.
 A policy does not select its destination and does not affect other names pointing to the same endpoint.
 
-These filters use only the current status. They do not implement Bash's history-dependent `critical` modifier,
-which can also deliver later WARNING/CLEAR events after a CRITICAL. Global initial-CLEAR eligibility belongs to the
-producer before invocation; the notifier does not infer it from `previous_status`.
+The table above assumes `critical` is false. Setting `critical: true` always allows CRITICAL and allows later
+WARNING/CLEAR only after CRITICAL has occurred in that alert lifecycle. The caller supplies this history as the
+optional top-level JSON boolean `critical_seen_since_clear`:
+
+| Current status | History omitted/null | History false | History true |
+|---|---|---|---|
+| CRITICAL | Send | Send | Send |
+| WARNING | Input error | Skip: critical | Send |
+| CLEAR | Input error | Skip: critical | Send |
+
+`nowarn` and `noclear` take precedence: a WARNING suppressed by `nowarn`, or a CLEAR suppressed by `noclear`, needs
+no history. Unselected destinations also impose no history requirement, including sends to only reserved
+`silent`/`disabled` roles. Otherwise, missing/null history needed by any selected critical policy rejects the
+**whole invocation before any delivery**, including unrelated destinations ordered earlier. No delivery results are reported. A malformed history value (anything other than a JSON
+boolean or null) always fails input validation, even if no selected policy needs history.
+
+The history is alert-global and describes the lifecycle, not successful deliveries. A destination added after CRITICAL
+can receive a later WARNING/CLEAR even if it did not receive CRITICAL, or the earlier delivery failed. This deliberately
+differs from Bash's per-recipient marker files. The producer must supply the closing lifecycle's history on CLEAR,
+then reset it for the next lifecycle. The notifier neither persists nor infers history from `previous_status`.
+`critical_seen_since_clear` is input-only: it is never forwarded in webhook, command or other provider payloads.
+Global initial-CLEAR eligibility still belongs to the producer before invocation.
+
+With the local receiver from **Build and run** listening, try the history-enabled example:
+
+```sh
+/tmp/alarm-notify validate --config examples/critical-history.yaml
+/tmp/alarm-notify send --config examples/critical-history.yaml --role sysadmin < examples/critical-history.json
+```
+
+Its post-CRITICAL WARNING reaches both destinations. Changing history to `false` skips `critical_alerts` and sends to
+`audit`; removing history fails before either destination sends. `examples/event.json` remains valid for configurations
+whose selected policies do not require history.
 
 ### Transport results
 
@@ -1991,10 +2022,11 @@ durations mean unknown and are omitted from the public Event JSON; explicit zero
 when supplied they also appear in webhook/custom-command input and Alerta/Opsgenie raw event details, and are available
 to SNS message templates. Other providers' duration presentation remains pending in the capability inventory.
 
-Destination `nowarn`/`noclear` policies filter the current status as described above. The notifier does not infer
-initial-CLEAR eligibility; that decision belongs to the producer before invocation. History-dependent `critical`
-filtering remains pending in the inventory. Add future internal-only event facts separately from this public
-webhook document.
+The input additionally accepts `critical_seen_since_clear`, a routing fact kept outside the public Event. A JSON
+boolean supplies known history; omitted/null means unknown. It is required only when a selected `critical` policy
+needs it, as described under **Destination status filters**, and never appears in provider payloads. No initial-CLEAR
+eligibility or history is inferred by the notifier; both belong to the producer. Keep future input-only routing facts
+separate from the public Event too.
 
 ## Internal packages
 
@@ -2008,11 +2040,13 @@ type Sender interface {
 
 A sender represents one configured destination. Success means the provider accepted the request; it does not promise
 that a human received the notification. The context carries the whole invocation deadline.
+The engine receives a `notifier.Notification` containing the public Event and input-only policy facts. It checks all
+selected policies before delivery, then passes only the public Event to each eligible sender.
 
 | Package | Ownership |
 |---|---|
 | `internal/app` | CLI options, event input, output and invocation resources |
-| `internal/notifier` | Sender contract, routing, status policies, sequential fan-out and delivery results |
+| `internal/notifier` | Sender contract, input-only notification facts, routing, status/history policies, sequential fan-out and delivery results |
 | `internal/config` | Strict YAML document decoding and typed factories supplied through an explicit registry |
 | `internal/config/field` | Reusable configuration scalar validation, including strict integers |
 | `internal/providers` | Explicit built-in registration |

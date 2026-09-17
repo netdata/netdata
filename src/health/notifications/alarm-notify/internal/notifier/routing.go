@@ -15,8 +15,9 @@ type Routing struct {
 }
 
 type DestinationPolicy struct {
-	NoWarn  bool `yaml:"nowarn,omitempty"`
-	NoClear bool `yaml:"noclear,omitempty"`
+	Critical bool `yaml:"critical,omitempty"`
+	NoWarn   bool `yaml:"nowarn,omitempty"`
+	NoClear  bool `yaml:"noclear,omitempty"`
 }
 
 // Decode policy flags strictly: nulls and legacy yes/no strings are not booleans.
@@ -32,6 +33,8 @@ func (policy *DestinationPolicy) UnmarshalYAML(node *yaml.Node) error {
 			return errors.New("routing policy flags must be booleans")
 		}
 		switch name {
+		case "critical":
+			decoded.Critical = enabled
 		case "nowarn":
 			decoded.NoWarn = enabled
 		case "noclear":
@@ -44,16 +47,32 @@ func (policy *DestinationPolicy) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-func (policy *DestinationPolicy) skipReason(status string) string {
-	if policy != nil {
-		if status == "WARNING" && policy.NoWarn {
-			return "nowarn"
-		}
-		if status == "CLEAR" && policy.NoClear {
-			return "noclear"
-		}
+func (policy *DestinationPolicy) skipReason(notification Notification) (string, error) {
+	if policy == nil {
+		return "", nil
 	}
-	return ""
+	switch notification.Event.Status {
+	case "WARNING":
+		if policy.NoWarn {
+			return "nowarn", nil
+		}
+	case "CLEAR":
+		if policy.NoClear {
+			return "noclear", nil
+		}
+	default:
+		return "", nil
+	}
+	if !policy.Critical {
+		return "", nil
+	}
+	if notification.CriticalSeenSinceClear == nil {
+		return "", errors.New("critical_seen_since_clear is required by a selected critical policy")
+	}
+	if !*notification.CriticalSeenSinceClear {
+		return "critical", nil
+	}
+	return "", nil
 }
 
 func reservedRole(role string) bool {
