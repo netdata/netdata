@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -137,7 +138,64 @@ func TestCollectorSessionStartsDuringRunningCollection(t *testing.T) {
 	require.NoError(t, collector.Collect(context.Background()))
 	require.NoError(t, cycle.CommitCycleSuccess())
 	assert.Equal(t, int64(1), server.sessionCreates.Load())
-	collector.Cleanup(context.Background())
-	collector.Cleanup(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	collector.Cleanup(ctx)
+	collector.Cleanup(ctx)
 	assert.Equal(t, int64(1), server.sessionDeletes.Load())
+}
+
+func TestDecodedCollectorSessionRecovery(t *testing.T) {
+	var expire atomic.Bool
+	server := newRedfishTestServer(t, redfishTestServerConfig{
+		supportSession:    true,
+		expireSessionOnce: &expire,
+	})
+	defer server.Close()
+	collector := collectorapi.DefaultRegistry["redfish"].CreateV2()
+	require.NoError(
+		t,
+		json.Unmarshal(
+			[]byte(
+				fmt.Sprintf(
+					`{"name":"session","url":%q,"auth_method":"session","username":"user","password":"test-password"}`,
+					server.URL,
+				),
+			),
+			collector,
+		),
+	)
+	require.NoError(t, collector.Init(t.Context()))
+	defer collector.Cleanup(context.Background())
+	require.NoError(t, collector.Check(t.Context()))
+	assert.Zero(t, server.sessionCreates.Load())
+	managed, ok := metrix.AsCycleManagedStore(collector.MetricStore())
+	require.True(t, ok)
+	_, origin, err := normalizeServiceRoot(server.URL)
+	require.NoError(t, err)
+	labels := metrix.Labels{
+		"endpoint_key": stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars),
+		"endpoint_job": "session",
+	}
+	for cycle := range 3 {
+		managed.CycleController().BeginCycle()
+		require.NoError(t, collector.Collect(t.Context()))
+		require.NoError(t, managed.CycleController().CommitCycleSuccess())
+		point, ok := collector.MetricStore().Read().StateSet("collection_status", labels)
+		require.True(t, ok)
+		assert.True(t, point.States["success"])
+		var hardwareSeries int
+		collector.MetricStore().
+			Read(metrix.ReadFlatten()).
+			ForEachByName("system_health", func(metrix.LabelView, metrix.SampleValue) {
+				hardwareSeries++
+			})
+		assert.Positive(t, hardwareSeries, "session recovery must not leave a hardware gap")
+		if cycle == 0 {
+			expire.Store(true)
+		}
+	}
+	assert.Equal(t, int64(2), server.sessionCreates.Load())
+	collector.Cleanup(t.Context())
+	assert.Zero(t, server.activeSessions.Load())
 }

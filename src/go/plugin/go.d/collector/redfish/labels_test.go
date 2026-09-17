@@ -27,7 +27,6 @@ func TestDecodedCollectorPreservesEndpointJobIdentity(t *testing.T) {
 				"module":      "redfish",
 				"url":         server.URL,
 				"auth_method": "none",
-				"retries":     0,
 			}
 			cfg.ApplyDefaults(confgroup.Default{})
 			require.Equal(t, job, cfg.Name())

@@ -35,11 +35,16 @@ modules:
         method_description: |
           The collector authenticates to the Redfish ServiceRoot over HTTP or HTTPS, reads supported standard resource types
           and follows their same-origin links. It prefers session authentication in `auto` mode and falls back to HTTP Basic
-          authentication when the endpoint does not support a usable session. Requests are bounded by the configured timeout,
-          retry count, and concurrency.
+          authentication when sessions are not advertised or are unsupported. Requests are bounded by the configured timeout
+          and concurrency.
+          If a session read returns HTTP 401, the collector reconnects once and repeats acquisition within the same
+          collection cycle. A failed login, a second HTTP 401 or the collection deadline ends recovery.
+          Other failures are retried on the next scheduled cycle.
+          The only remote writes create and delete the collector's own sessions.
 
           For session and auto authentication, the configuration test identifies the endpoint without creating a session.
-          Credentials are validated when collection starts. BMC health states are reported directly; the collector does not
+          Credentials are validated when collection starts. Session authentication requires an origin-relative `Links.Sessions`
+          endpoint; use Basic authentication if the BMC does not provide one. BMC health states are reported directly; the collector does not
           infer alarms from numeric thresholds.
 
           Collection is best-effort: one unreadable resource does not stop independently reachable resources. Missing current
@@ -129,11 +134,6 @@ modules:
               group: HTTP
               description: HTTP request timeout, in seconds.
               default_value: 15
-              required: false
-            - name: retries
-              group: HTTP
-              description: Number of extra attempts for a request that fails with a transient error.
-              default_value: 2
               required: false
             - name: max_concurrent_requests
               group: HTTP
@@ -746,7 +746,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: started
-                - name: retried
                 - name: redirected
             - name: redfish.collection.operations
               description: Redfish Collection Operations

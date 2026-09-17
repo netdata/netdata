@@ -32,9 +32,8 @@ func (c *staticEndpointClient) Collect(ctx context.Context) (collectionResult, e
 	c.deadline, c.hasDeadline = ctx.Deadline()
 	return c.result, c.err
 }
-func (c *staticEndpointClient) Close(context.Context) error {
+func (c *staticEndpointClient) Close() {
 	c.closed = true
-	return nil
 }
 func (c *staticEndpointClient) selectedAuthenticationMethod() string { return c.auth }
 

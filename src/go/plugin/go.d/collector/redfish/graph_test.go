@@ -496,7 +496,7 @@ func TestGraphFetchBrokerCoalescesCanonicalResource(t *testing.T) {
 	t.Parallel()
 
 	var requests atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newResourceTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
 		writeJSON(w, map[string]any{
 			"@odata.id":   r.URL.Path,
@@ -506,7 +506,7 @@ func TestGraphFetchBrokerCoalescesCanonicalResource(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
+	client := newTestResourceClient(t, testConfig(server.URL, "none"))
 	ctx := withGraphFetchBroker(context.Background())
 	rel := graphRelationship{
 		ChildKind: "fan",
@@ -540,9 +540,9 @@ func TestGraphFetchBrokerCoalescesCanonicalResource(t *testing.T) {
 func TestCompleteCollectionMembershipSurvivesMemberAcquisitionFailure(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(http.NotFoundHandler())
+	server := newResourceTestServer(http.NotFoundHandler())
 	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
+	client := newTestResourceClient(t, testConfig(server.URL, "none"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cancel()

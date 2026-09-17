@@ -6,52 +6,40 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 )
 
 func (c *protocolClient) fetchServiceRoot(
 	ctx context.Context,
-	authenticated bool,
 	stats *wireStats,
 ) (document *serviceRootDocument, err error) {
-	response, err := c.do(
-		ctx,
-		protocolRequest{
-			method: http.MethodGet,
-			target: c.root,
-			auth:   c.currentAuth(authenticated),
-		},
-		stats,
-		true,
-		http.StatusOK,
-	)
+	response, err := c.get(ctx, c.root, stats)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { response.finish(err) }()
-	var root serviceRootDocument
-	if err := decodeJSON(response, &root); err != nil {
-		return nil, fmt.Errorf("decode ServiceRoot: %w", err)
-	}
-	// The typed envelope owns protocol features; the raw document retains source fields for metrics.
-	if err := decodeJSON(response, &root.Raw); err != nil {
-		return nil, fmt.Errorf("decode raw ServiceRoot: %w", err)
-	}
-	if err := c.validateResourceIdentity("service", root.Raw, response.url); err != nil {
-		return nil, fmt.Errorf("validate ServiceRoot: %w", err)
-	}
-	if !validRedfishVersion(root.RedfishVersion) {
-		err := errors.New("ServiceRoot has no valid RedfishVersion")
+	root, err := c.decodeServiceRoot(response)
+	if err != nil {
 		return nil, err
 	}
-	root.Response = metadataForResponse(response)
-	if root.ProtocolFeaturesSupported.MultipleHTTPRequests != nil &&
-		!*root.ProtocolFeaturesSupported.MultipleHTTPRequests {
-		c.setRequestLimit(1)
-	} else {
-		c.setRequestLimit(c.config.MaxConcurrentRequests)
+	c.requestLimit = c.config.MaxConcurrentRequests
+	if multiple, ok := jsonPath(root.Raw, "ProtocolFeaturesSupported.MultipleHTTPRequests"); ok && multiple == false {
+		c.requestLimit = 1
 	}
-	c.setExpansionValue(expansionValue(&root))
+	return root, nil
+}
+
+func (c *protocolClient) decodeServiceRoot(response *responseData) (*serviceRootDocument, error) {
+	var root serviceRootDocument
+	if err := decodeJSON(response, &root.Raw); err != nil {
+		return nil, err
+	}
+	if err := c.validateResourceIdentity("service", root.Raw, response.url); err != nil {
+		return nil, err
+	}
+	if stringAt(root.Raw, "RedfishVersion") == "" {
+		return nil, errors.New("ServiceRoot has no RedfishVersion")
+	}
+	root.Response = metadataForResponse(response)
 	return &root, nil
 }
 
@@ -70,22 +58,29 @@ func (c *protocolClient) fetchBaseResources(
 	stats *wireStats,
 ) ([]baseResource, bool, error) {
 	collections := []struct {
-		kind string
-		link redfishLink
+		kind     string
+		property string
 	}{
-		{"system", root.Systems},
-		{"chassis", root.Chassis},
-		{"manager", root.Managers},
+		{"system", "Systems"},
+		{"chassis", "Chassis"},
+		{"manager", "Managers"},
 	}
 	var resources []baseResource
 	complete := true
 	var joined error
 	for _, collection := range collections {
-		if collection.link.ODataID == "" {
+		if root.Raw[collection.property] == nil {
 			c.replaceBaseMembership(collection.kind, nil)
 			continue
 		}
-		members, ok, err := c.fetchCollectionMembers(ctx, collection.link.ODataID, collection.kind, stats)
+		var members []collectionMember
+		var ok bool
+		var err error
+		if ref := linkAt(root.Raw, collection.property); ref != "" {
+			members, ok, err = c.fetchCollectionMembers(ctx, ref, stats)
+		} else {
+			err = fmt.Errorf("%s link has no usable @odata.id", collection.property)
+		}
 		if err != nil {
 			complete = false
 			joined = errors.Join(joined, fmt.Errorf("%s collection: %w", collection.kind, err))
@@ -136,7 +131,7 @@ func (c *protocolClient) fetchBaseMembers(
 			break
 		}
 		member := members[index]
-		resource, err := c.fetchBaseMember(ctx, kind, member, stats)
+		resource, err := c.fetchBaseResource(ctx, kind, member.Ref, stats)
 		if err != nil {
 			failures.Add(fmt.Errorf("%s resource: %w", kind, err))
 			resource = c.unreadableBaseResource(kind, member.Ref.ODataID)
@@ -165,33 +160,6 @@ func (c *protocolClient) fetchBaseMembers(
 	return current, failures.Err()
 }
 
-func (c *protocolClient) fetchBaseMember(
-	ctx context.Context,
-	kind string,
-	member collectionMember,
-	stats *wireStats,
-) (baseResource, error) {
-	if member.Data == nil {
-		return c.fetchBaseResource(ctx, kind, member.Ref, stats)
-	}
-	target, err := c.resolveURI(c.root, member.Ref.ODataID, false)
-	if err != nil {
-		return baseResource{}, err
-	}
-	doc, err := c.validateResourceData(kind, member.Data, target)
-	if err != nil {
-		return baseResource{}, err
-	}
-	return baseResource{
-		Kind:             kind,
-		URI:              member.Ref.ODataID,
-		Doc:              doc,
-		Data:             cloneJSONMap(member.Data),
-		Response:         member.Response,
-		AcquisitionState: "readable",
-	}, nil
-}
-
 func (c *protocolClient) fetchBaseResource(
 	ctx context.Context,
 	kind string,
@@ -202,17 +170,7 @@ func (c *protocolClient) fetchBaseResource(
 	if err != nil {
 		return baseResource{}, err
 	}
-	response, err := c.do(
-		ctx,
-		protocolRequest{
-			method: http.MethodGet,
-			target: target,
-			auth:   c.currentAuth(true),
-		},
-		stats,
-		true,
-		http.StatusOK,
-	)
+	response, err := c.get(ctx, target, stats)
 	if err != nil {
 		return baseResource{}, err
 	}

@@ -393,7 +393,7 @@ func sourceTestDecodedCollector(t *testing.T, endpoint string) collectorapi.Coll
 	require.True(t, ok)
 	collector := creator.CreateV2()
 	payload, err := json.Marshal(
-		map[string]any{"name": "source-contract", "url": endpoint, "auth_method": "none", "retries": 0},
+		map[string]any{"name": "source-contract", "url": endpoint, "auth_method": "none"},
 	)
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(payload, collector))
@@ -940,4 +940,41 @@ func TestDecodedCollectorSensorExcerptIdentityIsOrderIndependent(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestDecodedCollectorReadsLargeDriveFixture(t *testing.T) {
+	const root = "/redfish/v1/"
+	const chassis = root + "Chassis/Fixture-1"
+	drive := loadFixture(t, "telegraf-hpe-modern-drive.min.json")
+	driveURI := drive["@odata.id"].(string)
+	endpoint := sourceTestServeDocuments(t, map[string]map[string]any{
+		root: sourceTestResource(
+			root,
+			"ServiceRoot",
+			"Root",
+			map[string]any{"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(root + "Chassis")},
+		),
+		root + "Chassis": sourceTestCollection(root+"Chassis", "Chassis", chassis),
+		chassis: sourceTestResource(
+			chassis,
+			"Chassis",
+			"Chassis",
+			map[string]any{"Drives": []any{sourceTestLink(driveURI)}},
+		),
+		driveURI: drive,
+	})
+	collector := sourceTestDecodedCollector(t, endpoint)
+	sourceTestCollectCycle(t, collector)
+	// CapacityBytes is 1.6 TB in this vendor-derived fixture. A typed SDK int
+	// overflows on 32-bit builds before any of these useful readings are decoded.
+	assert.Equal(
+		t,
+		map[string]float64{"Synthetic SSD": 98},
+		sourceTestMetricByResource(t, collector.MetricStore().Read(), "drive_media_life", ""),
+	)
+	assert.Equal(
+		t,
+		map[string]float64{"Synthetic SSD": 12e9},
+		sourceTestMetricByResource(t, collector.MetricStore().Read(), "drive_link_speed_negotiated", ""),
+	)
 }

@@ -23,39 +23,43 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 			Resources:    make(map[string]int),
 		},
 	}
-	result.Diagnostics = append(result.Diagnostics, c.takeCompatibilityDiagnostics()...)
 	defer func() {
-		result.Diagnostics = appendUniqueDiagnostics(result.Diagnostics, responseCompatibilityDiagnostics(stats)...)
-		if diagnostic := c.takeExpansionFallbackDiagnostic(); diagnostic != "" {
-			result.Diagnostics = appendUniqueDiagnostics(result.Diagnostics, diagnostic)
-		}
+		result.Metrics.Duration = time.Since(started).Seconds()
 	}()
 
-	err = c.initializeAuthentication(ctx, stats)
-	var root *serviceRootDocument
-	if err == nil {
-		root, err = c.fetchServiceRoot(ctx, true, stats)
+	// Recover once after session expiry, after all reads have settled and before
+	// projecting hardware or advancing counter baselines. Wire totals include both attempts.
+	var graph *resourceGraph
+	for range 2 {
+		stats.unauthorized = false
+		graph, result.Complete, err = c.acquireResourceGraph(ctx, stats)
+		if c.authMode != "session" || !stats.unauthorized {
+			break
+		}
+		c.closeSession(ctx)
+		if ctx.Err() != nil {
+			err = errors.Join(err, ctx.Err())
+			break
+		}
+		if identityIntegrityError(err) {
+			break
+		}
 	}
-	if err != nil {
+	if graph == nil {
 		result.Metrics.Status = "unavailable"
-		result.Metrics.Duration = time.Since(started).Seconds()
 		c.copyWireStats(&result.Metrics, stats)
 		return result, err
 	}
-	resources, baseComplete, baseErr := c.fetchBaseResources(ctx, root, stats)
-	graph, graphErr := c.collectResourceGraph(ctx, root, resources, stats)
-	collectionErr := errors.Join(baseErr, graphErr)
-	result.Complete = baseComplete && baseErr == nil && graph.Complete && graphErr == nil
-	if identityIntegrityError(graphErr) {
+	if identityIntegrityError(err) {
 		result.Complete = false
 		result.Diagnostics = append(result.Diagnostics, graph.finalDiagnostics()...)
-		result.Diagnostics = append(result.Diagnostics, boundedDiagnostic(graphErr.Error()))
+		result.Diagnostics = append(result.Diagnostics, boundedDiagnostic(err.Error()))
 		c.finishCollectionResult(&result, graph, stats, started)
-		return result, collectionErr
+		return result, err
 	}
 	var hardwareErr error
 	result.Hardware, hardwareErr = c.hardwareSurface(graph, result.ObservedAt)
-	collectionErr = errors.Join(collectionErr, hardwareErr)
+	err = errors.Join(err, hardwareErr)
 	result.Complete = result.Complete && hardwareErr == nil
 	result.Diagnostics = append(result.Diagnostics, graph.finalDiagnostics()...)
 	if hardwareErr != nil {
@@ -67,10 +71,24 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 		result.Hardware = nil
 		result.Complete = false
 		c.finishCollectionResult(&result, graph, stats, started)
-		return result, collectionErr
+		return result, err
 	}
 	c.finishCollectionResult(&result, graph, stats, started)
-	return result, collectionErr
+	return result, err
+}
+
+func (c *protocolClient) acquireResourceGraph(ctx context.Context, stats *wireStats) (*resourceGraph, bool, error) {
+	if err := c.initializeAuthentication(ctx, stats); err != nil {
+		return nil, false, err
+	}
+	root, err := c.fetchServiceRoot(ctx, stats)
+	if err != nil {
+		return nil, false, err
+	}
+	resources, baseComplete, baseErr := c.fetchBaseResources(ctx, root, stats)
+	graph, graphErr := c.collectResourceGraph(ctx, root, resources, stats)
+	err = errors.Join(baseErr, graphErr)
+	return graph, baseComplete && graph.Complete && err == nil, err
 }
 
 func (c *protocolClient) finishCollectionResult(
@@ -104,7 +122,6 @@ func (c *protocolClient) finishCollectionResult(
 
 func (c *protocolClient) copyWireStats(metrics *cycleMetrics, stats *wireStats) {
 	metrics.HTTPRequests["started"] = stats.started
-	metrics.HTTPRequests["retried"] = stats.retried
 	metrics.HTTPRequests["redirected"] = stats.redirected
 	metrics.Operations["successful"] = stats.successful
 	metrics.Operations["failed"] = stats.failed

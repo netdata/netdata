@@ -374,29 +374,6 @@ func mergeSensorExcerptSources(sets ...[]sensorExcerptSource) []sensorExcerptSou
 	return result
 }
 
-func serviceRootMap(root *serviceRootDocument) map[string]any {
-	if root != nil && root.Raw != nil {
-		return cloneJSONMap(root.Raw)
-	}
-	data := map[string]any{
-		"@odata.id":      root.ODataID,
-		"@odata.type":    root.ODataType,
-		"Id":             root.ID,
-		"Name":           root.Name,
-		"RedfishVersion": root.RedfishVersion,
-		"UUID":           root.UUID,
-		"Vendor":         root.Vendor,
-		"Product":        root.Product,
-	}
-	if root.UpdateService.ODataID != "" {
-		data["UpdateService"] = map[string]any{"@odata.id": root.UpdateService.ODataID}
-	}
-	if root.Storage.ODataID != "" {
-		data["Storage"] = map[string]any{"@odata.id": root.Storage.ODataID}
-	}
-	return data
-}
-
 func (c *protocolClient) seedResourceGraph(
 	graph *resourceGraph,
 	root *serviceRootDocument,
@@ -406,9 +383,9 @@ func (c *protocolClient) seedResourceGraph(
 		Kind:    "service",
 		URI:     "/redfish/v1/",
 		Locator: "/redfish/v1/",
-		Data:    serviceRootMap(root),
+		Data:    cloneJSONMap(root.Raw),
 		Doc: genericResource{
-			Name: root.Name,
+			Name: stringAt(root.Raw, "Name"),
 		},
 		AcquisitionState: "readable",
 		IdentityQuality:  "addressable",

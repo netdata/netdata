@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnavailableCollectionKeepsResponseDiagnostics(t *testing.T) {
+func TestUnavailableCollectionReportsAuthenticationFailure(t *testing.T) {
 	server := newRedfishTestServer(t, redfishTestServerConfig{
 		sessionStatus: http.StatusUnauthorized,
 	})
@@ -21,11 +21,10 @@ func TestUnavailableCollectionKeepsResponseDiagnostics(t *testing.T) {
 	result, err := client.Collect(t.Context())
 	require.Error(t, err)
 	require.Equal(t, "unavailable", result.Metrics.Status)
-	require.Positive(t, result.Metrics.Operations["successful"])
-	require.Contains(t, result.Diagnostics, "Redfish compatibility: response OData-Version header is missing")
+	require.Positive(t, result.Metrics.Failures["auth"])
 }
 
-func TestFatalGraphCollectionKeepsExpansionDiagnostic(t *testing.T) {
+func TestCollectionDoesNotRequestExpansion(t *testing.T) {
 	const root = "/redfish/v1/"
 	const system = root + "Systems/1"
 	var expanded atomic.Int64
@@ -42,7 +41,7 @@ func TestFatalGraphCollectionKeepsExpansionDiagnostic(t *testing.T) {
 			if r.URL.Query().Has("$expand") {
 				expanded.Add(1)
 			}
-			// A service advertising expansion but returning ordinary links triggers fallback.
+			// An advertised expansion capability does not change the request path.
 			writeJSON(w, sourceTestCollection(root+"Systems", "ComputerSystem", system))
 		case system:
 			writeJSON(w, sourceTestResource(system, "ComputerSystem", "System", nil))
@@ -53,17 +52,14 @@ func TestFatalGraphCollectionKeepsExpansionDiagnostic(t *testing.T) {
 	t.Cleanup(server.Close)
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	// A real digest collision is impractical to construct; seed the conflicting
-	// binding to exercise the production fatal return after real HTTP fallback.
+	// binding to exercise the production fatal return after real HTTP collection.
 	require.NoError(t, client.identities.register([]identityBinding{{
 		Domain: "resource", Key: resourceKey(client.origin, "system", system), Preimage: "other-resource",
 	}}))
 	result, err := client.Collect(t.Context())
 	require.ErrorIs(t, err, errIdentityIntegrity)
 	require.Equal(t, "partial", result.Metrics.Status)
-	require.Equal(t, int64(1), expanded.Load())
-	require.Contains(t, result.Diagnostics,
-		"Redfish compatibility: advertised collection query expansion was rejected; using ordinary member links")
-	require.Empty(t, client.takeExpansionFallbackDiagnostic(), "reported warning must be consumed")
+	require.Zero(t, expanded.Load())
 }
 
 func TestFatalGraphCollectionKeepsEarlierDiagnostics(t *testing.T) {

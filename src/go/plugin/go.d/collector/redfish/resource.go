@@ -42,9 +42,6 @@ func (c *protocolClient) validateResourceData(
 }
 
 func (c *protocolClient) validateResourceIdentity(kind string, data map[string]any, responseURL *url.URL) error {
-	if err := validateRequiredResourceProperties(kind, data); err != nil {
-		return err
-	}
 	rawType, _ := stringValue(data["@odata.type"])
 	if err := validateResourceSchemaType(kind, rawType); err != nil {
 		return err
@@ -105,16 +102,6 @@ func stringValue(value any) (string, bool) {
 	result, ok := value.(string)
 	result = strings.TrimSpace(result)
 	return result, ok && result != ""
-}
-
-func nonEmptyStrings(values ...string) []string {
-	var result []string
-	for _, value := range values {
-		if value != "" {
-			result = append(result, value)
-		}
-	}
-	return result
 }
 
 func boundedDiagnostic(value string) string {

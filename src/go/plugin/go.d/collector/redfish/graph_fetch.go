@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"sync"
 )
 
@@ -143,37 +142,7 @@ func (c *protocolClient) acquireLinkedURI(
 	if err != nil {
 		return nil, false, err
 	}
-	collectionIdentity := canonicalResourceURI(target)
-	if c.isKnownCollection(collectionIdentity) {
-		members, complete, pageErr := c.fetchCollectionMembersAt(
-			ctx,
-			target,
-			nil,
-			rel.ChildKind,
-			stats,
-		)
-		return c.fetchGraphCollectionMembers(
-			ctx,
-			graphCollectionRequest{
-				relationship:       rel,
-				members:            members,
-				membershipComplete: complete,
-				pageErr:            pageErr,
-			},
-			stats,
-		)
-	}
-	response, err := c.do(
-		ctx,
-		protocolRequest{
-			method: http.MethodGet,
-			target: target,
-			auth:   c.currentAuth(true),
-		},
-		stats,
-		true,
-		http.StatusOK,
-	)
+	response, err := c.get(ctx, target, stats)
 	if err != nil {
 		return nil, false, err
 	}
@@ -182,17 +151,13 @@ func (c *protocolClient) acquireLinkedURI(
 		response.finish(err)
 		return nil, false, err
 	}
-	if members, present := data["Members"]; present {
-		c.markKnownCollection(collectionIdentity)
+	if _, present := data["Members"]; present {
 		collectionMembers, complete, pageErr := c.fetchCollectionMemberPages(
 			ctx,
 			target,
 			response,
 			stats,
-			rel.ChildKind,
-			false,
 		)
-		_ = members
 		return c.fetchGraphCollectionMembers(
 			ctx,
 			graphCollectionRequest{
@@ -223,7 +188,7 @@ func (c *protocolClient) fetchGraphCollectionMembers(
 	localStats := make([]*wireStats, len(members))
 	attempted := make([]bool, len(members))
 	jobs := make(chan int)
-	workers := min(max(c.config.MaxConcurrentRequests, 1), len(members))
+	workers := min(max(c.requestLimit, 1), len(members))
 	var wait sync.WaitGroup
 	for range workers {
 		wait.Go(func() {
@@ -231,10 +196,11 @@ func (c *protocolClient) fetchGraphCollectionMembers(
 				itemStats := &wireStats{
 					failures: make(map[string]int),
 				}
-				node, fetchErr := c.fetchGraphCollectionMember(
+				node, fetchErr := c.fetchGraphNode(
 					ctx,
+					request.relationship.ChildKind,
+					members[index].Ref.ODataID,
 					request.relationship,
-					members[index],
 					itemStats,
 				)
 				fetched[index] = node
@@ -298,53 +264,6 @@ dispatch:
 	return result, request.membershipComplete && request.pageErr == nil, joined
 }
 
-func (c *protocolClient) fetchGraphCollectionMember(
-	ctx context.Context,
-	rel graphRelationship,
-	member collectionMember,
-	stats *wireStats,
-) (*graphNode, error) {
-	if member.Data == nil {
-		return c.fetchGraphNode(
-			ctx,
-			rel.ChildKind,
-			member.Ref.ODataID,
-			rel,
-			stats,
-		)
-	}
-	key := rel.ChildKind + "\x00" + member.Ref.ODataID
-	return graphFetchBrokerFrom(ctx).fetch(ctx, key, func() (*graphNode, error) {
-		target, err := c.resolveURI(c.root, member.Ref.ODataID, false)
-		if err != nil {
-			return nil, err
-		}
-		doc, err := c.validateResourceData(rel.ChildKind, member.Data, target)
-		var decodeErr *resourceDecodeError
-		if err != nil && !errors.As(err, &decodeErr) {
-			return nil, err
-		}
-		model := rel.Source
-		if model == "" {
-			model = "resource"
-		}
-		node := &graphNode{
-			Kind:             rel.ChildKind,
-			URI:              member.Ref.ODataID,
-			Locator:          member.Ref.ODataID,
-			Data:             cloneJSONMap(member.Data),
-			Doc:              doc,
-			AcquisitionState: "readable",
-			IdentityQuality:  "addressable",
-			SourceModel:      model,
-			Response:         member.Response,
-			Parents:          make(map[string]*graphNode),
-		}
-		node.Key = resourceKey(c.origin, rel.ChildKind, member.Ref.ODataID)
-		return node, nil
-	})
-}
-
 func (c *protocolClient) unavailableGraphNode(kind, uri, state string) *graphNode {
 	node := &graphNode{
 		Kind:             kind,
@@ -371,17 +290,7 @@ func (c *protocolClient) fetchGraphNode(
 	}
 	key := kind + "\x00" + canonicalResourceURI(target)
 	return graphFetchBrokerFrom(ctx).fetch(ctx, key, func() (*graphNode, error) {
-		response, err := c.do(
-			ctx,
-			protocolRequest{
-				method: http.MethodGet,
-				target: target,
-				auth:   c.currentAuth(true),
-			},
-			stats,
-			true,
-			http.StatusOK,
-		)
+		response, err := c.get(ctx, target, stats)
 		if err != nil {
 			return nil, err
 		}

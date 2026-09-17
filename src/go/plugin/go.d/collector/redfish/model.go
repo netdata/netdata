@@ -13,62 +13,11 @@ type redfishLink struct {
 }
 
 type serviceRootDocument struct {
-	ODataID        string `json:"@odata.id"`
-	ODataType      string `json:"@odata.type"`
-	ID             string `json:"Id"`
-	Name           string `json:"Name"`
-	RedfishVersion string `json:"RedfishVersion"`
-	UUID           string `json:"UUID"`
-	Vendor         string `json:"Vendor"`
-	Product        string `json:"Product"`
-
-	Systems        redfishLink `json:"Systems"`
-	Chassis        redfishLink `json:"Chassis"`
-	Managers       redfishLink `json:"Managers"`
-	Storage        redfishLink `json:"Storage"`
-	SessionService redfishLink `json:"SessionService"`
-	UpdateService  redfishLink `json:"UpdateService"`
-	Links          struct {
-		Sessions redfishLink `json:"Sessions"`
-	} `json:"Links"`
-	ProtocolFeaturesSupported struct {
-		MultipleHTTPRequests *bool `json:"MultipleHTTPRequests"`
-		ExpandQuery          struct {
-			ExpandAll bool `json:"ExpandAll"`
-			Levels    bool `json:"Levels"`
-			Links     bool `json:"Links"`
-			MaxLevels uint `json:"MaxLevels"`
-			NoLinks   bool `json:"NoLinks"`
-		} `json:"ExpandQuery"`
-	} `json:"ProtocolFeaturesSupported"`
-
-	Raw      map[string]any   `json:"-"`
-	Response responseMetadata `json:"-"`
-}
-
-type collectionPage struct {
-	ODataID   string          `json:"@odata.id"`
-	ODataType string          `json:"@odata.type"`
-	Count     *int            `json:"Members@odata.count"`
-	Members   json.RawMessage `json:"Members"`
-	NextLink  string          `json:"Members@odata.nextLink"`
-}
-
-type collectionMember struct {
-	Ref      redfishLink
-	Data     map[string]any
+	Raw      map[string]any
 	Response responseMetadata
 }
 
-type collectionProgress struct {
-	CollectionIdentity string
-	ExpectedCount      int
-	Members            []collectionMember
-	SeenPages          map[string]struct{}
-	SeenMembers        map[string]struct{}
-	InvalidMembers     int
-	FirstMemberError   string
-}
+type collectionMember struct{ Ref redfishLink }
 
 type genericStatus struct {
 	Health       string             `json:"Health"`
@@ -155,13 +104,6 @@ func normalizedConditionSeverity(raw json.RawMessage) (string, bool) {
 	default:
 		return "unknown", true
 	}
-}
-
-func dereferenceInt(value *int) int {
-	if value == nil {
-		return 0
-	}
-	return *value
 }
 
 // resourceDecodeError marks malformed optional typed properties. Base resources
