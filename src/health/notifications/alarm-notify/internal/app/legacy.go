@@ -5,7 +5,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/legacyconfig"
 )
@@ -15,9 +14,9 @@ func checkLegacy(ctx context.Context, paths []string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		file, err := os.Open(path)
+		file, err := openConfig(path)
 		if err != nil {
-			return fmt.Errorf("legacy configuration file %d: could not open file", i+1)
+			return fmt.Errorf("legacy configuration file %d: could not open file: %w", i+1, err)
 		}
 		_, err = legacyconfig.Parse(file)
 		_ = file.Close()

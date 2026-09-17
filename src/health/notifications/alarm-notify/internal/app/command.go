@@ -167,10 +167,17 @@ receive:
 		logger.Printf("delivery summary: %d succeeded, %d failed, %d skipped", succeeded, failed, skipped)
 	}
 	if err != nil {
+		subject := "notification"
+		switch args[0] {
+		case "check-legacy":
+			subject = "legacy configuration check"
+		case "validate":
+			subject = "configuration validation"
+		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			err = errors.New("notification timed out")
+			err = fmt.Errorf("%s timed out", subject)
 		} else if errors.Is(err, context.Canceled) {
-			err = errors.New("notification canceled")
+			err = fmt.Errorf("%s canceled", subject)
 		}
 		logger.Print(err)
 		return 1
@@ -196,9 +203,9 @@ func execute(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	file, err := os.Open(configPath)
+	file, err := openConfig(configPath)
 	if err != nil {
-		return errors.New("could not open configuration file")
+		return fmt.Errorf("could not open configuration file: %w", err)
 	}
 	cfg, err := config.Read(file, registry)
 	_ = file.Close()
@@ -220,4 +227,17 @@ func execute(
 		return err
 	}
 	return cfg.Deliver(ctx, destinations, notification, report)
+}
+
+func openConfig(path string) (*os.File, error) {
+	file, err := os.Open(path)
+	if err == nil {
+		return file, nil
+	}
+	// Omit the configured path while preserving the filesystem cause and errors.Is.
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		return nil, pathErr.Err
+	}
+	return nil, errors.New("unknown filesystem error")
 }

@@ -156,8 +156,9 @@ legacy routing is implemented. Function text is retained exactly, including inte
 Each input file is limited to 1 MiB. Evaluation also limits individual values to 1 MiB and total stored names/values
 and function source to 4 MiB, preventing repeated expansion from growing without bounds. The syntax check does not
 perform evaluation and therefore does not check those evaluated-value limits. Errors identify the input file by its
-one-based argument order and, where available, a line/column; they do not print configuration text or values. All
-specified files must be readable and pass the check. `check-legacy` accepts the same positive `--timeout` as the other
+one-based argument order and, where available, a line/column; they do not print configuration text or values.
+File-open errors retain the filesystem cause while omitting the configured path. All specified files must be readable
+and pass the check. `check-legacy` accepts the same positive `--timeout` as the other
 commands and returns `0` on supported syntax or `1` on errors/cancellation.
 
 ## Command and configuration contract
