@@ -1921,12 +1921,13 @@ if(ENABLE_DBENGINE)
     # The engine. Its public headers live under include/dbengine/ and are included from the source root
     # (database/storage-engines/dbengine/include/dbengine/<name>.h), which resolves through libnetdata's src/
     # include path; the target declares no include directories of its own, so the layout documents the public
-    # surface and the target compiles the engine as one unit. It is a statement, not a guard: libnetdata exports src/, so a private
-    # engine header stays reachable by its path. It is an object library, not a static archive, so every engine
-    # object is linked whether or not something references it by name: a constructor-only object cannot be dropped
-    # from the link. The published statistics structs (dbengine-stats.h) are assembled by both this target and
-    # netdata, and their layout depends on the compile-time switches in that header: never give one target a
-    # definition the other does not get, or the snapshots pulse copies across the boundary silently misalign.
+    # surface and the target compiles the engine as one unit. It is a statement, not a guard: libnetdata exports
+    # src/, so a private engine header stays reachable by its path. It is an object library, not a static archive,
+    # so every engine object is linked whether or not something references it by name: a constructor-only object
+    # cannot be dropped from the link. The published statistics structs (dbengine-stats.h) are assembled by both
+    # this target and netdata, and their layout depends on the compile-time switches in that header: never give one
+    # target a definition the other does not get, or the snapshots pulse copies across the boundary silently
+    # misalign.
     set(DBENGINE_FILES
             src/database/storage-engines/dbengine/include/dbengine/rrdengineapi.h
             src/database/storage-engines/dbengine/include/dbengine/dbengine-config.h

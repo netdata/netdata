@@ -32,7 +32,9 @@ Working on dbengine page eviction:
     --version auto \
     --output /tmp/related-pass1.json
 
-# 2. If pass 1 is sparse, widen to filename.
+# 2. If pass 1 is sparse, widen to filename. AE_FATAL_FILENAME carries the path as compiled into the reporting
+#    agent, so list every spelling the fleet still runs (the engine moved from src/database/engine/ to
+#    src/database/storage-engines/dbengine/).
 payload=$(jq -nc '{
   "after": -1209600, "before": 0, "last": 200,
   "__logs_sources": "agent-events",
@@ -40,7 +42,10 @@ payload=$(jq -nc '{
     "AE_FATAL_FILENAME": [
       "src/database/storage-engines/dbengine/cache.c",
       "src/database/storage-engines/dbengine/pdc.c",
-      "src/database/storage-engines/dbengine/rrdengine.c"
+      "src/database/storage-engines/dbengine/rrdengine.c",
+      "src/database/engine/cache.c",
+      "src/database/engine/pdc.c",
+      "src/database/engine/rrdengine.c"
     ]
   }
 }')
