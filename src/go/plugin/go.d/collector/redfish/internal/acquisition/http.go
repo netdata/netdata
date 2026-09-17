@@ -102,8 +102,13 @@ func (t *redfishTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	if err != nil {
 		return nil, err
 	}
+	// Identify ServiceRoot by the original request, including authorized redirects.
+	initial := req
+	for initial.Response != nil && initial.Response.Request != nil {
+		initial = initial.Response.Request
+	}
 	if response.StatusCode == http.StatusOK && req.Method == http.MethodGet &&
-		strings.TrimSuffix(req.URL.Path, "/") == strings.TrimSuffix(t.root.Path, "/") {
+		strings.TrimSuffix(initial.URL.Path, "/") == strings.TrimSuffix(t.root.Path, "/") {
 		var root struct {
 			ProtocolFeaturesSupported struct{ MultipleHTTPRequests *bool }
 		}

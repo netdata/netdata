@@ -235,18 +235,24 @@ func TestSDKAcquisitionPreservesCounterTokensAndResponseTime(t *testing.T) {
 }
 
 func TestSDKCollectionHonorsRequestConcurrency(t *testing.T) {
-	for _, serial := range []bool{false, true} {
-		t.Run(fmt.Sprintf("serial=%v", serial), func(t *testing.T) {
+	for _, tc := range []struct{ serial, redirect bool }{
+		{false, false}, {true, false}, {false, true}, {true, true},
+	} {
+		t.Run(fmt.Sprintf("serial=%v/redirect=%v", tc.serial, tc.redirect), func(t *testing.T) {
 			var active, peak atomic.Int64
 			const root = "/redfish/v1/"
 			const chassis = root + "Chassis/1"
 			const sensors = chassis + "/Sensors"
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
-				case root:
-					testutil.WriteJSON(w, testutil.Resource(root, "ServiceRoot", "Root", map[string]any{
+				case root, root + "redirected":
+					if tc.redirect && r.URL.Path == root {
+						http.Redirect(w, r, root+"redirected", http.StatusTemporaryRedirect)
+						return
+					}
+					testutil.WriteJSON(w, testutil.Resource(r.URL.Path, "ServiceRoot", "Root", map[string]any{
 						"RedfishVersion": "1.20.0", "Chassis": testutil.Link(root + "Chassis"),
-						"ProtocolFeaturesSupported": map[string]any{"MultipleHTTPRequests": !serial},
+						"ProtocolFeaturesSupported": map[string]any{"MultipleHTTPRequests": !tc.serial},
 					}))
 				case root + "Chassis":
 					testutil.WriteJSON(w, testutil.Collection(r.URL.Path, "Chassis", chassis))
@@ -293,7 +299,7 @@ func TestSDKCollectionHonorsRequestConcurrency(t *testing.T) {
 			result, err := client.Acquire(t.Context())
 			require.NoError(t, err)
 			require.True(t, result.Complete)
-			if serial {
+			if tc.serial {
 				assert.Equal(t, int64(1), peak.Load())
 			} else {
 				assert.Equal(t, int64(2), peak.Load())

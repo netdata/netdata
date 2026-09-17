@@ -158,10 +158,15 @@ func TestLogsSessionsAreOwnedAndRecoveredIndependently(t *testing.T) {
 }
 
 func TestLogsShareRequestBudgetWithoutHoldingCollection(t *testing.T) {
-	for _, multiple := range []bool{true, false} {
-		t.Run(fmt.Sprint(multiple), func(t *testing.T) {
+	for _, tc := range []struct{ multiple, redirect bool }{
+		{true, false}, {false, false}, {true, true}, {false, true},
+	} {
+		t.Run(fmt.Sprintf("multiple=%v/redirect=%v", tc.multiple, tc.redirect), func(t *testing.T) {
 			docs := testutil.LogDocuments(0)
-			docs["/redfish/v1/"]["ProtocolFeaturesSupported"] = map[string]any{"MultipleHTTPRequests": multiple}
+			docs["/redfish/v1/"]["ProtocolFeaturesSupported"] = map[string]any{"MultipleHTTPRequests": tc.multiple}
+			if tc.redirect {
+				docs["/redfish/v1/"]["@odata.id"] = "/redfish/v1/redirected"
+			}
 			arrived := make(chan struct{}, 1)
 			var current, peak atomic.Int64
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -181,6 +186,16 @@ func TestLogsShareRequestBudgetWithoutHoldingCollection(t *testing.T) {
 					<-r.Context().Done()
 					return
 				}
+				if tc.redirect {
+					switch r.URL.Path {
+					case "/redfish/v1/":
+						http.Redirect(w, r, "/redfish/v1/redirected", http.StatusTemporaryRedirect)
+						return
+					case "/redfish/v1/redirected":
+						testutil.WriteJSON(w, docs["/redfish/v1/"])
+						return
+					}
+				}
 				testutil.WriteJSON(w, docs[r.URL.RequestURI()])
 			}))
 			t.Cleanup(server.Close)
@@ -198,7 +213,7 @@ func TestLogsShareRequestBudgetWithoutHoldingCollection(t *testing.T) {
 			}
 			collected := make(chan error, 1)
 			go func() { _, err := client.Acquire(ctx); collected <- err }()
-			if multiple {
+			if tc.multiple {
 				select {
 				case err := <-collected:
 					require.NoError(t, err)
@@ -222,7 +237,7 @@ func TestLogsShareRequestBudgetWithoutHoldingCollection(t *testing.T) {
 			case <-time.After(asyncTestTimeout):
 				t.Fatal("log cancellation did not settle")
 			}
-			if !multiple {
+			if !tc.multiple {
 				select {
 				case err := <-collected:
 					require.ErrorIs(t, err, context.Canceled)
