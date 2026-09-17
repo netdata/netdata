@@ -238,6 +238,7 @@ struct rrdeng_file_deletion {
     char path[RRDENG_PATH_MAX];
     size_t bytes;
     bool datafile;
+    unsigned retries;
     int result;
 };
 
@@ -321,7 +322,14 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
 }
 
 static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused) {
-    struct rrdeng_file_deletion *next = rrdeng_file_deletion_finish(work->data);
+    struct rrdeng_file_deletion *deletion = work->data;
+    if (deletion->result != 0 && deletion->result != UV_ENOENT && deletion->retries < 3) {
+        deletion->retries++;
+        if (uv_queue_work(&rrdeng_main.loop, &deletion->work,
+                          rrdeng_file_deletion_worker, rrdeng_file_deletion_after) == 0)
+            return;
+    }
+    struct rrdeng_file_deletion *next = rrdeng_file_deletion_finish(deletion);
     if (next)
         rrdeng_file_deletion_start(next);
 }

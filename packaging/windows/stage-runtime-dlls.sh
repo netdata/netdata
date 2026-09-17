@@ -65,7 +65,6 @@ copy_missing_dlls_once() {
     local copied=0
     local unresolved=()
     local dll
-    local resolved
     local source
 
     local dependency_output
@@ -85,11 +84,6 @@ copy_missing_dlls_once() {
                 dll="${dll#"${dll%%[![:space:]]*}"}"
                 dll="${dll%"${dll##*[![:space:]]}"}"
                 dll="${dll##*/}"
-                resolved="${line#*=>}"
-                resolved="${resolved%%(*}"
-                resolved="${resolved#"${resolved%%[![:space:]]*}"}"
-                resolved="${resolved%"${resolved##*[![:space:]]}"}"
-
                 if is_msys_dll "${dll}"; then
                     unresolved+=("${dll} (MSYS runtime dependency)")
                     continue
@@ -100,9 +94,6 @@ copy_missing_dlls_once() {
                 fi
 
                 source="${runtime_dll_dir}/${dll}"
-                if [ ! -f "${source}" ] && [ -f "${resolved}" ]; then
-                    source="${resolved}"
-                fi
 
                 if [ ! -f "${source}" ]; then
                     unresolved+=("${dll}")

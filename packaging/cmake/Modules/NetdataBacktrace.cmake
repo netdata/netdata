@@ -31,6 +31,12 @@ function(netdata_bundle_libbacktrace)
                 if(NOT BASH_EXECUTABLE)
                         message(FATAL_ERROR "MSYS2 bash not found; install it under MSYS2/usr/bin")
                 endif()
+                get_filename_component(_BT_MSYS_BIN "${BASH_EXECUTABLE}" DIRECTORY)
+                find_program(_BT_MAKE_EXECUTABLE NAMES make.exe make
+                             HINTS "${_BT_MSYS_BIN}" NO_DEFAULT_PATH)
+                if(NOT _BT_MAKE_EXECUTABLE)
+                        message(FATAL_ERROR "MSYS2 make not found next to the selected bash")
+                endif()
                 set(_bt_configure_cmd ${BASH_EXECUTABLE} "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
         else()
                 set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
@@ -43,7 +49,7 @@ function(netdata_bundle_libbacktrace)
                 SOURCE_DIR "${libbacktrace_SOURCE_DIR}"
                 BINARY_DIR "${libbacktrace_BINARY_DIR}"
                 CONFIGURE_COMMAND ${_bt_configure_cmd}
-                BUILD_COMMAND make install
+                BUILD_COMMAND ${_BT_MAKE_EXECUTABLE} install
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS "${libbacktrace_LIBRARY}"
                 EXCLUDE_FROM_ALL 1
