@@ -1922,10 +1922,9 @@ if(ENABLE_DBENGINE)
     # (database/engine/include/dbengine/<name>.h), which resolves through libnetdata's src/ include path; the
     # target declares no include directories of its own, so the layout documents the public surface and the
     # target compiles the engine as one unit. It is a statement, not a guard: libnetdata exports src/, so a private
-    # engine header stays reachable by its path. Being a static archive, an engine object that is only referenced
-    # by its own constructors would be dropped from the link silently; today every constructor lives in an object
-    # that is referenced by name as well (rrdengine.c, rrdengineapi.c), and that must stay so (CMake 3.16 has no
-    # WHOLE_ARCHIVE). The published statistics structs (dbengine-stats.h) are assembled by both this target and
+    # engine header stays reachable by its path. It is an object library, not a static archive, so every engine
+    # object is linked whether or not something references it by name: a constructor-only object cannot be dropped
+    # from the link. The published statistics structs (dbengine-stats.h) are assembled by both this target and
     # netdata, and their layout depends on the compile-time switches in that header: never give one target a
     # definition the other does not get, or the snapshots pulse copies across the boundary silently misalign.
     set(DBENGINE_FILES
@@ -3701,7 +3700,7 @@ elseif(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
 endif()
 
 if(ENABLE_DBENGINE)
-    add_library(dbengine STATIC ${DBENGINE_FILES})
+    add_library(dbengine OBJECT ${DBENGINE_FILES})
     target_link_libraries(dbengine PUBLIC libnetdata)
 endif()
 

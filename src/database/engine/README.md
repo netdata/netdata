@@ -195,7 +195,7 @@ The engine is a component of the `netdata` binary, sealed in both directions. It
 `src/database/engine/` include or call nothing of the daemon, and the daemon sees the engine only through its public
 headers under `include/dbengine/`, included from the source root as `database/engine/include/dbengine/<name>.h`;
 `rrdengineapi.h` does not include the private `rrdengine.h`, so an engine instance is an opaque pointer outside this
-directory (the storage vtable's `STORAGE_INSTANCE` is that pointer). The engine is built as its own static library
+directory (the storage vtable's `STORAGE_INSTANCE` is that pointer). The engine is built as its own object library
 target, `dbengine`, linked into `netdata`; the target declares no include directories, so the layout states the
 public surface and the build compiles the engine as one unit. The public headers:
 
@@ -229,6 +229,5 @@ collect handle holds, belongs in `rrdengineapi-unittest.c`, which the daemon dri
 The daemon depends on the engine, not the other way round, and owns `netdata.conf` parsing, sqlite, streaming and the
 charts. The seal is enforced by review, not by the build: libnetdata exports the whole `src/` tree as an include
 path, so a private engine header is still reachable from anywhere by its path, and the `dbengine` target is a
-statement of the boundary rather than a guard. Being a static archive, an engine object referenced only by its own
-constructors would be dropped from the link silently; every constructor today lives in an object that is also
-referenced by name, and a new one must too.
+statement of the boundary rather than a guard. Being an object library, every engine object is linked whether or not
+something references it by name, so a constructor-only object cannot be dropped from the link.
