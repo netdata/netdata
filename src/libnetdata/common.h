@@ -854,11 +854,39 @@ static inline int statfs(const char *path __maybe_unused, struct statfs *buf __m
 // stat()-based type check (the DT_UNKNOWN branch is always guarded in paths.c).
 #ifndef DT_UNKNOWN
 #define DT_UNKNOWN  0
-#define DT_DIR      4
-#define DT_REG      8
-#define DT_LNK     10
-#define d_type      d_ino
 #endif
+#ifndef DT_DIR
+#define DT_DIR      4
+#endif
+#ifndef DT_REG
+#define DT_REG      8
+#endif
+#ifndef DT_LNK
+#define DT_LNK      10
+#endif
+
+// Return entry type portably; UCRT64 has no dirent::d_type member.
+static inline unsigned char nd_dirent_type(const char *directory, const struct dirent *entry) {
+#if defined(OS_WINDOWS)
+    if (!directory || !entry)
+        return DT_UNKNOWN;
+    char path[FILENAME_MAX + 1];
+    int n = snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+    if (n < 0 || (size_t)n >= sizeof(path))
+        return DT_UNKNOWN;
+    struct stat st;
+    if (stat(path, &st) != 0)
+        return DT_UNKNOWN;
+    if (S_ISDIR(st.st_mode)) return DT_DIR;
+    if (S_ISREG(st.st_mode)) return DT_REG;
+#ifdef S_ISLNK
+    if (S_ISLNK(st.st_mode)) return DT_LNK;
+#endif
+    return DT_UNKNOWN;
+#else
+    return entry->d_type;
+#endif
+}
 
 // ── strerror_r() ── POSIX XSI variant, absent from UCRT64 ────────────────────
 // Windows provides strerror_s() with reversed argument order and returns errno.

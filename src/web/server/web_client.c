@@ -1327,6 +1327,14 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     return HTTP_RESP_NOT_FOUND;
 }
 
+static inline bool web_client_startup_gate(void) {
+#if defined(OS_WINDOWS)
+    return !netdata_ready_load();
+#else
+    return false;
+#endif
+}
+
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_service_unavailable(w);
@@ -1344,11 +1352,11 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
         if(likely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {                           // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
-            if(unlikely(!netdata_ready_load())) {
+            if(unlikely(web_client_startup_gate())) {
                 // The local dashboard cannot boot without this response and does not retry a 503.
                 // Keep only its read-only bootstrap request pending until rrd_init() publishes localhost.
                 if(w->mode == HTTP_REQUEST_MODE_GET && http_can_access_dashboard(w) &&
-                   !strcmp(decoded_url_path, "v3/info")) {
+                   decoded_url_path && !strcmp(decoded_url_path, "v3/info")) {
                     if(!web_server_startup_wait_acquire())
                         return web_client_service_unavailable(w);
 
@@ -1363,14 +1371,14 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(likely(hash == url_hashes->mcp && strcmp(tok, "mcp") == 0)) {
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(web_client_startup_gate()))
                 return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_http_handle_request(host, w);
         }
         else if(likely(hash == url_hashes->sse && strcmp(tok, "sse") == 0)) {
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(web_client_startup_gate()))
                 return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
@@ -1378,7 +1386,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
         else if(unlikely((hash == url_hashes->host && strcmp(tok, "host") == 0) || (hash == url_hashes->node && strcmp(tok, "node") == 0))) { // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(web_client_startup_gate()))
                 return web_client_service_unavailable(w);
             return web_client_switch_host(host, w, decoded_url_path, hash == url_hashes->node, web_client_process_url);
         }
@@ -1407,7 +1415,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return web_client_process_url(host, w, decoded_url_path);
         }
         else if(unlikely(hash == url_hashes->netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(web_client_startup_gate()))
                 return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
@@ -1421,7 +1429,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         else if(unlikely(hash == url_hashes->exit && strcmp(tok, "exit") == 0)) {
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(web_client_startup_gate()))
                 return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
@@ -1439,7 +1447,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == url_hashes->debug && strcmp(tok, "debug") == 0)) {
-            if(unlikely(!netdata_ready_load()))
+            if(unlikely(web_client_startup_gate()))
                 return web_client_service_unavailable(w);
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);

@@ -245,23 +245,31 @@ static void rrdeng_file_deletion_worker(uv_work_t *work) {
     struct rrdeng_file_deletion *deletion = work->data;
     uv_fs_t request = { 0 };
 
+    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
+    register_libuv_worker_jobs();
+    worker_is_busy(UV_EVENT_WORKER_INIT);
     deletion->result = uv_fs_unlink(NULL, &request, deletion->path, NULL);
     uv_fs_req_cleanup(&request);
+    worker_is_idle();
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 }
 
 static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused);
-static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion);
+static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion);
 
 static void rrdeng_file_deletion_start(struct rrdeng_file_deletion *deletion) {
-    int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
-                           rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
-    if (unlikely(rc)) {
+    while (deletion) {
+        int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
+                               rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
+        if (likely(rc == 0))
+            return;
+
         deletion->result = rc;
-        rrdeng_file_deletion_finish(deletion);
+        deletion = rrdeng_file_deletion_finish(deletion);
     }
 }
 
-static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
+static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
     struct rrdengine_instance *ctx = deletion->ctx;
 
     if (deletion->result == 0) {
@@ -283,8 +291,12 @@ static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
         __atomic_sub_fetch(&ctx->atomic.pending_deletion_bytes, deletion->bytes, __ATOMIC_RELAXED);
 
     spinlock_lock(&ctx->deletion.spinlock);
-    fatal_assert(__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED) != 0);
-    __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELAXED);
+    if (unlikely(__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED) == 0)) {
+        spinlock_unlock(&ctx->deletion.spinlock);
+        netdata_log_error("DBENGINE: deletion queue accounting underflow for '%s'", deletion->path);
+        freez(deletion);
+        return NULL;
+    }
     struct rrdeng_file_deletion *next = ctx->deletion.head;
     if (next) {
         ctx->deletion.head = next->next;
@@ -299,10 +311,13 @@ static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
 
     if (next)
         rrdeng_file_deletion_start(next);
+
+    __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELEASE);
+    return NULL;
 }
 
 static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused) {
-    rrdeng_file_deletion_finish(work->data);
+    (void)rrdeng_file_deletion_finish(work->data);
 }
 
 int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *path, size_t bytes, bool datafile) {
@@ -345,12 +360,19 @@ int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *pa
 
 void rrdeng_file_deletion_drain(struct rrdengine_instance *ctx) {
     bool logged = false;
-    while (__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED)) {
+    usec_t deadline = now_monotonic_usec() + 30 * USEC_PER_SEC;
+    while (__atomic_load_n(&ctx->deletion.pending, __ATOMIC_ACQUIRE)) {
         if (!logged) {
             netdata_log_info("DBENGINE: tier %d: waiting for %zu queued file deletions...",
                              ctx->config.tier,
                              __atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED));
             logged = true;
+        }
+        if (now_monotonic_usec() >= deadline) {
+            netdata_log_error("DBENGINE: tier %d: timed out waiting for queued file deletions (%zu remain)",
+                              ctx->config.tier,
+                              __atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED));
+            break;
         }
         sleep_usec(10 * USEC_PER_MS);
     }

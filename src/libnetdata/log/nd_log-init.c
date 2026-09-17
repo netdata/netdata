@@ -230,7 +230,13 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 #else
             const char *log_path = e->filename;
 #endif
-            int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0640);
+            int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
+#if defined(OS_WINDOWS)
+                          0640
+#else
+                          0664
+#endif
+            );
             if(fd == -1) {
                 if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
                     e->fd = STDERR_FILENO;
@@ -286,7 +292,13 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_stdin_init(int fd, const char *filename) {
-    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0640);
+    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT,
+#if defined(OS_WINDOWS)
+                 0640
+#else
+                 0664
+#endif
+    );
     if(f == -1)
         return;
 

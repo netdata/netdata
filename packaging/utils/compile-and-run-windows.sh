@@ -23,12 +23,12 @@ if [ "${1:-}" = "service" ]; then
     RUN_AS_SERVICE=1
 fi
 
+# shellcheck source=../windows/win-build-dir.sh
+. "${REPO_ROOT}/packaging/windows/win-build-dir.sh"
+
 set -eu -o pipefail
 
 "${REPO_ROOT}/packaging/windows/compile-on-windows.sh"
-
-# shellcheck source=../windows/win-build-dir.sh
-. "${REPO_ROOT}/packaging/windows/win-build-dir.sh"
 
 echo "Stopping service Netdata..."
 sc stop "Netdata" || echo "stop Failed, ok"

@@ -717,7 +717,15 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     posix_memalign_freez(superblock);
 
     if (ret < 0) {
-        journalfile_destroy_unsafe(journalfile, datafile);
+        // This path may be retried with the same fileno. Remove the failed
+        // journal synchronously so an asynchronous deletion cannot race the
+        // next creation attempt and delete its replacement.
+        (void)close_uv_file(datafile, journalfile->file);
+        journalfile->file = 0;
+        uv_fs_t unlink_req;
+        if (uv_fs_unlink(NULL, &unlink_req, path, NULL) < 0)
+            netdata_log_error("DBENGINE: failed to remove incomplete journal '%s'", path);
+        uv_fs_req_cleanup(&unlink_req);
         ctx_io_error(ctx);
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
         nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create journlfile \"%s\"", path);

@@ -589,7 +589,6 @@ int init_data_files(struct rrdengine_instance *ctx)
         return ret;
     } else if (0 == ret) {
         netdata_log_info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
-        ctx_last_fileno_set(ctx, 0);
         ret = create_new_datafile_pair(ctx);
         if (ret) {
             netdata_log_error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);

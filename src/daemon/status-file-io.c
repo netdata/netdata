@@ -166,13 +166,25 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     flags |= O_NOFOLLOW;
 #endif
 
-    int fd = open(temp, flags | O_CREAT | O_EXCL, 0660);
+    int fd = open(temp, flags | O_CREAT | O_EXCL,
+#if defined(OS_WINDOWS)
+                  0660
+#else
+                  0664
+#endif
+    );
     bool reuse = false;
     if (fd == -1) {
         if (errno != EEXIST)
             return false;
         // File exists from a prior interrupted save; truncate it.
-        fd = open(temp, flags, 0660);
+        fd = open(temp, flags,
+#if defined(OS_WINDOWS)
+                  0660
+#else
+                  0664
+#endif
+        );
         if (fd == -1)
             return false;
         reuse = true;
@@ -215,7 +227,13 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Set permissions using chmod() */
-    if (fchmod(fd, 0660) != 0) {
+    if (fchmod(fd,
+#if defined(OS_WINDOWS)
+               0660
+#else
+               0664
+#endif
+               ) != 0) {
         close(fd);
         unlink(temp);
         return false;

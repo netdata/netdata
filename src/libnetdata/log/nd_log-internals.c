@@ -783,7 +783,7 @@ ND_LOG_SOURCES nd_log_resolve_source_from_stack(ND_LOG_SOURCES source) {
 }
 
 bool nd_log_source_has_flood_protection(ND_LOG_SOURCES source) {
-    return source > NDLS_UNSET && source < _NDLS_MAX;
+    return source == NDLS_DAEMON || source == NDLS_COLLECTORS;
 }
 
 ND_LOG_SOURCES nd_log_resolve_source_with_flood_protection(ND_LOG_SOURCES source, bool *limit) {

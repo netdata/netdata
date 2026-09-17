@@ -1043,13 +1043,25 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     // because line 897 above already updated session_status.status before this
     // guard runs, so checking session_status.status alone is insufficient.
     // Also skip when still initializing or during shutdown.
-    if(status == DAEMON_STATUS_NONE && session_status.status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get())
+    if(
+#if defined(OS_WINDOWS)
+        status == DAEMON_STATUS_NONE && session_status.status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get()
+#else
+        true
+#endif
+    )
         session_status.metrics_metadata = rrdstats_metadata_collect();
 
     // Update disk footprint at most once every 10 minutes (600 seconds).
     // Skip entirely during shutdown — dir_size_multiple walks the filesystem
     // and can block long enough to trigger error 1053.
-    if (!exit_initiated_get()) {
+    if (
+#if defined(OS_WINDOWS)
+        !exit_initiated_get()
+#else
+        true
+#endif
+    ) {
         if ((now_ut - session_status.disk_footprint.last_updated_ut) >= 600 * USEC_PER_SEC ||
             session_status.disk_footprint.last_updated_ut == 0) {
             // Calculate disk footprint by categories
