@@ -3850,6 +3850,11 @@ if(ENABLE_ALARM_NOTIFY_GO)
         set(ALARM_NOTIFY_GO_BIN alarm-notify)
     endif()
     add_go_target(alarm-notify-go ${ALARM_NOTIFY_GO_BIN} src/health/notifications/alarm-notify .)
+    add_custom_command(OUTPUT ${ALARM_NOTIFY_GO_BIN} APPEND
+        DEPENDS
+            src/health/notifications/alarm-notify/internal/legacycustom/helpers.sh
+            src/health/notifications/alarm-notify/internal/legacycustom/presentation.sh
+    )
 endif()
 
 #
