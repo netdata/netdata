@@ -8,11 +8,31 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/awssns"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/email"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/irc"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/smstools3"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/syslog"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
+
+func buildAWSSNS(b *builder, recipients []string) ([]notifier.Sender, error) {
+	if b.values["AWSSNS_CREDENTIAL_SOURCE"] == "" {
+		return nil, errors.New("AWSSNS_CREDENTIAL_SOURCE must select static, web_identity, ecs or imds; ambient AWS credentials are not inherited")
+	}
+	env := make(map[string]string)
+	for key, value := range b.values {
+		if strings.HasPrefix(key, "AWS_") && value != "" {
+			env[key] = value
+		}
+	}
+	return each(recipients, func(r string) (notifier.Sender, error) {
+		return awssns.New(awssns.Config{
+			Secrets: secret.LiteralInput, Executable: b.values["aws"], Env: env, TargetARN: r,
+			CredentialSource: b.values["AWSSNS_CREDENTIAL_SOURCE"], LegacyMessage: b.values["AWSSNS_MESSAGE_FORMAT"],
+		}, b.runner)
+	})
+}
 
 func buildEmail(b *builder, recipients []string) ([]notifier.Sender, error) {
 	return one(email.New(email.Config{Executable: b.values["sendmail"], From: b.values["EMAIL_SENDER"], Recipients: recipients, PlainTextOnly: new(b.values["EMAIL_PLAINTEXT_ONLY"] == "YES"), Threading: new(b.values["EMAIL_THREADING"] != "NO")}, b.runner))

@@ -37,6 +37,15 @@ func TestRunLegacyChatMapping(t *testing.T) {
 			method: "slack", settings: `SLACK_WEBHOOK_URL='ENDPOINT/slack'; DEFAULT_RECIPIENT_SLACK=unused; role_recipients_slack[ops]='one|nowarn #two|critical @three'; role_recipients_slack[all]='#two'`,
 			targets: []target{{path: "/slack", channel: "#two"}, {path: "/slack", channel: "@three"}},
 		},
+		"Slack empty image base": {
+			method: "slack", settings: `SLACK_WEBHOOK_URL='ENDPOINT/slack'; DEFAULT_RECIPIENT_SLACK='#ops'; images_base_url=''`,
+			targets: []target{{path: "/slack", channel: "#ops"}},
+		},
+		"Slack overlay clears image base": {
+			method: "slack", stock: true,
+			settings: `SLACK_WEBHOOK_URL='ENDPOINT/slack'; DEFAULT_RECIPIENT_SLACK='#ops'; images_base_url='https://example.test/assets'`,
+			overlay:  `images_base_url=''`, targets: []target{{path: "/slack", channel: "#ops"}},
+		},
 		"Slack stock overlay and custom icon": {
 			method: "slack", stock: true, status: "CRITICAL",
 			settings: `SLACK_WEBHOOK_URL='ENDPOINT/slack'; DEFAULT_RECIPIENT_SLACK='#ops'; images_base_url='https://example.test/assets'`,

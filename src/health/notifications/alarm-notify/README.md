@@ -228,6 +228,7 @@ attempted successes and failures; filtering happens before the plan is built, so
 | Method | Legacy settings and recipient meaning |
 |---|---|
 | `alerta` | `ALERTA_WEBHOOK_URL`, optional `ALERTA_API_KEY`; recipient is the environment |
+| `awssns` | `aws`, `AWSSNS_CREDENTIAL_SOURCE`, mode-specific `AWS_*` assignments, optional `AWSSNS_MESSAGE_FORMAT`; recipient is an SNS topic or platform endpoint ARN (see below) |
 | `discord` | `DISCORD_WEBHOOK_URL`; recipients gate the single native webhook send |
 | `dynatrace` | `DYNATRACE_SERVER`, `DYNATRACE_SPACE`, `DYNATRACE_TOKEN`, `DYNATRACE_TAG_VALUE`, `DYNATRACE_EVENT`, optional `DYNATRACE_ANNOTATION_TYPE`; global Events API v2 send |
 | `email` | `sendmail`, `EMAIL_SENDER`, `EMAIL_PLAINTEXT_ONLY=YES`, `EMAIL_THREADING` (enabled unless `NO`); recipients are mail addresses/local users |
@@ -256,7 +257,7 @@ attempted successes and failures; filtering happens before the plan is built, so
 | `kafka` | `KAFKA_URL`, `KAFKA_SENDER_IP`; global send |
 | `signl4` | `SIGNL4_WEBHOOK_URL`; global send |
 
-The four implemented command mappings (email, SMS, syslog and IRC) use an explicit absolute executable path or
+The five implemented command mappings (email, SMS, syslog, IRC and AWS SNS) use an explicit absolute executable path or
 discovery in the invoking process's `PATH`. A missing discovered tool disables its method; an explicit path is
 validated by the native provider and attempted during delivery.
 `SEND_EMAIL=AUTO` checks sendmail availability. Child processes retain the native isolated environment, not the parent
@@ -271,8 +272,11 @@ reference. Native YAML retains its existing lazy secret-reference behavior. The 
 YAML option.
 
 Available initial event scalars are `roles`, `host`, `args_host`, `when` (Unix seconds), `name`, `chart`, `context`,
-`status`, `old_status`, `units`, `info`, `summary`, `value`, `old_value`, `duration` and `non_clear_duration`.
-Missing optional numeric facts are empty. There is no ambient environment import or invented Bash alarm/event ID.
+`status`, `old_status`, `units`, `info`, `summary`, `value`, `old_value`, `duration`, `non_clear_duration`,
+`date`, `value_string`, `old_value_string` and `status_message`. `date` is the event timestamp in UTC RFC3339;
+the value strings include units when the numeric value is present. Missing optional numeric facts are empty,
+while zero remains `0` (or `0 <units>`). `status_message` is `needs attention`, `is critical` or `recovered`.
+All these facts are initialized before configuration evaluation. There is no ambient environment import or invented Bash alarm/event ID.
 The senders use the current native event content and provider formatting, including already documented corrections;
 this is not byte-for-byte Bash output. Unknown scalar settings can serve as intermediate assignment variables but
 have no independent delivery effect.
@@ -285,17 +289,58 @@ settings derived during evaluation retain their assignment-time expansions. Use 
 contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
 implementation.
 
-Two retained legacy mappings remain pending: AWS SNS credentials/message templates and Unix `custom_sender()`
-execution. Enabled, configured selections fail before any sends once applicable recipient requirements are met.
-The check does not probe AWS CLI availability or require a custom global default when a role already selects a
-custom recipient. It exposes pending work rather than attempting those unimplemented runtime checks. HipChat is
-explicitly excluded and also errors when eligible. Function bodies remain inert, including `custom_sender()` and
-helpers; no original configuration file is sourced.
+The remaining legacy mapping is Unix `custom_sender()` execution. Enabled, configured selections fail before
+any sends once applicable recipient requirements are met, including a role recipient without a global default.
+HipChat is explicitly excluded and also errors when eligible. Function bodies remain inert, including
+`custom_sender()` and helpers; no original configuration file is sourced.
 
-Five Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
+Six Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
 PagerDuty/Prowl/ntfy can use role recipients without a global default; ntfy sends the resolved filtered recipients;
-Fleep does not require the unused `FLEEP_SERVER` setting; and Teams sends once per distinct resolved URL.
-Production Bash and installation remain unchanged.
+Fleep does not require the unused `FLEEP_SERVER` setting; Teams sends once per distinct resolved URL; and SNS
+message assignments can use `date` and `status_message` before configuration evaluation instead of expanding them
+to empty strings. Production Bash and installation remain unchanged.
+
+### Legacy AWS SNS settings
+
+SNS uses the existing [AWS CLI v2 sender](#aws-sns), with the same isolated environment, private temporary home,
+ARN-derived region and delivery limits. Configure `aws` as an absolute path or leave it empty to discover `aws`
+in the invoking process's `PATH`. Missing discovery disables SNS. An eligible SNS target requires an explicit
+`AWSSNS_CREDENTIAL_SOURCE`; credentials from the invoking process, home directory or AWS profiles are not inherited.
+Use **ordinary assignments**, not `export` statements:
+
+```sh
+SEND_AWSSNS=YES
+aws=/usr/local/bin/aws
+AWSSNS_CREDENTIAL_SOURCE=static
+AWS_ACCESS_KEY_ID='REPLACE_WITH_ACCESS_KEY'
+AWS_SECRET_ACCESS_KEY='REPLACE_WITH_SECRET_KEY'
+DEFAULT_RECIPIENT_AWSSNS='arn:aws:sns:us-east-1:123456789012:alerts'
+role_recipients_awssns[ops]="$DEFAULT_RECIPIENT_AWSSNS"
+AWSSNS_MESSAGE_FORMAT="${status} on ${host} at ${date}: ${chart} ${value_string}"
+```
+
+The credential source and fields match the native provider:
+
+| `AWSSNS_CREDENTIAL_SOURCE` | Required assignments | Optional assignments |
+|---|---|---|
+| `static` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | `AWS_SESSION_TOKEN` |
+| `web_identity` | `AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE` (absolute path) | `AWS_ROLE_SESSION_NAME` |
+| `ecs` | `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` (path on the fixed ECS metadata endpoint) | None |
+| `imds` | None; explicitly permits the standard EC2 metadata credential source | None |
+
+Empty optional fields are omitted. Nonempty `AWS_*` assignments outside the selected mode are rejected before any
+selected delivery, including wrong-mode credentials, profiles and endpoint overrides. These values stay literal:
+`${env:...}` and `${file:...}` are native YAML features, not secret references in shell-format configuration.
+`AWS_WEB_IDENTITY_TOKEN_FILE` retains its AWS CLI meaning: a file read by the CLI when it needs the identity token.
+There is no implicit credential source or fallback to profiles. Use the explicit source that matches the deployment.
+
+`AWSSNS_MESSAGE_FORMAT` is expanded **once, at assignment time**, by the native legacy reader. The resulting text
+is sent literally; native `{{field}}` placeholders, shell-looking text and `file://` prefixes are not interpreted again.
+Single-quoted references stay literal. A later variable assignment does not change an earlier message assignment;
+reassign the format in the later file to use new values. Empty/unset format uses the native default body.
+The subject keeps the native status wording. Messages must be valid UTF-8 and at most 262144 bytes; subjects must
+be under 100 characters without controls or line breaks. There is no Bash locale/date-format processing or support
+for richer event facts absent from the native event contract.
 
 ### Legacy ilert, Opsgenie and Dynatrace settings
 
@@ -371,9 +416,9 @@ DEFAULT_RECIPIENT_SLACK='#operations @oncall #'
 
 Each distinct eligible recipient produces a request. A bare name becomes `#name`, `#channel` and `@user` remain intact,
 and `#` omits the channel field to use the webhook's default. The sender name is `netdata on <event node>`. The icon is
-`https://registry.my-netdata.io/images/banner-icon-144x144.png`; setting `images_base_url` replaces its base. The final
-icon URL must be absolute HTTP(S) and at most 255 characters. This customization is currently supported only when
-Slack is the sole eligible method; artwork for other providers remains pending. Slack keeps the native alert content,
+`https://registry.my-netdata.io/images/banner-icon-144x144.png`; a nonempty `images_base_url` replaces its base.
+An unset or empty value uses the default. The final icon URL must be absolute HTTP(S) and at most 255 characters.
+This customization is currently supported only when Slack is the sole eligible method; artwork for other providers remains pending. Slack keeps the native alert content,
 status colors and escaping. These legacy overrides are internal to `send-legacy`, not new YAML fields.
 
 Teams uses the already supported [Workflows setup](#microsoft-teams-workflows), with its trigger set to **Anyone**.
@@ -2228,7 +2273,8 @@ Durations render as whole seconds. Additional fields are `status_message` (the s
 wording), `value_string` and `previous_value_string` (number plus units). Missing optional values become empty strings.
 Whitespace around a placeholder name is ignored. Write `{{{{` to emit a literal `{{`. Unknown or unclosed placeholders
 fail configuration validation. Substitution happens once: inserted text is not evaluated, shell syntax is literal,
-and templates do not resolve secret references. Richer Bash facts and its shell-format syntax remain later work.
+and templates do not resolve secret references. For shell-format message assignments, use the
+[legacy SNS mapping](#legacy-aws-sns-settings). Richer Bash facts remain later work.
 
 The adapter sends `TargetArn`, `Subject` and `Message` as JSON on stdin via `--cli-input-json file:///dev/stdin`.
 This avoids putting event text on the command line or treating text beginning with `file://` as a file to read.

@@ -9,6 +9,7 @@ import (
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/alerta"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/awssns"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/discord"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/dynatrace"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/fleep"
@@ -38,6 +39,7 @@ import (
 
 func TestProviderInputModeCannotBeSetThroughYAML(t *testing.T) {
 	for name, test := range map[string]struct{ factory config.FactoryFunc }{
+		"awssns":      {factory: config.Factory(func(awssns.Config) (notifier.Sender, error) { return nil, nil })},
 		"dynatrace":   {factory: config.Factory(func(dynatrace.Config) (notifier.Sender, error) { return nil, nil })},
 		"ilert":       {factory: config.Factory(func(ilert.Config) (notifier.Sender, error) { return nil, nil })},
 		"opsgenie":    {factory: config.Factory(func(opsgenie.Config) (notifier.Sender, error) { return nil, nil })},
@@ -64,7 +66,11 @@ func TestProviderInputModeCannotBeSetThroughYAML(t *testing.T) {
 		"slack":       {factory: config.Factory(func(slack.Config) (notifier.Sender, error) { return nil, nil })},
 	} {
 		t.Run(name, func(t *testing.T) {
-			for key, value := range map[string]string{"secrets": "1", "Secrets": "1", "input_mode": "1"} {
+			keys := map[string]string{"secrets": "1", "Secrets": "1", "input_mode": "1"}
+			if name == "awssns" {
+				keys["legacy_message"], keys["LegacyMessage"] = "literal", "literal"
+			}
+			for key, value := range keys {
 				t.Run(key, func(t *testing.T) {
 					data := "version: 1\ndestinations:\n  dev:\n    type: " + name + "\n    " + key + ": " + value + "\n"
 					got, err := config.Read(strings.NewReader(data), config.Registry{name: test.factory})
