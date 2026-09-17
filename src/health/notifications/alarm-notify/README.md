@@ -273,10 +273,12 @@ YAML option.
 
 Available initial event scalars are `roles`, `host`, `args_host`, `when` (Unix seconds), `name`, `chart`, `context`,
 `status`, `old_status`, `units`, `info`, `summary`, `value`, `old_value`, `duration`, `non_clear_duration`,
-`date`, `value_string`, `old_value_string` and `status_message`. `date` is the event timestamp in UTC RFC3339;
-the value strings include units when the numeric value is present. Missing optional numeric facts are empty,
-while zero remains `0` (or `0 <units>`). `status_message` is `needs attention`, `is critical` or `recovered`.
-All these facts are initialized before configuration evaluation. There is no ambient environment import or invented Bash alarm/event ID.
+`date`, `value_string`, `old_value_string` and `status_message`. The optional [producer context](#producer-context)
+adds the other Bash input scalars listed below. `date` is the event timestamp in UTC RFC3339. Supplied value strings
+are preserved; otherwise they include units when the numeric value is present. Missing optional numeric facts are
+empty, while zero remains `0` (or `0 <units>`). `status_message` is `needs attention`, `is critical` or `recovered`.
+All these facts are initialized before configuration evaluation. There is no ambient environment import or invented
+alarm/event ID. Producer-context keys are reserved event scalars even when their input is omitted.
 The senders use the current native event content and provider formatting, including already documented corrections;
 this is not byte-for-byte Bash output. Unknown scalar settings can serve as intermediate assignment variables but
 have no independent delivery effect.
@@ -284,8 +286,8 @@ have no independent delivery effect.
 These configured behaviors are rejected when applicable to eligible delivery: nonempty `curl`/`curl_options` for
 HTTP methods; non-UTF-8 `EMAIL_CHARSET` for email; configured nonempty `PATH` for command methods; nonempty
 `date_format`; nonempty `images_base_url` when any eligible method is not Slack; `use_fqdn=YES`/`clear_alarm_always=YES`;
-and final evaluated values of the event scalars above that differ from their initial values. Temporary assignments are allowed if those values are restored;
-settings derived during evaluation retain their assignment-time expansions. Use the native event/configuration
+and final evaluated values of any event or producer-context scalar that differ from their initial values. Temporary
+assignments are allowed if those values are restored; settings derived during evaluation retain their assignment-time expansions. Use the native event/configuration
 contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
 implementation.
 
@@ -339,8 +341,8 @@ is sent literally; native `{{field}}` placeholders, shell-looking text and `file
 Single-quoted references stay literal. A later variable assignment does not change an earlier message assignment;
 reassign the format in the later file to use new values. Empty/unset format uses the native default body.
 The subject keeps the native status wording. Messages must be valid UTF-8 and at most 262144 bytes; subjects must
-be under 100 characters without controls or line breaks. There is no Bash locale/date-format processing or support
-for richer event facts absent from the native event contract.
+be under 100 characters without controls or line breaks. There is no Bash locale/date-format processing.
+Message assignments can reference the optional producer-context scalars as well as the core event scalars.
 
 ### Legacy ilert, Opsgenie and Dynatrace settings
 
@@ -2368,8 +2370,61 @@ to SNS message templates. Other providers' duration presentation remains pending
 The input additionally accepts `critical_seen_since_clear`, a routing fact kept outside the public Event. A JSON
 boolean supplies known history; omitted/null means unknown. It is required only when a selected `critical` policy
 needs it, as described under **Destination status filters**, and never appears in provider payloads. No initial-CLEAR
-eligibility or history is inferred by the notifier; both belong to the producer. Keep future input-only routing facts
-separate from the public Event too.
+eligibility or history is inferred by the notifier; both belong to the producer. The optional `producer_context`
+object below also stays outside the public Event.
+
+### Producer context
+
+Both `send` and `send-legacy` accept an optional top-level `producer_context` object alongside the event fields.
+It carries additional caller-supplied facts for legacy settings and the future Bash custom-function adapter.
+Omitting it, using `null`, or using `{}` keeps existing input valid. All members are optional; unknown members or
+wrong JSON types reject the entire invocation before delivery, even when no destination needs these facts.
+Repeated `producer_context` fields and duplicate member names are rejected, including case-insensitive or
+JSON-escape-equivalent spellings.
+
+| Members | JSON type | Meaning / Bash scalar names |
+|---|---|---|
+| `unique_id`, `alarm_id`, `event_id` | Integer or null | Producer notification, alarm and per-alarm event IDs; same scalar names |
+| `src` | String or null | Alert configuration source location |
+| `value_string`, `old_value_string` | String or null | Caller-formatted current and previous values |
+| `calc_expression`, `calc_param_values` | String or null | Alert expression and its evaluation details |
+| `total_warnings`, `total_critical` | Integer or null | Counts of other active WARNING/CRITICAL alerts, excluding this alarm |
+| `total_warn_alarms`, `total_crit_alarms` | String or null | Producer's list text; the Agent uses comma-separated `name=Unix-timestamp` entries |
+| `classification`, `component`, `type` | String or null | Alert classification, component and type |
+| `edit_command_line` | String or null | Configuration-edit command text, carried as data |
+| `child_machine_guid`, `transition_id` | String or null | Producer host and transition identities, carried as opaque strings |
+
+Integers must be from `0` through `4294967295`, without fractions, exponents or quotes. Omitted/null numbers are
+unknown and expand to empty strings in legacy settings; explicit zero expands to `0`. IDs are not inferred from
+`incident_id` and do not replace the stable identity used by native incident providers. Counts and list strings
+are supplied independently; the notifier does not compute or reconcile them.
+
+Strings preserve whitespace, Unicode and shell-looking text; NUL is rejected because shell variables cannot carry it.
+Omitted/null strings become empty, except `value_string` and `old_value_string`: those fall back to the existing
+numeric-value-plus-units formatting. An explicitly supplied empty formatted string stays empty. Supplied formatted
+values are accepted even when the corresponding numeric value is unknown.
+
+For example, add this member to `examples/event.json`:
+
+```json
+"producer_context": {
+  "unique_id": 42,
+  "alarm_id": 7,
+  "event_id": 3,
+  "value_string": "42.50 C",
+  "total_warnings": 2,
+  "total_critical": 0,
+  "calc_expression": "$this > 40"
+}
+```
+
+Then a legacy assignment such as `AWSSNS_MESSAGE_FORMAT="$alarm_id: $value_string ($calc_expression)"` expands to
+`7: 42.50 C ($this > 40)` once, before delivery. No expression or command text is executed or expanded again.
+
+Producer context is input-only. It is excluded from webhook JSON, command stdin, provider raw-event attachments and
+native message templates. Legacy settings can explicitly include its scalars in supported message assignments.
+It does not change ordinary provider formatting. The Agent does not yet generate this JSON; development callers
+supply it. Bash custom execution and derived presentation/helpers remain the next increment.
 
 ## Internal packages
 
@@ -2383,8 +2438,8 @@ type Sender interface {
 
 A sender represents one configured destination. Success means the provider accepted the request; it does not promise
 that a human received the notification. The context carries the whole invocation deadline.
-The engine receives a `notifier.Notification` containing the public Event and input-only policy facts. It checks all
-selected policies before delivery, then passes only the public Event to each eligible sender.
+The engine receives a `notifier.Notification` containing the public Event, input-only policy facts and producer context.
+It checks all selected policies before delivery, then passes only the public Event to each eligible sender.
 
 | Package | Ownership |
 |---|---|

@@ -33,26 +33,30 @@ func TestRunLegacySNS(t *testing.T) {
 		source, status, arn, region, mode string
 		env                               map[string]string
 		configs                           []string
+		producerContext                   string
 		event                             event.Event
 		want                              string
 		code                              int
 		stock                             bool
 	}{
-		"stock format initialized":   {stock: true, want: defaultBody},
-		"unset format":               {want: defaultBody},
-		"empty format":               {configs: []string{`AWSSNS_MESSAGE_FORMAT=''`}, want: defaultBody},
-		"static literal credentials": {source: "static", env: map[string]string{"AWS_ACCESS_KEY_ID": "${env:SNS_TEST_UNREAD}", "AWS_SECRET_ACCESS_KEY": "${file:/unread/synthetic-private-value}", "AWS_SESSION_TOKEN": "synthetic-private-value"}, want: defaultBody},
-		"web identity critical":      {source: "web_identity", status: "CRITICAL", region: "eu-west-1", arn: "arn:aws:sns:eu-west-1:123456789012:alerts", env: map[string]string{"AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/notifier", "AWS_WEB_IDENTITY_TOKEN_FILE": "/unread/token", "AWS_ROLE_SESSION_NAME": "notifier-test"}, configs: []string{`AWSSNS_MESSAGE_FORMAT="$status_message: $value_string (was $old_value_string)"`}, want: "is critical: 42.5 C (was 0 C)"},
-		"ecs clear":                  {source: "ecs", status: "CLEAR", env: map[string]string{"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/credentials"}, configs: []string{`AWSSNS_MESSAGE_FORMAT="$status_message: $date"`}, want: "recovered: 2026-09-14T12:00:00Z"},
-		"zero and absent":            {event: zero, configs: []string{`AWSSNS_MESSAGE_FORMAT="[$value_string][$old_value_string]"`}, want: "[0 C][]"},
-		"missing values":             {event: missing, configs: []string{`AWSSNS_MESSAGE_FORMAT="[$value_string][$old_value_string]"`}, want: "[][]"},
-		"UTC date":                   {event: offset, configs: []string{`AWSSNS_MESSAGE_FORMAT="$date"`}, want: "2026-09-14T12:00:00Z"},
-		"assignment order":           {configs: []string{`PREFIX=first; AWSSNS_MESSAGE_FORMAT="$PREFIX $status_message"`, `PREFIX=second`}, want: "first needs attention"},
-		"last assignment":            {configs: []string{`AWSSNS_MESSAGE_FORMAT=first`, `AWSSNS_MESSAGE_FORMAT="$status_message"`}, want: "needs attention"},
-		"literal syntax":             {configs: []string{`AWSSNS_MESSAGE_FORMAT='file://{{unknown}} ${date} $(literal) θερμοκρασία'`}, want: "file://{{unknown}} ${date} $(literal) θερμοκρασία"},
-		"event text is data":         {configs: []string{`AWSSNS_MESSAGE_FORMAT="$info"`}, want: testutil.ExpectedEvent().Info},
-		"maximum literal braces":     {configs: []string{"AWSSNS_MESSAGE_FORMAT='" + strings.Repeat("{{", 131072) + "'"}, want: strings.Repeat("{{", 131072)},
-		"command failure":            {mode: "-fail", code: 1, want: defaultBody},
+		"stock format initialized":    {stock: true, want: defaultBody},
+		"unset format":                {want: defaultBody},
+		"empty format":                {configs: []string{`AWSSNS_MESSAGE_FORMAT=''`}, want: defaultBody},
+		"static literal credentials":  {source: "static", env: map[string]string{"AWS_ACCESS_KEY_ID": "${env:SNS_TEST_UNREAD}", "AWS_SECRET_ACCESS_KEY": "${file:/unread/synthetic-private-value}", "AWS_SESSION_TOKEN": "synthetic-private-value"}, want: defaultBody},
+		"web identity critical":       {source: "web_identity", status: "CRITICAL", region: "eu-west-1", arn: "arn:aws:sns:eu-west-1:123456789012:alerts", env: map[string]string{"AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/notifier", "AWS_WEB_IDENTITY_TOKEN_FILE": "/unread/token", "AWS_ROLE_SESSION_NAME": "notifier-test"}, configs: []string{`AWSSNS_MESSAGE_FORMAT="$status_message: $value_string (was $old_value_string)"`}, want: "is critical: 42.5 C (was 0 C)"},
+		"ecs clear":                   {source: "ecs", status: "CLEAR", env: map[string]string{"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/credentials"}, configs: []string{`AWSSNS_MESSAGE_FORMAT="$status_message: $date"`}, want: "recovered: 2026-09-14T12:00:00Z"},
+		"zero and absent":             {event: zero, configs: []string{`AWSSNS_MESSAGE_FORMAT="[$value_string][$old_value_string]"`}, want: "[0 C][]"},
+		"missing values":              {event: missing, configs: []string{`AWSSNS_MESSAGE_FORMAT="[$value_string][$old_value_string]"`}, want: "[][]"},
+		"UTC date":                    {event: offset, configs: []string{`AWSSNS_MESSAGE_FORMAT="$date"`}, want: "2026-09-14T12:00:00Z"},
+		"assignment order":            {configs: []string{`PREFIX=first; AWSSNS_MESSAGE_FORMAT="$PREFIX $status_message"`, `PREFIX=second`}, want: "first needs attention"},
+		"last assignment":             {configs: []string{`AWSSNS_MESSAGE_FORMAT=first`, `AWSSNS_MESSAGE_FORMAT="$status_message"`}, want: "needs attention"},
+		"literal syntax":              {configs: []string{`AWSSNS_MESSAGE_FORMAT='file://{{unknown}} ${date} $(literal) θερμοκρασία'`}, want: "file://{{unknown}} ${date} $(literal) θερμοκρασία"},
+		"producer facts":              {producerContext: testutil.ProducerContextJSON, configs: []string{`AWSSNS_MESSAGE_FORMAT="$unique_id/$alarm_id/$event_id: $value_string ($old_value_string); warnings=$total_warnings critical=$total_critical; $calc_expression; $src"`}, want: "42/7/3: 42.50 °C (0.00 °C); warnings=2 critical=0; $this > 40; line=12,file=/etc/netdata/health.d/example.conf"},
+		"producer text stays literal": {producerContext: `{"calc_param_values":"$(literal) ${env:UNREAD} {{unknown}}"}`, configs: []string{`AWSSNS_MESSAGE_FORMAT="$calc_param_values"`}, want: "$(literal) ${env:UNREAD} {{unknown}}"},
+		"producer empty formatting":   {producerContext: `{"value_string":"","old_value_string":""}`, configs: []string{`AWSSNS_MESSAGE_FORMAT="[$value_string][$old_value_string]"`}, want: "[][]"},
+		"event text is data":          {configs: []string{`AWSSNS_MESSAGE_FORMAT="$info"`}, want: testutil.ExpectedEvent().Info},
+		"maximum literal braces":      {configs: []string{"AWSSNS_MESSAGE_FORMAT='" + strings.Repeat("{{", 131072) + "'"}, want: strings.Repeat("{{", 131072)},
+		"command failure":             {mode: "-fail", code: 1, want: defaultBody},
 	} {
 		t.Run(name, func(t *testing.T) {
 			for _, key := range []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE", "AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_SNS", "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONTAINER_CREDENTIALS_FULL_URI", "AWS_EC2_METADATA_SERVICE_ENDPOINT", "HTTPS_PROXY", "BASH_ENV", "SNS_TEST_UNREAD"} {
@@ -89,7 +93,7 @@ func TestRunLegacySNS(t *testing.T) {
 				args = append(args, "--config", writeConfig(t, config))
 			}
 			var stdout, stderr bytes.Buffer
-			assert.Equal(t, tt.code, Run(context.Background(), args, bytes.NewReader(input), &stdout, &stderr), stderr.String())
+			assert.Equal(t, tt.code, Run(context.Background(), args, strings.NewReader(testutil.WithProducerContext(string(input), tt.producerContext)), &stdout, &stderr), stderr.String())
 			assert.Empty(t, stdout.String())
 			assert.NotContains(t, stderr.String(), "private-value")
 			captures := readCommandCaptures(t, capture)
@@ -187,6 +191,22 @@ func TestRunLegacySNSPreflight(t *testing.T) {
 			assert.Contains(t, stderr.String(), "0 succeeded, 0 failed")
 			assert.NotContains(t, stderr.String(), "synthetic-private-value")
 			assert.Zero(t, calls.Load())
+			assert.NoFileExists(t, capture)
+		})
+	}
+}
+
+func TestRunLegacySNSProducerContextDuplicates(t *testing.T) {
+	for name, input := range duplicateProducerContextInputs(t) {
+		t.Run(name, func(t *testing.T) {
+			dst, capture := snsHelperDestination(t, "")
+			config := fmt.Sprintf("aws='%s'; AWSSNS_CREDENTIAL_SOURCE=imds; DEFAULT_RECIPIENT_AWSSNS='%s'; ", dst["executable"], testSNSARN) + `AWSSNS_MESSAGE_FORMAT="$src $unique_id $value_string"`
+			var stdout, stderr bytes.Buffer
+			code := Run(context.Background(), []string{"send-legacy", "--config", writeConfig(t, config), "--method", "awssns", "--role", "ops"}, strings.NewReader(input), &stdout, &stderr)
+			assert.Equal(t, 1, code, stderr.String())
+			assert.Empty(t, stdout.String())
+			assert.Contains(t, stderr.String(), "invalid JSON event")
+			assert.NotContains(t, stderr.String(), "synthetic-private-value")
 			assert.NoFileExists(t, capture)
 		})
 	}

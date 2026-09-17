@@ -77,7 +77,8 @@ func Prepare(ctx context.Context, programs []*legacyconfig.Program, requested, r
 	if err != nil {
 		return fail(err)
 	}
-	initial := initialValues(n.Event, roles)
+	facts := eventValues(n, roles)
+	initial := initialValues(facts)
 	settings, err := legacyconfig.Evaluate(initial, programs...)
 	if err != nil {
 		return fail(fmt.Errorf("legacy configuration: %w", err))
@@ -150,7 +151,7 @@ func Prepare(ctx context.Context, programs []*legacyconfig.Program, requested, r
 		eligible = append(eligible, m)
 	}
 	if len(eligible) > 0 {
-		if err := unsupportedSettings(b.values, initial, eligible); err != nil {
+		if err := unsupportedSettings(b.values, facts, eligible); err != nil {
 			return fail(err)
 		}
 	}

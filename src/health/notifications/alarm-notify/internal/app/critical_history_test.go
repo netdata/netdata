@@ -124,7 +124,7 @@ func TestRunCriticalHistoryResults(t *testing.T) {
 	}
 }
 
-func TestRunCriticalHistoryPublicPayload(t *testing.T) {
+func TestRunInputOnlyFactsPublicPayload(t *testing.T) {
 	for name, test := range map[string]struct {
 		destination map[string]any
 		path        []string
@@ -167,7 +167,7 @@ func TestRunCriticalHistoryPublicPayload(t *testing.T) {
 			data, err := yaml.Marshal(cfg)
 			require.NoError(t, err)
 			var stdout, stderr bytes.Buffer
-			require.Zero(t, Run(context.Background(), []string{"send", "--config", writeConfig(t, string(data)), "--destination", "target"}, bytes.NewReader(criticalHistoryInput(t, "WARNING", "true")), &stdout, &stderr), stderr.String())
+			require.Zero(t, Run(context.Background(), []string{"send", "--config", writeConfig(t, string(data)), "--destination", "target"}, strings.NewReader(testutil.WithProducerContext(string(criticalHistoryInput(t, "WARNING", "true")), testutil.ProducerContextJSON)), &stdout, &stderr), stderr.String())
 			assert.Empty(t, stdout.String())
 			assert.Equal(t, "alarm-notify: destination \"target\" sent\nalarm-notify: delivery summary: 1 succeeded, 0 failed, 0 skipped\n", stderr.String())
 			require.Len(t, requests, 1)
