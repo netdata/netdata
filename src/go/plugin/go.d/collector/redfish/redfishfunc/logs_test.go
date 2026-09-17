@@ -135,7 +135,7 @@ func TestLogQueryValidationAndTimeParsing(t *testing.T) {
 		now,
 	)
 	require.NoError(t, err)
-	assert.Equal(t, "selected", q.service)
+	assert.Equal(t, "old", q.service)
 	assert.Equal(t, now.Unix()-3600, *q.after)
 	assert.Equal(t, now.Unix(), *q.before)
 	q, err = parseLogQuery(funcapi.RawMethodRequest{
@@ -163,7 +163,7 @@ func TestLogFunctionFailureAndEmptyDiscovery(t *testing.T) {
 	for _, tc := range []struct {
 		err    error
 		status int
-	}{{context.Canceled, 499}, {context.DeadlineExceeded, 504}, {acquisition.ErrLogServiceUnavailable, 400}, {errors.New("source failed"), 503}} {
+	}{{context.Canceled, 499}, {context.DeadlineExceeded, 504}, {acquisition.ErrLogServiceUnavailable, 400}, {acquisition.ErrLogEntriesUnsupported, 400}, {errors.New("source failed"), 503}} {
 		deps.err = tc.err
 		response = h.HandleRaw(
 			t.Context(),
@@ -183,4 +183,27 @@ func TestLogFunctionFailureAndEmptyDiscovery(t *testing.T) {
 		Payload: []byte(`{"service":"a"}`),
 	})
 	assert.Equal(t, 499, response.Status)
+}
+
+func TestLogQueryUsesFrameworkParameterPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		args              []string
+		payload           string
+		service, severity string
+	}{
+		{"arguments win", []string{"service:/argument", "severity:Critical"}, `{"service":"/payload","severity":"OK","selections":{"service":["/selection"],"severity":["Warning"]}}`, "/argument", "Critical"},
+		{"selections win over payload", nil, `{"service":"/payload","severity":"OK","selections":{"service":["/selection"],"severity":["Warning"]}}`, "/selection", "Warning"},
+		{"payload fallback", nil, `{"service":"/payload","severity":"OK"}`, "/payload", "OK"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := parseLogQuery(funcapi.RawMethodRequest{
+				Args:    tc.args,
+				Payload: []byte(tc.payload),
+			}, time.Now())
+			require.NoError(t, err)
+			assert.Equal(t, tc.service, q.service)
+			assert.Equal(t, tc.severity, q.severity)
+		})
+	}
 }

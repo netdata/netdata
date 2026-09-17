@@ -28,11 +28,21 @@ func newRequestAdmission(limit int) *requestAdmission {
 }
 
 func (a *requestAdmission) acquire(ctx context.Context) (int64, error) {
-	weight := int64(1)
-	if a.serial.Load() {
-		weight = a.capacity
+	for {
+		serial := a.serial.Load()
+		weight := int64(1)
+		if serial {
+			weight = a.capacity
+		}
+		if err := a.slots.Acquire(ctx, weight); err != nil {
+			return 0, err
+		}
+		// A ServiceRoot response may change the policy while this request waits.
+		if a.serial.Load() == serial {
+			return weight, nil
+		}
+		a.slots.Release(weight)
 	}
-	return weight, a.slots.Acquire(ctx, weight)
 }
 
 func (a *requestAdmission) release(weight int64) { a.slots.Release(weight) }

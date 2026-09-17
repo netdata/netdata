@@ -36,15 +36,19 @@ func parseLogQuery(req funcapi.RawMethodRequest, now time.Time) (logQuery, error
 		if json.Unmarshal(req.Payload, &payload) != nil || payload == nil {
 			return logQuery{}, errors.New("expected a JSON object")
 		}
-		for k, v := range payload {
-			values[k] = v
-		}
 		if raw, ok := payload["selections"]; ok {
 			var selections map[string]json.RawMessage
 			if json.Unmarshal(raw, &selections) != nil {
 				return logQuery{}, errors.New("invalid selections")
 			}
 			for k, v := range selections {
+				if _, exists := values[k]; !exists {
+					values[k] = v
+				}
+			}
+		}
+		for k, v := range payload {
+			if _, exists := values[k]; !exists {
 				values[k] = v
 			}
 		}

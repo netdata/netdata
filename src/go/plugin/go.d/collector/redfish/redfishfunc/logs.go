@@ -110,7 +110,7 @@ func logError(err error) *funcapi.FunctionResponse {
 		return funcapi.ErrorResponse(499, "Redfish log request canceled")
 	case errors.Is(err, context.DeadlineExceeded):
 		return funcapi.ErrorResponse(504, "Redfish log request timed out before the complete log could be read")
-	case errors.Is(err, acquisition.ErrLogServiceUnavailable):
+	case errors.Is(err, acquisition.ErrLogServiceUnavailable), errors.Is(err, acquisition.ErrLogEntriesUnsupported):
 		return funcapi.ErrorResponse(400, "%s", err)
 	default:
 		return funcapi.UnavailableResponse(fmt.Sprintf("Redfish log request failed: %s", err))
