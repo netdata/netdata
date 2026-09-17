@@ -245,13 +245,19 @@ func valueAt(data map[string]any, path string) (any, bool) {
 	return Properties(data).Lookup(path)
 }
 
+// firstValue keeps the existing non-null fallback order, while remembering an
+// explicitly null reading when none of the alternate properties supplies a value.
 func firstValue(data map[string]any, paths ...string) (any, bool) {
+	present := false
 	for _, path := range paths {
-		if value, ok := valueAt(data, path); ok && value != nil {
-			return value, true
+		if value, ok := valueAt(data, path); ok {
+			present = true
+			if value != nil {
+				return value, true
+			}
 		}
 	}
-	return nil, false
+	return nil, present
 }
 
 type rawReadingTimestamp struct {

@@ -33,6 +33,7 @@ type normalizedReading struct {
 	RangeMin              *float64
 	RangeMax              *float64
 	SourceAlarm           string
+	Health                string
 	SourceAlarmDiagnostic string
 	DataSourceURI         *string
 	SensorResetTime       *int64

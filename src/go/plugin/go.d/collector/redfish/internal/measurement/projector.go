@@ -35,11 +35,13 @@ func New(origin, job string, resolveProvenance func(baseURI, raw string) (string
 	return p
 }
 
-// Result contains observations and diagnostic messages for the collector to publish
-// and bound together with acquisition diagnostics. No input resource is modified.
+// Result contains metric observations, copied view facts and diagnostics from the
+// same measurement pass. No input resource is modified.
 type Result struct {
 	Observations []Observation
 	Diagnostics  []string
+	Components   []Component
+	Sensors      []Sensor
 }
 
 type Observation struct {
@@ -65,6 +67,9 @@ func (c *Projector) Project(nodes []*Resource, complete bool, observedAt time.Ti
 	}
 	var observations []Observation
 	for _, node := range nodes {
+		if node.Kind != "service" {
+			result.Components = append(result.Components, componentView(node, observedAt))
+		}
 		values := c.scalarValues(node, observedAt)
 		if value, present, diagnostic := managerClockValue(node); present {
 			if diagnostic != "" {
@@ -93,6 +98,9 @@ func (c *Projector) Project(nodes []*Resource, complete bool, observedAt time.Ti
 		}
 		observations = append(observations, c.flagObservations(node, flagValues(node))...)
 		for _, reading := range readings[node.Key] {
+			if reading.Primary && reading.Metric != "" {
+				result.Sensors = append(result.Sensors, sensorView(node, reading, observedAt))
+			}
 			result.addDiagnostic(reading.SourceAlarmDiagnostic)
 			if reading.Valid || reading.SourceAlarm != "" {
 				observations = append(observations, c.readingObservations(node, reading)...)

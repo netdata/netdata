@@ -60,6 +60,7 @@ func normalizeReading(node *Resource, raw rawReading) normalizedReading {
 
 	reading.Primary = reading.Primary && surface.Primary
 	if raw.ReadingScoped {
+		reading.Health = raw.Health
 		switch {
 		case strings.TrimSpace(raw.Health) == "":
 			reading.SourceAlarmDiagnostic = fmt.Sprintf(

@@ -6,10 +6,11 @@ renaming or removing a heading here updates the skill in the same change.
 
 ## TL;DR
 - Bring up databases with Docker Compose.
-- Use `go.d.plugin --function` with the configs in `./config`.
+- Start `go.d.plugin` normally and send Function requests through its stdin protocol.
+- The current CLI has no `--function` or `--function-args` flags. `--config-dir` remains available as `-c`.
 - Config files live under `./config/go.d`.
-- Validate output against the embedded schema.
-- Use `./e2e.sh` for automated end-to-end checks in `/tmp` (runs per-DB scripts).
+- Extract each Function JSON result and validate it against the canonical schema.
+- The container E2E scripts still use the removed CLI flags and need migration before they can validate current builds.
 
 ## Start containers
 ```
@@ -17,13 +18,36 @@ docker compose up -d
 ```
 
 ## Example CLI run (Postgres)
+Run from the repository root:
+
+```bash
+(cd src/go && go build -o /tmp/go.d.plugin ./cmd/godplugin)
+/tmp/go.d.plugin -c src/go/tools/functions-validation/config -m postgres
 ```
-cd ../../../
-src/go/go.d.plugin \
-  --config-dir src/go/tools/functions-validation/config \
-  --function postgres:top-queries \
-  --function-args info
+
+For an automated pipe-based harness, keep stdin open and consume stdout continuously. In non-terminal mode,
+wait for the job's `CONFIG ... create ... job` announcement, then enable that exact job through DynCfg. For a
+job announced as `go.d:collector:postgres:local`, send:
+
+```text
+FUNCTION enable-local 30 "config go.d:collector:postgres:local enable" 0xFFFF "method=api,role=test"
 ```
+
+After `FUNCTION GLOBAL "postgres:top-queries"` is announced, send requests on the same stdin:
+
+```text
+FUNCTION query-info 30 "postgres:top-queries info" 0xFFFF "method=api,role=test"
+FUNCTION query-data 30 "postgres:top-queries __job:local" 0xFFFF "method=api,role=test"
+```
+
+Match each response by its request ID in `FUNCTION_RESULT_BEGIN`, and save only the JSON body up to
+`FUNCTION_RESULT_END`; stdout also carries charts and configuration messages. `info` describes the method and
+is not a data sample. A collector that publishes collected snapshots may return unavailable until its first
+collection. Send `QUIT` and wait for this process when the harness finishes.
+
+The framing is shared by all job-backed Functions; use the module, method and announced job from the tested
+collector. Single-instance collectors do not expose `__job`. Sources: `pkg/cli`, `plugin/agent/policy/runmode.go`
+and the process-level examples in `plugin/agent/jobmgr/internal/jobmgrtest/agent_predicate_helpers.go`.
 
 ## Validate output
 
@@ -48,17 +72,17 @@ correlation rules must reference existing actor/link types and point/claim key
 columns.
 
 ## Validate output (require rows)
-```
-src/go/go.d.plugin \
-  --config-dir src/go/tools/functions-validation/config \
-  --function postgres:top-queries \
-  --function-args __job:local \
-  > /tmp/pg.json
+Save the JSON body of a successful data response as `/tmp/pg.json`, then run from the repository root:
 
+```bash
 (cd src/go && go run ./tools/functions-validation/validate --input /tmp/pg.json --min-rows 1)
 ```
 
-## E2E runner (recommended)
+## E2E runner (legacy)
+
+These commands document the existing container scripts. They currently invoke removed CLI flags and do not
+validate current `go.d.plugin` builds; migrate their request transport before using them. The standalone JSON
+validator and topology fixture validation above remain usable.
 ```
 ./e2e.sh
 ```

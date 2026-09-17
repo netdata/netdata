@@ -27,7 +27,12 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("redfish")
 	require.True(t, ok)
 	require.Nil(t, creator.AgentFunctions)
-	require.Nil(t, creator.MethodHandler)
+	require.NotNil(t, creator.MethodHandler)
+	require.NotNil(t, creator.SharedFunctions)
+	methods := creator.SharedFunctions()
+	require.Len(t, methods, 2)
+	assert.Equal(t, "sensors", methods[0].ID)
+	assert.Equal(t, "hardware", methods[1].ID)
 	server := testutil.NewServer(t, testutil.ServerConfig{})
 	defer server.Close()
 

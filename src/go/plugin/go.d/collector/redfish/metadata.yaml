@@ -700,6 +700,225 @@ modules:
         metric: system.hw.sensor.voltage.alarm
         info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Voltage Alarm State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+    functions:
+      description: |
+        Inspect sensor readings and hardware health for one configured endpoint using the Instance selector.
+        Both tables refresh every 60 seconds and show the latest completed collection. Collection timing follows the
+        job's `update_every` (60 seconds by default); the Observed column shows when each row was collected.
+        Opening a table does not query the BMC. Partial collections show current available data and identify gaps;
+        a total collection failure makes both Functions unavailable instead of showing old readings.
+      list:
+        - id: sensors
+          name: Redfish Sensors
+          description: |
+            Inspect current primary sensor readings and their reported health. Average, peak and threshold companion values are not separate rows. Power calculated from energy is explicitly labeled.
+          parameters:
+            - id: __job
+              name: Instance
+              description: Select the configured Redfish endpoint job.
+              type: select
+              required: false
+              default: First available job
+              options: []
+          returns:
+            description: |
+              One row per supported primary reading from the current collection. Missing or invalid values are blank; missing health is Not reported.
+            columns:
+              - name: "Key"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Stable row identity."
+              - name: "Sort"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Attention, name and identity ordering."
+              - name: "Sensor"
+                type: string
+                unit: ""
+                description: "Sensor or component reading."
+              - name: "Type"
+                type: string
+                unit: ""
+                description: "Measured quantity."
+              - name: "Reading"
+                type: float
+                unit: ""
+                description: "Current value; blank when unavailable."
+              - name: "Units"
+                type: string
+                unit: ""
+                description: "Reading units."
+              - name: "Health"
+                type: string
+                unit: ""
+                description: "BMC-reported health of this reading; not inherited component health."
+              - name: "Data availability"
+                type: string
+                unit: ""
+                description: "Whether this reading has a usable value."
+              - name: "Observed"
+                type: timestamp
+                unit: ""
+                description: "Collection observation time; not the BMC's internal sampling time."
+              - name: "Resource"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Resource supplying this reading."
+              - name: "Resource URI"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source resource address."
+              - name: "Source property"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source reading property."
+              - name: "Location"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC-reported physical context."
+              - name: "Source"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Whether this value was reported or calculated."
+              - name: "rowOptions"
+                type: none
+                unit: ""
+                visibility: hidden
+                description: "Row presentation."
+          performance: |
+            Reads data already collected by the job; no additional BMC requests. Response size grows with the number of rows.
+          security: |
+            Exposes device identity, health and source resource addresses to authorized operators. Does not expose credentials or session tokens.
+          availability: |
+            Available after collection produces usable data. Returns HTTP 503 before the first collection and after a total failure. Partial collections retain current rows and mark gaps.
+          require_cloud: false
+        - id: hardware
+          name: Redfish Hardware
+          description: |
+            Find components needing attention and inspect their identity and reported condition. Component health, aggregate health and collection availability are kept distinct.
+          parameters:
+            - id: __job
+              name: Instance
+              description: Select the configured Redfish endpoint job.
+              type: select
+              required: false
+              default: First available job
+              options: []
+          returns:
+            description: |
+              One row per monitored component or logical resource, including known resources that could not be read. Model, serial, part number and firmware are optional detail columns.
+            columns:
+              - name: "Key"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Stable row identity."
+              - name: "Sort"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Attention, name and identity ordering."
+              - name: "Component"
+                type: string
+                unit: ""
+                description: "Component or logical resource name."
+              - name: "Type"
+                type: string
+                unit: ""
+                description: "Resource kind."
+              - name: "Health"
+                type: string
+                unit: ""
+                description: "BMC-reported health of this component."
+              - name: "State"
+                type: string
+                unit: ""
+                description: "BMC-reported operational state."
+              - name: "Location"
+                type: string
+                unit: ""
+                description: "BMC-reported location or slot."
+              - name: "Reported issue"
+                type: string
+                unit: ""
+                description: "BMC conditions, rollup warnings or predicted failure."
+              - name: "Data availability"
+                type: string
+                unit: ""
+                description: "Whether this component was read in this collection."
+              - name: "Observed"
+                type: timestamp
+                unit: ""
+                description: "Collection observation time; not the BMC's internal sampling time."
+              - name: "Manufacturer"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component manufacturer."
+              - name: "Model"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component model."
+              - name: "Serial number"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component serial number."
+              - name: "Part number"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component part number."
+              - name: "Asset tag"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component asset tag."
+              - name: "Firmware"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Firmware, software or BIOS version."
+              - name: "Power state"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC-reported power state."
+              - name: "Health rollup"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC-reported aggregate health, separate from component health."
+              - name: "Failure predicted"
+                type: boolean
+                unit: ""
+                visibility: hidden
+                description: "BMC predicts component failure."
+              - name: "Resource URI"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source resource address."
+              - name: "rowOptions"
+                type: none
+                unit: ""
+                visibility: hidden
+                description: "Row presentation."
+          performance: |
+            Reads data already collected by the job; no additional BMC requests. Response size grows with the number of rows.
+          security: |
+            Exposes device identity, health and source resource addresses to authorized operators. Does not expose credentials or session tokens.
+          availability: |
+            Available after collection produces usable data. Returns HTTP 503 before the first collection and after a total failure. Partial collections retain current rows and mark gaps.
+          require_cloud: false
     metrics:
       folding:
         title: Metrics

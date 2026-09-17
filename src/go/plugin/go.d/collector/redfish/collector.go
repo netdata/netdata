@@ -10,13 +10,16 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/redfishfunc"
 )
 
 //go:embed "config_schema.json"
@@ -34,8 +37,10 @@ func init() {
 			UpdateEvery:        defaultUpdateEvery,
 			AutoDetectionRetry: 0,
 		},
-		CreateV2: func() collectorapi.CollectorV2 { return New() },
-		Config:   func() any { return &Config{} },
+		CreateV2:        func() collectorapi.CollectorV2 { return New() },
+		Config:          func() any { return &Config{} },
+		SharedFunctions: redfishMethods,
+		MethodHandler:   redfishFunctionHandler,
 	})
 }
 
@@ -52,15 +57,18 @@ type collectionResult struct {
 	Hardware    []measurement.Observation
 	Diagnostics []string
 	Complete    bool
+	Snapshot    *redfishfunc.Snapshot
 }
 
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	store    metrix.CollectorStore
-	metrics  *collectorMetrics
-	hardware *hardwareMetrics
+	store            metrix.CollectorStore
+	metrics          *collectorMetrics
+	hardware         *hardwareMetrics
+	funcRouter       funcapi.MethodHandler
+	functionSnapshot atomic.Pointer[redfishfunc.Snapshot]
 
 	endpointKey string
 
@@ -78,7 +86,7 @@ type Collector struct {
 // New returns one independently owned endpoint collector.
 func New() *Collector {
 	store := metrix.NewCollectorStore()
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			UpdateEvery:           defaultUpdateEvery,
 			AuthMethod:            defaultAuthMethod,
@@ -94,6 +102,10 @@ func New() *Collector {
 		},
 		now: time.Now,
 	}
+	c.funcRouter = redfishfunc.NewRouter(functionDeps{
+		snapshot: &c.functionSnapshot,
+	})
+	return c
 }
 
 func (c *Collector) Configuration() any { return c.Config }
@@ -155,6 +167,7 @@ func (c *Collector) Check(ctx context.Context) error {
 
 func (c *Collector) Collect(ctx context.Context) error {
 	if c.client == nil {
+		c.functionSnapshot.Store(nil)
 		return errors.New("Redfish client is not initialized")
 	}
 
@@ -165,8 +178,10 @@ func (c *Collector) Collect(ctx context.Context) error {
 		c.authSelectionOnce.Do(func() { c.Infof("Redfish authentication method selected: %s", result.AuthMethod) })
 	}
 	if err := ctx.Err(); err != nil {
+		c.functionSnapshot.Store(nil)
 		return err
 	}
+	c.functionSnapshot.Store(result.Snapshot)
 	c.warnCollectionDiagnostics(result.Diagnostics)
 	c.metrics.observe(c.endpointKey, c.Name, result.Metrics)
 	c.hardware.observe(result.Hardware)
@@ -207,6 +222,10 @@ func (c *Collector) warnCollectionDiagnostics(diagnostics []string) {
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
+	c.functionSnapshot.Store(nil)
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.client != nil {
 		c.client.Close()
 		c.client = nil
