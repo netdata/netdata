@@ -12,16 +12,23 @@ static char *nd_env_native_path_list(const char *src) {
 
     size_t len = strlen(src);
     char *dst = strdupz(src);
+    size_t entry_start = 0;
     for(size_t i = 0; i < len; i++) {
+        if(dst[i] == ';') {
+            entry_start = i + 1;
+            continue;
+        }
+
         if(dst[i] != ':')
             continue;
 
-        // The colon immediately following a drive letter is part of C:/...,
-        // while all other colons in this normalized representation delimit
-        // path-list entries.
-        if(i == 1 && isalpha((unsigned char)dst[0]))
+        // Preserve the colon in a drive-qualified entry (C:/...), including
+        // entries after the first one. All other colons are MSYS separators.
+        if(i == entry_start + 1 && isalpha((unsigned char)dst[entry_start]))
             continue;
+
         dst[i] = ';';
+        entry_start = i + 1;
     }
     return dst;
 }
@@ -63,12 +70,25 @@ void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
             strncpyz(dst + 2, src + 2, dst_size - 3);
         }
     } else {
-        strncpyz(dst, src, dst_size - 1);
+        size_t i = 0;
+        for (; src[i] && i < dst_size - 1; i++)
+            dst[i] = (src[i] == '\\') ? '/' : src[i];
+        dst[i] = '\0';
     }
 #else
     strncpyz(dst, src, dst_size - 1);
 #endif
 }
+
+#if defined(OS_WINDOWS)
+static void nd_env_set_required(const char *name, const char *value) {
+    nd_setenv(name, value ? value : "", 1);
+
+    const char *actual = getenv(name);
+    if (!actual || strcmp(actual, value ? value : "") != 0)
+        fatal("Failed to publish required environment variable '%s'", name);
+}
+#endif
 
 #if defined(OS_WINDOWS)
 // mkdir -p for Windows native paths (C:/foo/bar/baz).
@@ -251,7 +271,7 @@ void set_environment_for_plugins_and_scripts(void) {
     const char *configured_path = inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path);
 #if defined(OS_WINDOWS)
     CLEAN_CHAR_P *native_path = nd_env_native_path_list(configured_path);
-    setenv("PATH", native_path, 1);
+    nd_env_set_required("PATH", native_path);
     freez(native_path);
 #else
     setenv("PATH", configured_path, 1);
@@ -263,7 +283,7 @@ void set_environment_for_plugins_and_scripts(void) {
     const char *configured_pythonpath = inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p);
 #if defined(OS_WINDOWS)
     CLEAN_CHAR_P *native_pythonpath = nd_env_native_path_list(configured_pythonpath);
-    setenv("PYTHONPATH", native_pythonpath, 1);
+    nd_env_set_required("PYTHONPATH", native_pythonpath);
     freez(native_pythonpath);
 #else
     setenv("PYTHONPATH", configured_pythonpath, 1);

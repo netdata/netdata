@@ -17,8 +17,16 @@ static void config_dir_print_available(void) {
     size_t column_width = 80;
     size_t current_columns = 7; // Start with 7 spaces for the first line
 
+    // readdir() receives the configured POSIX-style path, while Win32 file
+    // attribute APIs require a native drive path.
+    CLEAN_CHAR_P *native_path = NULL;
+#if defined(OS_WINDOWS)
+    native_path = os_translate_msys_to_windows_path(path);
+#endif
+    const char *type_path = native_path ? native_path : path;
+
     while ((entry = readdir(dir))) {
-        if (nd_dirent_type(path, entry) == DT_REG) { // Check if it's a regular file
+        if (nd_dirent_type(type_path, entry) == DT_REG) { // Check if it's a regular file
             const char *file_name = entry->d_name;
             size_t len = strlen(file_name);
             if (len >= 5 && strcmp(file_name + len - 5, ".yaml") == 0) {
@@ -38,6 +46,7 @@ static void config_dir_print_available(void) {
         }
     }
 
+    freez(native_path);
     closedir(dir);
     printf("\n"); // Add a newline at the end
 }

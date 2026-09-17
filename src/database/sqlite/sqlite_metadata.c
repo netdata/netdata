@@ -682,10 +682,15 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
 
         if (rc == SQLITE_OK) {
 #if defined(OS_WINDOWS)
-            if (!MoveFileExA(native_dst, native_src, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+            wchar_t *native_dst_w = os_translate_msys_to_windows_pathW(native_dst);
+            wchar_t *native_src_w = os_translate_msys_to_windows_pathW(native_src);
+            if (!native_dst_w || !native_src_w ||
+                !MoveFileExW(native_dst_w, native_src_w, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
                 rc = -1;
             else
                 rc = 0;
+            freez(native_dst_w);
+            freez(native_src_w);
 #else
             rc = rename(native_dst, native_src);
 #endif

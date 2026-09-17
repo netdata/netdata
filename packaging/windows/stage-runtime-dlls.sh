@@ -136,9 +136,10 @@ copy_missing_dlls_once() {
 for _ in $(seq 1 20); do
     if copy_missing_dlls_once; then
         exit 0
+    else
+        rc=$?
     fi
 
-    rc=$?
     if [ "${rc}" -ne 1 ]; then
         exit "${rc}"
     fi

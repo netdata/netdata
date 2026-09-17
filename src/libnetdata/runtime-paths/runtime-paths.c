@@ -53,6 +53,38 @@ static bool nd_windows_directory_exists(const char *path) {
     return exists;
 }
 
+static char *nd_windows_temp_path_utf8(void) {
+    DWORD capacity = MAX_PATH;
+    for (;;) {
+        wchar_t *wide = mallocz((size_t)capacity * sizeof(*wide));
+        DWORD length = GetTempPathW(capacity, wide);
+        if (!length) {
+            freez(wide);
+            return NULL;
+        }
+        if (length < capacity) {
+            int utf8_length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                                                  wide, (int)length, NULL, 0, NULL, NULL);
+            if (utf8_length <= 0) {
+                freez(wide);
+                return NULL;
+            }
+            char *utf8 = mallocz((size_t)utf8_length + 1);
+            if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                                     wide, (int)length, utf8, utf8_length, NULL, NULL)) {
+                freez(wide);
+                freez(utf8);
+                return NULL;
+            }
+            utf8[utf8_length] = '\0';
+            freez(wide);
+            return utf8;
+        }
+        freez(wide);
+        capacity = length + 1;
+    }
+}
+
 static char *nd_windows_detect_install_prefix_once(void) {
     CLEAN_CHAR_P *exe_path = os_get_process_path();
     CLEAN_CHAR_P *install_prefix = nd_windows_install_prefix_from_executable_path(exe_path);
@@ -155,10 +187,9 @@ void nd_windows_detect_prefix_and_override_paths(void) {
     // would otherwise abort the agent.  A per-user temporary location is
     // writable in both interactive and service contexts.
     if (!nd_windows_directory_exists(run_dir)) {
-        char temp_path[MAX_PATH + 1];
-        DWORD temp_len = GetTempPathA((DWORD)sizeof(temp_path), temp_path);
-        if (temp_len > 0 && temp_len < sizeof(temp_path)) {
-            size_t fallback_size = (size_t)temp_len + sizeof("netdata/run");
+        char *temp_path = nd_windows_temp_path_utf8();
+        if (temp_path) {
+            size_t fallback_size = strlen(temp_path) + sizeof("netdata/run");
             CLEAN_CHAR_P *fallback_parent = mallocz(fallback_size);
             CLEAN_CHAR_P *fallback = mallocz(fallback_size);
             snprintfz(fallback_parent, fallback_size, "%snetdata", temp_path);
@@ -169,6 +200,7 @@ void nd_windows_detect_prefix_and_override_paths(void) {
                 nd_setenv("NETDATA_RUN_DIR", fallback, 1);
             else
                 nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+            freez(temp_path);
         }
         else
             nd_setenv("NETDATA_RUN_DIR", run_dir, 1);

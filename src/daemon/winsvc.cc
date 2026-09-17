@@ -137,9 +137,6 @@ static NORETURN void call_netdata_cleanup(void *arg)
         svc_heartbeat_done_event = nullptr;
     }
 
-    // Close event handle
-    CloseHandle(svc_stop_event_handle);
-
     // Set status to stopped
     ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
 

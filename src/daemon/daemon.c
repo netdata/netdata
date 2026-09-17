@@ -48,13 +48,23 @@ static inline void clean_directory(const char *dirname)
     DIR *dir = opendir(dirname);
     if(!dir) return;
 
-    int dir_fd = dirfd(dir);
     struct dirent *de = NULL;
 
     while((de = readdir(dir)))
         if(nd_dirent_type(dirname, de) == DT_REG)
-            if (unlinkat(dir_fd, de->d_name, 0))
+        {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, sizeof(filename), "%s/%s", dirname, de->d_name);
+#if defined(OS_WINDOWS)
+            wchar_t *native_filename = os_translate_msys_to_windows_pathW(filename);
+            bool deleted = native_filename && DeleteFileW(native_filename);
+            freez(native_filename);
+#else
+            bool deleted = unlinkat(dirfd(dir), de->d_name, 0) == 0;
+#endif
+            if (!deleted)
                 netdata_log_error("Cannot delete %s/%s", dirname, de->d_name);
+        }
 
     closedir(dir);
 }

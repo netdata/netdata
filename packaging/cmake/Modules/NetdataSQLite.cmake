@@ -48,7 +48,9 @@ function(netdata_bundle_sqlite3)
                 # so configure and make run in the correct POSIX environment.
                 # Requires: bash, make, and tclsh (pacman -S bash make tcl).
                 find_program(_ND_SQLITE_BASH NAMES bash.exe bash
-                             HINTS "$ENV{MSYS2_ROOT}/usr/bin" "C:/msys64/usr/bin"
+                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                                   "C:/msys64/usr/bin"
+                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
                              NO_DEFAULT_PATH)
                 if(NOT _ND_SQLITE_BASH)
                         message(FATAL_ERROR

@@ -21,7 +21,9 @@ function(netdata_bundle_libbacktrace)
         # commands in Makefiles natively and can be invoked directly by cmake.
         if(OS_WINDOWS)
                 find_program(BASH_EXECUTABLE NAMES bash.exe bash
-                             HINTS "$ENV{MSYS2_ROOT}/usr/bin" "C:/msys64/usr/bin"
+                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                                   "C:/msys64/usr/bin"
+                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
                              NO_DEFAULT_PATH)
                 if(NOT BASH_EXECUTABLE)
                         message(FATAL_ERROR "MSYS2 bash not found; install it under MSYS2/usr/bin")

@@ -32,6 +32,10 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
    AGENT_TARGET="${AGENT_TARGET%%/*}"
 
    mkdir -p .local/audits/query-netdata-agents
+   # Resolve/cache Cloud credentials outside the measured interval.
+   agents_call_function --via agent --node "$NODE_UUID" --host "$AGENT_TARGET" \
+     --machine-guid "$MACHINE_GUID" --function netdata-metrics-cardinality \
+     --body '{"info":true}' >/dev/null 2>&1 || true
    direct_start="$(date +%s%N)"
    direct_rc=0
    agents_call_function --via agent --node "$NODE_UUID" --host "$AGENT_TARGET" \
@@ -40,7 +44,7 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
      > .local/audits/query-netdata-agents/function-timeout-direct.json || direct_rc=$?
    direct_elapsed="$(awk -v s="$direct_start" -v e="$(date +%s%N)" 'BEGIN { printf "%.3f", (e-s)/1000000000 }')"
    if [[ "$direct_rc" -eq 0 ]] && jq -e . .local/audits/query-netdata-agents/function-timeout-direct.json >/dev/null 2>&1; then
-       jq --arg elapsed "${direct_elapsed}s" '{status: 200, total: $elapsed}' \
+       jq --arg elapsed "${direct_elapsed}s" '{status: (.status // null), total: $elapsed}' \
          .local/audits/query-netdata-agents/function-timeout-direct.json
    else
        jq -n --arg elapsed "${direct_elapsed}s" --arg rc "$direct_rc" \
