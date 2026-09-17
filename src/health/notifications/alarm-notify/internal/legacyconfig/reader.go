@@ -171,11 +171,17 @@ func (p *Program) entry(name string, index syntax.ArithmExpr, value *syntax.Word
 	if index == nil {
 		return pos.error("recipient map keys must be nonempty literal strings")
 	}
+	start, end := index.Pos().Offset(), index.End().Offset()
+	// Arithmetic parsing omits surrounding whitespace, but associative keys retain it.
+	// Require padding to be quoted so an accepted entry cannot silently change keys.
+	if start == 0 || end >= uint(len(source)) || source[start-1] != '[' || source[end] != ']' {
+		return pos.error("recipient key padding must be quoted")
+	}
 	word, ok := index.(*syntax.Word)
 	if !ok {
 		// The parser treats subscripts as arithmetic without knowing the array's type.
 		// Here db-admin and 1+2 are literal associative keys, not arithmetic operations.
-		raw := source[index.Pos().Offset():index.End().Offset()]
+		raw := source[start:end]
 		count := 0
 		err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Words(bytes.NewReader(raw), func(parsed *syntax.Word) bool {
 			word = parsed

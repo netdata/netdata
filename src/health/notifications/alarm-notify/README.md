@@ -142,7 +142,8 @@ substitution are rejected. So are arithmetic, advanced parameter expansion, unqu
 quoting, `export`/`readonly`, append assignments, indexed arrays and arbitrary associative maps. Quote a literal tilde
 where Bash would otherwise expand it. These restrictions apply to declarative settings; function bodies are retained
 as Bash code and are not checked against the settings subset. Function declarations themselves must have a plain
-brace body without attached redirections or command modifiers.
+brace body without attached redirections or command modifiers. Unquoted padding around recipient keys is rejected;
+use `[" sysadmin "]` when the spaces belong to the key.
 
 The internal evaluator applies files and assignments in order using explicitly supplied initial scalar variables.
 It never reads the process environment. Undefined variables expand to empty strings. Expansion happens once at
