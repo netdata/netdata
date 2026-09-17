@@ -1239,10 +1239,18 @@ int rrdeng_init(
         }
     }
 
-    if (unittest_running && ctx->dynamically_allocated) {
-        freez(ctx);
-        if (ctxp)
-            *ctxp = NULL;
+    if (ctx->dynamically_allocated) {
+        bool drained = rrdeng_file_deletion_drain(ctx);
+        if (drained) {
+            freez(ctx);
+            if (ctxp)
+                *ctxp = NULL;
+        }
+        else if (ctxp) {
+            // Keep the context alive until queued callbacks finish; they retain
+            // its pointer while unlink work is in flight.
+            *ctxp = ctx;
+        }
     }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);

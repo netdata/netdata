@@ -39,6 +39,7 @@ function(netdata_bundle_libbacktrace)
                 endif()
                 set(_bt_configure_cmd ${BASH_EXECUTABLE} "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
         else()
+                set(_BT_MAKE_EXECUTABLE make)
                 set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
         endif()
 

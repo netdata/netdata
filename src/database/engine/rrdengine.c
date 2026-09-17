@@ -238,6 +238,7 @@ struct rrdeng_file_deletion {
     char path[RRDENG_PATH_MAX];
     size_t bytes;
     bool datafile;
+    bool dispatched;
     unsigned retries;
     int result;
 };
@@ -260,11 +261,15 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
 
 static void rrdeng_file_deletion_start(struct rrdeng_file_deletion *deletion) {
     while (deletion) {
+        __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
         int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
                                rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
-        if (likely(rc == 0))
+        if (likely(rc == 0)) {
+            deletion->dispatched = true;
             return;
+        }
 
+        __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
         deletion->result = rc;
         deletion = rrdeng_file_deletion_finish(deletion);
     }
@@ -273,7 +278,7 @@ static void rrdeng_file_deletion_start(struct rrdeng_file_deletion *deletion) {
 static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
     struct rrdengine_instance *ctx = deletion->ctx;
 
-    if (deletion->result == 0) {
+    if (deletion->result == 0 || deletion->result == UV_ENOENT) {
         if (deletion->datafile)
             __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
         else
@@ -317,6 +322,8 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
     spinlock_unlock(&ctx->deletion.spinlock);
 
     freez(deletion);
+    if (deletion->dispatched)
+        __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELEASE);
     return next;
 }
@@ -325,9 +332,13 @@ static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unuse
     struct rrdeng_file_deletion *deletion = work->data;
     if (deletion->result != 0 && deletion->result != UV_ENOENT && deletion->retries < 3) {
         deletion->retries++;
+        __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
         if (uv_queue_work(&rrdeng_main.loop, &deletion->work,
-                          rrdeng_file_deletion_worker, rrdeng_file_deletion_after) == 0)
+                          rrdeng_file_deletion_worker, rrdeng_file_deletion_after) == 0) {
+            deletion->dispatched = true;
             return;
+        }
+        __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     }
     struct rrdeng_file_deletion *next = rrdeng_file_deletion_finish(deletion);
     if (next)
