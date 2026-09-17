@@ -13,7 +13,7 @@
 #include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
 #endif
 
-#define is_valid_backend(backend) ((backend) >= STORAGE_ENGINE_BACKEND_RRDDIM && (backend) <= STORAGE_ENGINE_BACKEND_DBENGINE)
+#define is_valid_backend(backend) ((backend) >= STORAGE_ENGINE_BACKEND_RAM && (backend) <= STORAGE_ENGINE_BACKEND_DBENGINE)
 
 // --------------------------------------------------------------------------------------------------------------------
 // function pointers for all APIs provided by a storage engine
@@ -73,7 +73,7 @@ static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_EN
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_metrics_group_get(si, uuid);
 #endif
-    return rrddim_metrics_group_get(si, uuid);
+    return ram_metrics_group_get(si, uuid);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -86,7 +86,7 @@ static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND s
         rrdeng_metrics_group_release(si, smg);
     else
 #endif
-        rrddim_metrics_group_release(si, smg);
+        ram_metrics_group_release(si, smg);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_B
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_store_metric_init(smh, update_every, smg);
 #endif
-    return rrddim_collect_init(smh, update_every, smg);
+    return ram_store_init(smh, update_every, smg);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ static void storage_engine_store_metric(
                                         n, min_value, max_value,
                                         count, anomaly_count, flags);
 #endif
-    return rrddim_collect_store_metric(sch, point_in_time_ut,
+    return ram_store_next(sch, point_in_time_ut,
                                        n, min_value, max_value,
                                        count, anomaly_count, flags);
 }
@@ -193,7 +193,7 @@ static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
         rrdeng_store_metric_flush_current_page(sch);
     else
 #endif
-        rrddim_store_metric_flush(sch);
+        ram_store_flush(sch);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -212,7 +212,7 @@ static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
         return rrdeng_store_metric_finalize(sch);
 #endif
 
-    return rrddim_collect_finalize(sch);
+    return ram_store_finalize(sch);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -228,7 +228,7 @@ static inline void storage_engine_store_change_collection_frequency(STORAGE_COLL
         rrdeng_store_metric_change_collection_frequency(sch, update_every);
     else
 #endif
-        rrddim_store_metric_change_collection_frequency(sch, update_every);
+        ram_store_change_collection_frequency(sch, update_every);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -242,7 +242,7 @@ static time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND seb  __maybe_u
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_metric_oldest_time(smh);
 #endif
-    return rrddim_query_oldest_time_s(smh);
+    return ram_oldest_time_s(smh);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -255,7 +255,7 @@ static time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND seb __maybe_un
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_metric_latest_time(smh);
 #endif
-    return rrddim_query_latest_time_s(smh);
+    return ram_latest_time_s(smh);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -272,7 +272,7 @@ static void storage_engine_query_init(
         rrdeng_load_metric_init(smh, seqh, start_time_s, end_time_s, priority);
     else
 #endif
-        rrddim_query_init(smh, seqh, start_time_s, end_time_s, priority);
+        ram_query_init(smh, seqh, start_time_s, end_time_s, priority);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -285,7 +285,7 @@ static STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_quer
     if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_load_metric_next(seqh);
 #endif
-    return rrddim_query_next_metric(seqh);
+    return ram_query_next(seqh);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -298,7 +298,7 @@ static int storage_engine_query_is_finished(struct storage_engine_query_handle *
     if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_load_metric_is_finished(seqh);
 #endif
-    return rrddim_query_is_finished(seqh);
+    return ram_query_is_finished(seqh);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -312,7 +312,7 @@ static void storage_engine_query_finalize(struct storage_engine_query_handle *se
         rrdeng_load_metric_finalize(seqh);
     else
 #endif
-        rrddim_query_finalize(seqh);
+        ram_query_finalize(seqh);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -325,7 +325,7 @@ static time_t storage_engine_align_to_optimal_before(struct storage_engine_query
     if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
         return rrdeng_load_align_to_optimal_before(seqh);
 #endif
-    return rrddim_query_align_to_optimal_before(seqh);
+    return ram_query_align_to_optimal_before(seqh);
 }
 
 #endif

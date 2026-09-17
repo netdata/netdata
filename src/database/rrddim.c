@@ -236,8 +236,8 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RRDDIM)
-                db_data_lifetime_transferred |= rrddim_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
+            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RAM)
+                db_data_lifetime_transferred |= ram_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
             else
                 eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
