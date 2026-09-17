@@ -4883,8 +4883,9 @@ if(OS_WINDOWS)
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
-        # Make curl work with ssl
-        install(DIRECTORY /usr/ssl DESTINATION usr)
+        # Windows OpenSSL loads trusted roots from the Windows certificate
+        # stores; `/usr/ssl` is an MSYS runtime path, not a valid CMake source
+        # path in the native UCRT64 install tree.
 
         # Install UCRT64 runtime DLLs to both usr/bin and plugins.d.
         # compile-on-windows.sh stages all transitive lib*.dll and zlib1.dll
