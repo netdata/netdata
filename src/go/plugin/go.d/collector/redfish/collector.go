@@ -39,7 +39,7 @@ func init() {
 type endpointClient interface {
 	Check(context.Context) error
 	Collect(context.Context) (collectionResult, error)
-	Close(context.Context) error
+	Close()
 }
 
 type collectionResult struct {
@@ -78,7 +78,6 @@ func New() *Collector {
 			UpdateEvery:           defaultUpdateEvery,
 			AuthMethod:            defaultAuthMethod,
 			Timeout:               defaultTimeout,
-			Retries:               new(defaultRetries),
 			MaxConcurrentRequests: defaultMaxConcurrentRequests,
 			Collect:               defaultCollect,
 		},
@@ -202,7 +201,7 @@ func (c *Collector) warnCollectionDiagnostics(diagnostics []string) {
 
 func (c *Collector) Cleanup(ctx context.Context) {
 	if c.client != nil {
-		_ = c.client.Close(ctx)
+		c.client.Close()
 		c.client = nil
 	}
 	if c.httpClient != nil {
@@ -220,4 +219,8 @@ func contextError(ctx context.Context) error {
 		return nil
 	}
 	return ctx.Err()
+}
+
+func isCallerContextError(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }

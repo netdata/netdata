@@ -3,16 +3,13 @@
 package redfish
 
 import (
-	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 )
 
 const (
 	maxSchemaIdentityTokenBytes = 256
-	maxRedfishVersionTokenBytes = 64
 )
 
 var resourceSchemaNames = map[string][]string{
@@ -72,8 +69,6 @@ var resourceSchemaNames = map[string][]string{
 	"legacy_thermal":       {"Thermal"},
 	"legacy_power":         {"Power"},
 	"update_service":       {"UpdateService"},
-	"session_service":      {"SessionService"},
-	"session":              {"Session"},
 }
 
 func validateResourceSchemaType(kind, value string) error {
@@ -81,68 +76,16 @@ func validateResourceSchemaType(kind, value string) error {
 	if len(expected) == 0 {
 		return nil
 	}
-	name, namespace, ok := parseODataType(value)
+	name, _, ok := parseODataType(value)
 	if !ok {
 		return fmt.Errorf("%s resource has no valid @odata.type", kind)
 	}
 	for _, candidate := range expected {
-		if name == candidate && validVersionedSchemaNamespace(candidate, namespace) {
+		if name == candidate {
 			return nil
 		}
 	}
 	return fmt.Errorf("%s resource has unexpected @odata.type", kind)
-}
-
-func validateCollectionSchemaType(value, expectedKind string) error {
-	name, namespace, ok := parseODataType(value)
-	if !ok || !strings.HasSuffix(name, "Collection") {
-		return errors.New("collection has no valid @odata.type")
-	}
-	if namespace != name {
-		return errors.New("collection has unexpected @odata.type")
-	}
-	if expectedKind == "" {
-		return nil
-	}
-	for _, resourceName := range resourceSchemaNames[expectedKind] {
-		if name == resourceName+"Collection" {
-			return nil
-		}
-	}
-	return fmt.Errorf("%s collection has unexpected @odata.type", expectedKind)
-}
-
-func validateRequiredResourceProperties(kind string, data map[string]any) error {
-	for _, property := range []string{"Id", "Name"} {
-		value, ok := stringValue(data[property])
-		if !ok || strings.TrimSpace(value) == "" {
-			return fmt.Errorf("%s resource has no usable %s", kind, property)
-		}
-	}
-	return nil
-}
-
-func validVersionedSchemaNamespace(name, namespace string) bool {
-	if len(name) > maxSchemaIdentityTokenBytes || len(namespace) > maxSchemaIdentityTokenBytes {
-		return false
-	}
-	version, ok := strings.CutPrefix(namespace, name+".v")
-	if !ok {
-		return false
-	}
-	parts := strings.Split(version, "_")
-	if len(parts) != 3 {
-		return false
-	}
-	for _, part := range parts {
-		if part == "" {
-			return false
-		}
-		if _, err := strconv.ParseUint(part, 10, 32); err != nil {
-			return false
-		}
-	}
-	return true
 }
 
 func parseODataType(value string) (name, namespace string, ok bool) {
@@ -162,23 +105,4 @@ func parseODataType(value string) (name, namespace string, ok bool) {
 		return "", "", false
 	}
 	return parts[len(parts)-1], strings.Join(parts[:len(parts)-1], "."), true
-}
-
-func validRedfishVersion(value string) bool {
-	if len(value) > maxRedfishVersionTokenBytes {
-		return false
-	}
-	parts := strings.Split(strings.TrimSpace(value), ".")
-	if len(parts) < 2 || len(parts) > 3 {
-		return false
-	}
-	for _, part := range parts {
-		if part == "" {
-			return false
-		}
-		if _, err := strconv.ParseUint(part, 10, 32); err != nil {
-			return false
-		}
-	}
-	return true
 }

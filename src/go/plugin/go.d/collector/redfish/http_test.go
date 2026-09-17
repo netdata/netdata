@@ -4,11 +4,11 @@ package redfish
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"math"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -25,14 +25,12 @@ func TestSanitizeTransportErrorPreservesPolicyWithoutLeakingDetails(t *testing.T
 	})
 	assert.NotContains(t, retryable.Error(), "test-password")
 	assert.Equal(t, "transport", classifyError(retryable))
-	assert.True(t, retryableTransport(retryable))
 
 	timeout := sanitizeTransportError(sensitiveNetError{
 		timeout: true,
 	})
 	assert.NotContains(t, timeout.Error(), "test-password")
 	assert.Equal(t, "timeout", classifyError(timeout))
-	assert.False(t, retryableTransport(timeout))
 }
 
 func TestProtocolClientRejectsCrossOriginRedirect(t *testing.T) {
@@ -76,7 +74,7 @@ func TestProtocolClientRejectsRedirectThatChangesAuthorizedQuery(t *testing.T) {
 	t.Parallel()
 
 	var redirected atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newResourceTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("$top") == "1" {
 			http.Redirect(w, r, "/redfish/v1/Systems?$top=2", http.StatusTemporaryRedirect)
 			return
@@ -85,21 +83,11 @@ func TestProtocolClientRejectsRedirectThatChangesAuthorizedQuery(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
+	client := newTestResourceClient(t, testConfig(server.URL, "none"))
 	target, err := client.resolveURI(client.root, "/redfish/v1/Systems?$top=1", true)
 	require.NoError(t, err)
 
-	_, err = client.do(
-		context.Background(),
-		protocolRequest{
-			method: http.MethodGet,
-			target: target,
-			auth:   client.currentAuth(false),
-		},
-		nil,
-		false,
-		http.StatusOK,
-	)
+	_, err = client.get(context.Background(), target, nil)
 	require.ErrorContains(t, err, "changed an authorized query")
 	assert.Zero(t, redirected.Load())
 }
@@ -108,7 +96,7 @@ func TestProtocolClientRejectsRedirectThatRemovesAuthorizedQuery(t *testing.T) {
 	t.Parallel()
 
 	var redirected atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := newResourceTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RawQuery != "" {
 			http.Redirect(w, r, "/redfish/v1/Systems", http.StatusTemporaryRedirect)
 			return
@@ -117,108 +105,13 @@ func TestProtocolClientRejectsRedirectThatRemovesAuthorizedQuery(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
+	client := newTestResourceClient(t, testConfig(server.URL, "none"))
 	target, err := client.resolveURI(client.root, "/redfish/v1/Systems?$top=1", true)
 	require.NoError(t, err)
 
-	_, err = client.do(
-		context.Background(),
-		protocolRequest{
-			method: http.MethodGet,
-			target: target,
-			auth:   client.currentAuth(false),
-		},
-		nil,
-		false,
-		http.StatusOK,
-	)
+	_, err = client.get(context.Background(), target, nil)
 	require.ErrorContains(t, err, "changed an authorized query")
 	assert.Zero(t, redirected.Load())
-}
-
-func TestProtocolClientDoesNotSleepAfterFinalRetryableResponse(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Retry-After", "5")
-		http.Error(w, "busy", http.StatusTooManyRequests)
-	}))
-	defer server.Close()
-	cfg := testConfig(server.URL, "none")
-	cfg.Retries = new(0)
-	client := newTestProtocolClient(t, cfg)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	_, err := client.do(
-		ctx,
-		protocolRequest{
-			method: http.MethodGet,
-			target: client.root,
-			auth:   requestAuth{},
-		},
-		nil,
-		true,
-		http.StatusOK,
-	)
-	var status statusError
-	require.ErrorAs(t, err, &status)
-	assert.Equal(t, http.StatusTooManyRequests, status.status)
-}
-
-func TestRetryAfterBoundsUntrustedHeaderValues(t *testing.T) {
-	t.Parallel()
-
-	for name, value := range map[string]string{
-		"oversized token":      strings.Repeat("9", maxRetryAfterBytes+1),
-		"oversized whitespace": strings.Repeat(" ", maxRetryAfterBytes) + "1",
-		"uint overflow":        strings.Repeat("9", maxRetryAfterBytes),
-	} {
-		t.Run(name, func(t *testing.T) {
-			header := make(http.Header)
-			header.Set("Retry-After", value)
-			assert.Zero(t, retryAfter(header))
-		})
-	}
-
-	header := make(http.Header)
-	header.Set("Retry-After", "9223372036854775807")
-	assert.Equal(t, maxRetryAfter, retryAfter(header))
-}
-
-func TestProtocolClientRetryBudgetDoesNotOverflow(t *testing.T) {
-	t.Parallel()
-
-	var requests atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		if requests.Add(1) == 1 {
-			http.Error(w, "busy", http.StatusServiceUnavailable)
-			return
-		}
-		writeJSON(w, map[string]any{"ok": true})
-	}))
-	defer server.Close()
-
-	cfg := testConfig(server.URL, "none")
-	cfg.Retries = new(int)
-	*cfg.Retries = math.MaxInt
-	client := newTestProtocolClient(t, cfg)
-
-	response, err := client.do(
-		context.Background(),
-		protocolRequest{
-			method: http.MethodGet,
-			target: client.root,
-			auth:   requestAuth{},
-		},
-		nil,
-		true,
-		http.StatusOK,
-	)
-	require.NoError(t, err)
-	require.NotNil(t, response)
-	response.finish(nil)
-	assert.Equal(t, int64(2), requests.Load())
 }
 
 func TestProtocolClientResponseGuards(t *testing.T) {
@@ -286,9 +179,156 @@ func TestProtocolClientCheckAcceptsJSONWithIncompatibleContentType(t *testing.T)
 	t.Cleanup(server.Close)
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	require.NoError(t, client.Check(t.Context()))
-	require.Equal(
-		t,
-		[]string{"Redfish compatibility: response Content-Type header is invalid"},
-		client.takeCompatibilityDiagnostics(),
-	)
+}
+
+func TestSDKAcquisitionPreservesCounterTokensAndResponseTime(t *testing.T) {
+	server := newResourceTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/redfish/v1/Metrics":
+			_, _ = w.Write(
+				[]byte(
+					`{"@odata.id":"/redfish/v1/Metrics","@odata.type":"#PortMetrics.v1_0_0.PortMetrics","RXBytes":18446744073709551001,"TXBytes":0,"RXFrames":"invalid optional property"}`,
+				),
+			)
+		case "/redfish/v1/Manager":
+			writeJSON(
+				w,
+				sourceTestResource(
+					r.URL.Path,
+					"Manager",
+					"Clock",
+					map[string]any{"DateTime": time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano)},
+				),
+			)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := newTestResourceClient(t, testConfig(server.URL, "none"))
+	node, err := client.fetchGraphNode(t.Context(), "port_metrics", "/redfish/v1/Metrics", graphRelationship{}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, json.Number("18446744073709551001"), node.Data["RXBytes"])
+	assert.Equal(t, json.Number("0"), node.Data["TXBytes"])
+	node, err = client.fetchGraphNode(t.Context(), "manager", "/redfish/v1/Manager", graphRelationship{}, nil)
+	require.NoError(t, err)
+	clock, present, diagnostic := managerClockValue(node)
+	require.True(t, present)
+	require.True(t, clock.Valid, diagnostic)
+	assert.InDelta(t, 60, clock.Value, 5)
+}
+
+func TestSDKCollectionHonorsRequestConcurrency(t *testing.T) {
+	for _, serial := range []bool{false, true} {
+		t.Run(fmt.Sprintf("serial=%v", serial), func(t *testing.T) {
+			var active, peak atomic.Int64
+			const root = "/redfish/v1/"
+			const chassis = root + "Chassis/1"
+			const sensors = chassis + "/Sensors"
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case root:
+					writeJSON(w, sourceTestResource(root, "ServiceRoot", "Root", map[string]any{
+						"RedfishVersion": "1.20.0", "Chassis": sourceTestLink(root + "Chassis"),
+						"ProtocolFeaturesSupported": map[string]any{"MultipleHTTPRequests": !serial},
+					}))
+				case root + "Chassis":
+					writeJSON(w, sourceTestCollection(r.URL.Path, "Chassis", chassis))
+				case chassis:
+					writeJSON(
+						w,
+						sourceTestResource(
+							chassis,
+							"Chassis",
+							"Chassis",
+							map[string]any{"Sensors": sourceTestLink(sensors)},
+						),
+					)
+				case sensors:
+					writeJSON(
+						w,
+						sourceTestCollection(sensors, "Sensor", sensors+"/1", sensors+"/2", sensors+"/3", sensors+"/4"),
+					)
+				default:
+					n := active.Add(1)
+					defer active.Add(-1)
+					for previous := peak.Load(); n > previous; previous = peak.Load() {
+						if peak.CompareAndSwap(previous, n) {
+							break
+						}
+					}
+					// Keep responses overlapping long enough to observe the configured ceiling.
+					time.Sleep(10 * time.Millisecond)
+					writeJSON(
+						w,
+						sourceTestResource(
+							r.URL.Path,
+							"Sensor",
+							"Sensor",
+							map[string]any{"Reading": 0, "ReadingType": "Temperature", "ReadingUnits": "Cel"},
+						),
+					)
+				}
+			}))
+			defer server.Close()
+			cfg := testConfig(server.URL, "none")
+			cfg.MaxConcurrentRequests = 2
+			client := newTestProtocolClient(t, cfg)
+			result, err := client.Collect(t.Context())
+			require.NoError(t, err)
+			require.True(t, result.Complete)
+			if serial {
+				assert.Equal(t, int64(1), peak.Load())
+			} else {
+				assert.Equal(t, int64(2), peak.Load())
+			}
+		})
+	}
+}
+
+func TestSDKValidatesSessionLocationBeforeOriginIsDiscarded(t *testing.T) {
+	for _, style := range []string{"relative", "absolute", "foreign"} {
+		t.Run(style, func(t *testing.T) {
+			var endpoint string
+			var deleted atomic.Int64
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodGet:
+					serveServiceRoot(w, true)
+				case http.MethodPost:
+					location := "/redfish/v1/SessionService/Sessions/1"
+					if style == "absolute" {
+						location = endpoint + location
+					}
+					if style == "foreign" {
+						location = "https://foreign.invalid" + location
+					}
+					w.Header().Set("X-Auth-Token", "test-token")
+					w.Header().Set("Location", location)
+					w.WriteHeader(http.StatusCreated)
+					_, _ = w.Write([]byte(`{}`))
+				case http.MethodDelete:
+					assert.Equal(t, "/redfish/v1/SessionService/Sessions/1", r.URL.Path)
+					assert.Equal(t, "test-token", r.Header.Get("X-Auth-Token"))
+					deleted.Add(1)
+					w.WriteHeader(http.StatusNoContent)
+				}
+			}))
+			defer server.Close()
+			endpoint = server.URL
+			client := newTestProtocolClient(t, testConfig(endpoint, "session"))
+			err := client.initializeAuthentication(t.Context(), nil)
+			if style == "foreign" {
+				require.ErrorContains(t, err, "invalid Location")
+			} else {
+				require.NoError(t, err)
+			}
+			client.Close()
+			if style == "foreign" {
+				assert.Zero(t, deleted.Load())
+			} else {
+				assert.Equal(t, int64(1), deleted.Load())
+			}
+		})
+	}
 }

@@ -42,7 +42,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			vec,
 			"collection_http_requests",
 			"started",
-			"retried",
 			"redirected",
 		),
 		operations: gaugeMap(vec, "collection_operations", "successful", "failed"),

@@ -18,26 +18,23 @@ import (
 )
 
 type redfishTestServerConfig struct {
-	requireBasic                bool
-	supportSession              bool
-	sessionStatus               int
-	rootRedirect                string
-	rootHits                    *atomic.Int64
-	failSystems                 *atomic.Bool
-	expireSessionOnce           *atomic.Bool
-	malformedSessionBody        bool
-	badDirectSession            bool
-	sessionDeleteStatus         int
-	sessionDeleteStatusSequence []int
+	requireBasic         bool
+	supportSession       bool
+	sessionStatus        int
+	rootRedirect         string
+	rootHits             *atomic.Int64
+	failSystems          *atomic.Bool
+	expireSessionOnce    *atomic.Bool
+	malformedSessionBody bool
+	sessionDeleteStatus  int
 }
 
 type redfishTestServer struct {
 	*httptest.Server
-	sessionCreates            atomic.Int64
-	sessionDeletes            atomic.Int64
-	activeSessions            atomic.Int64
-	basicRequests             atomic.Int64
-	unsupportedSessionCreates atomic.Int64
+	sessionCreates atomic.Int64
+	sessionDeletes atomic.Int64
+	activeSessions atomic.Int64
+	basicRequests  atomic.Int64
 }
 
 func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTestServer {
@@ -122,11 +119,6 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 			})
 			return
 		}
-		if r.URL.Path == "/redfish/v1/UnsupportedSessions" && r.Method == http.MethodPost {
-			state.unsupportedSessionCreates.Add(1)
-			http.Error(w, "unsupported", http.StatusNotImplemented)
-			return
-		}
 		if strings.HasPrefix(r.URL.Path, "/redfish/v1/SessionService/Sessions/") && r.Method == http.MethodDelete {
 			token := r.Header.Get("X-Auth-Token")
 			mu.Lock()
@@ -136,11 +128,8 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
-			attempt := state.sessionDeletes.Add(1)
+			state.sessionDeletes.Add(1)
 			status := cfg.sessionDeleteStatus
-			if index := int(attempt - 1); index < len(cfg.sessionDeleteStatusSequence) {
-				status = cfg.sessionDeleteStatusSequence[index]
-			}
 			if status == 0 {
 				status = http.StatusNoContent
 			}
@@ -153,16 +142,6 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 				}
 			}
 			w.WriteHeader(status)
-			return
-		}
-		if r.URL.Path == "/redfish/v1/SessionService" {
-			writeJSON(w, map[string]any{
-				"@odata.id":   r.URL.Path,
-				"@odata.type": "#SessionService.v1_2_0.SessionService",
-				"Id":          "SessionService",
-				"Name":        "Session Service",
-				"Sessions":    map[string]any{"@odata.id": "/redfish/v1/SessionService/Sessions"},
-			})
 			return
 		}
 
@@ -185,11 +164,10 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 
 		switch r.URL.Path {
 		case "/redfish/v1/":
-			serveServiceRootConfigured(
+			serveServiceRootAt(
 				w,
 				"/redfish/v1/",
 				cfg.supportSession || cfg.sessionStatus != 0,
-				cfg.badDirectSession,
 			)
 		case "/redfish/v1/Systems":
 			if cfg.failSystems != nil && cfg.failSystems.Load() {
@@ -216,18 +194,13 @@ func newRedfishTestServer(t *testing.T, cfg redfishTestServerConfig) *redfishTes
 }
 
 func serveServiceRoot(w http.ResponseWriter, session bool) {
-	serveServiceRootConfigured(w, "/redfish/v1/", session, false)
+	serveServiceRootAt(w, "/redfish/v1/", session)
 }
 
-func serveServiceRootAt(w http.ResponseWriter, resourceURI string, session bool) {
-	serveServiceRootConfigured(w, resourceURI, session, false)
-}
-
-func serveServiceRootConfigured(
+func serveServiceRootAt(
 	w http.ResponseWriter,
 	resourceURI string,
 	session bool,
-	badDirectSession bool,
 ) {
 	document := map[string]any{
 		"@odata.id":      resourceURI,
@@ -241,10 +214,8 @@ func serveServiceRootConfigured(
 	}
 	if session {
 		document["SessionService"] = map[string]any{"@odata.id": "/redfish/v1/SessionService"}
-	}
-	if badDirectSession {
 		document["Links"] = map[string]any{
-			"Sessions": map[string]any{"@odata.id": "/redfish/v1/UnsupportedSessions"},
+			"Sessions": map[string]any{"@odata.id": "/redfish/v1/SessionService/Sessions"},
 		}
 	}
 	writeJSON(w, document)
@@ -321,7 +292,7 @@ func fetchTestCollection(
 	ref string,
 	stats *wireStats,
 ) ([]redfishLink, bool, error) {
-	members, complete, err := c.fetchCollectionMembers(ctx, ref, "", stats)
+	members, complete, err := c.fetchCollectionMembers(ctx, ref, stats)
 	result := make([]redfishLink, len(members))
 	for i, member := range members {
 		result[i] = member.Ref
@@ -352,4 +323,23 @@ func (t *requestRecordingTransport) CloseIdleConnections() {
 	if closer, ok := t.base.(interface{ CloseIdleConnections() }); ok {
 		closer.CloseIdleConnections()
 	}
+}
+
+// Resource unit tests supply only the resource under test; SDK connections also
+// read the ServiceRoot. Lifecycle tests use their own full endpoint fixtures.
+func newResourceTestServer(handler http.Handler) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/redfish/v1/" {
+			serveServiceRoot(w, false)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	}))
+}
+
+func newTestResourceClient(t *testing.T, cfg Config) *protocolClient {
+	t.Helper()
+	c := newTestProtocolClient(t, cfg)
+	require.NoError(t, c.initializeAuthentication(t.Context(), nil))
+	return c
 }

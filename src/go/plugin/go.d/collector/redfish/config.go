@@ -17,7 +17,6 @@ import (
 const (
 	defaultUpdateEvery           = 60
 	defaultAuthMethod            = "auto"
-	defaultRetries               = 2
 	defaultMaxConcurrentRequests = 3
 	defaultCollect               = "*"
 )
@@ -52,7 +51,6 @@ type Config struct {
 	Password   string `yaml:"password,omitempty"    json:"password"`
 
 	Timeout               confopt.Duration `yaml:"timeout,omitempty"                 json:"timeout"`
-	Retries               *int             `yaml:"retries,omitempty"                 json:"retries"`
 	MaxConcurrentRequests int              `yaml:"max_concurrent_requests,omitempty" json:"max_concurrent_requests"`
 	ProxyURL              string           `yaml:"proxy_url,omitempty"               json:"proxy_url"`
 	TLSCA                 string           `yaml:"tls_ca,omitempty"                  json:"tls_ca"`
@@ -81,9 +79,6 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Timeout.Duration() == 0 {
 		c.Timeout = defaultTimeout
-	}
-	if c.Retries == nil {
-		c.Retries = new(defaultRetries)
 	}
 	if c.MaxConcurrentRequests == 0 {
 		c.MaxConcurrentRequests = defaultMaxConcurrentRequests
@@ -118,9 +113,6 @@ func (c Config) validate() error {
 	}
 	if c.Timeout.Duration() <= 0 {
 		errs = append(errs, errors.New("'timeout' must be positive"))
-	}
-	if c.Retries == nil || *c.Retries < 0 {
-		errs = append(errs, errors.New("'retries' must be non-negative"))
 	}
 	if c.MaxConcurrentRequests <= 0 {
 		errs = append(errs, errors.New("'max_concurrent_requests' must be positive"))

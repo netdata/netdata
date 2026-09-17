@@ -62,13 +62,6 @@
         "exclusiveMinimum": 0,
         "default": 15
       },
-      "retries": {
-        "title": "GET retries",
-        "description": "Number of extra attempts for a request that fails with a transient error.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 2
-      },
       "max_concurrent_requests": {
         "title": "Maximum concurrent requests",
         "description": "Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit.",
@@ -215,7 +208,6 @@
           "title": "HTTP",
           "fields": [
             "timeout",
-            "retries",
             "max_concurrent_requests",
             "proxy_url"
           ]

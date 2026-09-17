@@ -216,20 +216,6 @@ func compileConfigSchema(t *testing.T) *jsonschema.Schema {
 	return schema
 }
 
-func TestConfigDefaultsPreserveExplicitZeroSemantics(t *testing.T) {
-	zero := 0
-	cfg := Config{
-		URL:        "https://bmc.example.test",
-		AuthMethod: "none",
-		Retries:    &zero,
-	}
-
-	cfg.applyDefaults()
-
-	require.Zero(t, *cfg.Retries)
-	require.NoError(t, cfg.validate())
-}
-
 func TestConfigValidation(t *testing.T) {
 	tests := map[string]struct {
 		cfg     Config

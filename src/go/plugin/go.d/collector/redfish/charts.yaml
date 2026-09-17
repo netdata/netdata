@@ -10051,7 +10051,6 @@ groups:
           - collection_failures_tls
           - collection_failures_transport
           - collection_http_requests_redirected
-          - collection_http_requests_retried
           - collection_http_requests_started
           - collection_operations_failed
           - collection_operations_successful
@@ -10118,8 +10117,6 @@ groups:
             dimensions:
               - selector: collection_http_requests_started
                 name: started
-              - selector: collection_http_requests_retried
-                name: retried
               - selector: collection_http_requests_redirected
                 name: redirected
           - id: redfish_collection_operations

@@ -8,7 +8,6 @@
   "username": "monitoring",
   "password": "test-password",
   "timeout": 15,
-  "retries": 2,
   "max_concurrent_requests": 3,
   "proxy_url": "http://proxy.example.test:8080",
   "tls_ca": "/etc/netdata/bmc-ca.pem",

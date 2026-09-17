@@ -44,8 +44,6 @@ func BenchmarkCollectionPage(b *testing.B) {
 				body: body,
 			},
 			nil,
-			"sensor",
-			false,
 		)
 		if err != nil || !complete || len(got) != len(members) {
 			b.Fatalf("members=%d complete=%v err=%v", len(got), complete, err)

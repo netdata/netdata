@@ -197,16 +197,6 @@
       "source": "mockups/DSP2046-examples/ServiceRoot-v1-example.json"
     },
     {
-      "schema": "Session",
-      "odata_type": "#Session.v1_8_0.Session",
-      "source": "mockups/DSP2046-examples/Session-v1-example.json"
-    },
-    {
-      "schema": "SessionService",
-      "odata_type": "#SessionService.v1_2_0.SessionService",
-      "source": "mockups/DSP2046-examples/SessionService-v1-example.json"
-    },
-    {
       "schema": "SoftwareInventory",
       "odata_type": "#SoftwareInventory.v1_14_0.SoftwareInventory",
       "source": "mockups/DSP2046-examples/SoftwareInventory-v1-example.json"

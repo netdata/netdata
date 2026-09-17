@@ -4,7 +4,6 @@ package redfish
 
 import (
 	"encoding/json"
-	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -88,19 +87,14 @@ func BenchmarkGraphResourceDecode(b *testing.B) {
 			body := []byte(
 				`{"@odata.id":"/redfish/v1/Sensors/1","@odata.type":"#Sensor.v1_0_0.Sensor","Id":"1","Name":"Sensor","Status":{"Health":"OK","Conditions":[{"Severity":"Warning","MessageArgs":["a"]}]},"ReadingType":"Temperature","ReadingUnits":"Cel","Reading":42` + extra + `}`,
 			)
-			header := http.Header{
-				"Content-Type":  {"application/json"},
-				"Odata-Version": {"4.0"},
-			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
 				_, err := client.graphNodeFromResponse(
 					"sensor",
 					&responseData{
-						url:    target,
-						header: header,
-						body:   body,
+						url:  target,
+						body: body,
 					},
 					"",
 				)

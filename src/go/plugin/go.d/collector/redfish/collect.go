@@ -23,18 +23,17 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 			Resources:    make(map[string]int),
 		},
 	}
-	result.Diagnostics = append(result.Diagnostics, c.takeCompatibilityDiagnostics()...)
 	defer func() {
-		result.Diagnostics = appendUniqueDiagnostics(result.Diagnostics, responseCompatibilityDiagnostics(stats)...)
-		if diagnostic := c.takeExpansionFallbackDiagnostic(); diagnostic != "" {
-			result.Diagnostics = appendUniqueDiagnostics(result.Diagnostics, diagnostic)
+		if c.authMode == "session" && stats.unauthorized {
+			c.Close()
 		}
+		result.Metrics.Duration = time.Since(started).Seconds()
 	}()
 
 	err = c.initializeAuthentication(ctx, stats)
 	var root *serviceRootDocument
 	if err == nil {
-		root, err = c.fetchServiceRoot(ctx, true, stats)
+		root, err = c.fetchServiceRoot(ctx, stats)
 	}
 	if err != nil {
 		result.Metrics.Status = "unavailable"
@@ -104,7 +103,6 @@ func (c *protocolClient) finishCollectionResult(
 
 func (c *protocolClient) copyWireStats(metrics *cycleMetrics, stats *wireStats) {
 	metrics.HTTPRequests["started"] = stats.started
-	metrics.HTTPRequests["retried"] = stats.retried
 	metrics.HTTPRequests["redirected"] = stats.redirected
 	metrics.Operations["successful"] = stats.successful
 	metrics.Operations["failed"] = stats.failed
