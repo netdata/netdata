@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/testutil"
+
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
@@ -22,16 +24,16 @@ const asyncTestTimeout = 10 * time.Second
 func TestProtocolClientBasicCheckAndCollect(t *testing.T) {
 	t.Parallel()
 
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		requireBasic: true,
+	server := testutil.NewServer(t, testutil.ServerConfig{
+		RequireBasic: true,
 	})
 	defer server.Close()
 
 	cfg := testConfig(server.URL, "basic")
-	client := newTestProtocolClient(t, cfg)
+	client := newTestCollector(t, cfg)
 	require.NoError(t, client.Check(context.Background()))
 
-	result, err := client.Collect(context.Background())
+	result, err := client.collect(context.Background())
 	require.NoError(t, err)
 	assert.True(t, result.Complete)
 	assert.Equal(t, "success", result.Metrics.Status)
@@ -49,85 +51,22 @@ func TestProtocolClientBasicCheckAndCollect(t *testing.T) {
 	collecttest.AssertChartCoverage(t, coverage, collecttest.ChartCoverageExpectation{})
 }
 
-func TestProtocolClientCancellationMarksUnvisitedMembersUnknown(t *testing.T) {
-	t.Parallel()
-
-	blocked := make(chan struct{}, 2)
-	server := newResourceTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/redfish/v1/Systems/1" {
-			select {
-			case blocked <- struct{}{}:
-			case <-r.Context().Done():
-				return
-			}
-			<-r.Context().Done()
-			return
-		}
-		serveBaseResource(w, r.URL.Path, "#ComputerSystem.v1_20_0.ComputerSystem", r.URL.Path)
-	}))
-	defer server.Close()
-
-	client := newTestResourceClient(t, testConfig(server.URL, "none"))
-	recorder := &requestRecordingTransport{
-		base: client.http.Transport,
-	}
-	client.http.Transport = recorder
-	members := []collectionMember{
-		{Ref: redfishLink{
-			ODataID: "/redfish/v1/Systems/1",
-		}},
-		{Ref: redfishLink{
-			ODataID: "/redfish/v1/Systems/2",
-		}},
-		{Ref: redfishLink{
-			ODataID: "/redfish/v1/Systems/3",
-		}},
-	}
-	for range 2 {
-		ctx, cancel := context.WithCancel(context.Background())
-		result := make(chan error, 1)
-		go func() {
-			resources, err := client.fetchBaseMembers(ctx, "system", members, nil)
-			assert.Equal(t, []baseResource{
-				{Kind: "system", URI: "/redfish/v1/Systems/1", AcquisitionState: "unreadable"},
-				{Kind: "system", URI: "/redfish/v1/Systems/2", AcquisitionState: "unknown"},
-				{Kind: "system", URI: "/redfish/v1/Systems/3", AcquisitionState: "unknown"},
-			}, resources)
-			result <- err
-		}()
-		select {
-		case <-blocked:
-		case <-time.After(asyncTestTimeout):
-			cancel()
-			t.Fatal("timed out waiting for blocked Redfish member request")
-		}
-		cancel()
-		select {
-		case err := <-result:
-			require.ErrorIs(t, err, context.Canceled)
-		case <-time.After(asyncTestTimeout):
-			t.Fatal("timed out waiting for canceled Redfish member collection")
-		}
-	}
-	assert.Equal(t, []string{"/redfish/v1/Systems/1", "/redfish/v1/Systems/1"}, recorder.paths())
-}
-
 func TestProtocolClientRetainsLastCompleteMembershipWithoutReplayingCurrentState(t *testing.T) {
 	t.Parallel()
 
-	var failSystems atomic.Bool
-	server := newRedfishTestServer(t, redfishTestServerConfig{
-		failSystems: &failSystems,
+	var FailSystems atomic.Bool
+	server := testutil.NewServer(t, testutil.ServerConfig{
+		FailSystems: &FailSystems,
 	})
 	defer server.Close()
 
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-	first, err := client.Collect(context.Background())
+	client := newTestCollector(t, testConfig(server.URL, "none"))
+	first, err := client.collect(context.Background())
 	require.NoError(t, err)
 	require.True(t, first.Complete)
 
-	failSystems.Store(true)
-	second, err := client.Collect(context.Background())
+	FailSystems.Store(true)
+	second, err := client.collect(context.Background())
 	require.Error(t, err)
 	assert.False(t, second.Complete)
 	assert.Equal(t, "partial", second.Metrics.Status)
@@ -150,11 +89,11 @@ func TestProtocolClientRetainsPartialMembershipUntilAuthoritativeRemoval(t *test
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/redfish/v1/":
-			serveServiceRoot(w, false)
+			testutil.ServeServiceRoot(w, false)
 		case "/redfish/v1/Systems":
 			switch phase.Load() {
 			case 0:
-				writeJSON(w, map[string]any{
+				testutil.WriteJSON(w, map[string]any{
 					"@odata.id": r.URL.Path, "@odata.type": "#ComputerSystemCollection.ComputerSystemCollection",
 					"Members@odata.count": 2,
 					"Members": []any{
@@ -165,31 +104,31 @@ func TestProtocolClientRetainsPartialMembershipUntilAuthoritativeRemoval(t *test
 			case 1:
 				http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			default:
-				serveCollection(w, r.URL.Path)
+				testutil.ServeCollection(w, r.URL.Path)
 			}
 		case "/redfish/v1/Systems/1":
-			serveBaseResource(w, r.URL.Path, "#ComputerSystem.v1_21_0.ComputerSystem", "System")
+			testutil.ServeBaseResource(w, r.URL.Path, "#ComputerSystem.v1_21_0.ComputerSystem", "System")
 		case "/redfish/v1/Chassis", "/redfish/v1/Managers":
-			serveCollection(w, r.URL.Path)
+			testutil.ServeCollection(w, r.URL.Path)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-	first, err := client.Collect(context.Background())
+	client := newTestCollector(t, testConfig(server.URL, "none"))
+	first, err := client.collect(context.Background())
 	require.Error(t, err)
 	assert.False(t, first.Complete)
 	assert.Equal(t, map[string]int{"discovered": 2, "readable": 2}, first.Metrics.Resources)
 	phase.Store(1)
-	second, err := client.Collect(context.Background())
+	second, err := client.collect(context.Background())
 	require.Error(t, err)
 	assert.Equal(t, map[string]int{"discovered": 2, "readable": 1, "unknown": 1}, second.Metrics.Resources)
 	for _, metric := range second.Hardware {
 		assert.NotEqual(t, "system_health", metric.Metric, "previous health must never be replayed")
 	}
 	phase.Store(2)
-	third, err := client.Collect(context.Background())
+	third, err := client.collect(context.Background())
 	require.NoError(t, err)
 	assert.True(t, third.Complete)
 	assert.Equal(t, map[string]int{"discovered": 1, "readable": 1}, third.Metrics.Resources)
@@ -203,28 +142,28 @@ func TestMalformedBaseLinkRetainsUnknownMembership(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/redfish/v1/":
-			systems := any(sourceTestLink("/redfish/v1/Systems"))
+			systems := any(testutil.Link("/redfish/v1/Systems"))
 			if malformed.Load() {
 				systems = map[string]any{"Name": "missing link"}
 			}
-			writeJSON(w, sourceTestResource(r.URL.Path, "ServiceRoot", "Root", map[string]any{
+			testutil.WriteJSON(w, testutil.Resource(r.URL.Path, "ServiceRoot", "Root", map[string]any{
 				"RedfishVersion": "1.20.0", "Systems": systems,
 			}))
 		case "/redfish/v1/Systems":
-			serveCollection(w, r.URL.Path, "/redfish/v1/Systems/1")
+			testutil.ServeCollection(w, r.URL.Path, "/redfish/v1/Systems/1")
 		case "/redfish/v1/Systems/1":
-			serveBaseResource(w, r.URL.Path, "#ComputerSystem.v1_0_0.ComputerSystem", "System")
+			testutil.ServeBaseResource(w, r.URL.Path, "#ComputerSystem.v1_0_0.ComputerSystem", "System")
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer server.Close()
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-	result, err := client.Collect(t.Context())
+	client := newTestCollector(t, testConfig(server.URL, "none"))
+	result, err := client.collect(t.Context())
 	require.NoError(t, err)
 	assert.True(t, result.Complete)
 	malformed.Store(true)
-	result, err = client.Collect(t.Context())
+	result, err = client.collect(t.Context())
 	require.Error(t, err)
 	assert.Equal(t, "partial", result.Metrics.Status)
 	assert.Equal(t, 1, result.Metrics.Resources["unknown"])

@@ -14,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
@@ -40,11 +41,12 @@ func init() {
 
 type endpointClient interface {
 	Check(context.Context) error
-	Collect(context.Context) (collectionResult, error)
+	Acquire(context.Context) (acquisition.Result, error)
 	Close()
 }
 
 type collectionResult struct {
+	AuthMethod  string
 	ObservedAt  time.Time
 	Metrics     cycleMetrics
 	Hardware    []measurement.Observation
@@ -63,8 +65,9 @@ type Collector struct {
 	endpointKey string
 
 	client             endpointClient
+	measurement        *measurement.Projector
 	httpClient         *http.Client
-	newClient          func(Config, *http.Client) (endpointClient, error)
+	newClient          func(acquisition.Options, *http.Client) (endpointClient, error)
 	now                func() time.Time
 	warningMu          sync.Mutex
 	warnedDiagnostics  map[string]struct{}
@@ -83,11 +86,13 @@ func New() *Collector {
 			MaxConcurrentRequests: defaultMaxConcurrentRequests,
 			Collect:               defaultCollect,
 		},
-		store:     store,
-		metrics:   newCollectorMetrics(store),
-		hardware:  newHardwareMetrics(store),
-		newClient: newEndpointClient,
-		now:       time.Now,
+		store:    store,
+		metrics:  newCollectorMetrics(store),
+		hardware: newHardwareMetrics(store),
+		newClient: func(opts acquisition.Options, client *http.Client) (endpointClient, error) {
+			return acquisition.New(opts, client)
+		},
+		now: time.Now,
 	}
 }
 
@@ -105,7 +110,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return fmt.Errorf("config validation: %w", err)
 	}
 
-	root, origin, _ := normalizeServiceRoot(c.URL)
+	root, origin, _ := acquisition.NormalizeServiceRoot(c.URL)
 	if root.Scheme == "http" {
 		c.Warningf("Redfish endpoint %s uses unencrypted HTTP; credentials and metrics can be intercepted", origin)
 	} else if c.TLSSkipVerify {
@@ -117,12 +122,23 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("init HTTP client: %w", err)
 	}
-	c.client, err = c.newClient(c.Config, c.httpClient)
+	c.client, err = c.newClient(
+		acquisition.Options{
+			URL:                   c.URL,
+			AuthMethod:            c.AuthMethod,
+			Username:              c.Username,
+			Password:              c.Password,
+			MaxConcurrentRequests: c.MaxConcurrentRequests,
+			Collect:               c.Config.Collect,
+		},
+		c.httpClient,
+	)
 	if err != nil {
 		c.httpClient.CloseIdleConnections()
 		c.httpClient = nil
 		return fmt.Errorf("init Redfish client: %w", err)
 	}
+	c.measurement = measurement.New(origin, c.Name, acquisition.ReadingProvenanceResolver(root, origin))
 	return nil
 }
 
@@ -138,34 +154,23 @@ func (c *Collector) Check(ctx context.Context) error {
 }
 
 func (c *Collector) Collect(ctx context.Context) error {
-	started := c.now()
 	if c.client == nil {
 		return errors.New("Redfish client is not initialized")
 	}
 
 	cycleCtx, cancel := context.WithTimeout(ctx, time.Duration(c.UpdateEvery)*time.Second)
 	defer cancel()
-	result, err := c.client.Collect(cycleCtx)
-	if reporter, ok := c.client.(interface{ selectedAuthenticationMethod() string }); ok {
-		if method := reporter.selectedAuthenticationMethod(); method != "" {
-			c.authSelectionOnce.Do(func() {
-				c.Infof("Redfish authentication method selected: %s", method)
-			})
-		}
+	result, err := c.collect(cycleCtx)
+	if result.AuthMethod != "" {
+		c.authSelectionOnce.Do(func() { c.Infof("Redfish authentication method selected: %s", result.AuthMethod) })
 	}
-	if result.Metrics.Duration == 0 {
-		result.Metrics.Duration = c.now().Sub(started).Seconds()
-	}
-	if err := contextError(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	c.warnCollectionDiagnostics(result.Diagnostics)
 	c.metrics.observe(c.endpointKey, c.Name, result.Metrics)
 	c.hardware.observe(result.Hardware)
 
-	if err != nil && result.Metrics.Status == "" {
-		return err
-	}
 	if err != nil {
 		c.Limit("redfish:partial-collection", 1, time.Hour).
 			Warningf("Redfish partial collection error: %v", err)
@@ -180,7 +185,7 @@ func (c *Collector) warnCollectionDiagnostics(diagnostics []string) {
 		c.warnedDiagnostics = make(map[string]struct{})
 	}
 	for _, diagnostic := range diagnostics {
-		diagnostic = boundedDiagnostic(strings.TrimSpace(diagnostic))
+		diagnostic = acquisition.BoundDiagnostic(strings.TrimSpace(diagnostic))
 		if diagnostic == "" {
 			continue
 		}
@@ -206,6 +211,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.client.Close()
 		c.client = nil
 	}
+	c.measurement = nil
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 		c.httpClient = nil
@@ -215,14 +221,3 @@ func (c *Collector) Cleanup(ctx context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
-
-func contextError(ctx context.Context) error {
-	if ctx == nil {
-		return nil
-	}
-	return ctx.Err()
-}
-
-func isCallerContextError(err error) bool {
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
-}
