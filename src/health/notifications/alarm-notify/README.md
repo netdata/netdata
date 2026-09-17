@@ -213,7 +213,8 @@ Explicitly selecting an unknown or unimplemented method is an error. All files m
 Activation requires exact `SEND_<METHOD>=YES` (also `AUTO` for email), the method's nonempty prerequisites and,
 for recipient-based methods, an eligible recipient. Without stock configuration, recipient-based methods and Kafka
 default to `YES`. Dynatrace, SIGNL4, Opsgenie and ilert need an explicit `YES`, normally supplied by the stock file.
-Missing prerequisites or required recipients disable that method. Kafka and SIGNL4 are global: they send once when
+Missing prerequisites or required recipients disable that method, except that an obsolete ilert source URL is rejected
+before credential gating (see below). Kafka, SIGNL4, Dynatrace, Opsgenie and ilert are global: they send once when
 enabled and configured, regardless of roles, including reserved roles. Gotify, Discord and Flock send once only when at least one
 recipient survives filtering. Email, Prowl and SMSEagle batch their final eligible recipients. Teams sends once per distinct final URL after recipient filtering. Other mappings send
 once per distinct eligible target.
@@ -228,16 +229,19 @@ attempted successes and failures; filtering happens before the plan is built, so
 |---|---|
 | `alerta` | `ALERTA_WEBHOOK_URL`, optional `ALERTA_API_KEY`; recipient is the environment |
 | `discord` | `DISCORD_WEBHOOK_URL`; recipients gate the single native webhook send |
+| `dynatrace` | `DYNATRACE_SERVER`, `DYNATRACE_SPACE`, `DYNATRACE_TOKEN`, `DYNATRACE_TAG_VALUE`, `DYNATRACE_EVENT`, optional `DYNATRACE_ANNOTATION_TYPE`; global Events API v2 send |
 | `email` | `sendmail`, `EMAIL_SENDER`, `EMAIL_PLAINTEXT_ONLY=YES`, `EMAIL_THREADING` (enabled unless `NO`); recipients are mail addresses/local users |
 | `fleep` | `FLEEP_SENDER` (initially the event node); each recipient is a hook ID appended to `https://fleep.io/hook/` |
 | `flock` | `FLOCK_WEBHOOK_URL`; recipients gate the single webhook send |
 | `gotify` | `GOTIFY_APP_URL`, `GOTIFY_APP_TOKEN`; recipients gate the single application send |
+| `ilert` | `ILERT_INTEGRATION_KEY`, optional `ILERT_API_URL`; global Event API send using an API alert source; obsolete `ILERT_ALERT_SOURCE_URL` must be empty |
 | `irc` | `nc`, `IRC_NETWORK`, `IRC_PORT` (initially `6667`), `IRC_NICKNAME`, `IRC_REALNAME`; recipient is a channel |
 | `kavenegar` | `KAVENEGAR_API_KEY`, `KAVENEGAR_SENDER`; recipient is a phone number |
 | `matrix` | `MATRIX_HOMESERVER`, `MATRIX_ACCESSTOKEN`; recipient is a room ID |
 | `messagebird` | `MESSAGEBIRD_ACCESS_KEY`, `MESSAGEBIRD_NUMBER`; recipient is a phone number |
 | `msteams` | `MSTEAMS_WEBHOOK_URL`, `MSTEAMS_ICON_<STATUS>`, `MSTEAMS_COLOR_<STATUS>`; recipient replaces each `CHANNEL` in the URL; singular `MSTEAM_*` aliases are supported |
 | `ntfy` | Recipient is a full topic URL; a complete `NTFY_USERNAME`/`NTFY_PASSWORD` pair takes precedence over `NTFY_ACCESS_TOKEN`; an incomplete pair is ignored |
+| `opsgenie` | `OPSGENIE_API_KEY`, optional `OPSGENIE_API_URL`; global Alert API v2 send using an API Integration |
 | `pd` | Recipient is the integration key; exact `USE_PD_VERSION=2` selects v2, other values select v1 |
 | `prowl` | Recipients are API keys, submitted together |
 | `pushbullet` | `PUSHBULLET_ACCESS_TOKEN`, optional `PUSHBULLET_SOURCE_DEVICE`; recipient is an email or `#channel-tag` |
@@ -281,17 +285,78 @@ settings derived during evaluation retain their assignment-time expansions. Use 
 contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
 implementation.
 
-Five retained legacy mappings remain pending: ilert API alert-source setup, Opsgenie Alert API v2 integration setup,
-Dynatrace Events v2 settings, AWS SNS credentials/message templates, and Unix `custom_sender()` execution. Enabled, configured selections fail before any sends once applicable recipient
-requirements are met. Dynatrace, Opsgenie and ilert are global and require no recipients. The check does not probe
-AWS CLI availability or require a custom global default when a role already selects a custom recipient. It exposes
-pending work rather than attempting those unimplemented runtime checks. HipChat is explicitly excluded and also
-errors when eligible. Function bodies remain inert, including `custom_sender()` and helpers; no original configuration file is sourced.
+Two retained legacy mappings remain pending: AWS SNS credentials/message templates and Unix `custom_sender()`
+execution. Enabled, configured selections fail before any sends once applicable recipient requirements are met.
+The check does not probe AWS CLI availability or require a custom global default when a role already selects a
+custom recipient. It exposes pending work rather than attempting those unimplemented runtime checks. HipChat is
+explicitly excluded and also errors when eligible. Function bodies remain inert, including `custom_sender()` and
+helpers; no original configuration file is sourced.
 
 Five Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
 PagerDuty/Prowl/ntfy can use role recipients without a global default; ntfy sends the resolved filtered recipients;
 Fleep does not require the unused `FLEEP_SERVER` setting; and Teams sends once per distinct resolved URL.
 Production Bash and installation remain unchanged.
+
+### Legacy ilert, Opsgenie and Dynatrace settings
+
+These mappings use the same APIs, payloads and incident identity as the native YAML providers. Reading shell-format
+settings does not preserve the old service-side integration setup. All three require exact `SEND_<METHOD>=YES` and
+send once without recipients or recipient policies, even for `silent`/`disabled` roles.
+
+For [ilert](#ilert), create an **API alert source** and configure its integration key. This is different from the old
+Netdata-specific alert source and URL; the adapter does not extract a credential from that URL.
+
+```sh
+SEND_ILERT=YES
+ILERT_ALERT_SOURCE_URL=''
+ILERT_INTEGRATION_KEY='replace-with-api-source-key'
+# Optional; this is the default base, before /events:
+ILERT_API_URL='https://api.ilert.com/api'
+```
+
+When ilert is selected and enabled, any nonempty `ILERT_ALERT_SOURCE_URL` rejects the entire invocation before any
+send, including when `ILERT_INTEGRATION_KEY` is also set. Clear or remove the old URL assignment, including any value
+in an earlier loaded file. Disabled/unselected ilert ignores it. With neither a key nor an old URL, ilert is inactive.
+WARNING/CRITICAL send `ALERT`; CLEAR sends `RESOLVE` with the same stable incident key.
+
+For [Opsgenie](#opsgenie-alerts), use the key from an **API Integration**, replacing the old Netdata integration setup.
+The existing setting names remain:
+
+```sh
+SEND_OPSGENIE=YES
+OPSGENIE_API_KEY='replace-with-api-integration-key'
+# Optional; omit or leave empty for https://api.opsgenie.com:
+OPSGENIE_API_URL='https://api.eu.opsgenie.com'
+```
+
+WARNING/CRITICAL create P3/P1 alerts; CLEAR closes the stable incident alias. API acceptance is asynchronous and
+uses the same acknowledgment checks as native delivery.
+
+For [Dynatrace](#dynatrace), the API token needs `events.ingest`. The existing server/space settings form the environment
+base `DYNATRACE_SERVER/e/DYNATRACE_SPACE`, followed by `/api/v2/events/ingest`. One optional trailing slash on the
+server is reused as the separator; additional slashes and encoded path segments are retained. No hostname or SaaS
+URL is inferred. Use native YAML's explicit `api_url` for a different environment URL layout.
+
+```sh
+SEND_DYNATRACE=YES
+DYNATRACE_SERVER='https://monitor.example.test'
+DYNATRACE_SPACE='environment-id'
+DYNATRACE_TOKEN='replace-with-events-ingest-token'
+DYNATRACE_TAG_VALUE='netdata'
+DYNATRACE_EVENT='CUSTOM_INFO'
+DYNATRACE_ANNOTATION_TYPE='Netdata Alarm'
+```
+
+Server, space, token, tag and event type must all be nonempty to activate delivery. An empty or unset annotation type
+uses the native `Netdata Alarm` source. The tag selects HOST entities with that one literal manual tag, for example
+`type(HOST),tag("netdata")`. Commas/parentheses remain quoted data; literal colons are backslash-escaped to avoid
+key/value interpretation, following the [entity-selector syntax](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/entity-v2/entity-selector).
+Tags with boundary whitespace, leading `[`, quotes, backslashes, tildes or control characters are rejected because
+the adapter cannot establish their literal selector interpretation. Use native YAML's explicit `entity_selector` for
+these cases or richer targeting. Spaces are URL-encoded in the environment ID; dot segments, path separators,
+percent encodings and control characters are rejected. Server URLs cannot contain credentials, queries or fragments.
+The configured event type applies to every status, including CLEAR; a recovery event does not explicitly close an
+existing Dynatrace problem. Native selector, event-type and content limits still apply.
 
 ### Legacy Slack and Teams routing
 
@@ -1273,7 +1338,8 @@ routing:
 `https://activegate.example.com:9999/e/environment`. The notifier appends `/api/v2/events/ingest` and uses
 `Authorization: Api-Token ...`. The API base and token accept whole environment/file references. A token must be
 nonempty printable ASCII without whitespace. This native setup replaces Bash's separate server/space/tag settings
-and v1 payload; it does not read those shell settings.
+and v1 payload; native YAML does not read those shell settings. The [legacy adapter](#legacy-ilert-opsgenie-and-dynatrace-settings)
+maps them separately to Events API v2.
 
 `entity_selector` is a required literal of at most 2000 characters, sent unchanged. The server validates
 [selector syntax](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/entity-v2/entity-selector);

@@ -57,6 +57,15 @@ func TestLegacyHTTPMappings(t *testing.T) {
 		ack                          string
 		requests                     []mappingRequest
 	}{
+		"ilert default API": {method: "ilert", settings: "SEND_ILERT=YES; ILERT_INTEGRATION_KEY=synthetic-key", code: 202, requests: []mappingRequest{
+			post("https://api.ilert.com/api/events", nil, map[string]any{"integrationKey": "synthetic-key", "eventType": "ALERT"}),
+		}},
+		"opsgenie default API": {method: "opsgenie", settings: "SEND_OPSGENIE=YES; OPSGENIE_API_KEY=synthetic-key", code: 202, ack: `{"result":"Request will be processed","requestId":"synthetic-request"}`, requests: []mappingRequest{
+			post("https://api.opsgenie.com/v2/alerts", map[string]string{"Authorization": "GenieKey synthetic-key"}, map[string]any{"priority": "P3"}),
+		}},
+		"opsgenie EU API": {method: "opsgenie", settings: "SEND_OPSGENIE=YES; OPSGENIE_API_KEY=synthetic-key; OPSGENIE_API_URL=https://api.eu.opsgenie.com/", code: 202, ack: `{"result":"Request will be processed","requestId":"synthetic-request"}`, requests: []mappingRequest{
+			post("https://api.eu.opsgenie.com/v2/alerts", map[string]string{"Authorization": "GenieKey synthetic-key"}, map[string]any{"priority": "P3"}),
+		}},
 		"alerta environments": {method: "alerta", settings: "ALERTA_WEBHOOK_URL='https://example.test/alerts/'\nALERTA_API_KEY='alerta-token'", recipients: "Production Testing", ack: `{"status":"ok","id":"accepted"}`, requests: []mappingRequest{
 			post("https://example.test/alerts/alert", map[string]string{"Authorization": "Key alerta-token"}, map[string]any{"environment": "Production"}),
 			post("https://example.test/alerts/alert", map[string]string{"Authorization": "Key alerta-token"}, map[string]any{"environment": "Testing"}),

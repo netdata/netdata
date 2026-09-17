@@ -10,15 +10,18 @@ import (
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/alerta"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/discord"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/dynatrace"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/fleep"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/flock"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/gotify"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/ilert"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/kafka"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/kavenegar"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/matrix"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/messagebird"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/msteams"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/ntfy"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/opsgenie"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/pagerduty"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/prowl"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/providers/pushbullet"
@@ -35,6 +38,9 @@ import (
 
 func TestProviderInputModeCannotBeSetThroughYAML(t *testing.T) {
 	for name, test := range map[string]struct{ factory config.FactoryFunc }{
+		"dynatrace":   {factory: config.Factory(func(dynatrace.Config) (notifier.Sender, error) { return nil, nil })},
+		"ilert":       {factory: config.Factory(func(ilert.Config) (notifier.Sender, error) { return nil, nil })},
+		"opsgenie":    {factory: config.Factory(func(opsgenie.Config) (notifier.Sender, error) { return nil, nil })},
 		"alerta":      {factory: config.Factory(func(alerta.Config) (notifier.Sender, error) { return nil, nil })},
 		"discord":     {factory: config.Factory(func(discord.Config) (notifier.Sender, error) { return nil, nil })},
 		"fleep":       {factory: config.Factory(func(fleep.Config) (notifier.Sender, error) { return nil, nil })},
