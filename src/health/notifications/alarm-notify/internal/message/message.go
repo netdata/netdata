@@ -35,11 +35,7 @@ func Fields(event event.Event) []Field {
 		value *float64
 	}{{"Value", event.Value}, {"Previous value", event.PreviousValue}} {
 		if value.value != nil {
-			formatted := strconv.FormatFloat(*value.value, 'g', -1, 64)
-			if event.Units != "" {
-				formatted += " " + event.Units
-			}
-			fields = append(fields, Field{value.label, formatted})
+			fields = append(fields, Field{value.label, ValueString(value.value, event.Units)})
 		}
 	}
 	return fields
@@ -85,5 +81,29 @@ func StatusColor(status string) string {
 		return "#d9534f"
 	default:
 		return "#5cb85c"
+	}
+}
+
+// ValueString formats a present value with its units, keeping missing values empty.
+func ValueString(value *float64, units string) string {
+	if value == nil {
+		return ""
+	}
+	text := strconv.FormatFloat(*value, 'g', -1, 64)
+	if units != "" {
+		text += " " + units
+	}
+	return text
+}
+
+// StatusDescription supplies the human-readable severity used in notification subjects.
+func StatusDescription(status string) string {
+	switch status {
+	case "CRITICAL":
+		return "is critical"
+	case "CLEAR":
+		return "recovered"
+	default:
+		return "needs attention"
 	}
 }

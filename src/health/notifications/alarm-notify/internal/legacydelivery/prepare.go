@@ -37,7 +37,7 @@ type builder struct {
 // Order follows the legacy method inventory and its remaining global sends.
 var methods = []method{
 	{name: "alerta", required: []string{"ALERTA_WEBHOOK_URL"}, build: buildAlerta},
-	{name: "awssns", gap: "AWS SNS credential and message-template mapping is not implemented"},
+	{name: "awssns", tool: "aws", build: buildAWSSNS},
 	{name: "custom", gap: "Unix custom_sender execution is not implemented"},
 	{name: "discord", required: []string{"DISCORD_WEBHOOK_URL"}, build: buildDiscord},
 	{name: "dynatrace", required: []string{"DYNATRACE_SPACE", "DYNATRACE_SERVER", "DYNATRACE_TOKEN", "DYNATRACE_TAG_VALUE", "DYNATRACE_EVENT"}, global: true, build: buildDynatrace},
