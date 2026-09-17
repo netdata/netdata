@@ -169,8 +169,13 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     }
 
     if (dir_ok) {
-        if(env)
+        if(env) {
+#if defined(OS_WINDOWS)
+            nd_env_set_required(env, native_dir);
+#else
             nd_setenv(env, dir, 1);
+#endif
+        }
         return;
     }
 

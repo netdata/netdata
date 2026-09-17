@@ -986,10 +986,11 @@ int log_stack_unittest(void) {
 
     LOG_STACK_TEST(!nd_log_source_has_flood_protection(NDLS_UNSET),
                    "unset source does not enable flood protection");
-    for (ND_LOG_SOURCES source = NDLS_DAEMON; source < _NDLS_MAX; source++)
-        if (source == NDLS_DAEMON || source == NDLS_COLLECTORS)
-        LOG_STACK_TEST(nd_log_source_has_flood_protection(source),
-                       "daemon and collector sources enable configured flood protection");
+    for (ND_LOG_SOURCES source = NDLS_UNSET; source < _NDLS_MAX; source++) {
+        bool expected = source == NDLS_DAEMON || source == NDLS_COLLECTORS;
+        LOG_STACK_TEST(nd_log_source_has_flood_protection(source) == expected,
+                       "flood protection is enabled for exactly daemon and collectors");
+    }
 
     LOG_STACK_TEST(thread_log_stack_next == 0, "source override test frames are balanced");
 

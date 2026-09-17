@@ -105,9 +105,7 @@ copy_missing_dlls_once() {
                 fi
 
                 if [ ! -f "${source}" ]; then
-                    if [ "${resolved}" = "not found" ]; then
-                        unresolved+=("${dll}")
-                    fi
+                    unresolved+=("${dll}")
                     continue
                 fi
 

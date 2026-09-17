@@ -386,14 +386,18 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     Pvoid_t datafiles_JudyL = NULL;
     Pvoid_t journafile_JudyL = NULL;
     bool validate_files = true;
-    for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
+    int scanned_datafiles = 0;
+    for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) ; ) {
         ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
 
         // This is a datafile
         if (2 == ret) {
             max_seen_fileno = MAX(max_seen_fileno, fileno);
-            datafile = datafile_alloc_and_init(ctx, tier, fileno);
-            datafiles[matched_files++] = datafile;
+            scanned_datafiles++;
+            if (matched_files < MAX_DATAFILES) {
+                datafile = datafile_alloc_and_init(ctx, tier, fileno);
+                datafiles[matched_files++] = datafile;
+            }
             Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
             if (!Pvalue || Pvalue == PJERR)
                 validate_files = false;
@@ -436,7 +440,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         return 0;
     }
 
-    if (matched_files == MAX_DATAFILES)
+    if (scanned_datafiles > MAX_DATAFILES)
         netdata_log_error("DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
 
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
@@ -457,7 +461,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     path,
                     sizeof(path),
                     "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
-                    datafile_ctx(datafile)->config.dbfiles_path,
+                    ctx->config.dbfiles_path,
                     1U,
                     (unsigned)idx);
 
@@ -471,7 +475,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     path,
                     sizeof(path),
                     "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
-                    datafile_ctx(datafile)->config.dbfiles_path,
+                    ctx->config.dbfiles_path,
                     1U,
                     (unsigned)idx);
 

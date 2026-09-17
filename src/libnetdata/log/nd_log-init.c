@@ -294,6 +294,10 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_stdin_init(int fd, const char *filename) {
+#if defined(OS_WINDOWS)
+    if (filename && strcmp(filename, "/dev/null") == 0)
+        filename = "NUL";
+#endif
     int f = open(filename, O_WRONLY | O_APPEND | O_CREAT,
 #if defined(OS_WINDOWS)
                  0640
