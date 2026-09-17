@@ -339,13 +339,7 @@ func functionResponseError(err error) (lifecycle.SealedResult, error) {
 }
 
 func (mg *methodGeneration) infoResult(method funcapi.FunctionConfig) (lifecycle.SealedResult, error) {
-	help := method.Help
-	if help == "" {
-		help = fmt.Sprintf("%s %s data function", mg.module, method.ID)
-	}
-	return mg.responseResult(method, method.RequiredParams, &funcapi.FunctionResponse{
-		Help: help,
-	}, true)
+	return mg.responseResult(method, method.RequiredParams, &funcapi.FunctionResponse{}, true)
 }
 
 func (mg *methodGeneration) responseResult(
@@ -374,10 +368,17 @@ func (mg *methodGeneration) responseResult(
 		params = funcapi.MergeParamConfigs(params, response.RequiredParams)
 	}
 	params = mg.withJobParam(method.ID, params)
+	help := response.Help
+	if info && help == "" {
+		help = method.Help
+		if help == "" {
+			help = fmt.Sprintf("%s %s data function", mg.module, method.ID)
+		}
+	}
 	payload := map[string]any{
 		"v": 3, "update_every": max(method.UpdateEvery, 1), "status": status,
 		"type":        functionResponseType(response.ResponseType, method.ResponseType),
-		"has_history": method.HasHistory, "help": response.Help,
+		"has_history": method.HasHistory, "help": help,
 		"accepted_params": acceptedMethodParams(params, method.AcceptedParams),
 		"required_params": requiredMethodParams(params),
 	}

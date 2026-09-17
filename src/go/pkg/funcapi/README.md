@@ -49,7 +49,8 @@ and scoped metadata. `ManagedInfo` requires `RawRequest`.
 3. The framework merges those selectors with the declaration and job selector,
    adds declared history and accepted inputs, and emits metadata only. Columns,
    rows and chart data are omitted from managed info; declared presentation is
-   included. Errors and complete `RawResponse` envelopes retain their normal paths.
+   included. Help uses the handler override when supplied, otherwise the declaration
+   or generated default. Errors and complete `RawResponse` envelopes retain their normal paths.
 
 For bound methods without a job selector, opted-in `info` invokes their handler
 directly. Data requests retain normal routing, including the default job when

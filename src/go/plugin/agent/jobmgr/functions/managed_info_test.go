@@ -70,6 +70,49 @@ func TestManagedInfoBootstrapAndScopedMetadata(t *testing.T) {
 	assertManagedInfoSchema(t, scoped, "info_response")
 }
 
+func TestManagedInfoHelp(t *testing.T) {
+	for name, test := range map[string]struct {
+		declared string
+		response string
+		info     bool
+		want     string
+	}{
+		"declared help":    {declared: "Declared help", info: true, want: "Declared help"},
+		"default help":     {info: true, want: "module events data function"},
+		"handler override": {declared: "Declared help", response: "Source help", info: true, want: "Source help"},
+		"data unchanged":   {declared: "Declared help"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			method := funcapi.FunctionConfig{
+				ID:          "events",
+				Help:        test.declared,
+				RawRequest:  true,
+				ManagedInfo: true,
+			}
+			h := newManagedInfoHarness(
+				t,
+				method,
+				"agent",
+				func(_ context.Context, _ string, _ funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+					return &funcapi.FunctionResponse{
+						Help:           test.response,
+						RequiredParams: []funcapi.ParamConfig{{ID: "service", Name: "Service"}},
+					}
+				},
+			)
+			var args []string
+			if test.info {
+				args = []string{"info"}
+			}
+			got := h.call(t, args, nil, 200)
+			assert.JSONEq(t, fmt.Sprintf(`{
+				"v":3,"update_every":1,"status":200,"type":"table","has_history":false,"help":%q,
+				"accepted_params":["service"],"required_params":[{"id":"service","name":"Service","type":"select","options":[]}]
+			}`, test.want), string(got))
+		})
+	}
+}
+
 func TestManagedInfoRoutingAndErrors(t *testing.T) {
 	tests := map[string]struct {
 		args    []string
