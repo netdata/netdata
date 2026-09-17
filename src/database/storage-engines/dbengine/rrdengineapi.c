@@ -1184,7 +1184,7 @@ int dbengine_tier_init(struct dbengine_tier **ctxp, const struct dbengine_tier_c
     ctx->quiesce.enabled = false;
 
     ctx->atomic.first_time_s = LONG_MAX;
-    // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
+    // The static multidb tiers may already have MRG prepopulation accounting from the first dbengine_spawn().
     dbengine_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
     if (!dbengine_spawn(ctx))
