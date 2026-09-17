@@ -7,14 +7,23 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/redfishfunc"
 )
 
 type functionDeps struct {
 	snapshot *atomic.Pointer[redfishfunc.Snapshot]
+	logs     *atomic.Pointer[acquisition.LogReader]
 }
 
 func (d functionDeps) CurrentSnapshot() *redfishfunc.Snapshot { return d.snapshot.Load() }
+
+func (d functionDeps) Logs() redfishfunc.LogReader {
+	if source := d.logs.Load(); source != nil {
+		return source
+	}
+	return nil
+}
 
 func redfishMethods() []funcapi.FunctionConfig { return redfishfunc.Methods(defaultUpdateEvery) }
 

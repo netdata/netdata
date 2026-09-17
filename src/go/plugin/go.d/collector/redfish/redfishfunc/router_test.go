@@ -18,6 +18,8 @@ import (
 
 type snapshotDeps struct{ value *Snapshot }
 
+func (*snapshotDeps) Logs() LogReader { return nil }
+
 func (d *snapshotDeps) CurrentSnapshot() *Snapshot { return d.value }
 
 func TestTablesAndMissingData(t *testing.T) {

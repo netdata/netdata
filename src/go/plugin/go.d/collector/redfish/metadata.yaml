@@ -702,11 +702,11 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
     functions:
       description: |
-        Inspect sensor readings and hardware health for one configured endpoint using the Instance selector.
-        Both tables refresh every 60 seconds and show the latest completed collection. Collection timing follows the
+        Inspect sensor readings, hardware health and BMC-retained events for one configured endpoint using the Instance selector.
+        The Sensors and Hardware tables refresh every 60 seconds and show the latest completed collection. Collection timing follows the
         job's `update_every` (60 seconds by default); the Observed column shows when each row was collected.
-        Opening a table does not query the BMC. Partial collections show current available data and identify gaps;
-        a total collection failure makes both Functions unavailable instead of showing old readings.
+        Opening Sensors or Hardware does not query the BMC. Partial collections show current available data and identify gaps;
+        a total collection failure makes both snapshot Functions unavailable instead of showing old readings. Logs queries the BMC on demand.
       list:
         - id: sensors
           name: Redfish Sensors
@@ -918,6 +918,135 @@ modules:
             Exposes device identity, health and source resource addresses to authorized operators. Does not expose credentials or session tokens.
           availability: |
             Available after collection produces usable data. Returns HTTP 503 before the first collection and after a total failure. Partial collections retain current rows and mark gaps.
+          require_cloud: false
+        - id: logs
+          name: Redfish Logs
+          description: |
+            Browse events currently retained by one BMC log service in the Logs view. Select the endpoint job and a service linked from its Systems, Managers or Chassis. Refresh reads the log again; BMC rotation or clearing can remove events. This viewer does not store an archive.
+          parameters:
+            - id: __job
+              name: Instance
+              description: Select the configured Redfish endpoint job.
+              type: select
+              required: false
+              default: First available job
+              options: []
+            - id: service
+              name: Log service
+              description: Select a linked service advertised by this endpoint.
+              type: select
+              required: true
+              default: First advertised service in the UI
+              options: []
+            - id: severity
+              name: Severity
+              description: Filter by BMC severity. Unknown includes missing and unrecognized values.
+              type: select
+              required: false
+              default: all
+              options:
+                - {id: all, name: All severities, default: true}
+                - {id: Critical, name: Critical}
+                - {id: Warning, name: Warning}
+                - {id: OK, name: OK}
+                - {id: Unknown, name: Unknown}
+            - id: after
+              name: After
+              description: Inclusive lower time boundary in integer Unix seconds. A negative value is relative to before, or to now when before is omitted.
+              type: integer
+              required: false
+              default: No lower boundary
+              options: []
+            - id: before
+              name: Before
+              description: Inclusive upper time boundary in integer Unix seconds. Zero or a negative value is relative to now.
+              type: integer
+              required: false
+              default: No upper boundary
+              options: []
+            - id: query
+              name: Search
+              description: 'Case-sensitive Netdata simple patterns against the combined message, IDs, resource addresses, entry type and reported severity. Use `*failure*` for a substring. Space-separated patterns are checked in order; the first match decides, `!` excludes, and no match excludes the row. Use `!*noise* *` to exclude noise and keep everything else.'
+              type: string
+              required: false
+              default: No text filter
+              options: []
+          returns:
+            description: |
+              One row per matching retained entry. Time uses EventTimestamp, then valid Created. Both originals and the time basis remain available in details. Undated entries remain visible as Unavailable after dated rows, with a notice that the time range cannot filter them. Refresh replaces all rows. Failed pages or members fail the request instead of returning a partial log as complete.
+            columns:
+              - name: "Order"
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "Newest first, then undated entries; row position within this query."
+              - name: "Time"
+                type: timestamp
+                unit: ""
+                description: "EventTimestamp with valid Created fallback; Unavailable when neither can be used."
+              - name: "Severity"
+                type: string
+                unit: ""
+                description: "OK, Warning, Critical or Unknown."
+              - name: "Message"
+                type: string
+                unit: ""
+                description: "BMC event message."
+              - name: "Entry ID"
+                type: string
+                unit: ""
+                description: "Identifier assigned by this log service."
+              - name: "Entry type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC event format."
+              - name: "Log service"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Selected source resource."
+              - name: "Entry URI"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source entry resource."
+              - name: "Message ID"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC message registry identifier."
+              - name: "EventTimestamp"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Original event time, including invalid source values."
+              - name: "Created"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Original entry creation time, including invalid source values."
+              - name: "Time basis"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "EventTimestamp, Created or Unavailable."
+              - name: "Reported severity"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Original severity, including unrecognized source values."
+              - name: "rowOptions"
+                type: none
+                unit: ""
+                visibility: hidden
+                description: "Row presentation."
+          performance: |
+            Each query discovers linked services and reads every page and entry of the selected log before filtering. There is no event cap; cost grows with BMC retention and pagination. Reads share the job's `max_concurrent_requests` budget with metrics. The default UI refresh is 60 seconds. Slow full scans can fail at the Function deadline; narrow time or text filters do not reduce BMC reads.
+          security: |
+            Uses the job's existing credentials, TLS and proxy settings. Reading logs requires BMC permissions for the linked services and entries. Queries are read-only apart from creating and deleting their authentication sessions. Event messages may contain sensitive operational information; credentials and session tokens are not returned.
+          availability: |
+            Available for running jobs without waiting for a successful metric poll. An empty service selector means no supported linked services were advertised. Missing Entries support and inaccessible services return an error; an empty readable log returns an empty table. The view has no histogram, live tail or historical archive, and a multi-page read is not an atomic snapshot.
           require_cloud: false
     metrics:
       folding:

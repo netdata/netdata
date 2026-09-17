@@ -36,6 +36,8 @@ func (c *staticEndpointClient) Acquire(ctx context.Context) (acquisition.Result,
 	result.AuthMethod = c.auth
 	return result, c.err
 }
+func (*staticEndpointClient) Logs() *acquisition.LogReader { return nil }
+
 func (c *staticEndpointClient) Close() {
 	c.closed = true
 }

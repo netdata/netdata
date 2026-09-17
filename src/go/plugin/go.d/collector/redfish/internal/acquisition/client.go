@@ -5,7 +5,6 @@ package acquisition
 import (
 	"context"
 	"net/http"
-	"net/url"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
@@ -14,10 +13,7 @@ import (
 )
 
 type Client struct {
-	config       Options
-	http         *http.Client
-	root         *url.URL
-	origin       string
+	connection
 	sdk          *gofish.APIClient
 	authMode     string
 	requestLimit int
@@ -47,19 +43,22 @@ func New(cfg Options, client *http.Client) (*Client, error) {
 		families[family] = family == "base" || familyMatcher.MatchString(family)
 	}
 	result := &Client{
-		config:          cfg,
-		http:            client,
-		root:            root,
-		origin:          origin,
+		connection: connection{
+			config: cfg,
+			http:   client,
+			root:   root,
+			origin: origin,
+		},
 		baseMembership:  make(map[string][]baseResourceIdentity),
 		graphMembership: make(map[string]graphMembershipSnapshot),
 		requestLimit:    cfg.MaxConcurrentRequests,
 		families:        families,
 	}
 	transport := &redfishTransport{
-		base:   client.Transport,
-		root:   root,
-		origin: origin,
+		admission: newRequestAdmission(cfg.MaxConcurrentRequests),
+		base:      client.Transport,
+		root:      root,
+		origin:    origin,
 	}
 	client.Transport = transport
 	client.CheckRedirect = transport.checkRedirect

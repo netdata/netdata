@@ -275,8 +275,10 @@ func fixtureClient() *Client {
 		panic(err)
 	}
 	client := &Client{
-		origin: "https://fixture.example",
-		root:   root,
+		connection: connection{
+			origin: "https://fixture.example",
+			root:   root,
+		},
 	}
 	return client
 }

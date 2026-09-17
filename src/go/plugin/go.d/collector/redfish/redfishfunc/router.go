@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/acquisition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 const (
 	SensorsMethod  = "sensors"
+	LogsMethod     = "logs"
 	HardwareMethod = "hardware"
 )
 
@@ -27,6 +29,12 @@ type Snapshot struct {
 
 type Deps interface {
 	CurrentSnapshot() *Snapshot
+	Logs() LogReader
+}
+
+type LogReader interface {
+	Services(context.Context) ([]acquisition.LogService, error)
+	Entries(context.Context, string) (acquisition.LogResult, error)
 }
 
 type router struct{ deps Deps }
@@ -53,11 +61,12 @@ func Methods(updateEvery int) []funcapi.FunctionConfig {
 			Help:         "Latest collected Redfish component health and inventory",
 			ResponseType: "table",
 		},
+		logsMethod(updateEvery),
 	}
 }
 
 func (r *router) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if method != SensorsMethod && method != HardwareMethod {
+	if method != SensorsMethod && method != HardwareMethod && method != LogsMethod {
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 	return nil, nil

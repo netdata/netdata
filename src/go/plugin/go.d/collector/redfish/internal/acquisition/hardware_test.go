@@ -59,8 +59,10 @@ func TestArrayReadingDataSourceURIStabilizesIdentityAcrossReorder(t *testing.T) 
 		t.Fatal(err)
 	}
 	client := &Client{
-		root:   root,
-		origin: origin,
+		connection: connection{
+			root:   root,
+			origin: origin,
+		},
 	}
 	parent := &graphNode{
 		Resource: measurement.Resource{
@@ -113,8 +115,10 @@ func TestSensorExcerptDataSourceProofMergesWithAddressableSensor(t *testing.T) {
 	root, origin, err := NormalizeServiceRoot("https://bmc.example/redfish/v1/")
 	require.NoError(t, err)
 	client := &Client{
-		root:   root,
-		origin: origin,
+		connection: connection{
+			root:   root,
+			origin: origin,
+		},
 	}
 	addressable := &graphNode{
 		Resource: measurement.Resource{

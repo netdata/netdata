@@ -48,6 +48,7 @@ type endpointClient interface {
 	Check(context.Context) error
 	Acquire(context.Context) (acquisition.Result, error)
 	Close()
+	Logs() *acquisition.LogReader
 }
 
 type collectionResult struct {
@@ -69,6 +70,7 @@ type Collector struct {
 	hardware         *hardwareMetrics
 	funcRouter       funcapi.MethodHandler
 	functionSnapshot atomic.Pointer[redfishfunc.Snapshot]
+	functionLogs     atomic.Pointer[acquisition.LogReader]
 
 	endpointKey string
 
@@ -104,6 +106,7 @@ func New() *Collector {
 	}
 	c.funcRouter = redfishfunc.NewRouter(functionDeps{
 		snapshot: &c.functionSnapshot,
+		logs:     &c.functionLogs,
 	})
 	return c
 }
@@ -150,6 +153,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.httpClient = nil
 		return fmt.Errorf("init Redfish client: %w", err)
 	}
+	c.functionLogs.Store(c.client.Logs())
 	c.measurement = measurement.New(origin, c.Name, acquisition.ReadingProvenanceResolver(root, origin))
 	return nil
 }
@@ -222,6 +226,7 @@ func (c *Collector) warnCollectionDiagnostics(diagnostics []string) {
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
+	c.functionLogs.Store(nil)
 	c.functionSnapshot.Store(nil)
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)

@@ -10,7 +10,7 @@ import (
 	"github.com/stmcginnis/gofish"
 )
 
-func (c *Client) sdkConfig() gofish.ClientConfig {
+func (c *connection) sdkConfig() gofish.ClientConfig {
 	return gofish.ClientConfig{
 		Endpoint:              c.origin,
 		HTTPClient:            c.http,
@@ -20,7 +20,7 @@ func (c *Client) sdkConfig() gofish.ClientConfig {
 	}
 }
 
-func (c *Client) connectSDK(
+func (c *connection) connectSDK(
 	ctx context.Context,
 	cfg gofish.ClientConfig,
 	stats *wireStats,
@@ -46,7 +46,7 @@ func (c *Client) get(ctx context.Context, target *url.URL, stats *wireStats) (*r
 	return c.getWithClient(ctx, c.sdk, target, stats)
 }
 
-func (c *Client) getWithClient(
+func (c *connection) getWithClient(
 	ctx context.Context,
 	client *gofish.APIClient,
 	target *url.URL,

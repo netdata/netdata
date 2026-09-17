@@ -16,8 +16,10 @@ func BenchmarkCollectionPage(b *testing.B) {
 		b.Fatal(err)
 	}
 	client := &Client{
-		root:   root,
-		origin: origin,
+		connection: connection{
+			root:   root,
+			origin: origin,
+		},
 	}
 	target, err := url.Parse("https://bmc.example/redfish/v1/Sensors")
 	if err != nil {
