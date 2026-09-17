@@ -485,7 +485,7 @@ struct rrdengine_instance {
 #define ctx_pending_deletion_bytes_get(ctx) __atomic_load_n(&(ctx)->atomic.pending_deletion_bytes, __ATOMIC_RELAXED)
 
 int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *path, size_t bytes, bool datafile);
-void rrdeng_file_deletion_drain(struct rrdengine_instance *ctx);
+bool rrdeng_file_deletion_drain(struct rrdengine_instance *ctx);
 
 static inline void ctx_io_read_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
     __atomic_add_fetch(&ctx->stats.io_read_bytes, bytes, __ATOMIC_RELAXED);

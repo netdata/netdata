@@ -1279,7 +1279,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
-    rrdeng_file_deletion_drain(ctx);
+    (void)rrdeng_file_deletion_drain(ctx);
 
     struct completion completion = {};
     completion_init(&completion);
@@ -1288,10 +1288,20 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    rrdeng_file_deletion_drain(ctx);
+    // After shutdown completion the loop may have enqueued final file
+    // deletions. Wait for them, and only free `ctx` when the drain succeeded:
+    // rrdeng_file_deletion_after() dereferences `ctx` (atomic counters,
+    // deletion spinlock, config), so freeing while a callback is still
+    // pending is a use-after-free.
+    bool drained = rrdeng_file_deletion_drain(ctx);
 
-    if(unittest_running && ctx->dynamically_allocated)
-        freez(ctx);
+    if(unittest_running && ctx->dynamically_allocated) {
+        if(drained)
+            freez(ctx);
+        else
+            netdata_log_error("DBENGINE: tier %d: keeping ctx allocated because file-deletion drain timed out",
+                              ctx->config.tier);
+    }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;

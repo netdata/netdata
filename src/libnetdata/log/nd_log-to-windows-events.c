@@ -391,7 +391,13 @@ static const char *get_field_value_unsafe(struct log_field *fields, ND_LOG_FIELD
     return s;
 }
 static void etw_replace_percent_with_unicode(wchar_t *s, size_t size) {
-    size_t original_len = wcslen(s);
+    if (!s || size == 0)
+        return;
+
+    // Bounded length keeps the read inside the buffer even if `s` was not
+    // null-terminated within `size`; etw_wcslen_bounded() returns 0 on a
+    // malformed buffer rather than overrunning it.
+    size_t original_len = etw_wcslen_bounded(s, size - 1);
 
     // Traverse the string, replacing '%' with the Unicode fullwidth percent sign
     for (size_t i = 0; i < original_len && i < size - 1; i++) {

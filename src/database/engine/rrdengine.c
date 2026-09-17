@@ -358,7 +358,13 @@ int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *pa
     return 0;
 }
 
-void rrdeng_file_deletion_drain(struct rrdengine_instance *ctx) {
+// Wait for every queued file deletion to complete. Returns true when the
+// queue drained before the timeout, false if the wait broke out early.
+// Callers that free or otherwise invalidate `ctx` MUST check the return
+// value and skip teardown when false: unlink callbacks dereference `ctx`
+// (atomic counters, deletion spinlock, config) and a use-after-free will
+// corrupt the heap or abort the process.
+bool rrdeng_file_deletion_drain(struct rrdengine_instance *ctx) {
     bool logged = false;
     usec_t deadline = now_monotonic_usec() + 30 * USEC_PER_SEC;
     while (__atomic_load_n(&ctx->deletion.pending, __ATOMIC_ACQUIRE)) {
@@ -372,10 +378,11 @@ void rrdeng_file_deletion_drain(struct rrdengine_instance *ctx) {
             netdata_log_error("DBENGINE: tier %d: timed out waiting for queued file deletions (%zu remain)",
                               ctx->config.tier,
                               __atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED));
-            break;
+            return false;
         }
         sleep_usec(10 * USEC_PER_MS);
     }
+    return true;
 }
 
 static void work_standard_worker(uv_work_t *req) {
