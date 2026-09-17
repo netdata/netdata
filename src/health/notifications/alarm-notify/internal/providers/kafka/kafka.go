@@ -8,7 +8,6 @@ import (
 	"net/netip"
 
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
@@ -18,7 +17,7 @@ func (dst Config) validate() error {
 	if err != nil || address.Zone() != "" {
 		return errors.New("kafka sender_ip must be a literal IPv4 or IPv6 address without a zone")
 	}
-	reference, err := secret.IsReference(dst.URL)
+	reference, err := dst.Secrets.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("kafka url: %w", err)
 	}

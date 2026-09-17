@@ -4,11 +4,14 @@ package kafka
 
 import (
 	"net/http"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
-	URL      string `yaml:"url,omitempty"`
-	SenderIP string `yaml:"sender_ip,omitempty"`
+	Secrets  secret.InputMode `yaml:"-"`
+	URL      string           `yaml:"url,omitempty"`
+	SenderIP string           `yaml:"sender_ip,omitempty"`
 }
 
 type Sender struct {

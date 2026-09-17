@@ -92,7 +92,7 @@ func (dst Config) validateRocketChat() error {
 		strings.IndexFunc(dst.Channel, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0) {
 		return errors.New("rocketchat channel must select one #channel or @user without whitespace")
 	}
-	reference, err := secret.IsReference(dst.URL)
+	reference, err := dst.Secrets.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("rocketchat url: %w", err)
 	}
@@ -106,7 +106,7 @@ func (dst Config) validateRocketChat() error {
 }
 
 func postJSON(ctx context.Context, client *http.Client, dst Config, message any) error {
-	endpoint, err := secret.Resolve(ctx, dst.URL)
+	endpoint, err := dst.Secrets.Resolve(ctx, dst.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
 	}
@@ -126,8 +126,9 @@ func sendRocketChat(ctx context.Context, dst Config, event notifyevent.Event, cl
 }
 
 type Config struct {
-	URL     string `yaml:"url,omitempty"`
-	Channel string `yaml:"channel,omitempty"`
+	Secrets secret.InputMode `yaml:"-"`
+	URL     string           `yaml:"url,omitempty"`
+	Channel string           `yaml:"channel,omitempty"`
 }
 
 type Sender struct {

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 const telegramDefaultAPI = "https://api.telegram.org"
@@ -43,7 +42,7 @@ func (dst Config) validateTelegram() error {
 		{"bot_token", dst.BotToken, validateTelegramToken},
 		{"api_url", dst.APIURL, validateTelegramAPI},
 	} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("telegram %s: %w", field.name, err)
 		}

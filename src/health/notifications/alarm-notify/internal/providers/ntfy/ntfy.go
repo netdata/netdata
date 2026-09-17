@@ -37,7 +37,7 @@ func (dst Config) validateNtfy() error {
 	for _, field := range []struct{ name, value string }{
 		{"url", dst.URL}, {"access_token", dst.AccessToken}, {"username", dst.Username}, {"password", dst.Password},
 	} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("ntfy %s: %w", field.name, err)
 		}
@@ -80,7 +80,7 @@ func sendNtfy(ctx context.Context, dst Config, event notifyevent.Event, client *
 	}{
 		{"url", &dst.URL}, {"access_token", &dst.AccessToken}, {"username", &dst.Username}, {"password", &dst.Password},
 	} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("ntfy %s: %w", field.name, err)
 		}
@@ -158,10 +158,11 @@ func readNtfyResponse(response *http.Response) error {
 }
 
 type Config struct {
-	URL         string `yaml:"url,omitempty"`
-	AccessToken string `yaml:"access_token,omitempty"`
-	Username    string `yaml:"username,omitempty"`
-	Password    string `yaml:"password,omitempty"`
+	Secrets     secret.InputMode `yaml:"-"`
+	URL         string           `yaml:"url,omitempty"`
+	AccessToken string           `yaml:"access_token,omitempty"`
+	Username    string           `yaml:"username,omitempty"`
+	Password    string           `yaml:"password,omitempty"`
 }
 
 type Sender struct {

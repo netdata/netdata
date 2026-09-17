@@ -5,10 +5,13 @@ package pagerduty
 import (
 	"net/http"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
+
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
 
 type Config struct {
+	Secrets        secret.InputMode     `yaml:"-"`
 	IntegrationKey string               `yaml:"integration_key,omitempty"`
 	APIURL         string               `yaml:"api_url,omitempty"`
 	APIVersion     *configfield.Integer `yaml:"api_version,omitempty"`

@@ -124,8 +124,8 @@ there is no automatic stock-file discovery:
 A successful check means **syntax support only**. It does not evaluate variable values, validate provider names,
 credentials, recipients or routing, or establish that a custom function will work. It reads no event from stdin,
 resolves no secrets and executes no configuration code. `send` and `validate` continue to accept YAML only.
-The internal recipient resolver below is available for future adapters. Old-format delivery mapping and the optional
-Unix Bash custom-function runtime remain later increments.
+Use `send-legacy` below for supported old-format delivery. The optional Unix Bash custom-function runtime remains
+a later increment.
 
 The reader supports this declarative subset:
 
@@ -164,10 +164,9 @@ commands and returns `0` on supported syntax or `1` on errors/cancellation.
 
 ## Legacy recipient routing
 
-`internal/legacyrouting.Resolve` resolves evaluated legacy settings for an explicit list of applicable method names
-and requested roles. It returns eligible method/recipient pairs; it does not enable old-format sending in the CLI.
-Provider mapping, `SEND_*` flags, credential prerequisites, executable discovery and custom-function execution remain
-separate adapter work. In particular, `check-legacy` still checks syntax only and does not invoke this resolver.
+`send-legacy` uses `internal/legacyrouting.Resolve` to resolve evaluated settings for the applicable methods and
+requested roles. It returns eligible method/recipient pairs before sender construction. `check-legacy` still checks
+syntax only and does not invoke this resolver.
 
 The resolver uses `role_recipients_<method>` and `DEFAULT_RECIPIENT_<METHOD>`. Its rules preserve the legacy format
 without changing native YAML routing:
@@ -195,6 +194,104 @@ Two intentional corrections to Bash apply: unknown modifiers fail instead of log
 role/recipient wildcard characters are literal instead of expanding against local filenames. Production Bash remains
 unchanged. Unix `custom_sender()` support, including helpers, event context and final-recipient batching, remains pending.
 
+## Legacy configuration delivery
+
+`send-legacy` applies the supported shell-format settings to the existing Go providers. It does not require Bash for
+HTTP delivery. Supply stock and user files explicitly in order, and the same JSON event used by native `send`:
+
+```sh
+/tmp/alarm-notify send-legacy \
+  --config ../health_alarm_notify.conf \
+  --config /path/to/user/health_alarm_notify.conf \
+  --role sysadmin --method telegram < examples/event.json
+```
+
+Repeat `--role` or `--method` as needed. Without `--method`, all configured methods are considered. With it, only
+those methods are considered; names use the Bash suffixes below (`pd` and `sms`, not `pagerduty` and `smstools3`).
+Explicitly selecting an unknown or unimplemented method is an error. All files must parse even when selection is narrowed.
+
+Activation requires exact `SEND_<METHOD>=YES` (also `AUTO` for email), the method's nonempty prerequisites and,
+for recipient-based methods, an eligible recipient. Without stock configuration, recipient-based methods and Kafka
+default to `YES`. Dynatrace, SIGNL4, Opsgenie and ilert need an explicit `YES`, normally supplied by the stock file.
+Missing prerequisites or required recipients disable that method. Kafka and SIGNL4 are global: they send once when
+enabled and configured, regardless of roles, including reserved roles. Gotify, Discord and Flock send once only when at least one
+recipient survives filtering. Email, Prowl and SMSEagle batch their final eligible recipients. Other mappings send
+once per distinct eligible target.
+
+All selected routing policies and eligible provider configurations are checked **before any delivery**. Missing
+required critical history, an eligible unsupported method, or invalid supported settings reject the whole invocation.
+No eligible targets is a successful no-op. Delivery uses the existing sequential, any-success result handling and
+invocation deadline. Logs use safe labels such as `telegram-1`, never recipient keys or URLs. The legacy summary counts
+attempted successes and failures; filtering happens before the plan is built, so it does not report a skipped count.
+
+| Method | Legacy settings and recipient meaning |
+|---|---|
+| `alerta` | `ALERTA_WEBHOOK_URL`, optional `ALERTA_API_KEY`; recipient is the environment |
+| `discord` | `DISCORD_WEBHOOK_URL`; recipients gate the single native webhook send |
+| `email` | `sendmail`, `EMAIL_SENDER`, `EMAIL_PLAINTEXT_ONLY=YES`, `EMAIL_THREADING` (enabled unless `NO`); recipients are mail addresses/local users |
+| `fleep` | `FLEEP_SENDER` (initially the event node); each recipient is a hook ID appended to `https://fleep.io/hook/` |
+| `flock` | `FLOCK_WEBHOOK_URL`; recipients gate the single webhook send |
+| `gotify` | `GOTIFY_APP_URL`, `GOTIFY_APP_TOKEN`; recipients gate the single application send |
+| `irc` | `nc`, `IRC_NETWORK`, `IRC_PORT` (initially `6667`), `IRC_NICKNAME`, `IRC_REALNAME`; recipient is a channel |
+| `kavenegar` | `KAVENEGAR_API_KEY`, `KAVENEGAR_SENDER`; recipient is a phone number |
+| `matrix` | `MATRIX_HOMESERVER`, `MATRIX_ACCESSTOKEN`; recipient is a room ID |
+| `messagebird` | `MESSAGEBIRD_ACCESS_KEY`, `MESSAGEBIRD_NUMBER`; recipient is a phone number |
+| `ntfy` | Recipient is a full topic URL; a complete `NTFY_USERNAME`/`NTFY_PASSWORD` pair takes precedence over `NTFY_ACCESS_TOKEN`; an incomplete pair is ignored |
+| `pd` | Recipient is the integration key; exact `USE_PD_VERSION=2` selects v2, other values select v1 |
+| `prowl` | Recipients are API keys, submitted together |
+| `pushbullet` | `PUSHBULLET_ACCESS_TOKEN`, optional `PUSHBULLET_SOURCE_DEVICE`; recipient is an email or `#channel-tag` |
+| `pushover` | `PUSHOVER_APP_TOKEN`; recipient is a user/group key |
+| `rocketchat` | `ROCKETCHAT_WEBHOOK_URL`; `#` is prepended to each legacy channel recipient |
+| `sms` | `sendsms`; recipient is a phone number, delivered through SMS Server Tools 3 |
+| `syslog` | `logger`, `logger_options`, `SYSLOG_FACILITY`; recipient syntax is `[[facility.level][@host[:port]]/]prefix`, with bracketed IPv6 supported |
+| `telegram` | `TELEGRAM_BOT_TOKEN`, optional `TELEGRAM_API_URL`, `TELEGRAM_RETRIES_ON_LIMIT`; recipient is `chat` or `chat:topic` |
+| `twilio` | `TWILIO_ACCOUNT_SID`, `TWILIO_ACCOUNT_TOKEN`, `TWILIO_NUMBER`; recipient is a phone number |
+| `smseagle` | `SMSEAGLE_API_URL`, `SMSEAGLE_API_ACCESSTOKEN`, `SMSEAGLE_MSG_TYPE` (initially `sms`); `SMSEAGLE_CALL_DURATION` (initially `10`) and `SMSEAGLE_VOICE_ID` (initially `1`) apply only to their call modes |
+| `kafka` | `KAFKA_URL`, `KAFKA_SENDER_IP`; global send |
+| `signl4` | `SIGNL4_WEBHOOK_URL`; global send |
+
+The four implemented command mappings (email, SMS, syslog and IRC) use an explicit absolute executable path or
+discovery in the invoking process's `PATH`. A missing discovered tool disables its method; an explicit path is
+validated by the native provider and attempted during delivery.
+`SEND_EMAIL=AUTO` checks sendmail availability. Child processes retain the native isolated environment, not the parent
+or configuration's arbitrary variables. `logger_options` splits on spaces, tabs and newlines into literal arguments;
+there is no second quoting pass, expansion or globbing. Native command delivery currently supports Linux/macOS.
+
+Evaluated values remain literal through validation and sending, even when resembling `${env:...}` or `${file:...}`.
+Use single quotes, such as `'${env:NAME}'`, to preserve these strings as literals in shell-format files. Unquoted
+and double-quoted forms are parsed as unsupported shell parameter expansion and rejected.
+Native field validation still applies; for example, an invalid token is rejected rather than interpreted as a secret
+reference. Native YAML retains its existing lazy secret-reference behavior. The internal input-mode setting is not a
+YAML option.
+
+Available initial event scalars are `roles`, `host`, `args_host`, `when` (Unix seconds), `name`, `chart`, `context`,
+`status`, `old_status`, `units`, `info`, `summary`, `value`, `old_value`, `duration` and `non_clear_duration`.
+Missing optional numeric facts are empty. There is no ambient environment import or invented Bash alarm/event ID.
+The senders use the current native event content and provider formatting, including already documented corrections;
+this is not byte-for-byte Bash output. Unknown scalar settings can serve as intermediate assignment variables but
+have no independent delivery effect.
+
+These configured behaviors are rejected when applicable to eligible delivery: nonempty `curl`/`curl_options` for
+HTTP methods; non-UTF-8 `EMAIL_CHARSET` for email; configured nonempty `PATH` for command methods; nonempty
+`date_format`/`images_base_url`; `use_fqdn=YES`/`clear_alarm_always=YES`; and final evaluated values of the event scalars
+above that differ from their initial values. Temporary assignments are allowed if those values are restored;
+settings derived during evaluation retain their assignment-time expansions. Use the native event/configuration
+contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
+implementation.
+
+Seven retained legacy mappings remain pending: Slack overrides, Teams Workflows setup/overrides, ilert API alert-source
+setup, Opsgenie Alert API v2 integration setup, Dynatrace Events v2 settings, AWS SNS credentials/message templates,
+and Unix `custom_sender()` execution. Enabled, configured selections fail before any sends once applicable recipient
+requirements are met. Dynatrace, Opsgenie and ilert are global and require no recipients. The check does not probe
+AWS CLI availability or require a custom global default when a role already selects a custom recipient. It exposes
+pending work rather than attempting those unimplemented runtime checks. Old singular `MSTEAM`
+aliases are recognized for that check. HipChat is explicitly excluded and also errors when eligible. Function bodies
+remain inert, including `custom_sender()` and helpers; no original configuration file is sourced.
+
+Four Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
+PagerDuty/Prowl/ntfy can use role recipients without a global default; ntfy sends the resolved filtered recipients;
+and Fleep does not require the unused `FLEEP_SERVER` setting. Production Bash and installation remain unchanged.
+
 ## Command and configuration contract
 
 - `validate --config FILE` checks one YAML document. Unknown fields, duplicate keys, unsupported provider types, and
@@ -204,7 +301,7 @@ unchanged. Unix `custom_sender()` support, including helpers, event context and 
 - `send --config FILE --role ROLE [--role ROLE ...]` uses YAML routing to select destinations. Choose either an explicit
   destination or roles; mixing the selectors fails. Roles are exact, case-sensitive names, without comma splitting,
   wildcards, or implicit role selection. They do not become fields in the webhook payload.
-- All three commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
+- All commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
   Deadline expiration, Ctrl-C, or SIGTERM stops the invocation. Run this developer tool as an ordinary user.
 - Exit status is `0` when at least one delivery succeeds, no destinations are eligible, validation or the syntax check
   succeeds, or help is requested. Invalid options/configuration/input, all attempted deliveries failing, or command cancellation/timeout

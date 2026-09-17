@@ -31,7 +31,7 @@ func (dst Config) validateFleep() error {
 		strings.IndexFunc(dst.Sender, unicode.IsControl) >= 0) {
 		return errors.New("fleep sender must be a nonempty literal name without controls")
 	}
-	reference, err := secret.IsReference(dst.URL)
+	reference, err := dst.Secrets.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("fleep url: %w", err)
 	}
@@ -45,7 +45,7 @@ func (dst Config) validateFleep() error {
 }
 
 func postJSON(ctx context.Context, client *http.Client, dst Config, message any) error {
-	endpoint, err := secret.Resolve(ctx, dst.URL)
+	endpoint, err := dst.Secrets.Resolve(ctx, dst.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
 	}
@@ -72,8 +72,9 @@ func sendFleep(ctx context.Context, dst Config, event notifyevent.Event, client 
 }
 
 type Config struct {
-	URL    string `yaml:"url,omitempty"`
-	Sender string `yaml:"sender,omitempty"`
+	Secrets secret.InputMode `yaml:"-"`
+	URL     string           `yaml:"url,omitempty"`
+	Sender  string           `yaml:"sender,omitempty"`
 }
 
 type Sender struct {

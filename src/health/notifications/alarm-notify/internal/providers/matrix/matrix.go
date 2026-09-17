@@ -25,7 +25,7 @@ func (dst Config) validateMatrix() error {
 		return errors.New("matrix room_id must be a literal !-prefixed room ID without whitespace or controls")
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"access_token", dst.AccessToken}} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("matrix %s: %w", field.name, err)
 		}
@@ -93,7 +93,7 @@ func sendMatrix(ctx context.Context, dst Config, event notifyevent.Event, client
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"access_token", &dst.AccessToken}} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("matrix %s: %w", field.name, err)
 		}
@@ -143,9 +143,10 @@ func readMatrixResponse(response *http.Response) error {
 }
 
 type Config struct {
-	APIURL      string `yaml:"api_url,omitempty"`
-	AccessToken string `yaml:"access_token,omitempty"`
-	RoomID      string `yaml:"room_id,omitempty"`
+	Secrets     secret.InputMode `yaml:"-"`
+	APIURL      string           `yaml:"api_url,omitempty"`
+	AccessToken string           `yaml:"access_token,omitempty"`
+	RoomID      string           `yaml:"room_id,omitempty"`
 }
 
 type Sender struct {

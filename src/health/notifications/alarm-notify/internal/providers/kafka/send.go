@@ -6,14 +6,13 @@ import (
 	"fmt"
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 	"net/http"
 
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
 
 func (s *Sender) Send(ctx context.Context, event notifyevent.Event) error {
-	endpoint, err := secret.Resolve(ctx, s.cfg.URL)
+	endpoint, err := s.cfg.Secrets.Resolve(ctx, s.cfg.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
 	}

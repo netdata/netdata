@@ -122,3 +122,37 @@ func TestResolveCancellation(t *testing.T) {
 		})
 	}
 }
+
+func TestInputMode(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "secret")
+	require.NoError(t, os.WriteFile(file, []byte("file-value\n"), 0600))
+	t.Setenv("NOTIFIER_INPUT_MODE", "env-value")
+	for name, test := range map[string]struct {
+		mode        InputMode
+		value, want string
+		reference   bool
+		invalid     bool
+	}{
+		"native env":         {value: "${env:NOTIFIER_INPUT_MODE}", want: "env-value", reference: true},
+		"native file":        {value: "${file:" + file + "}", want: "file-value", reference: true},
+		"native malformed":   {value: "prefix-${env:NOTIFIER_INPUT_MODE}", invalid: true},
+		"literal env":        {mode: LiteralInput, value: "${env:NOTIFIER_INPUT_MODE}", want: "${env:NOTIFIER_INPUT_MODE}"},
+		"literal file":       {mode: LiteralInput, value: "${file:" + file + "}", want: "${file:" + file + "}"},
+		"literal malformed":  {mode: LiteralInput, value: "prefix-${env:NOTIFIER_INPUT_MODE}", want: "prefix-${env:NOTIFIER_INPUT_MODE}"},
+		"literal whitespace": {mode: LiteralInput, value: "  value\n", want: "  value\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			reference, referenceErr := test.mode.IsReference(test.value)
+			got, resolveErr := test.mode.Resolve(t.Context(), test.value)
+			assert.Equal(t, test.reference, reference)
+			assert.Equal(t, test.want, got)
+			if test.invalid {
+				require.Error(t, referenceErr)
+				require.Error(t, resolveErr)
+			} else {
+				require.NoError(t, referenceErr)
+				require.NoError(t, resolveErr)
+			}
+		})
+	}
+}

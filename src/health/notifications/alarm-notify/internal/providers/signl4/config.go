@@ -4,10 +4,13 @@ package signl4
 
 import (
 	"net/http"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
-	URL string `yaml:"url,omitempty"`
+	Secrets secret.InputMode `yaml:"-"`
+	URL     string           `yaml:"url,omitempty"`
 }
 
 type Sender struct {

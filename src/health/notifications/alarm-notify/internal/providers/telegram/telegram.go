@@ -82,11 +82,11 @@ func sendTelegram(ctx context.Context, dst Config, event notifyevent.Event, clie
 	if err != nil {
 		return err
 	}
-	token, err := secret.Resolve(ctx, dst.BotToken)
+	token, err := dst.Secrets.Resolve(ctx, dst.BotToken)
 	if err != nil {
 		return fmt.Errorf("telegram bot_token: %w", err)
 	}
-	base, err := secret.Resolve(ctx, dst.APIURL)
+	base, err := dst.Secrets.Resolve(ctx, dst.APIURL)
 	if err != nil {
 		return fmt.Errorf("telegram api_url: %w", err)
 	}
@@ -174,11 +174,12 @@ func waitTelegramRetry(ctx context.Context, seconds int64) error {
 }
 
 type Config struct {
-	BotToken        string         `yaml:"bot_token,omitempty"`
-	ChatID          string         `yaml:"chat_id,omitempty"`
-	MessageThreadID *field.Integer `yaml:"message_thread_id,omitempty"`
-	APIURL          string         `yaml:"api_url,omitempty"`
-	RetriesOnLimit  *field.Integer `yaml:"retries_on_limit,omitempty"`
+	Secrets         secret.InputMode `yaml:"-"`
+	BotToken        string           `yaml:"bot_token,omitempty"`
+	ChatID          string           `yaml:"chat_id,omitempty"`
+	MessageThreadID *field.Integer   `yaml:"message_thread_id,omitempty"`
+	APIURL          string           `yaml:"api_url,omitempty"`
+	RetriesOnLimit  *field.Integer   `yaml:"retries_on_limit,omitempty"`
 }
 
 type Sender struct {
