@@ -36,7 +36,7 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 		if c.authMode != "session" || !stats.unauthorized {
 			break
 		}
-		c.Close()
+		c.closeSession(ctx)
 		if ctx.Err() != nil {
 			err = errors.Join(err, ctx.Err())
 			break

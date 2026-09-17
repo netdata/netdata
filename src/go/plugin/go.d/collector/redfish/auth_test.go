@@ -3,6 +3,7 @@
 package redfish
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,6 +41,25 @@ func TestProtocolClientSessionLifecycle(t *testing.T) {
 			assert.Zero(t, server.activeSessions.Load())
 		})
 	}
+}
+
+func TestProtocolClientSessionRetirementDoesNotRestartCanceledContext(t *testing.T) {
+	server := newRedfishTestServer(t, redfishTestServerConfig{
+		supportSession: true,
+	})
+	defer server.Close()
+	client := newTestProtocolClient(t, testConfig(server.URL, "session"))
+	defer client.Close()
+	_, err := client.Collect(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), server.sessionCreates.Load())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	client.closeSession(ctx)
+	assert.Nil(t, client.sdk)
+	assert.Empty(t, client.authMode)
+	assert.Zero(t, server.sessionDeletes.Load(), "retirement must not issue a request after cancellation")
 }
 
 func TestProtocolClientCheckOnlyReadsServiceRoot(t *testing.T) {

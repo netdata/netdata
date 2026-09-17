@@ -54,18 +54,24 @@ func sessionUnsupported(root *responseData, err error) bool {
 func (c *protocolClient) selectedAuthenticationMethod() string { return c.authMode }
 
 func (c *protocolClient) Close() {
+	c.closeSession(context.Background())
+}
+
+func (c *protocolClient) closeSession(ctx context.Context) {
 	client := c.sdk
 	c.sdk, c.authMode = nil, ""
 	if client == nil {
 		return
 	}
-	if _, err := client.GetSession(); err != nil {
+	session, err := client.GetSession()
+	if err != nil {
 		return
 	}
-	// Collector cleanup and expired-session retirement are best effort and must
-	// not inherit a canceled collection context or block the next login.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Recovery shares the collection budget; final cleanup has its own cap.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	client.WithContext(ctx).Logout()
-	return
+	// Logout replaces an already-canceled context with Background. Delete through
+	// the SDK directly so retirement cannot extend a canceled collection.
+	_ = client.WithContext(ctx).Service.DeleteSession(session.ID)
+	client.HTTPClient.CloseIdleConnections()
 }
