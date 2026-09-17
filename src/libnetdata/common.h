@@ -467,7 +467,15 @@ struct rlimit {
 #define RLIMIT_NOFILE  7
 #define RLIMIT_MEMLOCK 8
 #define RLIMIT_AS      9
-static inline int getrlimit(int resource __maybe_unused, struct rlimit *rlim) { if(rlim) { rlim->rlim_cur = 1024; rlim->rlim_max = 1024; } return 0; }
+// Windows does not impose the POSIX 1024 descriptor limit.  Use a generous
+// socket budget for collectors that size their listener sets from RLIMIT_NOFILE.
+#define NETDATA_WINDOWS_NOFILE_LIMIT 16384
+static inline int getrlimit(int resource __maybe_unused, struct rlimit *rlim) {
+    if (!rlim) { errno = EINVAL; return -1; }
+    rlim->rlim_cur = NETDATA_WINDOWS_NOFILE_LIMIT;
+    rlim->rlim_max = NETDATA_WINDOWS_NOFILE_LIMIT;
+    return 0;
+}
 static inline int setrlimit(int resource __maybe_unused, const struct rlimit *rlim __maybe_unused) { return 0; }
 #endif // RLIM_INFINITY
 
@@ -1008,8 +1016,18 @@ struct statvfs {
 static inline int statvfs(const char *path, struct statvfs *buf) {
     if (!buf) { errno = EINVAL; return -1; }
     memset(buf, 0, sizeof(*buf));
+    ULARGE_INTEGER free_bytes, total_bytes, total_free_bytes;
+    if (!path || !GetDiskFreeSpaceExA(path, &free_bytes, &total_bytes, &total_free_bytes)) {
+        errno = ENOENT;
+        return -1;
+    }
+    buf->f_bsize = 1;
+    buf->f_frsize = 1;
+    buf->f_blocks = total_bytes.QuadPart;
+    buf->f_bfree = total_free_bytes.QuadPart;
+    buf->f_bavail = free_bytes.QuadPart;
     buf->f_namemax = 255;
-    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES ? 0 : -1;
+    return 0;
 }
 #endif
 

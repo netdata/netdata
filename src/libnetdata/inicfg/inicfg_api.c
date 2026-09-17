@@ -113,7 +113,7 @@ static bool windows_path_list_needs_reformat_p(const char *value) {
 
     // Detect Windows indicators: semicolons, backslashes, native drive prefix, or MSYS form (/c/...).
     return strchr(value, ';') || strchr(value, '\\') || windows_native_path_p(value) ||
-           (value[0] == '/' && isalpha((unsigned char)value[1]) && (value[2] == '/' || value[2] == '\0'));
+           (value[0] == '/' && value[1] != '\0' && isalpha((unsigned char)value[1]));
 }
 
 static STRING *reformat_path_list(STRING *value) {

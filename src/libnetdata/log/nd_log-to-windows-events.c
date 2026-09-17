@@ -503,6 +503,11 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     //   - does NOT cover EventWrite (that runs in the async writer thread)
     netdata_mutex_lock(&etw_queue.mutex);
 
+    if (etw_queue.stopped) {
+        netdata_mutex_unlock(&etw_queue.mutex);
+        return false;
+    }
+
     wevt_generate_all_fields_unsafe(fields, fields_max, &tmp);
 
     MESSAGE_ID messageID;
