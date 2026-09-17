@@ -48,9 +48,11 @@ type requestTrace struct {
 	stats       *wireStats
 	first, last *responseData
 	failure     error
+
+	bootstrapUsername, bootstrapPassword string
 }
 
-// The SDK owns requests and credentials. This transport adds the collector's
+// The SDK owns requests and authentication after bootstrap. This transport adds
 // response timing/byte accounting and bounds reads before SDK error decoding.
 type redfishTransport struct {
 	base   http.RoundTripper
@@ -63,6 +65,12 @@ func (t *redfishTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, err
 	}
 	trace, _ := req.Context().Value(requestTraceKey{}).(*requestTrace)
+	if trace != nil && trace.bootstrapUsername != "" && req.Method == http.MethodGet &&
+		req.Header.Get("Authorization") == "" {
+		// Only Basic Connect carries these credentials, including root redirects.
+		req = req.Clone(req.Context())
+		req.SetBasicAuth(trace.bootstrapUsername, trace.bootstrapPassword)
+	}
 	if trace != nil && trace.last != nil && trace.last.status >= 200 && trace.last.status < 300 {
 		trace.last.finish(nil)
 	}

@@ -67,16 +67,9 @@ func (c *protocolClient) Check(ctx context.Context) error {
 	if c.config.AuthMethod == "basic" {
 		cfg.Username, cfg.Password, cfg.BasicAuth = c.config.Username, c.config.Password, true
 	}
-	client, root, err := c.connectSDK(ctx, cfg, nil)
+	_, root, err := c.connectSDK(ctx, cfg, nil)
 	if err != nil {
 		return err
-	}
-	// Connect fetches the ServiceRoot before it installs Basic credentials.
-	if cfg.BasicAuth {
-		root, err = c.getWithClient(ctx, client, c.root, nil)
-		if err != nil {
-			return err
-		}
 	}
 	_, err = c.decodeServiceRoot(root)
 	return err

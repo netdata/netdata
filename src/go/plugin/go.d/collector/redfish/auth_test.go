@@ -3,6 +3,7 @@
 package redfish
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -50,15 +51,76 @@ func TestProtocolClientCheckOnlyReadsServiceRoot(t *testing.T) {
 				assert.Equal(t, http.MethodGet, r.Method)
 				assert.Equal(t, "/redfish/v1/", r.URL.Path)
 				assert.Empty(t, r.Header.Get("X-Auth-Token"))
+				if method == "basic" {
+					username, password, ok := r.BasicAuth()
+					assert.True(t, ok)
+					assert.Equal(t, "user", username)
+					assert.Equal(t, "test-password", password)
+				} else {
+					assert.Empty(t, r.Header.Get("Authorization"))
+				}
 				serveServiceRoot(w, true)
 			}))
 			defer server.Close()
 			client := newTestProtocolClient(t, testConfig(server.URL, method))
 			require.NoError(t, client.Check(t.Context()))
 			client.Close()
-			assert.Positive(t, requests.Load())
+			assert.Equal(t, int64(1), requests.Load())
 			assert.Nil(t, client.sdk)
 		})
+	}
+}
+
+func TestProtocolClientBasicProtectedServiceRoot(t *testing.T) {
+	// Some services require credentials even at the root; see DMTF/python-redfish-library#165.
+	for _, redirect := range []bool{false, true} {
+		for _, password := range []string{"test-password", "wrong-password"} {
+			t.Run(fmt.Sprintf("redirect=%v/password=%s", redirect, password), func(t *testing.T) {
+				var anonymous atomic.Int64
+				server := newRedfishTestServer(t, redfishTestServerConfig{
+					requireBasic: true,
+					handleRequest: func(w http.ResponseWriter, r *http.Request) bool {
+						username, secret, ok := r.BasicAuth()
+						if !ok {
+							anonymous.Add(1)
+						}
+						if !ok || username != "user" || secret != "test-password" {
+							http.Error(w, "unauthorized", http.StatusUnauthorized)
+							return true
+						}
+						if redirect && r.URL.Path == "/redfish/v1/" {
+							http.Redirect(w, r, "/redfish/v1/redirected", http.StatusTemporaryRedirect)
+							return true
+						}
+						return false
+					},
+				})
+				defer server.Close()
+				cfg := testConfig(server.URL, "basic")
+				cfg.Password = password
+				client := newTestProtocolClient(t, cfg)
+				checkErr := client.Check(t.Context())
+				result, collectErr := client.Collect(t.Context())
+				if password == "test-password" {
+					assert.NoError(t, checkErr)
+					require.NoError(t, collectErr)
+					assert.True(t, result.Complete)
+					assert.Equal(t, "success", result.Metrics.Status)
+					assert.NotEmpty(t, result.Hardware)
+				} else {
+					require.Error(t, checkErr)
+					require.Error(t, collectErr)
+					assert.Equal(t, "auth", classifyError(checkErr))
+					assert.Equal(t, "unavailable", result.Metrics.Status)
+					assert.Equal(t, map[string]int{"auth": 1}, result.Metrics.Failures)
+					assert.Equal(t, 1, result.Metrics.HTTPRequests["started"])
+					assert.NotContains(t, checkErr.Error(), password)
+					assert.NotContains(t, collectErr.Error(), password)
+				}
+				assert.Zero(t, anonymous.Load())
+				assert.Zero(t, server.sessionCreates.Load())
+			})
+		}
 	}
 }
 

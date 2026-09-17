@@ -28,6 +28,10 @@ func (c *protocolClient) connectSDK(
 	trace := &requestTrace{
 		stats: stats,
 	}
+	if cfg.BasicAuth {
+		// gofish reads ServiceRoot before installing its Basic credentials.
+		trace.bootstrapUsername, trace.bootstrapPassword = cfg.Username, cfg.Password
+	}
 	client, err := gofish.ConnectContext(context.WithValue(ctx, requestTraceKey{}, trace), cfg)
 	err = sdkError(err, trace)
 	if trace.last != nil && !trace.last.finished {

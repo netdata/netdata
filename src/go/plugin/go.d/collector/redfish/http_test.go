@@ -36,7 +36,9 @@ func TestSanitizeTransportErrorPreservesPolicyWithoutLeakingDetails(t *testing.T
 func TestProtocolClientRejectsCrossOriginRedirect(t *testing.T) {
 	t.Parallel()
 
+	var foreignRequests atomic.Int64
 	foreign := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		foreignRequests.Add(1)
 		http.Error(w, "must not be reached", http.StatusInternalServerError)
 	}))
 	defer foreign.Close()
@@ -50,9 +52,16 @@ func TestProtocolClientRejectsCrossOriginRedirect(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-	err := client.Check(context.Background())
-	require.ErrorContains(t, err, "crosses the configured origin")
+	for _, method := range []string{"none", "basic"} {
+		t.Run(method, func(t *testing.T) {
+			client := newTestProtocolClient(t, testConfig(server.URL, method))
+			err := client.Check(context.Background())
+			require.ErrorContains(t, err, "crosses the configured origin")
+			_, err = client.Collect(context.Background())
+			require.ErrorContains(t, err, "crosses the configured origin")
+		})
+	}
+	assert.Zero(t, foreignRequests.Load())
 }
 
 func TestProtocolClientFollowsSameOriginGetRedirect(t *testing.T) {
