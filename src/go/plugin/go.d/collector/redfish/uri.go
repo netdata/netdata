@@ -273,5 +273,4 @@ func readingProvenanceResolver(root *url.URL, origin string) func(baseURI, raw s
 		}
 		return canonicalProvenanceURI(target), true
 	}
-
 }

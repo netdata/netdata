@@ -4,10 +4,6 @@ package redfish
 
 import (
 	"context"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
-
 	_ "embed"
 	"errors"
 	"fmt"
@@ -18,6 +14,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 //go:embed "config_schema.json"
