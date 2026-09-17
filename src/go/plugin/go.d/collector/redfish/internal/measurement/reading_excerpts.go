@@ -155,7 +155,7 @@ func excerptDocumentReadings(
 	physical, _ := stringValueAt(document, "PhysicalContext")
 	for _, source := range sources {
 		raw, present := valueAt(document, source.Path)
-		if !present || raw == nil {
+		if !present {
 			continue
 		}
 		path := pathPrefix + "." + source.Path
@@ -169,7 +169,7 @@ func excerptDocumentReadings(
 		}
 		for _, key := range source.Keys {
 			// Fixed-map scalars carry no parent physical context.
-			if raw := object[key]; raw != nil {
+			if raw, present := object[key]; present {
 				result = excerptValueReadings(result, raw, path+"."+key, sourceDocumentURI, source, "")
 			}
 		}

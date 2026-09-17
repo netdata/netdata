@@ -57,7 +57,10 @@ func TestFixedExcerptMapPreservesValuePresenceAndContext(t *testing.T) {
 		value any
 		want  []rawReading
 	}{
-		"null":                {value: nil},
+		"null": {value: nil, want: []rawReading{{
+			Path: "power_supply_metrics.PolyPhasePowerWatts.Line1ToNeutral",
+			Type: "Power", Units: "W", Basis: "Zero", Role: "power", ValuePresent: true, Primary: true,
+		}}},
 		"zero":                {value: json.Number("0"), want: []rawReading{{Path: "power_supply_metrics.PolyPhasePowerWatts.Line1ToNeutral", Type: "Power", Units: "W", Basis: "Zero", Role: "power", Value: json.Number("0"), ValuePresent: true, Primary: true}}},
 		"object null reading": {value: map[string]any{"Reading": nil, "PhysicalContext": "PowerSupply"}, want: []rawReading{{Path: "power_supply_metrics.PolyPhasePowerWatts.Line1ToNeutral.Reading", Type: "Power", Units: "W", Basis: "Zero", Role: "power", ValuePresent: true, Primary: true, PhysicalContext: "PowerSupply", ReadingScoped: true}}},
 	} {

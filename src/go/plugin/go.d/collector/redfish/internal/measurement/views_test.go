@@ -42,3 +42,73 @@ func TestProjectComponentViewsUseCurrentSourceMetadata(t *testing.T) {
 	resources[0].Data["Version"] = "changed"
 	require.Equal(t, "1.2.3", result.Components[0].Firmware, "published facts are independent of input documents")
 }
+
+func TestProjectPreservesNullReadingViewsWithoutNumericMetrics(t *testing.T) {
+	for name, resource := range map[string]*measurement.Resource{
+		"component scalar": {
+			Kind: "fan", Data: map[string]any{"SpeedPercent": nil},
+		},
+		"environment excerpt": {
+			Kind: "chassis", Enrichment: map[string]measurement.Enrichment{
+				"environment_metrics": {Data: map[string]any{"PowerWatts": nil}},
+			},
+		},
+		"polyphase member": {
+			Kind: "power_supply", Enrichment: map[string]measurement.Enrichment{
+				"power_supply_metrics": {Data: map[string]any{"PolyPhaseCurrentAmps": map[string]any{"Line1": nil}}},
+			},
+		},
+		"legacy temperature": {
+			Kind: "sensor", SourceModel: "deprecated_thermal", SourcePath: "Temperatures",
+			Data: map[string]any{"ReadingCelsius": nil},
+		},
+		"legacy fan": {
+			Kind: "sensor", SourceModel: "deprecated_thermal", SourcePath: "Fans",
+			Data: map[string]any{"Reading": nil},
+		},
+		"legacy voltage": {
+			Kind: "sensor", SourceModel: "deprecated_power", SourcePath: "Voltages",
+			Data: map[string]any{"ReadingVolts": nil},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			resource.Key = "resource"
+			resource.AcquisitionState = "readable"
+			observed := time.Unix(100, 0)
+			projector := measurement.New("https://fixture.example", "hardware", nil)
+			result, err := projector.Project([]*measurement.Resource{resource}, true, observed)
+			require.NoError(t, err)
+			require.Len(t, result.Sensors, 1, "an explicitly null reading remains visible")
+			require.False(t, result.Sensors[0].Valid)
+			require.Equal(t, observed, result.Sensors[0].ObservedAt)
+			absent := *resource
+			absent.Data = map[string]any{}
+			absent.Enrichment = nil
+			withoutReading, err := projector.Project([]*measurement.Resource{&absent}, true, observed)
+			require.NoError(t, err)
+			require.Empty(t, withoutReading.Sensors, "absent properties do not create rows")
+			require.Equal(t, withoutReading.Observations, result.Observations, "null values do not add numeric metrics")
+		})
+	}
+}
+
+func TestProjectLegacyNullStillAllowsNumericFallback(t *testing.T) {
+	projector := measurement.New("https://fixture.example", "hardware", nil)
+	resource := &measurement.Resource{
+		Key:              "temperature",
+		Kind:             "sensor",
+		SourceModel:      "deprecated_thermal",
+		SourcePath:       "Temperatures",
+		AcquisitionState: "readable",
+		Data:             map[string]any{"ReadingCelsius": nil, "Reading": 0},
+	}
+	result, err := projector.Project([]*measurement.Resource{resource}, true, time.Unix(100, 0))
+	require.NoError(t, err)
+	require.Len(t, result.Sensors, 1)
+	require.True(t, result.Sensors[0].Valid)
+	require.Zero(t, result.Sensors[0].Value)
+	delete(resource.Data, "ReadingCelsius")
+	withoutNull, err := projector.Project([]*measurement.Resource{resource}, true, time.Unix(100, 0))
+	require.NoError(t, err)
+	require.Equal(t, withoutNull, result, "an earlier null alias does not hide a later numeric value")
+}
