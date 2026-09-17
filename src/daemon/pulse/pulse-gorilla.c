@@ -7,7 +7,7 @@ void pulse_gorilla_do(bool extended __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(!extended) return;
 
-    struct rrdeng_gorilla_stats gs = rrdeng_get_gorilla_stats();
+    struct rrdeng_gorilla_stats gs = dbengine_get_gorilla_stats();
 
     if (netdata_conf_dbengine_page_type(0) == RRDENG_PAGE_TYPE_GORILLA_32BIT)
     {

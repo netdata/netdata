@@ -449,7 +449,7 @@ TEST(PGD, RejectCorruptGorillaDiskNbits) {
     pgd_free(pg_collector);
 }
 
-int pgd_test(int argc, char *argv[])
+int dbengine_page_test(int argc, char *argv[])
 {
     // Dummy/necessary initialization stuff
     PGC *dummy_cache = pgc_create("pgd-tests-cache", 32 * 1024 * 1024, NULL, 64, NULL, NULL,
@@ -466,7 +466,7 @@ int pgd_test(int argc, char *argv[])
 
 #else // HAVE_GTEST
 
-int pgd_test(int argc, char *argv[])
+int dbengine_page_test(int argc, char *argv[])
 {
     (void) argc;
     (void) argv;

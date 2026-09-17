@@ -71,7 +71,7 @@ static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_EN
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metrics_group_get(si, uuid);
+        return dbengine_metrics_group_get(si, uuid);
 #endif
     return ram_metrics_group_get(si, uuid);
 }
@@ -83,7 +83,7 @@ static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND s
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_metrics_group_release(si, smg);
+        dbengine_metrics_group_release(si, smg);
     else
 #endif
         ram_metrics_group_release(si, smg);
@@ -96,7 +96,7 @@ static inline STORAGE_COLLECT_HANDLE *storage_engine_store_init(STORAGE_ENGINE_B
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_init(smh, update_every, smg);
+        return dbengine_store_init(smh, update_every, smg);
 #endif
     return ram_store_init(smh, update_every, smg);
 }
@@ -115,13 +115,13 @@ static void storage_engine_store_metric(
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_next(sch, point_in_time_ut,
-                                        n, min_value, max_value,
-                                        count, anomaly_count, flags);
+        return dbengine_store_next(sch, point_in_time_ut,
+                                   n, min_value, max_value,
+                                   count, anomaly_count, flags);
 #endif
     return ram_store_next(sch, point_in_time_ut,
-                                       n, min_value, max_value,
-                                       count, anomaly_count, flags);
+                          n, min_value, max_value,
+                          count, anomaly_count, flags);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -129,7 +129,7 @@ static void storage_engine_store_metric(
 static inline uint64_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_disk_space_max(si);
+        return dbengine_disk_space_max(si);
 #endif
 
     return 0;
@@ -140,7 +140,7 @@ static inline uint64_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND seb 
 static inline uint64_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_disk_space_used(si);
+        return dbengine_disk_space_used(si);
 #endif
 
     // TODO - calculate the total host disk space for memory mode save and map
@@ -152,7 +152,7 @@ static inline uint64_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND seb
 static inline uint64_t storage_engine_metrics(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metrics(si);
+        return dbengine_metrics(si);
 #endif
 
     // TODO - calculate the total host disk space for memory mode save and map
@@ -164,7 +164,7 @@ static inline uint64_t storage_engine_metrics(STORAGE_ENGINE_BACKEND seb __maybe
 static inline uint64_t storage_engine_samples(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_samples(si);
+        return dbengine_samples(si);
 #endif
     return 0;
 }
@@ -174,7 +174,7 @@ static inline uint64_t storage_engine_samples(STORAGE_ENGINE_BACKEND seb __maybe
 static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_global_first_time_s(si);
+        return dbengine_global_first_time_s(si);
 #endif
 
     return now_realtime_sec() - (time_t)(default_rrd_history_entries * nd_profile.update_every);
@@ -190,7 +190,7 @@ static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_flush_current_page(sch);
+        dbengine_store_flush(sch);
     else
 #endif
         ram_store_flush(sch);
@@ -209,7 +209,7 @@ static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_finalize(sch);
+        return dbengine_store_finalize(sch);
 #endif
 
     return ram_store_finalize(sch);
@@ -225,7 +225,7 @@ static inline void storage_engine_store_change_collection_frequency(STORAGE_COLL
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_change_collection_frequency(sch, update_every);
+        dbengine_store_change_collection_frequency(sch, update_every);
     else
 #endif
         ram_store_change_collection_frequency(sch, update_every);
@@ -240,7 +240,7 @@ static time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND seb  __maybe_u
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metric_oldest_time(smh);
+        return dbengine_oldest_time_s(smh);
 #endif
     return ram_oldest_time_s(smh);
 }
@@ -253,7 +253,7 @@ static time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND seb __maybe_un
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metric_latest_time(smh);
+        return dbengine_latest_time_s(smh);
 #endif
     return ram_latest_time_s(smh);
 }
@@ -269,7 +269,7 @@ static void storage_engine_query_init(
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_load_metric_init(smh, seqh, start_time_s, end_time_s, priority);
+        dbengine_query_init(smh, seqh, start_time_s, end_time_s, priority);
     else
 #endif
         ram_query_init(smh, seqh, start_time_s, end_time_s, priority);
@@ -283,7 +283,7 @@ static STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_quer
 
 #ifdef ENABLE_DBENGINE
     if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_metric_next(seqh);
+        return dbengine_query_next(seqh);
 #endif
     return ram_query_next(seqh);
 }
@@ -296,7 +296,7 @@ static int storage_engine_query_is_finished(struct storage_engine_query_handle *
 
 #ifdef ENABLE_DBENGINE
     if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_metric_is_finished(seqh);
+        return dbengine_query_is_finished(seqh);
 #endif
     return ram_query_is_finished(seqh);
 }
@@ -309,7 +309,7 @@ static void storage_engine_query_finalize(struct storage_engine_query_handle *se
 
 #ifdef ENABLE_DBENGINE
     if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_load_metric_finalize(seqh);
+        dbengine_query_finalize(seqh);
     else
 #endif
         ram_query_finalize(seqh);
@@ -323,7 +323,7 @@ static time_t storage_engine_align_to_optimal_before(struct storage_engine_query
 
 #ifdef ENABLE_DBENGINE
     if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_align_to_optimal_before(seqh);
+        return dbengine_query_align_to_optimal_before(seqh);
 #endif
     return ram_query_align_to_optimal_before(seqh);
 }

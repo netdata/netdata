@@ -8,7 +8,7 @@
 // dbengine is netdata's tiered time-series store. Vocabulary used throughout this directory:
 //
 //   ctx (struct rrdengine_instance)   one tier of one database: a directory of datafiles and their journals;
-//                                     the daemon's tiers are multidb_ctx[]
+//                                     the daemon's tiers are dbengine_multidb_ctx[]
 //   datafile / extent / page          on-disk container / a compressed group of pages / one metric's samples
 //   journalfile                       the per-datafile index of extents and metrics (v1 while writing, v2 when sealed)
 //   MRG, the metric registry          process-wide: every metric's uuid, section (its ctx) and retention (mrg.h)
@@ -467,7 +467,7 @@ struct rrdengine_instance {
 
         PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
-        PAD64(bool) active;                                // set when rrdeng_init() succeeded, cleared by rrdeng_exit()
+        PAD64(bool) active;                                // set by a successful dbengine_instance_init(), cleared by dbengine_exit()
         PAD64(bool) mrg_populated;                         // set when the metrics registry has been loaded from every journal
         PAD64(bool) migration_to_v2_running;
         PAD64(bool) now_deleting_files;
@@ -733,9 +733,9 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// rrdeng_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
+// dbengine_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
 uint64_t rrdeng_get_used_disk_space_unsafe(struct rrdengine_instance *ctx);
-// after rrdeng_exit(), on a static multidb tier only: close its datafiles
+// after dbengine_exit(), on a static multidb tier only: close its datafiles
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);

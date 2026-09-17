@@ -375,13 +375,13 @@ static int scan_data_files_cmp(const void *a, const void *b)
 }
 
 // the one place a directory entry is recognised as a datafile: both the scan that loads a tier
-// and the embedder's probe (rrdeng_datafiles_present) must agree on what counts as persisted data
+// and the embedder's probe (dbengine_dir_has_datafiles) must agree on what counts as persisted data
 static bool datafile_name_parse(const char *name, unsigned *tier, unsigned *fileno)
 {
     return sscanf(name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, tier, fileno) == 2;
 }
 
-bool rrdeng_datafiles_present(const char *dbfiles_path)
+bool dbengine_dir_has_datafiles(const char *dbfiles_path)
 {
     DIR *dir = opendir(dbfiles_path);
     if (!dir)

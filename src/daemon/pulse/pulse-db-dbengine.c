@@ -645,21 +645,21 @@ void pulse_dbengine_do(bool extended) {
     static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {}; (void)mrg_stats_old;
 
     pgc_main_stats_old = pgc_main_stats;
-    bool have_main_cache = rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
+    bool have_main_cache = dbengine_get_cache_stats(RRDENG_CACHE_MAIN, &pgc_main_stats);
 
     pgc_open_stats_old = pgc_open_stats;
-    rrdeng_get_cache_statistics(RRDENG_CACHE_OPEN, &pgc_open_stats);
+    dbengine_get_cache_stats(RRDENG_CACHE_OPEN, &pgc_open_stats);
 
     pgc_extent_stats_old = pgc_extent_stats;
-    rrdeng_get_cache_statistics(RRDENG_CACHE_EXTENT, &pgc_extent_stats);
+    dbengine_get_cache_stats(RRDENG_CACHE_EXTENT, &pgc_extent_stats);
 
     cache_efficiency_stats_old = cache_efficiency_stats;
-    cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
+    cache_efficiency_stats = dbengine_get_cache_efficiency_stats();
 
     mrg_stats_old = mrg_stats;
-    bool have_mrg = rrdeng_get_mrg_statistics(&mrg_stats);
+    bool have_mrg = dbengine_get_metrics_registry_stats(&mrg_stats);
 
-    struct rrdeng_buffer_sizes dbmem = rrdeng_get_memory_sizes();
+    struct rrdeng_buffer_sizes dbmem = dbengine_get_memory_sizes();
 
     int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 
@@ -674,7 +674,7 @@ void pulse_dbengine_do(bool extended) {
     pulse_dbengine_total_memory =
         pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size +
         mrg_stats.size +
-        buffers_total_size + aral_structures_total_size + aral_padding_total_size + (int64_t)pgd_padding_bytes();
+        buffers_total_size + aral_structures_total_size + aral_padding_total_size + (int64_t)dbengine_page_padding_bytes();
 
     // we need all the above for the total dbengine memory as reported by the non-extended netdata memory chart
     if(!have_main_cache || !have_mrg || !extended)
@@ -729,7 +729,7 @@ void pulse_dbengine_do(bool extended) {
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_buffers, (collected_number)buffers_total_size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_aral_padding, (collected_number)aral_padding_total_size);
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_pgd_padding, (collected_number)pgd_padding_bytes());
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_pgd_padding, (collected_number)dbengine_page_padding_bytes());
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_aral_structures, (collected_number)aral_structures_total_size);
 
         rrdset_done(st_pgc_memory);
@@ -1500,7 +1500,7 @@ void pulse_dbengine_do(bool extended) {
                         counted_multihost_db[tier] = 1;
 
                     ++dbengine_contexts;
-                    rrdeng_get_37_statistics((struct rrdengine_instance *)host->db[tier].si, local_stats_array);
+                    dbengine_get_stats((struct rrdengine_instance *)host->db[tier].si, local_stats_array);
                     for (i = 0; i < RRDENG_NR_STATS; ++i) {
                         /* aggregate statistics across hosts */
                         stats_array[i] += local_stats_array[i];

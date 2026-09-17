@@ -97,39 +97,39 @@ void cancel_main_threads(void) {
 }
 
 #ifdef ENABLE_DBENGINE
-static void rrdeng_exit_background(void *ptr) {
+static void dbengine_exit_background(void *ptr) {
     struct rrdengine_instance *ctx = ptr;
-    rrdeng_exit(ctx);
+    dbengine_exit(ctx);
 }
 
 // the tier count in nd_profile is lowered when a tier fails to start, hiding any tier above it that did start;
 // the engine's own active flag is the truth about which tiers are up
-static void rrdeng_quiesce_all()
+static void dbengine_quiesce_all()
 {
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if (rrdeng_ctx_is_active(multidb_ctx[tier]))
-            rrdeng_quiesce(multidb_ctx[tier]);
+        if (dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
+            dbengine_quiesce(dbengine_multidb_ctx[tier]);
 }
 
-static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
+static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
-    if(!rrdeng_pages_pending_flush())
+    if(!dbengine_pages_pending_flush())
         return;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        if (!rrdeng_ctx_is_active(multidb_ctx[tier]))
+        if (!dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
             continue;
 
         if (dirty_only)
-            rrdeng_flush_dirty(multidb_ctx[tier]);
+            dbengine_flush_dirty(dbengine_multidb_ctx[tier]);
         else
-            rrdeng_flush_all(multidb_ctx[tier]);
+            dbengine_flush_all(dbengine_multidb_ctx[tier]);
     }
 
     struct pgc_statistics pgc_main_stats;
-    rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
+    dbengine_get_cache_stats(RRDENG_CACHE_MAIN, &pgc_main_stats);
     size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
     size_t entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
     if(size_to_flush > starting_size_to_flush || !starting_size_to_flush)
@@ -141,8 +141,8 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         while (running && count) {
             running = 0;
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-                if (rrdeng_ctx_is_active(multidb_ctx[tier]))
-                    running += rrdeng_collectors_running(multidb_ctx[tier]);
+                if (dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
+                    running += dbengine_collectors_running(dbengine_multidb_ctx[tier]);
 
             if (running) {
                 nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
@@ -156,7 +156,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         return;
 
     for(size_t iterations = 0; true ;iterations++) {
-        rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
+        dbengine_get_cache_stats(RRDENG_CACHE_MAIN, &pgc_main_stats);
         size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
         entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
         if(!starting_size_to_flush || size_to_flush > starting_size_to_flush)
@@ -203,8 +203,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
 #ifdef ENABLE_DBENGINE
     if(!abnormal && dbengine_enabled) {
-        rrdeng_quiesce_all();
-        rrdeng_flush_everything_and_wait(false, false, true);
+        dbengine_quiesce_all();
+        dbengine_flush_everything_and_wait(false, false, true);
     }
 #endif
 
@@ -239,7 +239,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 #ifdef ENABLE_DBENGINE
     if(!abnormal && dbengine_enabled)
         // flush all dirty pages now that all collectors and streaming completed
-        rrdeng_flush_everything_and_wait(false, false, true);
+        dbengine_flush_everything_and_wait(false, false, true);
 #endif
 
     service_wait_exit(SERVICE_REPLICATION, 5 * USEC_PER_SEC);
@@ -309,7 +309,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // remembered before any tier exits (exiting clears the engine's active flag), for the exit and the finalize loops
     bool dbengine_tier_up[RRD_STORAGE_TIERS];
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        dbengine_tier_up[tier] = dbengine_enabled && rrdeng_ctx_is_active(multidb_ctx[tier]);
+        dbengine_tier_up[tier] = dbengine_enabled && dbengine_ctx_is_active(dbengine_multidb_ctx[tier]);
 #endif
 
     if (abnormal) {
@@ -327,13 +327,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
             // flush anything remaining and wait for collectors to finish
-            rrdeng_flush_everything_and_wait(true, true, false);
+            dbengine_flush_everything_and_wait(true, true, false);
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
             ND_THREAD *th[RRD_STORAGE_TIERS] = { 0 };
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 if (dbengine_tier_up[tier])
-                    th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, rrdeng_exit_background, multidb_ctx[tier]);
+                    th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, dbengine_exit_background, dbengine_multidb_ctx[tier]);
 
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 if (th[tier])

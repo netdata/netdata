@@ -68,7 +68,7 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
         
 #ifdef ENABLE_DBENGINE
         if(!tier_info->disk_max && eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE) {
-            tier_info->disk_max = rrdeng_get_directory_free_bytes_space(multidb_ctx[tier]);
+            tier_info->disk_max = dbengine_get_directory_free_bytes_space(dbengine_multidb_ctx[tier]);
             tier_info->disk_max += tier_info->disk_used;
         }
 #endif
@@ -84,7 +84,7 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
         tier_info->last_time_s = now_s;
         
         // first_time_s zero means the storage engine does not know the start of
-        // the retention - rrdeng_global_first_time_s() normalizes both LONG_MAX
+        // the retention - dbengine_global_first_time_s() normalizes both LONG_MAX
         // (nothing loaded yet) and negatives to zero. It is not 1970: treating
         // it as a timestamp reports the whole unix epoch as retention.
         if(tier_info->first_time_s > 0 && tier_info->first_time_s < tier_info->last_time_s) {
@@ -99,7 +99,7 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
                 tier_info->requested_retention = 0;
 #ifdef ENABLE_DBENGINE
                 if(eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE)
-                    tier_info->requested_retention = rrdeng_max_retention_s(multidb_ctx[tier]);
+                    tier_info->requested_retention = dbengine_max_retention_s(dbengine_multidb_ctx[tier]);
 #endif
 
                 // Format human-readable requested retention

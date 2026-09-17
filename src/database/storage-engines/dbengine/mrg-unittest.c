@@ -1908,7 +1908,7 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     return errors;
 }
 
-int mrg_unittest(void) {
+int dbengine_metrics_registry_unittest(void) {
     int errors = dbengine_accounting_helpers_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
@@ -2298,7 +2298,7 @@ static void mrg_bench_print_summary(const mrg_bench_summary_stats_t *summary) {
     fprintf(stderr, "\n");
 }
 
-int mrg_retention_benchmark(void) {
+int dbengine_metrics_registry_retention_benchmark(void) {
     mrg_bench_summary_stats_t summary = {0};
 
     // Use mrg_create_for_unittest() to avoid loading from database

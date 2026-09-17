@@ -171,7 +171,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Flush pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].sch);
+            dbengine_store_flush((rd[i][j])->tiers[0].sch);
         }
     }
 }
@@ -396,7 +396,7 @@ static size_t test_dbengine_burst_retention_case(
     // already stamped the page end time (multi-page bursts), hiding all
     // earlier points of the burst from queries until a restart
     time_t first = 0, last = 0;
-    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
+    dbengine_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
 
     if(first != expected_first) {
         fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' first_entry is %ld, expected %ld\n",
@@ -413,7 +413,7 @@ static size_t test_dbengine_burst_retention_case(
     // a second read must return the same retention (the first read must not
     // have persisted anything different)
     time_t first2 = 0, last2 = 0;
-    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first2, &last2);
+    dbengine_metric_retention_by_id(host->db[0].si, rd->uuid, &first2, &last2);
 
     if(first2 != first || last2 != last) {
         fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' retention is not stable across reads: "
@@ -574,12 +574,12 @@ static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
     };
 
     size_t invalid_before =
-        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+        dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
     size_t errors = dbengine_cadence_test_query_points(
         rd, t + update_every, t + 2 * update_every,
         expected, _countof(expected), "long-cadence");
     size_t invalid_after =
-        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+        dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
 
     if(invalid_after != invalid_before) {
         fprintf(stderr,
@@ -601,7 +601,7 @@ int test_dbengine(void) {
     fprintf(stderr, "\nRunning DB-engine test\n");
 
     // before any tier is up: the caches do not exist yet, which is the state this check needs
-    errors += (size_t)rrdeng_cache_floor_unittest();
+    errors += (size_t)dbengine_cache_floor_unittest();
 
     default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
@@ -651,15 +651,15 @@ int test_dbengine(void) {
     }
 
     errors += test_dbengine_long_collection_cadence(host);
-    errors += (size_t)rrdeng_zero_page_cadence_unittest(host->db[0].si);
+    errors += (size_t)dbengine_zero_page_cadence_unittest(host->db[0].si);
 
     // prevent closing the database before the test is finished
     sleep(5);
 
     rrd_wrlock();
-    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_flush_all((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
+    dbengine_quiesce((struct rrdengine_instance *)host->db[0].si);
+    dbengine_flush_all((struct rrdengine_instance *)host->db[0].si);
+    dbengine_exit((struct rrdengine_instance *)host->db[0].si);
     dbengine_shutdown();
     rrd_wrunlock();
 

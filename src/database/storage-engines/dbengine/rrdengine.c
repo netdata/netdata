@@ -218,8 +218,8 @@ static inline void check_and_schedule_db_rotation(struct rrdengine_instance *ctx
     internal_fatal(rrdeng_main.tid != gettid_cached(), "check_and_schedule_db_rotation() can only be run from the event loop thread");
 
     // neither indexing nor rotation before the registry has been loaded from every journal,
-    // nor once rrdeng_exit() has started taking the tier down
-    if (!rrdeng_ctx_is_active(ctx) || !rrdeng_ctx_is_mrg_populated(ctx))
+    // nor once dbengine_exit() has started taking the tier down
+    if (!dbengine_ctx_is_active(ctx) || !rrdeng_ctx_is_mrg_populated(ctx))
         return;
 
     if (__atomic_load_n(&ctx->atomic.needs_indexing, __ATOMIC_RELAXED)) {
@@ -475,7 +475,7 @@ static struct {
 static size_t rrdeng_active_tiers(void) {
     size_t active = 0;
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if(rrdeng_ctx_is_active(multidb_ctx[tier]))
+        if(dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
             active++;
     return active;
 }
@@ -651,7 +651,7 @@ static void rrdeng_cmd_queue_set_accepting(bool accepting) {
     spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 }
 
-bool rrdeng_work_available(void) {
+bool dbengine_work_available(void) {
     spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
     bool accepting = rrdeng_main.cmd_queue.unsafe.accepting;
     spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
@@ -1163,8 +1163,8 @@ static void *external_work_worker(
     return NULL;
 }
 
-bool rrdeng_enq_work(struct rrdeng_work_request *req) {
-    if(!rrdeng_work_available())
+bool dbengine_enq_work(struct rrdeng_work_request *req) {
+    if(!dbengine_work_available())
         return false;   // never spawned, or already shut down: the queue's allocator may not even exist
 
     struct rrdeng_cmd *cmd = rrdeng_cmd_alloc(NULL, RRDENG_OPCODE_EXTERNAL_WORK, req, &req->completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL);
@@ -2430,7 +2430,7 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
 
 // the name each RRDENG_MEM slot is charted under; the daemon's pulse reads these together with the
 // statistics below instead of the engine registering them one by one
-const char *rrdeng_mem_name(RRDENG_MEM idx) {
+const char *dbengine_mem_name(RRDENG_MEM idx) {
     static const char *const names[RRDENG_MEM_MAX] = {
         [RRDENG_MEM_PGC]            = "pgc",
         [RRDENG_MEM_PGD]            = "pgd",
@@ -2449,7 +2449,7 @@ const char *rrdeng_mem_name(RRDENG_MEM idx) {
     return idx < RRDENG_MEM_MAX ? names[idx] : NULL;
 }
 
-struct rrdeng_buffer_sizes rrdeng_get_memory_sizes(void) {
+struct rrdeng_buffer_sizes dbengine_get_memory_sizes(void) {
     return (struct rrdeng_buffer_sizes) {
         .as = {
             [RRDENG_MEM_PGC]            = pgc_aral_stats(),
@@ -2511,7 +2511,7 @@ uint64_t rrdeng_get_used_disk_space_unsafe(struct rrdengine_instance *ctx)
     return estimated_disk_space;
 }
 
-uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx)
+uint64_t dbengine_get_used_disk_space(struct rrdengine_instance *ctx)
 {
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     uint64_t estimated_disk_space = rrdeng_get_used_disk_space_unsafe(ctx);
@@ -2567,8 +2567,8 @@ static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
     worker_is_busy(RRDENG_RETENTION_TIMER_CB);
 
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        struct rrdengine_instance *ctx = multidb_ctx[tier];
-        if (!rrdeng_ctx_is_active(ctx))
+        struct rrdengine_instance *ctx = dbengine_multidb_ctx[tier];
+        if (!dbengine_ctx_is_active(ctx))
             continue;
         check_and_schedule_db_rotation(ctx);
     }
@@ -2696,7 +2696,7 @@ static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_w
         work_dispatch(ctx, pdc, NULL, cmd.opcode, query_prep_tp_worker, NULL);
 }
 
-uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx)
+uint64_t dbengine_get_directory_free_bytes_space(struct rrdengine_instance *ctx)
 {
     uint64_t free_bytes = 0;
     OS_SYSTEM_DISK_SPACE space = os_disk_space(ctx->config.dbfiles_path);

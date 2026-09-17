@@ -6,8 +6,8 @@
 #ifdef ENABLE_DBENGINE
 // The vtable hands over the RRDDIM because the RAM backend keeps a reference to it;
 // dbengine only ever needs the dimension's uuid.
-static STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
-    return rrdeng_metric_get_or_create_by_id(si, rd->uuid);
+static STORAGE_METRIC_HANDLE *storage_engine_dbengine_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+    return dbengine_metric_get_or_create_by_id(si, rd->uuid);
 }
 #endif
 
@@ -49,14 +49,14 @@ static STORAGE_ENGINE engines[] = {
         .name = RRD_DB_MODE_DBENGINE_NAME,
         .seb = STORAGE_ENGINE_BACKEND_DBENGINE,
         .api = {
-            .metric_get_by_id = rrdeng_metric_get_by_id,
-            .metric_get_by_uuid = rrdeng_metric_get_by_uuid,
-            .metric_get_or_create = dbengine_metric_get_or_create,
-            .metric_dup = rrdeng_metric_dup,
-            .metric_release = rrdeng_metric_release,
-            .metric_retention_by_id = rrdeng_metric_retention_by_id,
-            .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
-            .metric_retention_delete_by_id = rrdeng_metric_retention_delete_by_id,
+            .metric_get_by_id = dbengine_metric_get_by_id,
+            .metric_get_by_uuid = dbengine_metric_get_by_uuid,
+            .metric_get_or_create = storage_engine_dbengine_metric_get_or_create,
+            .metric_dup = dbengine_metric_dup,
+            .metric_release = dbengine_metric_release,
+            .metric_retention_by_id = dbengine_metric_retention_by_id,
+            .metric_retention_by_uuid = dbengine_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = dbengine_metric_retention_delete_by_id,
         }
     },
 #endif

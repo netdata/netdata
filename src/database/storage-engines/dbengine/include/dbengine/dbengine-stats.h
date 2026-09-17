@@ -67,11 +67,11 @@ typedef struct {
     double average_page_size_bytes;
 } RRDENG_SIZE_STATS;
 
-RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
+RRDENG_SIZE_STATS dbengine_get_size_stats(struct rrdengine_instance *ctx);
 
 // the legacy per-tier counters array (RRDENG_NR_STATS entries)
 #define RRDENG_NR_STATS (38)
-void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
+void dbengine_get_stats(struct rrdengine_instance *ctx, unsigned long long *array);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // page cache statistics: the engine runs three caches (pages, open datafiles, extents), each reports this
@@ -217,13 +217,13 @@ typedef enum {
 // A snapshot of one cache; false, with *out zeroed, when that cache does not exist (no tier came up yet, or the
 // caches were destroyed). The counters are copied as a whole, not under a lock and not atomically: a counter may
 // be mid-update, and on a 32-bit target a 64-bit one may tear. Good enough for charts, not for accounting.
-bool rrdeng_get_cache_statistics(RRDENG_CACHE which, struct pgc_statistics *out);
+bool dbengine_get_cache_stats(RRDENG_CACHE which, struct pgc_statistics *out);
 
 // pages of the main cache still to be written: hot (collected) plus dirty (waiting for a flush); 0 without a cache
-size_t rrdeng_pages_pending_flush(void);
+size_t dbengine_pages_pending_flush(void);
 
 // bytes lost to alignment inside page data allocations (process-wide)
-size_t pgd_padding_bytes(void);
+size_t dbengine_page_padding_bytes(void);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // metrics registry statistics
@@ -255,7 +255,7 @@ struct mrg_statistics {
 };
 
 // A snapshot of the registry; false, with *out zeroed, when it does not exist
-bool rrdeng_get_mrg_statistics(struct mrg_statistics *out);
+bool dbengine_get_metrics_registry_stats(struct mrg_statistics *out);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // query / cache efficiency (process-wide, running totals)
@@ -343,7 +343,7 @@ struct rrdeng_cache_efficiency_stats {
     PAD64(size_t) metrics_retention_started;
 };
 
-struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
+struct rrdeng_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // memory: the engine's ARAL statistics, one per RRDENG_MEM slot, plus its non-ARAL buffers
@@ -374,8 +374,8 @@ struct rrdeng_buffer_sizes {
     size_t xt_buf;
 };
 
-struct rrdeng_buffer_sizes rrdeng_get_memory_sizes(void);
-const char *rrdeng_mem_name(RRDENG_MEM idx);   // the chart name of each slot
+struct rrdeng_buffer_sizes dbengine_get_memory_sizes(void);
+const char *dbengine_mem_name(RRDENG_MEM idx);   // the chart name of each slot
 
 // ---------------------------------------------------------------------------------------------------------------------
 // tier-0 gorilla compression counters, kept by the engine while compression_statistics is set; a snapshot
@@ -386,7 +386,7 @@ struct rrdeng_gorilla_stats {
     uint64_t tier0_disk_optimal_bytes;  // bytes they would occupy with perfectly sized buffers
     uint64_t tier0_disk_original_bytes; // bytes of the uncompressed samples they hold
 };
-struct rrdeng_gorilla_stats rrdeng_get_gorilla_stats(void);
+struct rrdeng_gorilla_stats dbengine_get_gorilla_stats(void);
 
 #ifdef __cplusplus
 }

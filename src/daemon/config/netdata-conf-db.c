@@ -11,7 +11,7 @@ bool dbengine_datafiles_present = false; // detected at startup, regardless of t
 #ifdef ENABLE_DBENGINE
 struct dbengine_config netdata_conf_dbengine = DBENGINE_CONFIG_DEFAULTS;
 static uint8_t dbengine_tier0_page_type = RRDENG_PAGE_TYPE_GORILLA_32BIT;
-int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
+int default_dbengine_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 bool new_dbengine_defaults = false;
 bool legacy_multihost_db_space = false;
@@ -109,7 +109,7 @@ struct dbengine_initialization {
 
 void dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = rrdeng_init(NULL, &dbi->config);
+    dbi->ret = dbengine_instance_init(NULL, &dbi->config);
 }
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
@@ -344,8 +344,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // every tier that came up, including one above a tier that failed: the engine runs and rotates it,
     // so its registry load is awaited like the others
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if(rrdeng_ctx_is_active(multidb_ctx[tier]))
-            rrdeng_readiness_wait(multidb_ctx[tier]);
+        if(dbengine_ctx_is_active(dbengine_multidb_ctx[tier]))
+            dbengine_readiness_wait(dbengine_multidb_ctx[tier]);
 
 
     dbengine_enabled = true;
@@ -425,7 +425,7 @@ void netdata_conf_section_db(void) {
         else
             snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
-        dbengine_datafiles_present = rrdeng_datafiles_present(dbenginepath);
+        dbengine_datafiles_present = dbengine_dir_has_datafiles(dbenginepath);
     }
 #endif
 

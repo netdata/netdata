@@ -201,22 +201,22 @@ through its public headers under `include/dbengine/`, included from the source r
 compiles the engine as one unit. The public headers:
 
 - **`rrdengineapi.h`**: the metric, collection and query operations behind the storage-engine vtable; the tier
-  lifecycle (`rrdeng_init()`, `rrdeng_readiness_wait()`, `rrdeng_exit()`, `rrdeng_ctx_is_active()`,
+  lifecycle (`dbengine_instance_init()`, `dbengine_readiness_wait()`, `dbengine_exit()`, `dbengine_ctx_is_active()`,
   `dbengine_shutdown()`, and `dbengine_destroy()` for a leak-checking exit); what the embedder reads about a tier
-  (retention limit, disk space, metrics, samples, first time); `rrdeng_datafiles_present()` to learn, before any tier
-  is up, whether a directory holds data; and **work**: `rrdeng_enq_work()` runs a function on the engine's worker
-  pool while the engine is serving, `rrdeng_work_available()` says whether it is, and a refused request is the
+  (retention limit, disk space, metrics, samples, first time); `dbengine_dir_has_datafiles()` to learn, before any tier
+  is up, whether a directory holds data; and **work**: `dbengine_enq_work()` runs a function on the engine's worker
+  pool while the engine is serving, `dbengine_work_available()` says whether it is, and a refused request is the
   caller's to run or drop.
 - **`dbengine-config.h`**: the embedder fills one `struct dbengine_config` and hands it to `dbengine_init()` once,
-  before the first tier; each tier gets a `struct rrdeng_tier_config` through `rrdeng_init()`. The same struct carries
-  the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest datafile) and
-  `preload_metrics` (the metric uuids the embedder already knows, fed into the metrics registry before the journals
-  load; `dbengine_preload_release()` drops the references once every tier is up). The page types and the tier
-  limits live here too.
+  before the first tier; each tier gets a `struct rrdeng_tier_config` through `dbengine_instance_init()`. The same
+  struct carries the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest datafile)
+  and `preload_metrics` (the metric uuids the embedder already knows, fed into the metrics registry before the
+  journals load; `dbengine_preload_release()` drops the references once every tier is up). The page types and the
+  tier limits live here too.
 - **`dbengine-stats.h`**: what the engine publishes about itself, as snapshot getters the daemon's pulse subsystem
-  reads each cycle: the page caches (`rrdeng_get_cache_statistics()`, `rrdeng_pages_pending_flush()`), the metrics
-  registry (`rrdeng_get_mrg_statistics()`), cache efficiency, gorilla and memory sizes. The engine never pushes into
-  daemon charts.
+  reads each cycle: the page caches (`dbengine_get_cache_stats()`, `dbengine_pages_pending_flush()`), the metrics
+  registry (`dbengine_get_metrics_registry_stats()`), cache efficiency, gorilla and memory sizes. The engine never
+  pushes into daemon charts.
 - **`dbengine-workers.h`**: the engine's jobs occupy the first block of the shared libuv pool's job id space; an
   embedder numbers its own jobs from `RRDENG_WORKER_JOB_MAX`. Pool-thread setup is `libuv_worker_thread_init()` in
   libnetdata.

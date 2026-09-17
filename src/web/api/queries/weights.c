@@ -2566,7 +2566,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         num_threads = active_hosts;
     }
 
-    if (num_threads <= 1 || active_hosts <= 1 || !rrdeng_work_available()) {
+    if (num_threads <= 1 || active_hosts <= 1 || !dbengine_work_available()) {
         // Fall back to single-threaded processing (also when there is no serving engine to run the workers:
         // running them inline here would register the pool's job names on a web thread for every query)
         freez(qwd->hosts_array);
@@ -2596,7 +2596,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         thread_data[i].work.fn = query_weights_worker_thread;
         thread_data[i].work.data = &thread_data[i];
         completion_init(&thread_data[i].work.completion);
-        if (!rrdeng_enq_work(&thread_data[i].work)) {
+        if (!dbengine_enq_work(&thread_data[i].work)) {
             // the engine stopped serving since the check above (shutdown race): do this share here, so the
             // collection loop below stays uniform
             query_weights_worker_body(&thread_data[i]);

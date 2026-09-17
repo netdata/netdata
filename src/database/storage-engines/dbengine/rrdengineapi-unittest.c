@@ -13,24 +13,24 @@ typedef struct {
 } EXPECTED_POINT;
 
 static void store_point(STORAGE_COLLECT_HANDLE *sch, time_t end_time_s, NETDATA_DOUBLE value) {
-    rrdeng_store_metric_next(sch, (usec_t)end_time_s * USEC_PER_SEC, value, value, value, 1, 0, SN_DEFAULT_FLAGS);
+    dbengine_store_next(sch, (usec_t)end_time_s * USEC_PER_SEC, value, value, value, 1, 0, SN_DEFAULT_FLAGS);
 }
 
 static int query_points(STORAGE_METRIC_HANDLE *smh, time_t start_time_s, time_t end_time_s,
                         const EXPECTED_POINT *expected, size_t expected_points, const char *id) {
     int errors = 0;
     struct storage_engine_query_handle seqh = { 0 };
-    rrdeng_load_metric_init(smh, &seqh, start_time_s, end_time_s, STORAGE_PRIORITY_SYNCHRONOUS);
+    dbengine_query_init(smh, &seqh, start_time_s, end_time_s, STORAGE_PRIORITY_SYNCHRONOUS);
 
     size_t points = 0;
     bool finished = false;
     for(size_t safety = 0; safety < 8; safety++) {
-        if(rrdeng_load_metric_is_finished(&seqh)) {
+        if(dbengine_query_is_finished(&seqh)) {
             finished = true;
             break;
         }
 
-        STORAGE_POINT sp = rrdeng_load_metric_next(&seqh);
+        STORAGE_POINT sp = dbengine_query_next(&seqh);
         if(points >= expected_points) {
             fprintf(stderr, " >>> DBENGINE: %s returned unexpected point %zu: %jd-%jd, value %f\n",
                     id, points, (intmax_t)sp.start_time_s, (intmax_t)sp.end_time_s, sp.sum);
@@ -56,7 +56,7 @@ static int query_points(STORAGE_METRIC_HANDLE *smh, time_t start_time_s, time_t 
         points++;
     }
 
-    if(!finished && rrdeng_load_metric_is_finished(&seqh))
+    if(!finished && dbengine_query_is_finished(&seqh))
         finished = true;
 
     if(!finished) {
@@ -69,14 +69,14 @@ static int query_points(STORAGE_METRIC_HANDLE *smh, time_t start_time_s, time_t 
         errors++;
     }
 
-    rrdeng_load_metric_finalize(&seqh);
+    dbengine_query_finalize(&seqh);
     return errors;
 }
 
 // The open and extent caches size themselves from the main cache; once dbengine_destroy() has freed it, their
 // callbacks settle on a fixed floor. Pinned here before the engine is up, where the main cache is absent by
 // construction and no thread reads it: the callbacks take the very branch the leak-checking teardown relies on.
-int rrdeng_cache_floor_unittest(void) {
+int dbengine_cache_floor_unittest(void) {
     if(main_cache) {
         fprintf(stderr, " >>> DBENGINE: the cache floor test runs before the engine is up, but the main cache exists\n");
         return 1;
@@ -103,23 +103,23 @@ int rrdeng_cache_floor_unittest(void) {
 // A collector that reports a zero cadence leaves the engine a page with no update-every; the first query of it
 // must repair the cadence once (counted in pages_invalid_update_every_fixed) and serve the points, a repeated
 // query must find nothing left to repair. The points sit far in the past so that they never meet live data.
-int rrdeng_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
+int dbengine_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
     const time_t t = 200000000 + 4250000;
     int errors = 0;
 
     nd_uuid_t uuid;
     uuid_generate(uuid);
     UUIDMAP_ID id = uuidmap_create(uuid);
-    STORAGE_METRIC_HANDLE *smh = rrdeng_metric_get_or_create_by_id(si, id);
-    STORAGE_METRICS_GROUP *smg = rrdeng_metrics_group_get(si, &uuid);
-    STORAGE_COLLECT_HANDLE *sch = smh ? rrdeng_store_metric_init(smh, 10, smg) : NULL;
+    STORAGE_METRIC_HANDLE *smh = dbengine_metric_get_or_create_by_id(si, id);
+    STORAGE_METRICS_GROUP *smg = dbengine_metrics_group_get(si, &uuid);
+    STORAGE_COLLECT_HANDLE *sch = smh ? dbengine_store_init(smh, 10, smg) : NULL;
     if(!smh || !sch) {
         fprintf(stderr, " >>> DBENGINE: zero-page-cadence metric initialization failed\n");
         errors++;
         goto cleanup;
     }
 
-    rrdeng_store_metric_change_collection_frequency(sch, 0);
+    dbengine_store_change_collection_frequency(sch, 0);
     store_point(sch, t + 100, 1);
     store_point(sch, t + 110, 2);
 
@@ -139,9 +139,9 @@ int rrdeng_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
         { t + 100, t + 110, 2 },
     };
 
-    size_t invalid_before = rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    size_t invalid_before = dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
     errors += query_points(smh, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-first");
-    size_t invalid_after_first = rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    size_t invalid_after_first = dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
 
     if(invalid_after_first != invalid_before + 1 || pgc_page_update_every_s(handle->pgc_page) != 10) {
         fprintf(stderr, " >>> DBENGINE: zero page cadence repairs=%zu cadence=%u, expected 1 and 10\n",
@@ -150,7 +150,7 @@ int rrdeng_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
     }
 
     errors += query_points(smh, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-repeat");
-    size_t invalid_after_repeat = rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    size_t invalid_after_repeat = dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
 
     if(invalid_after_repeat != invalid_after_first) {
         fprintf(stderr, " >>> DBENGINE: repeated zero-page-cadence query reported %zu repairs, expected 0\n",
@@ -160,11 +160,11 @@ int rrdeng_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
 
 cleanup:
     if(sch)
-        rrdeng_store_metric_finalize(sch); // flushes the page it holds
+        dbengine_store_finalize(sch); // flushes the page it holds
     if(smg)
-        rrdeng_metrics_group_release(si, smg);
+        dbengine_metrics_group_release(si, smg);
     if(smh)
-        rrdeng_metric_release(smh);
+        dbengine_metric_release(smh);
     uuidmap_free(id);
     return errors;
 }

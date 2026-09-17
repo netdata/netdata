@@ -225,7 +225,7 @@ static ARAL **arals = NULL;
 #define arals_slot(slot, partition) ((partition) * aral_sizes_count + (slot))
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition);
 
-size_t pgd_padding_bytes(void) {
+size_t dbengine_page_padding_bytes(void) {
     int64_t x = __atomic_load_n(&pgd_alloc_globals.padding_used, __ATOMIC_RELAXED);
     return (x > 0) ? x : 0;
 }
@@ -258,7 +258,7 @@ static inline void gorilla_stats_tier0_page_flush(uint32_t actual, uint32_t opti
     __atomic_fetch_add(&gorilla_stats.tier0_disk_original_bytes, original, __ATOMIC_RELAXED);
 }
 
-struct rrdeng_gorilla_stats rrdeng_get_gorilla_stats(void) {
+struct rrdeng_gorilla_stats dbengine_get_gorilla_stats(void) {
     return (struct rrdeng_gorilla_stats) {
         .hot_buffers_added         = __atomic_load_n(&gorilla_stats.hot_buffers_added, __ATOMIC_RELAXED),
         .tier0_disk_actual_bytes   = __atomic_load_n(&gorilla_stats.tier0_disk_actual_bytes, __ATOMIC_RELAXED),
