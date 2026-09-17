@@ -4,12 +4,15 @@ package alerta
 
 import (
 	"net/http"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
-	APIURL      string `yaml:"api_url,omitempty"`
-	APIKey      string `yaml:"api_key,omitempty"`
-	Environment string `yaml:"environment,omitempty"`
+	Secrets     secret.InputMode `yaml:"-"`
+	APIURL      string           `yaml:"api_url,omitempty"`
+	APIKey      string           `yaml:"api_key,omitempty"`
+	Environment string           `yaml:"environment,omitempty"`
 }
 
 type Sender struct {

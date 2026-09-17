@@ -6,8 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
-
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
 
@@ -18,7 +16,7 @@ func (dst Config) validate() error {
 		}
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"api_key", dst.APIKey}} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("kavenegar %s: %w", field.name, err)
 		}
@@ -50,7 +48,7 @@ func (dst *Config) resolve(ctx context.Context) error {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"api_key", &dst.APIKey}} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("kavenegar %s: %w", field.name, err)
 		}

@@ -4,13 +4,16 @@ package kavenegar
 
 import (
 	"net/http"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
-	APIKey    string `yaml:"api_key,omitempty"`
-	APIURL    string `yaml:"api_url,omitempty"`
-	Sender    string `yaml:"sender,omitempty"`
-	Recipient string `yaml:"recipient,omitempty"`
+	Secrets   secret.InputMode `yaml:"-"`
+	APIKey    string           `yaml:"api_key,omitempty"`
+	APIURL    string           `yaml:"api_url,omitempty"`
+	Sender    string           `yaml:"sender,omitempty"`
+	Recipient string           `yaml:"recipient,omitempty"`
 }
 
 type Sender struct {

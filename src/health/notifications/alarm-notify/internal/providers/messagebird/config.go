@@ -4,13 +4,16 @@ package messagebird
 
 import (
 	"net/http"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
-	AccessKey  string `yaml:"access_key,omitempty"`
-	Originator string `yaml:"originator,omitempty"`
-	Recipient  string `yaml:"recipient,omitempty"`
-	APIURL     string `yaml:"api_url,omitempty"`
+	Secrets    secret.InputMode `yaml:"-"`
+	AccessKey  string           `yaml:"access_key,omitempty"`
+	Originator string           `yaml:"originator,omitempty"`
+	Recipient  string           `yaml:"recipient,omitempty"`
+	APIURL     string           `yaml:"api_url,omitempty"`
 }
 
 type Sender struct {

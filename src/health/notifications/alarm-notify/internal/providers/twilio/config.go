@@ -4,14 +4,17 @@ package twilio
 
 import (
 	"net/http"
+
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
-	AccountSID string `yaml:"account_sid,omitempty"`
-	AuthToken  string `yaml:"auth_token,omitempty"`
-	From       string `yaml:"from,omitempty"`
-	To         string `yaml:"to,omitempty"`
-	APIURL     string `yaml:"api_url,omitempty"`
+	Secrets    secret.InputMode `yaml:"-"`
+	AccountSID string           `yaml:"account_sid,omitempty"`
+	AuthToken  string           `yaml:"auth_token,omitempty"`
+	From       string           `yaml:"from,omitempty"`
+	To         string           `yaml:"to,omitempty"`
+	APIURL     string           `yaml:"api_url,omitempty"`
 }
 
 type Sender struct {

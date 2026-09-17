@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
-
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
 
@@ -18,7 +16,7 @@ func (dst Config) validate() error {
 		return errors.New("alerta environment must be a nonempty literal")
 	}
 	for _, field := range dst.secretFields() {
-		reference, err := secret.IsReference(*field.value)
+		reference, err := dst.Secrets.IsReference(*field.value)
 		if err != nil {
 			return fmt.Errorf("alerta %s: %w", field.name, err)
 		}
@@ -62,7 +60,7 @@ func validateField(name, value string) error {
 
 func (dst *Config) resolve(ctx context.Context) error {
 	for _, field := range dst.secretFields() {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("alerta %s: %w", field.name, err)
 		}

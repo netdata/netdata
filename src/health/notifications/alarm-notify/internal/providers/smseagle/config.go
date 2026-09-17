@@ -5,10 +5,13 @@ package smseagle
 import (
 	"net/http"
 
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
+
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
 
 type Config struct {
+	Secrets      secret.InputMode     `yaml:"-"`
 	APIURL       string               `yaml:"api_url,omitempty"`
 	AccessToken  string               `yaml:"access_token,omitempty"`
 	Recipients   []string             `yaml:"recipients,omitempty"`

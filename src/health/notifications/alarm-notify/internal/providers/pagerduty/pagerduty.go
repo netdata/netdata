@@ -17,7 +17,6 @@ import (
 
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/httpclient"
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
@@ -41,7 +40,7 @@ func (dst Config) validate() error {
 		return errors.New("pagerduty api_version must be 1 or 2")
 	}
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"integration_key", dst.IntegrationKey}} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("pagerduty %s: %w", field.name, err)
 		}
@@ -166,7 +165,7 @@ func (s *Sender) Send(ctx context.Context, event notifyevent.Event) error {
 		name  string
 		value *string
 	}{{"api_url", &dst.APIURL}, {"integration_key", &dst.IntegrationKey}} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("pagerduty %s: %w", field.name, err)
 		}
