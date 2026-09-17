@@ -127,17 +127,22 @@ Metrics:
 |:------|:------------|:----------|:----|
 | hyperv.vms_health | Virtual machines health status | ok, critical | vms |
 | hyperv.root_partition_io_tlb_flush | Root partition flushes of I/O TLBs | gpa | flushes/s |
+| hyperv.root_partition_io_tlb_flush_cost | Root partition I/O TLB flush cost | cost | ns |
 | hyperv.root_partition_virtual_tlb_flush_entries | Root partition flushes of the entire virtual TLB | flushes | flushes/s |
 | hyperv.root_partition_virtual_tlb_pages | Root partition pages used by the virtual TLB | used | pages |
 | hyperv.root_partition_address_space | Root partition address spaces in the virtual TLB | address_spaces | address spaces |
 | hyperv.root_partition_attached_devices | Root partition attached devices | attached | devices |
 | hyperv.root_partition_device_dma_errors | Root partition illegal DMA requests | illegal_dma | requests |
 | hyperv.root_partition_device_interrupt_errors | Root partition illegal interrupt requests | illegal_interrupt | requests |
+| hyperv.root_partition_device_interrupt_mappings | Root partition device interrupt mappings | mappings | mappings |
 | hyperv.root_partition_device_interrupt_throttle_events | Root partition throttled interrupts | throttling | events |
 | hyperv.root_partition_deposited_pages | Root partition deposited pages | gpa | pages |
 | hyperv.root_partition_device_space_pages | Root partition device space pages | 4K, 2M, 1G | pages |
 | hyperv.root_partition_gpa_space_pages | Root partition GPA space pages | 4K, 2M, 1G | pages |
+| hyperv.root_partition_gpa_pages | Root partition GPA pages | gpa | pages |
 | hyperv.root_partition_gpa_space_modifications | Root partition GPA space modifications | gpa | modifications/s |
+| hyperv.root_partition_recommended_virtual_tlb_size | Root partition recommended virtual TLB size | recommended | pages |
+| hyperv.root_partition_skipped_timer_ticks | Root partition skipped timer ticks | skipped | ticks |
 
 
 ### Per Virtual Machine
@@ -159,7 +164,11 @@ Metrics:
 | hyperv.vm_memory_physical | VM assigned memory | assigned | bytes |
 | hyperv.vm_memory_physical_guest_visible | VM guest visible memory | visible, available | bytes |
 | hyperv.vm_memory_pressure_current | VM Memory Pressure | pressure | percentage |
+| hyperv.vm_memory_pressure_limits | VM memory pressure limits | max, min | percentage |
+| hyperv.vm_memory_operations | VM dynamic memory operations | add, remove | operations/s |
+| hyperv.vm_memory_added_removed | VM dynamic memory adjustments | added, removed | bytes/s |
 | hyperv.vm_vid_physical_pages_allocated | VM physical pages allocated | allocated | pages |
+| hyperv.vm_vid_preferred_numa_node | VM preferred NUMA node index | index | node |
 | hyperv.vm_vid_remote_physical_pages | VM physical pages not allocated from the preferred NUMA node | remote_physical | pages |
 
 
@@ -178,8 +187,13 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | hyperv.vm_storage_device_bytes | VM storage device IO | read, write | bytes/s |
-| hyperv.vm_storage_device_operations | VM storage device IOPS&#34; | read, write | operations/s |
+| hyperv.vm_storage_device_operations | VM storage device IOPS | read, write | operations/s |
 | hyperv.vm_storage_device_errors | VM storage device errors | errors | errors/s |
+| hyperv.vm_storage_device_queue_length | VM storage device queue length | device, lower | requests |
+| hyperv.vm_storage_device_latency | VM storage device latency | device, lower | seconds |
+| hyperv.vm_storage_device_throughput | VM storage device throughput | throughput | transfers/s |
+| hyperv.vm_storage_device_normalized_throughput | VM storage device normalized throughput | normalized | transfers |
+| hyperv.vm_storage_device_io_quota_replenishment_rate | VM storage device IO quota replenishment rate | replenishment | quota |
 
 
 ### Per Virtual Machine Network Interface
@@ -219,7 +233,9 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
+| hyperv.vswitch_total_traffic | Virtual switch total traffic | total | kilobits/s |
 | hyperv.vswitch_traffic | Virtual switch traffic | received, sent | kilobits/s |
+| hyperv.vswitch_total_packets | Virtual switch total packets | total | packets/s |
 | hyperv.vswitch_packets | Virtual switch packets | received, sent | packets/s |
 | hyperv.vswitch_directed_packets | Virtual switch directed packets | received, sent | packets/s |
 | hyperv.vswitch_broadcast_packets | Virtual switch broadcast packets | received, sent | packets/s |
@@ -229,3 +245,5 @@ Metrics:
 | hyperv.vswitch_packets_flooded | Virtual switch flooded packets | flooded | packets/s |
 | hyperv.vswitch_learned_mac_addresses | Virtual switch learned MAC addresses | learned | mac addresses/s |
 | hyperv.vswitch_purged_mac_addresses | Virtual switch purged MAC addresses | purged | mac addresses/s |
+| hyperv.vswitch_send_channel_moves | Virtual switch send channel moves | moves | moves/s |
+| hyperv.vswitch_vmq_moves | Virtual switch VMQ moves | moves | moves/s |

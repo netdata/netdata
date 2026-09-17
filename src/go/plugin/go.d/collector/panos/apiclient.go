@@ -41,13 +41,13 @@ type pangoAPIClient struct {
 	initialized bool
 }
 
-func newPangoAPIClient(cfg Config) (panosAPIClient, error) {
+func newPangoAPIClient(ctx context.Context, cfg Config) (panosAPIClient, error) {
 	apiURL, err := parseAPIURL(cfg.URL)
 	if err != nil {
 		return nil, err
 	}
 
-	transport, err := newPangoTransport(cfg.ClientConfig)
+	transport, err := newPangoTransport(ctx, cfg.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -250,8 +250,10 @@ func hasExplicitPort(host string) bool {
 	return strings.Count(host, ":") == 1
 }
 
-func newPangoTransport(cfg web.ClientConfig) (*http.Transport, error) {
-	client, err := web.NewHTTPClient(cfg)
+func newPangoTransport(ctx context.Context,
+	cfg web.ClientConfig,
+) (*http.Transport, error) {
+	client, err := web.NewHTTPClient(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}

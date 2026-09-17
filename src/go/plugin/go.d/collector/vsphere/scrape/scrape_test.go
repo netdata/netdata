@@ -4,6 +4,7 @@ package scrape
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"errors"
 	"net/url"
@@ -181,7 +182,7 @@ func prepareScraper(t *testing.T) (s *Scraper, res *rs.Resources, teardown func(
 }
 
 func newClient(t *testing.T, vCenterURL *url.URL) *client.Client {
-	c, err := client.New(client.Config{
+	c, err := client.New(context.Background(), client.Config{
 		URL:       vCenterURL.String(),
 		User:      "admin",
 		Password:  "password",

@@ -2,7 +2,8 @@
 
 This standalone Go module routes JSON notifications to webhook, Slack, Discord, Telegram, Pushover, Pushbullet,
 Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
-SMSEagle and PagerDuty.
+SMSEagle, PagerDuty, Opsgenie, Microsoft Teams, Matrix, custom commands, SMS Server Tools 3, syslog, AWS SNS, Kafka HTTP
+bridges, email through sendmail and IRC through nc.
 It has no imports from the existing `src/go` module. It is for local development and is not installed, packaged, or
 invoked by the Agent.
 The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
@@ -10,9 +11,12 @@ The active notifier remains `../alarm-notify.sh.in` and its shell configuration.
 The current increments provide explicit delivery, role-based routing, modern Slack and native Discord webhooks,
 Telegram bot messages, Pushover/Pushbullet/Gotify/ntfy notifications, Twilio/MessageBird text messages and
 Rocket.Chat/Flock/Fleep webhooks, ilert/SIGNL4 incident events and recovery, Alerta/Dynatrace monitoring events,
-Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, and PagerDuty v1/v2 incident events.
+Prowl push notifications, Kavenegar SMS, SMSEagle SMS/MMS and voice calls, PagerDuty v1/v2 incident events,
+Opsgenie alert creation and closure, Teams Workflows cards, Matrix room notices, foreground command delivery, syslog,
+AWS SNS, Kafka HTTP bridges, email through sendmail, IRC through nc and destination status/history filters.
 [CAPABILITIES.md](CAPABILITIES.md) tracks the remaining Bash functionality. Configuration and code may change substantially
-before production adoption; final redesign follows the working functional baseline.
+before production adoption. Shared mechanisms have separate packages, and each provider owns its typed configuration
+and delivery implementation behind a common sender interface.
 
 ## Build and run
 
@@ -20,6 +24,7 @@ From this directory, using the Go version in `go.mod`:
 
 ```sh
 go build -o /tmp/alarm-notify .
+/tmp/alarm-notify check-legacy --config ../health_alarm_notify.conf
 /tmp/alarm-notify validate --config examples/notify.yaml
 /tmp/alarm-notify send --config examples/notify.yaml --destination local < examples/event.json
 /tmp/alarm-notify send --config examples/notify.yaml --role sysadmin --role dba < examples/event.json
@@ -36,15 +41,28 @@ class Receiver(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
         print(body, flush=True)
+        opsgenie = self.path.endswith("/v2/alerts") or (
+            "/v2/alerts/" in self.path and self.path.endswith("/close?identifierType=alias")
+        )
+        matrix = "/_matrix/client/v3/rooms/" in self.path and "/send/m.room.message/" in self.path
+        teams = self.path.split("?", 1)[0].endswith("/teams")
         status = 200
-        if self.path.endswith(("/events", "/v2/enqueue")):
+        if teams or opsgenie or self.path.endswith(("/events", "/v2/enqueue")):
             status = 202
         elif self.path.endswith(("/Messages.json", "/messages", "/signl4", "/alert", "/api/v2/events/ingest")):
             status = 201
+        elif self.path.split("?", 1)[0].endswith("/kafka"):
+            status = 204
         self.send_response(status)
         self.send_header("Content-Type", "application/xml" if self.path.endswith("/add") else "application/json")
         self.end_headers()
-        if self.path.endswith(("/api/v2/messages/sms", "/api/v2/messages/mms",
+        if status == 204:
+            return
+        if matrix:
+            self.wfile.write(b'{"event_id":"$test-event"}')
+        elif opsgenie:
+            self.wfile.write(b'{"result":"Request will be processed","requestId":"test-request"}')
+        elif self.path.endswith(("/api/v2/messages/sms", "/api/v2/messages/mms",
                                "/api/v2/calls/ring", "/api/v2/calls/tts", "/api/v2/calls/tts_advanced")):
             recipients = json.loads(body)["to"]
             self.wfile.write(json.dumps([
@@ -72,6 +90,8 @@ class Receiver(BaseHTTPRequestHandler):
                 b'"id":"test-message","event":"message","result":{"message_id":1}}'
             )
 
+    do_PUT = do_POST
+
     def log_message(self, *args):
         pass  # Avoid logging credential-bearing request paths.
 
@@ -91,6 +111,90 @@ The result is `build/alarm-notify` (`alarm-notify.exe` on Windows). `ENABLE_ALAR
 independently of `DEFAULT_FEATURE_STATE`; even with it enabled there is no notifier install rule. CMake requires the
 normal Agent configuration dependencies. Direct Go builds require only this module and its dependencies.
 
+## Legacy configuration reader
+
+The experimental `check-legacy` command checks whether old `health_alarm_notify.conf` files use the supported
+configuration syntax. It runs natively without Bash, including on Windows. Supply files explicitly in load order;
+there is no automatic stock-file discovery:
+
+```sh
+/tmp/alarm-notify check-legacy --config ../health_alarm_notify.conf --config /path/to/user/health_alarm_notify.conf
+```
+
+A successful check means **syntax support only**. It does not evaluate variable values, validate provider names,
+credentials, recipients or routing, or establish that a custom function will work. It reads no event from stdin,
+resolves no secrets and executes no configuration code. `send` and `validate` continue to accept YAML only.
+The internal recipient resolver below is available for future adapters. Old-format delivery mapping and the optional
+Unix Bash custom-function runtime remain later increments.
+
+The reader supports this declarative subset:
+
+| Construct | Supported behavior |
+|---|---|
+| Comments and separators | Blank lines, shell comments, newlines, semicolons and backslash-newline continuation |
+| Scalars | `NAME=value`, including empty values, single/double quotes, adjacent quoted parts and shell backslash escaping |
+| References | `$NAME` and `${NAME}` referring to scalar variables; no special/positional variables or array references |
+| Recipient entries | `role_recipients_email[sysadmin]="ops@example.com"`; map names must start with `role_recipients_`, and keys must be nonempty literal strings; quote keys with punctuation or spaces |
+| Recipient maps | `role_recipients_email=([sysadmin]=ops@example.com [dba]=db@example.com)`, `=()` to reset, and optional `declare -A` declarations of these maps |
+| Functions | Plain `name() { ...; }` or `function name { ...; }` declarations, including helpers; bodies must parse as Bash and are retained without execution |
+
+Top-level commands, `source`, conditionals, loops, redirects, pipelines, background work and command/process
+substitution are rejected. So are arithmetic, advanced parameter expansion, unquoted tilde expansion, ANSI-C/localized
+quoting, `export`/`readonly`, append assignments, indexed arrays and arbitrary associative maps. Quote a literal tilde
+where Bash would otherwise expand it. These restrictions apply to declarative settings; function bodies are retained
+as Bash code and are not checked against the settings subset. Function declarations themselves must have a plain
+brace body without attached redirections or command modifiers. Unquoted padding around recipient keys is rejected;
+use `[" sysadmin "]` when the spaces belong to the key.
+
+The internal evaluator applies files and assignments in order using explicitly supplied initial scalar variables.
+It never reads the process environment. Undefined variables expand to empty strings. Expansion happens once at
+assignment time: changing `DEFAULT_RECIPIENT_EMAIL` later does not retroactively change a role entry assigned from it.
+Expanded values remain literal, including strings resembling native `${env:...}` or `${file:...}` secret references.
+Later files replace only assigned scalars, recipient keys and functions. A whole-map initializer replaces that map;
+`declare -A` without an initializer preserves its entries. The reader retains recipient modifiers as literal strings;
+the separate legacy resolver interprets them. Function text is retained exactly, including internal comments.
+
+Each input file is limited to 1 MiB. Evaluation also limits individual values to 1 MiB and total stored names/values
+and function source to 4 MiB, preventing repeated expansion from growing without bounds. The syntax check does not
+perform evaluation and therefore does not check those evaluated-value limits. Errors identify the input file by its
+one-based argument order and, where available, a line/column; they do not print configuration text or values.
+File-open errors retain the filesystem cause while omitting the configured path. All specified files must be readable
+and pass the check. `check-legacy` accepts the same positive `--timeout` as the other
+commands and returns `0` on supported syntax or `1` on errors/cancellation.
+
+## Legacy recipient routing
+
+`internal/legacyrouting.Resolve` resolves evaluated legacy settings for an explicit list of applicable method names
+and requested roles. It returns eligible method/recipient pairs; it does not enable old-format sending in the CLI.
+Provider mapping, `SEND_*` flags, credential prerequisites, executable discovery and custom-function execution remain
+separate adapter work. In particular, `check-legacy` still checks syntax only and does not invoke this resolver.
+
+The resolver uses `role_recipients_<method>` and `DEFAULT_RECIPIENT_<METHOD>`. Its rules preserve the legacy format
+without changing native YAML routing:
+
+- Roles and recipient lists split on commas, spaces, tabs and newlines. Other whitespace remains literal. There is no
+  shell quoting pass or filename globbing after evaluation, and strings resembling native secret references stay literal.
+- A missing or exactly empty role entry falls back to that method's default. A whitespace-only entry selects nobody;
+  it does not fall back. The exact roles `silent` and `disabled` are ignored individually. The exact recipient token
+  `disabled` is omitted; other selected roles and recipients still apply. These names are case-sensitive.
+- Recipient suffixes `|nowarn`, `|noclear` and `|critical` are case-insensitive and may be combined. Empty/repeated
+  modifier segments are tolerated as in Bash. Unknown modifiers and an empty base recipient are errors. An error
+  returns no partial targets and never echoes recipient or modifier values, which can contain credentials.
+- Multiple occurrences of the same recipient within one method form a union: if any occurrence permits the alert,
+  select that recipient once. Different methods remain distinct. Results follow method order, role order and first
+  recipient appearance, including an earlier filtered occurrence that a later role permits.
+- Policies reuse the native status/history evaluator. `critical` uses the producer-supplied
+  `critical_seen_since_clear` fact; there are no per-recipient state files. Stateless skips need no history. An
+  unrestricted permitting occurrence also makes history unnecessary for that recipient. If eligibility still depends
+  on missing history, the whole resolution fails before returning any targets.
+- No eligible recipients is a successful empty result. Resolution never constructs senders, resolves credentials,
+  executes functions or performs transport operations. Returned recipients may themselves be secrets and must not be
+  used as diagnostic labels by later adapters.
+
+Two intentional corrections to Bash apply: unknown modifiers fail instead of logging and permitting delivery, and
+role/recipient wildcard characters are literal instead of expanding against local filenames. Production Bash remains
+unchanged. Unix `custom_sender()` support, including helpers, event context and final-recipient batching, remains pending.
+
 ## Command and configuration contract
 
 - `validate --config FILE` checks one YAML document. Unknown fields, duplicate keys, unsupported provider types, and
@@ -100,10 +204,10 @@ normal Agent configuration dependencies. Direct Go builds require only this modu
 - `send --config FILE --role ROLE [--role ROLE ...]` uses YAML routing to select destinations. Choose either an explicit
   destination or roles; mixing the selectors fails. Roles are exact, case-sensitive names, without comma splitting,
   wildcards, or implicit role selection. They do not become fields in the webhook payload.
-- Both commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
+- All three commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
   Deadline expiration, Ctrl-C, or SIGTERM stops the invocation. Run this developer tool as an ordinary user.
-- Exit status is `0` when at least one delivery succeeds, no destinations are selected, validation succeeds, or help
-  is requested. Invalid options/configuration/input, all selected deliveries failing, or command cancellation/timeout
+- Exit status is `0` when at least one delivery succeeds, no destinations are eligible, validation or the syntax check
+  succeeds, or help is requested. Invalid options/configuration/input, all attempted deliveries failing, or command cancellation/timeout
   return `1`. Successful validation writes a confirmation to stdout. Sending leaves stdout empty and logs to stderr.
 
 Configuration has `version: 1` and a `destinations` mapping. Webhook, Slack and Discord destinations require `type`
@@ -124,6 +228,17 @@ Prowl requires `type: prowl` and `api_key`; Kavenegar requires `type: kavenegar`
 Both accept an optional `api_url`. SMSEagle requires `type: smseagle`, `api_url`, `access_token` and a `recipients`
 array, with optional message/call settings described below.
 PagerDuty requires `type: pagerduty` and `integration_key`; `api_version` and `api_url` are optional.
+Opsgenie requires `type: opsgenie` and `api_key`, with an optional `api_url`.
+Teams requires `type: msteams` and `url`, with optional `icons`/`colors` maps.
+Matrix requires `type: matrix`, `api_url`, `access_token` and `room_id`.
+Custom commands require `type: command` and `executable`, with optional `args` and `env`.
+SMS Server Tools 3 requires `type: smstools3`, `executable` and `to`, with optional `env`.
+Syslog requires `type: syslog` and `executable`, with optional facility, level, prefix, remote target and command settings.
+AWS SNS requires `type: awssns`, `executable`, `target_arn` and `credential_source`, with mode-specific `env` and an optional
+`message_template`.
+Kafka HTTP bridges require `type: kafka`, a full `url` and literal `sender_ip`.
+Email requires `type: email`, `executable` and a `recipients` array; `from`, `plain_text_only`, `threading` and `env` are optional.
+IRC requires `type: irc`, `executable`, `host`, `nickname`, `realname` and `channel`; `port` and `env` are optional.
 Destination names are nonsecret identifiers.
 The URL must be an absolute HTTP or HTTPS URL with a host and without embedded user/password information
 or a fragment. HTTP allows deliberate local or self-hosted delivery; HTTPS verifies certificates. Proxy selection
@@ -131,12 +246,14 @@ follows Go's HTTP_PROXY/HTTPS_PROXY/NO_PROXY rules.
 
 URLs, bearer tokens, Telegram bot tokens, Pushover app/user keys, Pushbullet access tokens, Twilio account credentials,
 MessageBird access keys, Gotify app tokens, ntfy credentials, ilert/PagerDuty integration keys, Alerta/Prowl/Kavenegar
-API keys, Dynatrace API tokens and SMSEagle access tokens accept literal strings or a whole `${env:VARIABLE}` or
+and Opsgenie API keys, Dynatrace API tokens, SMSEagle/Matrix access tokens and command environment values accept literal strings or a whole `${env:VARIABLE}` or
 `${file:/absolute/path}` reference.
 On Windows the file operand must be an absolute Windows path. File reads use native Go I/O under the invoking user's
-identity. Resolved values have surrounding whitespace trimmed and must be nonempty. Interpolation, command execution,
+identity and reject content larger than 1 MiB, measured before trimming whitespace. Resolved values have surrounding
+whitespace trimmed and must be nonempty. Interpolation, command execution,
 and secret-store references are unsupported. Examples prefer environment references so credentials stay outside YAML.
-`validate` checks reference syntax only; `send` resolves and validates the selected destination before sending.
+`validate` checks reference syntax only; `send` resolves and validates eligible selected destinations before sending.
+Destinations skipped by status policy do not resolve secret references.
 
 ## Routing and delivery results
 
@@ -157,27 +274,106 @@ reserved roles `silent` and `disabled` select nothing and cannot have configured
 roles in the same invocation. With neither a matching role nor defaults, sending is a successful no-op.
 
 The selected destinations are the union across roles, preserving input-role and configured-list order. Each
-destination name is sent once. Different names remain distinct destinations even if they use the same URL. In the
+destination name is considered once. Different names remain distinct destinations even if they use the same URL. In the
 example, `--role sysadmin --role dba` sends to `local` and `audit` once each; an unknown role selects `local`.
 
-All configuration and event structure is validated before delivery. Selected destinations are then attempted
-sequentially; a secret-resolution, HTTP, or transport error does not stop the next destination. The total timeout
-still covers the whole invocation, so a slow destination can exhaust the remaining time. Cancellation stops the
+All configuration and event structure is validated before delivery, even for destinations that will be skipped.
+Eligible selected destinations are then attempted sequentially; a secret-resolution, HTTP, or transport error does
+not stop the next destination. The total timeout still covers the whole invocation, so a slow destination can exhaust
+the remaining time. Cancellation stops the
 invocation even after earlier successful deliveries; no further destinations are started once it is observed.
 
-Each completed delivery reports its quoted destination name and outcome to stderr, followed by a success/failure
-count. Partial failure returns `0` when another delivery succeeded, matching Bash's any-success behavior; inspect
-the individual results to see failures. On interruption, counts cover results reported before cancellation and do
-not claim an outcome for interrupted or unstarted deliveries.
+Each completed delivery reports its quoted destination name and outcome to stderr. Filtered destinations report
+`skipped: nowarn`, `skipped: noclear`, or `skipped: critical`. The final summary counts `succeeded`, `failed`, and
+`skipped` separately.
+Partial failure returns `0` when another delivery succeeded, matching Bash's any-success behavior; inspect the
+individual results to see failures. If all attempted deliveries fail, the command returns `1` even when other
+destinations were skipped. No selected destinations or all selected destinations skipped returns `0` after successful
+configuration/input validation. On interruption, counts cover results reported before cancellation and do not claim
+an outcome for interrupted or unstarted deliveries.
+
+### Destination status filters
+
+Optional `routing.policies` entries apply to named destinations for both `--destination` and `--role` sends, after
+selection and deduplication. They apply to every provider, including commands. Each entry must name a configured
+destination and contain only the optional boolean flags `critical`, `nowarn` and `noclear`, all defaulting to `false`.
+Use YAML `true` or `false`; strings, null flags and unknown options are rejected. An empty mapping `{}` means no
+filters; a null policy entry is rejected.
+
+```yaml
+version: 1
+destinations:
+  critical_alerts:
+    type: webhook
+    url: http://127.0.0.1:18080/critical
+  audit:
+    type: webhook
+    url: http://127.0.0.1:18080/audit
+routing:
+  roles:
+    sysadmin: [critical_alerts, audit]
+  policies:
+    critical_alerts:
+      nowarn: true
+      noclear: true
+```
+
+| Policy | WARNING | CRITICAL | CLEAR |
+|---|---|---|---|
+| All flags omitted or false | Send | Send | Send |
+| `nowarn: true` | Skip | Send | Send |
+| `noclear: true` | Send | Send | Skip |
+| `nowarn: true` and `noclear: true` | Skip | Send | Skip |
+
+In the example, a WARNING sent to `sysadmin` reaches only `audit`; a CRITICAL reaches both destinations.
+A WARNING sent directly to `critical_alerts` is a successful no-op. Filtering happens before secret resolution,
+HTTP requests or subprocess startup, so skipped destinations do not require their referenced secrets to be available.
+A policy does not select its destination and does not affect other names pointing to the same endpoint.
+
+The table above assumes `critical` is false. Setting `critical: true` always allows CRITICAL and allows later
+WARNING/CLEAR only after CRITICAL has occurred in that alert lifecycle. The caller supplies this history as the
+optional top-level JSON boolean `critical_seen_since_clear`:
+
+| Current status | History omitted/null | History false | History true |
+|---|---|---|---|
+| CRITICAL | Send | Send | Send |
+| WARNING | Input error | Skip: critical | Send |
+| CLEAR | Input error | Skip: critical | Send |
+
+`nowarn` and `noclear` take precedence: a WARNING suppressed by `nowarn`, or a CLEAR suppressed by `noclear`, needs
+no history. Unselected destinations also impose no history requirement, including sends to only reserved
+`silent`/`disabled` roles. Otherwise, missing/null history needed by any selected critical policy rejects the
+**whole invocation before any delivery**, including unrelated destinations ordered earlier. No delivery results are reported. A malformed history value (anything other than a JSON
+boolean or null) always fails input validation, even if no selected policy needs history.
+
+The history is alert-global and describes the lifecycle, not successful deliveries. A destination added after CRITICAL
+can receive a later WARNING/CLEAR even if it did not receive CRITICAL, or the earlier delivery failed. This deliberately
+differs from Bash's per-recipient marker files. The producer must supply the closing lifecycle's history on CLEAR,
+then reset it for the next lifecycle. The notifier neither persists nor infers history from `previous_status`.
+`critical_seen_since_clear` is input-only: it is never forwarded in webhook, command or other provider payloads.
+Global initial-CLEAR eligibility still belongs to the producer before invocation.
+
+With the local receiver from **Build and run** listening, try the history-enabled example:
+
+```sh
+/tmp/alarm-notify validate --config examples/critical-history.yaml
+/tmp/alarm-notify send --config examples/critical-history.yaml --role sysadmin < examples/critical-history.json
+```
+
+Its post-CRITICAL WARNING reaches both destinations. Changing history to `false` skips `critical_alerts` and sends to
+`audit`; removing history fails before either destination sends. `examples/event.json` remains valid for configurations
+whose selected policies do not require history.
+
+### Transport results
 
 Deliveries use POST. Twilio, MessageBird, Prowl and Kavenegar use `application/x-www-form-urlencoded`;
 ntfy uses UTF-8 `text/plain`;
 the other providers use `application/json`.
 Generic webhooks may add `Authorization: Bearer ...`.
 Generic webhooks accept HTTP 200–299; Slack, Discord, Flock and Fleep accept HTTP 200. ilert accepts HTTP 202;
-SIGNL4 accepts HTTP 200, 201 or 202. These providers make one attempt and
+SIGNL4 accepts HTTP 200, 201 or 202. Teams Workflows accepts HTTP 200–299. These providers make one attempt and
 close response bodies without buffering or interpreting them. Telegram, Pushover, Pushbullet, Twilio, MessageBird,
-Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar, SMSEagle and PagerDuty check bounded JSON acknowledgments;
+Gotify, ntfy, Rocket.Chat, Alerta, Dynatrace, Kavenegar, SMSEagle, PagerDuty, Opsgenie and Matrix check bounded JSON acknowledgments;
 Prowl checks a bounded XML acknowledgment. Telegram can retry rate limits as described below.
 Redirects are never followed.
 Errors do not echo config/input values, secret contents, response text, or endpoint URLs.
@@ -1257,13 +1453,646 @@ Save as `pagerduty-local.yaml` and run:
 Repeat with WARNING, CRITICAL and CLEAR events, keeping `incident_id` unchanged. The printed requests show matching
 keys across all three statuses. The local receiver checks the wire contract; it does not simulate PagerDuty incidents.
 
+## Opsgenie alerts
+
+Use an Opsgenie **API Integration** that permits alert creation and closure, with responders configured in Opsgenie.
+This provider uses the [Alert API v2](https://docs.opsgenie.com/docs/alert-api), an approved change from Bash's
+Netdata-specific webhook. The integration key and service-side rules from that webhook are not automatically adapted.
+Opsgenie remains supported in this migration; its announced shutdown is
+[April 5, 2027](https://www.atlassian.com/licensing/opsgenie).
+
+```yaml
+version: 1
+destinations:
+  opsgenie_us:
+    type: opsgenie
+    api_key: ${env:NOTIFY_OPSGENIE_US_KEY}
+  opsgenie_eu:
+    type: opsgenie
+    api_url: https://api.eu.opsgenie.com
+    api_key: ${env:NOTIFY_OPSGENIE_EU_KEY}
+routing:
+  roles:
+    opsgenie_ops: [opsgenie_us, opsgenie_eu]
+```
+
+Configure one named destination per API integration. `api_key` and `api_url` accept literal, environment or file
+references. The key must be nonempty printable ASCII without whitespace and is sent in `Authorization: GenieKey ...`.
+`api_url` defaults to `https://api.opsgenie.com`; EU accounts use `https://api.eu.opsgenie.com`. Both official hosts
+require HTTPS. Custom bases may include a proxy prefix or use HTTP for deliberate local delivery.
+
+WARNING sends a create request with priority P3, CRITICAL sends one with P1, and CLEAR sends a close request.
+The alias is the lowercase hexadecimal SHA-256 digest of the caller's opaque `incident_id`. Keep that ID stable
+through WARNING, CRITICAL and CLEAR; changing timestamps or text does not change the alias. Separate incident IDs
+must identify separate incidents. Aliases can deduplicate across integrations in the same Opsgenie account;
+different destination names or keys do not create separate incident identities.
+
+Creation uses `/v2/alerts`; closure uses `/v2/alerts/<alias>/close?identifierType=alias`. The integration's permissions
+and rules determine final alert handling. The notifier neither creates integration settings nor looks up alert IDs.
+
+Create requests contain a node/status/summary title, the common plain-text alert content with navigation, node as
+`source`, alert name as `entity`, `user: Netdata`, and the complete native Event JSON as the string `details.event`.
+Close requests contain node, user, and a recovery note with the plain-text content and complete Event JSON.
+Unknown values remain null and zero values remain zero in that JSON.
+
+Titles are capped at 130 Unicode characters with `...`, preserving the full summary in description/details.
+Other limits fail the destination before sending without dropping content: source 100 characters, entity 512,
+description 15000, total details keys/values 8000, and recovery note 25000. Details/note counts include the serialized
+Event JSON and its escapes. The entity, description and details limits apply to creation; closure uses the note limit.
+
+Success requires HTTP 202 and a bounded JSON acknowledgment with `result: Request will be processed` and a nonempty
+`requestId`. It confirms asynchronous API acceptance, not completed creation or closure; it does not establish that
+an alias matched an existing alert. There are no retries, redirects or request-status polling. Replies are bounded
+to 256 KiB and the invocation deadline. Existing routing, any-success results and safe diagnostics apply.
+
+### Local Opsgenie exercise
+
+Use the receiver above with a synthetic key:
+
+```yaml
+version: 1
+destinations:
+  opsgenie:
+    type: opsgenie
+    api_url: http://127.0.0.1:18080
+    api_key: synthetic-opsgenie-key
+routing:
+  roles:
+    opsgenie_ops: [opsgenie]
+```
+
+Save as `opsgenie-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config opsgenie-local.yaml --role opsgenie_ops < examples/event.json
+```
+
+Repeat with WARNING, CRITICAL and CLEAR while retaining the same `incident_id`. The receiver prints the create and
+close bodies and returns synthetic acknowledgments; it does not create actual Opsgenie alerts.
+
+## Microsoft Teams Workflows
+
+Use a Workflows webhook with the **When a Teams webhook request is received** trigger, set to **Anyone**, and an
+appropriate posting action for a MessageCard. The workflow selects the chat/channel. Keep the complete callback URL
+secret; this mode must not send an Authorization header. Tenant-authenticated triggers and OAuth token acquisition
+are not implemented. Follow Microsoft's [Workflows setup](https://learn.microsoft.com/en-us/connectors/teams/#when-a-teams-webhook-request-is-received).
+Assign a co-owner so the workflow can remain maintained when its owner changes.
+
+This is an approved replacement for Bash's retired Office 365 Connector setup. Configure a complete URL for each
+named destination; multiple destinations preserve channel fan-out without `CHANNEL` substitution.
+
+```yaml
+version: 1
+destinations:
+  teams:
+    type: msteams
+    url: ${env:NOTIFY_TEAMS_WORKFLOW_URL}
+    icons:
+      warning: '⚠️'
+      critical: '🔥'
+      clear: '💚'
+    colors:
+      warning: 'FFA500'
+      critical: 'D93F3C'
+      clear: '65A677'
+routing:
+  roles:
+    teams_ops: [teams]
+```
+
+`url` accepts literal, environment or file references. `icons` and `colors` are optional maps using only `warning`,
+`critical` and `clear`; omitted entries use the defaults shown above. Icons are literal text without control characters;
+colors are six hexadecimal digits without `#`. An explicit empty string suppresses that status's icon or color.
+
+The MessageCard carries the status/title, common native alert facts, timestamp, summary and information. The title
+preserves the node name and configured icon as plain text, following the
+[Teams formatting rules](https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/cards-format).
+Event text in the body is escaped as Markdown. Navigation uses a clickable inline link because Workflows does not
+render MessageCard buttons. See [Microsoft's migration notice](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/).
+
+Cards exceeding 28 KiB of serialized JSON fail before sending, without truncation. Workflow processing can impose
+additional limits. Any HTTP 2xx response means the webhook accepted the request; it does not confirm that the later
+workflow action posted successfully. Response bodies are closed without reading. There are no retries or redirects.
+
+### Local Teams exercise
+
+Use the receiver above:
+
+```yaml
+version: 1
+destinations:
+  teams:
+    type: msteams
+    url: http://127.0.0.1:18080/teams
+routing:
+  roles:
+    teams_ops: [teams]
+```
+
+Save as `teams-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config teams-local.yaml --role teams_ops < examples/event.json
+```
+
+## Matrix room notices
+
+Use a Matrix account already joined to an **unencrypted room**, with permission to send messages. Supply its access
+token and the full room ID from your client, not a room alias. The provider uses the
+[Client-Server API](https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid).
+Like Bash, it sends unencrypted `m.notice` events; it does not log in, join rooms or perform end-to-end encryption.
+
+```yaml
+version: 1
+destinations:
+  matrix:
+    type: matrix
+    api_url: https://matrix.example.org
+    access_token: ${env:NOTIFY_MATRIX_ACCESS_TOKEN}
+    room_id: '!room:example.org'
+routing:
+  roles:
+    matrix_ops: [matrix]
+```
+
+`api_url` is the homeserver's client API base and may contain a reverse-proxy prefix. It accepts literal, environment
+or file references, requires a nonempty HTTP(S) URL and rejects query strings, fragments and embedded credentials.
+The public `matrix.org` and `matrix-client.matrix.org` hosts require HTTPS; custom bases permit deliberate local HTTP.
+`access_token` also accepts literal/environment/file references and must resolve to printable ASCII without whitespace.
+
+Use one named destination per room; route a role to several destinations for fan-out. `room_id` is a literal, opaque,
+case-sensitive `!`-prefixed ID without whitespace or controls. Both older IDs containing a server name and newer IDs
+without one are accepted. Path-sensitive characters are escaped when building the request URL.
+
+Each send uses `PUT /_matrix/client/v3/rooms/<room>/send/m.room.message/<transaction>` with a fresh random transaction
+ID and Bearer authentication. Repeating an invocation creates another notice, including when the incident ID and event
+are unchanged. WARNING/CRITICAL/CLEAR retain their status icons; notices contain plain text plus escaped HTML with the
+same native facts and navigation. Client notification settings may suppress `m.notice` push notifications.
+
+Success requires HTTP 200 and a bounded JSON `event_id` acknowledgment. Replies are limited to 256 KiB and the
+invocation deadline. Homeserver errors, including permission and complete-event size limits, fail the destination
+without logging response content. The notifier does not truncate content, retry requests or follow redirects.
+
+### Local Matrix exercise
+
+The receiver above accepts PUT and returns a synthetic event ID:
+
+```yaml
+version: 1
+destinations:
+  matrix:
+    type: matrix
+    api_url: http://127.0.0.1:18080
+    access_token: synthetic-token
+    room_id: '!room:example.org'
+routing:
+  roles:
+    matrix_ops: [matrix]
+```
+
+Save as `matrix-local.yaml` and run:
+
+```sh
+/tmp/alarm-notify send --config matrix-local.yaml --role matrix_ops < examples/event.json
+```
+
+The local receiver verifies request shape; it does not simulate Matrix membership, encryption or client rendering.
+
+## Email through sendmail
+
+`email` destinations submit MIME messages to an explicitly configured sendmail-compatible executable on Linux or
+macOS. Configure the MTA or submission client separately, including its SMTP server, authentication and TLS settings.
+The notifier does not open SMTP connections or discover a mail executable.
+
+```yaml
+version: 1
+destinations:
+  mail_ops:
+    type: email
+    executable: /usr/sbin/sendmail
+    recipients:
+      - Operations <ops@example.com>
+      - root
+    from: Netdata Alerts <netdata@example.com>
+    plain_text_only: false
+    threading: true
+routing:
+  roles:
+    sysadmin: [mail_ops]
+```
+
+Save as `email.yaml`. After configuring the chosen MTA, validate and send with:
+
+```sh
+/tmp/alarm-notify validate --config email.yaml
+/tmp/alarm-notify send --config email.yaml --role sysadmin < examples/event.json
+```
+
+Each recipient entry identifies one mailbox (optionally with a display name) or a local alias such as `root`.
+Local aliases use letters, digits, underscores and, after the first character, dots, plus signs or hyphens. Addresses
+and `from` are literal configuration, not secret references. Control characters, address lists, command/file targets,
+and addresses beginning with an option are rejected. Quoted mailbox local parts and UTF-8 display names are supported;
+non-ASCII mailbox addresses themselves require an MTA with internationalized address support. Recipients share a
+visible `To` header. Use separate destinations when recipients should not see each other's addresses.
+
+The optional `from` sets both the `From` header (including any display name) and the envelope sender through `-f`.
+Omitting it delegates sender identity and the `From` header to the configured MTA. Local aliases also work as senders;
+the MTA must qualify them into complete addresses for remote delivery. The notifier supplies submission-time `Date`
+and a fresh `Message-ID`; the message body separately retains the event timestamp. The MTA may rewrite headers or
+restrict sender identities according to its configuration.
+
+The default message is UTF-8 `multipart/alternative`, with quoted-printable plain text followed by escaped HTML.
+`plain_text_only: true` selects a single `text/plain` body. There is no charset override: UTF-8 correctly describes the
+bytes, replacing Bash's label-only charset setting. Both modes include the native alert facts, incident ID, supplied
+`duration`/`non_clear_duration` in seconds, and the optional event URL. Unknown durations are omitted; explicit zero
+is retained. HTML includes a clickable navigation link. `X-Netdata-Severity`, `X-Netdata-Alert-Name`, `X-Netdata-Chart`
+and `X-Netdata-Host` headers retain the available metadata; text headers use MIME encoded words.
+
+Threading defaults on. `In-Reply-To` and `References` use a stable identifier derived from node, chart and alert,
+retaining Bash's grouping across status changes and incidents. `Message-ID` stays unique per submission.
+`threading: false` omits both grouping headers. These are best-effort grouping hints, not a stored conversation tree;
+mail clients decide whether to group messages and may also consider subjects and recipients.
+
+The executable receives `-t -i`, optional `-f <sender>`, and the message on stdin. `-t` takes recipients from headers;
+`-i` prevents a dot-only body line from terminating input on compatible MTAs. The same explicit environment,
+foreground cleanup, timeout and safe diagnostics as [custom commands](#custom-commands) apply. The command runner
+supplies only its default PATH; configure `env` explicitly when the mail client needs HOME, locale, proxy or other
+environment settings. Environment values accept whole environment/file secret references. For example, a
+submission client using a user configuration file may need `env: {HOME: /var/lib/netdata}`. No shell is involved and
+no capability probe or retry is performed. Windows validates configurations but command execution remains pending.
+
+Exit zero means the local submission program accepted the message; it does not prove remote inbox delivery or
+individual recipient acceptance. Nonzero exit, launch failure or timeout fails the destination, and normal any-success
+routing applies. Child output is discarded and not included in diagnostics.
+
+This increment uses the native Event content. Classification, source/edit/expression details, role headers,
+active-alert counts/listings, cloud-specific links/artwork and richer presentation remain explicitly tracked for
+later implementation or a separate removal decision in [CAPABILITIES.md](CAPABILITIES.md). Production Bash is unchanged.
+
+## IRC through nc
+
+`irc` destinations use an explicitly configured nc-compatible executable on Linux or macOS. Each named destination
+opens one connection and sends to one channel. Use role routing for multiple channels; each connection needs a
+nickname the server will accept. The notifier does not discover nc or fall back to another nickname.
+
+```yaml
+version: 1
+destinations:
+  irc_ops:
+    type: irc
+    executable: /usr/bin/nc
+    host: irc.example.com
+    port: 6667
+    nickname: netdata-alerts
+    realname: Netdata alerts
+    channel: '#operations'
+routing:
+  roles:
+    sysadmin: [irc_ops]
+```
+
+Save as `irc.yaml`, adjust the executable and server settings, then validate and send:
+
+```sh
+/tmp/alarm-notify validate --config irc.yaml
+/tmp/alarm-notify send --config irc.yaml --role sysadmin < examples/event.json
+```
+
+The executable receives only the literal host and decimal port as separate arguments. The default port is `6667`;
+transport remains plaintext, matching the current Bash default. Choosing another port does not enable TLS. This
+increment supports guest access to channels without server passwords, SASL, channel keys or service authentication.
+Configure a hostname or an unbracketed IPv4/IPv6 address, a protocol-safe ASCII nickname and a nonempty realname.
+IPv6 zones such as `%eth0` or `%2` are supported; zone text must also pass the host character restrictions.
+A channel starts with `#`, `&`, `+` or `!`, has at most 50 UTF-8 bytes and contains no spaces, controls or commas.
+These settings are literal; only optional `env` values accept secret references. Arbitrary nc arguments are not exposed.
+
+The session sends `NICK`/`USER`, answers registration `PING` challenges, waits for the server's welcome, then waits
+for its own channel join. Notifications contain the native summary/info, node, alert, status transition, chart,
+context, values, timestamp and optional URL. Newlines become comma-space, other controls are visibly escaped and
+backslashes stay literal. Long messages split at UTF-8 boundaries, reserving room for the sender prefix reported
+by the server so forwarded lines fit the 512-byte IRC limit. There is no automatic retry or nickname fallback.
+
+Each message chunk is followed by a synchronization `PING`. A matching `PONG` permits the next chunk or `QUIT`;
+completion also requires connection closure and a zero process exit. This confirms the exchange progressed without
+an observed rejection, not that another client received or read the alert. Numeric errors `400`–`599` fail delivery,
+except `422` (no MOTD). Registration/join failures, early EOF, malformed or oversized protocol frames, process errors
+and timeout also fail. If both the protocol and the process fail, diagnostics retain both errors, including the
+process exit status when available. An ordinary server `ERROR` closing the connection after our `QUIT` is expected.
+
+The invocation deadline covers the whole exchange. Increase `--timeout` for servers with slow registration or flood
+limits. Explicit environment, foreground process ownership and platform restrictions follow
+[custom commands](#custom-commands). Protocol output is parsed with bounded buffers; raw replies and child stderr
+are never logged. Cancellation closes the owned protocol pipes and waits for cleanup; inherited pipes from a command
+that exits early have the same 250 ms cleanup allowance. No external IRC network is needed by the test suite.
+
+These behaviors deliberately correct Bash's blind send-and-quit sequence, unhandled PING challenges, unchecked nc
+exit status, backslash interpretation and unbounded message lines. Production Bash and its configuration are unchanged.
+
+## Custom commands
+
+`command` destinations execute a configured program on Linux or macOS. Use an absolute executable path and an optional
+list of literal arguments. The program receives one native JSON event followed by a newline on stdin. The notifier
+does not start a shell, interpolate arguments, source Bash functions or export Bash alert variables. Executable scripts
+with a valid interpreter line work like other programs.
+
+```yaml
+version: 1
+destinations:
+  custom:
+    type: command
+    executable: /opt/notifications/send-alert
+    args: [--recipient, ops]
+    env:
+      NOTIFY_TOKEN: ${env:NOTIFY_CUSTOM_TOKEN}
+routing:
+  roles:
+    custom_ops: [custom]
+```
+
+The only default environment entry is `PATH=/usr/local/bin:/usr/bin:/bin`. The optional `env` map extends or replaces
+these defaults; nothing else is inherited, including HOME, locale, proxy settings or credentials. Environment names
+use letters, digits and underscores and cannot start with a digit. Values accept literals and whole environment/file
+secret references; referenced values use the existing trimming/nonempty rules. Empty literal values are allowed.
+NUL bytes are rejected. References are resolved only for selected destinations. Arguments are always literal, including
+`${...}`, spaces and shell metacharacters. The executable is a literal path; it is never looked up through PATH.
+The child inherits the notifier's working directory and operating-system identity; this is not a privilege boundary.
+
+Commands **must stay in the foreground, wait for their children and keep them in the same process group**. Daemonizing,
+detaching or handing work to a persistent background process is unsupported. On cancellation or timeout, the notifier
+sends SIGKILL to the running command's process group and waits for the direct child and its stdin-copy cleanup before
+exiting. Process groups are cancellation support, not a sandbox for arbitrary programs. An additional cleanup allowance
+of up to 250 ms bounds an inherited stdin pipe if a command violates the foreground contract by exiting early.
+
+Exit status zero means success; any other exit status or launch failure fails that destination. Output goes directly
+to the null device, with no buffering or logging. Errors report launch/exit/cancellation categories without including
+the executable, arguments, environment or child output. Commands are not retried. Arguments can still be visible in
+the operating system's process listing; use the event on stdin or explicit environment for sensitive input.
+
+`validate` checks the configuration without inspecting the executable, resolving secrets or running programs.
+Windows and other platforms can validate configurations, but selected command delivery currently returns an explicit
+unsupported-platform error. Native Windows process management remains a later increment.
+
+### Local command exercise
+
+This example appends the received JSON to a local file using `tee` (adjust its absolute path if needed):
+
+```yaml
+version: 1
+destinations:
+  custom:
+    type: command
+    executable: /usr/bin/tee
+    args: [-a, /tmp/netdata-notify-events.jsonl]
+```
+
+Save as `command-local.yaml`, then run:
+
+```sh
+/tmp/alarm-notify validate --config command-local.yaml
+/tmp/alarm-notify send --config command-local.yaml --destination custom < examples/event.json
+cat /tmp/netdata-notify-events.jsonl
+```
+
+## SMS Server Tools 3
+
+Install and configure [SMS Server Tools 3](https://smstools3.kekekasvi.com/index.php?p=run), including its `sendsms`
+program, modem and `smsd` service. The invoking user needs the spool-directory permissions required by that installation.
+This provider uses the same foreground runner and platform support as custom commands.
+
+```yaml
+version: 1
+destinations:
+  sms:
+    type: smstools3
+    executable: /usr/local/bin/sendsms
+    to: '15005550009'
+    env:
+      LANG: C.UTF-8
+routing:
+  roles:
+    sms_ops: [sms]
+```
+
+Supply one phone number (digits with an optional leading `+`) per named destination. Route to multiple destinations
+for multiple recipients. `executable`, `to` and optional `env` are the only provider settings; arbitrary `args` are
+reserved for custom commands. Choose a locale supported by the gateway host when configuring `env`.
+
+Each delivery runs `sendsms <phone> <message>` as two literal arguments with empty stdin. The message uses Bash's
+status wording (needs attention, is critical, recovered), node, optional chart and summary, with the current value and
+units outside recovery. Summary underscores become spaces, and the text is truncated to 160 Unicode characters.
+Recovery durations remain pending with richer shared event facts. The gateway controls encoding and SMS segmentation;
+160 characters do not necessarily fit in one SMS. An exit status of zero reports tool acceptance, not handset delivery.
+
+## Syslog
+
+`syslog` uses an explicitly configured `logger` executable, with the same environment, foreground execution,
+cancellation and safe diagnostics as custom commands. Command delivery currently runs on Linux and macOS.
+The executable must support `-p facility.level` and a `--` argument terminator for local logging. Remote targets
+require `-n host` and optional `-P port`, as supported by
+[util-linux logger](https://man7.org/linux/man-pages/man1/logger.1.html). The macOS system logger supports local
+logging, but not these remote options.
+
+```yaml
+version: 1
+destinations:
+  local_log:
+    type: syslog
+    executable: /usr/bin/logger
+  remote_log:
+    type: syslog
+    executable: /usr/bin/logger
+    facility: daemon
+    level: notice
+    prefix: netdata
+    host: logs.example.org
+    port: 1514
+    args: [--tcp, --rfc3164]
+routing:
+  roles:
+    log_ops: [local_log, remote_log]
+```
+
+`facility` defaults to `local6`; use a standard lowercase syslog facility such as `auth`, `daemon`, `mail` or
+`local0` through `local7`. Without `level`, CRITICAL maps to `crit`, WARNING to `warning`, and CLEAR to `info`.
+An explicit `level` overrides the severity for every status: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`,
+`info` or `debug`. The logger aliases `security`, `panic`, `error` and `warn` are accepted in the corresponding fields.
+
+`prefix` defaults to `netdata` and is literal text at the start of the message, not logger's header tag.
+The message contains status, node, an RFC3339 event timestamp, optional chart and current value/units, including on
+CLEAR. Null values are omitted and zero remains zero. Rendered NUL characters are rejected before launching the tool.
+Other control characters and Unicode line/paragraph separators are written as visible backslash escapes (for example,
+`\n`, `\r`, `\x1b` and `\u2028`) to prevent multiline or forged-looking log records. Ordinary Unicode, quotes and literal
+backslashes are preserved.
+The notifier passes one message argument; logger controls any wire-format limits or truncation.
+
+Omit `host` to use local logging. Remote `host` is a literal hostname or unbracketed IPv4/IPv6 address; use the separate
+integer `port` field (1–65535) when needed. IPv6 zones such as `%eth0` or `%2` are supported and must pass the host
+character restrictions. An omitted port leaves the logger's default in effect. Remote logging retains
+the existing plaintext behavior; no TLS transport is added in this increment.
+
+Optional `args` preserves Bash's `logger_options` capability as a list of literal, complete logger options. These
+follow the generated priority/host/port options and precede `--` and the message. Options may override earlier settings
+according to the chosen logger; its supported flags determine what is available. For example, util-linux accepts
+`--tcp`, `--udp`, `--rfc3164`, `--rfc5424`, `--socket-errors=on`, or `-t` followed by a tag. Optional `env` works as
+described for custom commands. Neither event text nor option strings are evaluated by a shell.
+
+Each named destination builds its own options and reports its own result. Routes deduplicate destination names and
+keep the existing any-success exit rule. This avoids Bash's accumulated remote options and last-recipient-only status.
+Zero exit status means logger accepted the command, not that a remote collector or local daemon durably stored it.
+Some loggers can report success despite local socket errors; use supported logger options to select stricter reporting.
+
+Save the example above as `syslog.yaml`, then validate it without writing logs:
+
+```sh
+/tmp/alarm-notify validate --config syslog.yaml
+```
+
+Running `send` with this configuration writes to the configured log targets. The module's syslog tests instead use
+owned helper processes to inspect argv, environment and results without invoking a real logger.
+
+## AWS SNS
+
+`awssns` uses an explicitly configured [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/reference/sns/publish.html)
+executable on Linux or macOS. Use a current CLI v2 installation and grant its selected identity `sns:Publish` for the
+configured target. Each destination names a literal standard topic ARN or platform endpoint ARN; the region comes
+from that ARN. Platform application names accept 1-256 ASCII letters, digits, underscores, hyphens or periods;
+periods are not allowed in standard topic names. FIFO topics require additional publishing fields and are not supported
+by this adapter.
+
+```yaml
+version: 1
+destinations:
+  sns_ops:
+    type: awssns
+    executable: /usr/local/bin/aws
+    target_arn: arn:aws:sns:us-east-1:123456789012:netdata-alerts
+    credential_source: static
+    env:
+      AWS_ACCESS_KEY_ID: ${env:NOTIFY_AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${file:/run/secrets/notify-aws-secret}
+      # Include AWS_SESSION_TOKEN when using temporary static credentials.
+    message_template: |-
+      {{status}} on {{node}}: {{summary}}
+      {{chart}} {{value_string}}
+      {{url}}
+routing:
+  roles:
+    ops: [sns_ops]
+```
+
+Choose exactly one explicit credential source. The `env` map accepts only the variables listed for that mode:
+
+| `credential_source` | Required `env` variables | Optional `env` variables |
+|---|---|---|
+| `static` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | `AWS_SESSION_TOKEN` |
+| `web_identity` | `AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE` | `AWS_ROLE_SESSION_NAME` |
+| `ecs` | `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` | None |
+| `imds` | None | None |
+
+Values support literal values and whole `${env:NAME}` / `${file:/absolute/path}` references. References are resolved
+only for selected destinations. A web-identity token file value must resolve to an absolute filename; the CLI reads
+that token file itself. An ECS value must be a relative path beginning with `/`, fetched from the fixed ECS metadata
+address `169.254.170.2`. IMDS mode explicitly enables the CLI's EC2 instance-role provider. Other modes disable it.
+Missing or invalid credentials fail delivery; they do not fall back to an ambient profile.
+
+The CLI receives a private temporary home, empty shared AWS/Boto configuration, and an allowlisted environment.
+Ambient AWS credentials, profiles, credential processes, custom model directories, endpoint overrides and proxies
+are not inherited. The adapter sets the region, UTF-8 file encoding, standard AWS endpoints, `NO_PROXY=*`, disabled
+pager/auto-prompt, and one publish attempt. No arbitrary CLI options or environment overrides are accepted. AWS
+credential providers may make their own retrieval attempts within the invocation deadline. This deliberately requires
+explicit configuration even when an interactive `aws` command already works in the developer's shell.
+
+The subject follows Bash's wording: `<node> needs attention - <alert> - <chart>` for WARNING, `is critical` for
+CRITICAL and `recovered` for CLEAR. Alert underscores become spaces; an absent chart is omitted. Subjects must contain
+fewer than 100 Unicode characters and no control characters or line breaks. Invalid subjects fail before launch.
+The default body is `<status> on <node> at <RFC3339 timestamp>: <chart> <value> <units>`, omitting absent chart/value
+facts. CLEAR includes the current value, and zero is retained. Bodies must be nonempty UTF-8 and at most 262144 bytes;
+there is no automatic truncation or protocol-specific message structure.
+
+`message_template` customizes the body with `{{field}}` placeholders. Every native Event field is available:
+`version`, `incident_id`, `timestamp`, `node`, `alert`, `chart`, `context`, `status`, `previous_status`, `summary`,
+`info`, `value`, `previous_value`, `duration`, `non_clear_duration`, `units`, and `url`.
+Durations render as whole seconds. Additional fields are `status_message` (the subject's status
+wording), `value_string` and `previous_value_string` (number plus units). Missing optional values become empty strings.
+Whitespace around a placeholder name is ignored. Write `{{{{` to emit a literal `{{`. Unknown or unclosed placeholders
+fail configuration validation. Substitution happens once: inserted text is not evaluated, shell syntax is literal,
+and templates do not resolve secret references. Richer Bash facts and its shell-format syntax remain later work.
+
+The adapter sends `TargetArn`, `Subject` and `Message` as JSON on stdin via `--cli-input-json file:///dev/stdin`.
+This avoids putting event text on the command line or treating text beginning with `file://` as a file to read.
+The CLI's output is discarded; exit status zero means the publish call succeeded, not that subscribers received it.
+Failure or cancellation may occur after AWS accepted a publish, so the adapter never retries it automatically.
+The foreground process cleanup described for custom commands applies; its private home is removed before the
+invocation returns, including failures and cancellation.
+
+Save the example as `awssns.yaml`, then validate without reading secrets, launching the CLI or contacting AWS:
+
+```sh
+/tmp/alarm-notify validate --config awssns.yaml
+```
+
+`send` publishes to the configured AWS target. The module tests use owned helper executables and synthetic credentials;
+they do not contact AWS or metadata endpoints. Windows builds support validation but do not yet run command providers.
+
+## Kafka HTTP bridge
+
+`kafka` posts to a configured HTTP bridge URL. It does not connect to Kafka brokers or implement a specific vendor's
+REST API. The receiver must accept the document below and return HTTP **204**; other responses, including 200, 201
+and 202, fail. Acceptance by the bridge does not confirm downstream Kafka delivery. Requests are not retried and
+redirects are not followed.
+
+```yaml
+version: 1
+destinations:
+  bridge:
+    type: kafka
+    url: http://127.0.0.1:18080/kafka
+    sender_ip: 192.0.2.1
+routing:
+  roles:
+    sysadmin: [bridge]
+```
+
+`url` is a full HTTP(S) URL, literal or a whole `${env:KAFKA_URL}` / `${file:/absolute/path}` reference. References are
+resolved only for selected destinations. URLs may contain a path/query, but not user information or fragments.
+Treat URLs containing credentials as secrets. `sender_ip` is a required literal IPv4 or IPv6 address without a port,
+network prefix or zone. It labels the message's `host_ip`; it does not select the outbound interface or resolve `node`.
+
+The request uses `Content-Type: application/json`. Its fixed fields retain the Bash bridge's names:
+
+| Bridge field | Native source |
+|---|---|
+| `host_ip` | Destination `sender_ip` |
+| `when` | `timestamp` converted to Unix seconds; subsecond precision is discarded |
+| `name`, `chart` | `alert`, `chart` |
+| `status`, `old_status` | `status`, `previous_status` |
+| `value`, `old_value` | `value`, `previous_value` |
+| `duration`, `non_clear_duration` | Optional event duration facts, in seconds |
+| `units`, `info` | `units`, `info` |
+
+Missing numeric values/durations are JSON `null`; explicit zero remains zero. Missing strings are empty. Quotes,
+newlines, Unicode and other string content are JSON encoded. This intentionally corrects Bash's unquoted keys,
+unescaped interpolation and default form content type. A bridge depending on that old syntax needs adjustment.
+
+Save this example as `kafka.yaml`. With the local receiver from **Build and run** listening, validate and send:
+
+```sh
+/tmp/alarm-notify validate --config kafka.yaml
+/tmp/alarm-notify send --config kafka.yaml --role sysadmin < examples/event.json
+```
+
+That event has no duration facts, so both are sent as `null`. To exercise measured durations, add `"duration": 0` and
+`"non_clear_duration": 123` to the event document. The notifier accepts these facts from its caller; it does not infer
+them from local state or track history.
+
 ## Event document
 
-The webhook receives the typed event as JSON. `version` must be `1`. Required fields are `incident_id`, `timestamp`
+The webhook and custom command receive the typed event as JSON. `version` must be `1`. Required fields are `incident_id`, `timestamp`
 (RFC 3339), `node`, `alert`, `status`, and `summary`. `incident_id` is an opaque stable incident identifier supplied by
 the caller. Current statuses are `WARNING`, `CRITICAL`, and `CLEAR`.
 
-Optional fields are `chart`, `context`, `previous_status`, `info`, `value`, `previous_value`, `units`, and `url`.
+Optional fields are `chart`, `context`, `previous_status`, `info`, `value`, `previous_value`, `duration`,
+`non_clear_duration`, `units`, and `url`.
 `previous_status` accepts the three current statuses plus `UNINITIALIZED`, `UNDEFINED`, and `REMOVED`.
 `url` is a caller-supplied alert navigation link: absolute HTTP(S), without embedded user/password information;
 fragments are allowed. Use a URL suitable for disclosure in notifications. The notifier does not fetch this link.
@@ -1271,9 +2100,71 @@ Generic webhooks include `url` when it is supplied and omit it otherwise.
 Values are finite JSON numbers or null; missing values are sent as null and zero remains zero. Unknown fields and
 trailing documents are rejected. Strings are encoded as JSON, including quotes, newlines, and Unicode.
 
-This increment does not infer initial-CLEAR eligibility or apply severity filters or critical-history policy. Those
-capabilities remain pending in the inventory. Add future internal-only event facts separately from this public
-webhook document.
+`duration` is the time spent in the previous alert state; `non_clear_duration` is the total elapsed time the alert
+is/was non-clear. Both are caller-supplied whole seconds from 0 through 4294967295, matching the Agent's unsigned
+32-bit notification arguments. Negative, fractional, exponent-form and string values are rejected. Omitted or null
+durations mean unknown and are omitted from the public Event JSON; explicit zero is retained. They are public facts:
+when supplied they also appear in webhook/custom-command input and Alerta/Opsgenie raw event details, and are available
+to SNS message templates. Other providers' duration presentation remains pending in the capability inventory.
+
+The input additionally accepts `critical_seen_since_clear`, a routing fact kept outside the public Event. A JSON
+boolean supplies known history; omitted/null means unknown. It is required only when a selected `critical` policy
+needs it, as described under **Destination status filters**, and never appears in provider payloads. No initial-CLEAR
+eligibility or history is inferred by the notifier; both belong to the producer. Keep future input-only routing facts
+separate from the public Event too.
+
+## Internal packages
+
+All packages belong to this standalone module. Providers implement a single delivery contract:
+
+```go
+type Sender interface {
+    Send(context.Context, event.Event) error
+}
+```
+
+A sender represents one configured destination. Success means the provider accepted the request; it does not promise
+that a human received the notification. The context carries the whole invocation deadline.
+The engine receives a `notifier.Notification` containing the public Event and input-only policy facts. It checks all
+selected policies before delivery, then passes only the public Event to each eligible sender.
+
+| Package | Ownership |
+|---|---|
+| `internal/app` | CLI options, event input, output and invocation resources |
+| `internal/notifier` | Sender contract, input-only notification facts, routing, status/history policies, sequential fan-out and delivery results |
+| `internal/config` | Strict YAML document decoding and typed factories supplied through an explicit registry |
+| `internal/config/field` | Reusable configuration scalar validation, including strict integers |
+| `internal/providers` | Explicit built-in registration |
+| `internal/providers/<provider>` | Typed configuration, validation, rendering, delivery and acknowledgment for one provider |
+| `internal/event` | Public notification data and JSON field tags; internal routing facts belong separately |
+| `internal/message` | Common fields, plain text, control escaping and shared severity colors |
+| `internal/secret` | Whole-value reference syntax and lazy environment/file resolution |
+| `internal/httpclient` | Request construction, client settings, safe errors and bounded response reads |
+| `internal/commandexec` | Command options/environment, foreground processes, interactive sessions and cleanup |
+| `internal/testutil` | Provider-independent test fixtures and helpers |
+
+To add a provider, create its package with a typed `Config`, validating `New` constructor and `Send` method, register
+its constructor in `providers.Builtin`, and add its tests and documentation. The engine and other providers need no
+changes. Provider packages do not import each other or the application. Payloads, endpoint rules, acknowledgment
+checks and retries stay with the provider; shared mechanisms contain no provider dispatch.
+
+Constructors validate all configured destinations without resolving secrets or performing delivery. Configuration
+keeps its flat YAML shape and supports aliases and merges. A provider rejects undeclared fields even when their
+value is empty, zero or null. Typed factories decode the original YAML node graph to preserve cross-destination
+aliases while checking field names, duplicate keys and scalar types. Decoder diagnostics never echo input values.
+
+The application owns one HTTP client and command runner per invocation. Providers close response bodies; the
+application closes idle HTTP connections. Secrets resolve only for eligible sends, into local copies of each
+provider's configuration. Constructors retain their own copies of mutable options.
+
+Cancel the invocation context before calling `commandexec.Runner.CloseAndWait`, which rejects new child work and
+waits for admitted work to finish cleanup. The runner owns process-group cancellation, session I/O and private
+command homes. Blocked caller-owned input or secret-file reads remain outside that shutdown wait. The application
+alone writes CLI output, including after cancellation.
+
+Payload fixtures and private renderer/response/config tests live beside their provider. App tests exercise real
+YAML-to-HTTP and command paths; engine tests exercise routing and filtering with recording senders. The registry
+checks the complete provider inventory and field isolation, including explicitly empty foreign fields.
 
 ## Validation
 
@@ -1283,7 +2174,7 @@ go test -race -count=1 ./...
 go vet ./...
 ```
 
-Tests use tables keyed by case name and local HTTP receivers; no provider account or credentials are needed.
+Tests use tables keyed by case name, local HTTP receivers and owned helper processes; no provider account or credentials are needed.
 CI runs this module's tests on Linux. To check Windows compilation locally, use:
 
 ```sh

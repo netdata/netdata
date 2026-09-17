@@ -420,6 +420,25 @@ impl Predicate {
         Ok(())
     }
 
+    /// The first condition stored rows cannot answer — a trace-level
+    /// builtin (`root_name`, `root_service_name`, `trace_duration`) or a
+    /// `trace_id` constraint — or `None` when every condition is
+    /// span-local. The overview's filter and its callers decide policy
+    /// on this (refuse, or fall back to the unfiltered grid); the list
+    /// of fields is owned HERE so a wire cannot drift from the engine.
+    pub fn trace_level_target(&self) -> Option<&PredicateTarget> {
+        use BuiltinField::*;
+        self.conditions
+            .iter()
+            .map(|c| &c.target)
+            .find(|t| {
+                matches!(
+                    t,
+                    PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration | TraceId)
+                )
+            })
+    }
+
     /// Split into `(span_local, trace_level)` (pin R3-2): trace-level
     /// builtins (`RootName`, `RootServiceName`, `TraceDuration`)
     /// evaluate post-assembly as tri-state (decision 15); EVERYTHING the

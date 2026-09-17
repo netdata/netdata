@@ -111,6 +111,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pulsar"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/puppet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rabbitmq"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redis"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rethinkdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/riakkv"
@@ -152,6 +153,7 @@ import (
 // NewRegistry gives each Agent its own shared SNMP state and publisher.
 func NewRegistry(varLibDir string) (collectorapi.Registry, *snmpdiag.Publisher) {
 	registry := maps.Clone(collectorapi.DefaultRegistry)
+
 	// These collectors share SNMP state; wire them together here instead of
 	// exposing package-global registries from the individual collector packages.
 	deviceStore := ddsnmp.NewDeviceStore()

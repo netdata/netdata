@@ -3,6 +3,7 @@
 package ipfs
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -37,25 +38,25 @@ const (
 	urlPathPinLs          = "/api/v0/pin/ls"      // https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-pin-ls
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectStatsBandwidth(mx); err != nil {
+	if err := c.collectStatsBandwidth(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectSwarmPeers(mx); err != nil {
+	if err := c.collectSwarmPeers(ctx, mx); err != nil {
 		return nil, err
 	}
 	if c.QueryRepoApi {
 		// https://github.com/netdata/netdata/pull/9687
 		// TODO: collect by default with "size-only"
 		// https://github.com/ipfs/kubo/issues/7528#issuecomment-657398332
-		if err := c.collectStatsRepo(mx); err != nil {
+		if err := c.collectStatsRepo(ctx, mx); err != nil {
 			return nil, err
 		}
 	}
 	if c.QueryPinApi {
-		if err := c.collectPinLs(mx); err != nil {
+		if err := c.collectPinLs(ctx, mx); err != nil {
 			return nil, err
 		}
 	}
@@ -63,8 +64,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectStatsBandwidth(mx map[string]int64) error {
-	stats, err := c.queryStatsBandwidth()
+func (c *Collector) collectStatsBandwidth(ctx context.Context, mx map[string]int64) error {
+	stats, err := c.queryStatsBandwidth(ctx)
 	if err != nil {
 		return err
 	}
@@ -75,8 +76,8 @@ func (c *Collector) collectStatsBandwidth(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectSwarmPeers(mx map[string]int64) error {
-	stats, err := c.querySwarmPeers()
+func (c *Collector) collectSwarmPeers(ctx context.Context, mx map[string]int64) error {
+	stats, err := c.querySwarmPeers(ctx)
 	if err != nil {
 		return err
 	}
@@ -86,8 +87,8 @@ func (c *Collector) collectSwarmPeers(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectStatsRepo(mx map[string]int64) error {
-	stats, err := c.queryStatsRepo()
+func (c *Collector) collectStatsRepo(ctx context.Context, mx map[string]int64) error {
+	stats, err := c.queryStatsRepo(ctx)
 	if err != nil {
 		return err
 	}
@@ -102,8 +103,8 @@ func (c *Collector) collectStatsRepo(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectPinLs(mx map[string]int64) error {
-	stats, err := c.queryPinLs()
+func (c *Collector) collectPinLs(ctx context.Context, mx map[string]int64) error {
+	stats, err := c.queryPinLs(ctx)
 	if err != nil {
 		return err
 	}
@@ -121,8 +122,8 @@ func (c *Collector) collectPinLs(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) queryStatsBandwidth() (*ipfsStatsBw, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatsBandwidth)
+func (c *Collector) queryStatsBandwidth(ctx context.Context) (*ipfsStatsBw, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatsBandwidth)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +140,8 @@ func (c *Collector) queryStatsBandwidth() (*ipfsStatsBw, error) {
 	return &stats, nil
 }
 
-func (c *Collector) querySwarmPeers() (*ipfsSwarmPeers, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathSwarmPeers)
+func (c *Collector) querySwarmPeers(ctx context.Context) (*ipfsSwarmPeers, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathSwarmPeers)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +154,8 @@ func (c *Collector) querySwarmPeers() (*ipfsSwarmPeers, error) {
 	return &stats, nil
 }
 
-func (c *Collector) queryStatsRepo() (*ipfsStatsRepo, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatsRepo)
+func (c *Collector) queryStatsRepo(ctx context.Context) (*ipfsStatsRepo, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatsRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +168,8 @@ func (c *Collector) queryStatsRepo() (*ipfsStatsRepo, error) {
 	return &stats, nil
 }
 
-func (c *Collector) queryPinLs() (*ipfsPinsLs, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathPinLs)
+func (c *Collector) queryPinLs(ctx context.Context) (*ipfsPinsLs, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathPinLs)
 	if err != nil {
 		return nil, err
 	}

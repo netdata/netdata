@@ -491,6 +491,14 @@ pub struct OverviewParams {
     pub after: u32,
     #[serde(default)]
     pub before: u32,
+    /// Facet selections, the page's grammar ([`SearchParams::selections`]):
+    /// bin only the traces owning a stored row that matches. Span-level
+    /// keys only — a trace-level word (`root_name`, `root_service_name`,
+    /// `trace_duration`, `trace_id`) is a client error here, since this
+    /// request has no page whose list could carry it. The response's
+    /// `scope` says whether a selection was applied.
+    #[serde(default)]
+    pub selections: std::collections::HashMap<String, Vec<String>>,
     /// Also compute the top-root-service/operation facet lists.
     /// OPT-IN: resolving roots costs the sealed sources' root-field
     /// dictionary decodes, so the default paint stays cheap and
@@ -623,6 +631,11 @@ pub struct OverviewResult {
     /// verbatim, never hardcode.
     pub unit: &'static str,
     pub status: StatusWire,
+    /// Which population the grid covers: [`OVERVIEW_SCOPE_SELECTION`]
+    /// when the request's `selections` were applied, else
+    /// [`OVERVIEW_SCOPE_WINDOW`] (the selections constrain nothing:
+    /// none sent, or every value list empty).
+    pub scope: &'static str,
     pub grid: OverviewGridWire,
     pub totals: OverviewTotals,
     /// The top-root facet lists over the SAME binned population as the
@@ -826,17 +839,18 @@ pub struct SearchResult {
     /// the `anchor` param for the following page; treat it as opaque.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
-    /// The FULL-WINDOW aggregate, composed from a second engine pass in
-    /// this same request. The Functions view's contract only — the
+    /// The window aggregate, composed from a second engine pass in this
+    /// same request under the page's `selections` (its `scope` says
+    /// whether they applied). The Functions view's contract only — the
     /// legacy `search` mode never carries it — and absent (never
     /// `null`) when not composed, so a consumer detects it by PRESENCE
     /// and degrades to page-derived numbers without a version gate.
     ///
     /// Present on a FIRST page only: a request carrying an anchor
     /// ([`FunctionsParams::anchor`]) gets NO `overview` key at all. Such
-    /// a page reruns the same query over the cursor's frozen window, and
-    /// the aggregate applies none of the page's filters, so recomposing
-    /// it would repeat the section the first page already delivered —
+    /// a page reruns the same query (same selections) over the cursor's
+    /// frozen window, so recomposing the aggregate would repeat the
+    /// section the first page already delivered —
     /// one extra full-window pass per page of a walk, for identical
     /// numbers. A consumer therefore keeps the first page's section for
     /// the whole walk, and only re-reads it on a request without an
@@ -903,9 +917,16 @@ pub struct OverviewSection {
     /// both reported.
     pub coverage: CoverageWire,
     /// Which population these numbers cover, relative to the page:
-    /// [`OVERVIEW_SCOPE_WINDOW`] means the page's selections were NOT
-    /// applied. A consumer that captions the totals without reading
-    /// this lies as soon as the filter rail is non-empty.
+    /// [`OVERVIEW_SCOPE_SELECTION`] means the page's `selections` were
+    /// applied (the grid bins the traces owning a stored row that
+    /// matches them); [`OVERVIEW_SCOPE_WINDOW`] means they were NOT (the
+    /// page's selections constrain nothing — none, or only empty value
+    /// lists — or carry a trace-level word stored rows cannot answer).
+    /// The duration bounds are NEVER applied to the
+    /// grid, under either value: duration is the grid's own axis, so a
+    /// cell click or the rail's minimum narrows the list beside the
+    /// grid, not the grid. A consumer that captions the totals without
+    /// reading this lies as soon as the filter rail is non-empty.
     pub scope: &'static str,
     pub grid: OverviewGridWire,
     pub totals: OverviewTotals,
@@ -918,13 +939,26 @@ pub struct OverviewSection {
     pub top_root_operations: Option<FacetListWire>,
 }
 
-/// [`OverviewSection::scope`]: the aggregate covers the whole window and
-/// applied NONE of the page's selections. The value a consumer must be
-/// ready for next is `"selection"` — the same window under the same
-/// selections — which needs an engine predicate this pass does not
-/// carry; shipping the flag from day one keeps that a data change
-/// rather than a contract change.
+/// [`OverviewSection::scope`] / [`OverviewResult::scope`]: the aggregate
+/// covers the whole window and applied NONE of the page's selections —
+/// the page carried none, or carried a trace-level word (`root_name`,
+/// `root_service_name`, `trace_duration`, `trace_id`) that stored rows
+/// cannot answer, in which case the Functions view falls back to this
+/// rather than guess.
 pub const OVERVIEW_SCOPE_WINDOW: &str = "window";
+
+/// [`OverviewSection::scope`] / [`OverviewResult::scope`]: the same
+/// window under the same `selections` as the page. Stored-row
+/// semantics, like every other number in the section: a trace is
+/// binned when ANY stored copy of one of its spans matches and starts
+/// inside the grid. The list beside it can differ at the edges: it
+/// dedups copies (the contradicting-resend case the search engine
+/// documents), it shows a trace whose envelope starts before the grid
+/// while the grid's bin-by-envelope-start rule drops it, and the grid's
+/// window is the page's aligned to whole buckets, so a match in the
+/// widened band bins a trace the page excludes. The duration bounds
+/// are not part of the scope (see the field's doc).
+pub const OVERVIEW_SCOPE_SELECTION: &str = "selection";
 
 /// One returned trace summary; ids in W3C lowercase hex.
 #[derive(Debug, Serialize)]

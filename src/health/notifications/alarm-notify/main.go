@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/app"
 )
 
 func main() {
@@ -18,5 +18,5 @@ func main() {
 func run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	return notifier.Run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	return app.Run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
 }

@@ -34,9 +34,11 @@ func TestRegistry_DockerInclusion(t *testing.T) {
 	withDocker := Registry(true)
 	assert.Contains(t, withDocker.Types(), discovererHTTP)
 	assert.Contains(t, withDocker.Types(), discovererDocker)
+	assert.NotContains(t, withDocker.Types(), "redfish")
 
 	withoutDocker := Registry(false)
 	assert.Contains(t, withoutDocker.Types(), discovererHTTP)
+	assert.NotContains(t, withoutDocker.Types(), "redfish")
 	assert.NotContains(t, withoutDocker.Types(), discovererDocker)
 }
 

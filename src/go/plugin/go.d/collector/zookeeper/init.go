@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
@@ -18,12 +20,12 @@ func (c *Collector) verifyConfig() error {
 	return nil
 }
 
-func (c *Collector) initZookeeperFetcher() (fetcher, error) {
+func (c *Collector) initZookeeperFetcher(ctx context.Context) (fetcher, error) {
 	var tlsConf *tls.Config
 	var err error
 
 	if c.UseTLS {
-		tlsConf, err = tlscfg.NewTLSConfig(c.TLSConfig)
+		tlsConf, err = tlscfg.NewTLSConfig(ctx, c.TLSConfig)
 		if err != nil {
 			return nil, fmt.Errorf("creating tls config : %v", err)
 		}

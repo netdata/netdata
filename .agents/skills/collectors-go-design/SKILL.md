@@ -1,13 +1,13 @@
 ---
 name: collectors-go-design
-description: Design or review go.d collector contracts, including options, metric meaning and identity, vnodes, Functions, ownership, remote writes and durable state. Also author or review DynCfg config_schema.json forms. Contract-preserving fixes and migrations use framework guidance; integration prose uses the metadata skill.
+description: Design or review go.d collector and discoverer contracts, including capability scope, options, metric meaning and identity, vnodes, Functions, ownership, remote writes and durable state. Also author or review DynCfg config_schema.json forms. Contract-preserving fixes and migrations use framework guidance; integration prose uses the metadata skill.
 ---
 
 # Go Collector Design
 
-Use this skill to design or review what a collector promises, who owns its state, what an operator decides, what a
-sample means, and what proves it. Resolve applicable implementation design questions before code. Mechanics live in
-`.agents/skills/collectors-go-framework-v2/SKILL.md` and
+Use this skill to design or review what a collector or discoverer promises, who owns its state, what an operator
+decides, what a sample means, and what proves it. Resolve applicable implementation design questions before code.
+Collector mechanics live in `.agents/skills/collectors-go-framework-v2/SKILL.md` and
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md`; artifact delivery lives in
 `.agents/skills/integrations-lifecycle/`. Do not restate those here.
 
@@ -31,6 +31,7 @@ require durable-state machinery; ownership, lifecycle and cost changes still nee
 | Task | Load | Design note depth |
 |---|---|---|
 | New go.d collector | this skill, then the V2 skill and the how-to guide | full note; one line per item for a small read-only collector |
+| New go.d discoverer or changed discovery capability, ownership or lifecycle | this skill; implementation under `src/go/plugin/go.d/discovery/sdext/discoverer/` and shared engine under `src/go/plugin/agent/discovery/` | applicable product, ownership, lifecycle and option items; no collector metric or V2 requirements unless affected |
 | New public config option, mode, or default change | `operator-surface.md` (the option's decision record) | the affected item only |
 | Form presentation in `config_schema.json`, with option/default semantics unchanged | `config-schema.md` | none; a changed operator contract uses the relevant design row |
 | New or changed metric meaning, new entity axis, vnodes | the Metric Semantics and Identity items | the affected item only |
@@ -40,7 +41,7 @@ require durable-state machinery; ownership, lifecycle and cost changes still nee
 
 ## The Collector Design Note
 
-**When:** authorized design or implementation of a new collector or an affected public, ownership or lifecycle
+**When:** authorized design or implementation of a new collector, discoverer, or affected public, ownership or lifecycle
 contract. **Do:** fill the applicable items below as a `Collector design:` block under
 "Affected contracts and surfaces" in the SOW's Pre-Implementation Gate, before implementation. **Don't:** create
 separate documents, or answer items the collector does not have; write "none" with the reason instead. **Evidence:**
@@ -49,11 +50,13 @@ collector that only reads its source answers applicable items in one line each. 
 requests follow the exceptions above. Remote mutation or durable local state selects the applicable sections of
 `mutating-collectors.md`; it does not make every item apply to every collector.
 
-1. **Product boundary.** State the operational question the collector answers, the supported providers, versions,
-   and configurations, the explicit non-goals, and whether each measurement is client-observed or a backend
-   guarantee. Separate three things that get confused: a repair (the contemporary contract was violated), a
-   discoverability fix (the contract was hidden), and an expansion (a new capability, which needs the user's
-   approval). An explicitly excluded capability is not a defect.
+1. **Product boundary.** State the operational question, supported providers, versions and configurations, explicit
+   non-goals, and whether each measurement is client-observed or a backend guarantee. Distinguish a repair of the
+   contemporary contract, making that contract discoverable, and expanding it. Each added capability, including
+   network discovery, log ingestion or a Function, MUST have an approved operator need; a request for monitoring does
+   not imply these products. Protocol/SDK support, a sibling collector's features, and words such as "comprehensive"
+   or "production-ready" do not establish that need. Approval already covering the capability remains valid; no
+   separate approval per component is required. An explicitly excluded capability is not a defect.
 2. **Provider contract.** For every operation the design depends on, name the permissions, consistency assumptions,
    retries, and error meanings, with a link to the applicable provider/version documentation. When more than one
    provider or mode is involved, fill a capability matrix: one row per operation, one column per provider, cells say
@@ -85,37 +88,49 @@ For configured vnode acquisition and named attachment, use
 `src/go/plugin/framework/vnodes/README.md#collector-attachment` as the existing ownership contract before proposing
 collector-owned identity polling or shared connection settings.
 
-**When:** a proposal makes one job depend on another job's state (scanning its journals, waiting for its cleanup,
-sharing an operational lock, consulting a registry for permission to run), introduces durable state for otherwise
-independent reads, adds a scheduler or queue, lets cleanup freeze measurement, or builds a generic engine around one
-provider's quirks. **Do:** answer the five questions in the design note before code; if the answer is "unknown",
-investigate or ask, never implement a placeholder for later review. **Don't:** repair the proposal by making the scan
-faster, raising a file cap, adding retries, or writing tests that expect the coupling; those preserve the wrong
-dependency. **Evidence:** concrete object keys, owner identities, and a named invariant, not "there could be races".
-**Boundary:** a genuinely shared resource may require coordination; the gate is not a ban on locks, shared clients,
-or framework infrastructure, and "this looks complex" is not a finding without a named dependency and consequence.
+**When:** a proposal adds caching, durable state, scheduling, queues, cross-job dependencies, cleanup that can freeze
+measurement, or a generic engine around provider-specific behavior. This includes machinery owned by just one
+collector or discoverer. **Do:** answer the applicable questions below before code; if the justification is unknown,
+investigate or ask rather than implement a placeholder. **Don't:** make an unjustified scan faster, raise its cap,
+add retries, or write tests that expect the coupling. **Evidence:** a supported requirement and a concrete failure of
+its direct implementation, using the evidence standard in `src/go/AGENTS.md#evidence-before-complexity`.
+**Boundary:** state, locks, shared clients, framework infrastructure and protocol/security controls remain valid when
+justified. "This looks complex" alone is not a finding. An ordinary transient cache may need only a brief source-based
+explanation; it does not require persistence or a benchmark by default.
 
-1. **Shared resource.** What concrete object, namespace, limit, or external protocol is shared? Sharing a directory,
-   an SDK, or a provider type is not a collision.
-2. **Necessity.** Which supported execution fails with independent per-job ownership? Show the collision.
-3. **Narrowest boundary.** Why is per-owner identity and exclusion insufficient? Compare with the proposal using real
-   keys and owner identities.
+Designers and reviewers MUST evaluate the initiating decision before hardening its supporting layers. Trace
+serialization, versioning, invalidation, locking and recovery back to the mechanism that requires them. Correctness
+of those layers and passing tests do not prove that the mechanism is needed. If it is unjustified, propose removing
+or redesigning it with its dependent machinery within the approved scope; do not weaken safeguards around a retained
+requirement to reduce complexity.
+
+1. **Requirement and direct alternative.** What approved operator need or correctness, liveness, protocol, security,
+   compatibility or workload contract is being satisfied? Describe the direct implementation using existing helpers
+   and independent ownership, without the proposed machinery.
+2. **Necessity.** Which supported execution fails with that alternative? Identify the input, failure and requirement
+   it violates. For persistence, explain why re-querying or reconstructing state after restart is insufficient. For
+   a cost argument, show the expected workload and source-derived bounds or measurements; "avoids repeated work" is
+   insufficient by itself.
+3. **Narrowest boundary.** What state or resource needs the mechanism, who owns it, and for how long? For cross-job
+   coordination, identify the shared object, namespace, limit or protocol; show the collision with independent
+   ownership and why per-owner identity/exclusion is insufficient, using real keys. Sharing a directory, SDK or
+   provider type is not itself a collision.
 4. **Failure propagation and cost.** Can a stopped, corrupt, or unreachable job block a healthy one? State the cost
    variables: work per job per call, per retained item, remote calls, state serialization, lock scope, growth with
    jobs and backlog. Use source-derived bounds at design time; a shipped hot-path change still follows
-   `src/go/AGENTS.md` "Hot-Path And Benchmark Discipline". A cache that preserves the failure coupling is not a fix.
-5. **Decision.** Necessary coordination is exposed as an operational trade-off and gets the applicable design
-   approval. Unnecessary coordination is redesigned around the actual owner boundary. For durable ownership also
-   state the recovery consequences: same owner versus different owner, label change, credential rotation, location
-   change, rename. Isolation does not solve identity migration; say what a renamed job does and does not inherit.
+   `src/go/AGENTS.md#hot-path-and-benchmark-discipline`. A cache that preserves failure coupling is not a fix.
+5. **Decision.** Necessary machinery is exposed as an operational trade-off and gets the applicable design approval;
+   otherwise use the direct implementation or revise the requirement with the user. For durable ownership also state
+   recovery consequences: same versus different owner, label change, credential rotation, location change and rename.
+   Isolation does not solve identity migration; say what a renamed job does and does not inherit.
 
-Worked example, from the S3check original: the proposal scanned every job's ownership files under a global handoff
-lock before publishing a probe. Q1: object keys were already namespaced per Agent and per job, so no key collided;
-a shared directory is not a shared resource. Q2: no supported execution failed with per-job ownership; the only real
-overlap was the same job's old and new runtime during reload. Q3: a per-owner lock and journal (owner = Agent
-registry ID + job name) covered that overlap. Q4: an unrelated corrupt journal blocked a healthy job, scanning was
-O(jobs²), and a 256-file cap turned growth into a hard failure. Decision: reject the coordination, redesign around
-owner identity, record that a renamed job does not adopt old ownership. All of this was decidable from the proposal.
+Worked example from S3check: recovering ownership of created remote objects after a crash requires a journal. The
+original proposal additionally scanned every job's ownership files under a global handoff lock before publishing a
+probe. Object keys were already namespaced per Agent and job; the only real overlap was the same job's old and new
+runtime during reload. A per-owner lock and journal (owner = Agent registry ID + job name) covered that overlap. The
+global scan let an unrelated corrupt journal block a healthy job, cost O(jobs²), and turned growth into failure through
+a file-count cap. Reject the cross-job coordination, retain the necessary owner-scoped journal and lock, and record
+that a renamed job does not adopt old ownership. This follows from the supported execution and ownership keys.
 
 ## Measurement Truth Table
 

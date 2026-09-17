@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"context"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -32,8 +33,8 @@ func isTraefikMetrics(pms prometheus.Series) bool {
 	return false
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
-	pms, err := c.prom.ScrapeSeries()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries(ctx)
 	if err != nil {
 		return nil, err
 	}

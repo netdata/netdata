@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
@@ -56,6 +57,25 @@ func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestRedfishRegistration(t *testing.T) {
+	registry, _ := NewRegistry(t.TempDir())
+	creator := requireCreator(t, registry, "redfish")
+	assert.NotContains(t, registry, "redfish_logs")
+	assert.Nil(t, creator.Create)
+	require.NotNil(t, creator.CreateV2)
+	require.NotNil(t, creator.Config)
+	assert.Nil(t, creator.AgentFunctions)
+	assert.Nil(t, creator.SharedFunctions)
+	assert.Nil(t, creator.MethodHandler)
+	assert.Equal(t, 60, creator.Defaults.UpdateEvery)
+	first, ok := creator.CreateV2().(*redfish.Collector)
+	require.True(t, ok)
+	second, ok := creator.CreateV2().(*redfish.Collector)
+	require.True(t, ok)
+	assert.NotSame(t, first, second)
+	assert.NotSame(t, first.MetricStore(), second.MetricStore())
 }
 
 func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {

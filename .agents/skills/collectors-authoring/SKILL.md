@@ -48,7 +48,8 @@ prerequisites. In Go work, read `src/go/AGENTS.md` and the relevant subtree inst
 | Prometheus chart profile | `.agents/skills/collectors-prometheus-profiles/SKILL.md`; source and real-pipeline validation for the affected profile, with review action boundaries retained |
 | Interactive Function | `src/go/plugin/framework/functions/README.md`, `src/plugins.d/FUNCTION_UI_SCHEMA.json`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` |
 | Topology producer | `.agents/skills/topology-authoring/SKILL.md`, `src/go/pkg/topology/v1`, `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` |
-| Auto-discovery | Rules under `src/go/plugin/go.d/config/go.d/sd/`; engine `src/go/plugin/agent/discovery/` |
+| Auto-discovery rule edit | Rules under `src/go/plugin/go.d/config/go.d/sd/`; engine `src/go/plugin/agent/discovery/` |
+| New go.d discoverer or changed discovery capability, ownership or lifecycle | `.agents/skills/collectors-go-design/SKILL.md#the-collector-design-note` and its architecture gate; implementation under `src/go/plugin/go.d/discovery/sdext/discoverer/`; shared engine under `src/go/plugin/agent/discovery/` |
 | OTEL ingestion or mapping | `src/crates/otel-plugin/`, `src/crates/otel-ingestor/` and `./dashboard-shaping.md` |
 | Log ingestion or exploration | `src/collectors/log2journal/`, its `log2journal.d/` rules and `./landscape-and-domains.md#logs` |
 | Cross-plugin enrichment | `./collector-practices.md#29-cross-plugin-enrichment-via-netipc` |

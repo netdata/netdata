@@ -150,6 +150,15 @@ func StoreReferences(input any) ([]string, error) {
 	return keys, nil
 }
 
+// CloneLiteral clones one value with the same shape, depth, cycle, and size
+// defenses as secret resolution, but preserves all strings as literal data.
+func CloneLiteral(input any) (any, error) {
+	compiler := atomicCompiler{
+		active: make(map[atomicContainerIdentity]struct{}),
+	}
+	return compiler.clone(input, 0, false)
+}
+
 func (resolver *AtomicResolver) Resolve(
 	ctx context.Context,
 	input any,

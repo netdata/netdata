@@ -94,6 +94,17 @@ destinations:
     type: pagerduty
     api_version: 2
     integration_key: ${env:NOTIFY_PAGERDUTY_INTEGRATION_KEY}
+  opsgenie:
+    type: opsgenie
+    api_key: ${env:NOTIFY_OPSGENIE_API_KEY}
+  teams:
+    type: msteams
+    url: ${env:NOTIFY_TEAMS_WORKFLOW_URL}
+  matrix:
+    type: matrix
+    api_url: ${env:NOTIFY_MATRIX_API_URL}
+    access_token: ${env:NOTIFY_MATRIX_ACCESS_TOKEN}
+    room_id: '!room:example.org'
 routing:
   default: [local]
   roles:
@@ -114,3 +125,5 @@ routing:
     form_ops: [prowl, kavenegar]
     appliance_ops: [smseagle]
     pagerduty_ops: [pagerduty]
+    opsgenie_ops: [opsgenie]
+    room_chat_ops: [teams, matrix]
