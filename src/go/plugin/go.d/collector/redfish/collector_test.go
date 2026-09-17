@@ -14,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +92,7 @@ func TestCollectorRejectsOversizedJobNameBeforeClientConstruction(t *testing.T) 
 		URL:        "https://bmc.example.test",
 		AuthMethod: "none",
 	}
-	collector.Name = strings.Repeat("x", promotedLabelLimit+1)
+	collector.Name = strings.Repeat("x", measurement.MaxLabelValueBytes+1)
 	collector.newClient = func(Config, *http.Client) (endpointClient, error) {
 		t.Fatal("oversized job name reached client construction")
 		return nil, nil

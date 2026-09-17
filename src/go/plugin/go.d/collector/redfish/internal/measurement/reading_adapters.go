@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"strings"
 )
 
-func sensorExcerptReadings(source sensorExcerptSource) []rawReading {
+func sensorExcerptReadings(source SensorExcerpt) []rawReading {
 	value, present := valueAt(source.Data, "Reading")
 	physical, _ := stringValueAt(source.Data, "PhysicalContext")
 	subcontext, _ := stringValueAt(source.Data, "PhysicalSubContext")
@@ -168,7 +168,7 @@ func electricalAuxiliaryReadings(
 	return result
 }
 
-func legacyThermalReadings(node *graphNode) []rawReading {
+func legacyThermalReadings(node *Resource) []rawReading {
 	health, _ := stringValueAt(node.Data, "Status.Health")
 	switch node.SourcePath {
 	case "Temperatures":
@@ -195,7 +195,7 @@ func legacyThermalReadings(node *graphNode) []rawReading {
 	}
 }
 
-func legacyPowerReadings(node *graphNode) []rawReading {
+func legacyPowerReadings(node *Resource) []rawReading {
 	health, _ := stringValueAt(node.Data, "Status.Health")
 	switch node.SourcePath {
 	case "PowerControl":
@@ -217,7 +217,7 @@ func legacyPowerReadings(node *graphNode) []rawReading {
 }
 
 func legacyReading(
-	node *graphNode,
+	node *Resource,
 	value any,
 	present bool,
 	sourceType, units, role, health string,
@@ -242,7 +242,7 @@ func legacyReading(
 }
 
 func valueAt(data map[string]any, path string) (any, bool) {
-	return jsonPath(data, path)
+	return Properties(data).Lookup(path)
 }
 
 func firstValue(data map[string]any, paths ...string) (any, bool) {

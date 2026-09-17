@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"encoding/json"
@@ -22,7 +22,7 @@ func TestLegacyPowerReadingRequiresActualConsumption(t *testing.T) {
 		"actual consumed":           {data: map[string]any{"PowerConsumedWatts": json.Number("123"), "PowerRequestedWatts": json.Number("400")}, want: []float64{123}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			node := &graphNode{
+			node := &Resource{
 				Key:         "power",
 				Kind:        "sensor",
 				SourceModel: "deprecated_power",
@@ -30,7 +30,7 @@ func TestLegacyPowerReadingRequiresActualConsumption(t *testing.T) {
 				Data:        test.data,
 			}
 			var got []float64
-			for _, reading := range (&protocolClient{}).readingsForNode(node, time.Now()) {
+			for _, reading := range (New("", "", nil)).readingsForNode(node, time.Now()) {
 				if reading.Valid {
 					got = append(got, reading.Value)
 				}
@@ -46,12 +46,12 @@ func TestExcerptSourceFormsProduceOneReading(t *testing.T) {
 		"object":    map[string]any{"Reading": json.Number("20")},
 	} {
 		t.Run(name, func(t *testing.T) {
-			node := &graphNode{
+			node := &Resource{
 				Key:  "fan",
 				Kind: "fan",
 				Data: map[string]any{"SpeedPercent": source},
 			}
-			readings := (&protocolClient{}).readingsForNode(node, time.Now())
+			readings := (New("", "", nil)).readingsForNode(node, time.Now())
 			if !assert.Len(t, readings, 1) {
 				return
 			}
@@ -96,28 +96,28 @@ func TestReadingSourceHealthIsIndependentOfNumericValue(t *testing.T) {
 			Value: 90,
 		}},
 	} {
-		for sourceName, makeNode := range map[string]func(map[string]any) *graphNode{
-			"standalone sensor": func(data map[string]any) *graphNode {
+		for sourceName, makeNode := range map[string]func(map[string]any) *Resource{
+			"standalone sensor": func(data map[string]any) *Resource {
 				data["ReadingType"], data["ReadingUnits"] = "Percent", "%"
-				return &graphNode{
+				return &Resource{
 					Key:  "sensor",
 					Kind: "sensor",
 					Data: data,
 				}
 			},
-			"object excerpt": func(data map[string]any) *graphNode {
-				return &graphNode{
+			"object excerpt": func(data map[string]any) *Resource {
+				return &Resource{
 					Key:  "fan",
 					Kind: "fan",
 					Data: map[string]any{"SpeedPercent": data},
 				}
 			},
-			"array excerpt": func(data map[string]any) *graphNode {
-				return &graphNode{
+			"array excerpt": func(data map[string]any) *Resource {
+				return &Resource{
 					Key:            "sensor",
 					Kind:           "sensor",
 					SourceModel:    "embedded_sensor_excerpt",
-					SensorExcerpts: []sensorExcerptSource{{Path: "FanSpeedPercent[0]", Type: "Percent", Units: "%", Data: data}},
+					SensorExcerpts: []SensorExcerpt{{Path: "FanSpeedPercent[0]", Type: "Percent", Units: "%", Data: data}},
 				}
 			},
 		} {
@@ -132,7 +132,7 @@ func TestReadingSourceHealthIsIndependentOfNumericValue(t *testing.T) {
 					data["Status"] = map[string]any{"Health": test.health}
 				}
 				node := makeNode(data)
-				client := &protocolClient{}
+				client := New("", "", nil)
 				readings := client.readingsForNode(node, time.Now())
 				if !assert.Len(t, readings, 1) {
 					return
@@ -169,14 +169,14 @@ func TestStoredEnergyExcerptKeepsGaugeSemantics(t *testing.T) {
 		"object":    map[string]any{"Reading": json.Number("20")},
 	} {
 		t.Run(name, func(t *testing.T) {
-			node := &graphNode{
+			node := &Resource{
 				Key:  "battery",
 				Kind: "battery",
-				Enrichment: map[string]enrichmentResource{
+				Enrichment: map[string]Enrichment{
 					"battery_metrics": {Data: map[string]any{"StoredEnergyWattHours": source}},
 				},
 			}
-			client := &protocolClient{}
+			client := New("", "", nil)
 			for _, at := range []time.Time{time.Unix(1000, 0), time.Unix(1060, 0)} {
 				readings := client.readingsForNode(node, at)
 				if !assert.Len(t, readings, 1) {

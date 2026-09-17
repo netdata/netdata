@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 )
 
-const promotedLabelLimit = 256
+// MaxLabelValueBytes is the existing limit for promoted resource and job labels.
+const MaxLabelValueBytes = 256
 
-func (c *protocolClient) metricLabels(node *graphNode, reading *normalizedReading) []metrix.Label {
+func (c *Projector) metricLabels(node *Resource, reading *normalizedReading) []metrix.Label {
 	labels := []metrix.Label{
-		{Key: "endpoint_key", Value: stableKey("netdata:redfish:endpoint:v1", c.origin, endpointKeyHexChars)},
+		{
+			Key:   "endpoint_key",
+			Value: identity.Key("netdata:redfish:endpoint:v1", c.origin, identity.EndpointKeyHexChars),
+		},
 		{Key: "endpoint_job", Value: c.endpointJob},
 	}
 	addLabel := func(key, value string) {
@@ -43,7 +48,7 @@ func (c *protocolClient) metricLabels(node *graphNode, reading *normalizedReadin
 	return labels
 }
 
-func addMetricResourceLabels(add func(string, string), node *graphNode) {
+func addMetricResourceLabels(add func(string, string), node *Resource) {
 	if node == nil || node.Data == nil {
 		return
 	}
@@ -77,7 +82,7 @@ func addMetricResourceLabels(add func(string, string), node *graphNode) {
 
 func upsertLabel(labels []metrix.Label, key, value string) []metrix.Label {
 	value = strings.TrimSpace(value)
-	valid := value != "" && len(value) <= promotedLabelLimit
+	valid := value != "" && len(value) <= MaxLabelValueBytes
 	for i := range labels {
 		if labels[i].Key == key {
 			if !valid {

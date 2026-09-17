@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 )
 
-func normalizeReading(node *graphNode, raw rawReading) normalizedReading {
+func normalizeReading(node *Resource, raw rawReading) normalizedReading {
 	identitySource := raw.IdentitySource
 	if identitySource == "" {
 		identitySource = raw.Path
@@ -28,7 +30,7 @@ func normalizeReading(node *graphNode, raw rawReading) normalizedReading {
 	if reading.Role == "" {
 		reading.Role = "input"
 	}
-	reading.Key = stableKey("netdata:redfish:reading:v1", node.Key+"\x00"+identitySource, 32)
+	reading.Key = identity.Key("netdata:redfish:reading:v1", node.Key+"\x00"+identitySource, 32)
 	spec, fixed := readingType(raw.Type, raw.Units, raw.FixedFamily)
 	if !fixed {
 		return reading
@@ -132,7 +134,7 @@ func readingBasis(value string) (string, bool) {
 	}
 }
 
-func readingSemanticClass(node *graphNode, reading normalizedReading) string {
+func readingSemanticClass(node *Resource, reading normalizedReading) string {
 	switch {
 	case reading.Family == "rotational_speed" &&
 		(node.Kind == "fan" || strings.EqualFold(strings.TrimSpace(reading.PhysicalContext), "Fan")):
@@ -155,11 +157,11 @@ func scaleReadingValue(value float64, scale valueScale) float64 {
 	return value * rationalMultiplier(scale)
 }
 
-func (c *protocolClient) readingObservations(node *graphNode, reading normalizedReading) []hardwareObservation {
+func (c *Projector) readingObservations(node *Resource, reading normalizedReading) []Observation {
 	labels := c.metricLabels(node, &reading)
-	result := make([]hardwareObservation, 0, 2)
+	result := make([]Observation, 0, 2)
 	if reading.Valid {
-		result = append(result, hardwareObservation{
+		result = append(result, Observation{
 			Metric: reading.Metric,
 			Value:  reading.Value,
 			Labels: labels,

@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 func (c *protocolClient) fetchServiceRoot(
@@ -22,7 +24,8 @@ func (c *protocolClient) fetchServiceRoot(
 		return nil, err
 	}
 	c.requestLimit = c.config.MaxConcurrentRequests
-	if multiple, ok := jsonPath(root.Raw, "ProtocolFeaturesSupported.MultipleHTTPRequests"); ok && multiple == false {
+	if multiple, ok := measurement.Properties(root.Raw).Lookup("ProtocolFeaturesSupported.MultipleHTTPRequests"); ok &&
+		multiple == false {
 		c.requestLimit = 1
 	}
 	return root, nil
@@ -46,9 +49,9 @@ func (c *protocolClient) decodeServiceRoot(response *responseData) (*serviceRoot
 type baseResource struct {
 	Kind             string
 	URI              string
-	Doc              genericResource
+	Doc              measurement.Document
 	Data             map[string]any
-	Response         responseMetadata
+	Response         measurement.ResponseTiming
 	AcquisitionState string
 }
 

@@ -5,14 +5,15 @@ package redfish
 import (
 	"errors"
 	"net/url"
-	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 // resourceDisplayIdentity is the only document data retained across failed reads.
 // Health, measurements, and response timestamps always belong to the current cycle.
 type resourceDisplayIdentity struct{ ODataID, ID, Name string }
 
-func snapshotResourceDisplay(doc genericResource) resourceDisplayIdentity {
+func snapshotResourceDisplay(doc measurement.Document) resourceDisplayIdentity {
 	return resourceDisplayIdentity{
 		ODataID: doc.ODataID,
 		ID:      doc.ID,
@@ -20,8 +21,8 @@ func snapshotResourceDisplay(doc genericResource) resourceDisplayIdentity {
 	}
 }
 
-func (identity resourceDisplayIdentity) document() genericResource {
-	return genericResource{
+func (identity resourceDisplayIdentity) document() measurement.Document {
+	return measurement.Document{
 		ODataID: identity.ODataID,
 		ID:      identity.ID,
 		Name:    identity.Name,
@@ -34,19 +35,19 @@ func (c *protocolClient) validateResourceData(
 	kind string,
 	data map[string]any,
 	responseURL *url.URL,
-) (genericResource, error) {
+) (measurement.Document, error) {
 	if err := c.validateResourceIdentity(kind, data, responseURL); err != nil {
-		return genericResource{}, err
+		return measurement.Document{}, err
 	}
 	return decodeGenericResource(data)
 }
 
 func (c *protocolClient) validateResourceIdentity(kind string, data map[string]any, responseURL *url.URL) error {
-	rawType, _ := stringValue(data["@odata.type"])
+	rawType, _ := measurement.Properties(data).Text("@odata.type")
 	if err := validateResourceSchemaType(kind, rawType); err != nil {
 		return err
 	}
-	id, ok := stringValue(data["@odata.id"])
+	id, ok := measurement.Properties(data).Text("@odata.id")
 	if !ok {
 		return errors.New("resource has no usable @odata.id")
 	}
@@ -81,27 +82,6 @@ func cloneJSONValue(value any) any {
 	default:
 		return value
 	}
-}
-
-func jsonPath(data map[string]any, path string) (any, bool) {
-	var current any = data
-	for segment := range strings.SplitSeq(path, ".") {
-		object, ok := current.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		current, ok = object[segment]
-		if !ok {
-			return nil, false
-		}
-	}
-	return current, true
-}
-
-func stringValue(value any) (string, bool) {
-	result, ok := value.(string)
-	result = strings.TrimSpace(result)
-	return result, ok && result != ""
 }
 
 func boundedDiagnostic(value string) string {

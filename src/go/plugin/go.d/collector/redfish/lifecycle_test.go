@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,7 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			_, origin, err := normalizeServiceRoot(server.URL)
 			require.NoError(t, err)
 			labels := metrix.Labels{
-				"endpoint_key": stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars),
+				"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
 				"endpoint_job": "endpoint-a",
 			}
 			point, ok := collector.MetricStore().Read().StateSet("collection_status", labels)
@@ -174,7 +175,7 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 	_, origin, err := normalizeServiceRoot(server.URL)
 	require.NoError(t, err)
 	labels := metrix.Labels{
-		"endpoint_key": stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars),
+		"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
 		"endpoint_job": "session",
 	}
 	for cycle := range 3 {

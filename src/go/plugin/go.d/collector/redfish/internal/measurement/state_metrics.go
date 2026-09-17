@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"slices"
@@ -16,7 +16,7 @@ type flagValue struct {
 	Present bool
 }
 
-func flagValues(node *graphNode) []flagValue {
+func flagValues(node *Resource) []flagValue {
 	var result []flagValue
 	for _, set := range sourceFlagSets {
 		if string(set.Kind) != node.Kind {
@@ -31,7 +31,7 @@ func flagValues(node *graphNode) []flagValue {
 		}
 		values := make([]flagValue, 0, len(set.Members))
 		for _, member := range set.Members {
-			raw, present := jsonPath(document, member.Path)
+			raw, present := Properties(document).Lookup(member.Path)
 			value, valid := raw.(bool)
 			if present && valid && member.Invert {
 				value = !value
@@ -48,14 +48,14 @@ func flagValues(node *graphNode) []flagValue {
 	return result
 }
 
-func (c *protocolClient) flagObservations(node *graphNode, values []flagValue) []hardwareObservation {
+func (c *Projector) flagObservations(node *Resource, values []flagValue) []Observation {
 	labels := c.metricLabels(node, nil)
-	result := make([]hardwareObservation, 0, len(values))
+	result := make([]Observation, 0, len(values))
 	for _, value := range values {
 		if !value.Present {
 			continue
 		}
-		result = append(result, hardwareObservation{
+		result = append(result, Observation{
 			Metric: value.Set.Metric + "_" + value.Member.Role,
 			Value:  boolFloat(value.Value),
 			Labels: labels,
@@ -64,13 +64,13 @@ func (c *protocolClient) flagObservations(node *graphNode, values []flagValue) [
 	return result
 }
 
-func (c *protocolClient) statusObservations(node *graphNode) []hardwareObservation {
+func (c *Projector) statusObservations(node *Resource) []Observation {
 	labels := c.metricLabels(node, nil)
 	prefix := strings.ReplaceAll(node.Kind, "-", "_")
-	var result []hardwareObservation
+	var result []Observation
 	status := statusForKind(node.Kind)
 	if node.AcquisitionState != "" {
-		result = append(result, hardwareObservation{
+		result = append(result, Observation{
 			Metric: prefix + "_acquisition_state",
 			State:  normalizedEnum(node.AcquisitionState, acquisitionStates),
 			Labels: labels,
@@ -95,7 +95,7 @@ func (c *protocolClient) statusObservations(node *graphNode) []hardwareObservati
 		}
 	}
 	if status.FailurePredicted {
-		if raw, exists := jsonPath(node.Data, "FailurePredicted"); exists && raw != nil {
+		if raw, exists := Properties(node.Data).Lookup("FailurePredicted"); exists && raw != nil {
 			state := "unknown"
 			if value, ok := raw.(bool); ok {
 				if value {
@@ -112,7 +112,7 @@ func (c *protocolClient) statusObservations(node *graphNode) []hardwareObservati
 			for role, value := range map[string]int{
 				"ok": counts.OK, "warning": counts.Warning, "critical": counts.Critical, "unknown": counts.Unknown,
 			} {
-				result = append(result, hardwareObservation{
+				result = append(result, Observation{
 					Metric: prefix + "_conditions_" + role,
 					Value:  float64(value),
 					Labels: labels,
@@ -129,8 +129,8 @@ func statusForKind(kind string) statusDescriptor { return sourceStatusByKind[kin
 func stateObservation(
 	metric, state string,
 	labels []metrix.Label,
-) hardwareObservation {
-	return hardwareObservation{
+) Observation {
+	return Observation{
 		Metric: metric,
 		State:  state,
 		Labels: labels,
@@ -162,11 +162,11 @@ func normalizedEnum(value string, allowed []string) string {
 	return "unknown"
 }
 
-func (c *protocolClient) additionalStateObservations(
-	node *graphNode,
+func (c *Projector) additionalStateObservations(
+	node *Resource,
 	labels []metrix.Label,
-) []hardwareObservation {
-	var result []hardwareObservation
+) []Observation {
+	var result []Observation
 	for _, source := range additionalStateSources {
 		if source.Kind != node.Kind {
 			continue
@@ -175,9 +175,9 @@ func (c *protocolClient) additionalStateObservations(
 		if source.Document != "" {
 			document = findEnrichment(node, source.Document)
 		}
-		raw, ok := jsonPath(document, source.Path)
+		raw, ok := Properties(document).Lookup(source.Path)
 		if (!ok || raw == nil) && source.FallbackPath != "" {
-			raw, ok = jsonPath(document, source.FallbackPath)
+			raw, ok = Properties(document).Lookup(source.FallbackPath)
 		}
 		if !ok || raw == nil {
 			continue
@@ -239,7 +239,7 @@ func categoricalStringState(
 	path string,
 	normalize func(string) string,
 ) (state string, present, readable bool) {
-	raw, present := jsonPath(document, path)
+	raw, present := Properties(document).Lookup(path)
 	if !present || raw == nil {
 		return "", false, false
 	}
@@ -250,11 +250,11 @@ func categoricalStringState(
 	return normalize(value), true, true
 }
 
-func conditionCountsForNode(node *graphNode) (conditionCounts, bool, bool) {
+func conditionCountsForNode(node *Resource) (conditionCounts, bool, bool) {
 	if node == nil {
 		return conditionCounts{}, false, false
 	}
-	raw, present := jsonPath(node.Data, "Status.Conditions")
+	raw, present := Properties(node.Data).Lookup("Status.Conditions")
 	if !present || raw == nil {
 		return conditionCounts{}, false, false
 	}

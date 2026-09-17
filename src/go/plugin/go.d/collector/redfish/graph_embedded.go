@@ -7,6 +7,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 func (c *protocolClient) acquireEmbeddedValues(
@@ -78,9 +81,9 @@ func (c *protocolClient) embeddedNode(
 	data map[string]any,
 	index int,
 ) (*graphNode, error) {
-	id, _ := stringValue(data["MemberId"])
+	id, _ := measurement.Properties(data).Text("MemberId")
 	if id == "" {
-		id, _ = stringValue(data["Id"])
+		id, _ = measurement.Properties(data).Text("Id")
 	}
 	if index < 0 {
 		id = ""
@@ -88,7 +91,7 @@ func (c *protocolClient) embeddedNode(
 	locator := ""
 	quality := "embedded"
 	var provenanceErr error
-	if rawURI, ok := stringValue(data["DataSourceUri"]); ok {
+	if rawURI, ok := measurement.Properties(data).Text("DataSourceUri"); ok {
 		base := c.root
 		if containerURI := containingResourceURI(parent); containerURI != "" {
 			if target, err := c.resolveURI(c.root, containerURI, false); err == nil {
@@ -114,10 +117,10 @@ func (c *protocolClient) embeddedNode(
 	}
 	doc, _ := decodeGenericResource(data) // Embedded objects retain valid fields from partial documents.
 	if doc.Name == "" {
-		doc.Name, _ = stringValue(data["GroupName"])
+		doc.Name, _ = measurement.Properties(data).Text("GroupName")
 	}
 	if doc.Name == "" {
-		doc.Name, _ = stringValue(data["DeviceName"])
+		doc.Name, _ = measurement.Properties(data).Text("DeviceName")
 	}
 	node := &graphNode{
 		Kind:             rel.ChildKind,
@@ -132,7 +135,7 @@ func (c *protocolClient) embeddedNode(
 		Response:         parent.Response,
 		Parents:          map[string]*graphNode{parent.Key: parent},
 	}
-	node.Key = resourceKey(c.origin, node.Kind, locator)
+	node.Key = identity.ResourceKey(c.origin, node.Kind, locator)
 	if quality == "data_source_uri" {
 		// Reading adapters also consume provenance. Resolve it once against the
 		// containing document before the node is attached to its ownership parent.
@@ -183,12 +186,12 @@ func containingResourceURI(node *graphNode) string {
 
 func embeddedLocator(container, path, id string, index int) string {
 	if id != "" {
-		return "embedded:" + structuralTuple(container, path, "id", id)
+		return "embedded:" + identity.Tuple(container, path, "id", id)
 	}
 	if index >= 0 {
-		return "embedded:" + structuralTuple(container, path, "position", strconv.Itoa(index))
+		return "embedded:" + identity.Tuple(container, path, "position", strconv.Itoa(index))
 	}
-	return "embedded:" + structuralTuple(container, path, "singleton")
+	return "embedded:" + identity.Tuple(container, path, "singleton")
 }
 
 func (c *protocolClient) legacyComponents(
@@ -216,7 +219,7 @@ func (c *protocolClient) legacyComponents(
 	complete := true
 	var failures boundedErrorAccumulator
 	for _, childRel := range relationships {
-		value, ok := jsonPath(data, childRel.Path)
+		value, ok := measurement.Properties(data).Lookup(childRel.Path)
 		if !ok {
 			continue
 		}
@@ -284,7 +287,7 @@ func (c *protocolClient) addEmbeddedEnrichmentComponents(
 	graph *resourceGraph,
 	parent *graphNode,
 	rel graphRelationship,
-	enrichments map[string]enrichmentResource,
+	enrichments map[string]measurement.Enrichment,
 	complete bool,
 	queue *[]*graphNode,
 ) error {
@@ -401,7 +404,7 @@ func (c *protocolClient) sensorExcerptArrayNodes(
 	spec sensorExcerptArraySpec,
 	data map[string]any,
 ) ([]*graphNode, bool, error) {
-	raw, exists := jsonPath(data, spec.Path)
+	raw, exists := measurement.Properties(data).Lookup(spec.Path)
 	if !exists {
 		return nil, true, nil
 	}
@@ -423,7 +426,7 @@ func (c *protocolClient) sensorExcerptArrayNodes(
 		sourcePath,
 		func(node *graphNode, index int) {
 			node.SourceModel = "embedded_sensor_excerpt"
-			node.SensorExcerpts = []sensorExcerptSource{
+			node.SensorExcerpts = []measurement.SensorExcerpt{
 				{Path: sourcePath, Type: spec.Type, Units: spec.Units, Data: cloneJSONMap(node.Data)},
 			}
 			if node.Doc.Name == "" {
@@ -442,7 +445,7 @@ func (c *protocolClient) embeddedArrayNodes(
 	path, kind string,
 	data map[string]any,
 ) ([]*graphNode, bool) {
-	raw, ok := jsonPath(data, path)
+	raw, ok := measurement.Properties(data).Lookup(path)
 	if !ok {
 		return nil, true
 	}
@@ -481,6 +484,6 @@ func (c *protocolClient) makeDuplicateEmbeddedIDsPositional(
 		}
 		node.IdentityQuality = "positional"
 		node.Locator = embeddedLocator(embeddedIdentityContainer(parent), rel.Path, "", position)
-		node.Key = resourceKey(c.origin, node.Kind, node.Locator)
+		node.Key = identity.ResourceKey(c.origin, node.Kind, node.Locator)
 	}
 }

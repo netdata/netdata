@@ -7,6 +7,8 @@ import (
 	"errors"
 	"maps"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 )
 
 func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, err error) {
@@ -41,7 +43,7 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 			err = errors.Join(err, ctx.Err())
 			break
 		}
-		if identityIntegrityError(err) {
+		if identity.IsIntegrityError(err) {
 			break
 		}
 	}
@@ -50,15 +52,18 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 		c.copyWireStats(&result.Metrics, stats)
 		return result, err
 	}
-	if identityIntegrityError(err) {
+	if identity.IsIntegrityError(err) {
 		result.Complete = false
 		result.Diagnostics = append(result.Diagnostics, graph.finalDiagnostics()...)
 		result.Diagnostics = append(result.Diagnostics, boundedDiagnostic(err.Error()))
 		c.finishCollectionResult(&result, graph, stats, started)
 		return result, err
 	}
-	var hardwareErr error
-	result.Hardware, hardwareErr = c.hardwareSurface(graph, result.ObservedAt)
+	projected, hardwareErr := c.measurement.Project(graph.measurementResources(), graph.Complete, result.ObservedAt)
+	result.Hardware = projected.Observations
+	for _, diagnostic := range projected.Diagnostics {
+		graph.addDiagnostic(diagnostic)
+	}
 	err = errors.Join(err, hardwareErr)
 	result.Complete = result.Complete && hardwareErr == nil
 	result.Diagnostics = append(result.Diagnostics, graph.finalDiagnostics()...)
@@ -67,7 +72,7 @@ func (c *protocolClient) Collect(ctx context.Context) (result collectionResult, 
 			"Redfish metric surface: "+hardwareErr.Error(),
 		))
 	}
-	if identityIntegrityError(hardwareErr) {
+	if identity.IsIntegrityError(hardwareErr) {
 		result.Hardware = nil
 		result.Complete = false
 		c.finishCollectionResult(&result, graph, stats, started)

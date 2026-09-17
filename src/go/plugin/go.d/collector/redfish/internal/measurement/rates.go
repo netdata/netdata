@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"math/big"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 )
 
 type rateBaseline struct {
@@ -17,7 +18,7 @@ type rateBaseline struct {
 	Multiplier float64
 }
 
-func (c *protocolClient) pruneRateBaselines(nodes []*graphNode) {
+func (c *Projector) pruneRateBaselines(nodes []*Resource) {
 	active := make(map[string]struct{}, len(nodes))
 	for _, node := range nodes {
 		active[node.Key] = struct{}{}
@@ -35,7 +36,7 @@ func (c *protocolClient) pruneRateBaselines(nodes []*graphNode) {
 	c.rateMu.Unlock()
 }
 
-func (c *protocolClient) rateValue(
+func (c *Projector) rateValue(
 	key, exact string,
 	multiplier float64,
 	at time.Time,
@@ -87,26 +88,14 @@ func rateEpoch(document map[string]any) string {
 		"StartTime",
 	} {
 		if value, ok := stringValueAt(document, path); ok {
-			return stableTupleDigest("netdata:redfish:rate-epoch:v1", path, value)
+			return identity.TupleDigest("netdata:redfish:rate-epoch:v1", path, value)
 		}
 	}
 	return ""
 }
 
-// Keep rate locks with per-client state, independent of framework scheduling.
-type hardwareState struct {
-	rateMu        sync.Mutex
-	rateBaselines map[string]rateBaseline
-}
-
-func (s *hardwareState) initialize() {
-	if s.rateBaselines == nil {
-		s.rateBaselines = make(map[string]rateBaseline)
-	}
-}
-
-func (c *protocolClient) derivedPowerReading(
-	node *graphNode,
+func (c *Projector) derivedPowerReading(
+	node *Resource,
 	source normalizedReading,
 	observedAt time.Time,
 ) (normalizedReading, bool) {
@@ -127,7 +116,7 @@ func (c *protocolClient) derivedPowerReading(
 	}
 	derived := source
 	derived.IdentitySource = source.SourcePath + "\x00energy_rate"
-	derived.Key = stableKey("netdata:redfish:reading:v1", node.Key+"\x00"+derived.IdentitySource, 32)
+	derived.Key = identity.Key("netdata:redfish:reading:v1", node.Key+"\x00"+derived.IdentitySource, 32)
 	derived.Family = "power"
 	derived.Units = "watts"
 	derived.Role = "energy_rate"
@@ -161,5 +150,5 @@ func readingRateEpoch(source normalizedReading) string {
 	if source.LifetimeStartDateTime != nil {
 		parts = append(parts, "lifetime_start_datetime", strconv.FormatInt(*source.LifetimeStartDateTime, 10))
 	}
-	return stableTupleDigest("netdata:redfish:reading-rate-epoch:v1", parts...)
+	return identity.TupleDigest("netdata:redfish:reading-rate-epoch:v1", parts...)
 }

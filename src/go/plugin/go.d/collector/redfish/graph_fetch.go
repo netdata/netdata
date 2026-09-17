@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 type graphCollectionRequest struct {
@@ -82,8 +85,8 @@ func cloneGraphNode(source *graphNode) *graphNode {
 		return nil
 	}
 	node := *source
-	node.Doc.Status.Conditions = append([]genericCondition(nil), source.Doc.Status.Conditions...)
-	node.Enrichment = make(map[string]enrichmentResource, len(source.Enrichment))
+	node.Doc.Status.Conditions = append([]measurement.Condition(nil), source.Doc.Status.Conditions...)
+	node.Enrichment = make(map[string]measurement.Enrichment, len(source.Enrichment))
 	for key, value := range source.Enrichment {
 		value.Data = cloneJSONMap(value.Data)
 		node.Enrichment[key] = value
@@ -101,7 +104,7 @@ func (c *protocolClient) acquireLinkedValues(
 ) ([]*graphNode, bool, error) {
 	switch typed := value.(type) {
 	case map[string]any:
-		if rawURI, ok := stringValue(typed["@odata.id"]); ok {
+		if rawURI, ok := measurement.Properties(typed).Text("@odata.id"); ok {
 			return c.acquireLinkedURI(ctx, rel, rawURI, stats)
 		}
 		return nil, false, errors.New("link object has no usable @odata.id")
@@ -116,7 +119,7 @@ func (c *protocolClient) acquireLinkedValues(
 				failures.Add(fmt.Errorf("array member %d is not an object", index))
 				continue
 			}
-			if rawURI, ok := stringValue(obj["@odata.id"]); ok {
+			if rawURI, ok := measurement.Properties(obj).Text("@odata.id"); ok {
 				children, ok, err := c.acquireLinkedURI(ctx, rel, rawURI, stats)
 				result = append(result, children...)
 				complete = complete && ok
@@ -274,7 +277,7 @@ func (c *protocolClient) unavailableGraphNode(kind, uri, state string) *graphNod
 		SourceModel:      "resource",
 		Parents:          make(map[string]*graphNode),
 	}
-	node.Key = resourceKey(c.origin, kind, uri)
+	node.Key = identity.ResourceKey(c.origin, kind, uri)
 	return node
 }
 
@@ -341,7 +344,7 @@ func (c *protocolClient) graphNodeFromData(
 		Response:         metadataForResponse(response),
 		Parents:          make(map[string]*graphNode),
 	}
-	node.Key = resourceKey(c.origin, kind, uri)
+	node.Key = identity.ResourceKey(c.origin, kind, uri)
 	response.finish(nil)
 	return node, nil
 }

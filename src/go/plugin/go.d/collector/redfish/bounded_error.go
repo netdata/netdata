@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 )
 
 const (
@@ -100,7 +102,7 @@ func (a *boundedErrorAccumulator) Err() error {
 
 func boundedErrorClass(err error) string {
 	switch {
-	case errors.Is(err, errIdentityIntegrity):
+	case errors.Is(err, identity.ErrIntegrity):
 		return "identity"
 	case errors.Is(err, context.Canceled):
 		return "canceled"

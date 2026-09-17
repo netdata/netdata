@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -410,7 +411,7 @@ func TestEarlyGraphIntegrityFailureStillFinalizesRetainedState(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	defer server.Close()
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
-	serviceKey := resourceKey(client.origin, "service", "/redfish/v1/")
+	serviceKey := identity.ResourceKey(client.origin, "service", "/redfish/v1/")
 	rel := graphRelationship{
 		ParentKind: "service",
 		Path:       "Retained",
@@ -434,8 +435,8 @@ func TestEarlyGraphIntegrityFailureStillFinalizesRetainedState(t *testing.T) {
 	}
 
 	baseURI := "/redfish/v1/Systems/1"
-	baseKey := resourceKey(client.origin, "system", baseURI)
-	require.NoError(t, client.identities.register([]identityBinding{{
+	baseKey := identity.ResourceKey(client.origin, "system", baseURI)
+	require.NoError(t, client.identities.Register([]identity.Binding{{
 		Domain: "resource", Key: baseKey, Preimage: "different\x00resource",
 	}}))
 	root := &serviceRootDocument{
@@ -447,7 +448,7 @@ func TestEarlyGraphIntegrityFailureStillFinalizesRetainedState(t *testing.T) {
 	graph, err := client.collectResourceGraph(context.Background(), root, []baseResource{{
 		Kind: "system", URI: baseURI, AcquisitionState: "readable",
 	}}, nil)
-	require.ErrorIs(t, err, errIdentityIntegrity)
+	require.ErrorIs(t, err, identity.ErrIntegrity)
 	require.False(t, graph.Complete)
 	restored := graph.findKey(retained.Key)
 	require.NotNil(t, restored)

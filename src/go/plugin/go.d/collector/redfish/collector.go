@@ -14,6 +14,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 )
 
 //go:embed "config_schema.json"
@@ -45,7 +47,7 @@ type endpointClient interface {
 type collectionResult struct {
 	ObservedAt  time.Time
 	Metrics     cycleMetrics
-	Hardware    []hardwareObservation
+	Hardware    []measurement.Observation
 	Diagnostics []string
 	Complete    bool
 }
@@ -96,8 +98,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.Name == "" {
 		return errors.New("config validation: job name is required")
 	}
-	if len(c.Name) > promotedLabelLimit {
-		return fmt.Errorf("config validation: job name must not exceed %d bytes", promotedLabelLimit)
+	if len(c.Name) > measurement.MaxLabelValueBytes {
+		return fmt.Errorf("config validation: job name must not exceed %d bytes", measurement.MaxLabelValueBytes)
 	}
 	if err := c.Config.validate(); err != nil {
 		return fmt.Errorf("config validation: %w", err)
@@ -109,7 +111,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	} else if c.TLSSkipVerify {
 		c.Warningf("Redfish endpoint %s has TLS certificate verification disabled", origin)
 	}
-	c.endpointKey = stableKey("netdata:redfish:endpoint:v1", origin, endpointKeyHexChars)
+	c.endpointKey = identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars)
 	var err error
 	c.httpClient, err = newHTTPClient(ctx, c.Config)
 	if err != nil {

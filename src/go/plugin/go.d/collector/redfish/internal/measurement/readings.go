@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
+	"cmp"
 	"strings"
 	"time"
 )
@@ -62,7 +63,7 @@ type rawReading struct {
 	LifetimeStartDateTime rawReadingTimestamp
 }
 
-func (c *protocolClient) readingsForNode(node *graphNode, observedAt time.Time) []normalizedReading {
+func (c *Projector) readingsForNode(node *Resource, observedAt time.Time) []normalizedReading {
 	raw := c.rawReadingsForNode(node)
 	result := make([]normalizedReading, 0, len(raw)+1)
 	for _, source := range raw {
@@ -78,7 +79,7 @@ func (c *protocolClient) readingsForNode(node *graphNode, observedAt time.Time) 
 	return result
 }
 
-func (c *protocolClient) rawReadingsForNode(node *graphNode) []rawReading {
+func (c *Projector) rawReadingsForNode(node *Resource) []rawReading {
 	var result []rawReading
 	if node.Kind == "sensor" &&
 		node.SourceModel != "deprecated_thermal" &&
@@ -104,8 +105,8 @@ func (c *protocolClient) rawReadingsForNode(node *graphNode) []rawReading {
 		if source.DataSourceURI != nil {
 			rawURI = *source.DataSourceURI
 		}
-		baseURI := firstNonEmpty(source.SourceDocumentURI, node.URI)
-		if canonical, ok := c.canonicalReadingDataSourceURI(baseURI, rawURI); ok {
+		baseURI := cmp.Or(strings.TrimSpace(source.SourceDocumentURI), strings.TrimSpace(node.URI))
+		if canonical, ok := c.canonicalProvenance(baseURI, rawURI); ok {
 			source.IdentitySource = canonical + "\x00" + source.Role
 			source.DataSourceURI = &canonical
 		}
@@ -123,7 +124,10 @@ func mergeProvenSensorReadings(current, excerpts []rawReading) []rawReading {
 			if excerptOK && candidateOK &&
 				excerptType.Family == candidateType.Family &&
 				excerpt.Role == candidate.Role &&
-				strings.EqualFold(firstNonEmpty(excerpt.Basis, "Zero"), firstNonEmpty(candidate.Basis, "Zero")) {
+				strings.EqualFold(
+					cmp.Or(strings.TrimSpace(excerpt.Basis), "Zero"),
+					cmp.Or(strings.TrimSpace(candidate.Basis), "Zero"),
+				) {
 				match = index
 				break
 			}
@@ -163,23 +167,6 @@ func mergeProvenSensorReadings(current, excerpts []rawReading) []rawReading {
 	return current
 }
 
-func (c *protocolClient) canonicalReadingDataSourceURI(baseURI, raw string) (string, bool) {
-	if raw == "" || c == nil || c.root == nil {
-		return "", false
-	}
-	base := c.root
-	if baseURI != "" {
-		if target, err := c.resolveURI(c.root, baseURI, false); err == nil {
-			base = target
-		}
-	}
-	target, err := resolveRedfishURI(c.origin, base, raw, uriProvenance)
-	if err != nil {
-		return "", false
-	}
-	return canonicalProvenanceURI(target), true
-}
-
 func deduplicateRawReadings(values []rawReading) []rawReading {
 	seen := make(map[string]struct{}, len(values))
 	result := make([]rawReading, 0, len(values))
@@ -192,4 +179,11 @@ func deduplicateRawReadings(values []rawReading) []rawReading {
 		result = append(result, value)
 	}
 	return result
+}
+
+func (c *Projector) canonicalProvenance(baseURI, raw string) (string, bool) {
+	if c.resolveProvenance == nil {
+		return "", false
+	}
+	return c.resolveProvenance(baseURI, raw)
 }

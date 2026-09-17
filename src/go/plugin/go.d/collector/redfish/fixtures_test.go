@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
-	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,22 +96,17 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, "Synthetic Fan Group", redundancy[0].Doc.Name)
 	require.Equal(t, "OK", redundancy[0].Doc.Status.Health)
 	require.Equal(t, embeddedLocator(thermal.Locator, "FanRedundancy", "", 0), redundancy[0].Locator)
-	scalars := make(map[string]scalarValue)
-	for _, scalar := range client.scalarValues(redundancy[0], time.Now()) {
-		scalars[scalar.Descriptor.ID] = scalar
-	}
-	require.True(t, scalars["redundancy_members_active"].Emit)
-	require.Equal(t, float64(1), scalars["redundancy_members_active"].Value)
-	require.True(t, scalars["redundancy_members_total"].Emit)
-	require.Equal(t, float64(2), scalars["redundancy_members_total"].Value)
+	observations := measurementTestProject(t, client, redundancy[0])
+	measurementTestRequireValue(t, observations, "redfish_redundancy_members_active", 1)
+	measurementTestRequireValue(t, observations, "redfish_redundancy_members_total", 2)
 
 	withoutCount := *redundancy[0]
 	withoutCount.Data = cloneJSONMap(redundancy[0].Data)
 	delete(withoutCount.Data, "ActiveRedundancyGroup@odata.count")
-	_, present := registeredValueAt(withoutCount.Data, "ActiveRedundancyGroup.@odata.count")
+	_, present := withoutCount.Data["ActiveRedundancyGroup@odata.count"]
 	require.False(t, present)
-	for _, scalar := range client.scalarValues(&withoutCount, time.Now()) {
-		require.NotEqual(t, "redundancy_members_active", scalar.Descriptor.ID)
+	for _, observation := range measurementTestProject(t, client, &withoutCount) {
+		require.NotEqual(t, "redfish_redundancy_members_active", observation.Metric)
 	}
 
 	leakDetection := fixtureGraphParent(t, "leak_detection", fixture["leak_detection"])
@@ -213,11 +208,7 @@ func TestCompatibilityFixturesLegacyThermal(t *testing.T) {
 				case "sensor":
 					temperatures++
 				}
-				for _, reading := range client.readingsForNode(component, time.Now()) {
-					if reading.Valid {
-						valid++
-					}
-				}
+				valid += len(measurementTestReadings(measurementTestProject(t, client, component)))
 			}
 			require.Equal(t, test.wantFans, fans)
 			require.Equal(t, test.wantTemperatures, temperatures)
@@ -238,90 +229,11 @@ func TestCompatibilityFixtureLegacySourceHealthIsAuthoritative(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, complete)
 	temperature := fixtureComponentByName(t, components, "Synthetic Hot Intake")
-	readings := client.readingsForNode(temperature, time.Now())
+	observations := measurementTestProject(t, client, temperature)
+	readings := measurementTestReadings(observations)
 	require.Len(t, readings, 1)
-	require.True(t, readings[0].Valid)
 	require.Equal(t, float64(70), readings[0].Value)
-	require.Equal(t, "clear", readings[0].SourceAlarm)
-}
-
-func TestCompatibilityFixturesModernReadings(t *testing.T) {
-	client := fixtureClient()
-	tests := map[string]struct {
-		node         *graphNode
-		wantFamilies map[string]int
-	}{
-		"thermal metrics": {
-			node: &graphNode{
-				Kind: "thermal_subsystem",
-				Key:  "thermal-subsystem",
-				Enrichment: map[string]enrichmentResource{
-					"thermal_metrics:0": {Data: loadFixture(
-						t,
-						"telegraf-hpe-modern-thermal-metrics.min.json",
-					)},
-				},
-			},
-			wantFamilies: map[string]int{"temperature": 1},
-		},
-		"fan": {
-			node: &graphNode{
-				Kind: "fan",
-				Key:  "fan",
-				Data: loadFixture(t, "telegraf-hpe-modern-fan.min.json"),
-			},
-			wantFamilies: map[string]int{"percentage": 1},
-		},
-		"power supply metrics": {
-			node: &graphNode{
-				Kind: "power_supply",
-				Key:  "power-supply",
-				Enrichment: map[string]enrichmentResource{
-					"power_supply_metrics:0": {Data: loadFixture(
-						t,
-						"telegraf-hpe-modern-power-supply-metrics.min.json",
-					)},
-				},
-			},
-			wantFamilies: map[string]int{
-				"current": 1, "energy": 1, "frequency": 1, "percentage": 1,
-				"power": 2, "rotational_speed": 1, "temperature": 1, "voltage": 1,
-			},
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			got := make(map[string]int)
-			identities := make(map[string]struct{})
-			for _, reading := range client.readingsForNode(test.node, time.Now()) {
-				if !reading.Valid {
-					continue
-				}
-				got[reading.Family]++
-				if _, ok := identities[reading.Key]; ok {
-					t.Fatalf("duplicate reading identity %q", reading.Key)
-				}
-				identities[reading.Key] = struct{}{}
-			}
-			require.Equal(t, test.wantFamilies, got)
-		})
-	}
-}
-
-func TestCompatibilityFixtureModernStandaloneSensor(t *testing.T) {
-	client := fixtureClient()
-	node := &graphNode{
-		Kind: "sensor",
-		Key:  "standalone-sensor",
-		Data: loadFixture(t, "checkmk-nvidia-modern-sensor.min.json"),
-	}
-	readings := client.readingsForNode(node, time.Now())
-	require.Len(t, readings, 1)
-	reading := readings[0]
-	require.True(t, reading.Valid)
-	require.Equal(t, "temperature", reading.Family)
-	require.Equal(t, "clear", reading.SourceAlarm)
-
+	measurementTestRequireAlarm(t, observations, "clear")
 }
 
 func TestCompatibilityFixtureLegacyPowerAndModernDrive(t *testing.T) {
@@ -340,27 +252,21 @@ func TestCompatibilityFixtureLegacyPowerAndModernDrive(t *testing.T) {
 	families := make(map[string]int)
 	for _, component := range components {
 		kinds[component.Kind]++
-		for _, reading := range client.readingsForNode(component, time.Now()) {
-			if reading.Valid {
-				families[reading.Family]++
-			}
+		for _, reading := range measurementTestReadings(measurementTestProject(t, client, component)) {
+			families[measurementTestLabel(reading, "reading_type")]++
 		}
 	}
 	require.Equal(t, map[string]int{"power_supply": 1, "sensor": 2}, kinds)
 	require.Equal(t, map[string]int{"power": 1, "voltage": 1}, families)
 
 	drive := &graphNode{
-		Kind: "drive",
-		Key:  "drive",
-		Data: loadFixture(t, "telegraf-hpe-modern-drive.min.json"),
+		Resource: measurement.Resource{
+			Kind: "drive",
+			Key:  "drive",
+			Data: loadFixture(t, "telegraf-hpe-modern-drive.min.json"),
+		},
 	}
-	fields := make(map[string]scalarValue)
-	for _, value := range client.scalarValues(drive, time.Now()) {
-		fields[value.Descriptor.ID] = value
-	}
-
-	require.True(t, fields["drive_predictedmedialifeleftpercent"].Emit)
-	require.Equal(t, float64(98), fields["drive_predictedmedialifeleftpercent"].Value)
+	measurementTestRequireValue(t, measurementTestProject(t, client, drive), "drive_media_life", 98)
 }
 
 func fixtureClient() *protocolClient {
@@ -369,10 +275,14 @@ func fixtureClient() *protocolClient {
 		panic(err)
 	}
 	client := &protocolClient{
-		origin:        "https://fixture.example",
-		root:          root,
-		rateBaselines: make(map[string]rateBaseline),
+		origin: "https://fixture.example",
+		root:   root,
 	}
+	client.measurement = measurement.New(
+		client.origin,
+		client.config.Name,
+		readingProvenanceResolver(client.root, client.origin),
+	)
 	return client
 }
 
@@ -380,18 +290,20 @@ func fixtureGraphParent(t *testing.T, kind string, value any) *graphNode {
 	t.Helper()
 	data, ok := value.(map[string]any)
 	require.True(t, ok)
-	uri, _ := stringValue(data["@odata.id"])
+	uri, _ := measurement.Properties(data).Text("@odata.id")
 	if uri == "" {
 		uri = "/redfish/v1/Synthetic/" + kind
 	}
 	return &graphNode{
-		Kind:             kind,
-		Key:              "fixture-" + kind,
-		URI:              uri,
-		Locator:          uri,
-		Data:             data,
-		AcquisitionState: "readable",
-		IdentityQuality:  "addressable",
+		Resource: measurement.Resource{
+			Kind:             kind,
+			Key:              "fixture-" + kind,
+			URI:              uri,
+			Data:             data,
+			AcquisitionState: "readable",
+		},
+		Locator:         uri,
+		IdentityQuality: "addressable",
 	}
 }
 
@@ -409,9 +321,11 @@ func fixtureRelationship(t *testing.T, parent, path string) graphRelationship {
 
 func fixtureParent() *graphNode {
 	return &graphNode{
-		Kind: "chassis",
-		Key:  "fixture-chassis",
-		URI:  "/redfish/v1/Chassis/Fixture-1",
+		Resource: measurement.Resource{
+			Kind: "chassis",
+			Key:  "fixture-chassis",
+			URI:  "/redfish/v1/Chassis/Fixture-1",
+		},
 	}
 }
 

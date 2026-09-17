@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/identity"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,11 +54,11 @@ func TestCollectionDoesNotRequestExpansion(t *testing.T) {
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	// A real digest collision is impractical to construct; seed the conflicting
 	// binding to exercise the production fatal return after real HTTP collection.
-	require.NoError(t, client.identities.register([]identityBinding{{
-		Domain: "resource", Key: resourceKey(client.origin, "system", system), Preimage: "other-resource",
+	require.NoError(t, client.identities.Register([]identity.Binding{{
+		Domain: "resource", Key: identity.ResourceKey(client.origin, "system", system), Preimage: "other-resource",
 	}}))
 	result, err := client.Collect(t.Context())
-	require.ErrorIs(t, err, errIdentityIntegrity)
+	require.ErrorIs(t, err, identity.ErrIntegrity)
 	require.Equal(t, "partial", result.Metrics.Status)
 	require.Zero(t, expanded.Load())
 }
@@ -94,7 +95,7 @@ func TestFatalGraphCollectionKeepsEarlierDiagnostics(t *testing.T) {
 	t.Cleanup(server.Close)
 	ordinary := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	before, err := ordinary.Collect(t.Context())
-	require.False(t, identityIntegrityError(err))
+	require.False(t, identity.IsIntegrityError(err))
 	var expected string
 	for _, diagnostic := range before.Diagnostics {
 		if strings.Contains(diagnostic, "Sensors") {
@@ -105,11 +106,11 @@ func TestFatalGraphCollectionKeepsEarlierDiagnostics(t *testing.T) {
 	require.NotEmpty(t, expected, "control run must record Sensors failure")
 	client := newTestProtocolClient(t, testConfig(server.URL, "none"))
 	// A real hash collision is impractical; inject its registry state to test this error branch.
-	require.NoError(t, client.identities.register([]identityBinding{{
-		Domain: "resource", Key: resourceKey(client.origin, "control", control), Preimage: "other-control",
+	require.NoError(t, client.identities.Register([]identity.Binding{{
+		Domain: "resource", Key: identity.ResourceKey(client.origin, "control", control), Preimage: "other-control",
 	}}))
 	result, err := client.Collect(t.Context())
-	require.ErrorIs(t, err, errIdentityIntegrity)
+	require.ErrorIs(t, err, identity.ErrIntegrity)
 	require.Empty(t, result.Hardware, "hardware must remain suppressed after identity failure")
 	require.Contains(t, result.Diagnostics, expected, "earlier graph diagnostic must survive fatal return")
 }

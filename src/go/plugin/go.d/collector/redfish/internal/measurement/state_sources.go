@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 type statusDescriptor struct{ Status, PowerState, FailurePredicted bool }
 type flagMember struct {

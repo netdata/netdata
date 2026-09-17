@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ func TestEnergyDerivativeRequiresCumulativeBasis(t *testing.T) {
 	for basis, wantPower := range map[string]bool{"Zero": true, "": true, "Delta": false, "Headroom": false} {
 		t.Run(basis, func(t *testing.T) {
 			client := fixtureClient()
-			node := &graphNode{
+			node := &Resource{
 				Kind: "sensor",
 				Key:  "energy",
 				Data: map[string]any{

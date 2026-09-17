@@ -2,7 +2,10 @@
 
 package redfish
 
-import "github.com/netdata/netdata/go/plugins/pkg/metrix"
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
+)
 
 var (
 	collectionStates = []string{"success", "partial", "unavailable"}
@@ -100,58 +103,20 @@ func newHardwareMetrics(store metrix.CollectorStore) *hardwareMetrics {
 		gauges: make(map[string]metrix.SnapshotGauge),
 		states: make(map[string]metrix.StateSetInstrument),
 	}
-	gauge := func(metric string) {
-		if _, exists := result.gauges[metric]; !exists {
-			result.gauges[metric] = meter.Gauge(metric)
-		}
-	}
-	states := func(metric string, values []string) {
-		if _, exists := result.states[metric]; !exists {
-			result.states[metric] = meter.StateSet(
-				metric,
+	for _, definition := range measurement.Definitions() {
+		if len(definition.States) == 0 {
+			result.gauges[definition.Name] = meter.Gauge(definition.Name)
+		} else {
+			result.states[definition.Name] = meter.StateSet(definition.Name,
 				metrix.WithStateSetMode(metrix.ModeEnum),
-				metrix.WithStateSetStates(values...),
+				metrix.WithStateSetStates(definition.States...),
 			)
-		}
-	}
-	for _, field := range scalarFields {
-		gauge(field.Metric)
-	}
-	for _, reading := range readingDescriptors {
-		gauge(reading.Metric)
-		if reading.AlarmMetric != "" {
-			states(reading.AlarmMetric, alarmStates)
-		}
-	}
-	for kind, status := range sourceStatusByKind {
-		states(kind+"_acquisition_state", acquisitionStates)
-		if status.Status {
-			states(kind+"_health", healthStates)
-			states(kind+"_health_rollup", healthStates)
-			states(kind+"_state", resourceStates)
-			for _, state := range healthStates {
-				gauge(kind + "_conditions_" + state)
-			}
-		}
-		if status.PowerState {
-			states(kind+"_power_state", powerStates)
-		}
-		if status.FailurePredicted {
-			states(kind+"_failure_predicted", failureStates)
-		}
-	}
-	for _, source := range additionalStateSources {
-		states(source.Metric, source.States)
-	}
-	for _, set := range sourceFlagSets {
-		for _, member := range set.Members {
-			gauge(set.Metric + "_" + member.Role)
 		}
 	}
 	return result
 }
 
-func (m *hardwareMetrics) observe(observations []hardwareObservation) {
+func (m *hardwareMetrics) observe(observations []measurement.Observation) {
 	for _, observation := range observations {
 		labels := m.meter.LabelSet(observation.Labels...)
 		if observation.State != "" {

@@ -2,6 +2,8 @@
 
 package redfish
 
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
+
 // reconcileSensorExcerptIdentities runs after traversal and retained-identity
 // restoration. A DataSourceUri pointer proves an alias only when its containing
 // resource is independently known as a Sensor; a pointer alone cannot prove it.
@@ -22,7 +24,7 @@ func (c *protocolClient) mergeProvenSensorExcerpts(graph *resourceGraph) map[str
 		}
 	}
 	aliases := make(map[string]*graphNode)
-	excerpts := make(map[*graphNode][][]sensorExcerptSource)
+	excerpts := make(map[*graphNode][][]measurement.SensorExcerpt)
 	for _, node := range graph.Nodes {
 		if node.Kind != "sensor" || node.IdentityQuality != "data_source_uri" ||
 			node.SourceModel != "embedded_sensor_excerpt" {
@@ -43,7 +45,7 @@ func (c *protocolClient) mergeProvenSensorExcerpts(graph *resourceGraph) map[str
 		candidate := *node
 		candidate.URI, candidate.Locator, candidate.Key = uri, uri, sensor.Key
 		if _, exists := excerpts[sensor]; !exists {
-			excerpts[sensor] = [][]sensorExcerptSource{sensor.SensorExcerpts}
+			excerpts[sensor] = [][]measurement.SensorExcerpt{sensor.SensorExcerpts}
 		}
 		excerpts[sensor] = append(excerpts[sensor], node.SensorExcerpts)
 		candidate.SensorExcerpts = nil

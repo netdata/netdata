@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package redfish
+package measurement
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ func TestElectricalAuxiliarySourceCoverage(t *testing.T) {
 	}
 	for name, standalone := range map[string]bool{"standalone": true, "excerpt": false} {
 		t.Run(name, func(t *testing.T) {
-			node := &graphNode{
+			node := &Resource{
 				Kind: "sensor",
 				Key:  "sensor",
 				Data: data,
@@ -39,10 +39,10 @@ func TestElectricalAuxiliarySourceCoverage(t *testing.T) {
 				want["load_percent"] = "percentage"
 			} else {
 				node.SourceModel = "embedded_sensor_excerpt"
-				node.SensorExcerpts = []sensorExcerptSource{{Path: "excerpt", Data: data}}
+				node.SensorExcerpts = []SensorExcerpt{{Path: "excerpt", Data: data}}
 			}
 			got := make(map[string]string)
-			for _, reading := range (&protocolClient{}).readingsForNode(node, time.Unix(1, 0)) {
+			for _, reading := range (New("", "", nil)).readingsForNode(node, time.Unix(1, 0)) {
 				require.True(t, reading.Valid, reading.SourcePath)
 				require.Zero(t, reading.Value, reading.SourcePath)
 				got[reading.Role] = reading.Family
@@ -62,9 +62,9 @@ func TestFixedExcerptMapPreservesValuePresenceAndContext(t *testing.T) {
 		"object null reading": {value: map[string]any{"Reading": nil, "PhysicalContext": "PowerSupply"}, want: []rawReading{{Path: "power_supply_metrics.PolyPhasePowerWatts.Line1ToNeutral.Reading", Type: "Power", Units: "W", Basis: "Zero", Role: "power", ValuePresent: true, Primary: true, PhysicalContext: "PowerSupply", ReadingScoped: true}}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			node := &graphNode{
+			node := &Resource{
 				Kind: "power_supply",
-				Enrichment: map[string]enrichmentResource{"power_supply_metrics": {Data: map[string]any{
+				Enrichment: map[string]Enrichment{"power_supply_metrics": {Data: map[string]any{
 					"PhysicalContext": "Chassis",
 					"PolyPhasePowerWatts": map[string]any{
 						"Line1ToNeutral": test.value,
@@ -80,9 +80,9 @@ func TestFixedExcerptMapPreservesValuePresenceAndContext(t *testing.T) {
 // This cycle path is O(fixed source properties + accepted readings). Allocation
 // counts track adapter overhead; ns/op is only a local-machine trend indicator.
 func BenchmarkExcerptReadings(b *testing.B) {
-	node := &graphNode{
+	node := &Resource{
 		Kind: "power_supply",
-		Enrichment: map[string]enrichmentResource{"power_supply_metrics": {Data: map[string]any{
+		Enrichment: map[string]Enrichment{"power_supply_metrics": {Data: map[string]any{
 			"InputPowerWatts": json.Number("100"), "OutputPowerWatts": json.Number("90"),
 			"PolyPhasePowerWatts": map[string]any{
 				"Line1ToNeutral": json.Number("50"),
@@ -100,9 +100,20 @@ func BenchmarkExcerptReadings(b *testing.B) {
 
 func TestElectricalAuxiliaryIdentityUsesSourceURI(t *testing.T) {
 	client := fixtureClient()
+	client.resolveProvenance = func(baseURI, raw string) (string, bool) {
+		require.Equal(t, "/redfish/v1/Sensors/Owner", baseURI)
+		switch raw {
+		case "/redfish/v1/Sensors/1", "https://fixture.example/redfish/v1/Sensors/1":
+			return "/redfish/v1/Sensors/1", true
+		case "/redfish/v1/Sensors/2":
+			return "/redfish/v1/Sensors/2", true
+		default:
+			return "", false
+		}
+	}
 	keyFor := func(path, uri string, standalone bool) string {
 		data := map[string]any{"DataSourceUri": uri, "ApparentVA": json.Number("12")}
-		node := &graphNode{
+		node := &Resource{
 			Kind: "sensor",
 			Key:  "sensor",
 			URI:  "/redfish/v1/Sensors/Owner",
@@ -110,7 +121,7 @@ func TestElectricalAuxiliaryIdentityUsesSourceURI(t *testing.T) {
 		}
 		if !standalone {
 			node.SourceModel = "embedded_sensor_excerpt"
-			node.SensorExcerpts = []sensorExcerptSource{{Path: path, Data: data}}
+			node.SensorExcerpts = []SensorExcerpt{{Path: path, Data: data}}
 		}
 		readings := client.readingsForNode(node, time.Unix(10, 0))
 		require.Len(t, readings, 1)
@@ -134,14 +145,14 @@ func TestElectricalAuxiliaryNonzeroNormalization(t *testing.T) {
 				"PowerFactor":   json.Number("0.8"),
 				"SpeedRPM":      json.Number("1800"),
 			}
-			node := &graphNode{
+			node := &Resource{
 				Kind: "sensor",
 				Key:  "sensor",
 				Data: data,
 			}
 			if !standalone {
 				node.SourceModel = "embedded_sensor_excerpt"
-				node.SensorExcerpts = []sensorExcerptSource{{Path: "excerpt", Data: data}}
+				node.SensorExcerpts = []SensorExcerpt{{Path: "excerpt", Data: data}}
 			}
 			got := make(map[string]float64)
 			for _, reading := range fixtureClient().readingsForNode(node, time.Unix(10, 0)) {
