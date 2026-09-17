@@ -23,6 +23,7 @@ import (
 const usage = `Experimental Netdata notifier (not installed or used by the Agent).
 
 Usage:
+  alarm-notify check-legacy --config FILE [--config FILE ...] [--timeout 10s]
   alarm-notify validate --config FILE [--timeout 10s]
   alarm-notify send --config FILE --destination NAME [--timeout 10s] < event.json
   alarm-notify send --config FILE --role ROLE [--role ROLE ...] [--timeout 10s] < event.json
@@ -31,9 +32,11 @@ send reads one JSON event and delivers it to the selected destinations.
 Use either one explicit destination or roles resolved through YAML routing.
 Destination critical/nowarn/noclear policies filter delivery. Missing required
 critical_seen_since_clear history rejects the invocation before any delivery.
-validate checks configuration without resolving secrets or sending requests.
+validate checks YAML configuration without resolving secrets or sending requests.
+check-legacy checks the supported shell configuration syntax without executing it;
+provider settings, variable values and custom-function behavior are not validated.
 The positive timeout covers the whole invocation, including input reads.
-Exit status: 0 on any successful delivery, no eligible destinations, validation, or help;
+Exit status: 0 on any successful delivery, no eligible destinations, successful checks, or help;
 1 on input/configuration errors, all attempted deliveries failing, or cancellation/timeout.
 `
 
@@ -50,13 +53,17 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		fmt.Fprint(stdout, usage)
 		return 0
 	}
-	if len(args) == 0 || (args[0] != "send" && args[0] != "validate") {
-		logger.Print("expected send or validate; use --help for usage")
+	if len(args) == 0 || (args[0] != "send" && args[0] != "validate" && args[0] != "check-legacy") {
+		logger.Print("expected send, validate or check-legacy; use --help for usage")
 		return 1
 	}
 	flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	flags.SetOutput(io.Discard) // Flag errors can echo credential-bearing arguments.
-	configPath := flags.String("config", "", "YAML configuration path")
+	var configPaths []string
+	flags.Func("config", "configuration path (repeat in load order for check-legacy)", func(value string) error {
+		configPaths = append(configPaths, value)
+		return nil
+	})
 	timeout := flags.Duration("timeout", 10*time.Second, "total invocation timeout")
 	var destination string
 	var roles []string
@@ -84,11 +91,13 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		logger.Print("invalid command options; use --help for usage")
 		return 1
 	}
-	if flags.NArg() != 0 || *configPath == "" || *timeout <= 0 ||
+	if flags.NArg() != 0 || len(configPaths) == 0 || configPaths[len(configPaths)-1] == "" || *timeout <= 0 ||
 		(args[0] == "send" && (destination == "") == (len(roles) == 0)) {
-		logger.Print(
-			"provide --config, a positive --timeout, and either --destination or --role for send; positional arguments are not accepted",
-		)
+		if args[0] == "send" {
+			logger.Print("provide --config, a positive --timeout, and either --destination or --role for send; positional arguments are not accepted")
+		} else {
+			logger.Print("provide --config and a positive --timeout; positional arguments are not accepted")
+		}
 		return 1
 	}
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
@@ -108,10 +117,14 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		}
 	}
 	go func() {
+		if args[0] == "check-legacy" {
+			publish(commandUpdate{err: checkLegacy(ctx, configPaths)})
+			return
+		}
 		err := execute(
 			ctx,
 			providers.Builtin(client, processes),
-			*configPath,
+			configPaths[len(configPaths)-1],
 			args[0] == "validate",
 			destination,
 			roles,
@@ -154,16 +167,25 @@ receive:
 		logger.Printf("delivery summary: %d succeeded, %d failed, %d skipped", succeeded, failed, skipped)
 	}
 	if err != nil {
+		subject := "notification"
+		switch args[0] {
+		case "check-legacy":
+			subject = "legacy configuration check"
+		case "validate":
+			subject = "configuration validation"
+		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			err = errors.New("notification timed out")
+			err = fmt.Errorf("%s timed out", subject)
 		} else if errors.Is(err, context.Canceled) {
-			err = errors.New("notification canceled")
+			err = fmt.Errorf("%s canceled", subject)
 		}
 		logger.Print(err)
 		return 1
 	}
 	if args[0] == "validate" {
 		fmt.Fprintln(stdout, "configuration is valid")
+	} else if args[0] == "check-legacy" {
+		fmt.Fprintln(stdout, "legacy configuration syntax is supported; delivery is not validated")
 	}
 	return 0
 }
@@ -181,9 +203,9 @@ func execute(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	file, err := os.Open(configPath)
+	file, err := openConfig(configPath)
 	if err != nil {
-		return errors.New("could not open configuration file")
+		return fmt.Errorf("could not open configuration file: %w", err)
 	}
 	cfg, err := config.Read(file, registry)
 	_ = file.Close()
@@ -205,4 +227,17 @@ func execute(
 		return err
 	}
 	return cfg.Deliver(ctx, destinations, notification, report)
+}
+
+func openConfig(path string) (*os.File, error) {
+	file, err := os.Open(path)
+	if err == nil {
+		return file, nil
+	}
+	// Omit the configured path while preserving the filesystem cause and errors.Is.
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		return nil, pathErr.Err
+	}
+	return nil, errors.New("unknown filesystem error")
 }
