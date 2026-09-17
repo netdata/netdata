@@ -11,7 +11,7 @@ executable="$1"
 destination="$2"
 runtime_dll_dir="${NETDATA_WINDOWS_RUNTIME_DLL_DIR:-/ucrt64/bin}"
 
-if [ ! -f "${executable}" ]; then
+if [ ! -f "${executable}" ] || [ ! -r "${executable}" ]; then
     echo "ERROR: executable not found: ${executable}" >&2
     exit 1
 fi
@@ -68,6 +68,16 @@ copy_missing_dlls_once() {
     local resolved
     local source
 
+    local dependency_output
+    if ! dependency_output="$(PATH="${destination}:${runtime_dll_dir}:${PATH}" ldd.exe "${executable}" 2>/dev/null)"; then
+        echo "ERROR: ldd.exe failed while inspecting ${executable}" >&2
+        return 3
+    fi
+    if [ -z "${dependency_output}" ]; then
+        echo "ERROR: ldd.exe returned no dependency information for ${executable}" >&2
+        return 3
+    fi
+
     while IFS= read -r line; do
         case "${line}" in
             *"=>"*)
@@ -108,7 +118,7 @@ copy_missing_dlls_once() {
                 fi
                 ;;
         esac
-    done < <(PATH="${destination}:${runtime_dll_dir}:${PATH}" ldd.exe "${executable}" 2>/dev/null || true)
+    done <<< "${dependency_output}"
 
     if [ "${#unresolved[@]}" -gt 0 ]; then
         printf 'ERROR: unresolved non-system Windows runtime DLLs for %s:\n' "${executable}" >&2
@@ -129,8 +139,8 @@ for _ in $(seq 1 20); do
     fi
 
     rc=$?
-    if [ "${rc}" -eq 2 ]; then
-        exit 2
+    if [ "${rc}" -ne 1 ]; then
+        exit "${rc}"
     fi
 done
 

@@ -681,7 +681,14 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
         (void) sqlite3_close_v2(database);
 
         if (rc == SQLITE_OK) {
+#if defined(OS_WINDOWS)
+            if (!MoveFileExA(native_dst, native_src, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+                rc = -1;
+            else
+                rc = 0;
+#else
             rc = rename(native_dst, native_src);
+#endif
             if (rc == 0) {
                 netdata_log_info("Renamed %s", new_sqlite_database);
                 netdata_log_info("     to %s", sqlite_database);

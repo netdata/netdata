@@ -20,7 +20,12 @@ function(netdata_bundle_libbacktrace)
         # bash, but make.exe is an MSYS2 binary that handles POSIX paths and shell
         # commands in Makefiles natively and can be invoked directly by cmake.
         if(OS_WINDOWS)
-                find_program(BASH_EXECUTABLE bash REQUIRED)
+                find_program(BASH_EXECUTABLE NAMES bash.exe bash
+                             HINTS "$ENV{MSYS2_ROOT}/usr/bin" "C:/msys64/usr/bin"
+                             NO_DEFAULT_PATH)
+                if(NOT BASH_EXECUTABLE)
+                        message(FATAL_ERROR "MSYS2 bash not found; install it under MSYS2/usr/bin")
+                endif()
                 set(_bt_configure_cmd ${BASH_EXECUTABLE} "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
         else()
                 set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)

@@ -76,10 +76,11 @@ cmake_make_program=()
 # UCRT64 ninja (native Windows binary) uses CreateProcess to invoke the compiler,
 # whereas MSYS2 ninja uses /bin/sh which strips backslashes from Windows-style paths,
 # causing "command not found" failures at exit code 127.
-if [ -x "/ucrt64/bin/ninja" ]; then
+native_ninja=""
+if native_ninja="$(command -v ninja.exe 2>/dev/null || true)" && [ -n "${native_ninja}" ]; then
     generator="Ninja"
     build_args="-k 1"
-    cmake_make_program=("-DCMAKE_MAKE_PROGRAM=/ucrt64/bin/ninja")
+    cmake_make_program=("-DCMAKE_MAKE_PROGRAM=${native_ninja}")
 fi
 
 COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64"
@@ -116,7 +117,8 @@ COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64"
 # "lld: error: unknown argument: --no-keep-memory", failing CMake's
 # initial compiler-test link. The flag is kept only in the BFD fallback.
 linker_cmake_flags=()
-if [ -x "/ucrt64/bin/ld.lld" ]; then
+native_lld=""
+if native_lld="$(command -v ld.lld.exe 2>/dev/null || true)" && [ -n "${native_lld}" ]; then
     linker_cmake_flags=("-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
                         "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g1 -DNDEBUG"
                         "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"

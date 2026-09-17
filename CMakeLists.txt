@@ -3702,7 +3702,8 @@ if(OS_WINDOWS)
         # POSIX path (/ucrt64/include/ddk) passes through cmake unchanged and UCRT64
         # native GCC, invoked via CreateProcess with no MSYS2 shell, cannot translate
         # it to the correct Windows path, causing "wdm.h: No such file or directory".
-        get_filename_component(_ddk_include "${CMAKE_C_COMPILER}/../../include/ddk" REALPATH)
+        get_filename_component(_compiler_dir "${CMAKE_C_COMPILER}" DIRECTORY)
+        get_filename_component(_ddk_include "${_compiler_dir}/../include/ddk" REALPATH)
         target_include_directories(netdata_driver BEFORE PRIVATE "${_ddk_include}" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall

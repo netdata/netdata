@@ -874,6 +874,16 @@ static inline unsigned char nd_dirent_type(const char *directory, const struct d
     int n = snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
     if (n < 0 || (size_t)n >= sizeof(path))
         return DT_UNKNOWN;
+#if defined(_WIN32)
+    DWORD attrs = GetFileAttributesA(path);
+    if (attrs == INVALID_FILE_ATTRIBUTES)
+        return DT_UNKNOWN;
+    if (attrs & FILE_ATTRIBUTE_REPARSE_POINT)
+        return DT_LNK;
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
+        return DT_DIR;
+    return DT_REG;
+#else
     struct stat st;
     if (stat(path, &st) != 0)
         return DT_UNKNOWN;
@@ -883,6 +893,7 @@ static inline unsigned char nd_dirent_type(const char *directory, const struct d
     if (S_ISLNK(st.st_mode)) return DT_LNK;
 #endif
     return DT_UNKNOWN;
+#endif
 #else
     return entry->d_type;
 #endif
@@ -988,7 +999,21 @@ struct rusage {
     long ru_nivcsw;            // involuntary context switches
 };
 static inline int getrusage(int who __maybe_unused, struct rusage *r) {
-    if (r) memset(r, 0, sizeof(*r));
+    if (!r) { errno = EINVAL; return -1; }
+    memset(r, 0, sizeof(*r));
+#if defined(OS_WINDOWS)
+    FILETIME creation, exit_time, kernel, user;
+    if (who == RUSAGE_SELF && GetProcessTimes(GetCurrentProcess(), &creation, &exit_time, &kernel, &user)) {
+        ULARGE_INTEGER k = { .LowPart = kernel.dwLowDateTime, .HighPart = kernel.dwHighDateTime };
+        ULARGE_INTEGER u = { .LowPart = user.dwLowDateTime, .HighPart = user.dwHighDateTime };
+        uint64_t kt = k.QuadPart / 10; // 100ns units to microseconds
+        uint64_t ut = u.QuadPart / 10;
+        r->ru_stime.tv_sec = (long)(kt / 1000000ULL);
+        r->ru_stime.tv_usec = (long)(kt % 1000000ULL);
+        r->ru_utime.tv_sec = (long)(ut / 1000000ULL);
+        r->ru_utime.tv_usec = (long)(ut % 1000000ULL);
+    }
+#endif
     return 0;
 }
 #endif
@@ -1096,7 +1121,12 @@ static inline int sigaction(int signo __maybe_unused,
                              const struct sigaction *act __maybe_unused,
                              struct sigaction *oldact __maybe_unused) {
     if (oldact) memset(oldact, 0, sizeof(*oldact));
-    return 0;
+    if (!act) { errno = EINVAL; return -1; }
+    // Windows only supports one-argument CRT signal handlers. The daemon's
+    // console/service paths provide shutdown handling; report unsupported
+    // POSIX sigaction requests instead of claiming installation succeeded.
+    errno = ENOSYS;
+    return -1;
 }
 #endif
 

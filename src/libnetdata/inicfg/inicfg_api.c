@@ -127,7 +127,27 @@ static STRING *reformat_path_list(STRING *value) {
     const char *segment_start = src;
 
     while(true) {
-        const char *separator = strchr(segment_start, ';');
+        // Native Windows lists use ';'.  Older MSYS configurations may use
+        // ':' between /c/... entries; do not mistake the colon in a drive
+        // prefix (C:/...) for a list separator.
+        const char *separator = NULL;
+        for(const char *p = segment_start; *p; p++) {
+            if(*p == ';') {
+                separator = p;
+                break;
+            }
+
+            if(*p != ':' || p == segment_start)
+                continue;
+
+            if((size_t)(p - segment_start) == 1 && isalpha((unsigned char)segment_start[0]))
+                continue;
+
+            if(p[1] == '/') {
+                separator = p;
+                break;
+            }
+        }
         size_t segment_len = separator
             ? (size_t)(separator - segment_start)
             : src_len - (size_t)(segment_start - src);

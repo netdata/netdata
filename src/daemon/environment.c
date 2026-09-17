@@ -5,11 +5,39 @@
 
 // Normalize a directory path for Win32/UCRT64 API use.
 // Accepts both POSIX form (/c/...) and Windows-native form (C:\... or C:/...);
+#if defined(OS_WINDOWS)
+static char *nd_env_native_path_list(const char *src) {
+    if(!src)
+        return strdupz("");
+
+    size_t len = strlen(src);
+    char *dst = strdupz(src);
+    for(size_t i = 0; i < len; i++) {
+        if(dst[i] != ':')
+            continue;
+
+        // The colon immediately following a drive letter is part of C:/...,
+        // while all other colons in this normalized representation delimit
+        // path-list entries.
+        if(i == 1 && isalpha((unsigned char)dst[0]))
+            continue;
+        dst[i] = ';';
+    }
+    return dst;
+}
+#endif
+
 // output is always C:/... with forward slashes.  Non-Windows: straight copy.
 void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
     if (!src || !dst || !dst_size) return;
 
 #if defined(OS_WINDOWS)
+    // Translate package-relative POSIX paths (for example /etc/netdata)
+    // before passing them to UCRT/Win32 filesystem calls.
+    char translated_src[FILENAME_MAX + 1];
+    os_translate_path(translated_src, src, sizeof(translated_src));
+    src = translated_src;
+
     if (isalpha((unsigned char)src[0]) && src[1] == ':') {
         // Windows-native: upper-case drive, \ → /
         if (dst_size < 4) { dst[0] = '\0'; return; }
@@ -32,13 +60,13 @@ void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
         if (src[2] == '\0') {
             dst[2] = '/'; dst[3] = '\0';
         } else {
-            strncpyz(dst + 2, src + 2, dst_size - 2);
+            strncpyz(dst + 2, src + 2, dst_size - 3);
         }
     } else {
-        strncpyz(dst, src, dst_size);
+        strncpyz(dst, src, dst_size - 1);
     }
 #else
-    strncpyz(dst, src, dst_size);
+    strncpyz(dst, src, dst_size - 1);
 #endif
 }
 
@@ -220,12 +248,26 @@ void set_environment_for_plugins_and_scripts(void) {
     const char *p = getenv("PATH");
     if (!p) p = "/bin:/usr/bin";
     snprintfz(path, sizeof(path), "%s:%s", p, "/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin");
-    setenv("PATH", inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path), 1);
+    const char *configured_path = inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PATH", path);
+#if defined(OS_WINDOWS)
+    CLEAN_CHAR_P *native_path = nd_env_native_path_list(configured_path);
+    setenv("PATH", native_path, 1);
+    freez(native_path);
+#else
+    setenv("PATH", configured_path, 1);
+#endif
 
     // python options
     p = getenv("PYTHONPATH");
     if (!p) p = "";
-    setenv("PYTHONPATH", inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p), 1);
+    const char *configured_pythonpath = inicfg_get_path_list(&netdata_config, CONFIG_SECTION_ENV_VARS, "PYTHONPATH", p);
+#if defined(OS_WINDOWS)
+    CLEAN_CHAR_P *native_pythonpath = nd_env_native_path_list(configured_pythonpath);
+    setenv("PYTHONPATH", native_pythonpath, 1);
+    freez(native_pythonpath);
+#else
+    setenv("PYTHONPATH", configured_pythonpath, 1);
+#endif
 
     // disable buffering for python plugins
     setenv("PYTHONUNBUFFERED", "1", 1);

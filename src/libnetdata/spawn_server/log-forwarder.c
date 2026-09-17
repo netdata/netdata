@@ -376,6 +376,16 @@ static void log_forwarder_thread_func(void *arg) {
                     DWORD wr = WaitForMultipleObjects((DWORD)nfds, handles, FALSE, (DWORD)timeout);
                     if(wr == WAIT_TIMEOUT) {
                         ret = 0;
+                        // Pipe handles do not reliably signal readability via
+                        // WaitForMultipleObjects; probe queued bytes as well.
+                        for(i = 0; i < nfds; i++) {
+                            DWORD avail = 0;
+                            if(!PeekNamedPipe(handles[i], NULL, 0, NULL, &avail, NULL))
+                                pfds[i].revents = POLLHUP;
+                            else if(avail > 0)
+                                pfds[i].revents = POLLIN;
+                            if(pfds[i].revents) ret++;
+                        }
                     }
                     else if(wr >= WAIT_OBJECT_0 && wr < WAIT_OBJECT_0 + (DWORD)nfds) {
                         ret = 0;
@@ -398,7 +408,21 @@ static void log_forwarder_thread_func(void *arg) {
                 }
             }
             else {
-                ret = poll(pfds, (nfds_t)nfds, timeout); // too many fds — fall through
+                // WaitForMultipleObjects is limited to MAXIMUM_WAIT_OBJECTS;
+                // anonymous pipes are not sockets, so WSAPoll cannot be used
+                // as a fallback for larger sets. Probe each pipe directly.
+                ret = 0;
+                for(i = 0; i < nfds; i++) {
+                    HANDLE handle = (HANDLE)_get_osfhandle(pfds[i].fd);
+                    DWORD avail = 0;
+                    if(handle == INVALID_HANDLE_VALUE || !PeekNamedPipe(handle, NULL, 0, NULL, &avail, NULL))
+                        pfds[i].revents = POLLHUP;
+                    else if(avail > 0)
+                        pfds[i].revents = POLLIN;
+                    if(pfds[i].revents) ret++;
+                }
+                if(ret == 0)
+                    Sleep((DWORD)timeout);
             }
         }
 #else

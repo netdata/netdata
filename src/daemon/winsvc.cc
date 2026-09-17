@@ -169,6 +169,14 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "CLEANUP");
             cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, call_netdata_cleanup, NULL);
 
+            // There is no other worker that can consume the stop request when
+            // creation fails.  Report a terminal state and terminate instead
+            // of leaving the service stuck in SERVICE_STOP_PENDING forever.
+            if (!cleanup_thread) {
+                ReportSvcStatus(SERVICE_STOPPED, ERROR_NOT_ENOUGH_MEMORY, 0, 0);
+                ExitProcess(ERROR_NOT_ENOUGH_MEMORY);
+            }
+
             // Signal the stop request
             SetEvent(svc_stop_event_handle);
             break;

@@ -38,6 +38,13 @@ static bool nd_log_is_default_file_path(const char *value, const char *source_na
 
     size_t vlen = strlen(value);
     size_t elen = strlen(expected);
+    // Only migrate paths that explicitly identify a filesystem location.
+    // A relative filename such as "daemon.log" is a valid user choice and
+    // must not be redirected merely because its basename matches a default.
+    bool absolute = value[0] == '/' || value[0] == '\\' ||
+                    (isalpha((unsigned char)value[0]) && value[1] == ':');
+    if (!absolute)
+        return false;
     return vlen >= elen && strcmp(value + vlen - elen, expected) == 0;
 }
 #endif

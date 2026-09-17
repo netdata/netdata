@@ -14,7 +14,7 @@ size_t nd_mmap_size = 0;
 #if defined(OS_WINDOWS)
 
 void *mmap(void *addr __maybe_unused, size_t len, int prot, int flags,
-           int fd, off_t offset __maybe_unused) {
+           int fd, off_t offset) {
     if (flags & MAP_ANONYMOUS) {
         DWORD protect = (prot & PROT_WRITE) ? PAGE_READWRITE : PAGE_READONLY;
         void *ptr = VirtualAlloc(NULL, len, MEM_COMMIT | MEM_RESERVE, protect);
@@ -24,6 +24,15 @@ void *mmap(void *addr __maybe_unused, size_t len, int prot, int flags,
     HANDLE handle = (HANDLE)_get_osfhandle(fd);
     if (handle == INVALID_HANDLE_VALUE)
         return MAP_FAILED;
+
+    // munmap() receives only the returned view address.  Without retaining a
+    // mapping table there is no safe way to recover the aligned base address
+    // for a non-zero offset, so reject it instead of silently mapping offset 0.
+    // All current Windows users map complete files from offset zero.
+    if (offset != 0) {
+        errno = EINVAL;
+        return MAP_FAILED;
+    }
 
     DWORD flProtect = (prot & PROT_WRITE) ? PAGE_READWRITE : PAGE_READONLY;
     HANDLE mapHandle = CreateFileMapping(handle, NULL, flProtect, 0, 0, NULL);
@@ -219,7 +228,7 @@ inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused)
 }
 
 inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused) {
-#ifdef MADV_MERGEABLE
+#if defined(MADV_MERGEABLE) && !defined(OS_WINDOWS)
     static int logger = 1;
     int ret = madvise(mem, len, MADV_MERGEABLE);
 

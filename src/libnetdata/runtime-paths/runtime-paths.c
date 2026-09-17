@@ -148,7 +148,33 @@ void nd_windows_detect_prefix_and_override_paths(void) {
     snprintfz(run_dir, run_dir_size, "%s/run/netdata", install_prefix);
     (void)mkdir(run_parent, 0755);
     (void)mkdir(run_dir,    0755);
-    nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+
+    // An interactive, non-elevated installation cannot create directories
+    // below a protected prefix such as "Program Files".  Do not publish a
+    // path that does not exist: os_run_dir() validates it before startup and
+    // would otherwise abort the agent.  A per-user temporary location is
+    // writable in both interactive and service contexts.
+    if (!nd_windows_directory_exists(run_dir)) {
+        char temp_path[MAX_PATH + 1];
+        DWORD temp_len = GetTempPathA((DWORD)sizeof(temp_path), temp_path);
+        if (temp_len > 0 && temp_len < sizeof(temp_path)) {
+            size_t fallback_size = (size_t)temp_len + sizeof("netdata/run");
+            CLEAN_CHAR_P *fallback_parent = mallocz(fallback_size);
+            CLEAN_CHAR_P *fallback = mallocz(fallback_size);
+            snprintfz(fallback_parent, fallback_size, "%snetdata", temp_path);
+            snprintfz(fallback, fallback_size, "%snetdata/run", temp_path);
+            (void)mkdir(fallback_parent, 0755);
+            (void)mkdir(fallback, 0755);
+            if (nd_windows_directory_exists(fallback))
+                nd_setenv("NETDATA_RUN_DIR", fallback, 1);
+            else
+                nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+        }
+        else
+            nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+    }
+    else
+        nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
 }
 #endif
 

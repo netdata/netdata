@@ -48,15 +48,20 @@ function(netdata_bundle_sqlite3)
                 # so configure and make run in the correct POSIX environment.
                 # Requires: bash, make, and tclsh (pacman -S bash make tcl).
                 find_program(_ND_SQLITE_BASH NAMES bash.exe bash
-                             HINTS "C:/msys64/usr/bin" "/usr/bin"
+                             HINTS "$ENV{MSYS2_ROOT}/usr/bin" "C:/msys64/usr/bin"
                              NO_DEFAULT_PATH)
-                if(NOT _ND_SQLITE_BASH)
-                        find_program(_ND_SQLITE_BASH NAMES bash.exe bash)
-                endif()
                 if(NOT _ND_SQLITE_BASH)
                         message(FATAL_ERROR
                                 "bash not found — required to build the SQLite amalgamation on Windows. "
                                 "Install MSYS2 and run: pacman -S bash make tcl")
+                endif()
+                get_filename_component(_ND_SQLITE_MSYS_BIN "${_ND_SQLITE_BASH}" DIRECTORY)
+                find_program(_ND_SQLITE_MAKE NAMES make.exe make
+                             HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
+                find_program(_ND_SQLITE_TCLSH NAMES tclsh.exe tclsh
+                             HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
+                if(NOT _ND_SQLITE_MAKE OR NOT _ND_SQLITE_TCLSH)
+                        message(FATAL_ERROR "MSYS2 make and tclsh are required to build SQLite")
                 endif()
                 set(_SQLITE_CONFIGURE_CMD "${_ND_SQLITE_BASH}" "${sqlite_SOURCE_DIR}/configure" --enable-update-limit)
                 set(_SQLITE_BUILD_CMD     "${_ND_SQLITE_BASH}" -c "make sqlite3.c sqlite3.h")

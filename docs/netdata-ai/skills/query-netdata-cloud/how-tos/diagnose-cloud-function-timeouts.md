@@ -6,38 +6,71 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
 
 ## Inputs
 
-- A reachable agent address for the direct timing probe.
-- The agent node UUID and Cloud credentials loaded by the token-safe wrapper environment.
+- A reachable agent address (`AGENT_URL`, or `AGENT_HOST` with an optional port).
+- The agent node UUID, machine GUID, and Cloud credentials loaded by the token-safe wrapper environment.
 
 ## Steps
 
-1. Check the local/direct Function path and record only status and elapsed time:
+1. Derive the direct target without adding a second port when `AGENT_HOST` already
+   contains one. Use the same node UUID for both probes, and record only status and
+   elapsed time for the direct call:
 
    ```bash
-   curl --silent --show-error --max-time 45 -o /dev/null \
-     -w 'status=%{http_code} total=%{time_total}s bytes=%{size_download}\n' \
-     -X POST -H 'Content-Type: application/json' \
-     --data '{"info":true}' \
-     'http://AGENT_HOST:19999/api/v3/function?function=netdata-metrics-cardinality'
+   source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh
+   agents_load_env
+   if [[ -z "${AGENT_URL:-}" ]]; then
+       AGENT_TARGET="${AGENT_HOST:-127.0.0.1}"
+       case "$AGENT_TARGET" in
+           \[*\]) AGENT_TARGET="${AGENT_TARGET}:${AGENT_PORT:-19999}" ;;
+           *:*) : ;; # Preserve an already supplied port.
+           *) AGENT_TARGET="${AGENT_TARGET}:${AGENT_PORT:-19999}" ;;
+       esac
+       AGENT_URL="http://${AGENT_TARGET}"
+   fi
+   AGENT_TARGET="${AGENT_URL#http://}"
+   AGENT_TARGET="${AGENT_TARGET#https://}"
+   AGENT_TARGET="${AGENT_TARGET%%/*}"
+
+   mkdir -p .local/audits/query-netdata-agents
+   direct_start="$(date +%s%N)"
+   direct_rc=0
+   agents_call_function --via agent --node "$NODE_UUID" --host "$AGENT_TARGET" \
+     --machine-guid "$MACHINE_GUID" --function netdata-metrics-cardinality \
+     --body '{"info":true}' \
+     > .local/audits/query-netdata-agents/function-timeout-direct.json || direct_rc=$?
+   direct_elapsed="$(awk -v s="$direct_start" -v e="$(date +%s%N)" 'BEGIN { printf "%.3f", (e-s)/1000000000 }')"
+   if [[ "$direct_rc" -eq 0 ]] && jq -e . .local/audits/query-netdata-agents/function-timeout-direct.json >/dev/null 2>&1; then
+       jq --arg elapsed "${direct_elapsed}s" '{status: 200, total: $elapsed}' \
+         .local/audits/query-netdata-agents/function-timeout-direct.json
+   else
+       jq -n --arg elapsed "${direct_elapsed}s" --arg rc "$direct_rc" \
+         '{status: null, total: $elapsed, transport_error: $rc}'
+   fi
    ```
 
 2. Load the token-safe Cloud wrapper and run the same Function request. The wrapper emits only the response body:
 
    ```bash
    mkdir -p .local/audits/query-netdata-agents
-   source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
-   agents_load_env
+   # Reuse AGENT_TARGET and the credentials loaded above.
+   cloud_rc=0
    agents_call_function --via cloud --node "$NODE_UUID" \
      --function netdata-metrics-cardinality --body '{"info":true}' \
-     > .local/audits/query-netdata-agents/function-timeout-cloud.json
-   jq '{status, type, errorMessage, errorMsgKey, errorCode}' \
-     .local/audits/query-netdata-agents/function-timeout-cloud.json
+     > .local/audits/query-netdata-agents/function-timeout-cloud.json || cloud_rc=$?
+   if [[ "$cloud_rc" -eq 0 ]] && jq -e . .local/audits/query-netdata-agents/function-timeout-cloud.json >/dev/null 2>&1; then
+       jq '{status, type, errorMessage, errorMsgKey, errorCode}' \
+         .local/audits/query-netdata-agents/function-timeout-cloud.json
+   else
+       jq -n --arg rc "$cloud_rc" '{status: null, transport_error: $rc}'
+   fi
    ```
 
 ## Output
 
-- A fast direct HTTP 200 with a Cloud timeout indicates an ACLK/Cloud transport problem.
-- A slow or failed direct request indicates the Function or its plugin is the bottleneck.
+- A fast successful direct response with a Cloud timeout indicates an ACLK/Cloud transport problem.
+- A slow successful direct response indicates the Function or its plugin may be the bottleneck.
+- A failed direct request does not establish a Function bottleneck: authentication, routing,
+  and network failures must be diagnosed separately from the HTTP/curl error.
 - Keep raw Cloud responses under `.local/audits/` and report only sanitized status and error fields.
 
 ## Notes / gotchas
