@@ -1033,6 +1033,9 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 			return nil, errors.New("jobmgr Function controller: duplicate method ID")
 		}
 		seen[method.ID] = struct{}{}
+		if method.ManagedInfo && !method.RawRequest {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q ManagedInfo requires RawRequest", method.ID)
+		}
 		if !validQuotedProtocolField(method.Help) {
 			return nil, errors.New("jobmgr Function controller: invalid Function help")
 		}
@@ -1076,6 +1079,12 @@ func controllerGroupSignature(
 		writeDigestString(digest, method.Tags)
 		writeDigestString(digest, method.ResponseType)
 		writeDigestBool(digest, method.RawRequest)
+		writeDigestBool(digest, method.ManagedInfo)
+		writeDigestBool(digest, method.HasHistory)
+		writeDigestUint64(digest, uint64(len(method.AcceptedParams)))
+		for _, name := range method.AcceptedParams {
+			writeDigestString(digest, name)
+		}
 		for _, alias := range method.Aliases {
 			writeDigestString(digest, alias)
 		}
