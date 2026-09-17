@@ -221,10 +221,15 @@ static DWORD netdata_windows_get_current_build()
 
 static bool netdata_windows_get_update_revision(DWORD *ubr)
 {
-    return netdata_registry_get_dword(ubr,
-                                      HKEY_LOCAL_MACHINE,
-                                      "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
-                                      "UBR");
+    unsigned int value;
+    if (!netdata_registry_get_dword(&value,
+                                    HKEY_LOCAL_MACHINE,
+                                    "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+                                    "UBR"))
+        return false;
+
+    *ubr = (DWORD)value;
+    return true;
 }
 
 static const char *netdata_windows_server_version_from_build(DWORD build)
