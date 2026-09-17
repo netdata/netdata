@@ -41,13 +41,16 @@ int os_get_fd_open_max(void) {
 
 void os_close_range(int first, int last, int flags) {
 #if defined(OS_WINDOWS)
-    // Windows has no fork/exec, so inherited-fd cleanup is not needed.
-    // Spawn processes use CreateProcess with PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-    // which restricts inheritance to explicitly listed handles without any
-    // handle-table walk.  The fd_is_valid() stub also always returns true here
-    // (fcntl F_GETFD returns 0 unconditionally), making a brute-force close
-    // loop incorrect.
-    (void)first; (void)last; (void)flags;
+    // The explicit handle list protects spawned children, but the daemon's
+    // startup path also uses this helper to close descriptors inherited by the
+    // current process.  UCRT descriptors can be closed safely by _close();
+    // close-on-exec is not meaningful for the CreateProcess handle-list path.
+    if (flags & CLOSE_RANGE_CLOEXEC)
+        return;
+    if (last == CLOSE_RANGE_FD_MAX || last >= _getmaxstdio())
+        last = _getmaxstdio() - 1;
+    for (int fd = first; fd <= last; fd++)
+        (void)_close(fd);
     return;
 #endif
 #if defined(HAVE_CLOSE_RANGE)

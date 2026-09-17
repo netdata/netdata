@@ -152,7 +152,14 @@ bool nd_log_init_windows(void) {
 #endif
 
     nd_log.eventlog.initialized = true;
-    etw_queue_init();
+    if(!etw_queue_init()) {
+        nd_log.eventlog.initialized = false;
+#if defined(HAVE_ETW)
+        if(nd_log.eventlog.etw)
+            EventUnregister(regHandle);
+#endif
+        return false;
+    }
     return true;
 }
 
@@ -247,7 +254,7 @@ static inline const wchar_t *etw_entry_field(const struct etw_queue_entry *e, si
     return e->small[i];
 }
 
-static void etw_entry_process(struct etw_queue_entry *e) {
+static bool etw_entry_process(struct etw_queue_entry *e) {
     EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
     for(size_t i = 1; i < _NDF_MAX; i++) {
         const wchar_t *buf = etw_entry_field(e, i);
@@ -266,7 +273,15 @@ static void etw_entry_process(struct etw_queue_entry *e) {
         .Task    = e->task,
         .Keyword = e->keyword,
     };
-    (void)EventWrite(regHandle, &ed, _NDF_MAX - 1, desc);
+    ULONG status = EventWrite(regHandle, &ed, _NDF_MAX - 1, desc);
+    if(status != ERROR_SUCCESS) {
+        // The producer has already released its queue slot by this point.  Keep
+        // the failure observable instead of silently losing the event.
+        fprintf(stderr, "Netdata ETW EventWrite failed: %lu\n", (unsigned long)status);
+        return false;
+    }
+
+    return true;
 }
 
 static void etw_async_writer(void *arg __maybe_unused) {
@@ -289,7 +304,7 @@ static void etw_async_writer(void *arg __maybe_unused) {
         netdata_mutex_unlock(&etw_queue.mutex);
 
         // EventWrite may block here — no lock held, producers unaffected.
-        etw_entry_process(&etw_queue.slots[idx]);
+        (void)etw_entry_process(&etw_queue.slots[idx]);
 
         // Release the slot
         netdata_mutex_lock(&etw_queue.mutex);
@@ -302,13 +317,28 @@ static void etw_async_writer(void *arg __maybe_unused) {
         SetEvent(etw_queue.drain_ack);
 }
 
-static void etw_queue_init(void) {
+static bool etw_queue_init(void) {
     netdata_mutex_init(&etw_queue.mutex);
     netdata_cond_init(&etw_queue.not_empty);
     etw_queue.drain_ack = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if(!etw_queue.drain_ack) {
+        netdata_cond_destroy(&etw_queue.not_empty);
+        netdata_mutex_destroy(&etw_queue.mutex);
+        return false;
+    }
+
     etw_queue.thread = nd_thread_create("ETW-ASYNC", NETDATA_THREAD_OPTION_DEFAULT,
                                         etw_async_writer, NULL);
+    if(!etw_queue.thread) {
+        CloseHandle(etw_queue.drain_ack);
+        etw_queue.drain_ack = NULL;
+        netdata_cond_destroy(&etw_queue.not_empty);
+        netdata_mutex_destroy(&etw_queue.mutex);
+        return false;
+    }
+
     etw_queue.initialized = true;
+    return true;
 }
 
 void nd_log_stop_windows_async(void) {

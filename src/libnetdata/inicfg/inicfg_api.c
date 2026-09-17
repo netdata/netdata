@@ -157,7 +157,9 @@ static STRING *reformat_path_list(STRING *value) {
         CLEAN_CHAR_P *converted = normalize_to_native_path(trimmed);
 
         if(!first)
-            buffer_strcat(wb, ":");
+            // Child processes on Windows parse PATH-like variables using ';'.
+            // Keep the native separator after converting each entry.
+            buffer_strcat(wb, ";");
         buffer_strcat(wb, converted);
         first = false;
 

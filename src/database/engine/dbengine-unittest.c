@@ -826,6 +826,7 @@ int dbengine_platform_unittest(void)
     bool init_thread_created[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     bool init_thread_joined[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     bool dbengine_initialized[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    bool dbengine_spawned = false;
     bool start = false;  // synchronization is via __atomic_load_n / __atomic_store_n; volatile is redundant.
     int errors = 0;
 
@@ -866,6 +867,15 @@ int dbengine_platform_unittest(void)
         goto cleanup_directories;
     }
     watchdog_started = true;
+
+    // Spawn the shared engine before tier initialization so it is also
+    // cleaned up when every tier fails during setup.
+    dbengine_spawned = rrdeng_dbengine_spawn(NULL);
+    if (!dbengine_spawned) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot start shared DBENGINE thread\n");
+        errors++;
+        goto cleanup_watchdog;
+    }
 
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
         completion_init(&init[tier].completed);
@@ -939,7 +949,7 @@ cleanup_watchdog:
         }
     }
 
-    bool dbengine_shutdown_required = false;
+    bool dbengine_shutdown_required = dbengine_spawned;
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
         if (!dbengine_initialized[tier])
             continue;

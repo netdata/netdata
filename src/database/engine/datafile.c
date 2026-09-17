@@ -427,6 +427,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     uv_fs_req_cleanup(&req);
 
     if (0 == matched_files) {
+        // Journals can be left behind without a matching datafile. Keep their
+        // file numbers reserved so the next journal cannot truncate an orphan.
+        ctx_fileno_initialize_from_scan(ctx, 0, max_seen_fileno);
         freez(datafiles);
         return 0;
     }

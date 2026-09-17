@@ -866,6 +866,11 @@ static inline int statfs(const char *path __maybe_unused, struct statfs *buf __m
 #endif
 
 // Return entry type portably; UCRT64 has no dirent::d_type member.
+#if defined(OS_WINDOWS)
+// Implemented by os.c; declared here because this low-level inline helper is
+// used before os.h is included by the library umbrella headers.
+char *os_translate_msys_to_windows_path(const char *src);
+#endif
 static inline unsigned char nd_dirent_type(const char *directory, const struct dirent *entry) {
 #if defined(OS_WINDOWS)
     if (!directory || !entry)
@@ -875,7 +880,11 @@ static inline unsigned char nd_dirent_type(const char *directory, const struct d
     if (n < 0 || (size_t)n >= sizeof(path))
         return DT_UNKNOWN;
 #if defined(_WIN32)
-    DWORD attrs = GetFileAttributesA(path);
+    // readdir() returns MSYS-style paths on UCRT64. Win32 APIs do not
+    // understand /c/... syntax, so translate before querying attributes.
+    CLEAN_CHAR_P *native_path = os_translate_msys_to_windows_path(path);
+    DWORD attrs = native_path ? GetFileAttributesA(native_path) : INVALID_FILE_ATTRIBUTES;
+    freez(native_path);
     if (attrs == INVALID_FILE_ATTRIBUTES)
         return DT_UNKNOWN;
     if (attrs & FILE_ATTRIBUTE_REPARSE_POINT)

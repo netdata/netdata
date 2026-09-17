@@ -870,10 +870,19 @@ int ssl_security_location_for_context(SSL_CTX *ctx, const char *file, const char
 // SSL_CTX_set_default_verify_paths() relies on OpenSSL's compiled-in OPENSSLDIR path
 // which does not exist on deployed Windows systems (only on the MSYS2 dev toolchain).
 bool netdata_ssl_load_windows_ca_certs(SSL_CTX *ctx) {
-    HCERTSTORE hStore = CertOpenSystemStoreA(0, "ROOT");
-    if (!hStore) {
+    // Services normally run under an account whose user store does not contain
+    // the enterprise roots installed for the machine.  Load both stores: the
+    // machine store is authoritative for service deployments, while retaining
+    // the user store preserves certificates configured for interactive runs.
+    HCERTSTORE stores[2] = {
+        CertOpenStore(CERT_STORE_PROV_SYSTEM_A, 0, 0,
+                      CERT_SYSTEM_STORE_LOCAL_MACHINE | CERT_STORE_OPEN_EXISTING_FLAG,
+                      "ROOT"),
+        CertOpenSystemStoreA(0, "ROOT"),
+    };
+    if (!stores[0] && !stores[1]) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "SSL: CertOpenSystemStoreA(ROOT) failed, err=%lu", GetLastError());
+               "SSL: unable to open Windows ROOT certificate stores, err=%lu", GetLastError());
         return false;
     }
 
@@ -881,21 +890,26 @@ bool netdata_ssl_load_windows_ca_certs(SSL_CTX *ctx) {
     PCCERT_CONTEXT cert_ctx = NULL;
     int count = 0;
 
-    while ((cert_ctx = CertEnumCertificatesInStore(hStore, cert_ctx)) != NULL) {
-        const unsigned char *encoded = cert_ctx->pbCertEncoded;
-        X509 *cert = d2i_X509(NULL, &encoded, (long)cert_ctx->cbCertEncoded);
-        if (cert) {
-            // Returns 1 on success; 0 means duplicate or error — clear the OpenSSL error queue
-            // so stale "already in store" errors don't confuse later operations.
-            if (X509_STORE_add_cert(x509_store, cert) == 1)
-                count++;
-            else
-                ERR_clear_error();
-            X509_free(cert);
-        }
-    }
+    for (size_t i = 0; i < _countof(stores); i++) {
+        if (!stores[i])
+            continue;
 
-    CertCloseStore(hStore, 0);
+        cert_ctx = NULL;
+        while ((cert_ctx = CertEnumCertificatesInStore(stores[i], cert_ctx)) != NULL) {
+            const unsigned char *encoded = cert_ctx->pbCertEncoded;
+            X509 *cert = d2i_X509(NULL, &encoded, (long)cert_ctx->cbCertEncoded);
+            if (cert) {
+                // Returns 1 on success; 0 means duplicate or error — clear the OpenSSL error queue
+                // so stale "already in store" errors don't confuse later operations.
+                if (X509_STORE_add_cert(x509_store, cert) == 1)
+                    count++;
+                else
+                    ERR_clear_error();
+                X509_free(cert);
+            }
+        }
+        CertCloseStore(stores[i], 0);
+    }
 
     if (count > 0)
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
