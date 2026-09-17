@@ -1148,13 +1148,20 @@ void pgc_open_add_hot_page(
 }
 
 int64_t dynamic_open_cache_size(void) {
-    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
+    // a cache that dbengine_destroy() had to leave allocated is still asked for space by whoever releases its
+    // pages, and by the finalization of its datafiles, after the main cache was freed: it then sizes itself from
+    // its floor. One load, so a caller racing the teardown cannot see the main cache go away between two reads.
+    PGC *mc = main_cache;
+    if(!mc)
+        return 2 * 1024 * 1024;
+
+    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(mc);
     int64_t target_size = main_wanted_cache_size / 100 * 5;
 
     if(target_size < 2 * 1024 * 1024)
         target_size = 2 * 1024 * 1024;
 
-    int64_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+    int64_t main_current_cache_size = pgc_get_current_cache_size(mc);
 
     int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
                                       main_wanted_cache_size - main_current_cache_size : 0;
@@ -1163,13 +1170,18 @@ int64_t dynamic_open_cache_size(void) {
 }
 
 int64_t dynamic_extent_cache_size(void) {
-    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
+    // same as the open cache: a retained extent cache outlives the main cache
+    PGC *mc = main_cache;
+    if(!mc)
+        return 5 * 1024 * 1024;
+
+    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(mc);
     int64_t target_size = main_wanted_cache_size / 100 * 30;
 
     if(target_size < 5 * 1024 * 1024)
         target_size = 5 * 1024 * 1024;
 
-    int64_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+    int64_t main_current_cache_size = pgc_get_current_cache_size(mc);
 
     int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
                                       main_wanted_cache_size - main_current_cache_size : 0;

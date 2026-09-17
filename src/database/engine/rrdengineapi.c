@@ -1209,10 +1209,12 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
 }
 
 size_t dbengine_destroy(void) {
-    // the open and extent caches size themselves from the main cache's statistics, so they go first; pages
-    // carry METRIC pointers, so the registry goes after the caches; a tier's datafiles hold the open cache's
-    // references, so they are finalized after it. A global is cleared only when its object was freed: one
-    // with live references stays allocated (its destroy says so), and a late release must still find it.
+    // destroying the open and extent caches asks their sizing callbacks, which read the main cache, so they go
+    // first; pages carry METRIC pointers, so the registry goes after the caches; an open cache page holds a
+    // reference on its datafile, released when the page is freed, so the datafiles are finalized after the open
+    // cache. A global is cleared only when its object was freed: one with live references stays allocated (its
+    // destroy says so), and a late release must still find it. Such a cache outlives the main cache it sizes
+    // itself from; its callback (pagecache.c) falls back to its floor once the main cache is gone.
     if(extent_cache) {
         fprintf(stderr, "Destroying extent cache (PGC)...\n");
         if(pgc_destroy(extent_cache, false))
