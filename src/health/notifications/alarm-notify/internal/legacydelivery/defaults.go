@@ -56,10 +56,8 @@ func unsupportedSettings(values, initial map[string]string, eligible []method) e
 		return fmt.Errorf("legacy setting %s is not supported for this delivery; use native event/configuration settings", key)
 	}
 	// These presentation and event mutations have no mapping to the current event contract.
-	for _, key := range []string{"date_format", "images_base_url"} {
-		if values[key] != "" {
-			return unsupported(key)
-		}
+	if values["date_format"] != "" {
+		return unsupported("date_format")
 	}
 	for _, key := range []string{"use_fqdn", "clear_alarm_always"} {
 		if values[key] == "YES" {
@@ -72,6 +70,9 @@ func unsupportedSettings(values, initial map[string]string, eligible []method) e
 		}
 	}
 	for _, m := range eligible {
+		if values["images_base_url"] != "" && m.name != "slack" {
+			return unsupported("images_base_url")
+		}
 		if m.tool == "" {
 			for _, key := range []string{"curl", "curl_options"} {
 				if strings.TrimSpace(values[key]) != "" {

@@ -215,7 +215,7 @@ for recipient-based methods, an eligible recipient. Without stock configuration,
 default to `YES`. Dynatrace, SIGNL4, Opsgenie and ilert need an explicit `YES`, normally supplied by the stock file.
 Missing prerequisites or required recipients disable that method. Kafka and SIGNL4 are global: they send once when
 enabled and configured, regardless of roles, including reserved roles. Gotify, Discord and Flock send once only when at least one
-recipient survives filtering. Email, Prowl and SMSEagle batch their final eligible recipients. Other mappings send
+recipient survives filtering. Email, Prowl and SMSEagle batch their final eligible recipients. Teams sends once per distinct final URL after recipient filtering. Other mappings send
 once per distinct eligible target.
 
 All selected routing policies and eligible provider configurations are checked **before any delivery**. Missing
@@ -236,12 +236,14 @@ attempted successes and failures; filtering happens before the plan is built, so
 | `kavenegar` | `KAVENEGAR_API_KEY`, `KAVENEGAR_SENDER`; recipient is a phone number |
 | `matrix` | `MATRIX_HOMESERVER`, `MATRIX_ACCESSTOKEN`; recipient is a room ID |
 | `messagebird` | `MESSAGEBIRD_ACCESS_KEY`, `MESSAGEBIRD_NUMBER`; recipient is a phone number |
+| `msteams` | `MSTEAMS_WEBHOOK_URL`, `MSTEAMS_ICON_<STATUS>`, `MSTEAMS_COLOR_<STATUS>`; recipient replaces each `CHANNEL` in the URL; singular `MSTEAM_*` aliases are supported |
 | `ntfy` | Recipient is a full topic URL; a complete `NTFY_USERNAME`/`NTFY_PASSWORD` pair takes precedence over `NTFY_ACCESS_TOKEN`; an incomplete pair is ignored |
 | `pd` | Recipient is the integration key; exact `USE_PD_VERSION=2` selects v2, other values select v1 |
 | `prowl` | Recipients are API keys, submitted together |
 | `pushbullet` | `PUSHBULLET_ACCESS_TOKEN`, optional `PUSHBULLET_SOURCE_DEVICE`; recipient is an email or `#channel-tag` |
 | `pushover` | `PUSHOVER_APP_TOKEN`; recipient is a user/group key |
 | `rocketchat` | `ROCKETCHAT_WEBHOOK_URL`; `#` is prepended to each legacy channel recipient |
+| `slack` | `SLACK_WEBHOOK_URL`; recipient is a bare channel, `#channel`, `@user`, or `#` for the webhook default; uses the host-derived sender name and optional `images_base_url` |
 | `sms` | `sendsms`; recipient is a phone number, delivered through SMS Server Tools 3 |
 | `syslog` | `logger`, `logger_options`, `SYSLOG_FACILITY`; recipient syntax is `[[facility.level][@host[:port]]/]prefix`, with bracketed IPv6 supported |
 | `telegram` | `TELEGRAM_BOT_TOKEN`, optional `TELEGRAM_API_URL`, `TELEGRAM_RETRIES_ON_LIMIT`; recipient is `chat` or `chat:topic` |
@@ -273,24 +275,71 @@ have no independent delivery effect.
 
 These configured behaviors are rejected when applicable to eligible delivery: nonempty `curl`/`curl_options` for
 HTTP methods; non-UTF-8 `EMAIL_CHARSET` for email; configured nonempty `PATH` for command methods; nonempty
-`date_format`/`images_base_url`; `use_fqdn=YES`/`clear_alarm_always=YES`; and final evaluated values of the event scalars
-above that differ from their initial values. Temporary assignments are allowed if those values are restored;
+`date_format`; nonempty `images_base_url` when any eligible method is not Slack; `use_fqdn=YES`/`clear_alarm_always=YES`;
+and final evaluated values of the event scalars above that differ from their initial values. Temporary assignments are allowed if those values are restored;
 settings derived during evaluation retain their assignment-time expansions. Use the native event/configuration
 contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
 implementation.
 
-Seven retained legacy mappings remain pending: Slack overrides, Teams Workflows setup/overrides, ilert API alert-source
-setup, Opsgenie Alert API v2 integration setup, Dynatrace Events v2 settings, AWS SNS credentials/message templates,
-and Unix `custom_sender()` execution. Enabled, configured selections fail before any sends once applicable recipient
+Five retained legacy mappings remain pending: ilert API alert-source setup, Opsgenie Alert API v2 integration setup,
+Dynatrace Events v2 settings, AWS SNS credentials/message templates, and Unix `custom_sender()` execution. Enabled, configured selections fail before any sends once applicable recipient
 requirements are met. Dynatrace, Opsgenie and ilert are global and require no recipients. The check does not probe
 AWS CLI availability or require a custom global default when a role already selects a custom recipient. It exposes
-pending work rather than attempting those unimplemented runtime checks. Old singular `MSTEAM`
-aliases are recognized for that check. HipChat is explicitly excluded and also errors when eligible. Function bodies
-remain inert, including `custom_sender()` and helpers; no original configuration file is sourced.
+pending work rather than attempting those unimplemented runtime checks. HipChat is explicitly excluded and also
+errors when eligible. Function bodies remain inert, including `custom_sender()` and helpers; no original configuration file is sourced.
 
-Four Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
+Five Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
 PagerDuty/Prowl/ntfy can use role recipients without a global default; ntfy sends the resolved filtered recipients;
-and Fleep does not require the unused `FLEEP_SERVER` setting. Production Bash and installation remain unchanged.
+Fleep does not require the unused `FLEEP_SERVER` setting; and Teams sends once per distinct resolved URL.
+Production Bash and installation remain unchanged.
+
+### Legacy Slack and Teams routing
+
+Slack shell-format delivery requires a [legacy incoming webhook](https://docs.slack.dev/legacy/legacy-custom-integrations/legacy-custom-integrations-incoming-webhooks/)
+for runtime channel/user and sender-identity overrides. Modern app webhooks bind these settings at installation;
+a URL alone does not identify which kind it is. Native YAML Slack destinations keep the modern app behavior.
+
+```sh
+SLACK_WEBHOOK_URL='https://example.test/slack-hook'
+DEFAULT_RECIPIENT_SLACK='#operations @oncall #'
+```
+
+Each distinct eligible recipient produces a request. A bare name becomes `#name`, `#channel` and `@user` remain intact,
+and `#` omits the channel field to use the webhook's default. The sender name is `netdata on <event node>`. The icon is
+`https://registry.my-netdata.io/images/banner-icon-144x144.png`; setting `images_base_url` replaces its base. The final
+icon URL must be absolute HTTP(S) and at most 255 characters. This customization is currently supported only when
+Slack is the sole eligible method; artwork for other providers remains pending. Slack keeps the native alert content,
+status colors and escaping. These legacy overrides are internal to `send-legacy`, not new YAML fields.
+
+Teams uses the already supported [Workflows setup](#microsoft-teams-workflows), with its trigger set to **Anyone**.
+An old connector URL must be replaced with a URL created by Workflows; the adapter cannot convert it automatically.
+Microsoft documents the [final connector retirement rollout in May 2026](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/).
+For one destination, configure the full URL and any nonempty recipient label:
+
+```sh
+MSTEAMS_WEBHOOK_URL='https://example.test/workflow?sig=synthetic-value'
+DEFAULT_RECIPIENT_MSTEAMS='operations'
+```
+
+For several destinations, use `CHANNEL` as the entire template and full URLs as recipients:
+
+```sh
+MSTEAMS_WEBHOOK_URL='CHANNEL'
+DEFAULT_RECIPIENT_MSTEAMS='https://example.test/workflow-one?sig=one https://example.test/workflow-two?sig=two'
+role_recipients_msteams[operations]="$DEFAULT_RECIPIENT_MSTEAMS"
+```
+
+The adapter replaces every literal `CHANNEL` with the eligible recipient, without another expansion or URL
+normalization. Recipient splitting and policy suffixes follow the existing rules, so full-URL recipients cannot
+contain raw commas, whitespace or `|`. Signed query strings retain their bytes and order. Teams sends once per distinct
+resulting URL **after filtering**; different recipient labels for a fixed URL no longer cause repeated messages.
+Existing per-recipient history requirements still apply before URL deduplication.
+
+`MSTEAMS_ICON_WARNING/CRITICAL/CLEAR` and `MSTEAMS_COLOR_WARNING/CRITICAL/CLEAR` override the native styles. Explicit
+empty values omit the icon/color. Default-status settings do not apply because the event contract permits only these
+three statuses. Old singular `MSTEAM_*`, `SEND_MSTEAM`, `DEFAULT_RECIPIENT_MSTEAM` and `role_recipients_msteam` aliases
+are applied after all files load: nonempty scalar aliases override plural settings; recipient aliases copy even
+empty entries. Teams retains MessageCard payloads and the inline alert link.
 
 ## Command and configuration contract
 
@@ -492,8 +541,8 @@ routing:
 
 Use this with the top-level `version: 1`, as shown in `examples/notify.yaml`. Slack's webhook URL is a secret; supply
 it through an environment variable or file reference. Slack manages the channel, username and icon in the app's
-configuration. Runtime channel/user/username/icon overrides from Bash's legacy Slack integration remain pending and
-are not accepted by this provider. This does not change the active Bash integration.
+configuration. Runtime channel/user/username/icon overrides are available through
+[legacy configuration delivery](#legacy-slack-and-teams-routing), not through these native YAML destinations.
 
 Messages show a plain-text Block Kit summary above details in a status-colored attachment: warning/yellow,
 critical/red, clear/green. They include the status transition, node, alert, summary, chart/context when present,

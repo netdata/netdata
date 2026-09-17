@@ -52,6 +52,11 @@ func testURLProviderConfiguration(t *testing.T, provider string) {
 			extra: "    icon_url: https://example.com/icon.png\n",
 			err:   "invalid YAML",
 		},
+		"internal legacy overrides refused": {
+			url:   "https://example.com/slack",
+			extra: "    legacy: {channel: '#synthetic-private-value'}\n",
+			err:   "invalid YAML",
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {

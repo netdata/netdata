@@ -37,7 +37,7 @@ func (dst Config) validateMSTeams() error {
 			}
 		}
 	}
-	reference, err := secret.IsReference(dst.URL)
+	reference, err := dst.Secrets.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("msteams url: %w", err)
 	}
@@ -107,7 +107,7 @@ func escapeMSTeamsMarkdown(value string) string {
 }
 
 func sendMSTeams(ctx context.Context, dst Config, event notifyevent.Event, client *http.Client) error {
-	endpoint, err := secret.Resolve(ctx, dst.URL)
+	endpoint, err := dst.Secrets.Resolve(ctx, dst.URL)
 	if err != nil {
 		return fmt.Errorf("msteams url: %w", err)
 	}
@@ -142,9 +142,10 @@ func sendMSTeams(ctx context.Context, dst Config, event notifyevent.Event, clien
 }
 
 type Config struct {
-	URL    string            `yaml:"url,omitempty"`
-	Icons  map[string]string `yaml:"icons,omitempty"`
-	Colors map[string]string `yaml:"colors,omitempty"`
+	Secrets secret.InputMode  `yaml:"-"`
+	URL     string            `yaml:"url,omitempty"`
+	Icons   map[string]string `yaml:"icons,omitempty"`
+	Colors  map[string]string `yaml:"colors,omitempty"`
 }
 
 type Sender struct {
