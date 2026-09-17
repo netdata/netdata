@@ -5,6 +5,10 @@
 
 #include "libnetdata/libnetdata.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct rrdengine_instance;
 
 // Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
@@ -61,7 +65,9 @@ struct dbengine_config {
 #define RRDENG_PAGE_TYPE_GORILLA_32BIT  (2)
 #define RRDENG_PAGE_TYPE_MAX            (2) // Maximum page type (inclusive)
 
-// the floors the engine enforces on a tier's settings, and the default it does not
+// the floor the engine enforces on a tier's disk space (rrdeng_init() raises a smaller value), the floor the embedder
+// is expected to keep the page cache above (the engine does not check it: below it the cache split underflows), and
+// the disk-space default the engine leaves to the embedder
 #define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
 #define RRDENG_MIN_DISK_SPACE_MB (25)
 #define RRDENG_DEFAULT_TIER_DISK_SPACE_MB (1024)
@@ -124,5 +130,9 @@ bool dbengine_initialized(void);
 // rrdeng_readiness_wait()): until then they keep preloaded metrics from being evicted before their journals are
 // read. A no-op when there is no registry.
 void dbengine_preload_release(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // NETDATA_DBENGINE_CONFIG_H

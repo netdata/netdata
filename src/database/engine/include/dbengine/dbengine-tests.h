@@ -3,6 +3,8 @@
 #ifndef NETDATA_DBENGINE_TESTS_H
 #define NETDATA_DBENGINE_TESTS_H
 
+#include "libnetdata/libnetdata.h"
+
 // The engine's self-tests and benchmarks. Each runs to completion on the calling thread.
 //
 // Four are command-line modes for the embedder and return a process exit code. None of them needs a tier;

@@ -5,6 +5,10 @@
 
 #include "libnetdata/libnetdata.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // The engine runs its work on the process-wide libuv thread pool, which it shares with whoever else
 // embeds it in the same process. Worker utilization is charted per job id, and every user of the pool
 // registers its own job names on each pool thread it runs on; the ids therefore live in one shared
@@ -55,5 +59,9 @@ enum rrdeng_worker_job {
 // Prepares the calling pool thread for engine work: pool-thread setup (once per thread) and the
 // engine's job names. Idempotent per thread; the engine calls it at the start of every work item.
 void rrdeng_worker_jobs_register(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // NETDATA_DBENGINE_WORKERS_H

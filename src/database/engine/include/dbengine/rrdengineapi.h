@@ -7,6 +7,10 @@
 #include "database/engine/include/dbengine/dbengine-config.h"
 #include "database/engine/include/dbengine/dbengine-stats.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // The engine's public API. Everything the daemon needs from the engine is declared here or in the other public
 // headers (dbengine-config.h, dbengine-stats.h, dbengine-workers.h, dbengine-tests.h); the rest of this directory
 // is private and no header here includes it.
@@ -119,5 +123,9 @@ bool rrdeng_enq_work(struct rrdeng_work_request *req);
 bool rrdeng_work_available(void);
 
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* NETDATA_RRDENGINEAPI_H */

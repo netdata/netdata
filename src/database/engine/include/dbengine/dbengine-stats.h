@@ -5,6 +5,10 @@
 
 #include "libnetdata/libnetdata.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // What the engine publishes about itself. The engine keeps these counters and sizes; whoever embeds
 // it reads them through the getters below, as snapshots, whenever it wants to chart or report them.
 // Nothing here is pushed: the engine has no idea who reads it.
@@ -211,7 +215,8 @@ typedef enum {
 } RRDENG_CACHE;
 
 // A snapshot of one cache; false, with *out zeroed, when that cache does not exist (no tier came up yet, or the
-// caches were destroyed). The counters are read one by one, not under a lock: a snapshot is consistent per field.
+// caches were destroyed). The counters are copied as a whole, not under a lock and not atomically: a counter may
+// be mid-update, and on a 32-bit target a 64-bit one may tear. Good enough for charts, not for accounting.
 bool rrdeng_get_cache_statistics(RRDENG_CACHE which, struct pgc_statistics *out);
 
 // pages of the main cache still to be written: hot (collected) plus dirty (waiting for a flush); 0 without a cache
@@ -387,5 +392,9 @@ struct rrdeng_gorilla_stats {
     uint64_t tier0_disk_original_bytes; // bytes of the uncompressed samples they hold
 };
 struct rrdeng_gorilla_stats rrdeng_get_gorilla_stats(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // NETDATA_DBENGINE_STATS_H
