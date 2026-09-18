@@ -32,10 +32,30 @@ only resolved selector values and cannot access these extra inputs. The framewor
 combines those names with required selector IDs without duplicates. These declarations do not implement filtering,
 storage, parsing or validation of extra inputs; the handler owns those semantics.
 
+## Info for structured methods
+
+For a shared Function with a job selector, structured `info` without an explicit `__job` returns declaration metadata
+and the available jobs without calling `MethodParams` or `Handle`. This keeps job discovery available even when a
+source cannot be queried. Agent, instance and single-instance structured Functions also retain declaration-only info.
+
+With an explicit `__job`, the framework resolves that running job and calls `MethodParams` under the same cancellation,
+availability and containment rules as data requests. It merges the result with declaration parameters and the
+framework-owned job selector, then returns metadata only. It does not call `Handle` or validate secondary selector
+values: a client may need this metadata to replace a selection that is unsupported by the new job.
+
+`MethodParams` may perform source I/O or use existing collector caches. A nil result preserves declared parameters;
+an error fails the metadata request. This exposes the handler's existing discovery semantics, not an atomic snapshot
+or a guarantee that the source is ready to return data. Data requests continue to discover and validate parameters
+normally.
+
+Clients SHOULD request scoped info when the selected job changes and reconcile dependent selections before querying
+data. The JSON schema and transport are unchanged. Existing clients that only request unscoped info keep their
+current behavior. Older agents may return only static declarations for scoped info, so clients MUST still handle
+data-request errors without presenting results from the previous job as current.
+
 ## Info for payload-aware methods
 
-Ordinary structured `info` returns declaration metadata without calling
-`MethodParams` or `Handle`. Existing raw-input methods receive `info` in `HandleRaw`.
+Existing raw-input methods receive `info` in `HandleRaw`.
 
 A raw-input method MAY set `ManagedInfo: true` to use framework-managed bootstrap
 and scoped metadata. `ManagedInfo` requires `RawRequest`.

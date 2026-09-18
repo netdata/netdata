@@ -3,11 +3,9 @@
 package functions
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,7 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,7 +55,7 @@ func TestManagedInfoBootstrapAndScopedMetadata(t *testing.T) {
 			{"id":"format","name":"Format","type":"select","options":[{"id":"text","name":"Text","defaultSelected":true}]}
 		]}`, string(bootstrap))
 	assert.Zero(t, calls.Load(), "bootstrap must not invoke the default source")
-	assertManagedInfoSchema(t, bootstrap, "info_response")
+	assertFunctionInfoSchema(t, bootstrap, "info_response")
 
 	scoped := h.call(t, []string{"info"}, []byte(`{"selections":{"__job":["beta rack,1"]},"after":123}`), 200)
 	var decoded map[string]any
@@ -67,7 +64,7 @@ func TestManagedInfoBootstrapAndScopedMetadata(t *testing.T) {
 	assert.Equal(t, []any{"__job", "format", "service", "after", "before", "query"}, decoded["accepted_params"])
 	assert.Len(t, decoded["required_params"], 3)
 	assert.EqualValues(t, 1, calls.Load())
-	assertManagedInfoSchema(t, scoped, "info_response")
+	assertFunctionInfoSchema(t, scoped, "info_response")
 }
 
 func TestManagedInfoHelp(t *testing.T) {
@@ -139,6 +136,16 @@ func TestManagedInfoRoutingAndErrors(t *testing.T) {
 			status:  400,
 			want:    "single value",
 		},
+		"repeated job arguments": {
+			args:   []string{"info", "__job:missing", "__job:alpha"},
+			status: 400,
+			want:   "single value",
+		},
+		"repeated job arguments on data": {
+			args:   []string{"__job:missing", "__job:alpha"},
+			status: 400,
+			want:   "single value",
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -179,7 +186,7 @@ func TestManagedInfoBoundMethods(t *testing.T) {
 			assert.NotContains(t, string(got), "__job")
 			assert.Contains(t, string(got), "Bound source")
 			assert.EqualValues(t, 1, calls.Load())
-			assertManagedInfoSchema(t, got, "info_response")
+			assertFunctionInfoSchema(t, got, "info_response")
 		})
 	}
 }
@@ -219,7 +226,7 @@ func TestManagedInfoDataComposition(t *testing.T) {
 			{"id":"format","name":"Format","type":"select","options":[{"id":"full","name":"Full","defaultSelected":true}]}
 		],"columns":{"message":{"index":0,"name":"Message","type":"string"}},"data":[["fan event"]]
 	}`, string(got))
-	assertManagedInfoSchema(t, got, "data_response")
+	assertFunctionInfoSchema(t, got, "data_response")
 }
 
 func TestManagedInfoExistingModes(t *testing.T) {
@@ -416,156 +423,23 @@ func (h *managedInfoHandler) HandleRaw(ctx context.Context, req funcapi.RawMetho
 
 func (*managedInfoHandler) Cleanup(context.Context) {}
 
-type managedInfoHarness struct {
-	controller *Controller
-	catalog    *Catalog
-	handles    map[string]*JobHandle
-	uid        int
-	route      string
-}
-
 func newManagedInfoHarness(
 	t *testing.T,
 	method funcapi.FunctionConfig,
 	mode string,
 	handle func(context.Context, string, funcapi.RawMethodRequest) *funcapi.FunctionResponse,
-) *managedInfoHarness {
+) *functionInfoHarness {
 	t.Helper()
-	creator := collectorapi.Creator{
-		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-			name := ""
-			if job != nil {
-				name = job.Name()
-			}
-			return &managedInfoHandler{
-				t: t,
-				handle: func(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-					return handle(ctx, name, req)
-				},
-			}
-		},
-	}
-	names := []string{"alpha", "beta rack,1"}
-	methods := func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{method} }
-	switch mode {
-	case "agent":
-		creator.AgentFunctions, names = methods, nil
-	case "single":
-		creator.SharedFunctions, creator.InstancePolicy, names = methods, collectorapi.InstancePolicySingle, []string{
-			"module",
+	return newFunctionInfoHarness(t, method, mode, func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+		name := ""
+		if job != nil {
+			name = job.Name()
 		}
-	case "instance":
-		creator.InstanceFunctions, names = func(collectorapi.RuntimeJob) []funcapi.FunctionConfig { return methods() }, []string{
-			"alpha",
-		}
-	default:
-		creator.SharedFunctions = methods
-	}
-	c, catalog, err := newContainedControllerTest(t, 1, collectorapi.Registry{
-		"module": creator,
-	})
-	require.NoError(t, err)
-	publication, err := NewPublication(1, newRecordingPublicationPort())
-	require.NoError(t, err)
-	require.NoError(t, c.Bind(&controllerTestMutationPort{
-		catalog: catalog,
-	}, publication))
-	require.NoError(t, c.Activate())
-	h := &managedInfoHarness{
-		controller: c,
-		catalog:    catalog,
-		handles:    make(map[string]*JobHandle),
-		route:      "module:events",
-	}
-	for _, name := range names {
-		job := &controllerTestJob{
-			fullName: "module_" + name,
-			module:   "module",
-			name:     name,
-			running:  true,
-		}
-		handle, err := prepareControllerTestJob(
-			t,
-			c,
-			lifecycle.ResourceIdentity{
-				ID:         job.FullName(),
-				Generation: 1,
+		return &managedInfoHandler{
+			t: t,
+			handle: func(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+				return handle(ctx, name, req)
 			},
-			job,
-		)
-		require.NoError(t, err)
-		require.NoError(t, handle.Publish())
-		h.handles[name] = handle
-	}
-	return h
-}
-
-func (h *managedInfoHarness) call(t *testing.T, args []string, payload []byte, status int) []byte {
-	t.Helper()
-	h.uid++
-	decision, err := h.catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID:         fmt.Sprintf("metadata-%d", h.uid),
-		Route:       h.route,
-		Args:        args,
-		Payload:     payload,
-		HasPayload:  len(payload) != 0,
-		ContentType: "application/json",
-		Timeout:     10 * time.Second,
+		}
 	})
-	require.NoError(t, err)
-	require.Zero(t, decision.Rejected)
-	var output bytes.Buffer
-	owner, err := lifecycle.NewFrameOwner(&output)
-	require.NoError(t, err)
-	supervisor, err := lifecycle.NewTaskSupervisor(owner)
-	require.NoError(t, err)
-	_, err = supervisor.Enqueue(
-		lifecycle.TaskClassGenericFunction,
-		lifecycle.TaskPlan{
-			Source: lifecycle.SourceFunction,
-			Work:   decision.Plan.Work,
-		},
-	)
-	require.NoError(t, err)
-	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
-	count, _, err := supervisor.Dispatch(t.Context(), 1, &started)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-	completion := <-supervisor.CompletionCh()
-	require.NoError(t, completion.Err)
-	require.NoError(t, supervisor.SendAction(lifecycle.TaskAction{
-		Ref:      completion.Ref,
-		Sequence: 2,
-		Kind:     lifecycle.TaskActionEncodeWrite,
-		UID:      "function-test",
-		Expiry:   1,
-	}))
-	ack := <-supervisor.AcknowledgementCh()
-	require.NoError(t, ack.Err)
-	require.NoError(t, supervisor.SendAction(lifecycle.TaskAction{
-		Ref:      completion.Ref,
-		Sequence: 3,
-		Kind:     lifecycle.TaskActionTerminate,
-	}))
-	ack = <-supervisor.AcknowledgementCh()
-	require.NoError(t, ack.Err)
-	require.NoError(t, supervisor.Release(completion.Ref))
-	cleanup, err := h.catalog.ReleaseInvocation(decision.Lease)
-	require.NoError(t, err)
-	require.False(t, cleanup.Valid())
-	return functionFramePayload(t, output.String(), status)
-}
-
-func assertManagedInfoSchema(t *testing.T, payload []byte, definition string) {
-	t.Helper()
-	data, err := os.ReadFile("../../../../../plugins.d/FUNCTION_UI_SCHEMA.json")
-	require.NoError(t, err)
-	var document, response any
-	require.NoError(t, json.Unmarshal(data, &document))
-	require.NoError(t, json.Unmarshal(payload, &response))
-	compiler := jsonschema.NewCompiler()
-	require.NoError(t, compiler.AddResource("function.json", document))
-	schema, err := compiler.Compile("function.json#/definitions/" + definition)
-	require.NoError(t, err)
-	assert.NoError(t, schema.Validate(response))
 }

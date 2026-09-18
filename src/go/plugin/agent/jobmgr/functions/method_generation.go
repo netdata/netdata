@@ -155,8 +155,11 @@ func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lif
 		return functionErrorResult(404, "unknown method %q", input.Method)
 	}
 	if slices.Contains(input.Args, "info") {
-		if !method.RawRequest || (method.ManagedInfo && mg.sharedJobSelectable() &&
-			len(functionJobValues(input)) == 0) {
+		selectableJob := mg.sharedJobSelectable()
+		boundInfo := !method.RawRequest && !selectableJob
+		bootstrapInfo := selectableJob && (!method.RawRequest || method.ManagedInfo) &&
+			len(functionJobValues(input)) == 0
+		if boundInfo || bootstrapInfo {
 			return mg.infoResult(method)
 		}
 	}
@@ -216,6 +219,12 @@ func (mg *methodGeneration) invokeResolved(
 		return functionErrorResult(503, "method %q cannot provide parameters: %v", method.ID, err)
 	}
 	params = funcapi.MergeParamConfigs(method.RequiredParams, params)
+	if slices.Contains(input.Args, "info") {
+		if job != nil && !job.IsRunning() {
+			return functionErrorResult(503, "job %q stopped during request", jobName)
+		}
+		return mg.responseResult(method, params, &funcapi.FunctionResponse{}, true)
+	}
 	payload := parseMethodPayload(input.Payload)
 	arguments := parseMethodArguments(input.Args)
 	if err := validateMethodParamValues(params, arguments, payload, jobName); err != nil {
@@ -474,7 +483,7 @@ func parseMethodArguments(arguments []string) map[string][]string {
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 			continue
 		}
-		params[parts[0]] = splitMethodCSV(parts[1])
+		params[parts[0]] = append(params[parts[0]], splitMethodCSV(parts[1])...)
 	}
 	if len(params) == 0 {
 		return nil
