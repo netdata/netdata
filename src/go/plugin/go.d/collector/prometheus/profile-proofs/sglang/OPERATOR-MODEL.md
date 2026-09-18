@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD013 MD043 MD060 -->
+
 # SGLang operator model
 
 Start with the endpoint's HTTP activity and completed inference work. Then use model and engine-role views to

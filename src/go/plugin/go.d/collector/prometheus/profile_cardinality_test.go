@@ -82,20 +82,7 @@ func TestCollector_ProfileCardinality(t *testing.T) {
 				population.Store(size)
 				collectProfileRelabelOnce(t, collector)
 				rejected = make(map[string]chartengine.PlanRouteDiagnostic)
-				attempt, err := engine.PreparePlan(collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-				require.NoError(t, err)
-				values := make(map[string][]float64)
-				for _, action := range attempt.Plan().Actions {
-					switch action := action.(type) {
-					case chartengine.CreateChartAction:
-						contexts[action.ChartID] = action.Meta.Context
-					case chartengine.UpdateChartAction:
-						for _, value := range action.Values {
-							values[contexts[action.ChartID]] = append(values[contexts[action.ChartID]], value.Float64)
-						}
-					}
-				}
-				require.NoError(t, attempt.Commit())
+				values := commitCardinalityPlan(t, collector, engine, contexts)
 				if size == 600 {
 					assert.ElementsMatch(t, []float64{900, 900}, values["prometheus.app.models"])
 					assert.ElementsMatch(t, []float64{600, 600, 600}, values["prometheus.app.teams"])
@@ -115,4 +102,23 @@ func TestCollector_ProfileCardinality(t *testing.T) {
 			}
 		})
 	}
+}
+
+func commitCardinalityPlan(t *testing.T, collector *Collector, engine *chartengine.Engine, contexts map[string]string) map[string][]float64 {
+	t.Helper()
+	attempt, err := engine.PreparePlan(collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	values := make(map[string][]float64)
+	for _, action := range attempt.Plan().Actions {
+		switch action := action.(type) {
+		case chartengine.CreateChartAction:
+			contexts[action.ChartID] = action.Meta.Context
+		case chartengine.UpdateChartAction:
+			for _, value := range action.Values {
+				values[contexts[action.ChartID]] = append(values[contexts[action.ChartID]], value.Float64)
+			}
+		}
+	}
+	require.NoError(t, attempt.Commit())
+	return values
 }

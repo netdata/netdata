@@ -89,6 +89,14 @@ func TestCompileComponentUnitDerivesLifecycleDefaults(t *testing.T) {
 			unit:      "bytes",
 			scale:     newRationalScale(1<<30, 1),
 		},
+		"current bandwidth": {
+			component: testUnitComponent("current", "data_rate", "gibibyte_per_second", "none", "transfer_speed"),
+			algorithm: "absolute", rate: "none", unit: "bytes/s", scale: newRationalScale(1<<30, 1),
+		},
+		"current bandwidth per second": {
+			component: testUnitComponent("current", "data_rate", "gibibyte_per_second", "per_second", "transfer_speed_change"),
+			algorithm: "absolute", rate: "per_second", unit: "bytes/s²", scale: newRationalScale(1<<30, 1),
+		},
 		"cumulative bandwidth observations": {
 			component: testUnitComponent("cumulative", "data_rate", "gibibyte_per_second", "none", "transfer_speed"),
 			algorithm: "incremental",

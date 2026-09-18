@@ -4,6 +4,7 @@ package promsemantics
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -87,4 +88,34 @@ func TestUnsignedIntegerCategoryCoverage(t *testing.T) {
 	assert.Contains(t, categoryCoverageBranches(definition, source), "missing")
 	source.Domain.Kind = "open"
 	assert.Contains(t, categoryCoverageBranches(definition, source), "malformed", "open strings retain malformed coverage")
+}
+
+func TestUnsignedIntegerCategoryExhaustiveCoverage(t *testing.T) {
+	zero, one, two, maximum := uint64(0), uint64(1), uint64(2), ^uint64(0)
+	beforeMaximum := maximum - 1
+	for _, tc := range []struct {
+		name     string
+		exact    map[string]string
+		ranges   []CategoryRange
+		complete bool
+	}{
+		{"full range", nil, []CategoryRange{{Min: &zero, Max: &maximum, Value: "all"}}, true},
+		{"exact bridges range", map[string]string{"0": "zero", "1": "one"}, []CategoryRange{{Min: &two, Max: &maximum, Value: "rest"}}, true},
+		{"gap", map[string]string{"0": "zero"}, []CategoryRange{{Min: &two, Max: &maximum, Value: "rest"}}, false},
+		{"maximum exact", map[string]string{"18446744073709551615": "last"}, []CategoryRange{{Min: &zero, Max: &beforeMaximum, Value: "rest"}}, true},
+		{"missing maximum", nil, []CategoryRange{{Min: &zero, Max: &beforeMaximum, Value: "rest"}}, false},
+		{"adjacent ranges", nil, []CategoryRange{{Min: &zero, Max: &zero, Value: "zero"}, {Min: &one, Max: &maximum, Value: "rest"}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			definition := Normalization{Exact: tc.exact, Ranges: tc.ranges, Missing: &CategoryAction{}, Malformed: &CategoryAction{}, Unknown: &CategoryAction{}, Output: &NormalizedLabelOutput{Meaning: "Category."}}
+			source := SourceLabel{Presence: LabelPresence{Kind: "required"}, Domain: LabelDomain{Kind: "unsigned_integer"}}
+			assert.Equal(t, tc.complete, categoryOutputPresence(definition, source).keyIsAlwaysPresent())
+			assert.Equal(t, !tc.complete, slices.Contains(categoryCoverageBranches(definition, source), "unknown"))
+			unreachable := "unreachable"
+			definition.Unknown.Set = &unreachable
+			assert.Equal(t, !tc.complete, slices.Contains(categoryOutputSchema(definition, source).Domain.Values, unreachable))
+			source.Presence.Kind = "optional"
+			assert.False(t, categoryOutputPresence(definition, source).keyIsAlwaysPresent())
+		})
+	}
 }

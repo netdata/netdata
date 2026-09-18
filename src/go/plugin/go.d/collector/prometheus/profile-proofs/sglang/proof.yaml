@@ -12,14 +12,14 @@ cases:
       sglang:
         role: unified
         capabilities:
-        - priority
-        - lora
-        - hicache
-        - streaming_session
-        - storage
-        - swa
-        - expert_balance
-        - prefill_delayer
+          - priority
+          - lora
+          - hicache
+          - streaming_session
+          - storage
+          - swa
+          - expert_balance
+          - prefill_delayer
     fixture: fixtures/unified.prom
     coverage: true
     expected:
@@ -29,14 +29,14 @@ cases:
       sglang:
         role: prefill
         capabilities:
-        - priority
-        - lora
-        - hicache
-        - streaming_session
-        - storage
-        - swa
-        - expert_balance
-        - prefill_delayer
+          - priority
+          - lora
+          - hicache
+          - streaming_session
+          - storage
+          - swa
+          - expert_balance
+          - prefill_delayer
     fixture: fixtures/prefill.prom
     coverage: true
     expected:
@@ -46,14 +46,14 @@ cases:
       sglang:
         role: decode
         capabilities:
-        - priority
-        - lora
-        - hicache
-        - streaming_session
-        - storage
-        - swa
-        - expert_balance
-        - prefill_delayer
+          - priority
+          - lora
+          - hicache
+          - streaming_session
+          - storage
+          - swa
+          - expert_balance
+          - prefill_delayer
     fixture: fixtures/decode.prom
     coverage: true
     expected:
@@ -72,13 +72,13 @@ cases:
       sglang:
         role: unified
         capabilities:
-        - lora
-        - hicache
-        - streaming_session
-        - storage
-        - swa
-        - expert_balance
-        - prefill_delayer
+          - lora
+          - hicache
+          - streaming_session
+          - storage
+          - swa
+          - expert_balance
+          - prefill_delayer
     fixture: fixtures/unified_plain.prom
     coverage: true
     expected:
@@ -88,13 +88,13 @@ cases:
       sglang:
         role: prefill
         capabilities:
-        - lora
-        - hicache
-        - streaming_session
-        - storage
-        - swa
-        - expert_balance
-        - prefill_delayer
+          - lora
+          - hicache
+          - streaming_session
+          - storage
+          - swa
+          - expert_balance
+          - prefill_delayer
     fixture: fixtures/prefill_plain.prom
     coverage: true
     expected:
@@ -104,13 +104,13 @@ cases:
       sglang:
         role: decode
         capabilities:
-        - lora
-        - hicache
-        - streaming_session
-        - storage
-        - swa
-        - expert_balance
-        - prefill_delayer
+          - lora
+          - hicache
+          - streaming_session
+          - storage
+          - swa
+          - expert_balance
+          - prefill_delayer
     fixture: fixtures/decode_plain.prom
     coverage: true
     expected:
@@ -120,13 +120,13 @@ cases:
       sglang:
         role: unified
         capabilities:
-        - priority
-        - lora
-        - hicache
-        - streaming_session
-        - storage
-        - expert_balance
-        - prefill_delayer
+          - priority
+          - lora
+          - hicache
+          - streaming_session
+          - storage
+          - expert_balance
+          - prefill_delayer
     fixture: fixtures/unified_mamba.prom
     coverage: true
     expected:

@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,20 +61,7 @@ func TestCollector_SGLangRollupCardinality(t *testing.T) {
 			for _, size := range []int64{600, 3, 600, 3} {
 				population.Store(size)
 				collectProfileRelabelOnce(t, collector)
-				attempt, err := engine.PreparePlan(collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-				require.NoError(t, err)
-				values := make(map[string][]float64)
-				for _, action := range attempt.Plan().Actions {
-					switch action := action.(type) {
-					case chartengine.CreateChartAction:
-						contexts[action.ChartID] = action.Meta.Context
-					case chartengine.UpdateChartAction:
-						for _, value := range action.Values {
-							values[contexts[action.ChartID]] = append(values[contexts[action.ChartID]], value.Float64)
-						}
-					}
-				}
-				require.NoError(t, attempt.Commit())
+				values := commitCardinalityPlan(t, collector, engine, contexts)
 				finished, tokens, httpTotal := []float64{900, 900}, []float64{57600, 14400}, float64(1800)
 				if size == 3 {
 					finished, tokens, httpTotal = []float64{4, 2}, []float64{192, 48}, 6

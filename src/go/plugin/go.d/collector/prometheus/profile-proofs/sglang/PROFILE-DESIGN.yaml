@@ -21,22 +21,22 @@ entities:
     grain: model_name
     identity:
       required:
-      - model_name
+        - model_name
       optional: []
   model_name_engine_type:
     grain: model_name, engine_type
     identity:
       required:
-      - model_name
-      - engine_type
+        - model_name
+        - engine_type
       optional: []
   model_name_engine_type_priority:
     grain: model_name, engine_type, priority
     identity:
       required:
-      - model_name
-      - engine_type
-      - priority
+        - model_name
+        - engine_type
+        - priority
       optional: []
     high_cardinality_acceptance:
       operator_value: This built-in detail identifies the responsible request priority or HTTP route; independently
@@ -45,25 +45,25 @@ entities:
     grain: model_name, engine_type, tp_rank, pp_rank, moe_ep_rank, dp_rank
     identity:
       required:
-      - model_name
-      - engine_type
-      - tp_rank
-      - pp_rank
-      - moe_ep_rank
+        - model_name
+        - engine_type
+        - tp_rank
+        - pp_rank
+        - moe_ep_rank
       optional:
-      - dp_rank
+        - dp_rank
   model_name_engine_type_tp_rank_pp_rank_moe_ep_rank_priority_optional_dp_rank:
     grain: model_name, engine_type, tp_rank, pp_rank, moe_ep_rank, priority, dp_rank
     identity:
       required:
-      - model_name
-      - engine_type
-      - tp_rank
-      - pp_rank
-      - moe_ep_rank
-      - priority
+        - model_name
+        - engine_type
+        - tp_rank
+        - pp_rank
+        - moe_ep_rank
+        - priority
       optional:
-      - dp_rank
+        - dp_rank
     high_cardinality_acceptance:
       operator_value: This built-in detail identifies the responsible request priority or HTTP route; independently
         admitted summaries retain visibility if this context exceeds an existing series limit.
@@ -71,170 +71,170 @@ entities:
     grain: model_name, engine_type, tp_rank, pp_rank, moe_ep_rank, stage, dp_rank
     identity:
       required:
-      - model_name
-      - engine_type
-      - tp_rank
-      - pp_rank
-      - moe_ep_rank
-      - stage
+        - model_name
+        - engine_type
+        - tp_rank
+        - pp_rank
+        - moe_ep_rank
+        - stage
       optional:
-      - dp_rank
+        - dp_rank
   model_name_engine_type_tp_rank_pp_rank_moe_ep_rank_forward_mode_optional_dp_rank:
     grain: model_name, engine_type, tp_rank, pp_rank, moe_ep_rank, forward_mode, dp_rank
     identity:
       required:
-      - model_name
-      - engine_type
-      - tp_rank
-      - pp_rank
-      - moe_ep_rank
-      - forward_mode
+        - model_name
+        - engine_type
+        - tp_rank
+        - pp_rank
+        - moe_ep_rank
+        - forward_mode
       optional:
-      - dp_rank
+        - dp_rank
   model_name_engine_type_tp_rank_pp_rank_moe_ep_rank_mode_optional_dp_rank:
     grain: model_name, engine_type, tp_rank, pp_rank, moe_ep_rank, mode, dp_rank
     identity:
       required:
-      - model_name
-      - engine_type
-      - tp_rank
-      - pp_rank
-      - moe_ep_rank
-      - mode
+        - model_name
+        - engine_type
+        - tp_rank
+        - pp_rank
+        - moe_ep_rank
+        - mode
       optional:
-      - dp_rank
+        - dp_rank
   model_name_engine_type_tp_rank_pp_rank_moe_ep_rank_category_optional_dp_rank:
     grain: model_name, engine_type, tp_rank, pp_rank, moe_ep_rank, category, dp_rank
     identity:
       required:
-      - model_name
-      - engine_type
-      - tp_rank
-      - pp_rank
-      - moe_ep_rank
-      - category
+        - model_name
+        - engine_type
+        - tp_rank
+        - pp_rank
+        - moe_ep_rank
+        - category
       optional:
-      - dp_rank
+        - dp_rank
   model_name_engine_type_tp_rank_pp_rank_moe_ep_rank_input_estimation_output_allow_output_reason_optional_dp_rank:
     grain: model_name, engine_type, tp_rank, pp_rank, moe_ep_rank, input_estimation, output_allow, output_reason,
       dp_rank
     identity:
       required:
-      - model_name
-      - engine_type
-      - tp_rank
-      - pp_rank
-      - moe_ep_rank
-      - input_estimation
-      - output_allow
-      - output_reason
+        - model_name
+        - engine_type
+        - tp_rank
+        - pp_rank
+        - moe_ep_rank
+        - input_estimation
+        - output_allow
+        - output_reason
       optional:
-      - dp_rank
+        - dp_rank
   model_name_dp_rank:
     grain: model_name, dp_rank
     identity:
       required:
-      - model_name
-      - dp_rank
+        - model_name
+        - dp_rank
       optional: []
   component:
     grain: component
     identity:
       required:
-      - component
+        - component
       optional: []
   name:
     grain: name
     identity:
       required:
-      - name
+        - name
       optional: []
   model_name_engine_type_phase:
     grain: model_name, engine_type, phase
     identity:
       required:
-      - model_name
-      - engine_type
-      - phase
+        - model_name
+        - engine_type
+        - phase
       optional: []
   storage_backend:
     grain: storage_backend
     identity:
       required:
-      - storage_backend
+        - storage_backend
       optional: []
   storage_backend_tp_rank_dp_rank_pp_rank_pp_size_attn_cp_rank_attn_cp_size:
     grain: storage_backend, tp_rank, dp_rank, pp_rank, pp_size, attn_cp_rank, attn_cp_size
     identity:
       required:
-      - storage_backend
-      - tp_rank
-      - dp_rank
-      - pp_rank
-      - pp_size
-      - attn_cp_rank
-      - attn_cp_size
+        - storage_backend
+        - tp_rank
+        - dp_rank
+        - pp_rank
+        - pp_size
+        - attn_cp_rank
+        - attn_cp_size
       optional: []
   layer:
     grain: layer
     identity:
       required:
-      - layer
+        - layer
       optional: []
   cache_type:
     grain: cache_type
     identity:
       required:
-      - cache_type
+        - cache_type
       optional: []
   cache_type_pool:
     grain: cache_type, pool
     identity:
       required:
-      - cache_type
-      - pool
+        - cache_type
+        - pool
       optional: []
   model_name_modality:
     grain: model_name, modality
     identity:
       required:
-      - model_name
-      - modality
+        - model_name
+        - modality
       optional: []
   model_name_dp_rank_modality:
     grain: model_name, dp_rank, modality
     identity:
       required:
-      - model_name
-      - dp_rank
-      - modality
+        - model_name
+        - dp_rank
+        - modality
       optional: []
   model_name_backend:
     grain: model_name, backend
     identity:
       required:
-      - model_name
-      - backend
+        - model_name
+        - backend
       optional: []
   model_name_dp_rank_backend:
     grain: model_name, dp_rank, backend
     identity:
       required:
-      - model_name
-      - dp_rank
-      - backend
+        - model_name
+        - dp_rank
+        - backend
       optional: []
   context:
     grain: context
     identity:
       required:
-      - context
+        - context
       optional: []
   endpoint:
     grain: endpoint
     identity:
       required:
-      - endpoint
+        - endpoint
       optional: []
     high_cardinality_acceptance:
       operator_value: This built-in detail identifies the responsible request priority or HTTP route; independently
@@ -243,8 +243,8 @@ entities:
     grain: endpoint, method
     identity:
       required:
-      - endpoint
-      - method
+        - endpoint
+        - method
       optional: []
     high_cardinality_acceptance:
       operator_value: This built-in detail identifies the responsible request priority or HTTP route; independently
@@ -257,7 +257,7 @@ normalizations:
     applies_to:
       signal: http_requests_total
       components:
-      - value
+        - value
     source_label: method
     target_label: method_class
     missing:
@@ -269,9 +269,9 @@ normalizations:
     output:
       meaning: Bounded HTTP method category.
       evidence:
-      - http_labels
+        - http_labels
     evidence:
-    - http_categories
+      - http_categories
     exact:
       GET: GET
       HEAD: HEAD
@@ -287,7 +287,7 @@ normalizations:
     applies_to:
       signal: http_responses_total
       components:
-      - value
+        - value
     source_label: method
     target_label: method_class
     missing:
@@ -299,9 +299,9 @@ normalizations:
     output:
       meaning: Bounded HTTP method category.
       evidence:
-      - http_labels
+        - http_labels
     evidence:
-    - http_categories
+      - http_categories
     exact:
       GET: GET
       HEAD: HEAD
@@ -317,7 +317,7 @@ normalizations:
     applies_to:
       signal: http_responses_total
       components:
-      - value
+        - value
     source_label: status_code
     target_label: status_class
     missing:
@@ -329,31 +329,31 @@ normalizations:
     output:
       meaning: Bounded HTTP status_code category.
       evidence:
-      - http_labels
+        - http_labels
     evidence:
-    - http_categories
+      - http_categories
     ranges:
-    - min: 100
-      max: 199
-      value: 1xx
-    - min: 200
-      max: 299
-      value: 2xx
-    - min: 300
-      max: 399
-      value: 3xx
-    - min: 400
-      max: 499
-      value: 4xx
-    - min: 500
-      max: 599
-      value: 5xx
+      - min: 100
+        max: 199
+        value: 1xx
+      - min: 200
+        max: 299
+        value: 2xx
+      - min: 300
+        max: 399
+        value: 3xx
+      - min: 400
+        max: 499
+        value: 4xx
+      - min: 500
+        max: 599
+        value: 5xx
   http_requests_active_method_class:
     kind: category
     applies_to:
       signal: http_requests_active
       components:
-      - value
+        - value
     source_label: method
     target_label: method_class
     missing:
@@ -365,9 +365,9 @@ normalizations:
     output:
       meaning: Bounded HTTP method category.
       evidence:
-      - http_labels
+        - http_labels
     evidence:
-    - http_categories
+      - http_categories
     exact:
       GET: GET
       HEAD: HEAD
@@ -389,7 +389,7 @@ views:
       finished:
         signal: num_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         is_streaming:
@@ -412,11 +412,11 @@ views:
       prompt:
         signal: prompt_tokens_total
         components:
-        - value
+          - value
       generated:
         signal: generation_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -438,7 +438,7 @@ views:
       distribution:
         signal: e2e_request_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -460,7 +460,7 @@ views:
       observations:
         signal: e2e_request_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -482,7 +482,7 @@ views:
       observation_sum:
         signal: e2e_request_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -504,7 +504,7 @@ views:
       distribution:
         signal: time_to_first_token_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -526,7 +526,7 @@ views:
       observations:
         signal: time_to_first_token_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -548,7 +548,7 @@ views:
       observation_sum:
         signal: time_to_first_token_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -570,7 +570,7 @@ views:
       distribution:
         signal: inter_token_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -591,7 +591,7 @@ views:
       observations:
         signal: inter_token_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -612,7 +612,7 @@ views:
       observation_sum:
         signal: inter_token_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -633,7 +633,7 @@ views:
       finished:
         signal: num_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         is_streaming:
@@ -655,11 +655,11 @@ views:
       prompt:
         signal: prompt_tokens_total
         components:
-        - value
+          - value
       generated:
         signal: generation_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -680,7 +680,7 @@ views:
       distribution:
         signal: e2e_request_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -701,7 +701,7 @@ views:
       observations:
         signal: e2e_request_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -722,7 +722,7 @@ views:
       observation_sum:
         signal: e2e_request_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -743,7 +743,7 @@ views:
       distribution:
         signal: time_to_first_token_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -764,7 +764,7 @@ views:
       observations:
         signal: time_to_first_token_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -785,7 +785,7 @@ views:
       observation_sum:
         signal: time_to_first_token_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -806,7 +806,7 @@ views:
       distribution:
         signal: inter_token_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -826,7 +826,7 @@ views:
       observations:
         signal: inter_token_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -846,7 +846,7 @@ views:
       observation_sum:
         signal: inter_token_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -866,7 +866,7 @@ views:
       finished:
         signal: num_so_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -886,7 +886,7 @@ views:
       aborted:
         signal: num_aborted_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -900,7 +900,7 @@ views:
       cached:
         signal: cached_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         cache_source:
@@ -922,7 +922,7 @@ views:
       distribution:
         signal: prompt_tokens_histogram
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -942,7 +942,7 @@ views:
       observations:
         signal: prompt_tokens_histogram
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -962,7 +962,7 @@ views:
       observation_sum:
         signal: prompt_tokens_histogram
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -982,7 +982,7 @@ views:
       distribution:
         signal: uncached_prompt_tokens_histogram
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1002,7 +1002,7 @@ views:
       observations:
         signal: uncached_prompt_tokens_histogram
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1022,7 +1022,7 @@ views:
       observation_sum:
         signal: uncached_prompt_tokens_histogram
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1042,7 +1042,7 @@ views:
       distribution:
         signal: generation_tokens_histogram
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1062,7 +1062,7 @@ views:
       observations:
         signal: generation_tokens_histogram
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1082,7 +1082,7 @@ views:
       observation_sum:
         signal: generation_tokens_histogram
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1102,7 +1102,7 @@ views:
       finished:
         signal: num_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         is_streaming:
@@ -1123,11 +1123,11 @@ views:
       prompt:
         signal: prompt_tokens_total
         components:
-        - value
+          - value
       generated:
         signal: generation_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1147,7 +1147,7 @@ views:
       distribution:
         signal: e2e_request_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1167,7 +1167,7 @@ views:
       observations:
         signal: e2e_request_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1187,7 +1187,7 @@ views:
       observation_sum:
         signal: e2e_request_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1207,7 +1207,7 @@ views:
       distribution:
         signal: time_to_first_token_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1227,7 +1227,7 @@ views:
       observations:
         signal: time_to_first_token_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1247,7 +1247,7 @@ views:
       observation_sum:
         signal: time_to_first_token_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1267,7 +1267,7 @@ views:
       distribution:
         signal: inter_token_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1286,7 +1286,7 @@ views:
       observations:
         signal: inter_token_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1305,7 +1305,7 @@ views:
       observation_sum:
         signal: inter_token_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1324,7 +1324,7 @@ views:
       finished:
         signal: num_so_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1343,7 +1343,7 @@ views:
       aborted:
         signal: num_aborted_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1356,7 +1356,7 @@ views:
       cached:
         signal: cached_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         cache_source:
@@ -1377,7 +1377,7 @@ views:
       distribution:
         signal: prompt_tokens_histogram
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1396,7 +1396,7 @@ views:
       observations:
         signal: prompt_tokens_histogram
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1415,7 +1415,7 @@ views:
       observation_sum:
         signal: prompt_tokens_histogram
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1434,7 +1434,7 @@ views:
       distribution:
         signal: uncached_prompt_tokens_histogram
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1453,7 +1453,7 @@ views:
       observations:
         signal: uncached_prompt_tokens_histogram
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1472,7 +1472,7 @@ views:
       observation_sum:
         signal: uncached_prompt_tokens_histogram
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1491,7 +1491,7 @@ views:
       distribution:
         signal: generation_tokens_histogram
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -1510,7 +1510,7 @@ views:
       observations:
         signal: generation_tokens_histogram
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -1529,7 +1529,7 @@ views:
       observation_sum:
         signal: generation_tokens_histogram
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -1548,12 +1548,12 @@ views:
       finished:
         signal: num_requests_total
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
     labels:
       dimensions:
         is_streaming:
@@ -1573,21 +1573,21 @@ views:
       prompt:
         signal: prompt_tokens_total
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
       generated:
         signal: generation_tokens_total
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
     labels:
       dimensions: {}
       promote: []
@@ -1606,21 +1606,21 @@ views:
       running:
         signal: num_running_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
       waiting:
         signal: num_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
     labels:
       dimensions: {}
       promote: []
@@ -1634,21 +1634,21 @@ views:
       running:
         signal: num_running_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
       waiting:
         signal: num_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
     labels:
       dimensions: {}
       promote: []
@@ -1672,21 +1672,21 @@ views:
       running:
         signal: num_running_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
       waiting:
         signal: num_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
     labels:
       dimensions: {}
       promote: []
@@ -1699,19 +1699,19 @@ views:
       overall:
         signal: token_usage
         components:
-        - value
+          - value
       full:
         signal: full_token_usage
         components:
-        - value
+          - value
       swa:
         signal: swa_token_usage
         components:
-        - value
+          - value
       mamba:
         signal: mamba_usage
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1733,11 +1733,11 @@ views:
       full:
         signal: kv_available_tokens
         components:
-        - value
+          - value
       swa:
         signal: swa_available_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1759,7 +1759,7 @@ views:
       mamba:
         signal: mamba_available_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1782,11 +1782,11 @@ views:
       retracted:
         signal: num_retracted_reqs
         components:
-        - value
+          - value
       paused:
         signal: num_paused_reqs
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1799,19 +1799,19 @@ views:
       overall:
         signal: token_usage
         components:
-        - value
+          - value
       full:
         signal: full_token_usage
         components:
-        - value
+          - value
       swa:
         signal: swa_token_usage
         components:
-        - value
+          - value
       mamba:
         signal: mamba_usage
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1824,15 +1824,15 @@ views:
       available:
         signal: kv_available_tokens
         components:
-        - value
+          - value
       evictable:
         signal: kv_evictable_tokens
         components:
-        - value
+          - value
       used:
         signal: kv_used_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1845,15 +1845,15 @@ views:
       available:
         signal: swa_available_tokens
         components:
-        - value
+          - value
       evictable:
         signal: swa_evictable_tokens
         components:
-        - value
+          - value
       used:
         signal: swa_used_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1866,15 +1866,15 @@ views:
       available:
         signal: mamba_available_tokens
         components:
-        - value
+          - value
       evictable:
         signal: mamba_evictable_tokens
         components:
-        - value
+          - value
       used:
         signal: mamba_used_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1887,11 +1887,11 @@ views:
       used:
         signal: lora_pool_slots_used
         components:
-        - value
+          - value
       capacity:
         signal: lora_pool_slots_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1904,11 +1904,11 @@ views:
       used:
         signal: hicache_host_used_tokens
         components:
-        - value
+          - value
       capacity:
         signal: hicache_host_total_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1921,11 +1921,11 @@ views:
       full:
         signal: max_total_num_tokens
         components:
-        - value
+          - value
       swa:
         signal: max_total_num_tokens_swa
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1939,19 +1939,19 @@ views:
       accepted:
         signal: spec_accept_length
         components:
-        - value
+          - value
       cap:
         signal: spec_cap_length
         components:
-        - value
+          - value
       block:
         signal: spec_block_accept_length
         components:
-        - value
+          - value
       draft:
         signal: spec_num_draft_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1964,11 +1964,11 @@ views:
       input:
         signal: num_retracted_input_tokens_total
         components:
-        - value
+          - value
       output:
         signal: num_retracted_output_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -1982,11 +1982,11 @@ views:
       read:
         signal: estimated_read_bytes_per_gpu_total
         components:
-        - value
+          - value
       write:
         signal: estimated_write_bytes_per_gpu_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2000,19 +2000,19 @@ views:
       attempts:
         signal: num_grammar_total
         components:
-        - value
+          - value
       hits:
         signal: num_grammar_cache_hit_total
         components:
-        - value
+          - value
       aborted:
         signal: num_grammar_aborted_total
         components:
-        - value
+          - value
       timed_out:
         signal: num_grammar_timeout_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2026,15 +2026,15 @@ views:
       bootstrap:
         signal: num_bootstrap_failed_reqs_total
         components:
-        - value
+          - value
       transfer:
         signal: num_transfer_failed_reqs_total
         components:
-        - value
+          - value
       retries:
         signal: num_prefill_retries_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2048,7 +2048,7 @@ views:
       num_grammar_queue_reqs:
         signal: num_grammar_queue_reqs
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2062,7 +2062,7 @@ views:
       gen_throughput:
         signal: gen_throughput
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2076,7 +2076,7 @@ views:
       cache_hit_rate:
         signal: cache_hit_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2090,7 +2090,7 @@ views:
       decode_sum_seq_lens:
         signal: decode_sum_seq_lens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2104,7 +2104,7 @@ views:
       num_used_tokens:
         signal: num_used_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2118,7 +2118,7 @@ views:
       weight_load_duration_seconds:
         signal: weight_load_duration_seconds
         components:
-        - value
+          - value
     labels:
       dimensions:
         source:
@@ -2134,7 +2134,7 @@ views:
       spec_accept_rate:
         signal: spec_accept_rate
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2148,7 +2148,7 @@ views:
       spec_num_steps:
         signal: spec_num_steps
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2161,7 +2161,7 @@ views:
       num_retracted_requests_total:
         signal: num_retracted_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2175,12 +2175,12 @@ views:
       num_prefill_bootstrap_queue_reqs:
         signal: num_prefill_bootstrap_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
     labels:
       dimensions: {}
       promote: []
@@ -2195,12 +2195,12 @@ views:
       num_prefill_bootstrap_queue_reqs:
         signal: num_prefill_bootstrap_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
     labels:
       dimensions: {}
       promote: []
@@ -2214,12 +2214,12 @@ views:
       num_prefill_inflight_queue_reqs:
         signal: num_prefill_inflight_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
     labels:
       dimensions: {}
       promote: []
@@ -2234,12 +2234,12 @@ views:
       num_prefill_inflight_queue_reqs:
         signal: num_prefill_inflight_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
     labels:
       dimensions: {}
       promote: []
@@ -2253,12 +2253,12 @@ views:
       num_decode_prealloc_queue_reqs:
         signal: num_decode_prealloc_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
     labels:
       dimensions: {}
       promote: []
@@ -2273,12 +2273,12 @@ views:
       num_decode_prealloc_queue_reqs:
         signal: num_decode_prealloc_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
     labels:
       dimensions: {}
       promote: []
@@ -2292,12 +2292,12 @@ views:
       num_decode_transfer_queue_reqs:
         signal: num_decode_transfer_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: absent
+            - all:
+                - label: priority
+                  op: absent
     labels:
       dimensions: {}
       promote: []
@@ -2312,12 +2312,12 @@ views:
       num_decode_transfer_queue_reqs:
         signal: num_decode_transfer_queue_reqs
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: priority
-              op: nonblank
+            - all:
+                - label: priority
+                  op: nonblank
     labels:
       dimensions: {}
       promote: []
@@ -2331,7 +2331,7 @@ views:
       distribution:
         signal: kv_transfer_speed_gb_s
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -2345,7 +2345,7 @@ views:
       observations:
         signal: kv_transfer_speed_gb_s
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -2359,7 +2359,7 @@ views:
       observation_sum:
         signal: kv_transfer_speed_gb_s
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -2373,7 +2373,7 @@ views:
       distribution:
         signal: kv_transfer_latency_ms
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -2387,7 +2387,7 @@ views:
       observations:
         signal: kv_transfer_latency_ms
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -2401,7 +2401,7 @@ views:
       observation_sum:
         signal: kv_transfer_latency_ms
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -2415,7 +2415,7 @@ views:
       pending_prealloc_token_usage:
         signal: pending_prealloc_token_usage
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2429,7 +2429,7 @@ views:
       distribution:
         signal: kv_transfer_bootstrap_ms
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -2443,7 +2443,7 @@ views:
       observations:
         signal: kv_transfer_bootstrap_ms
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -2457,7 +2457,7 @@ views:
       observation_sum:
         signal: kv_transfer_bootstrap_ms
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -2471,7 +2471,7 @@ views:
       distribution:
         signal: kv_transfer_alloc_ms
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -2485,7 +2485,7 @@ views:
       observations:
         signal: kv_transfer_alloc_ms
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -2499,7 +2499,7 @@ views:
       observation_sum:
         signal: kv_transfer_alloc_ms
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -2513,7 +2513,7 @@ views:
       distribution:
         signal: kv_transfer_total_mb
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -2527,7 +2527,7 @@ views:
       observations:
         signal: kv_transfer_total_mb
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -2541,7 +2541,7 @@ views:
       observation_sum:
         signal: kv_transfer_total_mb
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -2555,7 +2555,7 @@ views:
       utilization:
         signal: utilization
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2569,7 +2569,7 @@ views:
       fwd_occupancy:
         signal: fwd_occupancy
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2583,7 +2583,7 @@ views:
       new_token_ratio:
         signal: new_token_ratio
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2597,7 +2597,7 @@ views:
       is_cuda_graph:
         signal: is_cuda_graph
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2611,7 +2611,7 @@ views:
       cuda_graph_passes_total:
         signal: cuda_graph_passes_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         mode:
@@ -2626,7 +2626,7 @@ views:
       lora_pool_utilization:
         signal: lora_pool_utilization
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2640,7 +2640,7 @@ views:
       num_streaming_sessions:
         signal: num_streaming_sessions
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2654,7 +2654,7 @@ views:
       streaming_session_held_tokens:
         signal: streaming_session_held_tokens
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2668,7 +2668,7 @@ views:
       num_unique_running_routing_keys:
         signal: num_unique_running_routing_keys
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -2682,146 +2682,146 @@ views:
       requests_0_to_1:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '1'
-            - label: gt
-              op: eq
-              value: '0'
+            - all:
+                - label: le
+                  op: eq
+                  value: '1'
+                - label: gt
+                  op: eq
+                  value: '0'
       requests_1_to_2:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '2'
-            - label: gt
-              op: eq
-              value: '1'
+            - all:
+                - label: le
+                  op: eq
+                  value: '2'
+                - label: gt
+                  op: eq
+                  value: '1'
       requests_2_to_3:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '3'
-            - label: gt
-              op: eq
-              value: '2'
+            - all:
+                - label: le
+                  op: eq
+                  value: '3'
+                - label: gt
+                  op: eq
+                  value: '2'
       requests_3_to_5:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '5'
-            - label: gt
-              op: eq
-              value: '3'
+            - all:
+                - label: le
+                  op: eq
+                  value: '5'
+                - label: gt
+                  op: eq
+                  value: '3'
       requests_5_to_7:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '7'
-            - label: gt
-              op: eq
-              value: '5'
+            - all:
+                - label: le
+                  op: eq
+                  value: '7'
+                - label: gt
+                  op: eq
+                  value: '5'
       requests_7_to_10:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '10'
-            - label: gt
-              op: eq
-              value: '7'
+            - all:
+                - label: le
+                  op: eq
+                  value: '10'
+                - label: gt
+                  op: eq
+                  value: '7'
       requests_10_to_20:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '20'
-            - label: gt
-              op: eq
-              value: '10'
+            - all:
+                - label: le
+                  op: eq
+                  value: '20'
+                - label: gt
+                  op: eq
+                  value: '10'
       requests_20_to_50:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '50'
-            - label: gt
-              op: eq
-              value: '20'
+            - all:
+                - label: le
+                  op: eq
+                  value: '50'
+                - label: gt
+                  op: eq
+                  value: '20'
       requests_50_to_100:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '100'
-            - label: gt
-              op: eq
-              value: '50'
+            - all:
+                - label: le
+                  op: eq
+                  value: '100'
+                - label: gt
+                  op: eq
+                  value: '50'
       requests_100_to_200:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '200'
-            - label: gt
-              op: eq
-              value: '100'
+            - all:
+                - label: le
+                  op: eq
+                  value: '200'
+                - label: gt
+                  op: eq
+                  value: '100'
       requests_200_to_infinity:
         signal: routing_key_running_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: +Inf
-            - label: gt
-              op: eq
-              value: '200'
+            - all:
+                - label: le
+                  op: eq
+                  value: +Inf
+                - label: gt
+                  op: eq
+                  value: '200'
     labels:
       dimensions: {}
       promote: []
@@ -2837,146 +2837,146 @@ views:
       requests_0_to_1:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '1'
-            - label: gt
-              op: eq
-              value: '0'
+            - all:
+                - label: le
+                  op: eq
+                  value: '1'
+                - label: gt
+                  op: eq
+                  value: '0'
       requests_1_to_2:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '2'
-            - label: gt
-              op: eq
-              value: '1'
+            - all:
+                - label: le
+                  op: eq
+                  value: '2'
+                - label: gt
+                  op: eq
+                  value: '1'
       requests_2_to_3:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '3'
-            - label: gt
-              op: eq
-              value: '2'
+            - all:
+                - label: le
+                  op: eq
+                  value: '3'
+                - label: gt
+                  op: eq
+                  value: '2'
       requests_3_to_5:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '5'
-            - label: gt
-              op: eq
-              value: '3'
+            - all:
+                - label: le
+                  op: eq
+                  value: '5'
+                - label: gt
+                  op: eq
+                  value: '3'
       requests_5_to_7:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '7'
-            - label: gt
-              op: eq
-              value: '5'
+            - all:
+                - label: le
+                  op: eq
+                  value: '7'
+                - label: gt
+                  op: eq
+                  value: '5'
       requests_7_to_10:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '10'
-            - label: gt
-              op: eq
-              value: '7'
+            - all:
+                - label: le
+                  op: eq
+                  value: '10'
+                - label: gt
+                  op: eq
+                  value: '7'
       requests_10_to_20:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '20'
-            - label: gt
-              op: eq
-              value: '10'
+            - all:
+                - label: le
+                  op: eq
+                  value: '20'
+                - label: gt
+                  op: eq
+                  value: '10'
       requests_20_to_50:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '50'
-            - label: gt
-              op: eq
-              value: '20'
+            - all:
+                - label: le
+                  op: eq
+                  value: '50'
+                - label: gt
+                  op: eq
+                  value: '20'
       requests_50_to_100:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '100'
-            - label: gt
-              op: eq
-              value: '50'
+            - all:
+                - label: le
+                  op: eq
+                  value: '100'
+                - label: gt
+                  op: eq
+                  value: '50'
       requests_100_to_200:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: '200'
-            - label: gt
-              op: eq
-              value: '100'
+            - all:
+                - label: le
+                  op: eq
+                  value: '200'
+                - label: gt
+                  op: eq
+                  value: '100'
       requests_200_to_infinity:
         signal: routing_key_all_req_count
         components:
-        - value
+          - value
         where:
           any:
-          - all:
-            - label: le
-              op: eq
-              value: +Inf
-            - label: gt
-              op: eq
-              value: '200'
+            - all:
+                - label: le
+                  op: eq
+                  value: +Inf
+                - label: gt
+                  op: eq
+                  value: '200'
     labels:
       dimensions: {}
       promote: []
@@ -2992,7 +2992,7 @@ views:
       distribution:
         signal: queue_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3006,7 +3006,7 @@ views:
       observations:
         signal: queue_time_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3020,7 +3020,7 @@ views:
       observation_sum:
         signal: queue_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3034,7 +3034,7 @@ views:
       distribution:
         signal: per_stage_req_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3048,7 +3048,7 @@ views:
       observations:
         signal: per_stage_req_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3062,7 +3062,7 @@ views:
       observation_sum:
         signal: per_stage_req_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3076,7 +3076,7 @@ views:
       distribution:
         signal: grammar_compilation_time_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3090,7 +3090,7 @@ views:
       observations:
         signal: grammar_compilation_time_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3104,7 +3104,7 @@ views:
       observation_sum:
         signal: grammar_compilation_time_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3118,7 +3118,7 @@ views:
       distribution:
         signal: grammar_schema_count
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3132,7 +3132,7 @@ views:
       observations:
         signal: grammar_schema_count
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3146,7 +3146,7 @@ views:
       observation_sum:
         signal: grammar_schema_count
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3160,7 +3160,7 @@ views:
       distribution:
         signal: grammar_ebnf_size
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3174,7 +3174,7 @@ views:
       observations:
         signal: grammar_ebnf_size
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3188,7 +3188,7 @@ views:
       observation_sum:
         signal: grammar_ebnf_size
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3202,7 +3202,7 @@ views:
       distribution:
         signal: grammar_tree_traversal_time_avg
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3216,7 +3216,7 @@ views:
       observations:
         signal: grammar_tree_traversal_time_avg
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3230,7 +3230,7 @@ views:
       observation_sum:
         signal: grammar_tree_traversal_time_avg
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3244,7 +3244,7 @@ views:
       distribution:
         signal: grammar_tree_traversal_time_max
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3258,7 +3258,7 @@ views:
       observations:
         signal: grammar_tree_traversal_time_max
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3272,7 +3272,7 @@ views:
       observation_sum:
         signal: grammar_tree_traversal_time_max
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3286,7 +3286,7 @@ views:
       observations:
         signal: eplb_balancedness
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3300,7 +3300,7 @@ views:
       observation_sum:
         signal: eplb_balancedness
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3313,7 +3313,7 @@ views:
       realtime_tokens_total:
         signal: realtime_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         mode:
@@ -3328,7 +3328,7 @@ views:
       prefill_effective_tokens_total:
         signal: prefill_effective_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         mode:
@@ -3344,7 +3344,7 @@ views:
       forward_execution_seconds_total:
         signal: forward_execution_seconds_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         category:
@@ -3360,7 +3360,7 @@ views:
       estimated_flops_per_gpu_total:
         signal: estimated_flops_per_gpu_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3374,7 +3374,7 @@ views:
       dp_cooperation_realtime_tokens_total:
         signal: dp_cooperation_realtime_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         num_prefill_ranks:
@@ -3390,7 +3390,7 @@ views:
       dp_cooperation_forward_execution_seconds_total:
         signal: dp_cooperation_forward_execution_seconds_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         num_prefill_ranks:
@@ -3406,7 +3406,7 @@ views:
       distribution:
         signal: prefill_delayer_wait_forward_passes
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3420,7 +3420,7 @@ views:
       observations:
         signal: prefill_delayer_wait_forward_passes
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3434,7 +3434,7 @@ views:
       observation_sum:
         signal: prefill_delayer_wait_forward_passes
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3448,7 +3448,7 @@ views:
       distribution:
         signal: prefill_delayer_wait_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3462,7 +3462,7 @@ views:
       observations:
         signal: prefill_delayer_wait_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3476,7 +3476,7 @@ views:
       observation_sum:
         signal: prefill_delayer_wait_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3490,7 +3490,7 @@ views:
       prefill_delayer_outcomes_total:
         signal: prefill_delayer_outcomes_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         actual_execution:
@@ -3505,7 +3505,7 @@ views:
       weight_memory_usage_gb:
         signal: weight_memory_usage_gb
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3519,7 +3519,7 @@ views:
       kv_cache_memory_usage_gb:
         signal: kv_cache_memory_usage_gb
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3533,7 +3533,7 @@ views:
       graph_memory_usage_gb:
         signal: graph_memory_usage_gb
         components:
-        - value
+          - value
     labels:
       dimensions:
         phase:
@@ -3548,7 +3548,7 @@ views:
       page_size:
         signal: page_size
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3561,7 +3561,7 @@ views:
       num_pages:
         signal: num_pages
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3575,7 +3575,7 @@ views:
       context_len:
         signal: context_len
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3589,7 +3589,7 @@ views:
       startup_available_gpu_memory_gb:
         signal: startup_available_gpu_memory_gb
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3602,7 +3602,7 @@ views:
       encoder_dp_pending_requests:
         signal: encoder_dp_pending_requests
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3620,7 +3620,7 @@ views:
       encoder_dp_pending_requests:
         signal: encoder_dp_pending_requests
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3633,7 +3633,7 @@ views:
       failed_session_recoveries_total:
         signal: failed_session_recoveries_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3646,7 +3646,7 @@ views:
       process_cpu_seconds_total:
         signal: process_cpu_seconds_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3659,7 +3659,7 @@ views:
       distribution:
         signal: func_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3672,7 +3672,7 @@ views:
       observations:
         signal: func_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3685,7 +3685,7 @@ views:
       observation_sum:
         signal: func_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3698,7 +3698,7 @@ views:
       startup_time_seconds:
         signal: startup_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3711,7 +3711,7 @@ views:
       startup_cuda_graph_time_seconds:
         signal: startup_cuda_graph_time_seconds
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3724,7 +3724,7 @@ views:
       spec_verify_calls_total:
         signal: spec_verify_calls_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3743,7 +3743,7 @@ views:
       distribution:
         signal: get_loads_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3756,7 +3756,7 @@ views:
       observations:
         signal: get_loads_duration_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3769,7 +3769,7 @@ views:
       observation_sum:
         signal: get_loads_duration_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3782,7 +3782,7 @@ views:
       prefetched_tokens_total:
         signal: prefetched_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3806,7 +3806,7 @@ views:
       prefetched_tokens_total:
         signal: prefetched_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3819,7 +3819,7 @@ views:
       backuped_tokens_total:
         signal: backuped_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3843,7 +3843,7 @@ views:
       backuped_tokens_total:
         signal: backuped_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -3856,7 +3856,7 @@ views:
       distribution:
         signal: prefetch_pgs
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3879,7 +3879,7 @@ views:
       observations:
         signal: prefetch_pgs
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3902,7 +3902,7 @@ views:
       observation_sum:
         signal: prefetch_pgs
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3926,7 +3926,7 @@ views:
       distribution:
         signal: prefetch_pgs
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3940,7 +3940,7 @@ views:
       observations:
         signal: prefetch_pgs
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -3954,7 +3954,7 @@ views:
       observation_sum:
         signal: prefetch_pgs
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -3967,7 +3967,7 @@ views:
       distribution:
         signal: backup_pgs
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -3990,7 +3990,7 @@ views:
       observations:
         signal: backup_pgs
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4013,7 +4013,7 @@ views:
       observation_sum:
         signal: backup_pgs
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4037,7 +4037,7 @@ views:
       distribution:
         signal: backup_pgs
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4051,7 +4051,7 @@ views:
       observations:
         signal: backup_pgs
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4065,7 +4065,7 @@ views:
       observation_sum:
         signal: backup_pgs
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4078,7 +4078,7 @@ views:
       distribution:
         signal: prefetch_bandwidth
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4101,7 +4101,7 @@ views:
       observations:
         signal: prefetch_bandwidth
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4124,7 +4124,7 @@ views:
       observation_sum:
         signal: prefetch_bandwidth
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4148,7 +4148,7 @@ views:
       distribution:
         signal: prefetch_bandwidth
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4162,7 +4162,7 @@ views:
       observations:
         signal: prefetch_bandwidth
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4176,7 +4176,7 @@ views:
       observation_sum:
         signal: prefetch_bandwidth
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4189,7 +4189,7 @@ views:
       distribution:
         signal: backup_bandwidth
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4212,7 +4212,7 @@ views:
       observations:
         signal: backup_bandwidth
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4235,7 +4235,7 @@ views:
       observation_sum:
         signal: backup_bandwidth
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4259,7 +4259,7 @@ views:
       distribution:
         signal: backup_bandwidth
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4273,7 +4273,7 @@ views:
       observations:
         signal: backup_bandwidth
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4287,7 +4287,7 @@ views:
       observation_sum:
         signal: backup_bandwidth
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4300,7 +4300,7 @@ views:
       distribution:
         signal: eplb_gpu_physical_count
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4313,7 +4313,7 @@ views:
       observations:
         signal: eplb_gpu_physical_count
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4326,7 +4326,7 @@ views:
       observation_sum:
         signal: eplb_gpu_physical_count
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4339,7 +4339,7 @@ views:
       distribution:
         signal: eviction_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4352,7 +4352,7 @@ views:
       observations:
         signal: eviction_duration_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4365,7 +4365,7 @@ views:
       observation_sum:
         signal: eviction_duration_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4378,7 +4378,7 @@ views:
       evicted_tokens_total:
         signal: evicted_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -4391,7 +4391,7 @@ views:
       distribution:
         signal: load_back_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4404,7 +4404,7 @@ views:
       observations:
         signal: load_back_duration_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4417,7 +4417,7 @@ views:
       observation_sum:
         signal: load_back_duration_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4430,7 +4430,7 @@ views:
       load_back_tokens_total:
         signal: load_back_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         pool:
@@ -4445,7 +4445,7 @@ views:
       distribution:
         signal: hicache_backup_duration_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4458,7 +4458,7 @@ views:
       observations:
         signal: hicache_backup_duration_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4471,7 +4471,7 @@ views:
       observation_sum:
         signal: hicache_backup_duration_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4484,7 +4484,7 @@ views:
       hicache_backup_bytes_total:
         signal: hicache_backup_bytes_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -4497,7 +4497,7 @@ views:
       load_back_bytes_total:
         signal: load_back_bytes_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -4510,7 +4510,7 @@ views:
       hicache_backup_tokens_total:
         signal: hicache_backup_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         pool:
@@ -4525,7 +4525,7 @@ views:
       hicache_dropped_tokens_total:
         signal: hicache_dropped_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         reason:
@@ -4540,7 +4540,7 @@ views:
       encoder_cache_evictions_total:
         signal: encoder_cache_evictions_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4560,7 +4560,7 @@ views:
       encoder_cache_evictions_total:
         signal: encoder_cache_evictions_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4575,7 +4575,7 @@ views:
       encoder_cache_size_mb:
         signal: encoder_cache_size_mb
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -4593,7 +4593,7 @@ views:
       encoder_cache_size_mb:
         signal: encoder_cache_size_mb
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -4606,7 +4606,7 @@ views:
       encoder_cache_entries:
         signal: encoder_cache_entries
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -4624,7 +4624,7 @@ views:
       encoder_cache_entries:
         signal: encoder_cache_entries
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -4637,7 +4637,7 @@ views:
       encoder_cache_hit_tokens_total:
         signal: encoder_cache_hit_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4657,7 +4657,7 @@ views:
       encoder_cache_hit_tokens_total:
         signal: encoder_cache_hit_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4672,7 +4672,7 @@ views:
       encoder_cache_total_tokens_total:
         signal: encoder_cache_total_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4692,7 +4692,7 @@ views:
       encoder_cache_total_tokens_total:
         signal: encoder_cache_total_tokens_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4707,7 +4707,7 @@ views:
       encoder_cache_hit_files_total:
         signal: encoder_cache_hit_files_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4727,7 +4727,7 @@ views:
       encoder_cache_hit_files_total:
         signal: encoder_cache_hit_files_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4742,7 +4742,7 @@ views:
       encoder_cache_total_files_total:
         signal: encoder_cache_total_files_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4762,7 +4762,7 @@ views:
       encoder_cache_total_files_total:
         signal: encoder_cache_total_files_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4777,7 +4777,7 @@ views:
       encoder_requests_total:
         signal: encoder_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         status:
@@ -4797,7 +4797,7 @@ views:
       encoder_requests_total:
         signal: encoder_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         status:
@@ -4812,7 +4812,7 @@ views:
       encoder_requests_received_total:
         signal: encoder_requests_received_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4832,7 +4832,7 @@ views:
       encoder_requests_received_total:
         signal: encoder_requests_received_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         modality:
@@ -4847,7 +4847,7 @@ views:
       distribution:
         signal: encoder_mm_items_per_batch
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4865,7 +4865,7 @@ views:
       observations:
         signal: encoder_mm_items_per_batch
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4883,7 +4883,7 @@ views:
       observation_sum:
         signal: encoder_mm_items_per_batch
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4901,7 +4901,7 @@ views:
       distribution:
         signal: encoder_mm_items_per_batch
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4914,7 +4914,7 @@ views:
       observations:
         signal: encoder_mm_items_per_batch
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4927,7 +4927,7 @@ views:
       observation_sum:
         signal: encoder_mm_items_per_batch
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4940,7 +4940,7 @@ views:
       distribution:
         signal: encoder_mm_items_per_request
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -4958,7 +4958,7 @@ views:
       observations:
         signal: encoder_mm_items_per_request
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -4976,7 +4976,7 @@ views:
       observation_sum:
         signal: encoder_mm_items_per_request
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -4994,7 +4994,7 @@ views:
       distribution:
         signal: encoder_mm_items_per_request
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5007,7 +5007,7 @@ views:
       observations:
         signal: encoder_mm_items_per_request
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5020,7 +5020,7 @@ views:
       observation_sum:
         signal: encoder_mm_items_per_request
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5033,7 +5033,7 @@ views:
       distribution:
         signal: encoder_request_e2e_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5051,7 +5051,7 @@ views:
       observations:
         signal: encoder_request_e2e_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5069,7 +5069,7 @@ views:
       observation_sum:
         signal: encoder_request_e2e_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5087,7 +5087,7 @@ views:
       distribution:
         signal: encoder_request_e2e_latency_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5100,7 +5100,7 @@ views:
       observations:
         signal: encoder_request_e2e_latency_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5113,7 +5113,7 @@ views:
       observation_sum:
         signal: encoder_request_e2e_latency_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5126,7 +5126,7 @@ views:
       distribution:
         signal: encoder_queue_wait_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5144,7 +5144,7 @@ views:
       observations:
         signal: encoder_queue_wait_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5162,7 +5162,7 @@ views:
       observation_sum:
         signal: encoder_queue_wait_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5180,7 +5180,7 @@ views:
       distribution:
         signal: encoder_queue_wait_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5193,7 +5193,7 @@ views:
       observations:
         signal: encoder_queue_wait_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5206,7 +5206,7 @@ views:
       observation_sum:
         signal: encoder_queue_wait_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5219,7 +5219,7 @@ views:
       distribution:
         signal: encoder_preprocess_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5237,7 +5237,7 @@ views:
       observations:
         signal: encoder_preprocess_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5255,7 +5255,7 @@ views:
       observation_sum:
         signal: encoder_preprocess_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5273,7 +5273,7 @@ views:
       distribution:
         signal: encoder_preprocess_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5286,7 +5286,7 @@ views:
       observations:
         signal: encoder_preprocess_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5299,7 +5299,7 @@ views:
       observation_sum:
         signal: encoder_preprocess_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5312,7 +5312,7 @@ views:
       distribution:
         signal: encoder_model_forward_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5330,7 +5330,7 @@ views:
       observations:
         signal: encoder_model_forward_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5348,7 +5348,7 @@ views:
       observation_sum:
         signal: encoder_model_forward_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5366,7 +5366,7 @@ views:
       distribution:
         signal: encoder_model_forward_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5379,7 +5379,7 @@ views:
       observations:
         signal: encoder_model_forward_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5392,7 +5392,7 @@ views:
       observation_sum:
         signal: encoder_model_forward_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5405,7 +5405,7 @@ views:
       distribution:
         signal: encoder_transfer_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5423,7 +5423,7 @@ views:
       observations:
         signal: encoder_transfer_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5441,7 +5441,7 @@ views:
       observation_sum:
         signal: encoder_transfer_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5459,7 +5459,7 @@ views:
       distribution:
         signal: encoder_transfer_seconds
         components:
-        - bucket
+          - bucket
     labels:
       dimensions: {}
       promote: []
@@ -5472,7 +5472,7 @@ views:
       observations:
         signal: encoder_transfer_seconds
         components:
-        - count
+          - count
     labels:
       dimensions: {}
       promote: []
@@ -5485,7 +5485,7 @@ views:
       observation_sum:
         signal: encoder_transfer_seconds
         components:
-        - sum
+          - sum
     labels:
       dimensions: {}
       promote: []
@@ -5498,7 +5498,7 @@ views:
       startup_latency_breakdown_seconds_max:
         signal: startup_latency_breakdown_seconds_max
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -5511,7 +5511,7 @@ views:
       routing_keys_active:
         signal: routing_keys_active
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -5524,7 +5524,7 @@ views:
       http_requests_total:
         signal: http_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         method_class:
@@ -5545,7 +5545,7 @@ views:
       http_requests_total:
         signal: http_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         method_class:
@@ -5565,7 +5565,7 @@ views:
       http_requests_total:
         signal: http_requests_total
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []
@@ -5579,7 +5579,7 @@ views:
       http_responses_total:
         signal: http_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         status_class:
@@ -5602,7 +5602,7 @@ views:
       http_responses_total:
         signal: http_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         status_class:
@@ -5624,7 +5624,7 @@ views:
       http_responses_total:
         signal: http_responses_total
         components:
-        - value
+          - value
     labels:
       dimensions:
         status_code:
@@ -5641,7 +5641,7 @@ views:
       http_requests_active:
         signal: http_requests_active
         components:
-        - value
+          - value
     labels:
       dimensions:
         method_class:
@@ -5662,7 +5662,7 @@ views:
       http_requests_active:
         signal: http_requests_active
         components:
-        - value
+          - value
     labels:
       dimensions:
         method_class:
@@ -5682,7 +5682,7 @@ views:
       http_requests_active:
         signal: http_requests_active
         components:
-        - value
+          - value
     labels:
       dimensions: {}
       promote: []

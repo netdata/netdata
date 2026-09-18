@@ -546,8 +546,12 @@ func validateStep(parent context.Context, s *validationSession, dumpPath string)
 		if fact.Reason == chartengine.PlanRouteReasonContextMetricSeriesCap {
 			setting = "max_time_series_per_metric"
 		}
+		message := fmt.Sprintf("context omitted: %s=%d, output series=%d", setting, fact.SeriesLimit, fact.SeriesCount)
+		if fact.MetricFamilyName != "" {
+			message += fmt.Sprintf(", metric=%q", fact.MetricFamilyName)
+		}
 		r.addWarning("context_series_limit", context,
-			fmt.Sprintf("context omitted: %s=%d, output series=%d, metric=%q", setting, fact.SeriesLimit, fact.SeriesCount, fact.MetricFamilyName),
+			message,
 			"The complete context exceeds the existing limit. Other contexts are admitted independently; this context is retried each scrape.")
 	}
 
