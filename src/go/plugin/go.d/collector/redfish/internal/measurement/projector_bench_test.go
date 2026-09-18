@@ -10,6 +10,14 @@ import (
 
 // Projection and view construction should grow linearly with acquired resources.
 func BenchmarkProject(b *testing.B) {
+	benchmarkProject(b, false)
+}
+
+func BenchmarkProjectThresholds(b *testing.B) {
+	benchmarkProject(b, true)
+}
+
+func benchmarkProject(b *testing.B, thresholds bool) {
 	for _, count := range []int{10, 100} {
 		b.Run(fmt.Sprint(count), func(b *testing.B) {
 			resources := make([]*Resource, count)
@@ -31,12 +39,23 @@ func BenchmarkProject(b *testing.B) {
 						"Status":       map[string]any{"Health": "OK", "State": "Enabled"},
 					},
 				}
+				if thresholds {
+					resources[i].Data["Thresholds"] = map[string]any{
+						"UpperCritical": map[string]any{
+							"Reading": 50, "DwellTime": "PT10S",
+							"HysteresisDuration": "PT10S", "HysteresisReading": -1,
+						},
+					}
+				}
 			}
 			p := New("https://bmc.example.test", "benchmark", nil)
 			observed := time.Unix(1000, 0)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
+				if thresholds {
+					observed = observed.Add(time.Second)
+				}
 				if _, err := p.Project(resources, true, observed); err != nil {
 					b.Fatal(err)
 				}

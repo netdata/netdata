@@ -17,7 +17,12 @@ func (c *Collector) collect(ctx context.Context) (result collectionResult, err e
 	result.Snapshot = &redfishfunc.Snapshot{
 		CollectedAt: result.ObservedAt,
 	}
-	defer func() { result.Metrics.Duration = c.now().Sub(started).Seconds() }()
+	defer func() {
+		result.Metrics.Duration = c.now().Sub(started).Seconds()
+		if !result.Snapshot.Available && c.measurement != nil {
+			c.measurement.ResetDerivedHealth()
+		}
+	}()
 	acquired, err := c.client.Acquire(ctx)
 	result.AuthMethod = acquired.AuthMethod
 	result.Complete = acquired.Complete

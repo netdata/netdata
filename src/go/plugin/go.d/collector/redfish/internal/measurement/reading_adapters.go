@@ -13,7 +13,8 @@ func sensorExcerptReadings(source SensorExcerpt) []rawReading {
 	implementation, _ := stringValueAt(source.Data, "Implementation")
 	health, _ := stringValueAt(source.Data, "Status.Health")
 	var result []rawReading
-	if present || health != "" {
+	thresholds := modernThresholdSource(source.Data, source.Type, source.Units)
+	if present || health != "" || thresholds != nil {
 		result = append(result, rawReading{
 			Path:                  source.Path + ".Reading",
 			Type:                  source.Type,
@@ -30,6 +31,7 @@ func sensorExcerptReadings(source SensorExcerpt) []rawReading {
 			RangeMax:              source.Data["ReadingRangeMax"],
 			Health:                health,
 			ReadingScoped:         true,
+			ThresholdSource:       thresholds,
 			DataSourceURI:         readingSourceURI(source.Data, "DataSourceUri"),
 			SensorResetTime:       readingSourceTimestamp(source.Data, "SensorResetTime"),
 			LifetimeStartDateTime: readingSourceTimestamp(source.Data, "LifetimeStartDateTime"),
@@ -56,7 +58,8 @@ func sensorRawReadings(data map[string]any) []rawReading {
 	rangeMax, _ := valueAt(data, "ReadingRangeMax")
 	reading, present := valueAt(data, "Reading")
 	var result []rawReading
-	if present || health != "" {
+	thresholds := modernThresholdSource(data, sourceType, units)
+	if present || health != "" || thresholds != nil {
 		result = append(result, rawReading{
 			Path:                  "Sensor.Reading",
 			Type:                  sourceType,
@@ -73,6 +76,7 @@ func sensorRawReadings(data map[string]any) []rawReading {
 			RangeMax:              rangeMax,
 			Health:                health,
 			ReadingScoped:         true,
+			ThresholdSource:       thresholds,
 			DataSourceURI:         readingSourceURI(data, "DataSourceUri"),
 			SensorResetTime:       readingSourceTimestamp(data, "SensorResetTime"),
 			LifetimeStartDateTime: readingSourceTimestamp(data, "LifetimeStartDateTime"),
@@ -173,13 +177,13 @@ func legacyThermalReadings(node *Resource) []rawReading {
 	switch node.SourcePath {
 	case "Temperatures":
 		value, ok := firstValue(node.Data, "ReadingCelsius", "Reading")
-		if !ok && health == "" {
+		if !ok && health == "" && !hasLegacyThresholds(node.Data) {
 			return nil
 		}
 		return []rawReading{legacyReading(node, value, ok, "Temperature", "Cel", "input", health)}
 	case "Fans":
 		value, ok := firstValue(node.Data, "Reading", "ReadingRPM")
-		if !ok && health == "" {
+		if !ok && health == "" && !hasLegacyThresholds(node.Data) {
 			return nil
 		}
 		units, _ := stringValueAt(node.Data, "ReadingUnits")
@@ -207,7 +211,7 @@ func legacyPowerReadings(node *Resource) []rawReading {
 		return []rawReading{legacyReading(node, value, ok, "Power", "W", "input", health)}
 	case "Voltages":
 		value, ok := firstValue(node.Data, "ReadingVolts", "Reading")
-		if !ok && health == "" {
+		if !ok && health == "" && !hasLegacyThresholds(node.Data) {
 			return nil
 		}
 		return []rawReading{legacyReading(node, value, ok, "Voltage", "V", "input", health)}
@@ -235,6 +239,7 @@ func legacyReading(
 		PhysicalContext:       physical,
 		Health:                health,
 		ReadingScoped:         true,
+		ThresholdSource:       legacyThresholdSource(node, sourceType, units),
 		DataSourceURI:         readingSourceURI(node.Data, "DataSourceUri"),
 		SensorResetTime:       readingSourceTimestamp(node.Data, "SensorResetTime"),
 		LifetimeStartDateTime: readingSourceTimestamp(node.Data, "LifetimeStartDateTime"),

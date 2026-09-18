@@ -32,6 +32,7 @@ type normalizedReading struct {
 	ImplementationType    string
 	RangeMin              *float64
 	RangeMax              *float64
+	DerivedHealth         string
 	SourceAlarm           string
 	Health                string
 	SourceAlarmDiagnostic string
@@ -58,6 +59,7 @@ type rawReading struct {
 	RangeMax              any
 	Health                string
 	ReadingScoped         bool
+	ThresholdSource       *thresholdSource
 	FixedFamily           string
 	DataSourceURI         *string
 	SensorResetTime       rawReadingTimestamp
@@ -69,6 +71,7 @@ func (c *Projector) readingsForNode(node *Resource, observedAt time.Time) []norm
 	result := make([]normalizedReading, 0, len(raw)+1)
 	for _, source := range raw {
 		reading := normalizeReading(node, source)
+		reading.DerivedHealth = c.deriveHealth(reading, source.ThresholdSource, observedAt)
 		result = append(result, reading)
 		if reading.Valid && reading.Primary && reading.Family == "energy" && reading.Basis == "zero" &&
 			reading.SourceExact != "" {
@@ -141,10 +144,17 @@ func mergeProvenSensorReadings(current, excerpts []rawReading) []rawReading {
 		if !target.ValuePresent && excerpt.ValuePresent {
 			// Use the excerpt's numeric provenance while preserving explicit Sensor health.
 			health := target.Health
+			thresholds := target.ThresholdSource
 			*target = excerpt
+			if thresholds != nil {
+				target.ThresholdSource = thresholds
+			}
 			if health != "" {
 				target.Health = health
 			}
+		}
+		if target.ThresholdSource == nil {
+			target.ThresholdSource = excerpt.ThresholdSource
 		}
 		if target.RangeMin == nil {
 			target.RangeMin = excerpt.RangeMin

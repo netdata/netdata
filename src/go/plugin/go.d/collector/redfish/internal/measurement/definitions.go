@@ -30,6 +30,7 @@ func Definitions() []Definition {
 			})
 		}
 	}
+	states("derived_health", []string{"ok", "warning", "critical"})
 	for _, field := range scalarFields {
 		gauge(field.Metric)
 	}

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Component and Sensor contain copied source facts for current-state views. They
+// Component and Sensor contain copied facts and evaluated results for current-state views. They
 // never retain acquired documents or measurement history. Consumers treat them as immutable.
 type Component struct {
 	Key                       string
@@ -38,20 +38,21 @@ type ReportedCondition struct {
 }
 
 type Sensor struct {
-	Key        string
-	Resource   string
-	URI        string
-	Family     string
-	Units      string
-	Basis      string
-	Role       string
-	SourcePath string
-	Health     string
-	Location   string
-	Value      float64
-	Valid      bool
-	Calculated bool
-	ObservedAt time.Time
+	Key           string
+	Resource      string
+	URI           string
+	Family        string
+	Units         string
+	Basis         string
+	Role          string
+	SourcePath    string
+	Health        string
+	DerivedHealth string
+	Location      string
+	Value         float64
+	Valid         bool
+	Calculated    bool
+	ObservedAt    time.Time
 }
 
 func componentView(node *Resource, observedAt time.Time) Component {
@@ -111,20 +112,21 @@ func componentView(node *Resource, observedAt time.Time) Component {
 
 func sensorView(node *Resource, reading normalizedReading, observedAt time.Time) Sensor {
 	return Sensor{
-		Key:        reading.Key,
-		Resource:   cmp.Or(node.Doc.Name, node.Doc.ID, node.URI),
-		URI:        node.URI,
-		Family:     reading.Family,
-		Units:      reading.Units,
-		Basis:      reading.Basis,
-		Role:       reading.Role,
-		SourcePath: reading.SourcePath,
-		Health:     reading.Health,
-		Location:   strings.TrimSpace(reading.PhysicalContext + " " + reading.PhysicalSubcontext),
-		Value:      reading.Value,
-		Valid:      reading.Valid,
-		Calculated: reading.SemanticSourceClass == "energy_rate",
-		ObservedAt: observedAt,
+		Key:           reading.Key,
+		Resource:      cmp.Or(node.Doc.Name, node.Doc.ID, node.URI),
+		URI:           node.URI,
+		Family:        reading.Family,
+		Units:         reading.Units,
+		Basis:         reading.Basis,
+		Role:          reading.Role,
+		SourcePath:    reading.SourcePath,
+		Health:        reading.Health,
+		DerivedHealth: reading.DerivedHealth,
+		Location:      strings.TrimSpace(reading.PhysicalContext + " " + reading.PhysicalSubcontext),
+		Value:         reading.Value,
+		Valid:         reading.Valid,
+		Calculated:    reading.SemanticSourceClass == "energy_rate",
+		ObservedAt:    observedAt,
 	}
 }
 

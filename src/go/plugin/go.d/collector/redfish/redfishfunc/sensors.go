@@ -27,6 +27,11 @@ func sensorsTable(ctx context.Context, sensors []measurement.Sensor) *funcapi.Fu
 		},
 		textColumn("Units", "Reading units", true),
 		textColumn("Health", "BMC-reported health of this reading; not inherited component health", true),
+		textColumn(
+			"Derived health (thresholds)",
+			"Locally evaluated threshold status; OK does not imply overall hardware health",
+			true,
+		),
 		textColumn("Data availability", "Whether this reading has a usable value", true),
 		observedColumn(),
 		textColumn("Resource", "Resource supplying this reading", false),
@@ -51,6 +56,14 @@ func sensorsTable(ctx context.Context, sensors []measurement.Sensor) *funcapi.Fu
 		} else {
 			rank = min(rank, 2)
 		}
+		derived := "Not applicable"
+		if sensor.DerivedHealth == "unavailable" {
+			derived = "Unavailable"
+		} else if sensor.DerivedHealth != "" {
+			derived = displayHealth(sensor.DerivedHealth)
+			// Attention ordering considers either condition without merging their status values.
+			rank = min(rank, healthRank(sensor.DerivedHealth))
+		}
 		source := "BMC"
 		health := displayHealth(sensor.Health)
 		if sensor.Calculated {
@@ -61,7 +74,7 @@ func sensorsTable(ctx context.Context, sensors []measurement.Sensor) *funcapi.Fu
 		}
 		rows = append(rows, []any{
 			sensor.Key, sortKey(rank, name, sensor.Key), name, displayWords(sensor.Family), value, sensor.Units,
-			health, availability, observationTime(sensor.ObservedAt), sensor.Resource, sensor.URI, sensor.SourcePath,
+			health, derived, availability, observationTime(sensor.ObservedAt), sensor.Resource, sensor.URI, sensor.SourcePath,
 			optionalText(sensor.Location), source, rowOptions(rank),
 		})
 	}

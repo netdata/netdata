@@ -149,7 +149,7 @@ func TestReadingSourceHealthIsIndependentOfNumericValue(t *testing.T) {
 				)
 				var states []string
 				for _, observation := range client.readingObservations(node, reading) {
-					if observation.State != "" {
+					if observation.Metric == reading.AlarmMetric && observation.State != "" {
 						states = append(states, observation.State)
 					}
 				}
