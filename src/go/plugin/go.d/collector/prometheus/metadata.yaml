@@ -5172,6 +5172,9 @@ modules:
           description: |
             Configure a job for the SGLang metrics endpoint. The collector automatically selects the SGLang profile
             when it finds `sglang:*` metrics.
+            This profile targets the colon-prefixed exposition verified against SGLang source revision
+            `d91c3682b0b429e4c70df63cd57f819588ce29b0`. Deployments exposing only `sglang_*` metric names are not
+            covered by this profile. Check the names returned by your endpoint before using this example.
         limits:
           description: |
             By default, each context allows up to 2,000 rendered time series and up to 200 rendered time series from
