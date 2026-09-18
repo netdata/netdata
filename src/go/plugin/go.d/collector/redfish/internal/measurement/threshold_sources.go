@@ -6,9 +6,10 @@ import "strings"
 
 // A threshold source keeps its own units when a linked excerpt supplies the reading.
 type thresholdSource struct {
-	data   map[string]any
-	scale  float64
-	legacy bool
+	data       map[string]any
+	sourceType string
+	units      string
+	legacy     bool
 }
 
 type threshold struct {
@@ -41,13 +42,10 @@ func modernThresholdSource(data map[string]any, sourceType, units string) *thres
 	if _, present := data["Thresholds"]; !present {
 		return nil
 	}
-	spec, ok := readingType(sourceType, units, "")
-	if !ok {
-		return nil
-	}
 	return &thresholdSource{
-		data:  data,
-		scale: rationalMultiplier(spec.Scale),
+		data:       data,
+		sourceType: sourceType,
+		units:      units,
 	}
 }
 
@@ -69,20 +67,24 @@ func legacyThresholdSource(node *Resource, sourceType, units string) *thresholdS
 	if !hasLegacyThresholds(node.Data) {
 		return nil
 	}
-	spec, ok := readingType(sourceType, units, "")
-	if !ok {
-		return nil
-	}
 	return &thresholdSource{
-		data:   node.Data,
-		scale:  rationalMultiplier(spec.Scale),
-		legacy: true,
+		data:       node.Data,
+		sourceType: sourceType,
+		units:      units,
+		legacy:     true,
 	}
 }
 
-// Null limit placeholders are common on BMCs. They supply no threshold, never zero.
+// BMCs can supply null limit placeholders. They supply no threshold, never zero.
 // Unknown settings on an actual numeric threshold instead make evaluation unavailable.
-func (s *thresholdSource) thresholds() ([]threshold, bool) {
+func (s *thresholdSource) thresholds(family string) ([]threshold, bool) {
+	// Resolve the output family after adapters have selected it. For example,
+	// stored energy remains watt-hours while cumulative energy becomes joules.
+	spec, ok := readingType(s.sourceType, s.units, family)
+	if !ok {
+		return nil, false
+	}
+	scale := rationalMultiplier(spec.Scale)
 	data := s.data
 	if !s.legacy {
 		raw := data["Thresholds"]
@@ -128,8 +130,8 @@ func (s *thresholdSource) thresholds() ([]threshold, bool) {
 		if !ok {
 			return nil, false
 		}
-		config.limit = limit * s.scale
-		if !isFinite(config.limit) || (!s.legacy && !config.readSettings(settings, s.scale)) {
+		config.limit = limit * scale
+		if !isFinite(config.limit) || (!s.legacy && !config.readSettings(settings, scale)) {
 			return nil, false
 		}
 		result = append(result, config)

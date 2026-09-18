@@ -40,7 +40,7 @@ func (c *Projector) deriveHealth(reading normalizedReading, source *thresholdSou
 	if source == nil || reading.Metric == "" {
 		return ""
 	}
-	definitions, valid := source.thresholds()
+	definitions, valid := source.thresholds(reading.Family)
 	if !valid {
 		delete(c.thresholdStates, reading.Key)
 		return "unavailable"

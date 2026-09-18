@@ -252,3 +252,35 @@ func TestDerivedHealthKeepsKnownMaximumSeverity(t *testing.T) {
 	})
 	projectThresholdStatus(t, New("", "", nil), node, 0, "critical")
 }
+
+func TestDerivedHealthStoredEnergyUsesWattHours(t *testing.T) {
+	for _, test := range []struct {
+		name                      string
+		limit, offset, clearValue int
+	}{
+		{"UpperCritical", 40, -5, 35},
+		{"LowerCritical", 60, 5, 65},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := map[string]any{
+				"Reading": 50,
+				"Thresholds": map[string]any{test.name: map[string]any{
+					"Reading": test.limit, "HysteresisReading": test.offset,
+				}},
+			}
+			node := &Resource{
+				Key:  "battery",
+				Kind: "battery",
+				Enrichment: map[string]Enrichment{
+					"battery_metrics": {Data: map[string]any{"StoredEnergyWattHours": source}},
+				},
+			}
+			p := New("", "", nil)
+			result := projectThresholdStatus(t, p, node, 0, "critical")
+			assert.Equal(t, "watt-hours", result.Sensors[0].Units)
+			assert.Equal(t, float64(50), result.Sensors[0].Value)
+			source["Reading"] = test.clearValue
+			projectThresholdStatus(t, p, node, 1, "ok")
+		})
+	}
+}
