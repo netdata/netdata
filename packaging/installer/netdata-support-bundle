@@ -1741,10 +1741,13 @@ collect_permissions() {
   # it tries to open the journal.
   if [ "$INCLUDE_PLUGIN_DEBUG" = "1" ]; then
     _pd_bin=""
+    _pd_seen=""
     # shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
     for _d in $PLUGINSD_DIRS; do
       [ -n "$_d" ] || continue
-      if [ -x "$_d/systemd-journal.plugin" ]; then _pd_bin="$_d/systemd-journal.plugin"; break; fi
+      [ -f "$_d/systemd-journal.plugin" ] || continue
+      _pd_seen="$_d/systemd-journal.plugin"
+      if [ -x "$_pd_seen" ]; then _pd_bin="$_pd_seen"; break; fi
     done
 
     # resolve the agent user to a NAME: ps prints a bare uid for a containerised
@@ -1761,10 +1764,23 @@ collect_permissions() {
 
     if [ -z "$_pd_bin" ]; then
       mkdir -p "$WORK/09-permissions"
-      printf '%s\n' "(systemd-journal.plugin not found in: $PLUGINSD_DIRS)" \
-        > "$WORK/09-permissions/plugin-debug-systemd-journal.txt"
-      manifest_add 09-permissions/plugin-debug-systemd-journal.txt file generated \
-        "Requested plugin debug run: the plugin was not found"
+      # "not executable by us" is a different fact from "not installed", and
+      # saying the wrong one sends the reader looking for a missing package
+      if [ -n "$_pd_seen" ]; then
+        {
+          printf '%s\n' "systemd-journal.plugin IS installed at: $_pd_seen"
+          printf '%s\n' "but it is not executable by the current user ($(id -un 2>/dev/null))."
+          ls -l "$_pd_seen" 2>/dev/null
+          printf '%s\n' "Re-run the bundle with sudo to capture the debug output."
+        } > "$WORK/09-permissions/plugin-debug-systemd-journal.txt"
+        manifest_add 09-permissions/plugin-debug-systemd-journal.txt file generated \
+          "Requested plugin debug run: the plugin is installed but was not executable by the invoking user"
+      else
+        printf '%s\n' "(systemd-journal.plugin not installed in: $PLUGINSD_DIRS)" \
+          > "$WORK/09-permissions/plugin-debug-systemd-journal.txt"
+        manifest_add 09-permissions/plugin-debug-systemd-journal.txt file generated \
+          "Requested plugin debug run: the plugin is not installed"
+      fi
     else
       # STDERR ONLY, deliberately. The plugin's debug mode queries the last 200
       # records from every journal source and writes them to STDOUT; collecting
