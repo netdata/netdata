@@ -208,7 +208,8 @@ template:
         - sglang:generation_tokens_histogram_count
         - sglang:generation_tokens_histogram_sum
       charts:
-        - title: Finished Inference Requests
+        - family: Requests
+          title: Finished Inference Requests
           context: finished_requests
           units: requests/s
           dimensions:
@@ -218,7 +219,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Finished Request Tokens
+        - family: Requests
+          title: Finished Request Tokens
           context: tokens
           units: tokens/s
           dimensions:
@@ -230,7 +232,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: End-to-End Request Latency Distribution (seconds)
+        - family: Requests
+          title: End-to-End Request Latency Distribution (seconds)
           context: e2e_request_latency_distribution
           units: observations/s
           dimensions:
@@ -239,7 +242,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: End-to-End Request Latency Observation Rate
+        - family: Requests
+          title: End-to-End Request Latency Observation Rate
           context: e2e_request_latency_observations
           units: requests/s
           dimensions:
@@ -249,7 +253,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: End-to-End Request Latency Accumulated Observations
+        - family: Requests
+          title: End-to-End Request Latency Accumulated Observations
           context: e2e_request_latency_observation_sum
           units: seconds/s
           dimensions:
@@ -259,7 +264,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Time to First Token Distribution (seconds)
+        - family: Requests
+          title: Time to First Token Distribution (seconds)
           context: time_to_first_token_distribution
           units: observations/s
           dimensions:
@@ -268,7 +274,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Time to First Token Observation Rate
+        - family: Requests
+          title: Time to First Token Observation Rate
           context: time_to_first_token_observations
           units: requests/s
           dimensions:
@@ -278,7 +285,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Time to First Token Accumulated Observations
+        - family: Requests
+          title: Time to First Token Accumulated Observations
           context: time_to_first_token_observation_sum
           units: seconds/s
           dimensions:
@@ -288,7 +296,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Inter-Token Latency Distribution (seconds)
+        - family: Requests
+          title: Inter-Token Latency Distribution (seconds)
           context: inter_token_latency_distribution
           units: observations/s
           dimensions:
@@ -297,7 +306,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Inter-Token Latency Observation Rate
+        - family: Requests
+          title: Inter-Token Latency Observation Rate
           context: inter_token_latency_observations
           units: tokens/s
           dimensions:
@@ -307,7 +317,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Inter-Token Latency Accumulated Observations
+        - family: Requests
+          title: Inter-Token Latency Accumulated Observations
           context: inter_token_latency_observation_sum
           units: seconds/s
           dimensions:
@@ -317,7 +328,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Finished Structured-Output Requests
+        - family: Requests
+          title: Finished Structured-Output Requests
           context: structured_output_requests
           units: requests/s
           dimensions:
@@ -327,7 +339,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Request Abort Calls
+        - family: Requests
+          title: Request Abort Calls
           context: abort_calls
           units: requests/s
           dimensions:
@@ -336,7 +349,8 @@ template:
           instances:
             by_labels:
               - model_name
-        - title: Finished Request Cached Tokens
+        - family: Requests
+          title: Finished Request Cached Tokens
           context: cached_tokens
           units: tokens/s
           dimensions:
@@ -346,7 +360,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Prompt Length Distribution (tokens)
+        - family: Requests
+          title: Prompt Length Distribution (tokens)
           context: prompt_tokens_distribution
           units: observations/s
           dimensions:
@@ -355,7 +370,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Prompt Length Observation Rate
+        - family: Requests
+          title: Prompt Length Observation Rate
           context: prompt_tokens_observations
           units: requests/s
           dimensions:
@@ -365,7 +381,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Prompt Length Accumulated Observations
+        - family: Requests
+          title: Prompt Length Accumulated Observations
           context: prompt_tokens_observation_sum
           units: tokens/s
           dimensions:
@@ -375,7 +392,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Uncached Prompt Length Distribution (tokens)
+        - family: Requests
+          title: Uncached Prompt Length Distribution (tokens)
           context: uncached_prompt_tokens_distribution
           units: observations/s
           dimensions:
@@ -384,7 +402,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Uncached Prompt Length Observation Rate
+        - family: Requests
+          title: Uncached Prompt Length Observation Rate
           context: uncached_prompt_tokens_observations
           units: requests/s
           dimensions:
@@ -394,7 +413,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Uncached Prompt Length Accumulated Observations
+        - family: Requests
+          title: Uncached Prompt Length Accumulated Observations
           context: uncached_prompt_tokens_observation_sum
           units: tokens/s
           dimensions:
@@ -404,7 +424,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Generated Length Distribution (tokens)
+        - family: Requests
+          title: Generated Length Distribution (tokens)
           context: generation_tokens_distribution
           units: observations/s
           dimensions:
@@ -413,7 +434,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Generated Length Observation Rate
+        - family: Requests
+          title: Generated Length Observation Rate
           context: generation_tokens_observations
           units: requests/s
           dimensions:
@@ -423,7 +445,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Generated Length Accumulated Observations
+        - family: Requests
+          title: Generated Length Accumulated Observations
           context: generation_tokens_observation_sum
           units: tokens/s
           dimensions:
@@ -433,7 +456,8 @@ template:
             by_labels:
               - model_name
           aggregation: sum
-        - title: Finished Inference Requests
+        - family: Requests
+          title: Finished Inference Requests
           context: by_engine_finished_requests
           units: requests/s
           dimensions:
@@ -444,7 +468,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Finished Request Tokens
+        - family: Requests
+          title: Finished Request Tokens
           context: by_engine_tokens
           units: tokens/s
           dimensions:
@@ -457,7 +482,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: End-to-End Request Latency Distribution (seconds)
+        - family: Requests
+          title: End-to-End Request Latency Distribution (seconds)
           context: by_engine_e2e_request_latency_distribution
           units: observations/s
           dimensions:
@@ -467,7 +493,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: End-to-End Request Latency Observation Rate
+        - family: Requests
+          title: End-to-End Request Latency Observation Rate
           context: by_engine_e2e_request_latency_observations
           units: requests/s
           dimensions:
@@ -478,7 +505,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: End-to-End Request Latency Accumulated Observations
+        - family: Requests
+          title: End-to-End Request Latency Accumulated Observations
           context: by_engine_e2e_request_latency_observation_sum
           units: seconds/s
           dimensions:
@@ -489,7 +517,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Time to First Token Distribution (seconds)
+        - family: Requests
+          title: Time to First Token Distribution (seconds)
           context: by_engine_time_to_first_token_distribution
           units: observations/s
           dimensions:
@@ -499,7 +528,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Time to First Token Observation Rate
+        - family: Requests
+          title: Time to First Token Observation Rate
           context: by_engine_time_to_first_token_observations
           units: requests/s
           dimensions:
@@ -510,7 +540,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Time to First Token Accumulated Observations
+        - family: Requests
+          title: Time to First Token Accumulated Observations
           context: by_engine_time_to_first_token_observation_sum
           units: seconds/s
           dimensions:
@@ -521,7 +552,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Inter-Token Latency Distribution (seconds)
+        - family: Requests
+          title: Inter-Token Latency Distribution (seconds)
           context: by_engine_inter_token_latency_distribution
           units: observations/s
           dimensions:
@@ -531,7 +563,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Inter-Token Latency Observation Rate
+        - family: Requests
+          title: Inter-Token Latency Observation Rate
           context: by_engine_inter_token_latency_observations
           units: tokens/s
           dimensions:
@@ -542,7 +575,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Inter-Token Latency Accumulated Observations
+        - family: Requests
+          title: Inter-Token Latency Accumulated Observations
           context: by_engine_inter_token_latency_observation_sum
           units: seconds/s
           dimensions:
@@ -553,7 +587,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Finished Structured-Output Requests
+        - family: Requests
+          title: Finished Structured-Output Requests
           context: by_engine_structured_output_requests
           units: requests/s
           dimensions:
@@ -564,7 +599,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Request Abort Calls
+        - family: Requests
+          title: Request Abort Calls
           context: by_engine_abort_calls
           units: requests/s
           dimensions:
@@ -574,7 +610,8 @@ template:
             by_labels:
               - model_name
               - engine_type
-        - title: Finished Request Cached Tokens
+        - family: Requests
+          title: Finished Request Cached Tokens
           context: by_engine_cached_tokens
           units: tokens/s
           dimensions:
@@ -585,7 +622,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Prompt Length Distribution (tokens)
+        - family: Requests
+          title: Prompt Length Distribution (tokens)
           context: by_engine_prompt_tokens_distribution
           units: observations/s
           dimensions:
@@ -595,7 +633,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Prompt Length Observation Rate
+        - family: Requests
+          title: Prompt Length Observation Rate
           context: by_engine_prompt_tokens_observations
           units: requests/s
           dimensions:
@@ -606,7 +645,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Prompt Length Accumulated Observations
+        - family: Requests
+          title: Prompt Length Accumulated Observations
           context: by_engine_prompt_tokens_observation_sum
           units: tokens/s
           dimensions:
@@ -617,7 +657,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Uncached Prompt Length Distribution (tokens)
+        - family: Requests
+          title: Uncached Prompt Length Distribution (tokens)
           context: by_engine_uncached_prompt_tokens_distribution
           units: observations/s
           dimensions:
@@ -627,7 +668,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Uncached Prompt Length Observation Rate
+        - family: Requests
+          title: Uncached Prompt Length Observation Rate
           context: by_engine_uncached_prompt_tokens_observations
           units: requests/s
           dimensions:
@@ -638,7 +680,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Uncached Prompt Length Accumulated Observations
+        - family: Requests
+          title: Uncached Prompt Length Accumulated Observations
           context: by_engine_uncached_prompt_tokens_observation_sum
           units: tokens/s
           dimensions:
@@ -649,7 +692,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Generated Length Distribution (tokens)
+        - family: Requests
+          title: Generated Length Distribution (tokens)
           context: by_engine_generation_tokens_distribution
           units: observations/s
           dimensions:
@@ -659,7 +703,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Generated Length Observation Rate
+        - family: Requests
+          title: Generated Length Observation Rate
           context: by_engine_generation_tokens_observations
           units: requests/s
           dimensions:
@@ -670,7 +715,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Generated Length Accumulated Observations
+        - family: Requests
+          title: Generated Length Accumulated Observations
           context: by_engine_generation_tokens_observation_sum
           units: tokens/s
           dimensions:
@@ -681,7 +727,8 @@ template:
               - model_name
               - engine_type
           aggregation: sum
-        - title: Finished Inference Requests
+        - family: Requests
+          title: Finished Inference Requests
           context: by_priority_finished_requests
           units: requests/s
           dimensions:
@@ -693,7 +740,8 @@ template:
               - engine_type
               - priority
           aggregation: sum
-        - title: Finished Request Tokens
+        - family: Requests
+          title: Finished Request Tokens
           context: by_priority_tokens
           units: tokens/s
           dimensions:

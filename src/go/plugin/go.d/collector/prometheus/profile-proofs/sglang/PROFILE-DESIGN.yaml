@@ -626,7 +626,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.finished_requests:
-    family: Models
+    family: Models/Requests
     question: Finished Inference Requests for this model_name?
     entity: model_name
     inputs:
@@ -648,7 +648,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.tokens:
-    family: Models
+    family: Models/Requests
     question: Finished Request Tokens for this model_name?
     entity: model_name
     inputs:
@@ -673,7 +673,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.e2e_request_latency_distribution:
-    family: Models
+    family: Models/Requests
     question: End-to-End Request Latency Distribution (seconds) for this model_name?
     entity: model_name
     inputs:
@@ -694,7 +694,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.e2e_request_latency_observations:
-    family: Models
+    family: Models/Requests
     question: End-to-End Request Latency Observation Rate for this model_name?
     entity: model_name
     inputs:
@@ -715,7 +715,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.e2e_request_latency_observation_sum:
-    family: Models
+    family: Models/Requests
     question: End-to-End Request Latency Accumulated Observations for this model_name?
     entity: model_name
     inputs:
@@ -736,7 +736,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.time_to_first_token_distribution:
-    family: Models
+    family: Models/Requests
     question: Time to First Token Distribution (seconds) for this model_name?
     entity: model_name
     inputs:
@@ -757,7 +757,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.time_to_first_token_observations:
-    family: Models
+    family: Models/Requests
     question: Time to First Token Observation Rate for this model_name?
     entity: model_name
     inputs:
@@ -778,7 +778,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.time_to_first_token_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Time to First Token Accumulated Observations for this model_name?
     entity: model_name
     inputs:
@@ -799,7 +799,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.inter_token_latency_distribution:
-    family: Models
+    family: Models/Requests
     question: Inter-Token Latency Distribution (seconds) for this model_name?
     entity: model_name
     inputs:
@@ -819,7 +819,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.inter_token_latency_observations:
-    family: Models
+    family: Models/Requests
     question: Inter-Token Latency Observation Rate for this model_name?
     entity: model_name
     inputs:
@@ -839,7 +839,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.inter_token_latency_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Inter-Token Latency Accumulated Observations for this model_name?
     entity: model_name
     inputs:
@@ -859,7 +859,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.structured_output_requests:
-    family: Models
+    family: Models/Requests
     question: Finished Structured-Output Requests for this model_name?
     entity: model_name
     inputs:
@@ -879,7 +879,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.abort_calls:
-    family: Models
+    family: Models/Requests
     question: Request Abort Calls for this model_name?
     entity: model_name
     inputs:
@@ -893,7 +893,7 @@ views:
       omit:
         engine_type: Aggregated outside this view identity; use the corresponding built-in detail to compare contributors.
   models.cached_tokens:
-    family: Models
+    family: Models/Requests
     question: Finished Request Cached Tokens for this model_name?
     entity: model_name
     inputs:
@@ -915,7 +915,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.prompt_tokens_distribution:
-    family: Models
+    family: Models/Requests
     question: Prompt Length Distribution (tokens) for this model_name?
     entity: model_name
     inputs:
@@ -935,7 +935,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.prompt_tokens_observations:
-    family: Models
+    family: Models/Requests
     question: Prompt Length Observation Rate for this model_name?
     entity: model_name
     inputs:
@@ -955,7 +955,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.prompt_tokens_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Prompt Length Accumulated Observations for this model_name?
     entity: model_name
     inputs:
@@ -975,7 +975,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.uncached_prompt_tokens_distribution:
-    family: Models
+    family: Models/Requests
     question: Uncached Prompt Length Distribution (tokens) for this model_name?
     entity: model_name
     inputs:
@@ -995,7 +995,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.uncached_prompt_tokens_observations:
-    family: Models
+    family: Models/Requests
     question: Uncached Prompt Length Observation Rate for this model_name?
     entity: model_name
     inputs:
@@ -1015,7 +1015,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.uncached_prompt_tokens_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Uncached Prompt Length Accumulated Observations for this model_name?
     entity: model_name
     inputs:
@@ -1035,7 +1035,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.generation_tokens_distribution:
-    family: Models
+    family: Models/Requests
     question: Generated Length Distribution (tokens) for this model_name?
     entity: model_name
     inputs:
@@ -1055,7 +1055,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.generation_tokens_observations:
-    family: Models
+    family: Models/Requests
     question: Generated Length Observation Rate for this model_name?
     entity: model_name
     inputs:
@@ -1075,7 +1075,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.generation_tokens_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Generated Length Accumulated Observations for this model_name?
     entity: model_name
     inputs:
@@ -1095,7 +1095,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_finished_requests:
-    family: Models
+    family: Models/Requests
     question: Finished Inference Requests for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1116,7 +1116,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_tokens:
-    family: Models
+    family: Models/Requests
     question: Finished Request Tokens for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1140,7 +1140,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_e2e_request_latency_distribution:
-    family: Models
+    family: Models/Requests
     question: End-to-End Request Latency Distribution (seconds) for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1160,7 +1160,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_e2e_request_latency_observations:
-    family: Models
+    family: Models/Requests
     question: End-to-End Request Latency Observation Rate for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1180,7 +1180,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_e2e_request_latency_observation_sum:
-    family: Models
+    family: Models/Requests
     question: End-to-End Request Latency Accumulated Observations for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1200,7 +1200,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_time_to_first_token_distribution:
-    family: Models
+    family: Models/Requests
     question: Time to First Token Distribution (seconds) for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1220,7 +1220,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_time_to_first_token_observations:
-    family: Models
+    family: Models/Requests
     question: Time to First Token Observation Rate for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1240,7 +1240,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_time_to_first_token_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Time to First Token Accumulated Observations for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1260,7 +1260,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_inter_token_latency_distribution:
-    family: Models
+    family: Models/Requests
     question: Inter-Token Latency Distribution (seconds) for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1279,7 +1279,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_inter_token_latency_observations:
-    family: Models
+    family: Models/Requests
     question: Inter-Token Latency Observation Rate for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1298,7 +1298,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_inter_token_latency_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Inter-Token Latency Accumulated Observations for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1317,7 +1317,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_structured_output_requests:
-    family: Models
+    family: Models/Requests
     question: Finished Structured-Output Requests for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1336,7 +1336,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_abort_calls:
-    family: Models
+    family: Models/Requests
     question: Request Abort Calls for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1349,7 +1349,7 @@ views:
       promote: []
       omit: {}
   models.by_engine_cached_tokens:
-    family: Models
+    family: Models/Requests
     question: Finished Request Cached Tokens for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1370,7 +1370,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_prompt_tokens_distribution:
-    family: Models
+    family: Models/Requests
     question: Prompt Length Distribution (tokens) for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1389,7 +1389,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_prompt_tokens_observations:
-    family: Models
+    family: Models/Requests
     question: Prompt Length Observation Rate for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1408,7 +1408,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_prompt_tokens_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Prompt Length Accumulated Observations for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1427,7 +1427,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_uncached_prompt_tokens_distribution:
-    family: Models
+    family: Models/Requests
     question: Uncached Prompt Length Distribution (tokens) for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1446,7 +1446,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_uncached_prompt_tokens_observations:
-    family: Models
+    family: Models/Requests
     question: Uncached Prompt Length Observation Rate for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1465,7 +1465,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_uncached_prompt_tokens_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Uncached Prompt Length Accumulated Observations for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1484,7 +1484,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_generation_tokens_distribution:
-    family: Models
+    family: Models/Requests
     question: Generated Length Distribution (tokens) for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1503,7 +1503,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_generation_tokens_observations:
-    family: Models
+    family: Models/Requests
     question: Generated Length Observation Rate for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1522,7 +1522,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_engine_generation_tokens_observation_sum:
-    family: Models
+    family: Models/Requests
     question: Generated Length Accumulated Observations for this model_name, engine_type?
     entity: model_name_engine_type
     inputs:
@@ -1541,7 +1541,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_priority_finished_requests:
-    family: Models
+    family: Models/Requests
     question: Finished Inference Requests for this model_name, engine_type, priority?
     entity: model_name_engine_type_priority
     inputs:
@@ -1566,7 +1566,7 @@ views:
       lost_comparison: Contributors outside the selected identity are combined; independently limited detail retains
         the approved built-in comparisons.
   models.by_priority_tokens:
-    family: Models
+    family: Models/Requests
     question: Finished Request Tokens for this model_name, engine_type, priority?
     entity: model_name_engine_type_priority
     inputs:

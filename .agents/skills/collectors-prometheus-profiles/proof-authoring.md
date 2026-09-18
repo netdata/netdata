@@ -83,17 +83,19 @@ source_exclusions: {}
   environment condition, and registration evidence.
 - Every signal declares what one observation describes, its components, label domains with stability and cardinality,
   functional dependencies, and contributor behavior where reduction depends on membership or reset semantics.
-- Label domains are `closed` (enumerated values), `open` (arbitrary strings), or `unsigned_integer` (canonical decimal
-  values from zero through the uint64 maximum, without signs or leading zeros). Use the numeric domain only with
-  source evidence. Replay rejects values outside it, and category coverage does not demand malformed strings from it.
-  Cardinality remains a separate declaration; a numeric label is not automatically a bounded dimension.
+- Source label domains are owned by `src/go/internal/promprofile/semantics/validate_source.go::validateSourceLabel`;
+  canonical numeric matching by `src/go/internal/promprofile/semantics/views.go::labelValueMayMatch`.
+  In `prometheus-profile-proof verify`, source replay returns an error for values outside the declared domain
+  (`src/go/internal/promprofile/semantics/replay_source.go::validateProductionSourceLabels`). Use numeric domains
+  only with source evidence. Cardinality remains separate; numeric labels are not automatically bounded dimensions.
 - Reduction checks use the complete projection: instance identity, label-value dimensions and selector constraints.
   A label fixed absent cannot vary within that projection. A category determined by a retained raw-label dimension
   does not require aggregation merely because the category itself is omitted.
 - Model lifecycle as source behavior (`current`, `cumulative`, `constant`), never as a guess from the metric name.
-- Binary source data units include `mebibyte` and `gibibyte`. Observed bandwidth uses quantity `data_rate` with base
-  `gibibyte_per_second`; a cumulative observation sum has canonical rate `bytes/s²`, not achieved bandwidth.
-  Histogram bucket counts remain observations per second; identify the source bucket scale in the chart title.
+- Supported source units and conversions are owned by
+  `src/go/internal/promprofile/semantics/units.go::sourceUnitRegistry` and `canonicalUnit` in the same file.
+  A cumulative sum of bandwidth observations is not achieved bandwidth. Histogram bucket counts remain observations
+  per second; identify the source bucket scale in the chart title.
 - State encodings own closed state domains. Relationships own equivalence, partition, subset, overlap, and sum
   projection; a view cannot manufacture those facts.
 - A reusable component or label policy exists for actual reuse: the compiler rejects one with fewer than two

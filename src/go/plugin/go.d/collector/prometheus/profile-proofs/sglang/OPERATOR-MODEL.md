@@ -21,6 +21,8 @@ not collected. Raw scrape and metric-store memory still scale with the exporter 
 
 ## Request accounting and latency
 
+Model request, token and latency views live under `Models/Requests`; `Models` is a parent only.
+
 Finished requests, abort calls, structured-output requests and HTTP responses describe different populations.
 Finished does not mean successful. Structured-output requests are a subset of finished requests; abort calls
 are not a disjoint outcome partition. Do not infer a success or error percentage from these counters.
