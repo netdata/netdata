@@ -414,12 +414,14 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
             netdata_conf_dbengine_tier_config(0, &tc);
             tc.dbfiles_path = dbenginepath;
             tc.disk_space_mb = default_dbengine_disk_quota_mb;
-            ret = dbengine_tier_init((DBENGINE_TIER **)&host->db[0].si, &tc);
+            ret = dbengine_tier_init(&tc);
 
             initialized = (ret == 0);
 
-            if (initialized)
+            if (initialized) {
+                host->db[0].si = (STORAGE_INSTANCE *)dbengine_multidb_tiers[0];
                 dbengine_readiness_wait((DBENGINE_TIER *)host->db[0].si);
+            }
         }
     }
 

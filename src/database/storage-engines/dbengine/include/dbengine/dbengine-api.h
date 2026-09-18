@@ -57,12 +57,12 @@ time_t dbengine_latest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
-// bring a tier up; the first one spawns the engine's event loop. Once dbengine_shutdown() has run, the engine
-// cannot be started again in this process: a later dbengine_tier_init() fails with UV_EIO. A tier init and the
-// shutdown must not overlap: the check is made when the tier starts, so an init that is still in flight when the
-// shutdown begins would wait on a loop that is gone (the daemon joins its tier inits at startup, long before any
-// shutdown)
-int dbengine_tier_init(DBENGINE_TIER **tierp, const struct dbengine_tier_config *tc);
+// bring the static tier dbengine_multidb_tiers[tc->tier] up; the first one spawns the engine's event loop. Once
+// dbengine_shutdown() has run, the engine cannot be started again in this process: a later dbengine_tier_init()
+// fails with UV_EIO. A tier init and the shutdown must not overlap: the check is made when the tier starts, so an
+// init that is still in flight when the shutdown begins would wait on a loop that is gone (the daemon joins its
+// tier inits at startup, long before any shutdown)
+int dbengine_tier_init(const struct dbengine_tier_config *tc);
 
 void dbengine_readiness_wait(DBENGINE_TIER *tier);
 
@@ -86,7 +86,7 @@ void dbengine_flush_all(DBENGINE_TIER *tier);
 // metrics registry, then every static tier's datafiles, in the order their dependencies allow. Only after every
 // tier's dbengine_tier_exit() and dbengine_shutdown(); never on an exit that skipped them (the loop is still running).
 // A cache or the registry with live references stays allocated and reachable. Returns the registry metrics
-// still referenced, 0 when everything was freed. Caller-allocated tiers are freed by dbengine_tier_exit() already.
+// still referenced, 0 when everything was freed.
 size_t dbengine_destroy(void);
 
 // what the embedder reads about the tiers

@@ -609,6 +609,10 @@ int test_dbengine(void) {
     if(!host)
         fatal("Failed to initialize host");
 
+    // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
+    // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
+    dbengine_preload_release();
+
     errors += test_dbengine_burst_retention(host);
 
     RRDSET *st[CHARTS] = { 0 };

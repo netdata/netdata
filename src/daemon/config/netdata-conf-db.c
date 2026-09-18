@@ -109,7 +109,7 @@ struct dbengine_initialization {
 
 void netdata_conf_dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = dbengine_tier_init(NULL, &dbi->config);
+    dbi->ret = dbengine_tier_init(&dbi->config);
 }
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)

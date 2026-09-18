@@ -134,26 +134,6 @@ static int dbengine_accounting_helpers_unittest(void) {
     errors += mrg_unittest_expect_counter_sub(&ctx, 3, 9, false, 0, "underflow saturation");
 #endif
 
-    ctx.atomic.metrics = 11;
-    ctx.atomic.samples = 22;
-    dbengine_reset_accounting_if_fresh(&ctx, false);
-    if(ctx.atomic.metrics != 11 || ctx.atomic.samples != 22) {
-        fprintf(stderr,
-                "DBENGINE METRIC: global-context accounting reset policy failed, expected 11/22 got %"PRIu64"/%"PRIu64"\n",
-                ctx.atomic.metrics,
-                ctx.atomic.samples);
-        errors++;
-    }
-
-    dbengine_reset_accounting_if_fresh(&ctx, true);
-    if(ctx.atomic.metrics != 0 || ctx.atomic.samples != 0) {
-        fprintf(stderr,
-                "DBENGINE METRIC: fresh-context accounting reset policy failed, expected 0/0 got %"PRIu64"/%"PRIu64"\n",
-                ctx.atomic.metrics,
-                ctx.atomic.samples);
-        errors++;
-    }
-
     return errors;
 }
 

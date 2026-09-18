@@ -616,14 +616,6 @@ static inline bool dbengine_atomic_uint64_sub_saturating(
     }
 }
 
-static inline void dbengine_reset_accounting_if_fresh(struct dbengine_tier *ctx, bool freshly_initialized_ctx) {
-    if(!freshly_initialized_ctx)
-        return;
-
-    ctx->atomic.metrics = 0;
-    ctx->atomic.samples = 0;
-}
-
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)
 #define ctx_last_fileno_increment(ctx) __atomic_add_fetch(&(ctx)->atomic.last_fileno, 1, __ATOMIC_RELAXED)
 

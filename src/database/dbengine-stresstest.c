@@ -160,6 +160,10 @@ void generate_dbengine_dataset(unsigned history_seconds)
     if (NULL == host)
         return;
 
+    // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
+    // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
+    dbengine_preload_release();
+
     thread_info = mallocz(sizeof(*thread_info) * DSET_CHARTS);
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         thread_info[i] = mallocz(sizeof(*thread_info[i]) + sizeof(RRDDIM *) * DSET_DIMS);
@@ -193,7 +197,9 @@ void generate_dbengine_dataset(unsigned history_seconds)
 
     // shut the dbengine tier down before freeing the host: rrdhost_free() does
     // not do it, and destroying the charts under a live tier lets the flush
-    // workers touch freed memory. Same teardown as dbengine_stress_test() below.
+    // workers touch freed memory. The host's pointer to the (static, now inactive)
+    // tier is cleared so the free sees a host without a database. Same teardown
+    // as dbengine_stress_test() below.
     DBENGINE_TIER *tier = (DBENGINE_TIER *)host->db[0].si;
     dbengine_quiesce(tier);
     dbengine_tier_exit(tier);
@@ -366,6 +372,10 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     if (NULL == host)
         return;
 
+    // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
+    // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
+    dbengine_preload_release();
+
     chart_threads = mallocz(sizeof(*chart_threads) * DSET_CHARTS);
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         chart_threads[i] = mallocz(sizeof(*chart_threads[i]) + sizeof(RRDDIM *) * DSET_DIMS);
@@ -459,9 +469,9 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         freez(query_threads[i]);
     }
     freez(query_threads);
-    // same teardown as generate_dbengine_dataset() above: dbengine_tier_exit() frees a
-    // tier that is not a multidb tier, so clear the host's pointer to it, and release
-    // the host we created before the caller tears the shared libraries down
+    // same teardown as generate_dbengine_dataset() above: exit the tier, clear the
+    // host's pointer to it, and release the host we created before the caller tears
+    // the shared libraries down
     rrd_wrlock();
     dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
     dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
