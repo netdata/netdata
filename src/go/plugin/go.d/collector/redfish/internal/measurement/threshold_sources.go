@@ -181,11 +181,12 @@ func thresholdDuration(data map[string]any, key string) (float64, bool) {
 }
 
 func (s *thresholdSource) enabled() bool {
-	if enabled, present := s.data["Enabled"]; present && enabled != true {
+	// Nullable availability fields do not invalidate an otherwise usable reading.
+	if enabled := s.data["Enabled"]; enabled != nil && enabled != true {
 		return false
 	}
 	state, present := valueAt(s.data, "Status.State")
-	if !present {
+	if !present || state == nil {
 		return true
 	}
 	text, ok := state.(string)

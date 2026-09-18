@@ -93,12 +93,20 @@ func TestDerivedHealthUnavailableAndInapplicable(t *testing.T) {
 		"disabled limit ignores unknown settings": {func(n *Resource) {
 			n.Data["Thresholds"] = map[string]any{"UpperCritical": map[string]any{"Reading": 10, "Activation": "Disabled", "DwellTime": nil}}
 		}, ""},
-		"missing reading":            {func(n *Resource) { delete(n.Data, "Reading"); delete(n.Data, "Status") }, "unavailable"},
-		"null reading":               {func(n *Resource) { n.Data["Reading"] = nil }, "unavailable"},
-		"invalid reading":            {func(n *Resource) { n.Data["Reading"] = "hot" }, "unavailable"},
-		"outside advertised range":   {func(n *Resource) { n.Data["ReadingRangeMax"] = 15 }, "unavailable"},
-		"disabled sensor":            {func(n *Resource) { n.Data["Enabled"] = false }, "unavailable"},
-		"absent sensor":              {func(n *Resource) { n.Data["Status"] = map[string]any{"State": "Absent"} }, "unavailable"},
+		"missing reading":          {func(n *Resource) { delete(n.Data, "Reading"); delete(n.Data, "Status") }, "unavailable"},
+		"null reading":             {func(n *Resource) { n.Data["Reading"] = nil }, "unavailable"},
+		"invalid reading":          {func(n *Resource) { n.Data["Reading"] = "hot" }, "unavailable"},
+		"outside advertised range": {func(n *Resource) { n.Data["ReadingRangeMax"] = 15 }, "unavailable"},
+		"disabled sensor":          {func(n *Resource) { n.Data["Enabled"] = false }, "unavailable"},
+		"absent sensor":            {func(n *Resource) { n.Data["Status"] = map[string]any{"State": "Absent"} }, "unavailable"},
+		"null state with disabled sensor": {func(n *Resource) {
+			n.Data["Enabled"] = false
+			n.Data["Status"] = map[string]any{"State": nil}
+		}, "unavailable"},
+		"null enabled with absent sensor": {func(n *Resource) {
+			n.Data["Enabled"] = nil
+			n.Data["Status"] = map[string]any{"State": "Absent"}
+		}, "unavailable"},
 		"malformed threshold map":    {func(n *Resource) { n.Data["Thresholds"] = 3 }, "unavailable"},
 		"malformed threshold object": {func(n *Resource) { n.Data["Thresholds"] = map[string]any{"UpperCritical": 10} }, "unavailable"},
 		"malformed limit": {func(n *Resource) {
@@ -280,6 +288,26 @@ func TestDerivedHealthStoredEnergyUsesWattHours(t *testing.T) {
 			assert.Equal(t, "watt-hours", result.Sensors[0].Units)
 			assert.Equal(t, float64(50), result.Sensors[0].Value)
 			source["Reading"] = test.clearValue
+			projectThresholdStatus(t, p, node, 1, "ok")
+		})
+	}
+}
+
+func TestDerivedHealthNullableSensorAvailability(t *testing.T) {
+	for name, change := range map[string]func(*Resource){
+		"null enabled": func(n *Resource) { n.Data["Enabled"] = nil },
+		"null state":   func(n *Resource) { n.Data["Status"].(map[string]any)["State"] = nil },
+		"both null": func(n *Resource) {
+			n.Data["Enabled"] = nil
+			n.Data["Status"].(map[string]any)["State"] = nil
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			node := thresholdTestSensor(20, map[string]any{"UpperCritical": map[string]any{"Reading": 10}})
+			change(node)
+			p := New("", "", nil)
+			projectThresholdStatus(t, p, node, 0, "critical")
+			node.Data["Reading"] = 5
 			projectThresholdStatus(t, p, node, 1, "ok")
 		})
 	}
