@@ -1172,8 +1172,13 @@ static inline int link(const char *oldpath, const char *newpath) {
 // Return entry type portably; UCRT64 has no dirent::d_type member.
 #if defined(OS_WINDOWS)
 char *os_translate_msys_to_windows_path(const char *src);
+void freez(void *ptr);
 #endif
 static inline unsigned char nd_dirent_type(const char *directory, const struct dirent *entry) {
+#if !defined(OS_WINDOWS)
+    (void)directory;
+    return entry ? entry->d_type : DT_UNKNOWN;
+#else
     if (!directory || !entry)
         return DT_UNKNOWN;
 
@@ -1182,11 +1187,10 @@ static inline unsigned char nd_dirent_type(const char *directory, const struct d
     if (n < 0 || (size_t)n >= sizeof(path))
         return DT_UNKNOWN;
 
-#if defined(OS_WINDOWS)
     // readdir() receives MSYS-style paths; Win32 APIs require native paths.
     char *native_path = os_translate_msys_to_windows_path(path);
     DWORD attrs = native_path ? GetFileAttributesA(native_path) : INVALID_FILE_ATTRIBUTES;
-    free(native_path);
+    freez(native_path);
     if (attrs == INVALID_FILE_ATTRIBUTES)
         return DT_UNKNOWN;
     // Do not recurse through reparse points (symlinks and junctions).
@@ -1195,8 +1199,6 @@ static inline unsigned char nd_dirent_type(const char *directory, const struct d
     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
         return DT_DIR;
     return DT_REG;
-#else
-    return entry->d_type;
 #endif
 }
 

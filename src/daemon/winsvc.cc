@@ -28,6 +28,10 @@ static HANDLE svc_heartbeat_done_event = nullptr;
 // after the SCM has been told the service is stopped.
 static HANDLE heartbeat_thread = nullptr;
 
+static CRITICAL_SECTION svc_status_lock;
+static bool svc_status_lock_init_done = false;
+static void svc_status_lock_ensure_init(void);
+
 static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint, DWORD dwControlsAccepted)
 {
     static DWORD dwCheckPoint = 1;
@@ -77,9 +81,6 @@ static HANDLE CreateEventHandle(void)
 // stop-pending heartbeat thread both write svc_status; without this lock the
 // heartbeat can publish SERVICE_STOP_PENDING *after* the callback has set
 // SERVICE_STOPPED, and the SCM records a "stopped after stop pending" race.
-static CRITICAL_SECTION svc_status_lock;
-static bool svc_status_lock_init_done = false;
-
 static void svc_status_lock_ensure_init(void)
 {
     if (svc_status_lock_init_done)

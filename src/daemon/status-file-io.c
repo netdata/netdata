@@ -47,7 +47,7 @@ static ND_THREAD *status_file_io_publisher_thread = NULL;
 static HANDLE status_file_io_stop_event = NULL;
 static SPINLOCK status_file_io_pending_spinlock = SPINLOCK_INITIALIZER;
 
-static void *status_file_io_publisher_main(void *arg)
+static void status_file_io_publisher_main(void *arg)
 {
     UNUSED(arg);
     while (1) {
@@ -81,27 +81,15 @@ static void *status_file_io_publisher_main(void *arg)
             }
         }
     }
-    return NULL;
 }
 
-// Post a (temp, final) pair for the worker thread. Safe to call from a
-// signal handler: only touches the pre-allocated slot and a spinlock.
+// Windows does not install the POSIX signal handler used by the Unix crash
+// path, so publish directly and return the real rename result. This also
+// keeps fatal and timeout status snapshots synchronous.
 static inline bool status_file_io_publish_deferred(const char *temp_path, const char *final_path)
 {
-    if (!status_file_io_publisher_thread)
-        return false;
-    spinlock_lock(&status_file_io_pending_spinlock);
-    // The spinlock is acquired only briefly to copy both paths atomically;
-    // we then flip the ready flag under the lock and let the worker pick
-    // it up. We do not write the paths under the flag set because the
-    // worker reads them under the same spinlock.
-    strncpyz(status_file_io_pending.temp_path, temp_path, sizeof(status_file_io_pending.temp_path) - 1);
-    status_file_io_pending.temp_path[sizeof(status_file_io_pending.temp_path) - 1] = '\0';
-    strncpyz(status_file_io_pending.final_path, final_path, sizeof(status_file_io_pending.final_path) - 1);
-    status_file_io_pending.final_path[sizeof(status_file_io_pending.final_path) - 1] = '\0';
-    __atomic_store_n(&status_file_io_pending.ready, 1, __ATOMIC_RELEASE);
-    spinlock_unlock(&status_file_io_pending_spinlock);
-    return true;
+    return MoveFileExA(temp_path, final_path,
+                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 }
 
 void status_file_io_init(void)

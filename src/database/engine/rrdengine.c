@@ -238,7 +238,6 @@ struct rrdeng_file_deletion {
     char path[RRDENG_PATH_MAX];
     size_t bytes;
     bool datafile;
-    bool dispatched;
     unsigned retries;
     int result;
 };
@@ -253,6 +252,7 @@ static void rrdeng_file_deletion_worker(uv_work_t *work) {
     deletion->result = uv_fs_unlink(NULL, &request, deletion->path, NULL);
     uv_fs_req_cleanup(&request);
     worker_is_idle();
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 }
 
@@ -265,7 +265,6 @@ static void rrdeng_file_deletion_start(struct rrdeng_file_deletion *deletion) {
         int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
                                rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
         if (likely(rc == 0)) {
-            deletion->dispatched = true;
             return;
         }
 
@@ -298,18 +297,13 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
 
     spinlock_lock(&ctx->deletion.spinlock);
     if (unlikely(__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED) == 0)) {
-        struct rrdeng_file_deletion *next = ctx->deletion.head;
-        if (next) {
-            ctx->deletion.head = next->next;
-            if (!ctx->deletion.head)
-                ctx->deletion.tail = NULL;
-        }
-        else
-            ctx->deletion.running = false;
+        ctx->deletion.running = false;
         spinlock_unlock(&ctx->deletion.spinlock);
         netdata_log_error("DBENGINE: deletion queue accounting underflow for '%s'", deletion->path);
         freez(deletion);
-        return next;
+        // The accounting invariant is broken; do not re-arm a queue whose
+        // pending count is already zero, since shutdown may free the context.
+        return NULL;
     }
     struct rrdeng_file_deletion *next = ctx->deletion.head;
     if (next) {
@@ -322,8 +316,6 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
     spinlock_unlock(&ctx->deletion.spinlock);
 
     freez(deletion);
-    if (deletion->dispatched)
-        __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELEASE);
     return next;
 }
@@ -335,7 +327,6 @@ static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unuse
         __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
         if (uv_queue_work(&rrdeng_main.loop, &deletion->work,
                           rrdeng_file_deletion_worker, rrdeng_file_deletion_after) == 0) {
-            deletion->dispatched = true;
             return;
         }
         __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
