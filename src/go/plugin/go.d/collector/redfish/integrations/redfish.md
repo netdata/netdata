@@ -41,8 +41,10 @@ The only remote writes create and delete the collector's own sessions.
 
 For session and auto authentication, the configuration test identifies the endpoint without creating a session.
 Credentials are validated when collection starts. Session authentication requires an origin-relative `Links.Sessions`
-endpoint; use Basic authentication if the BMC does not provide one. BMC health states are reported directly; the collector does not
-infer alarms from numeric thresholds.
+endpoint; use Basic authentication if the BMC does not provide one.
+
+BMC health states are reported directly. Sensor thresholds are evaluated separately as derived health, without
+replacing BMC-reported health. Derived health describes observed threshold conditions, not overall hardware health.
 
 Collection is best-effort: one unreadable resource does not stop independently reachable resources. Missing current
 values produce gaps rather than zeroes. Complete membership scans obsolete removed components; partial scans retain
@@ -743,6 +745,7 @@ Metrics:
 |:------|:------------|:----------|:----|
 | redfish.reading.percentage | Percentage Readings | value | percentage |
 | redfish.reading.alarm | Redfish Reading Source Health State | clear, warning, critical | state |
+| redfish.reading.derived_health | Redfish Reading Derived Health (Thresholds) | ok, warning, critical | state |
 | redfish.reading.absolute_humidity | Absolute Humidity Readings | value | grams/cubic-meter |
 | redfish.reading.air_flow | Air Flow Readings | value | cubic-meters/minute |
 | redfish.reading.altitude | Altitude Readings | value | meters |
@@ -795,6 +798,185 @@ Metrics:
 | system.hw.sensor.voltage.average | Voltage Average (Zero basis) | average | volts |
 | system.hw.sensor.voltage.alarm | Voltage Source Health State | clear, warning, critical | state |
 | system.hw.sensor.voltage.input | Voltage Reading (Zero basis) | input | volts |
+
+
+
+## Live Data
+
+Inspect sensor readings, hardware health and BMC-retained events for one configured endpoint using the Instance selector.
+The Sensors and Hardware tables refresh every 60 seconds and show the latest completed collection. Collection timing follows the
+job's `update_every` (60 seconds by default); the Observed column shows when each row was collected.
+Opening Sensors or Hardware does not query the BMC. Partial collections show current available data and identify gaps;
+a total collection failure makes both snapshot Functions unavailable instead of showing old readings. Logs queries the BMC on demand.
+
+
+### Redfish Sensors
+
+Inspect current primary sensor readings, BMC-reported health and independently derived threshold health. Average, peak and threshold companion values are not separate rows. Power calculated from energy is explicitly labeled.
+
+Derived health evaluates supplied numeric upper and lower thresholds independently of BMC health, including when BMC health is present.
+OK means none of the evaluated thresholds is active; the BMC may report other faults. Legacy temperature, fan and voltage limits and modern Sensor thresholds are supported.
+
+Modern thresholds honor increasing upper/decreasing lower activation, dwell time and clearing hysteresis using successive observed samples.
+Omitted timing settings add no delay; explicit unknown settings, unsupported crossing directions, disabled sensors and unusable readings show Unavailable and leave a metric gap.
+Missing or null numeric limits supply no threshold. Without usable enabled thresholds, derived health is Not applicable.
+Collection gaps, restarts and threshold changes discard timing history; evaluation may remain unavailable until enough new samples establish a status.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Redfish:sensors` |
+| Require Cloud | no |
+| Performance | Reads data already collected by the job; no additional BMC requests. Response size grows with the number of rows. |
+| Security | Exposes device identity, health and source resource addresses to authorized operators. Does not expose credentials or session tokens. |
+| Availability | Available after collection produces usable data. Returns HTTP 503 before the first collection and after a total failure. Partial collections retain current rows and mark gaps. |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Instance | select | Select the configured Redfish endpoint job. | no | First available job |  |
+
+#### Returns
+
+One row per supported primary reading from the current collection. Missing or invalid values are blank; missing health is Not reported.
+
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Key | string |  | hidden | Stable row identity. |
+| Sort | string |  | hidden | Attention, name and identity ordering. |
+| Sensor | string |  |  | Sensor or component reading. |
+| Type | string |  |  | Measured quantity. |
+| Reading | float |  |  | Current value; blank when unavailable. |
+| Units | string |  |  | Reading units. |
+| Health | string |  |  | BMC-reported health of this reading; not inherited component health. |
+| Derived health (thresholds) | string |  |  | Locally evaluated threshold status; OK does not imply overall hardware health. |
+| Data availability | string |  |  | Whether this reading has a usable value. |
+| Observed | timestamp |  |  | Collection observation time; not the BMC's internal sampling time. |
+| Resource | string |  | hidden | Resource supplying this reading. |
+| Resource URI | string |  | hidden | Source resource address. |
+| Source property | string |  | hidden | Source reading property. |
+| Location | string |  | hidden | BMC-reported physical context. |
+| Source | string |  | hidden | Whether this value was reported or calculated. |
+| rowOptions | none |  | hidden | Row presentation. |
+
+### Redfish Hardware
+
+Find components needing attention and inspect their identity, configuration and reported condition. Optional columns show CPU counts, memory and storage capacity, firmware release dates and assembly revisions. Component health, aggregate health and collection availability are kept distinct.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Redfish:hardware` |
+| Require Cloud | no |
+| Performance | Reads data already collected by the job; no additional BMC requests. Response size grows with the number of rows. |
+| Security | Exposes device identity, health and source resource addresses to authorized operators. Does not expose credentials or session tokens. |
+| Availability | Available after collection produces usable data. Returns HTTP 503 before the first collection and after a total failure. Partial collections retain current rows and mark gaps. |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Instance | select | Select the configured Redfish endpoint job. | no | First available job |  |
+
+#### Returns
+
+One row per monitored component or logical resource, including known resources that could not be read. Identity, configuration and version details are optional columns populated when reported by the BMC. Capacity belongs to the individual resource; physical drives and logical volumes must not be added together. Release date describes the firmware or software release, not its installation. Missing or unusable details are blank.
+
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Key | string |  | hidden | Stable row identity. |
+| Sort | string |  | hidden | Attention, name and identity ordering. |
+| Component | string |  |  | Component or logical resource name. |
+| Type | string |  |  | Resource kind. |
+| Health | string |  |  | BMC-reported health of this component. |
+| State | string |  |  | BMC-reported operational state. |
+| Location | string |  |  | BMC-reported location or slot. |
+| Reported issue | string |  |  | BMC conditions, rollup warnings or predicted failure. |
+| Data availability | string |  |  | Whether this component was read in this collection. |
+| Observed | timestamp |  |  | Collection observation time; not the BMC's internal sampling time. |
+| Manufacturer | string |  | hidden | Component manufacturer. |
+| Model | string |  | hidden | Component model. |
+| Serial number | string |  | hidden | Component serial number. |
+| Part number | string |  | hidden | Component part number. |
+| Asset tag | string |  | hidden | Component asset tag. |
+| Firmware | string |  | hidden | Firmware, software or BIOS version. |
+| Power state | string |  | hidden | BMC-reported power state. |
+| Health rollup | string |  | hidden | BMC-reported aggregate health, separate from component health. |
+| Failure predicted | boolean |  | hidden | BMC predicts component failure. |
+| Resource URI | string |  | hidden | Source resource address. |
+| Processor cores | integer | cores | hidden | Total cores in this processor. |
+| Enabled cores | integer | cores | hidden | Enabled cores in this processor. |
+| Supported threads | integer | threads | hidden | Execution threads supported by this processor. |
+| Capacity | integer | bytes | hidden | Capacity of this memory device, physical drive or logical volume. Memory capacity is converted from MiB to bytes. |
+| Memory type | string |  | hidden | Memory device technology, such as DDR4 or DDR5. |
+| Media type | string |  | hidden | Drive media type, such as SSD or HDD. |
+| Drive protocol | string |  | hidden | Protocol used by this drive, such as SAS, SATA or NVMe. |
+| RAID type | string |  | hidden | RAID configuration of this logical volume. |
+| Release date | timestamp |  | hidden | Firmware or software release/production date; not installation time. |
+| Hardware version | string |  | hidden | Vendor-reported hardware version of this assembly. |
+| Engineering revision | string |  | hidden | Engineering change level or revision of this assembly. |
+| rowOptions | none |  | hidden | Row presentation. |
+
+### Redfish Logs
+
+Browse events currently retained by one BMC log service in the Logs view. Select the endpoint job and a service linked from its Systems, Managers or Chassis. Refresh reads the log again; BMC rotation or clearing can remove events. This viewer does not store an archive.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Redfish:logs` |
+| Require Cloud | no |
+| Performance | Each query discovers linked services and reads every page and entry of the selected log before filtering. There is no event cap; cost grows with BMC retention and pagination. Reads share the job's `max_concurrent_requests` budget with metrics. The default UI refresh is 60 seconds. Slow full scans can fail at the Function deadline; narrow time or text filters do not reduce BMC reads. |
+| Security | Uses the job's existing credentials, TLS and proxy settings. Reading logs requires BMC permissions for the linked services and entries. Queries are read-only apart from creating and deleting their authentication sessions. Event messages may contain sensitive operational information; credentials and session tokens are not returned. |
+| Availability | Available for running jobs without waiting for a successful metric poll. An empty service selector means no supported linked services were advertised. Missing Entries support and inaccessible services return an error; an empty readable log returns an empty table. The view has no histogram, live tail or historical archive, and a multi-page read is not an atomic snapshot. |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Instance | select | Select the configured Redfish endpoint job. | no | First available job |  |
+| Log service | select | Select a linked service advertised by this endpoint. | yes | First advertised service in the UI |  |
+| Severity | select | Filter by BMC severity. Unknown includes missing and unrecognized values. | no | all | All severities (default), Critical, Warning, OK, Unknown |
+| After | integer | Inclusive lower time boundary in integer Unix seconds. A negative value is relative to before, or to now when before is omitted. | no | No lower boundary |  |
+| Before | integer | Inclusive upper time boundary in integer Unix seconds. Zero or a negative value is relative to now. | no | No upper boundary |  |
+| Search | string | Case-sensitive Netdata simple patterns against the combined message, IDs, resource addresses, entry type and reported severity. Use `*failure*` for a substring. Space-separated patterns are checked in order; the first match decides, `!` excludes, and no match excludes the row. Use `!*noise* *` to exclude noise and keep everything else. | no | No text filter |  |
+
+#### Returns
+
+One row per matching retained entry. Time uses EventTimestamp, then valid Created. Both originals and the time basis remain available in details. Undated entries remain visible as Unavailable after dated rows, with a notice that the time range cannot filter them. Refresh replaces all rows. Failed pages or members fail the request instead of returning a partial log as complete.
+
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Order | integer |  | hidden | Newest first, then undated entries; row position within this query. |
+| Time | timestamp |  |  | EventTimestamp with valid Created fallback; Unavailable when neither can be used. |
+| Severity | string |  |  | OK, Warning, Critical or Unknown. |
+| Message | string |  |  | BMC event message. |
+| Entry ID | string |  |  | Identifier assigned by this log service. |
+| Entry type | string |  | hidden | BMC event format. |
+| Log service | string |  | hidden | Selected source resource. |
+| Entry URI | string |  | hidden | Source entry resource. |
+| Message ID | string |  | hidden | BMC message registry identifier. |
+| EventTimestamp | string |  | hidden | Original event time, including invalid source values. |
+| Created | string |  | hidden | Original entry creation time, including invalid source values. |
+| Time basis | string |  | hidden | EventTimestamp, Created or Unavailable. |
+| Reported severity | string |  | hidden | Original severity, including unrecognized source values. |
+| rowOptions | none |  | hidden | Row presentation. |
 
 
 
