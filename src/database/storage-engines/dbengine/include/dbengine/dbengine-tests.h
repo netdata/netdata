@@ -14,9 +14,12 @@
 // cache, which reads the process-wide configuration, so they take it from the embedder and set it themselves;
 // dbengine_metrics_registry_retention_benchmark() needs nothing.
 //
-// Two are for a test driver that adds their failed-check counts to its own: dbengine_cache_floor_unittest() runs
-// before the engine is up (it checks what the caches fall back to without a main cache), and
-// dbengine_zero_page_cadence_unittest() collects into and queries a tier the embedder brought up and hands it.
+// Three are for a test driver that adds their failed-check counts to its own: dbengine_cache_floor_unittest() runs
+// before the engine is up (it checks what the caches fall back to without a main cache),
+// dbengine_allocator_unittest() runs before the engine is up too (it brings the process-wide page allocators up
+// with the given configuration's allocator settings and checks that a second, different configuration leaves them
+// as built; the engine that comes up afterwards reuses them), and dbengine_zero_page_cadence_unittest() collects
+// into and queries a tier the embedder brought up and hands it.
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,6 +30,7 @@ int dbengine_cache_unittest(const struct dbengine_config *cfg);
 int dbengine_metrics_registry_unittest(const struct dbengine_config *cfg);
 int dbengine_metrics_registry_retention_benchmark(void);
 int dbengine_cache_floor_unittest(void);
+int dbengine_allocator_unittest(const struct dbengine_config *cfg);
 int dbengine_zero_page_cadence_unittest(STORAGE_INSTANCE *si);
 
 #ifdef __cplusplus

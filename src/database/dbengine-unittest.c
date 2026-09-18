@@ -623,6 +623,9 @@ int test_dbengine(void) {
     // before the engine is up: the caches do not exist yet, which is the state this check needs
     errors += (size_t)dbengine_cache_floor_unittest();
 
+    // before the engine is up: the page allocators are brought up here, and the engine below reuses them
+    errors += (size_t)dbengine_allocator_unittest(netdata_conf_dbengine_resolved());
+
     // the engine, then the host that brings the tier up on it
     netdata_conf_dbengine_apply();
 

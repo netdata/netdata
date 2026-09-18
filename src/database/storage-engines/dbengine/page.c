@@ -182,6 +182,12 @@ struct {
 
 static struct aral_statistics pgd_aral_statistics = { 0 };
 
+// the layer is process-wide: built once, by the first engine to come up, with its settings; kept here so the
+// counters below and a later engine's attempt to configure it again read what the layer was built with
+static SPINLOCK pgd_arals_spinlock = SPINLOCK_INITIALIZER;
+static bool pgd_arals_initialized = false;
+static struct dbengine_allocator_config pgd_arals_config = { 0 };
+
 static size_t aral_sizes_delta;
 static size_t aral_sizes_count;
 static size_t aral_sizes[] = {
@@ -243,14 +249,14 @@ static struct {
 // both run in the collection path of every collector thread, all writing the same few counters,
 // so they are counted only when the embedder charts them
 static inline void gorilla_stats_hot_buffer_added(void) {
-    if(!dbengine_cfg.compression_statistics)
+    if(!pgd_arals_config.compression_statistics)
         return;
 
     __atomic_fetch_add(&gorilla_stats.hot_buffers_added, 1, __ATOMIC_RELAXED);
 }
 
 static inline void gorilla_stats_tier0_page_flush(uint32_t actual, uint32_t optimal, uint32_t original) {
-    if(!dbengine_cfg.compression_statistics)
+    if(!pgd_arals_config.compression_statistics)
         return;
 
     __atomic_fetch_add(&gorilla_stats.tier0_disk_actual_bytes, actual, __ATOMIC_RELAXED);
@@ -279,8 +285,29 @@ int aral_size_sort_compare(const void *a, const void *b) {
     return (size_a > size_b) - (size_a < size_b);
 }
 
-void pgd_init_arals(void) {
-    size_t partitions = dbengine_cfg.cpus;
+void pgd_init_arals(const struct dbengine_allocator_config *cfg) {
+    spinlock_lock(&pgd_arals_spinlock);
+
+    if(pgd_arals_initialized) {
+        // the layer is shared: the first engine's settings stand, a later engine that asked for something else
+        // is told so (the size classes also depend on the compile-time tier page sizes, which never differ)
+        if(cfg->partitions != pgd_arals_config.partitions ||
+           cfg->arals_for_large_pages != pgd_arals_config.arals_for_large_pages ||
+           cfg->compression_statistics != pgd_arals_config.compression_statistics)
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "DBENGINE: the page allocators are already configured (partitions %zu, large pages %s, "
+                   "compression statistics %s); the new settings (partitions %zu, large pages %s, compression "
+                   "statistics %s) are ignored",
+                   pgd_arals_config.partitions, pgd_arals_config.arals_for_large_pages ? "yes" : "no",
+                   pgd_arals_config.compression_statistics ? "yes" : "no",
+                   cfg->partitions, cfg->arals_for_large_pages ? "yes" : "no",
+                   cfg->compression_statistics ? "yes" : "no");
+
+        spinlock_unlock(&pgd_arals_spinlock);
+        return;
+    }
+
+    size_t partitions = cfg->partitions;
     if(partitions < 4) partitions = 4;
     if(partitions > PGD_ARAL_PARTITIONS_MAX) partitions = PGD_ARAL_PARTITIONS_MAX;
     pgd_alloc_globals.partitions = partitions;
@@ -290,7 +317,7 @@ void pgd_init_arals(void) {
     for(size_t i = 0; i < RRD_STORAGE_TIERS ;i++)
         aral_sizes[i] = tier_page_size[i];
 
-    if(!dbengine_cfg.arals_for_large_pages) {
+    if(!cfg->arals_for_large_pages) {
         // do not use ARAL for sizes above 4KiB
         for(size_t i = RRD_STORAGE_TIERS ; i < _countof(aral_sizes) ;i++) {
             if(aral_sizes[i] > 4096)
@@ -392,6 +419,48 @@ void pgd_init_arals(void) {
     pgd_alloc_globals.sizeof_pgd = aral_actual_element_size(pgd_alloc_globals.aral_pgd[0]);
     pgd_alloc_globals.sizeof_gorilla_writer_t = aral_actual_element_size(pgd_alloc_globals.aral_gorilla_writer[0]);
     pgd_alloc_globals.sizeof_gorilla_buffer_32bit = aral_actual_element_size(pgd_alloc_globals.aral_gorilla_buffer[0]);
+
+    pgd_arals_config = *cfg;
+    pgd_arals_initialized = true;
+    spinlock_unlock(&pgd_arals_spinlock);
+}
+
+// the layer's own check: bringing it up twice, the second time with different settings, must leave it as the
+// first call built it (same partitions, same size classes, same allocators); run before any engine is up
+int dbengine_allocator_unittest(const struct dbengine_config *cfg) {
+    int errors = 0;
+
+    // resolve the partition count the way dbengine_init() will, so the engine that comes up afterwards finds the
+    // layer configured exactly as it would have configured it
+    struct dbengine_allocator_config first = cfg->allocator;
+    if(!first.partitions)
+        first.partitions = cfg->cpus ? cfg->cpus : os_get_system_cpus();
+
+    pgd_init_arals(&first);
+
+    size_t partitions = pgd_alloc_globals.partitions;
+    size_t count = aral_sizes_count;
+    ARAL **table = arals;
+    ARAL *pgd0 = pgd_alloc_globals.aral_pgd[0];
+
+    struct dbengine_allocator_config second = first;
+    second.partitions = first.partitions + 1;
+    second.arals_for_large_pages = !first.arals_for_large_pages;
+    second.compression_statistics = !first.compression_statistics;
+
+    pgd_init_arals(&second);
+
+    if(pgd_alloc_globals.partitions != partitions || aral_sizes_count != count || arals != table ||
+       pgd_alloc_globals.aral_pgd[0] != pgd0 ||
+       pgd_arals_config.partitions != first.partitions ||
+       pgd_arals_config.arals_for_large_pages != first.arals_for_large_pages ||
+       pgd_arals_config.compression_statistics != first.compression_statistics) {
+        fprintf(stderr, "DBENGINE ALLOCATOR: a second configuration changed the page allocators\n");
+        errors++;
+    }
+
+    fprintf(stderr, "DBENGINE ALLOCATOR: %d errors\n", errors);
+    return errors;
 }
 
 static ARAL *pgd_get_aral_by_size_and_partition(size_t size, size_t partition) {

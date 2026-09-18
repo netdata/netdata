@@ -141,9 +141,9 @@ const struct dbengine_config *netdata_conf_dbengine_resolved(void) {
     // settings the daemon resolves elsewhere, and on some paths (the unit tests) never from netdata.conf:
     // snapshot them at the moment the engine needs them
     netdata_conf_dbengine.cpus = netdata_conf_cpus();
-    netdata_conf_dbengine.arals_for_large_pages = netdata_conf_is_parent();
+    netdata_conf_dbengine.allocator.arals_for_large_pages = netdata_conf_is_parent();
     netdata_conf_dbengine.cache_statistics = pulse_enabled;
-    netdata_conf_dbengine.compression_statistics = pulse_extended_enabled;
+    netdata_conf_dbengine.allocator.compression_statistics = pulse_extended_enabled;
     netdata_conf_dbengine.default_update_every_s = nd_profile.update_every;
     netdata_conf_dbengine.libuv_worker_threads = libuv_worker_threads;
     netdata_conf_dbengine.reserved_libuv_worker_threads = RESERVED_LIBUV_WORKER_THREADS;

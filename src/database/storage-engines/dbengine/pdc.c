@@ -29,6 +29,10 @@ typedef struct datafile_extent_offset_list {
 // ----------------------------------------------------------------------------
 // PDC cache
 
+// the descriptor allocators below are process-wide and shared by every engine: each is created once, by the first
+// engine to come up, and reused
+static SPINLOCK pdc_globals_spinlock = SPINLOCK_INITIALIZER;
+
 static struct {
     struct {
         ARAL *ar;
@@ -52,15 +56,18 @@ static struct {
 } pdc_globals = {};
 
 void pdc_init(void) {
-    pdc_globals.pdc.ar = aral_create(
-            "dbengine-pdc",
-            sizeof(PDC),
-            0,
-            0,
-            NULL,
-            NULL, NULL, false, false, true
-            );
+    spinlock_lock(&pdc_globals_spinlock);
+    if(!pdc_globals.pdc.ar)
+        pdc_globals.pdc.ar = aral_create(
+                "dbengine-pdc",
+                sizeof(PDC),
+                0,
+                0,
+                NULL,
+                NULL, NULL, false, false, true
+                );
 
+    spinlock_unlock(&pdc_globals_spinlock);
 }
 
 ALWAYS_INLINE PDC *pdc_get(void) {
@@ -81,14 +88,17 @@ struct aral_statistics *pdc_aral_stats(void) {
 // PD cache
 
 void page_details_init(void) {
-    pdc_globals.pd.ar = aral_create(
-            "dbengine-pd",
-            sizeof(struct page_details),
-            0,
-            0,
-            NULL,
-            NULL, NULL, false, false, true
-    );
+    spinlock_lock(&pdc_globals_spinlock);
+    if(!pdc_globals.pd.ar)
+        pdc_globals.pd.ar = aral_create(
+                "dbengine-pd",
+                sizeof(struct page_details),
+                0,
+                0,
+                NULL,
+                NULL, NULL, false, false, true
+        );
+    spinlock_unlock(&pdc_globals_spinlock);
 }
 
 ALWAYS_INLINE struct page_details *page_details_get(void) {
@@ -109,14 +119,17 @@ struct aral_statistics *pd_aral_stats(void) {
 // epdl cache
 
 void epdl_init(void) {
-    pdc_globals.epdl.ar = aral_create(
-            "dbengine-epdl",
-            sizeof(EPDL),
-            0,
-            0,
-            NULL,
-            NULL, NULL, false, false, true
-    );
+    spinlock_lock(&pdc_globals_spinlock);
+    if(!pdc_globals.epdl.ar)
+        pdc_globals.epdl.ar = aral_create(
+                "dbengine-epdl",
+                sizeof(EPDL),
+                0,
+                0,
+                NULL,
+                NULL, NULL, false, false, true
+        );
+    spinlock_unlock(&pdc_globals_spinlock);
 }
 
 static ALWAYS_INLINE EPDL *epdl_get(void) {
@@ -137,15 +150,18 @@ struct aral_statistics *epdl_aral_stats(void) {
 // deol cache
 
 void deol_init(void) {
-    pdc_globals.deol.ar = aral_create(
-            "dbengine-deol",
-            sizeof(DEOL),
-            0,
-            0,
-            NULL,
-            NULL, NULL, false, false, true
-    );
+    spinlock_lock(&pdc_globals_spinlock);
+    if(!pdc_globals.deol.ar)
+        pdc_globals.deol.ar = aral_create(
+                "dbengine-deol",
+                sizeof(DEOL),
+                0,
+                0,
+                NULL,
+                NULL, NULL, false, false, true
+        );
 
+    spinlock_unlock(&pdc_globals_spinlock);
 }
 
 static ALWAYS_INLINE DEOL *deol_get(void) {
@@ -166,15 +182,18 @@ struct aral_statistics *deol_aral_stats(void) {
 // epdl_extent cache
 
 void epdl_extent_init(void) {
-    pdc_globals.epdl_extent.ar = aral_create(
-            "dbengine-epdl-extent",
-            sizeof(EPDL_EXTENT),
-            0,
-            0,
-            NULL,
-            NULL, NULL, false, false, true
-    );
+    spinlock_lock(&pdc_globals_spinlock);
+    if(!pdc_globals.epdl_extent.ar)
+        pdc_globals.epdl_extent.ar = aral_create(
+                "dbengine-epdl-extent",
+                sizeof(EPDL_EXTENT),
+                0,
+                0,
+                NULL,
+                NULL, NULL, false, false, true
+        );
 
+    spinlock_unlock(&pdc_globals_spinlock);
 }
 
 static ALWAYS_INLINE EPDL_EXTENT *epdl_extent_get(void) {

@@ -24,7 +24,7 @@ typedef struct pgd PGD;
 
 #define PGD_EMPTY (PGD *)(-1)
 
-void pgd_init_arals(void);
+void pgd_init_arals(const struct dbengine_allocator_config *cfg);
 
 PGD *pgd_create(uint8_t type, uint32_t slots);
 PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size);

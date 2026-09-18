@@ -20,6 +20,10 @@ static void dbengine_config_resolve(struct dbengine_config *cfg) {
     if(cfg->cpus < 1)
         cfg->cpus = 1;
 
+    // the allocator layer partitions by the first engine's cpus unless told otherwise
+    if(!cfg->allocator.partitions)
+        cfg->allocator.partitions = cfg->cpus;
+
     if(!cfg->default_update_every_s)
         cfg->default_update_every_s = 1;
 

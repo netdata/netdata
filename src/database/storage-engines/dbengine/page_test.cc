@@ -455,7 +455,7 @@ int dbengine_page_test(const struct dbengine_config *cfg, int argc, char *argv[]
     dbengine_config_set(cfg);
     PGC *dummy_cache = pgc_create("pgd-tests-cache", 32 * 1024 * 1024, NULL, 64, NULL, NULL,
                                   10, 10, 1000, 10, PGC_OPTIONS_NONE, 1, 11);
-    pgd_init_arals();
+    pgd_init_arals(&cfg->allocator);
 
     ::testing::InitGoogleTest(&argc, argv);
     int rc = RUN_ALL_TESTS();

@@ -22,6 +22,16 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *tier, nd_uuid_
 // hands it to dbengine_init(), which brings the engine up with it. The engine keeps a private
 // copy and reads nothing else afterwards. Per-tier settings (path, quota, retention, page type)
 // travel with dbengine_tier_init() instead.
+// The page allocator layer's settings. The layer (the page allocators, their size classes and the gorilla
+// counters) is process-wide and shared by every engine: the first engine to come up configures it with this group
+// and later engines reuse it (a differing group is logged and ignored). The size classes also depend on the
+// compile-time tier page sizes.
+struct dbengine_allocator_config {
+    size_t partitions;                          // allocator partitions; 0 = the engine's cpus
+    bool arals_for_large_pages;                 // keep allocators for page sizes above 4KiB (a parent expects such pages)
+    bool compression_statistics;                // count gorilla buffers and tier-0 compression bytes (pulse extended)
+};
+
 struct dbengine_config {
     // caches - read once, when dbengine_init() brings up the caches shared by all tiers
     size_t page_cache_mb;                       // [db] dbengine page cache size
@@ -30,11 +40,12 @@ struct dbengine_config {
     bool use_all_ram_for_caches;                // [db] dbengine use all ram for caches
 
     bool cache_statistics;                      // keep per-cache statistics (the daemon's pulse setting)
-    bool compression_statistics;                // count gorilla buffers and tier-0 compression bytes (pulse extended)
 
-    // sizing of partitions, evictors, flushers and metric-registry loaders
+    // sizing of cache partitions, evictors, flushers and metric-registry loaders: this engine's concurrency width
     size_t cpus;                                // 0 = detect the system's cpus
-    bool arals_for_large_pages;                 // keep ARALs for page sizes above 4KiB (a parent expects such pages)
+
+    // the process-wide page allocator layer (see above)
+    struct dbengine_allocator_config allocator;
 
     // files
     bool direct_io;                             // [db] dbengine use direct io
@@ -79,16 +90,20 @@ struct dbengine_config {
 #endif
 
 // The compiled defaults: the baseline a caller adjusts before dbengine_init(), which resolves the
-// 0-means-default fields (cpus, default_update_every_s, pages_per_extent, libuv_worker_threads) to concrete values.
+// 0-means-default fields (cpus, allocator.partitions, default_update_every_s, pages_per_extent,
+// libuv_worker_threads) to concrete values.
 #define DBENGINE_CONFIG_DEFAULTS {                              \
     .page_cache_mb = DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB,     \
     .extent_cache_mb = 0,                                       \
     .out_of_memory_protection_bytes = 0,                        \
     .use_all_ram_for_caches = false,                            \
     .cache_statistics = true,                                   \
-    .compression_statistics = false,                            \
     .cpus = 0,                                                  \
-    .arals_for_large_pages = false,                             \
+    .allocator = {                                              \
+        .partitions = 0,                                        \
+        .arals_for_large_pages = false,                         \
+        .compression_statistics = false,                        \
+    },                                                          \
     .direct_io = true,                                          \
     .pages_per_extent = DBENGINE_DEFAULT_PAGES_PER_EXTENT,      \
     .journal_integrity_check = false,                           \
