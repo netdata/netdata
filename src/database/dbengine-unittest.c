@@ -593,9 +593,7 @@ static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
 
 // a dbengine_tier_init() that must be refused: the same tier 0 the host runs on, with a path that does not
 // exist, so a tier that was re-opened by mistake would show up as errors in the tests that follow
-static size_t test_dbengine_tier_init_refused(RRDHOST *host, int expected, const char *what) {
-    (void)host;
-
+static size_t test_dbengine_tier_init_refused(int expected, const char *what) {
     struct dbengine_tier_config tc;
     netdata_conf_dbengine_tier_config(0, &tc);
     tc.dbfiles_path = "/nonexistent/dbengine";
@@ -634,7 +632,7 @@ int test_dbengine(void) {
     // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
     dbengine_preload_release();
 
-    errors += test_dbengine_tier_init_refused(host, UV_EALREADY, "a tier that is up");
+    errors += test_dbengine_tier_init_refused(UV_EALREADY, "a tier that is up");
 
     errors += test_dbengine_burst_retention(host);
 
@@ -690,7 +688,7 @@ int test_dbengine(void) {
     dbengine_shutdown();
     rrd_wrunlock();
 
-    errors += test_dbengine_tier_init_refused(host, UV_EIO, "a tier on a shut-down engine");
+    errors += test_dbengine_tier_init_refused(UV_EIO, "a tier on a shut-down engine");
 
     return (int)(errors + value_errors + time_errors);
 }
