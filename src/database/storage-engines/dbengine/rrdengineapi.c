@@ -1155,6 +1155,11 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
         return UV_EALREADY;
     }
 
+    if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.came_up, __ATOMIC_ACQUIRE)) {
+        netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again in this process", tier);
+        return UV_EIO;
+    }
+
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
     /* reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier */
@@ -1195,6 +1200,7 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
     if (!init_rrd_files(ctx)) {
         // success - we run this ctx too
         __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
+        __atomic_store_n(&ctx->atomic.came_up, true, __ATOMIC_RELEASE);
         __atomic_store_n(&ctx->atomic.active, true, __ATOMIC_RELEASE);
         dbengine_populate_mrg(ctx);
         return 0;

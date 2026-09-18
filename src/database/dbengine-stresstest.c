@@ -159,8 +159,11 @@ void generate_dbengine_dataset(unsigned history_seconds)
     // the engine, then the host that brings the tier up on it
     netdata_conf_dbengine_apply();
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
-    if (NULL == host)
+    if (NULL == host) {
+        // the engine is up with no tier: stop it, as the success path does at the end
+        dbengine_shutdown();
         return;
+    }
 
     // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
     // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
@@ -373,8 +376,11 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     // the engine, then the host that brings the tier up on it
     netdata_conf_dbengine_apply();
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
-    if (NULL == host)
+    if (NULL == host) {
+        // the engine is up with no tier: stop it, as the success path does at the end
+        dbengine_shutdown();
         return;
+    }
 
     // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
     // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier

@@ -57,12 +57,12 @@ time_t dbengine_latest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
-// bring the static tier dbengine_multidb_tiers[tc->tier] up on a running engine: after dbengine_init() (fatal
-// before it), before dbengine_shutdown() (UV_EIO after it) and not while the tier is up (UV_EALREADY). Those
-// refusals leave the tier untouched; an init that fails opening the datafiles returns UV_EIO with the tier's
-// configuration already written. Once per tier per process: a tier that came up and exited cannot be brought up
-// again (only dbengine_destroy() finalizes its datafiles) and nothing guards that; two inits of the same tier
-// must not overlap either. A tier init and the shutdown must not overlap: the check is made when the tier starts,
+// bring the static tier dbengine_multidb_tiers[tc->tier] up on a running engine, once per process: after
+// dbengine_init() (fatal before it), before dbengine_shutdown() (UV_EIO after it), not while the tier is up
+// (UV_EALREADY) and not after it came up and exited (UV_EIO: only dbengine_destroy() finalizes its datafiles and
+// resets the slot). Those refusals leave the tier untouched; an init that fails opening the datafiles returns
+// UV_EIO with the tier's configuration already written. Two inits of the same tier must not overlap, nothing
+// serialises them. A tier init and the shutdown must not overlap either: the check is made when the tier starts,
 // so an init that is still in flight when the shutdown begins would wait on a loop that is gone (the daemon joins
 // its tier inits at startup, long before any shutdown)
 int dbengine_tier_init(const struct dbengine_tier_config *tc);

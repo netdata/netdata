@@ -591,12 +591,13 @@ static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
     return errors;
 }
 
-// a dbengine_tier_init() that must be refused: the same tier 0 the host runs on, with a path that does not
-// exist, so a tier that was re-opened by mistake would show up as errors in the tests that follow
-static size_t test_dbengine_tier_init_refused(int expected, const char *what) {
+// a dbengine_tier_init() that must be refused: the same tier 0 the host runs on. While the tier is up the path
+// does not exist, so a tier that was re-opened by mistake would show up as errors in the tests that follow; after
+// the tier exited its real path is used, so a re-open that is not refused is the real thing, not a path failure
+static size_t test_dbengine_tier_init_refused(int expected, const char *what, const char *path) {
     struct dbengine_tier_config tc;
     netdata_conf_dbengine_tier_config(0, &tc);
-    tc.dbfiles_path = "/nonexistent/dbengine";
+    tc.dbfiles_path = path;
     tc.disk_space_mb = default_dbengine_disk_quota_mb;
 
     int rc = dbengine_tier_init(&tc);
@@ -632,7 +633,7 @@ int test_dbengine(void) {
     // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
     dbengine_preload_release();
 
-    errors += test_dbengine_tier_init_refused(UV_EALREADY, "a tier that is up");
+    errors += test_dbengine_tier_init_refused(UV_EALREADY, "a tier that is up", "/nonexistent/dbengine");
 
     errors += test_dbengine_burst_retention(host);
 
@@ -681,14 +682,18 @@ int test_dbengine(void) {
     // prevent closing the database before the test is finished
     sleep(5);
 
+    char tier_path[FILENAME_MAX + 1];
+    snprintfz(tier_path, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+
     rrd_wrlock();
     dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
     dbengine_flush_all((DBENGINE_TIER *)host->db[0].si);
     dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
+    errors += test_dbengine_tier_init_refused(UV_EIO, "a tier that came up and exited", tier_path);
     dbengine_shutdown();
     rrd_wrunlock();
 
-    errors += test_dbengine_tier_init_refused(UV_EIO, "a tier on a shut-down engine");
+    errors += test_dbengine_tier_init_refused(UV_EIO, "a tier on a shut-down engine", "/nonexistent/dbengine");
 
     return (int)(errors + value_errors + time_errors);
 }
