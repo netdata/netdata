@@ -136,6 +136,16 @@ func TestManagedInfoRoutingAndErrors(t *testing.T) {
 			status:  400,
 			want:    "single value",
 		},
+		"repeated job arguments": {
+			args:   []string{"info", "__job:missing", "__job:alpha"},
+			status: 400,
+			want:   "single value",
+		},
+		"repeated job arguments on data": {
+			args:   []string{"__job:missing", "__job:alpha"},
+			status: 400,
+			want:   "single value",
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {

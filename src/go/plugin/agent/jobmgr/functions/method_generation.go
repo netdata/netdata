@@ -483,7 +483,7 @@ func parseMethodArguments(arguments []string) map[string][]string {
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 			continue
 		}
-		params[parts[0]] = splitMethodCSV(parts[1])
+		params[parts[0]] = append(params[parts[0]], splitMethodCSV(parts[1])...)
 	}
 	if len(params) == 0 {
 		return nil

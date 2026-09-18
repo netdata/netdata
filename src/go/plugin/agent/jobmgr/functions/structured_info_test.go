@@ -127,11 +127,13 @@ func TestStructuredInfoRoutingAndErrors(t *testing.T) {
 		message string
 		calls   int64
 	}{
-		"unknown job":    {args: []string{"info", "__job:missing"}, status: 404, message: "unknown job"},
-		"multiple jobs":  {args: []string{"info"}, payload: `{"selections":{"__job":["alpha","beta rack,1"]}}`, status: 400, message: "single value"},
-		"source failure": {args: []string{"info", "__job:alpha"}, failure: "source", status: 503, message: "source unavailable", calls: 1},
-		"panic":          {args: []string{"info", "__job:alpha"}, failure: "panic", status: 503, message: "Function handler is unavailable", calls: 1},
-		"job stopped":    {args: []string{"info", "__job:alpha"}, failure: "stop", status: 503, message: "stopped during request", calls: 1},
+		"unknown job":               {args: []string{"info", "__job:missing"}, status: 404, message: "unknown job"},
+		"multiple jobs":             {args: []string{"info"}, payload: `{"selections":{"__job":["alpha","beta rack,1"]}}`, status: 400, message: "single value"},
+		"repeated job arguments":    {args: []string{"info", "__job:missing", "__job:alpha"}, status: 400, message: "single value"},
+		"repeated equals arguments": {args: []string{"info", "__job=missing", "__job=alpha"}, status: 400, message: "single value"},
+		"source failure":            {args: []string{"info", "__job:alpha"}, failure: "source", status: 503, message: "source unavailable", calls: 1},
+		"panic":                     {args: []string{"info", "__job:alpha"}, failure: "panic", status: 503, message: "Function handler is unavailable", calls: 1},
+		"job stopped":               {args: []string{"info", "__job:alpha"}, failure: "stop", status: 503, message: "stopped during request", calls: 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var calls atomic.Int64
@@ -293,7 +295,9 @@ func TestStructuredInfoPreservesDataValidation(t *testing.T) {
 	assert.Contains(t, string(got), `"data":[["alpha","alpha"]]`)
 	got = h.call(t, []string{"__job:alpha", "__sort:stale"}, nil, 400)
 	assert.Contains(t, string(got), "not supported by job")
-	assert.EqualValues(t, 2, paramsCalls.Load())
+	got = h.call(t, []string{"__job:alpha", "__sort:stale", "__sort:alpha"}, nil, 400)
+	assert.Contains(t, string(got), "single value")
+	assert.EqualValues(t, 3, paramsCalls.Load())
 	assert.EqualValues(t, 1, dataCalls.Load())
 }
 
