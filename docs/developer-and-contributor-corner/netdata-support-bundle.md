@@ -89,6 +89,21 @@ The archive is organized into numbered directories so a person or an automated r
   Netdata process tree and their native states.
 - `09-permissions/`, file modes, ownership, plugin capabilities, extended attributes, security contexts, and ACLs for the agent's directories and plugins.
 
+## Include plugin debug
+
+Support may ask you to add:
+
+```sh
+sudo netdata-support-bundle --include-plugin-debug
+```
+
+This runs `systemd-journal.plugin` in debug mode as the Agent's own user and captures what it
+reports. It is the only option that runs a collector, so it is off by default. Use it when systemd
+journal logs are missing from Netdata — that failure is almost always a permissions problem, and the
+plugin states the reason directly.
+
+The output is sanitized and size-capped like everything else in the bundle.
+
 ## Include SNMP diagnostics
 
 For SNMP metrics, BGP, licensing, or topology issues, run:

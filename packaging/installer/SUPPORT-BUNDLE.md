@@ -217,6 +217,8 @@ confinement, and packagers use **ACLs**. None of that shows in an `ls -la`.
 
 | item | why |
 |---|---|
+| **agent user and groups** (`09-permissions/netdata-user.txt`) | journal and device access is granted by one of three mechanisms — a file capability on the plugin, membership of the journal group by the agent user, or an ACL on the journal directory. The capability sweep covers the first; this covers the second. Without it a host relying on group membership is indistinguishable from a broken one |
+| **journal directories** (`/var/log/journal`, `/run/log/journal`, in `netdata-paths.txt`) | the third mechanism. On a default systemd host these are `root:systemd-journal` with an ACL, and an ACL is invisible to `ls` — so this is the only way a bundle shows whether the agent could read the journal at all. A recurring `systemd-journal.plugin` support class |
 | **`plugins.d`**: mode, ownership, setuid/setgid bits and per-file **capabilities** (`getcap`) | a dropped capability or lost setuid bit is a top cause of "this collector shows no data" — a stock install has seven capability-bearing plugins (`apps.plugin`, `debugfs.plugin`, `go.d.plugin`, `network-viewer.plugin`, `perf.plugin`, `slabinfo.plugin`, `systemd-journal.plugin`) and several setuid ones |
 | all netdata paths (config dir, `netdata.conf`, `stream.conf`, `ssl/`, log/lib/cache dirs, `plugins.d`, the binary): mode, owner, **extended attributes**, **security context**, **ACLs**, non-default ext2/3/4 file flags | an immutable (`i`) flag on a state directory silently blocks the agent's own writes, and an SELinux mislabel fails collectors with nothing in the agent log |
 | Windows: ACLs with inheritance state, protected-ACL detection, integrity labels, alternate data streams | a `Zone.Identifier` stream marks a file downloaded-and-blocked; a protected (inheritance-disabled) ACL is a common post-restore breakage |
@@ -246,6 +248,25 @@ These are excluded by design. **Do not add them.**
   values already captured in explicitly requested raw SNMP diagnostic files
 - anything outside netdata's own scope (no full system journals, no other
   services' logs, no packet captures)
+
+## Requested plugin debug (opt-in)
+
+`--include-plugin-debug` is the **only** option that executes a collector, which is why it is opt-in
+and off by default: the design contract above promises the tool is read-only.
+
+It runs `systemd-journal.plugin debug` as the agent's own user (via `runuser`, falling back to `su`)
+and captures the combined output into `09-permissions/plugin-debug-systemd-journal.txt`. Running it
+as the invoking root user would prove nothing about the agent's access, so the artifact records which
+user it actually ran as. The run is bounded by the normal per-command timeout and output cap, and the
+result is sanitized and manifest-tracked like every other capture.
+
+It exists because this plugin's failures are overwhelmingly permission failures, and its stderr names
+the reason directly — the permission artifacts above show what the agent *has*, this shows what the
+plugin *did*. Support previously had to hand customers a manual debug and `strace` recipe and receive
+loose files by email; this keeps the evidence inside the sanitized, capped bundle.
+
+Only this plugin is included. Extending the set is deliberate, not automatic: every addition executes
+more code on a customer's machine.
 
 ## Raw SNMP evidence
 
