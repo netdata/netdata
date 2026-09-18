@@ -124,8 +124,7 @@ there is no automatic stock-file discovery:
 A successful check means **syntax support only**. It does not evaluate variable values, validate provider names,
 credentials, recipients or routing, or establish that a custom function will work. It reads no event from stdin,
 resolves no secrets and executes no configuration code. `send` and `validate` continue to accept YAML only.
-Use `send-legacy` below for supported old-format delivery. The optional Unix Bash custom-function runtime remains
-a later increment.
+Use `send-legacy` below for supported old-format delivery, including the optional Unix custom-function runtime.
 
 The reader supports this declarative subset:
 
@@ -192,7 +191,7 @@ without changing native YAML routing:
 
 Two intentional corrections to Bash apply: unknown modifiers fail instead of logging and permitting delivery, and
 role/recipient wildcard characters are literal instead of expanding against local filenames. Production Bash remains
-unchanged. Unix `custom_sender()` support, including helpers, event context and final-recipient batching, remains pending.
+unchanged. Unix `custom_sender()` receives the same filtered, deduplicated recipient batch.
 
 ## Legacy configuration delivery
 
@@ -216,7 +215,7 @@ default to `YES`. Dynatrace, SIGNL4, Opsgenie and ilert need an explicit `YES`, 
 Missing prerequisites or required recipients disable that method, except that an obsolete ilert source URL is rejected
 before credential gating (see below). Kafka, SIGNL4, Dynatrace, Opsgenie and ilert are global: they send once when
 enabled and configured, regardless of roles, including reserved roles. Gotify, Discord and Flock send once only when at least one
-recipient survives filtering. Email, Prowl and SMSEagle batch their final eligible recipients. Teams sends once per distinct final URL after recipient filtering. Other mappings send
+recipient survives filtering. Email, Prowl, SMSEagle and custom functions batch their final eligible recipients. Teams sends once per distinct final URL after recipient filtering. Other mappings send
 once per distinct eligible target.
 
 All selected routing policies and eligible provider configurations are checked **before any delivery**. Missing
@@ -229,6 +228,7 @@ attempted successes and failures; filtering happens before the plan is built, so
 |---|---|
 | `alerta` | `ALERTA_WEBHOOK_URL`, optional `ALERTA_API_KEY`; recipient is the environment |
 | `awssns` | `aws`, `AWSSNS_CREDENTIAL_SOURCE`, mode-specific `AWS_*` assignments, optional `AWSSNS_MESSAGE_FORMAT`; recipient is an SNS topic or platform endpoint ARN (see below) |
+| `custom` | Optional absolute `bash` path, `SEND_CUSTOM`, `custom_sender()` and helper definitions; one invocation with the filtered recipient batch (see below) |
 | `discord` | `DISCORD_WEBHOOK_URL`; recipients gate the single native webhook send |
 | `dynatrace` | `DYNATRACE_SERVER`, `DYNATRACE_SPACE`, `DYNATRACE_TOKEN`, `DYNATRACE_TAG_VALUE`, `DYNATRACE_EVENT`, optional `DYNATRACE_ANNOTATION_TYPE`; global Events API v2 send |
 | `email` | `sendmail`, `EMAIL_SENDER`, `EMAIL_PLAINTEXT_ONLY=YES`, `EMAIL_THREADING` (enabled unless `NO`); recipients are mail addresses/local users |
@@ -285,22 +285,99 @@ have no independent delivery effect.
 
 These configured behaviors are rejected when applicable to eligible delivery: nonempty `curl`/`curl_options` for
 HTTP methods; non-UTF-8 `EMAIL_CHARSET` for email; configured nonempty `PATH` for command methods; nonempty
-`date_format`; nonempty `images_base_url` when any eligible method is not Slack; `use_fqdn=YES`/`clear_alarm_always=YES`;
+`date_format`; nonempty `images_base_url` when any eligible method is neither Slack nor custom; `use_fqdn=YES`/`clear_alarm_always=YES`;
 and final evaluated values of any event or producer-context scalar that differ from their initial values. Temporary
 assignments are allowed if those values are restored; settings derived during evaluation retain their assignment-time expansions. Use the native event/configuration
 contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
 implementation.
 
-The remaining legacy mapping is Unix `custom_sender()` execution. Enabled, configured selections fail before
-any sends once applicable recipient requirements are met, including a role recipient without a global default.
-HipChat is explicitly excluded and also errors when eligible. Function bodies remain inert, including
-`custom_sender()` and helpers; no original configuration file is sourced.
+Unix `custom_sender()` runs only for eligible custom delivery (see below). HipChat is explicitly excluded and errors
+when eligible. Function bodies stay inert during native parsing/evaluation and preflight; original configuration files
+are never sourced by Bash.
 
-Six Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
+Seven Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
 PagerDuty/Prowl/ntfy can use role recipients without a global default; ntfy sends the resolved filtered recipients;
 Fleep does not require the unused `FLEEP_SERVER` setting; Teams sends once per distinct resolved URL; and SNS
 message assignments can use `date` and `status_message` before configuration evaluation instead of expanding them
-to empty strings. Production Bash and installation remain unchanged.
+to empty strings; selected custom delivery rejects the shipped unconfigured placeholder instead of reporting a
+successful no-op. Production Bash and installation remain unchanged.
+
+### Legacy custom functions
+
+On Linux and macOS, `send-legacy --method custom` can run a trusted Bash `custom_sender()` function. Bash 4 or later
+is required only when custom has an eligible recipient. Set `bash` to an absolute executable path, or leave it
+unset/empty to discover it from the invoking process's `PATH`. Missing or incompatible Bash is an error for eligible
+custom delivery. Windows can still parse/check the configuration, but cannot run this adapter.
+
+```bash
+# Custom overlay; load after the stock configuration if using one.
+SEND_CUSTOM=YES
+DEFAULT_RECIPIENT_CUSTOM='ops'
+# bash=/absolute/path/to/bash
+curl=/usr/bin/curl
+CUSTOM_ENDPOINT='http://127.0.0.1:18080/custom'
+custom_sender() {
+    local httpcode
+    httpcode=$(docurl --data-urlencode "recipients=$1" \
+        --data-urlencode "message=$host $status_message: $alarm" "$CUSTOM_ENDPOINT") || return 1
+    [[ $httpcode == 200 || $httpcode == 202 ]]
+}
+```
+
+The final function definition wins across configuration files. It is called **once**, with one argument containing
+the final space-separated recipients; `to_custom` contains the same string. Role-only recipients work without a
+global default. Disabled, unselected and fully filtered custom delivery neither needs Bash nor executes functions.
+An absent function or either known shipped unconfigured placeholder is an error before any provider sends.
+Other functions determine their own acceptance through their final exit status; the adapter cannot verify that an
+arbitrary function actually sent a notification. Exit zero counts as one successful custom batch, and nonzero counts
+as one failed batch. Existing any-success handling applies across methods.
+
+Native evaluation supplies literal scalar globals and declared recipient associative maps. Quotes, newlines,
+Unicode and shell-looking values are not evaluated again. Only retained function bodies are executable code. Bash
+receives this state through stdin, never through process arguments or a second sourcing of the original files.
+The complete selection is preflighted first, including a fixed Bash-version probe and a syntax-only check with the
+selected interpreter. Neither check executes custom code. `check-legacy` remains a native syntax-subset check and
+does not perform these runtime checks.
+
+The function can read every [core legacy scalar](#legacy-configuration-delivery) and every
+[producer-context scalar](#producer-context), including IDs, source/expressions, formatted values, counts/lists and
+metadata. Missing optional facts remain empty; explicit numeric zero remains `0`. Derived presentation is computed
+for the custom runtime after settings evaluation, without retroactively expanding earlier assignments:
+
+| Globals | Meaning |
+|---|---|
+| `date`, `date_utc` | Event time in UTC RFC3339, following the legacy adapter's existing date contract |
+| `url_host`, `url_chart`, `url_name`, `url_value_string` | Byte-wise URL encoding of the supplied host, chart, alert and formatted value |
+| `goto_url` | The caller's event `url`; no registry file lookup or invented identity |
+| `duration_txt`, `non_clear_duration_txt` | Bash-style human durations, or empty when the input is missing |
+| `alarm`, `status_message`, `severity`, `raised_for` | Summary/value and transition presentation; recovery omits the current value; unknown durations do not create a duration claim |
+| `image`, `color` | Bash status artwork/color; `images_base_url` defaults to `https://registry.my-netdata.io` |
+
+Built-in helpers are available to retained functions:
+
+- `urlencode TEXT` prints the encoded text and sets `REPLY`, using lowercase escapes and byte-wise UTF-8 encoding.
+- `duration4human SECONDS` prints a duration and sets `REPLY`. It accepts decimal integers from 0 through 4294967295,
+  rejects expressions/negative values, and preserves Bash's duration rounding and wording.
+- `docurl ARGS...` invokes `curl` with literal arguments, discards the response body, prints the HTTP status and returns
+  curl's exit status. HTTP acceptance is the custom function's decision. Set `curl` to an absolute path or leave it
+  empty for optional discovery; missing curl makes this helper fail, without blocking functions that do not use it.
+  `curl_options` splits on spaces, tabs and newlines, with no globbing, quote re-parsing or evaluation; pass options
+  requiring embedded spaces as quoted arguments to `docurl` inside the function. Native Go HTTP providers still reject
+  these curl overrides when they are also eligible.
+- `info` and `error` return successful logging operations; child output is discarded by the runner. Custom helper
+  definitions may override these defaults. The adapter reports safe process failure/status diagnostics only.
+
+The child starts without ambient credentials, exported functions or startup scripts, with a private temporary `HOME`,
+`LC_ALL=C` and `PATH=/usr/local/bin:/usr/bin:/bin`. Settings are shell globals, not automatically exported environment
+variables; a custom function can explicitly export values needed by its own commands. Runtime-controlled shell names
+(such as `PATH`, `HOME`, `IFS`, `BASH*`, locale variables, special Bash variables and `_netdata_custom_*`) are rejected
+as settings rather than altering interpreter startup or data assignment. Reserved internal function names are also
+rejected. NUL cannot be represented and is rejected. Use absolute paths for commands outside the child's fixed PATH.
+
+Functions are trusted code with the notifier process's permissions, **not an OS sandbox**. They must run in the
+foreground, wait for their children and not detach from the process group. The existing invocation deadline and
+command process-group cancellation apply; private-home cleanup finishes before return. Native YAML command/webhook
+providers, public Event payloads, Agent invocation and production packaging are unchanged.
 
 ### Legacy AWS SNS settings
 
@@ -420,7 +497,7 @@ Each distinct eligible recipient produces a request. A bare name becomes `#name`
 and `#` omits the channel field to use the webhook's default. The sender name is `netdata on <event node>`. The icon is
 `https://registry.my-netdata.io/images/banner-icon-144x144.png`; a nonempty `images_base_url` replaces its base.
 An unset or empty value uses the default. The final icon URL must be absolute HTTP(S) and at most 255 characters.
-This customization is currently supported only when Slack is the sole eligible method; artwork for other providers remains pending. Slack keeps the native alert content,
+This customization is supported when the eligible methods are Slack and/or custom; artwork for other providers remains pending. Slack keeps the native alert content,
 status colors and escaping. These legacy overrides are internal to `send-legacy`, not new YAML fields.
 
 Teams uses the already supported [Workflows setup](#microsoft-teams-workflows), with its trigger set to **Anyone**.
@@ -2376,7 +2453,7 @@ object below also stays outside the public Event.
 ### Producer context
 
 Both `send` and `send-legacy` accept an optional top-level `producer_context` object alongside the event fields.
-It carries additional caller-supplied facts for legacy settings and the future Bash custom-function adapter.
+It carries additional caller-supplied facts for legacy settings and the optional Unix Bash custom-function adapter.
 Omitting it, using `null`, or using `{}` keeps existing input valid. All members are optional; unknown members or
 wrong JSON types reject the entire invocation before delivery, even when no destination needs these facts.
 Repeated `producer_context` fields and duplicate member names are rejected, including case-insensitive or
@@ -2424,7 +2501,7 @@ Then a legacy assignment such as `AWSSNS_MESSAGE_FORMAT="$alarm_id: $value_strin
 Producer context is input-only. It is excluded from webhook JSON, command stdin, provider raw-event attachments and
 native message templates. Legacy settings can explicitly include its scalars in supported message assignments.
 It does not change ordinary provider formatting. The Agent does not yet generate this JSON; development callers
-supply it. Bash custom execution and derived presentation/helpers remain the next increment.
+supply it. The Unix custom adapter exposes these facts alongside its derived presentation and helpers.
 
 ## Internal packages
 
@@ -2454,6 +2531,10 @@ It checks all selected policies before delivery, then passes only the public Eve
 | `internal/secret` | Whole-value reference syntax and lazy environment/file resolution |
 | `internal/httpclient` | Request construction, client settings, safe errors and bounded response reads |
 | `internal/commandexec` | Command options/environment, foreground processes, interactive sessions and cleanup |
+| `internal/legacyconfig` | Native shell-subset parsing and literal evaluation, with inert function retention |
+| `internal/legacyrouting` | Legacy role/recipient resolution and policy filtering |
+| `internal/legacydelivery` | Legacy settings mapped to typed senders after whole-selection preflight |
+| `internal/legacycustom` | Optional Unix Bash function execution, literal state handoff, context and helpers |
 | `internal/testutil` | Provider-independent test fixtures and helpers |
 
 To add a provider, create its package with a typed `Config`, validating `New` constructor and `Send` method, register

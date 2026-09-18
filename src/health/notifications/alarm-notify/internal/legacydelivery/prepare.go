@@ -15,6 +15,7 @@ import (
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/legacyconfig"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/legacycustom"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/legacyrouting"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
 )
@@ -29,16 +30,19 @@ type method struct {
 }
 
 type builder struct {
-	values map[string]string
-	client *http.Client
-	runner *commandexec.Runner
+	values       map[string]string
+	client       *http.Client
+	runner       *commandexec.Runner
+	ctx          context.Context
+	settings     legacyconfig.Settings
+	notification notifier.Notification
 }
 
 // Order follows the legacy method inventory and its remaining global sends.
 var methods = []method{
 	{name: "alerta", required: []string{"ALERTA_WEBHOOK_URL"}, build: buildAlerta},
 	{name: "awssns", tool: "aws", build: buildAWSSNS},
-	{name: "custom", gap: "Unix custom_sender execution is not implemented"},
+	{name: "custom", build: buildCustom},
 	{name: "discord", required: []string{"DISCORD_WEBHOOK_URL"}, build: buildDiscord},
 	{name: "dynatrace", required: []string{"DYNATRACE_SPACE", "DYNATRACE_SERVER", "DYNATRACE_TOKEN", "DYNATRACE_TAG_VALUE", "DYNATRACE_EVENT"}, global: true, build: buildDynatrace},
 	{name: "email", tool: "sendmail", build: buildEmail},
@@ -84,7 +88,7 @@ func Prepare(ctx context.Context, programs []*legacyconfig.Program, requested, r
 		return fail(fmt.Errorf("legacy configuration: %w", err))
 	}
 	migrateTeams(&settings)
-	b := &builder{values: settings.Variables, client: client, runner: runner}
+	b := &builder{values: settings.Variables, client: client, runner: runner, ctx: ctx, settings: settings, notification: n}
 	var applicable []method
 	var routed []string
 	for _, m := range selected {
@@ -245,4 +249,8 @@ func migrateTeams(s *legacyconfig.Settings) {
 		}
 		maps.Copy(s.Recipients["role_recipients_msteams"], s.Recipients["role_recipients_msteam"])
 	}
+}
+
+func buildCustom(b *builder, recipients []string) ([]notifier.Sender, error) {
+	return one(legacycustom.New(b.ctx, b.settings, recipients, b.notification.Event, b.runner))
 }

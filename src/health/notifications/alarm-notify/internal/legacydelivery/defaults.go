@@ -95,10 +95,10 @@ func unsupportedSettings(values, facts map[string]string, eligible []method) err
 		}
 	}
 	for _, m := range eligible {
-		if values["images_base_url"] != "" && m.name != "slack" {
+		if values["images_base_url"] != "" && m.name != "slack" && m.name != "custom" {
 			return unsupported("images_base_url")
 		}
-		if m.tool == "" {
+		if m.tool == "" && m.name != "custom" {
 			for _, key := range []string{"curl", "curl_options"} {
 				if strings.TrimSpace(values[key]) != "" {
 					return unsupported(key)

@@ -5,6 +5,7 @@ package legacydelivery
 import (
 	"context"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -28,6 +29,10 @@ func parsedPrograms(t *testing.T, texts ...string) []*legacyconfig.Program {
 
 func TestPrepareSelection(t *testing.T) {
 	const dynatrace = `SEND_DYNATRACE=YES; DYNATRACE_SPACE=space; DYNATRACE_SERVER=https://example.org; DYNATRACE_TOKEN=synthetic-private-value; DYNATRACE_TAG_VALUE=tag; DYNATRACE_EVENT=CUSTOM_INFO`
+	customError := "bash executable is required"
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		customError = "custom delivery is currently supported only on Linux and macOS"
+	}
 	tests := map[string]struct {
 		config         []string
 		methods, roles []string
@@ -59,8 +64,8 @@ func TestPrepareSelection(t *testing.T) {
 		"unsupported alongside valid":      {config: []string{`DISCORD_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_DISCORD=channel; SEND_ILERT=YES; ILERT_ALERT_SOURCE_URL=https://example.org/synthetic-private-value`}, err: "legacy ilert"},
 		"slack filtered":                   {config: []string{`SLACK_WEBHOOK_URL=https://example.org; DEFAULT_RECIPIENT_SLACK='channel|nowarn'`}},
 		"inert custom function":            {config: []string{`custom_sender() { exit 123; }; DEFAULT_RECIPIENT_CUSTOM=''`}},
-		"eligible custom":                  {config: []string{`role_recipients_custom[ops]=recipient; custom_sender() { exit 123; }`}, err: "custom_sender execution"},
-		"explicit unmapped":                {methods: []string{"custom"}, err: "custom_sender execution"},
+		"eligible custom":                  {config: []string{`role_recipients_custom[ops]=recipient; custom_sender() { exit 123; }`}, err: customError},
+		"explicit custom empty":            {methods: []string{"custom"}},
 		"unknown method safe":              {methods: []string{"synthetic-private-value"}, err: "unknown legacy method"},
 		"global ignores roles":             {config: []string{`KAFKA_URL=https://example.org; KAFKA_SENDER_IP=192.0.2.1; SEND_SIGNL4=YES; SIGNL4_WEBHOOK_URL=https://example.org`}, roles: []string{"silent"}, names: []string{"kafka-1", "signl4-1"}},
 		"global disabled":                  {config: []string{`SEND_KAFKA=NO; KAFKA_URL=https://example.org; KAFKA_SENDER_IP=192.0.2.1`}},
