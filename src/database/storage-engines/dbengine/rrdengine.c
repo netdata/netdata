@@ -2617,8 +2617,18 @@ static void dbengine_initialize_structures(void) {
     extent_io_descriptor_init();
 }
 
-// the loop, its handles, the structures and the thread; with the lifecycle lock held. A failed step undoes what
-// came before it and leaves spawned == false, so the engine stays down
+// a spawn that failed after handles were opened on the loop: a closed handle leaves the loop only when a loop
+// iteration runs its close callback, and the loop cannot be closed before that
+static void dbengine_spawn_unwind(void) {
+#if defined(OS_WINDOWS)
+    dbengine_main.async_ready = false;
+#endif
+    uv_run(&dbengine_main.loop, UV_RUN_DEFAULT);
+    fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
+}
+
+// the loop, its handles, the structures and the thread; with the lifecycle lock held. A failed step closes what
+// came before it and leaves spawned == false, so the engine stays down and dbengine_init() reports the error
 static int dbengine_spawn(void) {
     int ret;
 
@@ -2644,7 +2654,7 @@ static int dbengine_spawn(void) {
     if (ret) {
         netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
         uv_close((uv_handle_t *)&dbengine_main.async, NULL);
-        fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
+        dbengine_spawn_unwind();
         return ret;
     }
 
@@ -2653,7 +2663,7 @@ static int dbengine_spawn(void) {
         netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
         uv_close((uv_handle_t *)&dbengine_main.timer, NULL);
         uv_close((uv_handle_t *)&dbengine_main.async, NULL);
-        fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
+        dbengine_spawn_unwind();
         return ret;
     }
 
