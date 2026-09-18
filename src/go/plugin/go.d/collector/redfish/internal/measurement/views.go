@@ -31,6 +31,17 @@ type Component struct {
 	AssetTag                  string
 	Firmware                  string
 	Location                  string
+	TotalCores                *float64
+	EnabledCores              *float64
+	TotalThreads              *float64
+	CapacityBytes             *float64
+	MemoryType                string
+	MediaType                 string
+	DriveProtocol             string
+	RAIDType                  string
+	ReleaseDate               time.Time
+	HardwareVersion           string
+	EngineeringRevision       string
 }
 
 type ReportedCondition struct {
@@ -104,9 +115,7 @@ func componentView(node *Resource, observedAt time.Time) Component {
 			v.Location = value
 		}
 	}, node)
-	if node.Kind == "firmware" || node.Kind == "software" {
-		v.Firmware, _ = Properties(node.Data).String("Version")
-	}
+	v.addInventory(node)
 	return v
 }
 

@@ -37,6 +37,23 @@ func hardwareTable(ctx context.Context, components []measurement.Component) *fun
 			Filter:   funcapi.FieldFilterMultiselect,
 		},
 		textColumn("Resource URI", "Source resource address", false),
+		inventoryNumberColumn("Processor cores", "Total cores in this processor", "cores"),
+		inventoryNumberColumn("Enabled cores", "Enabled cores in this processor", "cores"),
+		inventoryNumberColumn("Supported threads", "Execution threads supported by this processor", "threads"),
+		inventoryNumberColumn("Capacity", "Capacity of this memory device, physical drive or logical volume", "bytes"),
+		textColumn("Memory type", "Memory device technology, such as DDR4 or DDR5", false),
+		textColumn("Media type", "Drive media type, such as SSD or HDD", false),
+		textColumn("Drive protocol", "Protocol used by this drive, such as SAS, SATA or NVMe", false),
+		textColumn("RAID type", "RAID configuration of this logical volume", false),
+		funcapi.ColumnMeta{
+			Name:      "Release date",
+			Tooltip:   "Firmware or software release/production date; not installation time",
+			Type:      funcapi.FieldTypeTimestamp,
+			Sortable:  true,
+			Transform: funcapi.FieldTransformDatetime,
+		},
+		textColumn("Hardware version", "Vendor-reported hardware version of this assembly", false),
+		textColumn("Engineering revision", "Engineering change level or revision of this assembly", false),
 		rowOptionsColumn(),
 	)
 	columns[2].Sticky = true
@@ -72,10 +89,40 @@ func hardwareTable(ctx context.Context, components []measurement.Component) *fun
 			displayHealth(component.HealthRollup),
 			failure,
 			component.URI,
+			optionalNumber(component.TotalCores),
+			optionalNumber(component.EnabledCores),
+			optionalNumber(component.TotalThreads),
+			optionalNumber(component.CapacityBytes),
+			optionalText(component.MemoryType),
+			optionalText(component.MediaType),
+			optionalText(component.DriveProtocol),
+			optionalText(component.RAIDType),
+			observationTime(component.ReleaseDate),
+			optionalText(component.HardwareVersion),
+			optionalText(component.EngineeringRevision),
 			rowOptions(rank),
 		})
 	}
 	return tableResponse(columns, rows)
+}
+
+func inventoryNumberColumn(name, help, units string) funcapi.ColumnMeta {
+	return funcapi.ColumnMeta{
+		Name:      name,
+		Tooltip:   help,
+		Type:      funcapi.FieldTypeInteger,
+		Units:     units,
+		Sortable:  true,
+		Filter:    funcapi.FieldFilterRange,
+		Transform: funcapi.FieldTransformNumber,
+	}
+}
+
+func optionalNumber(value *float64) any {
+	if value == nil {
+		return nil
+	}
+	return *value
 }
 
 func componentIssue(component measurement.Component) (string, int) {
