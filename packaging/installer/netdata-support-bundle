@@ -1740,32 +1740,17 @@ collect_permissions() {
   # question the permission artifacts cannot: what the plugin itself reports when
   # it tries to open the journal.
   if [ "$INCLUDE_PLUGIN_DEBUG" = "1" ]; then
-    # Resolve the agent user to a local NAME. A containerised agent runs as a uid
-    # with no local account, and impersonating the HOST netdata account instead
-    # would test the wrong identity entirely - so that case is reported, never
-    # substituted.
-    _pd_user=""; _pd_raw=""; _pd_note=""
-    [ -n "${NETDATA_PID:-}" ] && _pd_raw=$(ps -o user= -p "$NETDATA_PID" 2>/dev/null | tr -d ' ')
-    case "$_pd_raw" in
-      "") _pd_note="no running netdata process; using the local netdata account if one exists"
-          getent passwd netdata >/dev/null 2>&1 && _pd_user=netdata ;;
-      *[!0-9]*) _pd_user="$_pd_raw" ;;
-      *) if getent passwd "$_pd_raw" >/dev/null 2>&1; then
-           _pd_user=$(getent passwd "$_pd_raw" | cut -d: -f1)
-         else
-           _pd_note="the agent runs as uid $_pd_raw, which has no local account (containerised); NOT substituting the host netdata account, because that would test a different identity"
-         fi ;;
-    esac
-
-    # everything goes through collect_cmd so it is sanitized, capped and
-    # manifest-tracked like any other capture - writing the file directly would
-    # make the manifest's sanitized flag a lie
+    # Everything - identity lookup included - happens inside collect_cmd, so it
+    # is bounded by the per-command timeout. A getent out here would be
+    # unbounded, and a slow or wedged NSS would stall the whole bundle before
+    # the capped capture even started.
     # shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
     collect_cmd 09-permissions/plugin-debug-systemd-journal.txt \
       "REQUESTED: systemd-journal.plugin debug STDERR (its stdout is journal content and is discarded); states directly why the journal could not be opened" \
       sh -c '
-        u="$1"; note="$2"; t="$3"; shift 3
-        [ -n "$note" ] && echo "# note: $note"
+        pid="$1"; t="$2"; shift 2
+
+        # --- locate the plugin -------------------------------------------------
         bin=""; seen=""
         for d in "$@"; do
           [ -n "$d" ] || continue
@@ -1784,20 +1769,48 @@ collect_permissions() {
           echo "systemd-journal.plugin is not installed in any discovered plugins.d directory."
           exit 0
         fi
-        if [ -z "$u" ]; then
-          echo "# not running the plugin: the agent user could not be resolved to a local account."
-          echo "# Running it as anyone else would not reflect the agent'"'"'s access."
-          exit 0
-        fi
+
+        # --- resolve the agent user to a local NAME ----------------------------
+        raw=""; u=""
+        [ -n "$pid" ] && raw=$(ps -o user= -p "$pid" 2>/dev/null | tr -d " ")
+        case "$raw" in
+          "") if getent passwd netdata >/dev/null 2>&1; then u=netdata
+                echo "# note: no running netdata process; using the local netdata account"
+              else
+                echo "# note: no running netdata process and no local netdata account"
+              fi ;;
+          *[!0-9]*) u="$raw" ;;
+          *) if getent passwd "$raw" >/dev/null 2>&1; then
+               u=$(getent passwd "$raw" | cut -d: -f1)
+             else
+               echo "# note: the agent runs as uid $raw, which has no local account (containerised)."
+               echo "# NOT substituting the host netdata account - that would test a different identity."
+             fi ;;
+        esac
+        [ -n "$u" ] || exit 0
+
+        # --- refuse a path we cannot pass safely -------------------------------
+        # runuser takes argv, so any path is safe there; the su fallback has to
+        # build a command string, and a path with shell metacharacters would be
+        # executed as code under the agent account.
+        case "$bin" in
+          *[!A-Za-z0-9/._-]*) bin_safe=0 ;;
+          *) bin_safe=1 ;;
+        esac
+
         run() { if command -v timeout >/dev/null 2>&1; then timeout "$t" "$@"; else echo "# note: no timeout(1) here; only the bundle watchdog bounds this"; "$@"; fi; }
+
         if [ "$(id -u)" = "0" ] && command -v runuser >/dev/null 2>&1; then
           echo "# running as: $u (via runuser)"
           run runuser -u "$u" -- "$bin" debug 2>&1 >/dev/null
           echo "# exit: $?"
-        elif [ "$(id -u)" = "0" ] && command -v su >/dev/null 2>&1; then
+        elif [ "$(id -u)" = "0" ] && command -v su >/dev/null 2>&1 && [ "$bin_safe" = "1" ]; then
           echo "# running as: $u (via su)"
-          run su -s /bin/sh -c "\"$bin\" debug 2>&1 >/dev/null" "$u"
+          run su -s /bin/sh -c "$bin debug 2>&1 >/dev/null" "$u"
           echo "# exit: $?"
+        elif [ "$(id -u)" = "0" ] && [ "$bin_safe" = "0" ]; then
+          echo "# NOT running the plugin: its path contains characters that cannot be passed"
+          echo "# safely to su, and runuser is unavailable. Path: $bin"
         elif [ "$(id -un 2>/dev/null)" = "$u" ]; then
           echo "# running as: $u (already this user)"
           run "$bin" debug 2>&1 >/dev/null
@@ -1806,7 +1819,7 @@ collect_permissions() {
           echo "# NOT running the plugin: cannot become $u (not root, or no runuser/su)."
           echo "# An access error from any other user would not reflect the agent."
         fi
-        true' sh "$_pd_user" "$_pd_note" "${CMD_TIMEOUT:-10}" $PLUGINSD_DIRS
+        true' sh "${NETDATA_PID:-}" "${CMD_TIMEOUT:-10}" $PLUGINSD_DIRS
   fi
 
   # paths reach the child as positional ARGUMENTS - see the note above
