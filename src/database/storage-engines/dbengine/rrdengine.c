@@ -2684,9 +2684,13 @@ int dbengine_init(const struct dbengine_config *cfg) {
     else if(dbengine_lifecycle.spawned)
         ret = UV_EALREADY;
     else {
-        // the configuration first: the caches and the allocators read it as they come up
+        // the configuration first: the caches and the allocators read it as they come up. A spawn that fails
+        // does so before they exist, so the previous configuration is put back and the engine is as if never called
+        struct dbengine_config previous = dbengine_cfg;
         dbengine_config_set(cfg);
         ret = dbengine_spawn();
+        if(ret)
+            dbengine_cfg = previous;
     }
 
     spinlock_unlock(&dbengine_lifecycle.spinlock);

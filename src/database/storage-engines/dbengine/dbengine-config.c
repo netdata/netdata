@@ -10,7 +10,7 @@
 #endif
 
 // Written before the engine comes up, by dbengine_init() or (for the tests that need only the configuration) by
-// dbengine_config_set(); read-only afterwards.
+// dbengine_config_set(); read-only while the engine is up.
 struct dbengine_config dbengine_cfg = DBENGINE_CONFIG_DEFAULTS;
 
 // the 0-means-default fields become concrete values here, so the engine never has to re-check them

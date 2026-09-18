@@ -1150,6 +1150,11 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
     size_t tier = tc->tier;
     unsigned disk_space_mb = tc->disk_space_mb;
 
+    if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.active, __ATOMIC_ACQUIRE)) {
+        netdata_log_error("DBENGINE: tier %zu is already up, the tier cannot be initialized again", tier);
+        return UV_EALREADY;
+    }
+
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
     /* reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier */

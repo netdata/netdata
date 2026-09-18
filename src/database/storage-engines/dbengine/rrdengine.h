@@ -30,11 +30,12 @@
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
 
-// the process-wide configuration, copied by dbengine_init() before the engine comes up and read-only afterwards
+// the process-wide configuration, copied by dbengine_init() before the engine comes up and read-only while it is up
 extern struct dbengine_config dbengine_cfg;
 
 // resolve cfg's 0-means-default fields and make it the engine's configuration, without bringing anything up: the
-// way in for the tests that need only the configuration (a page cache, the page allocators)
+// way in for the tests that need only the configuration (a page cache, the page allocators). Never while the
+// engine is up: nothing guards it, dbengine_init() is the only caller that checks the lifecycle first
 void dbengine_config_set(const struct dbengine_config *cfg);
 
 // where the engine is in its one-way life: never brought up, running, or shut down

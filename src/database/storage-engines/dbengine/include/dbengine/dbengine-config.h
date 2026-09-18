@@ -79,7 +79,7 @@ struct dbengine_config {
 #endif
 
 // The compiled defaults: the baseline a caller adjusts before dbengine_init(), which resolves the
-// 0-means-default fields (cpus, libuv_worker_threads) to concrete values.
+// 0-means-default fields (cpus, default_update_every_s, pages_per_extent, libuv_worker_threads) to concrete values.
 #define DBENGINE_CONFIG_DEFAULTS {                              \
     .page_cache_mb = DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB,     \
     .extent_cache_mb = 0,                                       \

@@ -40,7 +40,8 @@ void netdata_conf_section_db(void);
 void netdata_conf_dbengine_init(const char *hostname);
 
 // bring the engine up with the resolved configuration; fatal when it does not come up. Once per process, before
-// any tier; the tier count must be final (the engine preloads its registry per configured tier)
+// any tier (a second call is fatal too: the engine reports it is already up); the tier count must be final (the
+// engine preloads its registry per configured tier)
 void netdata_conf_dbengine_apply(void);
 
 #include "netdata-conf.h"

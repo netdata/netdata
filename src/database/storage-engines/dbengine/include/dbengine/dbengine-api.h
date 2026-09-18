@@ -57,10 +57,11 @@ time_t dbengine_latest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
-// bring the static tier dbengine_multidb_tiers[tc->tier] up on a running engine: after dbengine_init() (fatal
-// before it) and before dbengine_shutdown() (UV_EIO after it, the tier untouched). A tier init and the shutdown
-// must not overlap: the check is made when the tier starts, so an init that is still in flight when the shutdown
-// begins would wait on a loop that is gone (the daemon joins its tier inits at startup, long before any shutdown)
+// bring the static tier dbengine_multidb_tiers[tc->tier] up on a running engine, once: after dbengine_init()
+// (fatal before it), before dbengine_shutdown() (UV_EIO after it) and only while the tier is down (UV_EALREADY
+// while it is up); a refused init leaves the tier untouched. A tier init and the shutdown must not overlap: the
+// check is made when the tier starts, so an init that is still in flight when the shutdown begins would wait on a
+// loop that is gone (the daemon joins its tier inits at startup, long before any shutdown)
 int dbengine_tier_init(const struct dbengine_tier_config *tc);
 
 void dbengine_readiness_wait(DBENGINE_TIER *tier);
@@ -76,7 +77,7 @@ bool dbengine_tier_is_active(DBENGINE_TIER *tier);
 // every tier's dbengine_tier_exit() (a tier exit needs the live loop), and never while a dbengine_tier_init() is
 // in flight. Nothing may be enqueued to the engine afterwards, and the engine cannot be started again in this
 // process (dbengine_init() and dbengine_tier_init() fail). On an engine that never came up, or on a second call,
-// it returns at once; a second call does not wait for the first to finish
+// it returns at once but still closes the engine the same way; a second call does not wait for the first to finish
 void dbengine_shutdown(void);
 void dbengine_quiesce(DBENGINE_TIER *tier);
 void dbengine_flush_dirty(DBENGINE_TIER *tier);
