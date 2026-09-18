@@ -52,7 +52,9 @@ than infer:
    it, silence means nothing.
 3. Which host this is, and for a streaming or Cloud question, whether you also need the other end.
 
-Then run `./scripts/bundle-summary.sh <bundle>` before reading any single file. It reports what the
+Then run the inventory before reading any single file - from the repository root that is
+`.agents/skills/triage-support-bundle/scripts/bundle-summary.sh <bundle>`, or `./scripts/bundle-summary.sh`
+from this skill's own directory. It reports what the
 bundle holds, what is absent, what was truncated or withheld, and whether the incident time falls
 inside the window. Reading files without that inventory is how absence gets misread as evidence.
 

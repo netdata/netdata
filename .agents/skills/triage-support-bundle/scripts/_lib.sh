@@ -120,8 +120,14 @@ _sb_flatten_backslash_entries() {
         # symlink entry and then a backslash entry that normalises THROUGH it,
         # so a purely lexical check still lands outside the tree. Create the
         # parent, then confirm its resolved path is still inside root.
+        # mkdir is guarded: under errexit a failure here would abort before the
+        # caller installs its cleanup trap, stranding extracted customer data.
         parent="$(dirname "$dest")"
-        mkdir -p "$parent"
+        if ! mkdir -p "$parent" 2>/dev/null; then
+            sb_warn "could not create ${parent}; dropping entry: ${rel}"
+            rm -f "$f"
+            continue
+        fi
         if ! _sb_path_inside "$root" "$parent"; then
             sb_warn "rejected unsafe bundle entry (escapes via a link): ${rel}"
             rm -f "$f"
