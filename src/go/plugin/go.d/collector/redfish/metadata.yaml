@@ -816,7 +816,7 @@ modules:
         - id: hardware
           name: Redfish Hardware
           description: |
-            Find components needing attention and inspect their identity and reported condition. Component health, aggregate health and collection availability are kept distinct.
+            Find components needing attention and inspect their identity, configuration and reported condition. Optional columns show CPU counts, memory and storage capacity, firmware release dates and assembly revisions. Component health, aggregate health and collection availability are kept distinct.
           parameters:
             - id: __job
               name: Instance
@@ -827,7 +827,7 @@ modules:
               options: []
           returns:
             description: |
-              One row per monitored component or logical resource, including known resources that could not be read. Model, serial, part number and firmware are optional detail columns.
+              One row per monitored component or logical resource, including known resources that could not be read. Identity, configuration and version details are optional columns populated when reported by the BMC. Capacity belongs to the individual resource; physical drives and logical volumes must not be added together. Release date describes the firmware or software release, not its installation. Missing or unusable details are blank.
             columns:
               - name: "Key"
                 type: string
@@ -921,6 +921,61 @@ modules:
                 unit: ""
                 visibility: hidden
                 description: "Source resource address."
+              - name: "Processor cores"
+                type: integer
+                unit: "cores"
+                visibility: hidden
+                description: "Total cores in this processor."
+              - name: "Enabled cores"
+                type: integer
+                unit: "cores"
+                visibility: hidden
+                description: "Enabled cores in this processor."
+              - name: "Supported threads"
+                type: integer
+                unit: "threads"
+                visibility: hidden
+                description: "Execution threads supported by this processor."
+              - name: "Capacity"
+                type: integer
+                unit: "bytes"
+                visibility: hidden
+                description: "Capacity of this memory device, physical drive or logical volume. Memory capacity is converted from MiB to bytes."
+              - name: "Memory type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Memory device technology, such as DDR4 or DDR5."
+              - name: "Media type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Drive media type, such as SSD or HDD."
+              - name: "Drive protocol"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Protocol used by this drive, such as SAS, SATA or NVMe."
+              - name: "RAID type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "RAID configuration of this logical volume."
+              - name: "Release date"
+                type: timestamp
+                unit: ""
+                visibility: hidden
+                description: "Firmware or software release/production date; not installation time."
+              - name: "Hardware version"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Vendor-reported hardware version of this assembly."
+              - name: "Engineering revision"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Engineering change level or revision of this assembly."
               - name: "rowOptions"
                 type: none
                 unit: ""
