@@ -18,6 +18,8 @@ type Projector struct {
 	origin            string
 	endpointJob       string
 	resolveProvenance func(baseURI, raw string) (string, bool)
+	thresholdStates   map[string]*readingThresholdState
+	thresholdCycle    uint64
 	rateMu            sync.Mutex
 	rateBaselines     map[string]rateBaseline
 	identities        identity.Registry
@@ -55,6 +57,8 @@ type Observation struct {
 // which authorizes pruning rate baselines for resources no longer present.
 func (c *Projector) Project(nodes []*Resource, complete bool, observedAt time.Time) (Result, error) {
 	var result Result
+	c.thresholdCycle++
+	defer c.pruneThresholdStates()
 	if complete {
 		c.pruneRateBaselines(nodes)
 	}
@@ -63,6 +67,7 @@ func (c *Projector) Project(nodes []*Resource, complete bool, observedAt time.Ti
 		readings[node.Key] = c.readingsForNode(node, observedAt)
 	}
 	if err := c.validateAndRegisterReadingIdentities(readings); err != nil {
+		c.ResetDerivedHealth()
 		return result, err
 	}
 	var observations []Observation

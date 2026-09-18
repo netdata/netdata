@@ -182,6 +182,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 		c.authSelectionOnce.Do(func() { c.Infof("Redfish authentication method selected: %s", result.AuthMethod) })
 	}
 	if err := ctx.Err(); err != nil {
+		c.measurement.ResetDerivedHealth()
 		c.functionSnapshot.Store(nil)
 		return err
 	}

@@ -160,7 +160,11 @@ func scaleReadingValue(value float64, scale valueScale) float64 {
 
 func (c *Projector) readingObservations(node *Resource, reading normalizedReading) []Observation {
 	labels := c.metricLabels(node, &reading)
-	result := make([]Observation, 0, 2)
+	capacity := 2
+	if reading.DerivedHealth != "" && reading.DerivedHealth != "unavailable" {
+		capacity++
+	}
+	result := make([]Observation, 0, capacity)
 	if reading.Valid {
 		result = append(result, Observation{
 			Metric: reading.Metric,
@@ -170,6 +174,9 @@ func (c *Projector) readingObservations(node *Resource, reading normalizedReadin
 	}
 	if reading.SourceAlarm != "" && reading.AlarmMetric != "" {
 		result = append(result, stateObservation(reading.AlarmMetric, reading.SourceAlarm, labels))
+	}
+	if reading.DerivedHealth != "" && reading.DerivedHealth != "unavailable" {
+		result = append(result, stateObservation("derived_health", reading.DerivedHealth, labels))
 	}
 	return result
 }

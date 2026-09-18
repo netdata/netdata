@@ -258,6 +258,48 @@ groups:
                 name: warning
               - selector: reading_alarm{reading_alarm="critical"}
                 name: critical
+      - family: derived_health
+        context_namespace: redfish
+        metrics:
+          - derived_health
+        chart_defaults:
+          label_promotion:
+            - endpoint_job
+            - endpoint_key
+            - resource_kind
+            - resource_name
+            - component_family
+            - source_model
+            - reading_key
+            - physical_context
+            - physical_subcontext
+            - reading_type
+            - reading_basis
+            - reading_role
+            - reading_source
+            - semantic_source_class
+            - implementation_type
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - id: redfish_derived_health
+            title: Redfish Reading Derived Health (Thresholds)
+            context: reading.derived_health
+            units: state
+            algorithm: absolute
+            type: stacked
+            priority: 1741
+            lifecycle:
+              expire_after_cycles: 5
+            dimensions:
+              - selector: derived_health{derived_health="ok"}
+                name: ok
+              - selector: derived_health{derived_health="warning"}
+                name: warning
+              - selector: derived_health{derived_health="critical"}
+                name: critical
       - family: redundancy
         context_namespace: redfish
         metrics:
