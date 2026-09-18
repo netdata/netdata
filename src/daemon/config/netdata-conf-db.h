@@ -10,9 +10,16 @@ extern bool dbengine_datafiles_present; // dbengine datafiles exist on disk, eve
 
 #ifdef ENABLE_DBENGINE
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
-// the engine's process-wide configuration as the daemon resolved it from netdata.conf; the
+// the engine's configuration as the daemon resolved it from netdata.conf; the
 // daemon reads its own copy, the engine gets it through netdata_conf_dbengine_apply()
 extern struct dbengine_config netdata_conf_dbengine;
+
+// The engine, made by netdata_conf_dbengine_apply() and owned by the daemon: NULL until then, and again after the
+// shutdown path destroyed it (the engine also stays NULL when the daemon runs without dbengine, and the engine's
+// verbs and getters take NULL as an engine with nothing in it). Whoever reads it (pulse, the web API, the tests)
+// is stopped before the destroy, and pulse registers the engine's allocator statistics once and never unregisters
+// them, so the engine is created once per process.
+extern DBENGINE_ENGINE *netdata_conf_dbengine_engine;
 
 // the configuration with the settings the daemon resolves elsewhere snapshotted into it, ready for the engine
 // or for a test that needs only the configuration
@@ -39,9 +46,9 @@ size_t get_tier_grouping(size_t tier);
 void netdata_conf_section_db(void);
 void netdata_conf_dbengine_init(const char *hostname);
 
-// bring the engine up with the resolved configuration; fatal when it does not come up. Once per process, before
-// any tier (a second call is fatal too: the engine reports it is already up); the tier count must be final (the
-// engine preloads its registry per configured tier)
+// bring the engine up with the resolved configuration and keep it in netdata_conf_dbengine_engine; fatal when it does
+// not come up. Once per process, before any tier (a second call is fatal too: the engine refuses to make one more);
+// the tier count must be final (the engine preloads its registry per configured tier)
 void netdata_conf_dbengine_apply(void);
 
 #include "netdata-conf.h"

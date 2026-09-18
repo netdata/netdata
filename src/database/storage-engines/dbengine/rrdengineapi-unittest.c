@@ -95,10 +95,76 @@ int dbengine_cache_floor_unittest(void) {
     return errors;
 }
 
+// An embedder that never made an engine (the daemon in ram mode) still calls the engine's getters and verbs, with
+// NULL: each must answer as an engine with nothing in it would. dbengine_shutdown(NULL) is left out on purpose,
+// it records that no engine may be made afterwards. The buffers start as 0xff so that a getter that forgets to
+// write its answer shows.
+int dbengine_null_engine_unittest(void) {
+    int errors = 0;
+
+    for(DBENGINE_CACHE which = DBENGINE_CACHE_MAIN; which <= DBENGINE_CACHE_EXTENT; which++) {
+        struct dbengine_cache_stats cache_stats, zero_cache_stats;
+        memset(&cache_stats, 0xff, sizeof(cache_stats));
+        memset(&zero_cache_stats, 0, sizeof(zero_cache_stats));
+        if(dbengine_get_cache_stats(NULL, which, &cache_stats) || memcmp(&cache_stats, &zero_cache_stats, sizeof(cache_stats))) {
+            fprintf(stderr, " >>> DBENGINE: cache %d stats of no engine are not false and zeroed\n", (int)which);
+            errors++;
+        }
+    }
+
+    if(dbengine_pages_pending_flush(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no engine has pages to flush\n");
+        errors++;
+    }
+
+    struct dbengine_metrics_registry_stats registry_stats, zero_registry_stats;
+    memset(&registry_stats, 0xff, sizeof(registry_stats));
+    memset(&zero_registry_stats, 0, sizeof(zero_registry_stats));
+    if(dbengine_get_metrics_registry_stats(NULL, &registry_stats) || memcmp(&registry_stats, &zero_registry_stats, sizeof(registry_stats))) {
+        fprintf(stderr, " >>> DBENGINE: the registry stats of no engine are not false and zeroed\n");
+        errors++;
+    }
+
+    struct dbengine_cache_efficiency_stats efficiency = dbengine_get_cache_efficiency_stats(NULL), zero_efficiency;
+    memset(&zero_efficiency, 0, sizeof(zero_efficiency));
+    if(memcmp(&efficiency, &zero_efficiency, sizeof(efficiency))) {
+        fprintf(stderr, " >>> DBENGINE: the cache efficiency stats of no engine are not zeroed\n");
+        errors++;
+    }
+
+    struct dbengine_buffer_sizes sizes = dbengine_get_memory_sizes(NULL);
+    const DBENGINE_MEM engine_slots[] = { DBENGINE_MEM_OPCODES, DBENGINE_MEM_HANDLES, DBENGINE_MEM_DESCRIPTORS,
+                                          DBENGINE_MEM_WORKERS, DBENGINE_MEM_XT_IO };
+    for(size_t i = 0; i < _countof(engine_slots); i++) {
+        if(sizes.as[engine_slots[i]]) {
+            fprintf(stderr, " >>> DBENGINE: the memory slot %d of no engine is set\n", (int)engine_slots[i]);
+            errors++;
+        }
+    }
+    if(sizes.wal) {
+        fprintf(stderr, " >>> DBENGINE: the WAL bytes of no engine are not zero\n");
+        errors++;
+    }
+
+    struct dbengine_work_request request = { .fn = NULL, .data = NULL };
+    if(dbengine_work_available(NULL) || dbengine_enq_work(NULL, &request)) {
+        fprintf(stderr, " >>> DBENGINE: no engine takes work\n");
+        errors++;
+    }
+
+    dbengine_preload_release(NULL);
+    if(dbengine_destroy(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: destroying no engine reports referenced metrics\n");
+        errors++;
+    }
+
+    return errors;
+}
+
 // A collector that reports a zero cadence leaves the engine a page with no update-every; the first query of it
 // must repair the cadence once (counted in pages_invalid_update_every_fixed) and serve the points, a repeated
 // query must find nothing left to repair. The points sit far in the past so that they never meet live data.
-int dbengine_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
+int dbengine_zero_page_cadence_unittest(DBENGINE_ENGINE *engine, STORAGE_INSTANCE *si) {
     const time_t t = 200000000 + 4250000;
     int errors = 0;
 
@@ -134,9 +200,9 @@ int dbengine_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
         { t + 100, t + 110, 2 },
     };
 
-    size_t invalid_before = dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    size_t invalid_before = dbengine_get_cache_efficiency_stats(engine).pages_invalid_update_every_fixed;
     errors += query_points(smh, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-first");
-    size_t invalid_after_first = dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    size_t invalid_after_first = dbengine_get_cache_efficiency_stats(engine).pages_invalid_update_every_fixed;
 
     if(invalid_after_first != invalid_before + 1 || pgc_page_update_every_s(handle->pgc_page) != 10) {
         fprintf(stderr, " >>> DBENGINE: zero page cadence repairs=%zu cadence=%u, expected 1 and 10\n",
@@ -145,7 +211,7 @@ int dbengine_zero_page_cadence_unittest(STORAGE_INSTANCE *si) {
     }
 
     errors += query_points(smh, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-repeat");
-    size_t invalid_after_repeat = dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+    size_t invalid_after_repeat = dbengine_get_cache_efficiency_stats(engine).pages_invalid_update_every_fixed;
 
     if(invalid_after_repeat != invalid_after_first) {
         fprintf(stderr, " >>> DBENGINE: repeated zero-page-cadence query reported %zu repairs, expected 0\n",

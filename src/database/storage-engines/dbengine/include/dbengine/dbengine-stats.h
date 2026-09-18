@@ -213,13 +213,16 @@ typedef enum dbengine_cache {
     DBENGINE_CACHE_EXTENT,        // the compressed extents
 } DBENGINE_CACHE;
 
+// Every getter that takes the engine accepts NULL, the engine of an embedder that never brought one up (the daemon
+// in ram mode): it reports what an engine with nothing in it reports (false, zeros).
+//
 // A snapshot of one cache; false, with *out zeroed, when that cache does not exist (no tier came up yet, or the
 // caches were destroyed). The counters are copied as a whole, not under a lock and not atomically: a counter may
 // be mid-update, and on a 32-bit target a 64-bit one may tear. Good enough for charts, not for accounting.
-bool dbengine_get_cache_stats(DBENGINE_CACHE which, struct dbengine_cache_stats *out);
+bool dbengine_get_cache_stats(DBENGINE_ENGINE *engine, DBENGINE_CACHE which, struct dbengine_cache_stats *out);
 
 // pages of the main cache still to be written: hot (collected) plus dirty (waiting for a flush); 0 without a cache
-size_t dbengine_pages_pending_flush(void);
+size_t dbengine_pages_pending_flush(DBENGINE_ENGINE *engine);
 
 // bytes lost to alignment inside page data allocations (process-wide)
 size_t dbengine_page_padding_bytes(void);
@@ -254,10 +257,10 @@ struct dbengine_metrics_registry_stats {
 };
 
 // A snapshot of the registry; false, with *out zeroed, when it does not exist
-bool dbengine_get_metrics_registry_stats(struct dbengine_metrics_registry_stats *out);
+bool dbengine_get_metrics_registry_stats(DBENGINE_ENGINE *engine, struct dbengine_metrics_registry_stats *out);
 
 // ---------------------------------------------------------------------------------------------------------------------
-// query / cache efficiency (process-wide, running totals)
+// query / cache efficiency (the engine's running totals)
 
 struct dbengine_time_and_count {
     size_t count;
@@ -342,7 +345,7 @@ struct dbengine_cache_efficiency_stats {
     PAD64(size_t) metrics_retention_started;
 };
 
-struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void);
+struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(DBENGINE_ENGINE *engine);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // memory: the engine's ARAL statistics, one per DBENGINE_MEM slot, plus its non-ARAL buffers
@@ -373,7 +376,10 @@ struct dbengine_buffer_sizes {
     size_t xt_buf;
 };
 
-struct dbengine_buffer_sizes dbengine_get_memory_sizes(void);
+// The slots of the engine's own allocators (opcodes, handles, descriptors, workers, extent io) and the WAL are the
+// engine's; the others are process-wide and shared by every engine, and NULL until the first engine came up (the
+// allocators are made by it). Without an engine the engine's slots are NULL and the WAL is 0.
+struct dbengine_buffer_sizes dbengine_get_memory_sizes(DBENGINE_ENGINE *engine);
 const char *dbengine_mem_name(DBENGINE_MEM idx);   // the chart name of each slot
 
 // ---------------------------------------------------------------------------------------------------------------------

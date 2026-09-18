@@ -7,6 +7,9 @@
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
+#ifdef ENABLE_DBENGINE
+DBENGINE_ENGINE *netdata_conf_dbengine_engine = NULL; // made by netdata_conf_dbengine_apply()
+#endif
 bool dbengine_datafiles_present = false; // detected at startup, regardless of the configured memory mode
 #ifdef ENABLE_DBENGINE
 struct dbengine_config netdata_conf_dbengine = DBENGINE_CONFIG_DEFAULTS;
@@ -109,7 +112,7 @@ struct dbengine_initialization {
 
 void netdata_conf_dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = dbengine_tier_init(&dbi->config);
+    dbi->ret = dbengine_tier_init(netdata_conf_dbengine_engine, &dbi->config);
 }
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
@@ -156,9 +159,9 @@ const struct dbengine_config *netdata_conf_dbengine_resolved(void) {
 
 void netdata_conf_dbengine_apply(void) {
 #ifdef ENABLE_DBENGINE
-    int ret = dbengine_init(netdata_conf_dbengine_resolved());
-    if(ret)
-        fatal("DBENGINE: the engine did not come up: %s", uv_strerror(ret));
+    netdata_conf_dbengine_engine = dbengine_create(netdata_conf_dbengine_resolved());
+    if(!netdata_conf_dbengine_engine)
+        fatal("DBENGINE: the engine did not come up, see the errors logged above");
 #endif
 }
 

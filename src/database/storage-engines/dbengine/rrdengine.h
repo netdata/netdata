@@ -37,19 +37,13 @@ void dbengine_config_resolve(struct dbengine_config *cfg);
 
 struct dbengine_engine;
 
-// where the engine is in its one-way life: never brought up, running, or shut down
+// where an engine is in its one-way life: made and not spawned, running, or shut down
 typedef enum {
     DBENGINE_LIFECYCLE_DOWN,
     DBENGINE_LIFECYCLE_RUNNING,
     DBENGINE_LIFECYCLE_STOPPED,
 } DBENGINE_LIFECYCLE_STATE;
-DBENGINE_LIFECYCLE_STATE dbengine_lifecycle_state(void);
-
-// The engine object. Public headers hand it out only as a pointer; until the API takes it, the one engine of the
-// process is reached through this private handle, set by dbengine_init() and cleared when dbengine_destroy() frees
-// the object
-extern struct dbengine_engine *dbengine_the_engine;
-#define dbengine_the_engine_get() __atomic_load_n(&dbengine_the_engine, __ATOMIC_ACQUIRE)
+DBENGINE_LIFECYCLE_STATE dbengine_engine_lifecycle_state(struct dbengine_engine *engine);
 
 // a configured engine with nothing running: the object and its locks, no loop, no caches; cfg is copied and resolved.
 // The tests that need an engine without an event loop use it directly
@@ -554,7 +548,7 @@ struct dbengine_engine {
         bool stopped;
     } lifecycle;
 
-    // the configuration, resolved: the copy of what dbengine_init() was given
+    // the configuration, resolved: the copy of what dbengine_create() was given
     struct dbengine_config cfg;
 
     // the caches and the registry the tiers share

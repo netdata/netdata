@@ -195,21 +195,23 @@ The engine is a component of the `netdata` binary, sealed in both directions. It
 `src/database/storage-engines/dbengine/` include or call nothing of the daemon, and the daemon sees the engine only
 through its public headers under `include/dbengine/`, included from the source root as
 `database/storage-engines/dbengine/include/dbengine/<name>.h`; `dbengine-api.h` does not include the private
-`rrdengine.h`, so a tier is an opaque pointer outside this directory (the storage vtable's
-`STORAGE_INSTANCE` is that pointer). The engine is built as its own object library target, `dbengine`, linked into
+`rrdengine.h`, so the engine (`DBENGINE_ENGINE`) and a tier are opaque pointers outside this directory (the storage
+vtable's `STORAGE_INSTANCE` is the tier pointer). The engine is built as its own object library target, `dbengine`, linked into
 `netdata`; the target declares no include directories, so the layout states the public surface and the build
 compiles the engine as one unit. The public headers:
 
 - **`dbengine-api.h`**: the metric, collection and query operations behind the storage-engine vtable; the tier
-  lifecycle (`dbengine_tier_init()`, `dbengine_readiness_wait()`, `dbengine_tier_exit()`, `dbengine_tier_is_active()`,
-  `dbengine_shutdown()` as the counterpart of `dbengine_init()` below, and `dbengine_destroy()` for a leak-checking
-  exit); what the embedder reads about a tier
+  lifecycle (`dbengine_tier_init()`, which takes the engine, `dbengine_readiness_wait()`, `dbengine_tier_exit()`,
+  `dbengine_tier_is_active()`), the engine's (`dbengine_shutdown()` as the counterpart of `dbengine_create()` below,
+  and `dbengine_destroy()` for a leak-checking exit); what the embedder reads about a tier
   (retention limit, disk space, metrics, samples, first time); `dbengine_dir_has_datafiles()` to learn, before any tier
   is up, whether a directory holds data; and **work**: `dbengine_enq_work()` runs a function on the engine's worker
   pool while the engine is serving, `dbengine_work_available()` says whether it is, and a refused request is the
-  caller's to run or drop.
-- **`dbengine-config.h`**: the embedder fills one `struct dbengine_config` and hands it to `dbengine_init()`, which
-  brings the engine up; each tier then gets a `struct dbengine_tier_config` through `dbengine_tier_init()`. The same
+  caller's to run or drop. Every verb and getter about the engine takes it, and accepts NULL as an engine with
+  nothing in it.
+- **`dbengine-config.h`**: the embedder fills one `struct dbengine_config` and hands it to `dbengine_create()`, which
+  brings an engine up and returns it; each tier then gets a `struct dbengine_tier_config` through
+  `dbengine_tier_init()`. The same
   struct carries the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest datafile)
   and `preload_metrics` (the metric uuids the embedder already knows, fed into the metrics registry before the
   journals load; `dbengine_preload_release()` drops the references once every tier is up). The page types and the

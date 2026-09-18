@@ -414,7 +414,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
             netdata_conf_dbengine_tier_config(0, &tc);
             tc.dbfiles_path = dbenginepath;
             tc.disk_space_mb = default_dbengine_disk_quota_mb;
-            ret = dbengine_tier_init(&tc);
+            ret = dbengine_tier_init(netdata_conf_dbengine_engine, &tc);
 
             initialized = (ret == 0);
 

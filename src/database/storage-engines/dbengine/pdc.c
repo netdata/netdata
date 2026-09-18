@@ -81,7 +81,8 @@ static ALWAYS_INLINE void pdc_release(PDC *pdc) {
 }
 
 struct aral_statistics *pdc_aral_stats(void) {
-    return aral_get_statistics(pdc_globals.pdc.ar);
+    ARAL *ar = pdc_globals.pdc.ar;
+    return ar ? aral_get_statistics(ar) : NULL;   // no engine came up yet
 }
 
 // ----------------------------------------------------------------------------
@@ -112,7 +113,8 @@ static ALWAYS_INLINE void page_details_release(struct page_details *pd) {
 }
 
 struct aral_statistics *pd_aral_stats(void) {
-    return aral_get_statistics(pdc_globals.pd.ar);
+    ARAL *ar = pdc_globals.pd.ar;
+    return ar ? aral_get_statistics(ar) : NULL;   // no engine came up yet
 }
 
 // ----------------------------------------------------------------------------
@@ -143,7 +145,8 @@ static ALWAYS_INLINE void epdl_release(EPDL *epdl) {
 }
 
 struct aral_statistics *epdl_aral_stats(void) {
-    return aral_get_statistics(pdc_globals.epdl.ar);
+    ARAL *ar = pdc_globals.epdl.ar;
+    return ar ? aral_get_statistics(ar) : NULL;   // no engine came up yet
 }
 
 // ----------------------------------------------------------------------------
@@ -175,7 +178,8 @@ static ALWAYS_INLINE void deol_release(DEOL *deol) {
 }
 
 struct aral_statistics *deol_aral_stats(void) {
-    return aral_get_statistics(pdc_globals.deol.ar);
+    ARAL *ar = pdc_globals.deol.ar;
+    return ar ? aral_get_statistics(ar) : NULL;   // no engine came up yet
 }
 
 // ----------------------------------------------------------------------------
@@ -207,7 +211,8 @@ ALWAYS_INLINE void epdl_extent_release(EPDL_EXTENT *e) {
 }
 
 struct aral_statistics *epdl_extent_aral_stats(void) {
-    return aral_get_statistics(pdc_globals.epdl_extent.ar);
+    ARAL *ar = pdc_globals.epdl_extent.ar;
+    return ar ? aral_get_statistics(ar) : NULL;   // no engine came up yet
 }
 
 // ----------------------------------------------------------------------------

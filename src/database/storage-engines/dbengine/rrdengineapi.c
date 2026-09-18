@@ -1148,7 +1148,7 @@ static void dbengine_tier_config_validate(const struct dbengine_tier_config *tc)
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
 }
 
-int dbengine_tier_init(const struct dbengine_tier_config *tc)
+int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tier_config *tc)
 {
     uint32_t max_open_files;
 
@@ -1156,9 +1156,12 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
     // engine and the tier, all before anything is written: a refused init must leave the static tier as it found it
     dbengine_tier_config_validate(tc);
 
-    switch(dbengine_lifecycle_state()) {
+    if(!engine)
+        fatal("DBENGINE: dbengine_tier_init() for tier %zu called without an engine", tc->tier);
+
+    switch(dbengine_engine_lifecycle_state(engine)) {
         case DBENGINE_LIFECYCLE_DOWN:
-            fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
+            fatal("DBENGINE: dbengine_tier_init() for tier %zu called on an engine that is not up", tc->tier);
 
         case DBENGINE_LIFECYCLE_STOPPED:
             netdata_log_error("DBENGINE: tier %zu: the engine was shut down, the tier cannot be initialized", tc->tier);
@@ -1168,7 +1171,6 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
             break;
     }
 
-    struct dbengine_engine *engine = dbengine_the_engine_get();
     size_t tier = tc->tier;
     unsigned disk_space_mb = tc->disk_space_mb;
 
@@ -1232,8 +1234,7 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
     return UV_EIO;
 }
 
-size_t dbengine_destroy(void) {
-    struct dbengine_engine *engine = dbengine_the_engine_get();
+size_t dbengine_destroy(struct dbengine_engine *engine) {
     if(!engine)
         return 0;
 
@@ -1287,22 +1288,18 @@ size_t dbengine_destroy(void) {
         ctx->engine = retained ? engine : NULL;
     }
 
-    if(!retained) {
-        __atomic_store_n(&dbengine_the_engine, NULL, __ATOMIC_RELEASE);
+    if(!retained)
         dbengine_engine_free(engine);
-    }
 
     return metrics_referenced;
 }
 
-void dbengine_preload_release(void) {
-    struct dbengine_engine *engine = dbengine_the_engine_get();
+void dbengine_preload_release(struct dbengine_engine *engine) {
     if(engine && engine->main_mrg)
         mrg_metric_prepopulate_cleanup(engine->main_mrg);
 }
 
-bool dbengine_get_cache_stats(DBENGINE_CACHE which, struct dbengine_cache_stats *out) {
-    struct dbengine_engine *engine = dbengine_the_engine_get();
+bool dbengine_get_cache_stats(struct dbengine_engine *engine, DBENGINE_CACHE which, struct dbengine_cache_stats *out) {
     PGC *cache = NULL;
     if(engine) {
         switch(which) {
@@ -1319,13 +1316,11 @@ bool dbengine_get_cache_stats(DBENGINE_CACHE which, struct dbengine_cache_stats 
     return true;
 }
 
-size_t dbengine_pages_pending_flush(void) {
-    struct dbengine_engine *engine = dbengine_the_engine_get();
+size_t dbengine_pages_pending_flush(struct dbengine_engine *engine) {
     return engine && engine->main_cache ? pgc_hot_and_dirty_entries(engine->main_cache) : 0;
 }
 
-bool dbengine_get_metrics_registry_stats(struct dbengine_metrics_registry_stats *out) {
-    struct dbengine_engine *engine = dbengine_the_engine_get();
+bool dbengine_get_metrics_registry_stats(struct dbengine_engine *engine, struct dbengine_metrics_registry_stats *out) {
     if(!engine || !engine->main_mrg) {
         memset(out, 0, sizeof(*out));
         return false;
@@ -1595,8 +1590,7 @@ struct dbengine_size_stats dbengine_get_size_stats(struct dbengine_tier *ctx) {
     return stats;
 }
 
-struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void) {
+struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(struct dbengine_engine *engine) {
     // FIXME - make cache efficiency stats atomic
-    struct dbengine_engine *engine = dbengine_the_engine_get();
     return engine ? engine->cache_efficiency_stats : (struct dbengine_cache_efficiency_stats){ 0 };
 }

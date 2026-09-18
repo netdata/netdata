@@ -430,7 +430,7 @@ void pgd_init_arals(const struct dbengine_allocator_config *cfg) {
 int dbengine_allocator_unittest(const struct dbengine_config *cfg) {
     int errors = 0;
 
-    // resolve the partition count the way dbengine_init() will, so the engine that comes up afterwards finds the
+    // resolve the partition count the way dbengine_create() will, so the engine that comes up afterwards finds the
     // layer configured exactly as it would have configured it
     struct dbengine_allocator_config first = cfg->allocator;
     if(!first.partitions)

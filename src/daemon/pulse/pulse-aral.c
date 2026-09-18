@@ -70,7 +70,7 @@ void pulse_aral_init(void) {
     // the engine publishes its ARAL statistics; register them here instead of the engine calling into pulse.
     // dbengine_get_memory_sizes() dereferences the engine's ARALs, so only when the engine is up.
     if(dbengine_enabled) {
-        struct dbengine_buffer_sizes dbmem = dbengine_get_memory_sizes();
+        struct dbengine_buffer_sizes dbmem = dbengine_get_memory_sizes(netdata_conf_dbengine_engine);
         for(size_t i = 0; i < DBENGINE_MEM_MAX; i++)
             pulse_aral_register_statistics(dbmem.as[i], dbengine_mem_name(i));
     }

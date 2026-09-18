@@ -574,12 +574,12 @@ static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
     };
 
     size_t invalid_before =
-        dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+        dbengine_get_cache_efficiency_stats(netdata_conf_dbengine_engine).pages_invalid_update_every_fixed;
     size_t errors = dbengine_cadence_test_query_points(
         rd, t + update_every, t + 2 * update_every,
         expected, _countof(expected), "long-cadence");
     size_t invalid_after =
-        dbengine_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
+        dbengine_get_cache_efficiency_stats(netdata_conf_dbengine_engine).pages_invalid_update_every_fixed;
 
     if(invalid_after != invalid_before) {
         fprintf(stderr,
@@ -603,7 +603,7 @@ static size_t test_dbengine_tier_init_refused(size_t tier, int expected, const c
     tc.dbfiles_path = path;
     tc.disk_space_mb = default_dbengine_disk_quota_mb;
 
-    int rc = dbengine_tier_init(&tc);
+    int rc = dbengine_tier_init(netdata_conf_dbengine_engine, &tc);
     if(rc == expected)
         return 0;
 
@@ -623,6 +623,9 @@ int test_dbengine(void) {
     // before the engine is up: the caches do not exist yet, which is the state this check needs
     errors += (size_t)dbengine_cache_floor_unittest();
 
+    // the daemon in ram mode has no engine and still calls the engine's getters with NULL
+    errors += (size_t)dbengine_null_engine_unittest();
+
     // before the engine is up: the page allocators are brought up here, and the engine below reuses them
     errors += (size_t)dbengine_allocator_unittest(netdata_conf_dbengine_resolved());
 
@@ -637,7 +640,7 @@ int test_dbengine(void) {
 
     // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
     // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
-    dbengine_preload_release();
+    dbengine_preload_release(netdata_conf_dbengine_engine);
 
     errors += test_dbengine_tier_init_refused(0, UV_EALREADY, "a tier that is up", "/nonexistent/dbengine");
 
@@ -683,7 +686,7 @@ int test_dbengine(void) {
     }
 
     errors += test_dbengine_long_collection_cadence(host);
-    errors += (size_t)dbengine_zero_page_cadence_unittest(host->db[0].si);
+    errors += (size_t)dbengine_zero_page_cadence_unittest(netdata_conf_dbengine_engine, host->db[0].si);
 
     // prevent closing the database before the test is finished
     sleep(5);
@@ -696,7 +699,7 @@ int test_dbengine(void) {
     dbengine_flush_all((DBENGINE_TIER *)host->db[0].si);
     dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
     errors += test_dbengine_tier_init_refused(0, UV_EIO, "a tier that came up and exited", tier_path);
-    dbengine_shutdown();
+    dbengine_shutdown(netdata_conf_dbengine_engine);
     rrd_wrunlock();
 
     // tier 1 never came up in this process; a refusal that did not happen would have created its first datafile

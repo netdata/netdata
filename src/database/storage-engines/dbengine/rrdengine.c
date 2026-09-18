@@ -26,31 +26,19 @@ static inline struct dbengine_cmd dbengine_deq_cmd(struct dbengine_engine *engin
 static inline void worker_dispatch_extent_read(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 static inline void worker_dispatch_query_prep(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 
-struct dbengine_engine *dbengine_the_engine = NULL;
-
-// What is left of the engine's one-way life, until the API takes the engine: the engine that comes up is the
-// process's only one (dbengine_the_engine), and once dbengine_shutdown() was called no other comes up in this process.
+// What is left of the engine's one-way life, until commit 5 of stage 2 removes it: once dbengine_shutdown() was
+// called, no engine is made again in this process, whether or not one was up.
 static struct {
-    SPINLOCK spinlock;      // guards dbengine_the_engine and the flag below
-    bool stopped_once;      // dbengine_shutdown() was called, whether or not an engine was up
+    SPINLOCK spinlock;      // serialises the creation of an engine, the claim on the static tiers, and the flag below
+    bool stopped_once;      // dbengine_shutdown() was called
 } dbengine_process = { .spinlock = SPINLOCK_INITIALIZER, .stopped_once = false };
 
-static DBENGINE_LIFECYCLE_STATE dbengine_engine_lifecycle_state(struct dbengine_engine *engine) {
+DBENGINE_LIFECYCLE_STATE dbengine_engine_lifecycle_state(struct dbengine_engine *engine) {
     spinlock_lock(&engine->lifecycle.spinlock);
     DBENGINE_LIFECYCLE_STATE state = engine->lifecycle.stopped ? DBENGINE_LIFECYCLE_STOPPED :
                                      engine->lifecycle.spawned ? DBENGINE_LIFECYCLE_RUNNING :
                                                                  DBENGINE_LIFECYCLE_DOWN;
     spinlock_unlock(&engine->lifecycle.spinlock);
-    return state;
-}
-
-DBENGINE_LIFECYCLE_STATE dbengine_lifecycle_state(void) {
-    spinlock_lock(&dbengine_process.spinlock);
-    struct dbengine_engine *engine = dbengine_the_engine_get();
-    DBENGINE_LIFECYCLE_STATE state = engine ? dbengine_engine_lifecycle_state(engine) :
-                                     dbengine_process.stopped_once ? DBENGINE_LIFECYCLE_STOPPED :
-                                                                     DBENGINE_LIFECYCLE_DOWN;
-    spinlock_unlock(&dbengine_process.spinlock);
     return state;
 }
 
@@ -583,8 +571,7 @@ static void dbengine_cmd_queue_set_accepting(struct dbengine_engine *engine, boo
     spinlock_unlock(&engine->cmd_queue.unsafe.spinlock);
 }
 
-bool dbengine_work_available(void) {
-    struct dbengine_engine *engine = dbengine_the_engine_get();
+bool dbengine_work_available(struct dbengine_engine *engine) {
     if(!engine)
         return false;
 
@@ -1091,11 +1078,10 @@ static void *external_work_worker(
     return NULL;
 }
 
-bool dbengine_enq_work(struct dbengine_work_request *req) {
-    if(!dbengine_work_available())
-        return false;   // never spawned, or already shut down: the queue's allocator may not even exist
+bool dbengine_enq_work(struct dbengine_engine *engine, struct dbengine_work_request *req) {
+    if(!dbengine_work_available(engine))
+        return false;   // no engine, never spawned, or already shut down: the queue's allocator may not even exist
 
-    struct dbengine_engine *engine = dbengine_the_engine_get();
     struct dbengine_cmd *cmd = dbengine_cmd_alloc(engine, NULL, DBENGINE_OPCODE_EXTERNAL_WORK, req, &req->completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL);
     if(!dbengine_cmd_append(engine, cmd, NULL, true)) {
         aral_freez(engine->cmd_queue.ar, cmd);
@@ -2383,7 +2369,7 @@ const char *dbengine_mem_name(DBENGINE_MEM idx) {
     return idx < DBENGINE_MEM_MAX ? names[idx] : NULL;
 }
 
-struct dbengine_buffer_sizes dbengine_get_memory_sizes(void) {
+struct dbengine_buffer_sizes dbengine_get_memory_sizes(struct dbengine_engine *engine) {
     struct dbengine_buffer_sizes sizes = {
         .as = {
             [DBENGINE_MEM_PGC]            = pgc_aral_stats(),
@@ -2399,7 +2385,6 @@ struct dbengine_buffer_sizes dbengine_get_memory_sizes(void) {
     };
 
     // the engine's own allocators exist only while it does
-    struct dbengine_engine *engine = dbengine_the_engine_get();
     if(engine) {
         sizes.as[DBENGINE_MEM_OPCODES]     = aral_get_statistics(engine->cmd_queue.ar);
         sizes.as[DBENGINE_MEM_HANDLES]     = aral_get_statistics(engine->handles.ar);
@@ -2563,7 +2548,7 @@ static void dbengine_spawn_unwind(struct dbengine_engine *engine, bool timer_ope
 }
 
 // the loop, its handles, the structures and the thread; with the process lock held. A failed step closes what
-// came before it and leaves the engine not spawned, so dbengine_init() reports the error and frees it
+// came before it and leaves the engine not spawned, so dbengine_create() reports the error and frees it
 static int dbengine_spawn(struct dbengine_engine *engine) {
     int ret;
 
@@ -2666,26 +2651,27 @@ void dbengine_engine_free(struct dbengine_engine *engine) {
     freez(engine);
 }
 
-int dbengine_init(const struct dbengine_config *cfg) {
+struct dbengine_engine *dbengine_create(const struct dbengine_config *cfg) {
     if(!cfg)
-        fatal("DBENGINE: dbengine_init() called without a configuration");
+        fatal("DBENGINE: dbengine_create() called without a configuration");
 
     spinlock_lock(&dbengine_process.spinlock);
 
-    int ret;
-    struct dbengine_engine *engine = dbengine_the_engine_get();
-    if(engine) {
-        if(dbengine_engine_lifecycle_state(engine) == DBENGINE_LIFECYCLE_STOPPED) {
-            netdata_log_error("DBENGINE: the engine was shut down and cannot be started again in this process");
-            ret = UV_EIO;
-        }
-        else
-            ret = UV_EALREADY;
-    }
-    else if(dbengine_process.stopped_once) {
+    struct dbengine_engine *engine = NULL;
+
+    // the daemon's static tiers are the tier list of the engine that owns them (until the list moves into the
+    // engine); one that a live engine, or a retained one, still points at is not free to be claimed
+    bool tiers_free = true;
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        if(dbengine_multidb_tiers[tier]->engine)
+            tiers_free = false;
+
+    if(dbengine_process.stopped_once)
         netdata_log_error("DBENGINE: the engine was shut down and cannot be started again in this process");
-        ret = UV_EIO;
-    }
+
+    else if(!tiers_free)
+        netdata_log_error("DBENGINE: the static tiers already belong to an engine, a second one cannot be made");
+
     else {
         // the configuration is resolved into the engine first: the caches and the allocators read it as they come
         // up. Every tier knows its engine before the spawn, which loads the registry through them
@@ -2693,20 +2679,18 @@ int dbengine_init(const struct dbengine_config *cfg) {
         for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
             dbengine_multidb_tiers[tier]->engine = engine;
 
-        ret = dbengine_spawn(engine);
-        if(ret) {
+        if(dbengine_spawn(engine)) {
             for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 dbengine_multidb_tiers[tier]->engine = NULL;
 
             // the spawn failed before its caches existed: nothing but the object and its locks
             dbengine_engine_free(engine);
+            engine = NULL;
         }
-        else
-            __atomic_store_n(&dbengine_the_engine, engine, __ATOMIC_RELEASE);
     }
 
     spinlock_unlock(&dbengine_process.spinlock);
-    return ret;
+    return engine;
 }
 
 static inline void worker_dispatch_extent_read(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker) {
@@ -3001,12 +2985,11 @@ void dbengine_event_loop(void* arg) {
     worker_unregister();
 }
 
-void dbengine_shutdown(void)
+void dbengine_shutdown(struct dbengine_engine *engine)
 {
-    // no engine comes up after this one: the flag outlives it, and it is set whether or not an engine was up
+    // no engine is made after this one: the flag is set whether or not an engine was up
     spinlock_lock(&dbengine_process.spinlock);
     dbengine_process.stopped_once = true;
-    struct dbengine_engine *engine = dbengine_the_engine_get();
     spinlock_unlock(&dbengine_process.spinlock);
     if(!engine)
         return;
