@@ -44,13 +44,14 @@ static status_file_io_pending_t status_file_io_pending = {
 };
 
 static ND_THREAD *status_file_io_publisher_thread = NULL;
+static HANDLE status_file_io_stop_event = NULL;
 static SPINLOCK status_file_io_pending_spinlock = SPINLOCK_INITIALIZER;
 
 static void *status_file_io_publisher_main(void *arg)
 {
     UNUSED(arg);
     while (1) {
-        sleep_usec(50 * USEC_PER_MS);
+        DWORD wait_result = WaitForSingleObject(status_file_io_stop_event, 50);
 
         spinlock_lock(&status_file_io_pending_spinlock);
         bool ready = __atomic_load_n(&status_file_io_pending.ready, __ATOMIC_ACQUIRE);
@@ -61,7 +62,11 @@ static void *status_file_io_publisher_main(void *arg)
             memcpy(final_path, status_file_io_pending.final_path, sizeof(final_path));
             __atomic_store_n(&status_file_io_pending.ready, 0, __ATOMIC_RELEASE);
         }
+
         spinlock_unlock(&status_file_io_pending_spinlock);
+
+        if (wait_result == WAIT_OBJECT_0 && !ready)
+            break;
 
         if (ready) {
             // MoveFileExA() can take meaningful time when antivirus or
@@ -81,8 +86,10 @@ static void *status_file_io_publisher_main(void *arg)
 
 // Post a (temp, final) pair for the worker thread. Safe to call from a
 // signal handler: only touches the pre-allocated slot and a spinlock.
-static inline void status_file_io_publish_deferred(const char *temp_path, const char *final_path)
+static inline bool status_file_io_publish_deferred(const char *temp_path, const char *final_path)
 {
+    if (!status_file_io_publisher_thread)
+        return false;
     spinlock_lock(&status_file_io_pending_spinlock);
     // The spinlock is acquired only briefly to copy both paths atomically;
     // we then flip the ready flag under the lock and let the worker pick
@@ -94,22 +101,36 @@ static inline void status_file_io_publish_deferred(const char *temp_path, const 
     status_file_io_pending.final_path[sizeof(status_file_io_pending.final_path) - 1] = '\0';
     __atomic_store_n(&status_file_io_pending.ready, 1, __ATOMIC_RELEASE);
     spinlock_unlock(&status_file_io_pending_spinlock);
+    return true;
 }
 
 void status_file_io_init(void)
 {
     if (!status_file_io_publisher_thread) {
+        status_file_io_stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (!status_file_io_stop_event)
+            return;
         status_file_io_publisher_thread =
             nd_thread_create("STATUSFILEPUB", NETDATA_THREAD_OPTION_DEFAULT,
                              status_file_io_publisher_main, NULL);
+        if (!status_file_io_publisher_thread) {
+            CloseHandle(status_file_io_stop_event);
+            status_file_io_stop_event = NULL;
+        }
     }
 }
 
 void status_file_io_shutdown(void)
 {
-    // Drain any pending rename so a clean shutdown does not lose the
-    // last status snapshot. The worker thread will exit on its own when
-    // the process terminates; we do not block here.
+    if (!status_file_io_publisher_thread)
+        return;
+    SetEvent(status_file_io_stop_event);
+    nd_thread_join(status_file_io_publisher_thread);
+    status_file_io_publisher_thread = NULL;
+    CloseHandle(status_file_io_stop_event);
+    status_file_io_stop_event = NULL;
+
+    // Drain any pending rename left after the worker exits.
     spinlock_lock(&status_file_io_pending_spinlock);
     bool ready = __atomic_load_n(&status_file_io_pending.ready, __ATOMIC_ACQUIRE);
     char temp_path[FILENAME_MAX];
@@ -362,7 +383,10 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     // worker thread drains off the signal path. If the process aborts before
     // the worker drains, the temp file is left behind and unlinked on next
     // startup's status_file_io_remove_obsolete() pass.
-    status_file_io_publish_deferred(temp, final);
+    if (!status_file_io_publish_deferred(temp, final)) {
+        unlink(temp);
+        return false;
+    }
 #else
     if (rename(temp, final) != 0) {
         unlink(temp);

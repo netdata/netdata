@@ -37,10 +37,14 @@ function(netdata_bundle_libbacktrace)
                 if(NOT _BT_MAKE_EXECUTABLE)
                         message(FATAL_ERROR "MSYS2 make not found next to the selected bash")
                 endif()
-                set(_bt_configure_cmd ${BASH_EXECUTABLE} "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
+                set(_bt_configure_cmd ${BASH_EXECUTABLE} -c
+                        "PATH='/ucrt64/bin:${_BT_MSYS_BIN}':\$PATH '${libbacktrace_SOURCE_DIR}/configure' --prefix='${libbacktrace_INSTALL_DIR}' --enable-static")
+                set(_bt_build_cmd ${BASH_EXECUTABLE} -c
+                        "PATH='/ucrt64/bin:${_BT_MSYS_BIN}':\$PATH MAKEFLAGS= '${_BT_MAKE_EXECUTABLE}' install")
         else()
                 set(_BT_MAKE_EXECUTABLE make)
                 set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
+                set(_bt_build_cmd ${_BT_MAKE_EXECUTABLE} install)
         endif()
 
         # Clone and build libbacktrace
@@ -50,7 +54,7 @@ function(netdata_bundle_libbacktrace)
                 SOURCE_DIR "${libbacktrace_SOURCE_DIR}"
                 BINARY_DIR "${libbacktrace_BINARY_DIR}"
                 CONFIGURE_COMMAND ${_bt_configure_cmd}
-                BUILD_COMMAND ${_BT_MAKE_EXECUTABLE} install
+                BUILD_COMMAND ${_bt_build_cmd}
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS "${libbacktrace_LIBRARY}"
                 EXCLUDE_FROM_ALL 1
