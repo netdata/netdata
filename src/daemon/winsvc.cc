@@ -22,9 +22,23 @@ static ND_THREAD *cleanup_thread = nullptr;
 // Signals the stop-pending heartbeat thread to exit.
 static HANDLE svc_heartbeat_done_event = nullptr;
 
+// Handle for the stop-pending heartbeat thread. The abort path
+// (netdata_svc_shutdown_aborted) waits on this handle before reporting
+// SERVICE_STOPPED, so the heartbeat cannot publish SERVICE_STOP_PENDING
+// after the SCM has been told the service is stopped.
+static HANDLE heartbeat_thread = nullptr;
+
 static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint, DWORD dwControlsAccepted)
 {
     static DWORD dwCheckPoint = 1;
+
+    // Take the lock so the heartbeat cannot publish SERVICE_STOP_PENDING
+    // between our writes to svc_status and the SetServiceStatus call below.
+    // The timeout path joins the heartbeat before taking this lock, so the
+    // heartbeat cannot be blocked while it exits.
+    svc_status_lock_ensure_init();
+    EnterCriticalSection(&svc_status_lock);
+
     svc_status.dwCurrentState = dwCurrentState;
     svc_status.dwWin32ExitCode = dwWin32ExitCode;
     svc_status.dwWaitHint = dwWaitHint;
@@ -39,10 +53,10 @@ static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
         svc_status.dwCheckPoint = dwCheckPoint++;
     }
 
-    if (!SetServiceStatus(svc_status_handle, &svc_status))
-        return false;
+    bool ok = SetServiceStatus(svc_status_handle, &svc_status) != 0;
 
-    return true;
+    LeaveCriticalSection(&svc_status_lock);
+    return ok;
 }
 
 static HANDLE CreateEventHandle(void)
@@ -58,12 +72,58 @@ static HANDLE CreateEventHandle(void)
     return h;
 }
 
+// Serializes updates to the SCM-visible svc_status and the abort path. The
+// shutdown-timeout callback (`svc_report_stopped_before_abort`) and the
+// stop-pending heartbeat thread both write svc_status; without this lock the
+// heartbeat can publish SERVICE_STOP_PENDING *after* the callback has set
+// SERVICE_STOPPED, and the SCM records a "stopped after stop pending" race.
+static CRITICAL_SECTION svc_status_lock;
+static bool svc_status_lock_init_done = false;
+
+static void svc_status_lock_ensure_init(void)
+{
+    if (svc_status_lock_init_done)
+        return;
+
+    // InitializeCriticalSection is not async-signal-safe, but the heartbeat
+    // thread and the abort callback both run from normal thread context, not
+    // from a signal handler. Calling it once at startup is safe.
+    InitializeCriticalSection(&svc_status_lock);
+    svc_status_lock_init_done = true;
+}
+
+// Stops the stop-pending heartbeat (if any) so the abort callback can publish
+// SERVICE_STOPPED without racing it. Returns after the heartbeat thread has
+// either signalled completion or been observed alive; the caller does not
+// own the heartbeat handle. Idempotent and safe to call from any thread,
+// including the shutdown-timeout callback.
+extern "C" void netdata_svc_shutdown_aborted(void)
+{
+    svc_status_lock_ensure_init();
+    if (svc_heartbeat_done_event) {
+        // Signal the heartbeat to exit and wait briefly. We are already past
+        // the SCM's dwWaitHint, so a few extra seconds here only delay an
+        // abort that is going to tear the process down anyway.
+        SetEvent(svc_heartbeat_done_event);
+        if (heartbeat_thread) {
+            WaitForSingleObject(heartbeat_thread, 3000);
+        }
+    }
+
+    // Join before taking the status lock: the heartbeat publishes through
+    // ReportSvcStatus() and therefore needs this same lock to exit.
+    EnterCriticalSection(&svc_status_lock);
+    ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
+
+    LeaveCriticalSection(&svc_status_lock);
+}
+
 // Called by the watcher before abort() when a shutdown step times out.
 // Reports SERVICE_STOPPED so the SCM marks the service as stopped rather than
 // crashed; the process then terminates via abort() a few instructions later.
 static void svc_report_stopped_before_abort(void)
 {
-    ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
+    netdata_svc_shutdown_aborted();
 }
 
 // Map a Windows Service Control Manager control code to a netdata EXIT_REASON.
@@ -94,6 +154,9 @@ static DWORD WINAPI stop_pending_heartbeat(LPVOID /*unused*/)
     return 0;
 }
 
+// Handle for the stop-pending heartbeat thread. The path that waits for
+// the cleanup to finish uses this handle to join the heartbeat thread
+// before reporting SERVICE_STOPPED.
 static NORETURN void call_netdata_cleanup(void *arg)
 {
     UNUSED(arg);
@@ -105,9 +168,9 @@ static NORETURN void call_netdata_cleanup(void *arg)
     // SERVICE_STOP_PENDING updates the SCM times out (error 1053) if
     // netdata_exit_gracefully() takes longer than dwWaitHint (5 s).
     svc_heartbeat_done_event = CreateEvent(NULL, TRUE, FALSE, NULL);
-    HANDLE heartbeat = nullptr;
+    heartbeat_thread = nullptr;
     if (svc_heartbeat_done_event)
-        heartbeat = CreateThread(NULL, 0, stop_pending_heartbeat, NULL, 0, NULL);
+        heartbeat_thread = CreateThread(NULL, 0, stop_pending_heartbeat, NULL, 0, NULL);
 
     // Stop the agent
     // C++17 init-statement scopes the loaded `controlCode` to the helper
@@ -129,12 +192,13 @@ static NORETURN void call_netdata_cleanup(void *arg)
     // Stop the heartbeat before reporting SERVICE_STOPPED.
     if (svc_heartbeat_done_event) {
         SetEvent(svc_heartbeat_done_event);
-        if (heartbeat) {
-            WaitForSingleObject(heartbeat, 5000);
-            CloseHandle(heartbeat);
+        if (heartbeat_thread) {
+            WaitForSingleObject(heartbeat_thread, 5000);
+            CloseHandle(heartbeat_thread);
         }
         CloseHandle(svc_heartbeat_done_event);
         svc_heartbeat_done_event = nullptr;
+        heartbeat_thread = nullptr;
     }
 
     // Set status to stopped

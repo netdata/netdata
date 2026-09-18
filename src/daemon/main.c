@@ -4,6 +4,7 @@
 #include "buildinfo.h"
 #include "daemon-shutdown-watcher.h"
 #include "status-file.h"
+#include "status-file-io.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 #include "web/mcp/mcp.h"
@@ -1122,6 +1123,7 @@ int netdata_main(int argc, char **argv) {
     nd_log_register_fatal_hook_cb(daemon_status_file_register_fatal);
     nd_log_register_fatal_final_cb(fatal_status_file_save);
     exit_initiated_init();
+    status_file_io_init(); // start the deferred-rename worker thread on UCRT64
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("signals");

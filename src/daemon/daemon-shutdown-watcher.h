@@ -53,4 +53,25 @@ void watcher_step_complete(watcher_step_id_t step_id);
 // so the service does not appear to crash rather than stop. Pass NULL to clear.
 void nd_register_shutdown_timeout_cb(void (*cb)(void));
 
+#ifdef OS_WINDOWS
+// Stops the Windows stop-pending heartbeat thread and publishes
+// SERVICE_STOPPED to the SCM, all while holding the svc_status lock so the
+// heartbeat cannot publish SERVICE_STOP_PENDING after the SCM has been told
+// the service is stopped. The watcher invokes this before calling the
+// registered shutdown-timeout callback so the SCM sees a coherent final
+// state before the process aborts.
+//
+// Exposed here (rather than only inside winsvc.cc) so daemon-shutdown-watcher.c
+// can call it without taking a C++ dependency on the service entry point.
+// extern "C" so the C source file links against the C++ definition without
+// name-mangling surprises.
+#ifdef __cplusplus
+extern "C" {
+#endif
+void netdata_svc_shutdown_aborted(void);
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 #endif /* DAEMON_WATCHER_H */

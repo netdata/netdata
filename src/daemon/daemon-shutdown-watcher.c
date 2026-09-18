@@ -31,6 +31,15 @@ static void shutdown_timed_out(const char *step) {
     // 2. Sentry may crash trying to access potentially freed/corrupted strings from session_status
     // 3. The abort() below will trigger a signal that Sentry will catch anyway
 
+#ifdef OS_WINDOWS
+    // Stop the stop-pending heartbeat and publish SERVICE_STOPPED to the SCM
+    // *before* invoking the registered callback. Both writes happen under
+    // the same critical section in winsvc.cc, so the SCM cannot see a
+    // "SERVICE_STOP_PENDING after SERVICE_STOPPED" sequence even though the
+    // watcher is racing toward abort().
+    netdata_svc_shutdown_aborted();
+#endif
+
     void (*cb)(void) = __atomic_load_n(&shutdown_timeout_cb, __ATOMIC_ACQUIRE);
     if (cb) cb();
 
