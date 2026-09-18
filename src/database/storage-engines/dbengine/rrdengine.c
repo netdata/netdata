@@ -26,12 +26,8 @@ static inline struct dbengine_cmd dbengine_deq_cmd(struct dbengine_engine *engin
 static inline void worker_dispatch_extent_read(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 static inline void worker_dispatch_query_prep(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 
-// What is left of the engine's one-way life, until commit 5 of stage 2 removes it: once dbengine_shutdown() was
-// called, no engine is made again in this process, whether or not one was up.
-static struct {
-    SPINLOCK spinlock;      // serialises the creation of an engine, the claim on the static tiers, and the flag below
-    bool stopped_once;      // dbengine_shutdown() was called
-} dbengine_process = { .spinlock = SPINLOCK_INITIALIZER, .stopped_once = false };
+// serialises the creation of engines: the claim on the daemon's static tiers is made under it
+static SPINLOCK dbengine_create_spinlock = SPINLOCK_INITIALIZER;
 
 DBENGINE_LIFECYCLE_STATE dbengine_engine_lifecycle_state(struct dbengine_engine *engine) {
     spinlock_lock(&engine->lifecycle.spinlock);
@@ -2655,21 +2651,19 @@ struct dbengine_engine *dbengine_create(const struct dbengine_config *cfg) {
     if(!cfg)
         fatal("DBENGINE: dbengine_create() called without a configuration");
 
-    spinlock_lock(&dbengine_process.spinlock);
+    spinlock_lock(&dbengine_create_spinlock);
 
     struct dbengine_engine *engine = NULL;
 
     // the daemon's static tiers are the tier list of the engine that owns them (until the list moves into the
-    // engine); one that a live engine, or a retained one, still points at is not free to be claimed
+    // engine); one that a live engine, a stopped one or a retained one still points at is not free to be claimed:
+    // dbengine_destroy() is what releases them, and a new engine can be made after it
     bool tiers_free = true;
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
         if(dbengine_multidb_tiers[tier]->engine)
             tiers_free = false;
 
-    if(dbengine_process.stopped_once)
-        netdata_log_error("DBENGINE: the engine was shut down and cannot be started again in this process");
-
-    else if(!tiers_free)
+    if(!tiers_free)
         netdata_log_error("DBENGINE: the static tiers already belong to an engine, a second one cannot be made");
 
     else {
@@ -2689,7 +2683,7 @@ struct dbengine_engine *dbengine_create(const struct dbengine_config *cfg) {
         }
     }
 
-    spinlock_unlock(&dbengine_process.spinlock);
+    spinlock_unlock(&dbengine_create_spinlock);
     return engine;
 }
 
@@ -2987,10 +2981,6 @@ void dbengine_event_loop(void* arg) {
 
 void dbengine_shutdown(struct dbengine_engine *engine)
 {
-    // no engine is made after this one: the flag is set whether or not an engine was up
-    spinlock_lock(&dbengine_process.spinlock);
-    dbengine_process.stopped_once = true;
-    spinlock_unlock(&dbengine_process.spinlock);
     if(!engine)
         return;
 

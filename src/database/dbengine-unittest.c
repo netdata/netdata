@@ -629,6 +629,11 @@ int test_dbengine(void) {
     // before the engine is up: the page allocators are brought up here, and the engine below reuses them
     errors += (size_t)dbengine_allocator_unittest(netdata_conf_dbengine_resolved());
 
+    // before the daemon's engine: two engines of the test's own, one after the other, on scratch directories
+    char lifecycle_dir[FILENAME_MAX + 1];
+    snprintfz(lifecycle_dir, sizeof(lifecycle_dir), "%s/dbengine-lifecycle-test", netdata_configured_cache_dir);
+    errors += (size_t)dbengine_engine_lifecycle_unittest(netdata_conf_dbengine_resolved(), lifecycle_dir);
+
     // the engine, then the host that brings the tier up on it
     netdata_conf_dbengine_apply();
 

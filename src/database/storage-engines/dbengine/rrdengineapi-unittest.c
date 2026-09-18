@@ -161,6 +161,145 @@ int dbengine_null_engine_unittest(void) {
     return errors;
 }
 
+// one engine's whole life on a scratch directory: made, refused a second engine, given a tier that collects and is
+// queried, stopped, refused a tier, destroyed with nothing referenced, and the static tiers released
+static int engine_lifecycle_generation(const struct dbengine_config *cfg, const char *dir, const char *what) {
+    int errors = 0;
+
+    if(mkdir(dir, 0775) != 0 && errno != EEXIST) {
+        fprintf(stderr, " >>> DBENGINE: %s: cannot create the scratch directory '%s'\n", what, dir);
+        return 1;
+    }
+
+    DBENGINE_ENGINE *engine = dbengine_create(cfg);
+    if(!engine) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine did not come up\n", what);
+        return 1;
+    }
+
+    if(dbengine_create(cfg)) {
+        fprintf(stderr, " >>> DBENGINE: %s: a second engine was made while the first owns the static tiers\n", what);
+        errors++;
+    }
+
+    struct dbengine_tier_config tc = {
+        .tier = 0,
+        .dbfiles_path = dir,
+        .disk_space_mb = 0,
+        .max_retention_s = 0,
+        .page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT,
+        .grouping = 1,
+    };
+    int rc = dbengine_tier_init(engine, &tc);
+    if(rc) {
+        fprintf(stderr, " >>> DBENGINE: %s: the tier did not come up: %s\n", what, uv_strerror(rc));
+        errors++;
+    }
+    else {
+        DBENGINE_TIER *tier = dbengine_multidb_tiers[0];
+        dbengine_readiness_wait(tier);
+
+        errors += dbengine_zero_page_cadence_unittest(engine, (STORAGE_INSTANCE *)tier);
+
+        dbengine_tier_exit(tier);
+    }
+
+    dbengine_shutdown(engine);
+
+    rc = dbengine_tier_init(engine, &tc);
+    if(rc != UV_EIO) {
+        fprintf(stderr, " >>> DBENGINE: %s: a tier came up on a stopped engine (returned %d)\n", what, rc);
+        errors++;
+    }
+
+    // stopped but not destroyed: it still owns the static tiers
+    if(dbengine_create(cfg)) {
+        fprintf(stderr, " >>> DBENGINE: %s: an engine was made while a stopped one still owns the static tiers\n", what);
+        errors++;
+    }
+
+    size_t referenced = dbengine_destroy(engine);
+    if(referenced) {
+        fprintf(stderr, " >>> DBENGINE: %s: %zu metrics stayed referenced across the destroy\n", what, referenced);
+        errors++;
+    }
+
+    for(size_t i = 0; i < RRD_STORAGE_TIERS; i++) {
+        if(dbengine_multidb_tiers[i]->engine) {
+            fprintf(stderr, " >>> DBENGINE: %s: static tier %zu still points at an engine after the destroy\n", what, i);
+            errors++;
+        }
+    }
+
+    return errors;
+}
+
+static void engine_lifecycle_remove_dir(const char *dir) {
+    DIR *d = opendir(dir);
+    if(!d)
+        return;
+
+    struct dirent *de;
+    while((de = readdir(d))) {
+        if(de->d_name[0] == '.')
+            continue;
+
+        char path[FILENAME_MAX + 1];
+        snprintfz(path, sizeof(path), "%s/%s", dir, de->d_name);
+        unlink(path);
+    }
+    closedir(d);
+    rmdir(dir);
+}
+
+// A stopped and destroyed engine leaves nothing behind that a new engine trips over: the second one, made with a
+// differing configuration, comes up on the page allocators the first one built (the process-wide layer keeps its
+// settings, and logs that the new ones are ignored), runs a tier, and is destroyed the same way. The floors of the
+// caches and the NULL engine still hold between the two. Runs before the daemon's own engine, on two scratch
+// directories inside scratch_dir, which it removes.
+int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const char *scratch_dir) {
+    int errors = 0;
+    fprintf(stderr, "\nTesting the life of two engines, one after the other...\n");
+
+    // nothing of the daemon's: no preload from its metadata database, no rotation callback into its contexts
+    struct dbengine_config first = *cfg;
+    first.preload_metrics = NULL;
+    first.on_db_rotation = NULL;
+
+    char dir_a[FILENAME_MAX + 1], dir_b[FILENAME_MAX + 1];
+    snprintfz(dir_a, sizeof(dir_a), "%s-a", scratch_dir);
+    snprintfz(dir_b, sizeof(dir_b), "%s-b", scratch_dir);
+
+    errors += engine_lifecycle_generation(&first, dir_a, "the first engine");
+
+    uintptr_t layer = dbengine_allocator_layer_fingerprint();
+
+    errors += dbengine_cache_floor_unittest();
+    errors += dbengine_null_engine_unittest();
+
+    // the second engine asks for other page allocator settings than the first one built them with
+    struct dbengine_config second = first;
+    second.allocator.partitions = (second.allocator.partitions ? second.allocator.partitions : second.cpus) + 1;
+    second.allocator.arals_for_large_pages = !second.allocator.arals_for_large_pages;
+    second.allocator.compression_statistics = !second.allocator.compression_statistics;
+
+    errors += engine_lifecycle_generation(&second, dir_b, "the second engine");
+
+    if(dbengine_allocator_layer_fingerprint() != layer) {
+        fprintf(stderr, " >>> DBENGINE: the second engine changed the page allocators the first one built\n");
+        errors++;
+    }
+
+    errors += dbengine_cache_floor_unittest();
+    errors += dbengine_null_engine_unittest();
+
+    engine_lifecycle_remove_dir(dir_a);
+    engine_lifecycle_remove_dir(dir_b);
+
+    fprintf(stderr, "Two engines, one after the other: %d ERROR(S)\n", errors);
+    return errors;
+}
+
 // A collector that reports a zero cadence leaves the engine a page with no update-every; the first query of it
 // must repair the cadence once (counted in pages_invalid_update_every_fixed) and serve the points, a repeated
 // query must find nothing left to repair. The points sit far in the past so that they never meet live data.

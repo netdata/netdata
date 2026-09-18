@@ -17,6 +17,9 @@
 // Four are for a test driver that adds their failed-check counts to its own: dbengine_cache_floor_unittest() runs
 // before the engine is up (it checks what the caches fall back to without a main cache), dbengine_null_engine_unittest()
 // needs no engine (it checks that the engine's verbs and getters take NULL as an engine with nothing in it),
+// dbengine_engine_lifecycle_unittest() runs before the daemon's own engine comes up (it makes, runs, stops and
+// destroys two engines of its own on scratch directories, and checks that nothing of the first is left for the
+// second),
 // dbengine_allocator_unittest() runs before the engine is up too (it brings the process-wide page allocators up
 // with the given configuration's allocator settings and checks that a second, different configuration leaves them
 // as built; the engine that comes up afterwards reuses them), and dbengine_zero_page_cadence_unittest() collects
@@ -32,6 +35,7 @@ int dbengine_metrics_registry_unittest(const struct dbengine_config *cfg);
 int dbengine_metrics_registry_retention_benchmark(void);
 int dbengine_cache_floor_unittest(void);
 int dbengine_null_engine_unittest(void);
+int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const char *scratch_dir);
 int dbengine_allocator_unittest(const struct dbengine_config *cfg);
 int dbengine_zero_page_cadence_unittest(DBENGINE_ENGINE *engine, STORAGE_INSTANCE *si);
 

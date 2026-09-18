@@ -37,7 +37,7 @@ void dbengine_config_resolve(struct dbengine_config *cfg);
 
 struct dbengine_engine;
 
-// where an engine is in its one-way life: made and not spawned, running, or shut down
+// where an engine is in its life: made and not spawned, running, or shut down (then only destroyed)
 typedef enum {
     DBENGINE_LIFECYCLE_DOWN,
     DBENGINE_LIFECYCLE_RUNNING,

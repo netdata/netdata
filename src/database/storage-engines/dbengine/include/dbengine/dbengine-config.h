@@ -139,8 +139,8 @@ struct dbengine_tier_config {
 // thread, and start taking work. The only way up; tiers come after it. Fatal when the libuv pool is not larger
 // than the threads reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or
 // when default_update_every_s is negative. Returns the engine, or NULL, with the reason logged: the libuv error
-// that stopped the loop from coming up (nothing is left behind, as if never called), an engine that already owns
-// the daemon's static tiers, or dbengine_shutdown() having been called (no engine comes up again in this process).
+// that stopped the loop from coming up (nothing is left behind, as if never called), or an engine that still owns
+// the daemon's static tiers (until its dbengine_destroy() released them).
 DBENGINE_ENGINE *dbengine_create(const struct dbengine_config *cfg);
 
 // Release the references preload_metrics() left on the registry, once every tier has come up (after the last

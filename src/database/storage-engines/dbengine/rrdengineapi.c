@@ -1180,7 +1180,7 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     }
 
     if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.came_up, __ATOMIC_ACQUIRE)) {
-        netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again in this process", tier);
+        netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again on this engine", tier);
         return UV_EIO;
     }
 
