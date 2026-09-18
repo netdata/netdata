@@ -732,7 +732,9 @@ manifest_fix_bytes() {
   awk -v rel="\"path\":\"$_mf_rel\"" -v n="$_mf_new" '
     index($0, rel) > 0 && !done { done = 1; sub(/"bytes":[0-9]+/, "\"bytes\":" n) }
     { print }
-  ' "$MANIFEST_ROWS" > "$MANIFEST_ROWS.fix" && mv "$MANIFEST_ROWS.fix" "$MANIFEST_ROWS"
+  ' "$MANIFEST_ROWS" > "$MANIFEST_ROWS.fix" && mv "$MANIFEST_ROWS.fix" "$MANIFEST_ROWS" && return 0
+  rm -f "$MANIFEST_ROWS.fix"
+  return 1
 }
 
 manifest_add() {
@@ -1533,11 +1535,26 @@ collect_runtime() {
       # Keep the observed failure rather than asserting a cause: a refusal, a
       # timeout, a transport error and a 5xx all land here identically, and
       # naming one of them would be the exact over-reading this marker exists
-      # to prevent.
-      _dt_detail=$(tr -d "\n" < "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null)
-      printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" \
-        > "$WORK/07-runtime/dyncfg-tree.json"
-      manifest_fix_bytes 07-runtime/dyncfg-tree.json
+      # to prevent. Every step below can fail, and a half-written marker with a
+      # stale manifest row is worse than the plain capture error it replaces,
+      # so anything short of full success keeps the original body.
+      _dt_new="$WORK/07-runtime/dyncfg-tree.json.new"
+      _dt_ok=0
+      if _dt_detail=$(tr -d "\n" < "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null) && [ -n "$_dt_detail" ]; then
+        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
+          if mv -f "$_dt_new" "$WORK/07-runtime/dyncfg-tree.json"; then
+            _dt_ok=1
+          fi
+        fi
+      fi
+      rm -f "$_dt_new"
+      if [ "$_dt_ok" = "1" ]; then
+        if ! manifest_fix_bytes 07-runtime/dyncfg-tree.json; then
+          printf '[netdata-support-bundle] dyncfg marker written but its manifest size could not be corrected\n' >&2
+        fi
+      else
+        printf '[netdata-support-bundle] could not write the dyncfg marker; the original capture error is kept\n' >&2
+      fi
     fi
     collect_api 07-runtime/ml-info.json "Machine learning status" /api/v1/ml_info
     # netdata's own resource usage, bounded windows (perf triage without screenshots)

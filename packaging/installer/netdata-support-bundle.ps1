@@ -910,8 +910,11 @@ function Save-Api([string]$rel, [string]$title, [string]$urlPath) {
     try {
         $resp = Invoke-LocalApi "http://127.0.0.1:$NdPort$urlPath" $TimeoutSeconds
         $content = $resp.Content
-        # a JSON body cut at any point is malformed, so overflow is withheld whole
-        if ($content.Length -gt 2MB) { $content = '{"error":"response exceeded the cap and was withheld"}' }
+        # a JSON body cut at any point is malformed, so overflow is withheld whole.
+        # Measure the UTF-8 bytes actually written, not the string's UTF-16 code
+        # units: a non-ASCII body can be several times longer on disk than in
+        # characters and would otherwise sail past the cap.
+        if ([System.Text.Encoding]::UTF8.GetByteCount($content) -gt 2MB) { $content = '{"error":"response exceeded the cap and was withheld"}' }
         Write-Utf8 $full $content
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'api' $urlPath $title
