@@ -7,12 +7,22 @@ import (
 	"errors"
 	"net/http"
 	"time"
+
+	"github.com/stmcginnis/gofish"
 )
 
 func (c *Client) initializeAuthentication(ctx context.Context, stats *wireStats) error {
 	if c.sdk != nil {
 		return nil
 	}
+	client, mode, err := c.connectAuthenticated(ctx, stats)
+	if err == nil {
+		c.sdk, c.authMode = client.WithContext(context.Background()), mode
+	}
+	return err
+}
+
+func (c *connection) connectAuthenticated(ctx context.Context, stats *wireStats) (*gofish.APIClient, string, error) {
 	cfg := c.sdkConfig()
 	if c.config.AuthMethod != "none" {
 		cfg.Username, cfg.Password = c.config.Username, c.config.Password
@@ -28,11 +38,7 @@ func (c *Client) initializeAuthentication(ctx context.Context, stats *wireStats)
 			mode = "basic"
 		}
 	}
-	if err != nil {
-		return err
-	}
-	c.sdk, c.authMode = client.WithContext(context.Background()), mode
-	return nil
+	return client, mode, err
 }
 
 func sessionUnsupported(root *responseData, err error) bool {
@@ -58,6 +64,10 @@ func (c *Client) Close() {
 func (c *Client) closeSession(ctx context.Context) {
 	client := c.sdk
 	c.sdk, c.authMode = nil, ""
+	retireSession(ctx, client)
+}
+
+func retireSession(ctx context.Context, client *gofish.APIClient) {
 	if client == nil {
 		return
 	}
@@ -71,5 +81,4 @@ func (c *Client) closeSession(ctx context.Context) {
 	// Logout replaces an already-canceled context with Background. Delete through
 	// the SDK directly so retirement cannot extend a canceled collection.
 	_ = client.WithContext(ctx).Service.DeleteSession(session.ID)
-	client.HTTPClient.CloseIdleConnections()
 }

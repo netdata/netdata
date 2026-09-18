@@ -41,8 +41,10 @@ func TestResourceValidationPreservesPartialDescendantPolicy(t *testing.T) {
 	root, origin, err := NormalizeServiceRoot("https://bmc.example/redfish/v1/")
 	require.NoError(t, err)
 	client := &Client{
-		root:   root,
-		origin: origin,
+		connection: connection{
+			root:   root,
+			origin: origin,
+		},
 	}
 	target, err := url.Parse("https://bmc.example/redfish/v1/Sensors/1")
 	require.NoError(t, err)
@@ -78,8 +80,10 @@ func BenchmarkGraphResourceDecode(b *testing.B) {
 	root, origin, err := NormalizeServiceRoot("https://bmc.example/redfish/v1/")
 	require.NoError(b, err)
 	client := &Client{
-		root:   root,
-		origin: origin,
+		connection: connection{
+			root:   root,
+			origin: origin,
+		},
 	}
 	target, err := url.Parse("https://bmc.example/redfish/v1/Sensors/1")
 	require.NoError(b, err)

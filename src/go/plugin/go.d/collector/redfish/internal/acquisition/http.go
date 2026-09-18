@@ -4,10 +4,12 @@ package acquisition
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -23,15 +25,21 @@ type requestTrace struct {
 // The SDK owns requests and authentication after bootstrap. This transport adds
 // response timing/byte accounting and bounds reads before SDK error decoding.
 type redfishTransport struct {
-	base   http.RoundTripper
-	root   *url.URL
-	origin string
+	admission *requestAdmission
+	base      http.RoundTripper
+	root      *url.URL
+	origin    string
 }
 
 func (t *redfishTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if _, err := resolveRedfishURI(t.origin, t.root, req.URL.String(), uriOpaquePage); err != nil {
 		return nil, err
 	}
+	weight, err := t.admission.acquire(req.Context())
+	if err != nil {
+		return nil, err
+	}
+	defer t.admission.release(weight)
 	trace, _ := req.Context().Value(requestTraceKey{}).(*requestTrace)
 	if trace != nil && trace.bootstrapUsername != "" && req.Method == http.MethodGet &&
 		req.Header.Get("Authorization") == "" {
@@ -93,6 +101,21 @@ func (t *redfishTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	}
 	if err != nil {
 		return nil, err
+	}
+	// Identify ServiceRoot by the original request, including authorized redirects.
+	initial := req
+	for initial.Response != nil && initial.Response.Request != nil {
+		initial = initial.Response.Request
+	}
+	if response.StatusCode == http.StatusOK && req.Method == http.MethodGet &&
+		strings.TrimSuffix(initial.URL.Path, "/") == strings.TrimSuffix(t.root.Path, "/") {
+		var root struct {
+			ProtocolFeaturesSupported struct{ MultipleHTTPRequests *bool }
+		}
+		if json.Unmarshal(body, &root) == nil {
+			multiple := root.ProtocolFeaturesSupported.MultipleHTTPRequests
+			t.admission.serial.Store(multiple != nil && !*multiple)
+		}
 	}
 	response.Body = io.NopCloser(bytes.NewReader(body))
 	return response, nil
