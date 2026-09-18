@@ -67,8 +67,9 @@ and never mentions alerts. Read it, then use this table.
 
 | Symptom | Start with | Guide |
 |---|---|---|
-| Alert did not fire, fires always, flaps, or notification never arrived | silencers, then the alert's own config and the health transition records | `./alerts.md` |
-| A chart, collector or job shows nothing | the dyncfg job states where the bundle carries them, then the collector log, then plugin capabilities | `./no-data.md` |
+| Alert did not fire, fires always, or flaps | silencers, then the alert's own config and the health transition records | `./alerts.md` |
+| A notification never arrived though the alert did raise | the notification configuration and its delivery surface, **not** silencers | `./alerts.md` |
+| A chart, collector or job shows nothing | the dyncfg job states where the bundle carries them, then the collector log; reach for plugin capabilities only when those are absent or inconclusive | `./no-data.md` |
 | A specific collector fails, or service discovery finds nothing | the job's own state and its config, then the collector log | `./no-data.md` |
 | Agent will not start, died, restarted, or was killed | the daemon status file, then the kernel messages, then the logs | `./lifecycle.md` |
 | High CPU, memory, file descriptors, or disk I/O | per-thread CPU and the self-monitoring captures | `./lifecycle.md` |
@@ -115,8 +116,10 @@ Hand-reviewed, because nothing checks them:
   this platform, capped, deadline-skipped, API down, withheld by the sanitizer, or genuinely absent.
 - Never compare pseudonyms across two bundles, and never ask the customer to send the pseudonym map
   unless the identity is load-bearing for the conclusion.
-- Prefer the effective running config over any on-disk config file; they disagree whenever dyncfg,
-  an environment override, or an unrecognized option is involved.
+- Prefer the effective running config over the on-disk `netdata.conf`; they disagree whenever an
+  environment override or an unrecognized option is involved. It is the merged **daemon** config
+  only - it does not contain collector job configuration, so a UI- or API-created job override is
+  visible only in the dynamic configuration area.
 - State the collection window with any negative finding. "No errors in the log" means "none inside
   the window that survived the caps".
 - Separate what the bundle shows from what you infer. Where the bundle cannot settle the question,

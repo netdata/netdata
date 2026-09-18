@@ -51,9 +51,10 @@ mean for an investigation.
   set of subdirectories on Windows.
 - **Caps cut at line boundaries**, and a capped tail with no line break is withheld entirely - so an
   empty file can mean "withheld", never assume "nothing happened".
-- **A global deadline** can skip a collector. A skipped command capture says so in its body and its
-  manifest origin, but a skipped file copy or API read can return without writing either - so a
-  deadline-skipped artifact is sometimes indistinguishable from one that was never attempted.
+- **A global deadline** can skip a collector. On POSIX a skipped command capture says so in its body
+  and its manifest origin, but a skipped file copy or API read can return without writing either. On
+  Windows the command helper also returns early, leaving no marker. So a deadline-skipped artifact is
+  often indistinguishable from one that was never attempted.
 
 Always state the window alongside a negative finding. "No errors in the log" means "none inside the
 window that survived the caps".

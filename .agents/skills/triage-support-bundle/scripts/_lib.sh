@@ -180,7 +180,8 @@ sb_resolve_bundle() {
         *.tar.zst)
             sb_need tar
             tar --zstd -xf "$input" -C "$tmp" 2>/dev/null \
-                || { sb_need zstd; zstd -dc "$input" | tar -xf - -C "$tmp"; } \
+                || { command -v zstd >/dev/null 2>&1 || _sb_resolve_fail "'zstd' is required to read ${input}"
+                     zstd -dc "$input" | tar -xf - -C "$tmp"; } \
                 || _sb_resolve_fail "could not extract ${input}" ;;
         *.tar.gz|*.tgz) sb_need tar; tar -xzf "$input" -C "$tmp" || _sb_resolve_fail "could not extract ${input}" ;;
         *.zip)

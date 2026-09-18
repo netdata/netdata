@@ -26,7 +26,8 @@ while [ $# -gt 0 ]; do
                     INCIDENT="$2"; shift 2 ;;
         -h|--help)  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)         sb_die "unknown option: $1" ;;
-        *)          INPUT="$1"; shift ;;
+        *)          [ -z "$INPUT" ] || sb_die "only one bundle may be given (got '$INPUT' and '$1')"
+                    INPUT="$1"; shift ;;
     esac
 done
 
@@ -60,7 +61,7 @@ hdr "Sanitization"
 jq -r '
   "PII pseudonymized  : \(.pii_obfuscated)",
   "secrets redacted   : \(.secrets_redacted)",
-  "streaming key kept : \(if .streaming_api_key_redacted then "no" else "YES - verbatim in the collected stream config, by design" end)",
+  "streaming key kept : " + (if .streaming_api_key_redacted == null then "unknown (field absent; pre-1.1.0 bundle)" elif .streaming_api_key_redacted then "no" else "YES - verbatim in the collected stream config, by design" end),
   "raw SNMP evidence  : " + (if .snmp_diagnostics == null then "not in this schema (pre-v2 bundle)" else "requested=\(.snmp_diagnostics.requested) status=\(.snmp_diagnostics.status) files=\(.snmp_diagnostics.files)" end)
 ' "$M"
 # A pre-v2 bundle has no snmp_diagnostics object at all; treating a missing
@@ -71,8 +72,11 @@ fi
 
 hdr "Log window"
 # The window is not a manifest field; it survives in the journal capture origin.
-WIN="$(jq -r '.files[] | select(.path|test("journal-netdata")) | .origin' "$M" 2>/dev/null \
-       | grep -oE -- "-[0-9]+ hours" | head -1 || true)"
+# POSIX records the window in the journal capture origin; Windows has no journal
+# and records it on the merged event-log capture instead.
+WIN="$(jq -r '.files[] | select(.path|test("journal-netdata|eventlog-netdata")) | .origin' "$M" 2>/dev/null \
+       | grep -oiE -- "-?[0-9]+ ?h(ours)?" | grep -oE '[0-9]+' | head -1 || true)"
+[ -n "$WIN" ] && WIN="-${WIN} hours"
 if [ -n "$WIN" ]; then
     echo "journal window  : ${WIN# } before collection"
 else
@@ -143,6 +147,17 @@ check "06-state/health-silencers.json"   "POSIX-only; on Windows 'not silenced' 
 check "07-runtime/stream-info.json"      "no streaming diagnostics"
 check "08-network/netdata-sockets.txt"   "no socket inventory"
 
+# The manifest is attacker-controlled data, not a trusted index: a crafted row
+# can name an absolute path or climb out of the bundle, and every loop below
+# builds a filesystem path from it. Accept only paths that stay inside.
+sb_manifest_path_ok() { # relative path from the manifest
+    case "$1" in
+        ""|/*|[A-Za-z]:*|*$'\n'*) return 1 ;;
+        ..|../*|*/../*|*/..) return 1 ;;
+    esac
+    return 0
+}
+
 hdr "Truncated, withheld, skipped"
 found=0
 # A capped file copy carries no in-body marker at all: the only signal is the
@@ -160,10 +175,18 @@ done < <(jq -r '.files[]
            | "\(.path)\t\(.origin)"' "$M")
 while IFS= read -r p; do
     [ -n "$p" ] || continue
+    if ! sb_manifest_path_ok "$p"; then
+        printf '  %s%s%s\n      manifest path escapes the bundle - not read\n' "$SB_RED" "$p" "$SB_NC"
+        found=1; continue
+    fi
     f="${B}/${p}"
-    [ -f "$f" ] || continue
-    if head -c 4096 "$f" 2>/dev/null | grep -qE 'SKIPPED: global deadline|### TRUNCATED|content withheld|was withheld|sanitization failed|capture failed'; then
-        reason="$(head -c 4096 "$f" | grep -oE 'SKIPPED: global deadline[^"]*|### TRUNCATED[^#]*###|\[[^]]*withheld[^]]*\]|"error":"[^"]*"|sanitization failed[^"]*' | head -1)"
+    if [ ! -f "$f" ] || [ ! -r "$f" ]; then continue; fi
+    # Withheld and skipped markers replace the body (head); a TRUNCATED marker is
+    # APPENDED after up to megabytes of output (tail). Scanning one end misses
+    # half the cases.
+    ends="$( { head -c 4096 "$f"; printf '\n'; tail -c 4096 "$f"; } 2>/dev/null )"
+    if printf '%s' "$ends" | grep -qE 'SKIPPED: global deadline|### TRUNCATED|content withheld|was withheld|sanitization failed|capture failed'; then
+        reason="$(printf '%s' "$ends" | grep -oE 'SKIPPED: global deadline[^"]*|### TRUNCATED[^#]*###|\[[^]]*withheld[^]]*\]|"error":"[^"]*"|sanitization failed[^"]*' | head -1)"
         printf '  %s%s%s\n      %s\n' "$SB_YELLOW" "$p" "$SB_NC" "${reason:-marker present}"
         found=1
     fi

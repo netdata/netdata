@@ -8,8 +8,11 @@ this file is the routing and the absence semantics, which live nowhere else.
 
 `MANIFEST.json` indexes every file except itself. Per row: `path`, `kind`, `origin`, `title`,
 `bytes`, `pii_obfuscated`, `sanitized`. Top level: `schema`, `tool_version`, `generated_utc`,
-`runtime_seconds`, `pii_obfuscated`, `secrets_redacted`, `streaming_api_key_redacted`,
-`agent_running`, `agent_api_reachable`, `is_container`, and a `snmp_diagnostics` object.
+`runtime_seconds`, `pii_obfuscated`, `secrets_redacted`, `agent_running`, `agent_api_reachable`
+and `is_container`. Two are additive and absent from older bundles:
+`streaming_api_key_redacted` and the `snmp_diagnostics` object. Treat either as *unknown* when
+missing - never as `false`, which would read as "the key was redacted" or "raw SNMP evidence is
+present".
 
 Three top-level fields decide how you read everything else:
 
