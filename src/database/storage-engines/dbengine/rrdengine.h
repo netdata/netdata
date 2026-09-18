@@ -11,10 +11,12 @@
 //                                     the daemon's tiers are dbengine_multidb_tiers[]
 //   datafile / extent / page          on-disk container / a compressed group of pages / one metric's samples
 //   journalfile                       the per-datafile index of extents and metrics (v1 while writing, v2 when sealed)
-//   MRG, the metric registry          process-wide: every metric's uuid, section (its ctx) and retention (mrg.h)
-//   PGC, the page cache               process-wide caches shared by all ctxs (cache.h, pagecache.h)
+//   the engine (struct dbengine_engine) what the tiers share: the event loop, the caches, the metric registry, the
+//                                     configuration, the counters
+//   MRG, the metric registry          the engine's: every metric's uuid, section (its ctx) and retention (mrg.h)
+//   PGC, the page cache               the engine's caches, shared by its ctxs (cache.h, pagecache.h)
 //   PDC, the page details control     the plan of one query: which pages, from cache or disk, in what order (pdc.h)
-//   the event loop (dbengine_main)    the single libuv thread that owns datafile I/O, flushing and rotation
+//   the event loop                    the engine's single libuv thread that owns datafile I/O, flushing and rotation
 //
 // The daemon drives the engine through dbengine-api.h behind the storage-engine vtable, hands it its
 // configuration and optional services through dbengine-config.h, and reads what the engine publishes
@@ -30,13 +32,10 @@
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
 
-// the process-wide configuration, copied by dbengine_init() before the engine comes up and read-only while it is up
-extern struct dbengine_config dbengine_cfg;
+// the 0-means-default fields of *cfg become concrete values, so the engine never has to re-check them
+void dbengine_config_resolve(struct dbengine_config *cfg);
 
-// resolve cfg's 0-means-default fields and make it the engine's configuration, without bringing anything up: the
-// way in for the tests that need only the configuration (a page cache, the page allocators). Never while the
-// engine is up: nothing guards it, dbengine_init() is the only caller that checks the lifecycle first
-void dbengine_config_set(const struct dbengine_config *cfg);
+struct dbengine_engine;
 
 // where the engine is in its one-way life: never brought up, running, or shut down
 typedef enum {
@@ -45,6 +44,20 @@ typedef enum {
     DBENGINE_LIFECYCLE_STOPPED,
 } DBENGINE_LIFECYCLE_STATE;
 DBENGINE_LIFECYCLE_STATE dbengine_lifecycle_state(void);
+
+// The engine object. Public headers hand it out only as a pointer; until the API takes it, the one engine of the
+// process is reached through this private handle, set by dbengine_init() and cleared when dbengine_destroy() frees
+// the object
+extern struct dbengine_engine *dbengine_the_engine;
+#define dbengine_the_engine_get() __atomic_load_n(&dbengine_the_engine, __ATOMIC_ACQUIRE)
+
+// a configured engine with nothing running: the object and its locks, no loop, no caches; cfg is copied and resolved.
+// The tests that need an engine without an event loop use it directly
+struct dbengine_engine *dbengine_engine_alloc(const struct dbengine_config *cfg);
+
+// release what the engine owns (its allocators, free lists, preload set, the loop's closes) and free the object.
+// Only when no cache, registry or event loop of it exists any more
+void dbengine_engine_free(struct dbengine_engine *engine);
 
 #define DBENGINE_FD_BUDGET_PER_TIER (50)
 
@@ -98,6 +111,7 @@ static ALWAYS_INLINE void time_and_count_add(struct dbengine_time_and_count *tc,
 /* Forward declarations */
 struct dbengine_tier;
 struct dbengine_cmd;
+struct dbengine_engine;
 
 #define MAX_PAGES_PER_EXTENT (109) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 
@@ -319,8 +333,8 @@ struct dbengine_query_handle {
 #endif
 };
 
-struct dbengine_query_handle *dbengine_query_handle_get(void);
-void dbengine_query_handle_release(struct dbengine_query_handle *handle);
+struct dbengine_query_handle *dbengine_query_handle_get(struct dbengine_engine *engine);
+void dbengine_query_handle_release(struct dbengine_engine *engine, struct dbengine_query_handle *handle);
 
 enum dbengine_opcode {
     /* can be used to return empty status or flush the command queue */
@@ -399,7 +413,7 @@ typedef struct wal {
 } WAL;
 
 WAL *wal_get(struct dbengine_tier *ctx, unsigned size);
-void wal_release(WAL *wal);
+void wal_release(struct dbengine_engine *engine, WAL *wal);
 
 /*
  * Debug statistics not used by code logic.
@@ -440,8 +454,6 @@ struct dbengine_global_stats {
     PAD64(dbengine_stats_t) global_flushing_pressure_page_deletions; /* number of deleted pages */
 };
 
-extern struct dbengine_global_stats global_stats;
-
 typedef struct tier_config_prototype {
     int tier;                                   // the tier of this ctx
     uint8_t page_type;                          // default page type for this context
@@ -453,6 +465,8 @@ typedef struct tier_config_prototype {
 } TIER_CONFIG_PROTOTYPE;
 
 struct dbengine_tier {
+    struct dbengine_engine *engine;                     // the engine this tier belongs to, set before the engine spawns
+
     TIER_CONFIG_PROTOTYPE config;
 
     struct {
@@ -508,6 +522,108 @@ struct dbengine_tier {
     struct dbengine_statistics stats;
 };
 
+// What the tiers of one database share. Everything but the tiers themselves (still the static
+// dbengine_multidb_tiers[]) hangs here: the event loop and its queues, the caches, the metric registry, the
+// configuration, the counters. The page allocators stay process-wide (dbengine-config.h: allocator).
+struct dbengine_engine {
+    // the event loop
+    ND_THREAD *thread;
+    uv_loop_t loop;
+    bool loop_open;                     // uv_loop_init() succeeded and the loop is not closed yet: a loop the thread
+                                        // could not close on its way out is drained by dbengine_engine_free()
+    uv_async_t async;
+#if defined(OS_WINDOWS)
+    bool async_ready;
+    uint64_t last_async_callback;
+#endif
+    uv_timer_t timer;
+    uv_timer_t retention_timer;
+    pid_t tid;
+
+    size_t flushes_running;
+    size_t evict_main_running;
+    size_t evict_open_running;
+    size_t evict_extent_running;
+    size_t cleanup_running;
+    time_t cleanup_last_run_s;          // when the journal unmount sweep last ran, in the cleanup worker
+
+    // where the engine is in its life
+    struct {
+        SPINLOCK spinlock;
+        bool spawned;
+        bool stopped;
+    } lifecycle;
+
+    // the configuration, resolved: the copy of what dbengine_init() was given
+    struct dbengine_config cfg;
+
+    // the caches and the registry the tiers share
+    struct mrg *main_mrg;
+    struct pgc *main_cache;
+    struct pgc *open_cache;
+    struct pgc *extent_cache;
+
+    struct dbengine_cache_efficiency_stats cache_efficiency_stats;
+    struct dbengine_global_stats global_stats;
+
+    // the metrics the registry preload acquired, until dbengine_preload_release() lets them go
+    struct {
+        METRIC_JudyLSet acquired;
+        size_t counter;
+        size_t deleted;
+    } preload;
+
+    // the write-ahead buffers idle between extents
+    struct {
+        struct {
+            SPINLOCK spinlock;
+            WAL *available_items;
+            size_t available;
+        } guarded;
+
+        struct {
+            size_t allocated;
+        } atomics;
+    } wal;
+
+    netdata_mutex_t datafile_write_mutex;   // serialises the choice of the datafile an extent is written to
+
+    struct {
+        ARAL *ar;
+
+        struct {
+            SPINLOCK spinlock;
+
+            bool accepting;                     // embedder work is taken; set when the event loop is spawned,
+                                                // cleared by dbengine_shutdown() before it queues the loop's exit
+            size_t waiting;
+            struct dbengine_cmd *waiting_items_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
+            size_t executed_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
+        } unsafe;
+    } cmd_queue;
+
+    struct {
+        ARAL *ar;
+
+        struct {
+            size_t dispatched;
+            size_t executing;
+        } atomics;
+    } work_cmd;
+
+    struct {
+        ARAL *ar;
+    } handles;
+
+    struct {
+        ARAL *ar;
+    } descriptors;
+
+    struct {
+        ARAL *ar;
+    } xt_io_descr;
+};
+
 // Retention and indexing work wait until the registry has been loaded from every journal: rotating a
 // datafile before then would drop metrics the registry has not learned yet. The loader's own datafile references only
 // protect the files it is reading at that moment; this flag keeps rotation from starting at all.
@@ -532,12 +648,12 @@ static inline void ctx_io_write_op_bytes(struct dbengine_tier *ctx, size_t bytes
 
 static inline void ctx_io_error(struct dbengine_tier *ctx) {
     __atomic_add_fetch(&ctx->stats.io_errors, 1, __ATOMIC_RELAXED);
-    rrd_stat_atomic_add(&global_stats.global_io_errors, 1);
+    rrd_stat_atomic_add(&ctx->engine->global_stats.global_io_errors, 1);
 }
 
 static inline void ctx_fs_error(struct dbengine_tier *ctx) {
     __atomic_add_fetch(&ctx->stats.fs_errors, 1, __ATOMIC_RELAXED);
-    rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
+    rrd_stat_atomic_add(&ctx->engine->global_stats.global_fs_errors, 1);
 }
 
 static inline bool dbengine_retention_samples_delta(
@@ -659,9 +775,9 @@ void dbengine_enqueue_epdl_cmd(struct dbengine_cmd *cmd);
 void dbengine_dequeue_epdl_cmd(struct dbengine_cmd *cmd);
 
 typedef struct dbengine_cmd *(*requeue_callback_t)(void *data);
-void dbengine_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority);
+void dbengine_req_cmd(struct dbengine_engine *engine, requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority);
 
-void dbengine_enq_cmd(struct dbengine_tier *ctx, enum dbengine_opcode opcode, void *data,
+void dbengine_enq_cmd(struct dbengine_engine *engine, struct dbengine_tier *ctx, enum dbengine_opcode opcode, void *data,
                 struct completion *completion, enum storage_priority priority,
                 enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb);
 
@@ -674,7 +790,7 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router)
 
 uint64_t dbengine_target_data_file_size(struct dbengine_tier *ctx);
 
-struct page_descr_with_data *page_descriptor_get(void);
+struct page_descr_with_data *page_descriptor_get(struct dbengine_engine *engine);
 
 typedef struct validated_page_descriptor {
     time_t start_time_s;

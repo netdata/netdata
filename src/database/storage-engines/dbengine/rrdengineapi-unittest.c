@@ -73,24 +73,19 @@ static int query_points(STORAGE_METRIC_HANDLE *smh, time_t start_time_s, time_t 
     return errors;
 }
 
-// The open and extent caches size themselves from the main cache; once dbengine_destroy() has freed it, their
-// callbacks settle on a fixed floor. Pinned here before the engine is up, where the main cache is absent by
-// construction and no thread reads it: the callbacks take the very branch the leak-checking teardown relies on.
+// The open and extent caches size themselves from the main cache; once dbengine_destroy() has freed it, they
+// settle on a fixed floor. Pinned through the helper both sizing callbacks share, asked about a main cache that
+// does not exist: the very branch the leak-checking teardown relies on.
 int dbengine_cache_floor_unittest(void) {
-    if(main_cache) {
-        fprintf(stderr, " >>> DBENGINE: the cache floor test runs before the engine is up, but the main cache exists\n");
-        return 1;
-    }
-
     int errors = 0;
-    int64_t open_size = dynamic_open_cache_size(NULL);
+    int64_t open_size = dbengine_follower_cache_size(NULL, OPEN_CACHE_PERCENT, OPEN_CACHE_MIN_SIZE);
     if(open_size != OPEN_CACHE_MIN_SIZE) {
         fprintf(stderr, " >>> DBENGINE: open cache size without a main cache is %" PRId64 ", expected %" PRId64 "\n",
                 open_size, (int64_t)OPEN_CACHE_MIN_SIZE);
         errors++;
     }
 
-    int64_t extent_size = dynamic_extent_cache_size(NULL);
+    int64_t extent_size = dbengine_follower_cache_size(NULL, EXTENT_CACHE_PERCENT, EXTENT_CACHE_MIN_SIZE);
     if(extent_size != EXTENT_CACHE_MIN_SIZE) {
         fprintf(stderr, " >>> DBENGINE: extent cache size without a main cache is %" PRId64 ", expected %" PRId64 "\n",
                 extent_size, (int64_t)EXTENT_CACHE_MIN_SIZE);

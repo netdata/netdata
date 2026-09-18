@@ -142,7 +142,9 @@ static inline size_t pgc_evictors_for_cpus(size_t cpus) {
 size_t pgc_max_evictors(PGC *cache);
 size_t pgc_max_flushers(PGC *cache);
 
-// the engine the cache belongs to; NULL for a cache that belongs to none (the tests')
+// the engine the cache belongs to; NULL for a cache that belongs to none (the tests'). Set once, right after the
+// cache is created and before it is given a callback that reads it
 struct dbengine_engine *pgc_engine(PGC *cache);
+void pgc_set_engine(PGC *cache, struct dbengine_engine *engine);
 
 #endif // DBENGINE_CACHE_H

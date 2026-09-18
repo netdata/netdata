@@ -11,7 +11,7 @@
 //
 // Four are command-line modes for the embedder and return a process exit code. None of them needs a tier or the
 // engine; dbengine_page_test(), dbengine_cache_unittest() and dbengine_metrics_registry_unittest() create a page
-// cache, which reads the process-wide configuration, so they take it from the embedder and set it themselves;
+// cache, or a throw-away engine holding one, so they take the configuration from the embedder;
 // dbengine_metrics_registry_retention_benchmark() needs nothing.
 //
 // Three are for a test driver that adds their failed-check counts to its own: dbengine_cache_floor_unittest() runs

@@ -2250,6 +2250,10 @@ struct dbengine_engine *pgc_engine(PGC *cache) {
     return cache->engine;
 }
 
+void pgc_set_engine(PGC *cache, struct dbengine_engine *engine) {
+    cache->engine = engine;
+}
+
 void pgc_flush_dirty_pages(PGC *cache, Word_t section) {
     flush_pages(cache, 0, section, true, true);
 }
@@ -2654,7 +2658,9 @@ void pgc_open_cache_to_journal_v2(
     void *data,
     bool startup)
 {
-    __atomic_add_fetch(&dbengine_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
+    struct dbengine_engine *engine = ((struct dbengine_tier *)section)->engine;
+
+    __atomic_add_fetch(&engine->cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
     pgc_atomic_add_fetch(&cache->stats.p2_workers_jv2_flush, 1);
 
     pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
@@ -2741,7 +2747,7 @@ void pgc_open_cache_to_journal_v2(
         // has been deleted simply misses. uuidmap ids are unique for the
         // lifetime of the uuidmap, so a stale id cannot alias a different
         // metric either (see mrg_metric_get_and_acquire_by_uuid()).
-        METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, xio->uuid_id, section);
+        METRIC *metric = mrg_metric_get_and_acquire_by_id(engine->main_mrg, xio->uuid_id, section);
         if(!metric) {
             // The metric is gone, so this page's data can no longer be referenced by
             // anything and it must not go into the journal. It must not be left hot
@@ -2756,7 +2762,7 @@ void pgc_open_cache_to_journal_v2(
 
         // The metric is alive and we hold a reference, so its uuid resolves by
         // construction; no NULL check is needed or meaningful here.
-        nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+        nd_uuid_t *uuid = mrg_metric_uuid(engine->main_mrg, metric);
 
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
@@ -2802,7 +2808,7 @@ void pgc_open_cache_to_journal_v2(
         else {
             // mi already owns a reference for this uuid; ours is redundant
             mi = *PValue;
-            mrg_metric_release(main_mrg, metric);
+            mrg_metric_release(engine->main_mrg, metric);
         }
 
         // update the pages JudyL of this metric
@@ -3004,7 +3010,7 @@ void pgc_open_cache_to_journal_v2(
             }
 
             JudyLFreeArray(&mi->JudyL_pages_by_start_time, PJE0);
-            mrg_metric_release(main_mrg, mi->metric);
+            mrg_metric_release(engine->main_mrg, mi->metric);
             aral_freez(ar_mi, mi);
         }
         JudyLFreeArray(&JudyL_metrics, PJE0);
@@ -3465,8 +3471,6 @@ void unittest_stress_test(void) {
 #endif
 
 int dbengine_cache_unittest(const struct dbengine_config *cfg) {
-    dbengine_config_set(cfg);
-
     PGC *cache = pgc_create("test",
                             32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, NULL, unittest_save_dirty_page_callback,

@@ -46,10 +46,11 @@ static bool mrg_destroy_claim_metric(METRIC *metric, METRIC ***claimed, size_t *
     return true;
 }
 
-static MRG *mrg_create_internal(bool load_from_db) {
+static MRG *mrg_create_internal(struct dbengine_engine *engine, bool load_from_db) {
     MRG *mrg;
     (void)posix_memalignz((void **)&mrg, _Alignof(MRG), sizeof(*mrg));
     memset(mrg, 0, sizeof(*mrg));
+    mrg->engine = engine;
 
     for(size_t i = 0; i < _countof(mrg->index) ; i++) {
         rw_spinlock_init(&mrg->index[i].rw_spinlock);
@@ -70,14 +71,14 @@ static MRG *mrg_create_internal(bool load_from_db) {
 // ----------------------------------------------------------------------------
 // public API
 
-inline MRG *mrg_create(void) {
-    return mrg_create_internal(true);
+inline MRG *mrg_create(struct dbengine_engine *engine) {
+    return mrg_create_internal(engine, true);
 }
 
 inline MRG *mrg_create_for_unittest(void) {
     // Skip mrg_load() to avoid pre-loaded metrics with writer counts
     // This allows deletion tests to work without interference from database metrics
-    return mrg_create_internal(false);
+    return mrg_create_internal(NULL, false);
 }
 
 struct aral_statistics *mrg_aral_stats(void) {
@@ -254,7 +255,7 @@ UUIDMAP_ID mrg_metric_uuidmap_id(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 ALWAYS_INLINE
-Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
+Word_t mrg_metric_section(METRIC *metric) {
     return metric->section;
 }
 
@@ -348,7 +349,8 @@ bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric,
 // returns true when metric still has retention
 ALWAYS_INLINE
 bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
-    Word_t section = mrg_metric_section(mrg, metric);
+    Word_t section = mrg_metric_section(metric);
+    PGC *main_cache = ((struct dbengine_tier *)section)->engine->main_cache;
     bool do_again = false;
     size_t countdown = 5;
 

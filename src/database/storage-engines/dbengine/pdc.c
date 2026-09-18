@@ -364,6 +364,7 @@ static ALWAYS_INLINE void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, P
 /*
 static bool epdl_check_if_pages_are_already_in_cache(struct dbengine_tier *ctx, EPDL *epdl, PDC_PAGE_STATUS tags)
 {
+    struct dbengine_engine *engine = ctx->engine;
     size_t count_remaining = 0;
     size_t found = 0;
 
@@ -380,7 +381,7 @@ static bool epdl_check_if_pages_are_already_in_cache(struct dbengine_tier *ctx, 
             if (pd->page)
                 continue;
 
-            pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, pd->metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
+            pd->page = pgc_page_get_and_acquire(ctx->engine->main_cache, (Word_t) ctx, pd->metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
             if (pd->page) {
                 found++;
                 pdc_page_status_set(pd, PDC_PAGE_READY | tags);
@@ -391,8 +392,8 @@ static bool epdl_check_if_pages_are_already_in_cache(struct dbengine_tier *ctx, 
     }
 
     if(found) {
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_ok_preloaded, found, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_data_source_main_cache, found, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_load_ok_preloaded, found, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_data_source_main_cache, found, __ATOMIC_RELAXED);
     }
 
     return count_remaining == 0;
@@ -403,8 +404,10 @@ static bool epdl_check_if_pages_are_already_in_cache(struct dbengine_tier *ctx, 
 // PDC logic
 
 static ALWAYS_INLINE void pdc_destroy(PDC *pdc) {
+    struct dbengine_engine *engine = pdc->ctx->engine;
+
     if(pdc->metric)
-        mrg_metric_release(main_mrg, pdc->metric);
+        mrg_metric_release(engine->main_mrg, pdc->metric);
 
     completion_destroy(&pdc->prep_completion);
     completion_destroy(&pdc->page_completion);
@@ -435,7 +438,7 @@ static ALWAYS_INLINE void pdc_destroy(PDC *pdc) {
             cancelled++;
 
         if(pd->page && !(status & PDC_PAGE_RELEASED)) {
-            pgc_page_release(main_cache, pd->page);
+            pgc_page_release(engine->main_cache, pd->page);
             // pdc_page_status_set(pd, PDC_PAGE_RELEASED);
         }
 
@@ -444,15 +447,15 @@ static ALWAYS_INLINE void pdc_destroy(PDC *pdc) {
 
     PDCJudyLFreeArray(&pdc->page_list_JudyL, PJE0);
 
-    __atomic_sub_fetch(&dbengine_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&engine->cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&pdc->ctx->atomic.inflight_queries, 1, __ATOMIC_RELAXED);
     pdc_release(pdc);
 
     if(unroutable)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_fail_unroutable, unroutable, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&engine->cache_efficiency_stats.pages_load_fail_unroutable, unroutable, __ATOMIC_RELAXED);
 
     if(cancelled)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_fail_cancelled, cancelled, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&engine->cache_efficiency_stats.pages_load_fail_cancelled, cancelled, __ATOMIC_RELAXED);
 }
 
 ALWAYS_INLINE void pdc_acquire(PDC *pdc) {
@@ -555,7 +558,7 @@ static ALWAYS_INLINE bool epdl_pending_add(EPDL *epdl) {
         added_new = false;
         epdl->head_to_datafile_extent_queries_pending_for_extent = false;
 
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&datafile_ctx(epdl->datafile)->engine->cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
 
 //        if(e->base->pdc->priority > epdl->pdc->priority) {
 //            e->base->pdc->priority = epdl->pdc->priority;
@@ -1057,7 +1060,7 @@ static void epdl_extent_loading_error_log(struct dbengine_tier *ctx, EPDL *epdl,
                 start_time_s = pd->first_time_s;
                 end_time_s = pd->last_time_s;
                 METRIC *metric = (METRIC *)pd->metric_id;
-                nd_uuid_t *u = mrg_metric_uuid(main_mrg, metric);
+                nd_uuid_t *u = mrg_metric_uuid(ctx->engine->main_mrg, metric);
                 uuid_unparse_lower(*u, uuid);
                 used_epdl = true;
             }
@@ -1213,7 +1216,7 @@ static bool epdl_populate_pages_from_extent_data(
             continue;
         }
 
-        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(ctx->engine->main_mrg, &header->descr[i].uuid, (Word_t)ctx);
         Word_t metric_id = (Word_t)metric;
         if(!metric) {
             char log[200 + 1];
@@ -1221,7 +1224,7 @@ static bool epdl_populate_pages_from_extent_data(
             epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log, NDLP_DEBUG);
             continue;
         }
-        mrg_metric_release(main_mrg, metric);
+        mrg_metric_release(ctx->engine->main_mrg, metric);
 
         struct page_details *pd_list = epdl_get_pd_load_link_list_from_metric_start_time(epdl, metric_id, start_time_s);
         if(likely(!pd_list))
@@ -1297,7 +1300,7 @@ static bool epdl_populate_pages_from_extent_data(
         };
 
         bool added = true;
-        PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+        PGC_PAGE *page = pgc_page_add_and_acquire(ctx->engine->main_cache, page_entry, &added);
         if (false == added) {
             pgd_free(pgd);
             pgd = pgc_page_data(page);
@@ -1342,7 +1345,7 @@ static bool epdl_populate_pages_from_extent_data(
         // Taking all the references first keeps the count above 0 for the whole loop, so the
         // page never becomes evictable while we still need it.
         for(struct page_details *pd = pd_list->load.next; pd ; pd = pd->load.next)
-            pgc_page_dup(main_cache, page);
+            pgc_page_dup(ctx->engine->main_cache, page);
 
         PDC_PAGE_STATUS status = PDC_PAGE_READY | tags | (pgd_is_empty(pgd) ? PDC_PAGE_EMPTY : 0);
         for(struct page_details *pd = pd_list; pd ; pd = pd->load.next) {
@@ -1355,26 +1358,26 @@ static bool epdl_populate_pages_from_extent_data(
     }
 
     if(stats_data_from_main_cache)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_data_source_main_cache, stats_data_from_main_cache, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_data_source_main_cache, stats_data_from_main_cache, __ATOMIC_RELAXED);
 
     if(cached_extent)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_data_source_extent_cache, stats_data_from_extent, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_data_source_extent_cache, stats_data_from_extent, __ATOMIC_RELAXED);
     else {
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_data_source_disk, stats_data_from_extent, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.extents_loaded_from_disk, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_data_source_disk, stats_data_from_extent, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.extents_loaded_from_disk, 1, __ATOMIC_RELAXED);
     }
 
     if(stats_cache_hit_while_inserting)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_while_inserting, stats_cache_hit_while_inserting, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_while_inserting, stats_cache_hit_while_inserting, __ATOMIC_RELAXED);
 
     if(stats_load_compressed)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_ok_compressed, stats_load_compressed, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_load_ok_compressed, stats_load_compressed, __ATOMIC_RELAXED);
 
     if(stats_load_uncompressed)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_ok_uncompressed, stats_load_uncompressed, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_load_ok_uncompressed, stats_load_uncompressed, __ATOMIC_RELAXED);
 
     if(stats_load_invalid_page)
-        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, stats_load_invalid_page, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, stats_load_invalid_page, __ATOMIC_RELAXED);
 
     if(worker)
         worker_is_idle();
@@ -1431,7 +1434,7 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct dbengine_tier *ct
     PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
 
     if(unlikely(epdl_pending_del_if_all_should_stop(epdl))) {
-        statistics_counter = &dbengine_cache_efficiency_stats.pages_load_fail_cancelled;
+        statistics_counter = &ctx->engine->cache_efficiency_stats.pages_load_fail_cancelled;
         not_loaded_pages_tag = PDC_PAGE_CANCELLED;
         goto cleanup;
     }
@@ -1440,13 +1443,13 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct dbengine_tier *ct
 
     void *extent_compressed_data = NULL;
     PGC_PAGE *extent_cache_page = pgc_page_get_and_acquire(
-            extent_cache, (Word_t)ctx,
+            ctx->engine->extent_cache, (Word_t)ctx,
             (Word_t)epdl->datafile->fileno, (time_t)epdl->extent_block,
             PGC_SEARCH_EXACT);
 
     if(extent_cache_page) {
         extent_compressed_data = pgc_page_data(extent_cache_page);
-        internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
+        internal_fatal(epdl->extent_size != pgc_page_data_size(ctx->engine->extent_cache, extent_cache_page),
                        "DBENGINE: cache size does not match the expected size");
 
         loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_CACHE;
@@ -1469,7 +1472,7 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct dbengine_tier *ct
                 worker_is_busy(DBENGINE_WORKER_JOB_EXTENT_CACHE_LOOKUP);
 
             bool added = false;
-            extent_cache_page = pgc_page_add_and_acquire(extent_cache, (PGC_ENTRY) {
+            extent_cache_page = pgc_page_add_and_acquire(ctx->engine->extent_cache, (PGC_ENTRY) {
                     .hot = false,
                     .section = (Word_t) ctx,
                     .metric_id = (Word_t) epdl->datafile->fileno,
@@ -1482,7 +1485,7 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct dbengine_tier *ct
 
             if (!added) {
                 dbengine_extent_free(extent_data, epdl->extent_size);
-                internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
+                internal_fatal(epdl->extent_size != pgc_page_data_size(ctx->engine->extent_cache, extent_cache_page),
                                "DBENGINE: cache size does not match the expected size");
             }
 
@@ -1503,20 +1506,20 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct dbengine_tier *ct
             // since the extent was used, all the pages that are not
             // loaded from this extent, were not found in the extent
             not_loaded_pages_tag |= PDC_PAGE_FAILED_NOT_IN_EXTENT;
-            statistics_counter = &dbengine_cache_efficiency_stats.pages_load_fail_not_found;
+            statistics_counter = &ctx->engine->cache_efficiency_stats.pages_load_fail_not_found;
         }
         else {
             not_loaded_pages_tag |= PDC_PAGE_FAILED_INVALID_EXTENT;
-            statistics_counter = &dbengine_cache_efficiency_stats.pages_load_fail_invalid_extent;
+            statistics_counter = &ctx->engine->cache_efficiency_stats.pages_load_fail_invalid_extent;
         }
     }
     else {
         not_loaded_pages_tag |= PDC_PAGE_FAILED_TO_MAP_EXTENT;
-        statistics_counter = &dbengine_cache_efficiency_stats.pages_load_fail_cant_mmap_extent;
+        statistics_counter = &ctx->engine->cache_efficiency_stats.pages_load_fail_cant_mmap_extent;
     }
 
     if(extent_cache_page)
-        pgc_page_release(extent_cache, extent_cache_page);
+        pgc_page_release(ctx->engine->extent_cache, extent_cache_page);
 
 cleanup:
     // remove it from the datafile extent_queries
