@@ -156,7 +156,9 @@ const struct dbengine_config *netdata_conf_dbengine_resolved(void) {
 
 void netdata_conf_dbengine_apply(void) {
 #ifdef ENABLE_DBENGINE
-    dbengine_init(netdata_conf_dbengine_resolved());
+    int ret = dbengine_init(netdata_conf_dbengine_resolved());
+    if(ret)
+        fatal("DBENGINE: the engine did not come up: %s", uv_strerror(ret));
 #endif
 }
 
@@ -218,9 +220,6 @@ void netdata_conf_dbengine_init(const char *hostname) {
         inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", netdata_conf_dbengine.pages_per_extent);
     }
 
-    // the process-wide configuration is complete: hand it to the engine before any tier starts
-    netdata_conf_dbengine_apply();
-
     nd_profile.storage_tiers = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     if(nd_profile.storage_tiers < 1) {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "At least 1 storage tier is required. Assuming 1.");
@@ -281,6 +280,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
 #endif
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
+
+    // the process-wide configuration is complete and the tier count is final (the engine's registry preload
+    // counts the configured tiers): bring the engine up, then the tiers
+    netdata_conf_dbengine_apply();
 
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];

@@ -207,8 +207,8 @@ compiles the engine as one unit. The public headers:
   is up, whether a directory holds data; and **work**: `dbengine_enq_work()` runs a function on the engine's worker
   pool while the engine is serving, `dbengine_work_available()` says whether it is, and a refused request is the
   caller's to run or drop.
-- **`dbengine-config.h`**: the embedder fills one `struct dbengine_config` and hands it to `dbengine_init()` once,
-  before the first tier; each tier gets a `struct dbengine_tier_config` through `dbengine_tier_init()`. The same
+- **`dbengine-config.h`**: the embedder fills one `struct dbengine_config` and hands it to `dbengine_init()`, which
+  brings the engine up; each tier then gets a `struct dbengine_tier_config` through `dbengine_tier_init()`. The same
   struct carries the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest datafile)
   and `preload_metrics` (the metric uuids the embedder already knows, fed into the metrics registry before the
   journals load; `dbengine_preload_release()` drops the references once every tier is up). The page types and the

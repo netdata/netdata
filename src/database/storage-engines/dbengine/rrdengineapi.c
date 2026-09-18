@@ -1133,8 +1133,18 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
 {
     uint32_t max_open_files;
 
-    if(!dbengine_configured())
-        fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
+    // before anything is written to the tier: a refused init must leave the static tier as it found it
+    switch(dbengine_lifecycle_state()) {
+        case DBENGINE_LIFECYCLE_DOWN:
+            fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
+
+        case DBENGINE_LIFECYCLE_STOPPED:
+            netdata_log_error("DBENGINE: tier %zu: the engine was shut down, the tier cannot be initialized", tc->tier);
+            return UV_EIO;
+
+        case DBENGINE_LIFECYCLE_RUNNING:
+            break;
+    }
 
     dbengine_tier_config_validate(tc);
     size_t tier = tc->tier;
@@ -1177,10 +1187,7 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
 
     ctx->atomic.first_time_s = LONG_MAX;
 
-    if (!dbengine_spawn(ctx))
-        netdata_log_error("DBENGINE: tier %zu: the engine is not running and could not be started, the tier cannot be initialized",
-                          (size_t)tc->tier);
-    else if (!init_rrd_files(ctx)) {
+    if (!init_rrd_files(ctx)) {
         // success - we run this ctx too
         __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
         __atomic_store_n(&ctx->atomic.active, true, __ATOMIC_RELEASE);

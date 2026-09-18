@@ -30,13 +30,20 @@
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
 
-// the process-wide configuration, copied by dbengine_init() and read-only afterwards
+// the process-wide configuration, copied by dbengine_init() before the engine comes up and read-only afterwards
 extern struct dbengine_config dbengine_cfg;
-bool dbengine_configured(void);
 
 // resolve cfg's 0-means-default fields and make it the engine's configuration, without bringing anything up: the
 // way in for the tests that need only the configuration (a page cache, the page allocators)
 void dbengine_config_set(const struct dbengine_config *cfg);
+
+// where the engine is in its one-way life: never brought up, running, or shut down
+typedef enum {
+    DBENGINE_LIFECYCLE_DOWN,
+    DBENGINE_LIFECYCLE_RUNNING,
+    DBENGINE_LIFECYCLE_STOPPED,
+} DBENGINE_LIFECYCLE_STATE;
+DBENGINE_LIFECYCLE_STATE dbengine_lifecycle_state(void);
 
 #define DBENGINE_FD_BUDGET_PER_TIER (50)
 
@@ -638,7 +645,6 @@ static inline void ctx_last_flush_fileno_set(struct dbengine_tier *ctx, unsigned
 
 bool dbengine_ctx_tier_cap_exceeded(struct dbengine_tier *ctx);
 int init_rrd_files(struct dbengine_tier *ctx);
-bool dbengine_spawn(struct dbengine_tier *ctx);
 void dbengine_event_loop(void *arg);
 
 typedef void (*enqueue_callback_t)(struct dbengine_cmd *cmd);

@@ -57,11 +57,10 @@ time_t dbengine_latest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
-// bring the static tier dbengine_multidb_tiers[tc->tier] up; the first one spawns the engine's event loop. Once
-// dbengine_shutdown() has run, the engine cannot be started again in this process: a later dbengine_tier_init()
-// fails with UV_EIO. A tier init and the shutdown must not overlap: the check is made when the tier starts, so an
-// init that is still in flight when the shutdown begins would wait on a loop that is gone (the daemon joins its
-// tier inits at startup, long before any shutdown)
+// bring the static tier dbengine_multidb_tiers[tc->tier] up on a running engine: after dbengine_init() (fatal
+// before it) and before dbengine_shutdown() (UV_EIO after it, the tier untouched). A tier init and the shutdown
+// must not overlap: the check is made when the tier starts, so an init that is still in flight when the shutdown
+// begins would wait on a loop that is gone (the daemon joins its tier inits at startup, long before any shutdown)
 int dbengine_tier_init(const struct dbengine_tier_config *tc);
 
 void dbengine_readiness_wait(DBENGINE_TIER *tier);
@@ -73,10 +72,11 @@ int dbengine_tier_exit(DBENGINE_TIER *tier);
 // started or already stopped
 bool dbengine_tier_is_active(DBENGINE_TIER *tier);
 
-// stop the engine's event loop and join its thread; after every tier's dbengine_tier_exit(), and never while a
-// dbengine_tier_init() is in flight. Nothing may be enqueued to the engine afterwards, and the engine cannot be
-// started again in this process (dbengine_tier_init() fails). On an engine that never spawned, or on a second
-// call, it returns at once; a second call does not wait for the first to finish
+// dbengine_init()'s counterpart: refuse embedder work, stop the engine's event loop and join its thread. After
+// every tier's dbengine_tier_exit() (a tier exit needs the live loop), and never while a dbengine_tier_init() is
+// in flight. Nothing may be enqueued to the engine afterwards, and the engine cannot be started again in this
+// process (dbengine_init() and dbengine_tier_init() fail). On an engine that never came up, or on a second call,
+// it returns at once; a second call does not wait for the first to finish
 void dbengine_shutdown(void);
 void dbengine_quiesce(DBENGINE_TIER *tier);
 void dbengine_flush_dirty(DBENGINE_TIER *tier);
@@ -111,8 +111,8 @@ extern void dbengine_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS
 // completion when it returns. fn is responsible for its own worker_is_busy() attribution, including registering
 // the job names it reports: the pool threads register only the engine's own names.
 //
-// The engine takes work only while it is serving: from the moment the first tier's dbengine_tier_init() spawned the
-// event loop until dbengine_shutdown() starts. Outside that window dbengine_enq_work() returns false having done
+// The engine takes work only while it is serving: from the moment dbengine_init() brought the event loop up until
+// dbengine_shutdown() starts. Outside that window dbengine_enq_work() returns false having done
 // nothing the caller can observe (no queueing, no wake-up, the completion is not touched), and the caller runs or
 // drops the work itself; dbengine_work_available() answers the same question up front, for a caller that wants to
 // plan a batch. Once the engine serves, the only later change is to stopped, so a request accepted is always

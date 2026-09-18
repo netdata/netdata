@@ -19,11 +19,11 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *tier, nd_uuid_
 // The storage engine's process-wide configuration.
 //
 // Whoever embeds the engine (the daemon; a test) fills one of these from its own sources and
-// hands it to dbengine_init() exactly once, before the first dbengine_tier_init(). The engine keeps a
-// private copy and reads nothing else afterwards. Per-tier settings (path, quota, retention,
-// page type) travel with dbengine_tier_init() instead.
+// hands it to dbengine_init(), which brings the engine up with it. The engine keeps a private
+// copy and reads nothing else afterwards. Per-tier settings (path, quota, retention, page type)
+// travel with dbengine_tier_init() instead.
 struct dbengine_config {
-    // caches - read once, when the first tier brings up the caches shared by all tiers
+    // caches - read once, when dbengine_init() brings up the caches shared by all tiers
     size_t page_cache_mb;                       // [db] dbengine page cache size
     size_t extent_cache_mb;                     // [db] dbengine extent cache size
     uint64_t out_of_memory_protection_bytes;    // [db] dbengine out of memory protection; 0 disables it
@@ -112,12 +112,15 @@ struct dbengine_tier_config {
     size_t grouping;                            // points of tier 0 that make one point of this tier (1 for tier 0)
 };
 
-// Copy cfg into the engine, resolving the 0-means-default fields (cpus, default_update_every_s,
-// pages_per_extent, libuv_worker_threads). Fatal when the libuv pool is not larger than the threads
-// reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or when
-// default_update_every_s is negative. Call it once, from one thread, before the first dbengine_tier_init();
-// a second call with an equal configuration is a no-op, with a different one it is fatal.
-void dbengine_init(const struct dbengine_config *cfg);
+// Bring the engine up: copy cfg into it, resolving the 0-means-default fields (cpus, default_update_every_s,
+// pages_per_extent, libuv_worker_threads), then create the event loop, the caches, the metrics registry (which
+// preloads through cfg->preload_metrics, so the embedder's tier count must be final by now) and the engine's
+// thread, and start taking work. The only way up; tiers come after it. Fatal when the libuv pool is not larger
+// than the threads reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or
+// when default_update_every_s is negative. Returns 0, the libuv error that stopped the loop from coming up
+// (the engine is then down, as if never called), UV_EALREADY when the engine is already up (the configuration
+// is left alone), or UV_EIO after dbengine_shutdown() (the engine cannot be started again in this process).
+int dbengine_init(const struct dbengine_config *cfg);
 
 // Release the references preload_metrics() left on the registry, once every tier has come up (after the last
 // dbengine_readiness_wait()): until then they keep preloaded metrics from being evicted before their journals are

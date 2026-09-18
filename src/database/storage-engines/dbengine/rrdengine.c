@@ -98,14 +98,24 @@ struct dbengine_main {
         }
 };
 
-// The event loop's lifecycle: spawned once by the first tier that comes up, stopped once by dbengine_shutdown().
-// There is no way back: a second spawn would create the caches and the registry again over the live ones, and
-// libuv does not re-initialise a closed loop. So a tier that comes up after the stop is refused, not hung.
+// The event loop's lifecycle: spawned once by dbengine_init(), stopped once by dbengine_shutdown(). There is no
+// way back: a second spawn would create the caches and the registry again over the live ones, and libuv does not
+// re-initialise a closed loop. So an init after the stop is refused, and a tier that comes up after it is refused
+// too, not hung.
 static struct {
     SPINLOCK spinlock;
     bool spawned;
     bool stopped;
 } dbengine_lifecycle = { .spinlock = SPINLOCK_INITIALIZER, .spawned = false, .stopped = false };
+
+DBENGINE_LIFECYCLE_STATE dbengine_lifecycle_state(void) {
+    spinlock_lock(&dbengine_lifecycle.spinlock);
+    DBENGINE_LIFECYCLE_STATE state = dbengine_lifecycle.stopped ? DBENGINE_LIFECYCLE_STOPPED :
+                                     dbengine_lifecycle.spawned ? DBENGINE_LIFECYCLE_RUNNING :
+                                                                  DBENGINE_LIFECYCLE_DOWN;
+    spinlock_unlock(&dbengine_lifecycle.spinlock);
+    return state;
+}
 
 #if defined(OS_WINDOWS)
 netdata_mutex_t dbengine_async_mutex;
@@ -2607,73 +2617,80 @@ static void dbengine_initialize_structures(void) {
     extent_io_descriptor_init();
 }
 
-bool dbengine_spawn(struct dbengine_tier *ctx __maybe_unused) {
-    // Every exit must release the spinlock: the other tier init threads are
-    // waiting on it, and a failed attempt leaves spawned == false so the next
-    // caller retries the setup rather than spinning forever.
-    spinlock_lock(&dbengine_lifecycle.spinlock);
+// the loop, its handles, the structures and the thread; with the lifecycle lock held. A failed step undoes what
+// came before it and leaves spawned == false, so the engine stays down
+static int dbengine_spawn(void) {
+    int ret;
 
-    if(dbengine_lifecycle.stopped) {
-        netdata_log_error("DBENGINE: the engine was shut down and cannot be started again in this process");
-        goto fail;
+    ret = uv_loop_init(&dbengine_main.loop);
+    if (ret) {
+        netdata_log_error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
+        return ret;
     }
+    dbengine_main.loop.data = &dbengine_main;
 
-    if(!dbengine_lifecycle.spawned) {
-        int ret;
-
-        ret = uv_loop_init(&dbengine_main.loop);
-        if (ret) {
-            netdata_log_error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
-            goto fail;
-        }
-        dbengine_main.loop.data = &dbengine_main;
-
-        ret = uv_async_init(&dbengine_main.loop, &dbengine_main.async, async_cb);
-        if (ret) {
-            netdata_log_error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
-            fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
-            goto fail;
-        }
-        dbengine_main.async.data = &dbengine_main;
+    ret = uv_async_init(&dbengine_main.loop, &dbengine_main.async, async_cb);
+    if (ret) {
+        netdata_log_error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
+        fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
+        return ret;
+    }
+    dbengine_main.async.data = &dbengine_main;
 #if defined(OS_WINDOWS)
-        dbengine_main.async_ready = true;
+    dbengine_main.async_ready = true;
 #endif
 
-        ret = uv_timer_init(&dbengine_main.loop, &dbengine_main.timer);
-        if (ret) {
-            netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
-            uv_close((uv_handle_t *)&dbengine_main.async, NULL);
-            fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
-            goto fail;
-        }
+    ret = uv_timer_init(&dbengine_main.loop, &dbengine_main.timer);
+    if (ret) {
+        netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
+        uv_close((uv_handle_t *)&dbengine_main.async, NULL);
+        fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
+        return ret;
+    }
 
-        ret = uv_timer_init(&dbengine_main.loop, &dbengine_main.retention_timer);
-        if (ret) {
-            netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
-            uv_close((uv_handle_t *)&dbengine_main.timer, NULL);
-            uv_close((uv_handle_t *)&dbengine_main.async, NULL);
-            fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
-            goto fail;
-        }
+    ret = uv_timer_init(&dbengine_main.loop, &dbengine_main.retention_timer);
+    if (ret) {
+        netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
+        uv_close((uv_handle_t *)&dbengine_main.timer, NULL);
+        uv_close((uv_handle_t *)&dbengine_main.async, NULL);
+        fatal_assert(0 == uv_loop_close(&dbengine_main.loop));
+        return ret;
+    }
 
-        dbengine_main.timer.data = &dbengine_main;
-        dbengine_main.retention_timer.data = &dbengine_main;
+    dbengine_main.timer.data = &dbengine_main;
+    dbengine_main.retention_timer.data = &dbengine_main;
 
-        dbengine_initialize_structures();
+    dbengine_initialize_structures();
 
-        dbengine_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &dbengine_main);
-        fatal_assert(0 != dbengine_main.thread);
+    dbengine_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &dbengine_main);
+    fatal_assert(0 != dbengine_main.thread);
 
-        dbengine_cmd_queue_set_accepting(true);
-        dbengine_lifecycle.spawned = true;
+    dbengine_cmd_queue_set_accepting(true);
+    dbengine_lifecycle.spawned = true;
+    return 0;
+}
+
+int dbengine_init(const struct dbengine_config *cfg) {
+    if(!cfg)
+        fatal("DBENGINE: dbengine_init() called without a configuration");
+
+    spinlock_lock(&dbengine_lifecycle.spinlock);
+
+    int ret;
+    if(dbengine_lifecycle.stopped) {
+        netdata_log_error("DBENGINE: the engine was shut down and cannot be started again in this process");
+        ret = UV_EIO;
+    }
+    else if(dbengine_lifecycle.spawned)
+        ret = UV_EALREADY;
+    else {
+        // the configuration first: the caches and the allocators read it as they come up
+        dbengine_config_set(cfg);
+        ret = dbengine_spawn();
     }
 
     spinlock_unlock(&dbengine_lifecycle.spinlock);
-    return true;
-
-fail:
-    spinlock_unlock(&dbengine_lifecycle.spinlock);
-    return false;
+    return ret;
 }
 
 static inline void worker_dispatch_extent_read(struct dbengine_cmd cmd, bool from_worker) {

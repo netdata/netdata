@@ -156,6 +156,8 @@ void generate_dbengine_dataset(unsigned history_seconds)
     nd_log_limits_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
 
+    // the engine, then the host that brings the tier up on it
+    netdata_conf_dbengine_apply();
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
     if (NULL == host)
         return;
@@ -368,6 +370,8 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
 
+    // the engine, then the host that brings the tier up on it
+    netdata_conf_dbengine_apply();
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
     if (NULL == host)
         return;
