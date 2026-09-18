@@ -27,6 +27,8 @@ import (
 type MethodHandler interface {
 	// MethodParams returns dynamic params for a method.
 	// Return nil to use static params from FunctionConfig.RequiredParams.
+	// It is also called for info with an explicit job on shared selectable Functions,
+	// without calling Handle or validating secondary selector values.
 	// The context should be used for timeout/cancellation of database queries.
 	MethodParams(ctx context.Context, method string) ([]ParamConfig, error)
 
