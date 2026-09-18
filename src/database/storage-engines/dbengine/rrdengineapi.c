@@ -1288,8 +1288,8 @@ size_t dbengine_destroy(void) {
     }
 
     if(!retained) {
-        dbengine_engine_free(engine);
         __atomic_store_n(&dbengine_the_engine, NULL, __ATOMIC_RELEASE);
+        dbengine_engine_free(engine);
     }
 
     return metrics_referenced;

@@ -2195,10 +2195,10 @@ static void async_closed_cb(uv_handle_t *handle)
 {
     struct dbengine_engine *engine = handle->data;
 
-    int ret = uv_async_init(handle->loop, &main->async, async_cb);
+    int ret = uv_async_init(handle->loop, &engine->async, async_cb);
     if (ret)
         netdata_log_error("DBENGINE: reinitializing uv_async_init(): %s", uv_strerror(ret));
-    __atomic_store_n(&main->async_ready, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&engine->async_ready, true, __ATOMIC_RELEASE);
 }
 #else
 void async_cb(uv_async_t *handle __maybe_unused)
@@ -2839,7 +2839,7 @@ void dbengine_event_loop(void* arg) {
                 case DBENGINE_OPCODE_QUERY:;
 #if defined(OS_WINDOWS)
                     static int max_timeout_count = 0;
-                    if (uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
+                    if (uv_hrtime() - engine->last_async_callback > 1000UL * NSEC_PER_MSEC) {
                         if (++max_timeout_count > 30) {
                             netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
                             __atomic_store_n(&engine->async_ready, false, __ATOMIC_RELEASE);
