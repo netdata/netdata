@@ -9,9 +9,10 @@
 #define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (16)
 #endif
 
-// Written once by dbengine_init(), before any tier exists; read-only afterwards.
+// Written before any tier exists, by dbengine_init() or (for the tests that need only the configuration) by
+// dbengine_config_set(); read-only afterwards.
 struct dbengine_config dbengine_cfg = DBENGINE_CONFIG_DEFAULTS;
-static bool dbengine_cfg_initialized = false;
+static bool dbengine_cfg_configured = false;
 
 static bool dbengine_config_equal(const struct dbengine_config *a, const struct dbengine_config *b) {
     return a->page_cache_mb == b->page_cache_mb &&
@@ -65,6 +66,17 @@ static void dbengine_config_resolve(struct dbengine_config *cfg) {
               cfg->libuv_worker_threads, cfg->reserved_libuv_worker_threads);
 }
 
+void dbengine_config_set(const struct dbengine_config *cfg) {
+    if(!cfg)
+        fatal("DBENGINE: the engine was given no configuration");
+
+    struct dbengine_config resolved = *cfg;
+    dbengine_config_resolve(&resolved);
+
+    dbengine_cfg = resolved;
+    dbengine_cfg_configured = true;
+}
+
 void dbengine_init(const struct dbengine_config *cfg) {
     if(!cfg)
         fatal("DBENGINE: dbengine_init() called without a configuration");
@@ -72,16 +84,16 @@ void dbengine_init(const struct dbengine_config *cfg) {
     struct dbengine_config resolved = *cfg;
     dbengine_config_resolve(&resolved);
 
-    if(dbengine_cfg_initialized) {
+    if(dbengine_cfg_configured) {
         if(!dbengine_config_equal(&resolved, &dbengine_cfg))
             fatal("DBENGINE: dbengine_init() called again with a different configuration");
         return;
     }
 
     dbengine_cfg = resolved;
-    dbengine_cfg_initialized = true;
+    dbengine_cfg_configured = true;
 }
 
-bool dbengine_initialized(void) {
-    return dbengine_cfg_initialized;
+bool dbengine_configured(void) {
+    return dbengine_cfg_configured;
 }

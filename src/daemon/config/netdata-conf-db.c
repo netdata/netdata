@@ -136,8 +136,8 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 }
 #endif
 
-void netdata_conf_dbengine_apply(void) {
 #ifdef ENABLE_DBENGINE
+const struct dbengine_config *netdata_conf_dbengine_resolved(void) {
     // settings the daemon resolves elsewhere, and on some paths (the unit tests) never from netdata.conf:
     // snapshot them at the moment the engine needs them
     netdata_conf_dbengine.cpus = netdata_conf_cpus();
@@ -150,7 +150,13 @@ void netdata_conf_dbengine_apply(void) {
     netdata_conf_dbengine.on_db_rotation = rrdcontext_db_rotation;
     netdata_conf_dbengine.preload_metrics = populate_metrics_from_database;
 
-    dbengine_init(&netdata_conf_dbengine);
+    return &netdata_conf_dbengine;
+}
+#endif
+
+void netdata_conf_dbengine_apply(void) {
+#ifdef ENABLE_DBENGINE
+    dbengine_init(netdata_conf_dbengine_resolved());
 #endif
 }
 

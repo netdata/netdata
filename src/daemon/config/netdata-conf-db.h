@@ -14,6 +14,10 @@ extern bool dbengine_datafiles_present; // dbengine datafiles exist on disk, eve
 // daemon reads its own copy, the engine gets it through netdata_conf_dbengine_apply()
 extern struct dbengine_config netdata_conf_dbengine;
 
+// the configuration with the settings the daemon resolves elsewhere snapshotted into it, ready for the engine
+// or for a test that needs only the configuration
+const struct dbengine_config *netdata_conf_dbengine_resolved(void);
+
 // per-tier configuration for dbengine_tier_init(): tier, page type and grouping; the caller adds path, quota
 // and retention
 void netdata_conf_dbengine_tier_config(size_t tier, struct dbengine_tier_config *out);

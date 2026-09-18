@@ -429,10 +429,8 @@ int netdata_main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 
-                        if(strcmp(optarg, "pgd-tests") == 0) {
-                            netdata_conf_dbengine_apply();
-                            return dbengine_page_test(argc, argv);
-                        }
+                        if(strcmp(optarg, "pgd-tests") == 0)
+                            return dbengine_page_test(netdata_conf_dbengine_resolved(), argc, argv);
 #endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
@@ -567,7 +565,7 @@ int netdata_main(int argc, char **argv) {
                             if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
-                            if (dbengine_metrics_registry_unittest()) return 1;
+                            if (dbengine_metrics_registry_unittest(netdata_conf_dbengine_resolved())) return 1;
 #endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
@@ -739,13 +737,11 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "pgctest") == 0) {
                             unittest_running = true;
-                            netdata_conf_dbengine_apply();
-                            return dbengine_cache_unittest();
+                            return dbengine_cache_unittest(netdata_conf_dbengine_resolved());
                         }
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
-                            netdata_conf_dbengine_apply();
-                            return dbengine_metrics_registry_unittest();
+                            return dbengine_metrics_registry_unittest(netdata_conf_dbengine_resolved());
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;

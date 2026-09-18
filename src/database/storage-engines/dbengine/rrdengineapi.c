@@ -1133,7 +1133,7 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
 {
     uint32_t max_open_files;
 
-    if(!dbengine_initialized())
+    if(!dbengine_configured())
         fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
 
     dbengine_tier_config_validate(tc);

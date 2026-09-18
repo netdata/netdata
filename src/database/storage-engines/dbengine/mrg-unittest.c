@@ -1888,7 +1888,9 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     return errors;
 }
 
-int dbengine_metrics_registry_unittest(void) {
+int dbengine_metrics_registry_unittest(const struct dbengine_config *cfg) {
+    dbengine_config_set(cfg);
+
     int errors = dbengine_accounting_helpers_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();

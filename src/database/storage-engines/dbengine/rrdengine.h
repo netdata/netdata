@@ -30,9 +30,13 @@
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
 
-// the process-wide configuration, copied once by dbengine_init() and read-only afterwards
+// the process-wide configuration, copied by dbengine_init() and read-only afterwards
 extern struct dbengine_config dbengine_cfg;
-bool dbengine_initialized(void);
+bool dbengine_configured(void);
+
+// resolve cfg's 0-means-default fields and make it the engine's configuration, without bringing anything up: the
+// way in for the tests that need only the configuration (a page cache, the page allocators)
+void dbengine_config_set(const struct dbengine_config *cfg);
 
 #define DBENGINE_FD_BUDGET_PER_TIER (50)
 
