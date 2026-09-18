@@ -1740,83 +1740,73 @@ collect_permissions() {
   # question the permission artifacts cannot: what the plugin itself reports when
   # it tries to open the journal.
   if [ "$INCLUDE_PLUGIN_DEBUG" = "1" ]; then
-    _pd_bin=""
-    _pd_seen=""
-    # shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
-    for _d in $PLUGINSD_DIRS; do
-      [ -n "$_d" ] || continue
-      [ -f "$_d/systemd-journal.plugin" ] || continue
-      _pd_seen="$_d/systemd-journal.plugin"
-      if [ -x "$_pd_seen" ]; then _pd_bin="$_pd_seen"; break; fi
-    done
-
-    # resolve the agent user to a NAME: ps prints a bare uid for a containerised
-    # agent, and runuser/su cannot impersonate a uid with no local account
-    _pd_user=""
-    _pd_raw=""
+    # Resolve the agent user to a local NAME. A containerised agent runs as a uid
+    # with no local account, and impersonating the HOST netdata account instead
+    # would test the wrong identity entirely - so that case is reported, never
+    # substituted.
+    _pd_user=""; _pd_raw=""; _pd_note=""
     [ -n "${NETDATA_PID:-}" ] && _pd_raw=$(ps -o user= -p "$NETDATA_PID" 2>/dev/null | tr -d ' ')
     case "$_pd_raw" in
-      "") : ;;
+      "") _pd_note="no running netdata process; using the local netdata account if one exists"
+          getent passwd netdata >/dev/null 2>&1 && _pd_user=netdata ;;
       *[!0-9]*) _pd_user="$_pd_raw" ;;
-      *) _pd_user=$(getent passwd "$_pd_raw" 2>/dev/null | cut -d: -f1) ;;
+      *) if getent passwd "$_pd_raw" >/dev/null 2>&1; then
+           _pd_user=$(getent passwd "$_pd_raw" | cut -d: -f1)
+         else
+           _pd_note="the agent runs as uid $_pd_raw, which has no local account (containerised); NOT substituting the host netdata account, because that would test a different identity"
+         fi ;;
     esac
-    [ -z "$_pd_user" ] && getent passwd netdata >/dev/null 2>&1 && _pd_user=netdata
 
-    if [ -z "$_pd_bin" ]; then
-      mkdir -p "$WORK/09-permissions"
-      # "not executable by us" is a different fact from "not installed", and
-      # saying the wrong one sends the reader looking for a missing package
-      if [ -n "$_pd_seen" ]; then
-        {
-          printf '%s\n' "systemd-journal.plugin IS installed at: $_pd_seen"
-          printf '%s\n' "but it is not executable by the current user ($(id -un 2>/dev/null))."
-          ls -l "$_pd_seen" 2>/dev/null
-          printf '%s\n' "Re-run the bundle with sudo to capture the debug output."
-        } > "$WORK/09-permissions/plugin-debug-systemd-journal.txt"
-        manifest_add 09-permissions/plugin-debug-systemd-journal.txt file generated \
-          "Requested plugin debug run: the plugin is installed but was not executable by the invoking user"
-      else
-        printf '%s\n' "(systemd-journal.plugin not installed in: $PLUGINSD_DIRS)" \
-          > "$WORK/09-permissions/plugin-debug-systemd-journal.txt"
-        manifest_add 09-permissions/plugin-debug-systemd-journal.txt file generated \
-          "Requested plugin debug run: the plugin is not installed"
-      fi
-    else
-      # STDERR ONLY, deliberately. The plugin's debug mode queries the last 200
-      # records from every journal source and writes them to STDOUT; collecting
-      # that would drag other services' logs into the bundle, which the
-      # never-collected list forbids. The permission failure this option exists
-      # for is reported on stderr.
-      #
-      # Also bounded explicitly: debug mode gives itself a 600s stop, far beyond
-      # the bundle's budget, and the portable watchdog only kills direct
-      # children, so the timeout goes around the plugin itself rather than
-      # relying on the wrapper being reaped.
-      collect_cmd 09-permissions/plugin-debug-systemd-journal.txt \
-        "REQUESTED: systemd-journal.plugin debug STDERR (its stdout is journal content and is discarded); states directly why the journal could not be opened" \
-        sh -c '
-          bin="$1"; u="$2"; t="$3"
-          run() { if command -v timeout >/dev/null 2>&1; then timeout "$t" "$@"; else "$@"; fi; }
-          if [ -n "$u" ] && [ "$(id -u)" = "0" ] && command -v runuser >/dev/null 2>&1; then
-            echo "# running as: $u (via runuser)"
-            run runuser -u "$u" -- "$bin" debug 2>&1 >/dev/null
-            echo "# exit: $?"
-          elif [ -n "$u" ] && [ "$(id -u)" = "0" ] && command -v su >/dev/null 2>&1; then
-            echo "# running as: $u (via su)"
-            run su -s /bin/sh -c "\"$bin\" debug 2>&1 >/dev/null" "$u"
-            echo "# exit: $?"
-          else
-            if [ -n "$u" ] && [ "$(id -u)" = "0" ]; then
-              echo "# WARNING: could not impersonate $u (no runuser or su); ran as root,"
-              echo "# so an access error here would NOT reflect the agent user."
-            else
-              echo "# running as: $(id -un) - NOT the agent user, so access errors may differ"
-            fi
-            run "$bin" debug 2>&1 >/dev/null
-            echo "# exit: $?"
-          fi
-          true' sh "$_pd_bin" "$_pd_user" "${CMD_TIMEOUT:-10}"
-    fi
+    # everything goes through collect_cmd so it is sanitized, capped and
+    # manifest-tracked like any other capture - writing the file directly would
+    # make the manifest's sanitized flag a lie
+    # shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
+    collect_cmd 09-permissions/plugin-debug-systemd-journal.txt \
+      "REQUESTED: systemd-journal.plugin debug STDERR (its stdout is journal content and is discarded); states directly why the journal could not be opened" \
+      sh -c '
+        u="$1"; note="$2"; t="$3"; shift 3
+        [ -n "$note" ] && echo "# note: $note"
+        bin=""; seen=""
+        for d in "$@"; do
+          [ -n "$d" ] || continue
+          [ -f "$d/systemd-journal.plugin" ] || continue
+          seen="$d/systemd-journal.plugin"
+          if [ -x "$seen" ]; then bin="$seen"; break; fi
+        done
+        if [ -z "$bin" ] && [ -n "$seen" ]; then
+          echo "systemd-journal.plugin IS installed at: $seen"
+          echo "but it is not executable by the current user ($(id -un 2>/dev/null))."
+          ls -l "$seen" 2>/dev/null
+          echo "Re-run the bundle with sudo to capture the debug output."
+          exit 0
+        fi
+        if [ -z "$bin" ]; then
+          echo "systemd-journal.plugin is not installed in any discovered plugins.d directory."
+          exit 0
+        fi
+        if [ -z "$u" ]; then
+          echo "# not running the plugin: the agent user could not be resolved to a local account."
+          echo "# Running it as anyone else would not reflect the agent'"'"'s access."
+          exit 0
+        fi
+        run() { if command -v timeout >/dev/null 2>&1; then timeout "$t" "$@"; else echo "# note: no timeout(1) here; only the bundle watchdog bounds this"; "$@"; fi; }
+        if [ "$(id -u)" = "0" ] && command -v runuser >/dev/null 2>&1; then
+          echo "# running as: $u (via runuser)"
+          run runuser -u "$u" -- "$bin" debug 2>&1 >/dev/null
+          echo "# exit: $?"
+        elif [ "$(id -u)" = "0" ] && command -v su >/dev/null 2>&1; then
+          echo "# running as: $u (via su)"
+          run su -s /bin/sh -c "\"$bin\" debug 2>&1 >/dev/null" "$u"
+          echo "# exit: $?"
+        elif [ "$(id -un 2>/dev/null)" = "$u" ]; then
+          echo "# running as: $u (already this user)"
+          run "$bin" debug 2>&1 >/dev/null
+          echo "# exit: $?"
+        else
+          echo "# NOT running the plugin: cannot become $u (not root, or no runuser/su)."
+          echo "# An access error from any other user would not reflect the agent."
+        fi
+        true' sh "$_pd_user" "$_pd_note" "${CMD_TIMEOUT:-10}" $PLUGINSD_DIRS
   fi
 
   # paths reach the child as positional ARGUMENTS - see the note above

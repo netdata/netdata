@@ -217,8 +217,8 @@ confinement, and packagers use **ACLs**. None of that shows in an `ls -la`.
 
 | item | why |
 |---|---|
-| **agent user and groups** (`09-permissions/netdata-user.txt`) | journal and device access is granted by one of three mechanisms — a file capability on the plugin, membership of the journal group by the agent user, or an ACL on the journal directory. The capability sweep covers the first; this covers the second. Without it a host relying on group membership is indistinguishable from a broken one |
-| **journal directories** (`/var/log/journal`, `/run/log/journal`, in `netdata-paths.txt`) | the third mechanism. On a default systemd host these are `root:systemd-journal` with an ACL, and an ACL is invisible to `ls` — so this is the only way a bundle shows whether the agent could read the journal at all. A recurring `systemd-journal.plugin` support class |
+| **agent user and groups** (`09-permissions/netdata-user.txt`) | journal and device access commonly rests on one of three mechanisms — a file capability on the plugin, membership of the journal group by the agent user, or an ACL on the journal directory — on top of ordinary mode bits and any MAC policy, both of which the other rows cover. The capability sweep covers the first; this covers the second. Without it a host relying on group membership is indistinguishable from a broken one |
+| **journal directories** (`/var/log/journal`, `/run/log/journal`, in `netdata-paths.txt`) | the third mechanism. On a default systemd host these are `root:systemd-journal` with an ACL, and an ACL is invisible to `ls` — so this is the permission evidence for journal access, complemented by the opt-in plugin debug capture below, which shows what the plugin actually reported. A recurring `systemd-journal.plugin` support class |
 | **`plugins.d`**: mode, ownership, setuid/setgid bits and per-file **capabilities** (`getcap`) | a dropped capability or lost setuid bit is a top cause of "this collector shows no data" — a stock install has seven capability-bearing plugins (`apps.plugin`, `debugfs.plugin`, `go.d.plugin`, `network-viewer.plugin`, `perf.plugin`, `slabinfo.plugin`, `systemd-journal.plugin`) and several setuid ones |
 | all netdata paths (config dir, `netdata.conf`, `stream.conf`, `ssl/`, log/lib/cache dirs, `plugins.d`, the binary): mode, owner, **extended attributes**, **security context**, **ACLs**, non-default ext2/3/4 file flags | an immutable (`i`) flag on a state directory silently blocks the agent's own writes, and an SELinux mislabel fails collectors with nothing in the agent log |
 | Windows: ACLs with inheritance state, protected-ACL detection, integrity labels, alternate data streams | a `Zone.Identifier` stream marks a file downloaded-and-blocked; a protected (inheritance-disabled) ACL is a common post-restore breakage |
@@ -267,7 +267,9 @@ records which user it actually ran as, and says plainly when impersonation was n
 agent user is resolved to a name first, because `ps` prints a bare uid for a containerised agent and
 neither `runuser` nor `su` can impersonate a uid with no local account. The run carries its own
 `timeout` around the plugin rather than relying on the wrapper being reaped, because debug mode gives
-itself a 600s stop and the portable watchdog only kills direct children. Output is sanitized and
+itself a 600s stop and the portable watchdog only kills direct children. Where `timeout` does not
+exist (notably macOS) the capture says so and only the best-effort watchdog applies, so the bound is
+not guaranteed there. Output is sanitized and
 manifest-tracked like every other capture.
 
 It exists because this plugin's failures are overwhelmingly permission failures, and its stderr names
