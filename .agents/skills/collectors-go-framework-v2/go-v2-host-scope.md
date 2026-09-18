@@ -41,6 +41,8 @@ or virtual-node targets.
 
 ## Jobruntime V2
 
+- Per-job status/duration charts remain on the local Agent host, outside all vnodes and scopes. Their semantics and
+  publication/cleanup contract are owned by `src/go/plugin/framework/jobruntime/README.md#per-job-collection-charts`.
 - V2 jobruntime owns host/vnode orchestration. Chartengine remains host-agnostic.
 - One `chartengine.Engine` is used per host scope for a job.
 - Scope engines are created lazily.

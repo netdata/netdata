@@ -691,7 +691,8 @@ END`, chartengine.Priority))
 						require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 						job.runOnce()
-						assert.Empty(t, output.String())
+						assertOnlySelfMetrics(t, output.String())
+						assert.Contains(t, output.String(), "SET 'failed' = 1")
 						job.runOnce()
 
 						assert.Contains(t, output.String(), "CHART 'module_job.workers_busy'")
@@ -700,7 +701,7 @@ END`, chartengine.Priority))
 				}
 			},
 		},
-		"collect error aborts cycle and emits nothing": {
+		"collect error aborts cycle and emits failed status": {
 			run: func(t *testing.T) {
 				store := metrix.NewCollectorStore()
 				mod := &mockModuleV2{
@@ -716,7 +717,7 @@ END`, chartengine.Priority))
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				job.runOnce()
 
-				assert.Equal(t, "", out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Equal(
 					t,
 					metrix.CollectStatusFailed,
@@ -1432,7 +1433,7 @@ HOST_DEFINE_END
 HOST 'node-guid'
 
 CHART 'module_job.workers_busy'`)
-	assert.NotContains(t, wire, "HOST ''")
+	assertSelfChartsLocal(t, out.String())
 
 	out.Reset()
 	current = 2
@@ -1829,7 +1830,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 
 				job.runOnce()
 
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Equal(t, 1, registry.OwnerCount("node-guid"))
 			},
 		},
@@ -1962,7 +1963,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 
 				job.runOnce()
 
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Empty(t, registry.OwnerCount("node-guid"))
 			},
 		},
@@ -2000,7 +2001,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
-				assert.Equal(t, "", out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Equal(t, 0, registry.Len())
 
 				emitValue = true
@@ -2032,7 +2033,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
-				assert.Equal(t, "", out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Nil(t, job.scopeStates[defaultHostScopeKey])
 
 				emitValue = true
@@ -2116,6 +2117,8 @@ CHART 'module_job.workers_busy'`)
 
 CHART 'module_job.workers_busy'`)
 				assertContainsInOrder(t, wire, "HOST ''", "HOST_DEFINE 'guid-a'", "HOST_DEFINE 'guid-b'")
+				assertSelfChartsLocal(t, wire)
+				assert.Equal(t, 1, strings.Count(wire, "BEGIN 'netdata.plugin_module_job_data_collection_status'"))
 				assert.Equal(t, 1, registry.OwnerCount("guid-a"))
 				assert.Equal(t, 1, registry.OwnerCount("guid-b"))
 			},
@@ -2161,6 +2164,8 @@ CHART 'module_job.workers_busy'`)
 CHART 'module_job.workers_busy'`)
 				assert.Contains(t, wire, "SET 'busy' = 1")
 				assert.NotContains(t, wire, "bad-guid")
+				assert.Contains(t, wire, "SET 'success' = 1\nSET 'failed' = 0")
+				assertSelfChartsLocal(t, wire)
 				assert.Empty(t, registry.OwnerCount("bad-guid"))
 				assert.Equal(t, int64(0), job.retries.Load())
 			},
@@ -2240,7 +2245,7 @@ CHART 'module_job.workers_busy'`)
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Empty(t, registry.OwnerCount("guid-a"))
 				require.NotNil(t, job.scopeStates["scope-a"])
 				assert.Empty(t, job.scopeStates["scope-a"].host.cleanupCharts)
@@ -2248,7 +2253,7 @@ CHART 'module_job.workers_busy'`)
 				emitScope = false
 				job.runOnce()
 
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Empty(t, registry.OwnerCount("guid-a"))
 				assert.Nil(t, job.scopeStates["scope-a"])
 			},
@@ -2634,10 +2639,10 @@ CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_b
 				MetadataRevision: 2,
 			})
 			job.runOnce()
-			require.Empty(t, out.String())
+			assertOnlySelfMetrics(t, out.String())
 			job.Cleanup()
 			if tc.wantCleanup == "" {
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 			} else {
 				assert.Contains(t, out.String(), tc.wantCleanup)
 			}
@@ -2708,7 +2713,7 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 		MetadataRevision: 2,
 	})
 	job.runOnce()
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 	require.Equal(t, 1, mod.templateCalls)
 	require.Equal(
 		t,
@@ -2729,7 +2734,7 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 
 	out.Reset()
 	job.runOnce()
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 	assert.Equal(t, 1, mod.templateCalls)
 	assert.Equal(
 		t,
@@ -2749,7 +2754,7 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 	)
 
 	job.Cleanup()
-	assert.Empty(t, out.String())
+	assertOnlySelfMetrics(t, out.String())
 	assert.Zero(t, job.publication.Len())
 }
 
@@ -2788,7 +2793,7 @@ func TestJobV2CleanupUsesPreModuleCleanupSnapshotForStaleSuppression(t *testing.
 
 	job.Cleanup()
 
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 	assert.True(t, mod.cleaned)
 }
 
