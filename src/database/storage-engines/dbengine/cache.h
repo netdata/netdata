@@ -7,6 +7,7 @@
 
 typedef struct pgc PGC;
 typedef struct pgc_page PGC_PAGE;
+struct dbengine_engine;
 #define PGC_NAME_MAX 23
 
 typedef enum __attribute__ ((__packed__)) {
@@ -34,13 +35,16 @@ typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
 typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *entries_array, PGC_PAGE **pages_array, size_t entries);
 typedef void (*save_dirty_init_callback)(PGC *cache, Word_t section);
 // create a cache
+// the last four parameters are the settings the cache follows, passed by the creator so that the cache reads no
+// engine configuration; cpus (>= 1) sizes the default partitions and the evictors and flushers the cache supports
 PGC *pgc_create(const char *name,
                 size_t clean_size_bytes, free_clean_page_callback pgc_free_clean_cb,
                 size_t max_dirty_pages_per_flush, save_dirty_init_callback pgc_save_init_cb, save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_inline_evictors,
                 size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
-                PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page);
+                PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page,
+                bool statistics, bool use_all_ram, uint64_t out_of_memory_protection_bytes, size_t cpus);
 
 // destroy the cache
 // false when the cache stays allocated: pages are still referenced (or there is no cache)
@@ -109,7 +113,7 @@ void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct dbengine_datafile
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 
-typedef int64_t (*dynamic_target_cache_size_callback)(void);
+typedef int64_t (*dynamic_target_cache_size_callback)(PGC *cache);
 void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache_size_callback callback);
 
 typedef size_t (*nominal_page_size_callback)(void *);
@@ -130,12 +134,15 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
     return hash % modulo;
 }
 
-static inline size_t pgc_max_evictors(void) {
-    return 1 + dbengine_cfg.cpus / 2;
+// the evictors and flushers a cache runs are functions of the cpus it was created for
+static inline size_t pgc_evictors_for_cpus(size_t cpus) {
+    return 1 + cpus / 2;
 }
 
-static inline size_t pgc_max_flushers(void) {
-    return dbengine_cfg.cpus;
-}
+size_t pgc_max_evictors(PGC *cache);
+size_t pgc_max_flushers(PGC *cache);
+
+// the engine the cache belongs to; NULL for a cache that belongs to none (the tests')
+struct dbengine_engine *pgc_engine(PGC *cache);
 
 #endif // DBENGINE_CACHE_H

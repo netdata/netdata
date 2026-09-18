@@ -1147,22 +1147,17 @@ void pgc_open_add_hot_page(
     pgc_page_release(open_cache, (PGC_PAGE *)page);
 }
 
-int64_t dynamic_open_cache_size(void) {
-    // a cache that dbengine_destroy() had to leave allocated is still asked for space by whoever releases its
-    // pages, and by the finalization of its datafiles, after the main cache was freed: it then sizes itself from
-    // its floor. One read of the global, so the NULL check and the two uses below cannot disagree; the store that
-    // clears it happens after every engine thread was joined, so nothing races it.
-    PGC *mc = main_cache;
-    if(!mc)
-        return OPEN_CACHE_MIN_SIZE;
+int64_t dbengine_follower_cache_size(PGC *main_cache_or_null, int64_t percent, int64_t floor_size) {
+    if(!main_cache_or_null)
+        return floor_size;
 
-    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(mc);
-    int64_t target_size = main_wanted_cache_size / 100 * 5;
+    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache_or_null);
+    int64_t target_size = main_wanted_cache_size / 100 * percent;
 
-    if(target_size < OPEN_CACHE_MIN_SIZE)
-        target_size = OPEN_CACHE_MIN_SIZE;
+    if(target_size < floor_size)
+        target_size = floor_size;
 
-    int64_t main_current_cache_size = pgc_get_current_cache_size(mc);
+    int64_t main_current_cache_size = pgc_get_current_cache_size(main_cache_or_null);
 
     int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
                                       main_wanted_cache_size - main_current_cache_size : 0;
@@ -1170,25 +1165,18 @@ int64_t dynamic_open_cache_size(void) {
     return target_size + main_free_cache_size;
 }
 
-int64_t dynamic_extent_cache_size(void) {
+int64_t dynamic_open_cache_size(PGC *cache __maybe_unused) {
+    // a cache that dbengine_destroy() had to leave allocated is still asked for space by whoever releases its
+    // pages, and by the finalization of its datafiles, after the main cache was freed: it then sizes itself from
+    // its floor. One read of the global, so the NULL check and the two uses in the helper cannot disagree; the
+    // store that clears it happens after every engine thread was joined, so nothing races it.
+    return dbengine_follower_cache_size(main_cache, 5, OPEN_CACHE_MIN_SIZE);
+}
+
+int64_t dynamic_extent_cache_size(PGC *cache __maybe_unused) {
     // as for the open cache: a retained extent cache outlives the main cache too, though only a late page
     // release reaches it (datafile finalization never asks the extent cache for anything)
-    PGC *mc = main_cache;
-    if(!mc)
-        return EXTENT_CACHE_MIN_SIZE;
-
-    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(mc);
-    int64_t target_size = main_wanted_cache_size / 100 * 30;
-
-    if(target_size < EXTENT_CACHE_MIN_SIZE)
-        target_size = EXTENT_CACHE_MIN_SIZE;
-
-    int64_t main_current_cache_size = pgc_get_current_cache_size(mc);
-
-    int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
-                                      main_wanted_cache_size - main_current_cache_size : 0;
-
-    return target_size + main_free_cache_size;
+    return dbengine_follower_cache_size(main_cache, 30, EXTENT_CACHE_MIN_SIZE);
 }
 
 size_t pgc_main_nominal_page_size(void *data) {
@@ -1211,6 +1199,12 @@ void pgc_and_mrg_initialize(void)
 
     extent_cache_size += dbengine_cfg.extent_cache_mb * 1024ULL * 1024ULL;
 
+    const bool statistics = dbengine_cfg.cache_statistics;
+    const bool use_all_ram = dbengine_cfg.use_all_ram_for_caches;
+    const uint64_t oom_protection_bytes = dbengine_cfg.out_of_memory_protection_bytes;
+    const size_t cpus = dbengine_cfg.cpus;
+    const size_t max_evictors = pgc_evictors_for_cpus(cpus);
+
     main_cache = pgc_create(
             "MAIN_PGC",
             main_cache_size,
@@ -1219,12 +1213,13 @@ void pgc_and_mrg_initialize(void)
             main_cache_flush_dirty_page_init_callback,
             main_cache_flush_dirty_page_callback,
             2,
-            pgc_max_evictors(),
+            max_evictors,
             1000,
             1,
             PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
             0,
-            0
+            0,
+            statistics, use_all_ram, oom_protection_bytes, cpus
     );
     pgc_set_nominal_page_size_callback(main_cache, pgc_main_nominal_page_size);
 
@@ -1236,12 +1231,13 @@ void pgc_and_mrg_initialize(void)
             NULL,
             open_cache_flush_dirty_page_callback,
             1,
-            pgc_max_evictors(),
+            max_evictors,
             1000,
             1,
             PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
             0,
-            sizeof(struct extent_io_data)
+            sizeof(struct extent_io_data),
+            statistics, use_all_ram, oom_protection_bytes, cpus
     );
     pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
 
@@ -1253,12 +1249,13 @@ void pgc_and_mrg_initialize(void)
             NULL,
             extent_cache_flush_dirty_page_callback,
             1,
-            pgc_max_evictors(),
+            max_evictors,
             1000,
             1,
             PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE, // no flushing needed
             0,
-            0
+            0,
+            statistics, use_all_ram, oom_protection_bytes, cpus
     );
     pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);
 }

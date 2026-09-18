@@ -97,6 +97,7 @@ struct pgc {
         bool stats; // enable extended statistics
         bool use_all_ram;
 
+        size_t cpus; // what the evictors and flushers this cache supports are sized from
         size_t partitions;
         int64_t clean_size;
         size_t max_dirty_pages_per_call;
@@ -119,6 +120,8 @@ struct pgc {
         dynamic_target_cache_size_callback dynamic_target_size_cb;
         nominal_page_size_callback nominal_page_size_cb;
     } config;
+
+    struct dbengine_engine *engine;
 
     struct {
         ND_THREAD *thread;              // the thread
@@ -431,7 +434,7 @@ static ssize_t cache_usage_per1000(PGC *cache, int64_t *size_to_evict) {
         if(cache->config.dynamic_target_size_cb) {
             wanted_cache_size = pgc_wanted_size(hot, hot, dirty, index);
 
-            const int64_t wanted_cache_size_cb = cache->config.dynamic_target_size_cb();
+            const int64_t wanted_cache_size_cb = cache->config.dynamic_target_size_cb(cache);
             if(wanted_cache_size_cb > wanted_cache_size)
                 wanted_cache_size = wanted_cache_size_cb;
         }
@@ -2120,7 +2123,11 @@ PGC *pgc_create(const char *name,
                 size_t max_flushes_inline,
                 PGC_OPTIONS options,
                 size_t partitions,
-                size_t additional_bytes_per_page) {
+                size_t additional_bytes_per_page,
+                bool statistics,
+                bool use_all_ram,
+                uint64_t out_of_memory_protection_bytes,
+                size_t cpus) {
 
     if(max_pages_per_inline_eviction < 1)
         max_pages_per_inline_eviction = 1;
@@ -2136,7 +2143,7 @@ PGC *pgc_create(const char *name,
 
     cache->config.options = options;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
-    cache->config.stats = dbengine_cfg.cache_statistics;
+    cache->config.stats = statistics;
 
     // flushing
     cache->config.max_flushes_inline            = (max_flushes_inline == 0) ? 2 : max_flushes_inline;
@@ -2158,11 +2165,13 @@ PGC *pgc_create(const char *name,
                                                         // otherwise, it runs by itself every 100ms
 
     // use all ram and protection from out of memory
-    cache->config.use_all_ram                       = dbengine_cfg.use_all_ram_for_caches;
-    cache->config.out_of_memory_protection_bytes    = (int64_t)dbengine_cfg.out_of_memory_protection_bytes;
+    cache->config.use_all_ram                       = use_all_ram;
+    cache->config.out_of_memory_protection_bytes    = (int64_t)out_of_memory_protection_bytes;
+
+    cache->config.cpus                              = cpus;
 
     // partitions
-    if(partitions == 0) partitions  = dbengine_cfg.cpus * 2;
+    if(partitions == 0) partitions  = cpus * 2;
     if(partitions <= 4) partitions  = 4;
     if(partitions > 256) partitions = 256;
     cache->config.partitions        = partitions;
@@ -2227,6 +2236,18 @@ PGC *pgc_create(const char *name,
 
 struct aral_statistics *pgc_aral_stats(void) {
     return &pgc_aral_statistics;
+}
+
+size_t pgc_max_evictors(PGC *cache) {
+    return pgc_evictors_for_cpus(cache->config.cpus);
+}
+
+size_t pgc_max_flushers(PGC *cache) {
+    return cache->config.cpus;
+}
+
+struct dbengine_engine *pgc_engine(PGC *cache) {
+    return cache->engine;
 }
 
 void pgc_flush_dirty_pages(PGC *cache, Word_t section) {
@@ -3450,7 +3471,9 @@ int dbengine_cache_unittest(const struct dbengine_config *cfg) {
                             32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, NULL, unittest_save_dirty_page_callback,
                             10, 10, 1000, 10,
-                            PGC_OPTIONS_DEFAULT, 1, 11);
+                            PGC_OPTIONS_DEFAULT, 1, 11,
+                            cfg->cache_statistics, cfg->use_all_ram_for_caches,
+                            cfg->out_of_memory_protection_bytes, cfg->cpus);
 
     // FIXME - unit tests
     // - add clean page
@@ -3519,12 +3542,16 @@ int dbengine_cache_unittest(const struct dbengine_config *cfg) {
                                   32 * 1024 * 1024, unittest_free_clean_page_callback,
                                   64, NULL, unittest_save_dirty_page_callback,
                                   10, 10, 1000, 10,
-                                  PGC_OPTIONS_DEFAULT, 4, 0);
+                                  PGC_OPTIONS_DEFAULT, 4, 0,
+                                  cfg->cache_statistics, cfg->use_all_ram_for_caches,
+                                  cfg->out_of_memory_protection_bytes, cfg->cpus);
         PGC *cache_b = pgc_create("partition-cache-b",
                                   32 * 1024 * 1024, unittest_free_clean_page_callback,
                                   64, NULL, unittest_save_dirty_page_callback,
                                   10, 10, 1000, 10,
-                                  PGC_OPTIONS_DEFAULT, 5, 0);
+                                  PGC_OPTIONS_DEFAULT, 5, 0,
+                                  cfg->cache_statistics, cfg->use_all_ram_for_caches,
+                                  cfg->out_of_memory_protection_bytes, cfg->cpus);
 
         Word_t metric_id = 5;
         size_t partition_a = pgc_indexing_partition(cache_a, metric_id);

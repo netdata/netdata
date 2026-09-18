@@ -876,7 +876,8 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
         32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
         64, NULL, jv2_stale_metric_save_dirty_cb,
         10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data),
+        true, false, 0, 1);
 
     // 1. a real metric, with no retention so it is deletable on release
     nd_uuid_t victim;
@@ -1362,7 +1363,8 @@ static int mrg_jv2_same_uuid_grouped_once_check(
         32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
         64, NULL, jv2_stale_metric_save_dirty_cb,
         10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data),
+        true, false, 0, 1);
 
     // declared before the goto below, so jumping to cleanup cannot skip an
     // initialization and leave the teardown reading indeterminate values
@@ -1689,7 +1691,8 @@ static int mrg_jv2_real_writer_unittest(void) {
         32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
         64, NULL, jv2_stale_metric_save_dirty_cb,
         10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data),
+        true, false, 0, 1);
 
     // everything the cleanup path can touch, and everything the gotos below jump
     // over, is declared and initialized up front

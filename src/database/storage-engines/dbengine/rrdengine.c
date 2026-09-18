@@ -1986,7 +1986,7 @@ static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct dbengine_
     worker_is_busy(DBENGINE_WORKER_JOB_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
-    for(size_t i = 0; i < pgc_max_flushers() ; i++)
+    for(size_t i = 0; i < pgc_max_flushers(main_cache) ; i++)
         dbengine_enq_cmd(NULL, DBENGINE_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     return data;
@@ -2000,7 +2000,7 @@ static void *flush_dirty_pages_of_section_tp_worker(struct dbengine_tier *ctx __
     worker_is_busy(DBENGINE_WORKER_JOB_FLUSH_DIRTY);
     pgc_flush_dirty_pages(main_cache, (Word_t)ctx);
 
-    for(size_t i = 0; i < pgc_max_flushers() ; i++)
+    for(size_t i = 0; i < pgc_max_flushers(main_cache) ; i++)
         dbengine_enq_cmd(NULL, DBENGINE_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     return data;
@@ -2859,7 +2859,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case DBENGINE_OPCODE_FLUSH_MAIN: {
-                    if(dbengine_main.flushes_running < pgc_max_flushers()) {
+                    if(dbengine_main.flushes_running < pgc_max_flushers(main_cache)) {
                         dbengine_main.flushes_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }
@@ -2867,7 +2867,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case DBENGINE_OPCODE_EVICT_MAIN: {
-                    if(dbengine_main.evict_main_running < pgc_max_evictors()) {
+                    if(dbengine_main.evict_main_running < pgc_max_evictors(main_cache)) {
                         dbengine_main.evict_main_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_evict_main_tp_worker, after_do_main_cache_evict);
                     }
@@ -2875,7 +2875,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case DBENGINE_OPCODE_EVICT_OPEN: {
-                    if(dbengine_main.evict_open_running < pgc_max_evictors()) {
+                    if(dbengine_main.evict_open_running < pgc_max_evictors(main_cache)) {
                         dbengine_main.evict_open_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_evict_open_tp_worker, after_do_open_cache_evict);
                     }
@@ -2883,7 +2883,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case DBENGINE_OPCODE_EVICT_EXTENT: {
-                    if(dbengine_main.evict_extent_running < pgc_max_evictors()) {
+                    if(dbengine_main.evict_extent_running < pgc_max_evictors(main_cache)) {
                         dbengine_main.evict_extent_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_evict_extent_tp_worker, after_do_extent_cache_evict);
                     }

@@ -14,8 +14,12 @@ extern struct pgc *extent_cache;
 // settle on once the main cache is gone; the extent floor is also the least the engine reserves for it at start
 #define OPEN_CACHE_MIN_SIZE   (2 * 1024 * 1024)
 #define EXTENT_CACHE_MIN_SIZE (5 * 1024 * 1024)
-int64_t dynamic_open_cache_size(void);
-int64_t dynamic_extent_cache_size(void);
+int64_t dynamic_open_cache_size(struct pgc *cache);
+int64_t dynamic_extent_cache_size(struct pgc *cache);
+
+// what a cache that sizes itself from the main cache wants: `percent` of what the main cache wants plus the main
+// cache's unused space, never below `floor_size`; `floor_size` alone when there is no main cache
+int64_t dbengine_follower_cache_size(struct pgc *main_cache_or_null, int64_t percent, int64_t floor_size);
 
 /* Forward declarations */
 struct dbengine_tier;

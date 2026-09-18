@@ -83,14 +83,14 @@ int dbengine_cache_floor_unittest(void) {
     }
 
     int errors = 0;
-    int64_t open_size = dynamic_open_cache_size();
+    int64_t open_size = dynamic_open_cache_size(NULL);
     if(open_size != OPEN_CACHE_MIN_SIZE) {
         fprintf(stderr, " >>> DBENGINE: open cache size without a main cache is %" PRId64 ", expected %" PRId64 "\n",
                 open_size, (int64_t)OPEN_CACHE_MIN_SIZE);
         errors++;
     }
 
-    int64_t extent_size = dynamic_extent_cache_size();
+    int64_t extent_size = dynamic_extent_cache_size(NULL);
     if(extent_size != EXTENT_CACHE_MIN_SIZE) {
         fprintf(stderr, " >>> DBENGINE: extent cache size without a main cache is %" PRId64 ", expected %" PRId64 "\n",
                 extent_size, (int64_t)EXTENT_CACHE_MIN_SIZE);
