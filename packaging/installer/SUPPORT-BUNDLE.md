@@ -255,10 +255,20 @@ These are excluded by design. **Do not add them.**
 and off by default: the design contract above promises the tool is read-only.
 
 It runs `systemd-journal.plugin debug` as the agent's own user (via `runuser`, falling back to `su`)
-and captures the combined output into `09-permissions/plugin-debug-systemd-journal.txt`. Running it
-as the invoking root user would prove nothing about the agent's access, so the artifact records which
-user it actually ran as. The run is bounded by the normal per-command timeout and output cap, and the
-result is sanitized and manifest-tracked like every other capture.
+and captures **stderr only** into `09-permissions/plugin-debug-systemd-journal.txt`.
+
+Stdout is discarded deliberately: debug mode issues a `last:200 ... __logs_sources:all` query and
+writes those journal records to stdout, so collecting it would pull other services' logs into the
+bundle — which "What is NEVER collected" forbids. The permission failure this option exists for is
+reported on stderr, which is also what the maintainer recipe it replaces tells customers to read.
+
+Running as the invoking root user would prove nothing about the agent's access, so the artifact
+records which user it actually ran as, and says plainly when impersonation was not possible. The
+agent user is resolved to a name first, because `ps` prints a bare uid for a containerised agent and
+neither `runuser` nor `su` can impersonate a uid with no local account. The run carries its own
+`timeout` around the plugin rather than relying on the wrapper being reaped, because debug mode gives
+itself a 600s stop and the portable watchdog only kills direct children. Output is sanitized and
+manifest-tracked like every other capture.
 
 It exists because this plugin's failures are overwhelmingly permission failures, and its stderr names
 the reason directly — the permission artifacts above show what the agent *has*, this shows what the

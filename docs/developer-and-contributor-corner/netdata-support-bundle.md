@@ -102,7 +102,9 @@ reports. It is the only option that runs a collector, so it is off by default. U
 journal logs are missing from Netdata — that failure is almost always a permissions problem, and the
 plugin states the reason directly.
 
-The output is sanitized and size-capped like everything else in the bundle.
+Only the plugin's error output is collected — its normal output is journal content and is
+discarded, so the bundle does not pick up logs from your other services. What is collected is
+sanitized and size-capped like everything else in the bundle.
 
 ## Include SNMP diagnostics
 
