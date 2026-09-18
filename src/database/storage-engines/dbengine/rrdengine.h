@@ -480,7 +480,8 @@ struct dbengine_tier {
         PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
         PAD64(bool) active;                                // set by a successful dbengine_tier_init(), cleared by dbengine_tier_exit()
-        PAD64(bool) came_up;                               // set with active, never cleared by dbengine_tier_exit(): a tier that
+        PAD64(bool) came_up;                               // set on a successful init, just before active; never cleared by
+                                                           // dbengine_tier_exit(): a tier that
                                                            // exited keeps its datafiles attached until dbengine_destroy() finalizes
                                                            // them and initialize_tier() resets the slot, so it cannot come up again
         PAD64(bool) mrg_populated;                         // set when the metrics registry has been loaded from every journal

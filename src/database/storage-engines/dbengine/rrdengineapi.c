@@ -1133,7 +1133,10 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
 {
     uint32_t max_open_files;
 
-    // before anything is written to the tier: a refused init must leave the static tier as it found it
+    // the configuration first (a bad one is a programming error, fatal whatever the engine's state), then the
+    // engine and the tier, all before anything is written: a refused init must leave the static tier as it found it
+    dbengine_tier_config_validate(tc);
+
     switch(dbengine_lifecycle_state()) {
         case DBENGINE_LIFECYCLE_DOWN:
             fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
@@ -1146,7 +1149,6 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
             break;
     }
 
-    dbengine_tier_config_validate(tc);
     size_t tier = tc->tier;
     unsigned disk_space_mb = tc->disk_space_mb;
 
