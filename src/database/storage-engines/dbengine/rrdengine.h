@@ -524,7 +524,8 @@ struct dbengine_engine {
     ND_THREAD *thread;
     uv_loop_t loop;
     bool loop_open;                     // uv_loop_init() succeeded and the loop is not closed yet: a loop the thread
-                                        // could not close on its way out is drained by dbengine_engine_free()
+                                        // could not close on its way out is run to completion and closed by
+                                        // dbengine_shutdown() once the thread was joined
     uv_async_t async;
 #if defined(OS_WINDOWS)
     bool async_ready;

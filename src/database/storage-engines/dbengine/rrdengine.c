@@ -2620,12 +2620,9 @@ void dbengine_engine_free(struct dbengine_engine *engine) {
     if(!engine)
         return;
 
-    // a loop whose thread could not close it on its way out has its handles closing: let them finish
-    if(engine->loop_open) {
-        uv_run(&engine->loop, UV_RUN_DEFAULT);
-        fatal_assert(0 == uv_loop_close(&engine->loop));
-        engine->loop_open = false;
-    }
+    // the loop is closed by the thread on its way out or by dbengine_shutdown() after it; an engine that spawned
+    // is freed only after that
+    internal_fatal(engine->loop_open, "DBENGINE: the engine is freed while its loop is open");
 
     // what the registry preload acquired holds references on metrics, so a registry that was freed was released
     // of it first
@@ -2974,7 +2971,8 @@ void dbengine_event_loop(void* arg) {
     uv_sem_destroy(&sem);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
-    // what is left open is drained when the engine is freed
+    // what is left open (a handle still closing, a work request still on the thread pool) is finished by
+    // dbengine_shutdown() once this thread was joined
     engine->loop_open = (0 != uv_loop_close(&engine->loop));
     worker_unregister();
 }
@@ -3002,4 +3000,14 @@ void dbengine_shutdown(struct dbengine_engine *engine)
         nd_log_daemon(NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
     else
         nd_log_daemon(NDLP_INFO, "DBENGINE: thread shutdown completed");
+
+    // a loop its thread could not close on the way out still has a handle closing, or a work request on the thread
+    // pool (a flush or a cleanup the last timer tick dispatched). Running it here finishes them while everything they
+    // touch is still allocated: this returns with nothing of the engine executing any more, which is what
+    // dbengine_destroy() relies on
+    if(engine->loop_open) {
+        uv_run(&engine->loop, UV_RUN_DEFAULT);
+        fatal_assert(0 == uv_loop_close(&engine->loop));
+        engine->loop_open = false;
+    }
 }
