@@ -25,6 +25,12 @@ typedef struct machine_learning_stats_t {
     uint32_t num_training_status_pending_with_model;
     uint32_t num_training_status_silenced;
 
+    // Dimensions holding at least one k-means model. NOT derivable from the
+    // counters above: a METRIC_TYPE_CONSTANT dimension is reported as
+    // "trained" (ml.cc, ml_chart_update_dimension) even though it never
+    // produced a model, so training_status overstates model coverage.
+    uint32_t num_dimensions_with_models;
+
     uint32_t num_anomalous_dimensions;
     uint32_t num_normal_dimensions;
 } ml_machine_learning_stats_t;
@@ -83,6 +89,7 @@ typedef struct ml_host {
     RRDDIM *training_status_trained_rd;
     RRDDIM *training_status_pending_with_model_rd;
     RRDDIM *training_status_silenced_rd;
+    RRDDIM *training_status_with_model_rd;
 
     RRDSET *dimensions_rs;
     RRDDIM *dimensions_anomalous_rd;
