@@ -592,8 +592,8 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     mrg_metric_release(mrg, metric);
 }
 
-inline void mrg_get_statistics(MRG *mrg, struct mrg_statistics *s) {
-    memset(s, 0, sizeof(struct mrg_statistics));
+inline void mrg_get_statistics(MRG *mrg, struct dbengine_metrics_registry_stats *s) {
+    memset(s, 0, sizeof(struct dbengine_metrics_registry_stats));
 
     for(size_t i = 0; i < _countof(mrg->index) ;i++) {
         s->entries += __atomic_load_n(&mrg->index[i].stats.entries, __ATOMIC_RELAXED);

@@ -1852,8 +1852,8 @@ set(RRD_PLUGIN_FILES
         src/database/storage-engines/storage-engine.c
         src/database/storage-engines/storage-engine.h
         src/database/storage-engines/storage-engine-types.h
-        src/database/storage-engines/ram/rrddim_mem.c
-        src/database/storage-engines/ram/rrddim_mem.h
+        src/database/storage-engines/ram/ram.c
+        src/database/storage-engines/ram/ram.h
         src/database/sqlite/sqlite_metadata.c
         src/database/sqlite/sqlite_metadata.h
         src/database/sqlite/sqlite_functions.c
@@ -1929,7 +1929,7 @@ if(ENABLE_DBENGINE)
     # target a definition the other does not get, or the snapshots pulse copies across the boundary silently
     # misalign.
     set(DBENGINE_FILES
-            src/database/storage-engines/dbengine/include/dbengine/rrdengineapi.h
+            src/database/storage-engines/dbengine/include/dbengine/dbengine-api.h
             src/database/storage-engines/dbengine/include/dbengine/dbengine-config.h
             src/database/storage-engines/dbengine/include/dbengine/dbengine-stats.h
             src/database/storage-engines/dbengine/include/dbengine/dbengine-workers.h

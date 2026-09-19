@@ -6,7 +6,7 @@ MRG *main_mrg = NULL;
 PGC *main_cache = NULL;
 PGC *open_cache = NULL;
 PGC *extent_cache = NULL;
-struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
+struct dbengine_cache_efficiency_stats dbengine_cache_efficiency_stats = {};
 
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
@@ -15,7 +15,7 @@ static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_E
 }
 
 static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused, Word_t section) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
+    struct dbengine_tier *ctx = (struct dbengine_tier *) section;
 
     // mark ctx as having flushing in progress
     __atomic_add_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
@@ -26,7 +26,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
     if(!entries)
         return;
 
-     struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
+     struct dbengine_tier *ctx = (struct dbengine_tier *) entries_array[0].section;
 
     struct page_descr_with_data *base = NULL;
 
@@ -50,14 +50,14 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
     struct completion completion;
     completion_init(&completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_EXTENT_WRITE, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    dbengine_enq_cmd(ctx, DBENGINE_OPCODE_EXTENT_WRITE, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 }
 
 static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
-    struct rrdengine_datafile *datafile = entry.data;
+    struct dbengine_datafile *datafile = entry.data;
     datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
     timing_dbengine_evict_step(TIMING_STEP_DBENGINE_EVICT_FREE_OPEN);
 }
@@ -211,7 +211,7 @@ static ALWAYS_INLINE_HOT struct page_details *pdc_find_page_for_time(
     return NULL;
 }
 
-static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx,
+static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct dbengine_tier *ctx,
         time_t wanted_start_time_s, time_t wanted_end_time_s,
         Pvoid_t *JudyL_page_array, size_t *cache_gaps,
         bool open_cache_mode, PDC_PAGE_STATUS tags) {
@@ -292,7 +292,7 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metri
             }
 
             if(open_cache_mode) {
-                struct rrdengine_datafile *datafile = pgc_page_data(page);
+                struct dbengine_datafile *datafile = pgc_page_data(page);
                 if(datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) { // for pd
                     struct extent_io_data *xio = (struct extent_io_data *) pgc_page_custom_data(cache, page);
                     pd->datafile.ptr = pgc_page_data(page);
@@ -326,7 +326,7 @@ static ALWAYS_INLINE_HOT size_t get_page_list_from_pgc(PGC *cache, METRIC *metri
     return pages_found_in_cache;
 }
 
-static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_t start_time_s, time_t end_time_s) {
+static void pgc_inject_gap(struct dbengine_tier *ctx, METRIC *metric, time_t start_time_s, time_t end_time_s) {
 
     time_t db_first_time_s, db_last_time_s;
     mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, NULL);
@@ -353,7 +353,7 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
 }
 
 static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
-        struct rrdengine_instance *ctx,
+        struct dbengine_tier *ctx,
         METRIC *metric,
         Pvoid_t JudyL_page_array,
         time_t wanted_start_time_s,
@@ -486,7 +486,7 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
 
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
 
-static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric,
+static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier *ctx, METRIC *metric,
                                                            usec_t start_time_ut, usec_t end_time_ut,
                                                            page_found_callback_t callback, void *callback_data)
 {
@@ -511,7 +511,7 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
             .j2_header_acquired = NULL,
     };
 
-    struct rrdengine_datafile *datafile;
+    struct dbengine_datafile *datafile;
     while((datafile = njfv2idx_find_and_acquire_j2_header(&state))) {
         struct journal_v2_header *j2_header = state.j2_header_acquired;
 
@@ -520,7 +520,7 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
             continue;
         }
 
-        char file_path[RRDENG_PATH_MAX];
+        char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
         if(no_signal_received) {
@@ -663,7 +663,7 @@ release_journal:
 }
 
 void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
-    struct rrdengine_datafile *datafile = pgc_page_data(page);
+    struct dbengine_datafile *datafile = pgc_page_data(page);
 
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) // for pd
         return;
@@ -699,7 +699,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
 // DBENGINE2:
 #define time_delta(finish, pass) do { if(pass) { usec_t t = pass; (pass) = (finish) - (pass); (finish) = t; } } while(0)
 static ALWAYS_INLINE_HOT Pvoid_t get_page_list(
-        struct rrdengine_instance *ctx,
+        struct dbengine_tier *ctx,
         METRIC *metric,
         usec_t start_time_ut,
         usec_t end_time_ut,
@@ -798,45 +798,45 @@ we_are_done:
     time_delta(finish_ut, pass2_ut); // do not change the order
     time_delta(finish_ut, pass1_ut); // do not change the order
 
-    time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_main_cache_lookup, pass1_ut);
+    time_and_count_add(&dbengine_cache_efficiency_stats.prep_time_in_main_cache_lookup, pass1_ut);
 
     if(done_open) {
-        time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_open_cache_lookup, pass2_ut);
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_open_cache, pages_found_in_open_cache, __ATOMIC_RELAXED);
+        time_and_count_add(&dbengine_cache_efficiency_stats.prep_time_in_open_cache_lookup, pass2_ut);
+        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_meta_source_open_cache, pages_found_in_open_cache, __ATOMIC_RELAXED);
     }
 
     if(done_v2) {
-        time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_journal_v2_lookup, pass3_ut);
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
+        time_and_count_add(&dbengine_cache_efficiency_stats.prep_time_in_journal_v2_lookup, pass3_ut);
+        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
     }
 
     if(done_pass4) {
-        time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_in_pass4_lookup, pass4_ut);
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
+        time_and_count_add(&dbengine_cache_efficiency_stats.prep_time_in_pass4_lookup, pass4_ut);
+        __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_data_source_main_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
     }
 
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_planned_with_gaps, (query_gaps) ? 1 : 0, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_total, pages_total, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, *pages_to_load_from_disk, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_overlapping_skipped, pages_overlapping, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.queries_planned_with_gaps, (query_gaps) ? 1 : 0, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_total, pages_total, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_meta_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_to_load_from_disk, *pages_to_load_from_disk, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_overlapping_skipped, pages_overlapping, __ATOMIC_RELAXED);
 
     return JudyL_page_array;
 }
 
-ALWAYS_INLINE void rrdeng_prep_wait(PDC *pdc) {
+ALWAYS_INLINE void dbengine_prep_wait(PDC *pdc) {
     if (unlikely(pdc && !pdc->prep_done)) {
         usec_t started_ut = now_monotonic_usec();
         completion_wait_for(&pdc->prep_completion);
         pdc->prep_done = true;
-        time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_wait_for_prep, now_monotonic_usec() - started_ut);
+        time_and_count_add(&dbengine_cache_efficiency_stats.query_time_wait_for_prep, now_monotonic_usec() - started_ut);
     }
 }
 
-ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool worker) {
+ALWAYS_INLINE_HOT void dbengine_prep_query(struct page_details_control *pdc, bool worker) {
     if(worker)
-        worker_is_busy(RRDENG_WORKER_JOB_QUERY);
+        worker_is_busy(DBENGINE_WORKER_JOB_QUERY);
 
     pdc->page_list_JudyL = get_page_list(pdc->ctx, pdc->metric,
                                                  pdc->start_time_s * USEC_PER_SEC,
@@ -859,15 +859,15 @@ ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool 
         usec_t start_ut = now_monotonic_usec();
         if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS)) {
             pdc_route_synchronously(pdc->ctx, pdc);
-            time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_to_route_sync, now_monotonic_usec() - start_ut);
+            time_and_count_add(&dbengine_cache_efficiency_stats.prep_time_to_route_sync, now_monotonic_usec() - start_ut);
         }
         else if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS_FIRST)) {
             pdc_route_synchronously_first(pdc->ctx, pdc);
-            time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_to_route_syncfirst, now_monotonic_usec() - start_ut);
+            time_and_count_add(&dbengine_cache_efficiency_stats.prep_time_to_route_syncfirst, now_monotonic_usec() - start_ut);
         }
         else {
             pdc_route_asynchronously(pdc->ctx, pdc);
-            time_and_count_add(&rrdeng_cache_efficiency_stats.prep_time_to_route_async, now_monotonic_usec() - start_ut);
+            time_and_count_add(&dbengine_cache_efficiency_stats.prep_time_to_route_async, now_monotonic_usec() - start_ut);
         }
     }
     else
@@ -889,12 +889,12 @@ ALWAYS_INLINE_HOT void rrdeng_prep_query(struct page_details_control *pdc, bool 
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
+ALWAYS_INLINE_HOT void pg_cache_preload(struct dbengine_query_handle *handle) {
     if (unlikely(!handle || !handle->metric))
         return;
 
     __atomic_add_fetch(&handle->ctx->atomic.inflight_queries, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     handle->pdc = pdc_get();
     handle->pdc->ctx = handle->ctx;
     handle->pdc->refcount = 1;
@@ -909,7 +909,7 @@ ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
         pdc_release_and_destroy_if_unreferenced(handle->pdc, true, true);
         handle->pdc = NULL;
         __atomic_sub_fetch(&handle->ctx->atomic.inflight_queries, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&dbengine_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
         return;
     }
     handle->pdc->start_time_s = handle->start_time_s;
@@ -923,9 +923,9 @@ ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
 
         if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS || handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS_FIRST))
-            rrdeng_prep_query(handle->pdc, false);
+            dbengine_prep_query(handle->pdc, false);
         else
-            rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
+            dbengine_enq_cmd(handle->ctx, DBENGINE_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }
     else {
         completion_mark_complete(&handle->pdc->prep_completion);
@@ -939,7 +939,7 @@ ALWAYS_INLINE_HOT void pg_cache_preload(struct rrdeng_query_handle *handle) {
  * If index is NULL lookup by UUID (id).
  */
 struct pgc_page *pg_cache_lookup_next(
-        struct rrdengine_instance *ctx,
+        struct dbengine_tier *ctx,
         PDC *pdc,
         time_t now_s,
         uint32_t last_update_every_s,
@@ -948,7 +948,7 @@ struct pgc_page *pg_cache_lookup_next(
     if (unlikely(!pdc))
         return NULL;
 
-    rrdeng_prep_wait(pdc);
+    dbengine_prep_wait(pdc);
 
     if (unlikely(!pdc->page_list_JudyL))
         return NULL;
@@ -1005,7 +1005,7 @@ struct pgc_page *pg_cache_lookup_next(
         uint32_t page_update_every_s = pgc_page_update_every_s(page);
 
         if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_to_clean_evict_or_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_INVALID | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
@@ -1013,7 +1013,7 @@ struct pgc_page *pg_cache_lookup_next(
         }
         else {
             if (unlikely(!page_update_every_s)) {
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
                 page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
                 pd->update_every_s = page_update_every_s;
             }
@@ -1027,13 +1027,13 @@ struct pgc_page *pg_cache_lookup_next(
 
                 internal_fatal(entries_by_size != entries_by_time, "DBENGINE: wrong entries by time again!");
 
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_entries_fixed, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_invalid_entries_fixed, 1, __ATOMIC_RELAXED);
             }
             *entries = entries_by_time;
         }
 
         if(unlikely(page_end_time_s < now_s)) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_past_time_skipped, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&dbengine_cache_efficiency_stats.pages_past_time_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_SKIP | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
@@ -1048,33 +1048,33 @@ struct pgc_page *pg_cache_lookup_next(
     }
 
     if(gaps && !pdc->executed_with_gaps)
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_executed_with_gaps, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&dbengine_cache_efficiency_stats.queries_executed_with_gaps, 1, __ATOMIC_RELAXED);
     pdc->executed_with_gaps += gaps;
 
     if(page) {
         if(waited)
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_wait_loaded, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&dbengine_cache_efficiency_stats.page_next_wait_loaded, 1, __ATOMIC_RELAXED);
         else
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_nowait_loaded, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&dbengine_cache_efficiency_stats.page_next_nowait_loaded, 1, __ATOMIC_RELAXED);
     }
     else {
         if(waited)
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_wait_failed, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&dbengine_cache_efficiency_stats.page_next_wait_failed, 1, __ATOMIC_RELAXED);
         else
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_nowait_failed, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&dbengine_cache_efficiency_stats.page_next_nowait_failed, 1, __ATOMIC_RELAXED);
     }
 
     if(waited) {
         if(preloaded)
-            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_slow_preload_next_page, now_monotonic_usec() - start_ut);
+            time_and_count_add(&dbengine_cache_efficiency_stats.query_time_to_slow_preload_next_page, now_monotonic_usec() - start_ut);
         else
-            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_slow_disk_next_page, now_monotonic_usec() - start_ut);
+            time_and_count_add(&dbengine_cache_efficiency_stats.query_time_to_slow_disk_next_page, now_monotonic_usec() - start_ut);
     }
     else {
         if(preloaded)
-            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_fast_preload_next_page, now_monotonic_usec() - start_ut);
+            time_and_count_add(&dbengine_cache_efficiency_stats.query_time_to_fast_preload_next_page, now_monotonic_usec() - start_ut);
         else
-            time_and_count_add(&rrdeng_cache_efficiency_stats.query_time_to_fast_disk_next_page, now_monotonic_usec() - start_ut);
+            time_and_count_add(&dbengine_cache_efficiency_stats.query_time_to_fast_disk_next_page, now_monotonic_usec() - start_ut);
     }
 
     return page;
@@ -1087,11 +1087,11 @@ void pgc_open_add_hot_page(
     time_t start_time_s,
     time_t end_time_s,
     uint32_t update_every_s,
-    struct rrdengine_datafile *datafile,
+    struct dbengine_datafile *datafile,
     uint64_t extent_offset,
     unsigned extent_size)
 {
-    if (unlikely(!rrdeng_valid_extent_disk_size(extent_size))) {
+    if (unlikely(!dbengine_valid_extent_disk_size(extent_size))) {
         nd_log_limit_static_thread_var(erl, 10, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "DBENGINE: skipped adding open-cache page for datafile %u of tier %u, "

@@ -194,7 +194,7 @@ func c035GapCollected(base, ts int64, every int) bool {
 // src/database/rrddim-collection.c:9-12,68-80
 // tier_next_point_time_s(), store_metric_at_tier()
 // src/database/storage-engines/dbengine/rrdengineapi.c:716-729
-// rrdeng_store_metric_change_collection_frequency()
+// dbengine_store_change_collection_frequency()
 func c035Records(
 	base int64,
 	tc c035Case,

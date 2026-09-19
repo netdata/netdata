@@ -15,26 +15,26 @@
 uint8_t dbengine_default_compression(void) {
 
 #ifdef ENABLE_ZSTD
-    return RRDENG_COMPRESSION_ZSTD;
+    return DBENGINE_COMPRESSION_ZSTD;
 #endif
 
 #ifdef ENABLE_LZ4
-    return RRDENG_COMPRESSION_LZ4;
+    return DBENGINE_COMPRESSION_LZ4;
 #endif
 
-    return RRDENG_COMPRESSION_NONE;
+    return DBENGINE_COMPRESSION_NONE;
 }
 
 bool dbengine_valid_compression_algorithm(uint8_t algorithm) {
     switch(algorithm) {
-        case RRDENG_COMPRESSION_NONE:
+        case DBENGINE_COMPRESSION_NONE:
 
 #ifdef ENABLE_LZ4
-        case RRDENG_COMPRESSION_LZ4:
+        case DBENGINE_COMPRESSION_LZ4:
 #endif
 
 #ifdef ENABLE_ZSTD
-        case RRDENG_COMPRESSION_ZSTD:
+        case DBENGINE_COMPRESSION_ZSTD:
 #endif
 
             return true;
@@ -47,17 +47,17 @@ bool dbengine_valid_compression_algorithm(uint8_t algorithm) {
 size_t dbengine_max_compressed_size(size_t uncompressed_size, uint8_t algorithm) {
     switch(algorithm) {
 #ifdef ENABLE_LZ4
-        case RRDENG_COMPRESSION_LZ4:
+        case DBENGINE_COMPRESSION_LZ4:
             fatal_assert(uncompressed_size < LZ4_MAX_INPUT_SIZE);
             return LZ4_compressBound((int)uncompressed_size);
 #endif
 
 #ifdef ENABLE_ZSTD
-        case RRDENG_COMPRESSION_ZSTD:
+        case DBENGINE_COMPRESSION_ZSTD:
             return ZSTD_compressBound(uncompressed_size);
 #endif
 
-        case RRDENG_COMPRESSION_NONE:
+        case DBENGINE_COMPRESSION_NONE:
             return uncompressed_size;
 
         default: {
@@ -75,7 +75,7 @@ size_t dbengine_compress(void *payload, size_t uncompressed_size, uint8_t algori
 
     switch(algorithm) {
 #ifdef ENABLE_LZ4
-        case RRDENG_COMPRESSION_LZ4: {
+        case DBENGINE_COMPRESSION_LZ4: {
             size_t max_compressed_size = dbengine_max_compressed_size(uncompressed_size, algorithm);
             struct extent_buffer *eb = extent_buffer_get(max_compressed_size);
             void *compressed_buf = eb->data;
@@ -94,7 +94,7 @@ size_t dbengine_compress(void *payload, size_t uncompressed_size, uint8_t algori
 #endif
 
 #ifdef ENABLE_ZSTD
-        case RRDENG_COMPRESSION_ZSTD: {
+        case DBENGINE_COMPRESSION_ZSTD: {
             size_t max_compressed_size = dbengine_max_compressed_size(uncompressed_size, algorithm);
             struct extent_buffer *eb = extent_buffer_get(max_compressed_size);
             void *compressed_buf = eb->data;
@@ -117,7 +117,7 @@ size_t dbengine_compress(void *payload, size_t uncompressed_size, uint8_t algori
         }
 #endif
 
-        case RRDENG_COMPRESSION_NONE:
+        case DBENGINE_COMPRESSION_NONE:
             return 0;
 
         default: {
@@ -132,7 +132,7 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
     switch(algorithm) {
 
 #ifdef ENABLE_LZ4
-        case RRDENG_COMPRESSION_LZ4: {
+        case DBENGINE_COMPRESSION_LZ4: {
             if(unlikely(src_size > (size_t)INT_MAX || dst_size > (size_t)INT_MAX)) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "DBENGINE: LZ4 decompression sizes exceed API limits: src %zu, dst %zu, limit %d",
@@ -151,7 +151,7 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
 #endif
 
 #ifdef ENABLE_ZSTD
-        case RRDENG_COMPRESSION_ZSTD: {
+        case DBENGINE_COMPRESSION_ZSTD: {
             size_t decompressed_size = ZSTD_decompress(dst, dst_size, src, src_size);
 
             if (ZSTD_isError(decompressed_size)) {
@@ -165,7 +165,7 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
         }
 #endif
 
-        case RRDENG_COMPRESSION_NONE:
+        case DBENGINE_COMPRESSION_NONE:
             internal_fatal(true, "DBENGINE: %s() should not be called for uncompressed pages", __FUNCTION__ );
             return 0;
 

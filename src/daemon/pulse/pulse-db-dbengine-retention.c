@@ -3,17 +3,17 @@
 #include "pulse-db-dbengine-retention.h"
 #ifdef ENABLE_DBENGINE
 #include "database/rrd.h"
-#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 
-typedef struct dbengine_tier_stats {
+typedef struct dbengine_retention_charts {
     RRDSET *st;
     RRDDIM *rd_space;
     RRDDIM *rd_time;
-} DBENGINE_TIER_STATS;
+} DBENGINE_RETENTION_CHARTS;
 
 void dbengine_retention_statistics(bool extended __maybe_unused) {
 
-    static DBENGINE_TIER_STATS stats[RRD_STORAGE_TIERS];
+    static DBENGINE_RETENTION_CHARTS stats[RRD_STORAGE_TIERS];
 
     if (!localhost)
         return;
@@ -60,18 +60,18 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
         //       get_used_disk_space is used to determine if database cleanup (file rotation should happen)
         //                           and adds to the disk space used the desired file size of the active
         //                           datafile
-        uint64_t disk_space = rrdeng_get_used_disk_space(multidb_ctx[tier]);
+        uint64_t disk_space = dbengine_get_used_disk_space(dbengine_multidb_tiers[tier]);
         //uint64_t disk_space = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
 
         uint64_t config_disk_space = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
         if (!config_disk_space) {
-            config_disk_space = rrdeng_get_directory_free_bytes_space(multidb_ctx[tier]);
+            config_disk_space = dbengine_get_directory_free_bytes_space(dbengine_multidb_tiers[tier]);
             config_disk_space += disk_space;
         }
 
         collected_number disk_percentage = (collected_number) (config_disk_space ? 100 * disk_space / config_disk_space : 0);
 
-        time_t max_retention_s = rrdeng_max_retention_s(multidb_ctx[tier]);
+        time_t max_retention_s = dbengine_max_retention_s(dbengine_multidb_tiers[tier]);
         collected_number retention_percentage = (collected_number)max_retention_s ?
                                                     100 * retention / max_retention_s :
                                                     0;

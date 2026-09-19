@@ -149,9 +149,9 @@ void generate_dbengine_dataset(unsigned history_seconds)
 
     default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     // Worst case for uncompressible data
-    default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
+    default_dbengine_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
                                    (1024 * 1024);
-    default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+    default_dbengine_disk_quota_mb -= default_dbengine_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
     nd_log_limits_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
@@ -191,12 +191,12 @@ void generate_dbengine_dataset(unsigned history_seconds)
     }
     freez(thread_info);
 
-    // shut the dbengine instance down before freeing the host: rrdhost_free() does
-    // not do it, and destroying the charts under a live instance lets the flush
+    // shut the dbengine tier down before freeing the host: rrdhost_free() does
+    // not do it, and destroying the charts under a live tier lets the flush
     // workers touch freed memory. Same teardown as dbengine_stress_test() below.
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
-    rrdeng_quiesce(ctx);
-    rrdeng_exit(ctx);
+    DBENGINE_TIER *tier = (DBENGINE_TIER *)host->db[0].si;
+    dbengine_quiesce(tier);
+    dbengine_tier_exit(tier);
     dbengine_shutdown();
     host->db[0].si = NULL;
 
@@ -250,7 +250,7 @@ static void query_dbengine_chart(void *arg)
 
         if (thread_info->delete_old_data) {
             /* A time window of twice the disk space is sufficient for compression space savings of up to 50% */
-            time_approx_min = time_max - (default_rrdeng_disk_quota_mb * 2 * 1024 * 1024) /
+            time_approx_min = time_max - (default_dbengine_disk_quota_mb * 2 * 1024 * 1024) /
                                              (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number));
             time_min = MAX(time_min, time_approx_min);
         }
@@ -352,12 +352,12 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     if (DISK_SPACE_MB) {
         fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "
                         "Data validation is turned off for this run.\n");
-        default_rrdeng_disk_quota_mb = DISK_SPACE_MB;
+        default_dbengine_disk_quota_mb = DISK_SPACE_MB;
     } else {
         // Worst case for uncompressible data
-        default_rrdeng_disk_quota_mb =
+        default_dbengine_disk_quota_mb =
             (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * HISTORY_SECONDS) / (1024 * 1024);
-        default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+        default_dbengine_disk_quota_mb -= default_dbengine_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
     }
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
@@ -459,12 +459,12 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         freez(query_threads[i]);
     }
     freez(query_threads);
-    // same teardown as generate_dbengine_dataset() above: rrdeng_exit() frees a
-    // ctx that is not a multidb tier, so clear the host's pointer to it, and release
+    // same teardown as generate_dbengine_dataset() above: dbengine_tier_exit() frees a
+    // tier that is not a multidb tier, so clear the host's pointer to it, and release
     // the host we created before the caller tears the shared libraries down
     rrd_wrlock();
-    rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
+    dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
+    dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
     dbengine_shutdown();
     host->db[0].si = NULL;
     rrdhost_free___while_having_rrd_wrlock(host);

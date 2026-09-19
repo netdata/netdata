@@ -88,7 +88,7 @@ struct pgc_queue {
     size_t version;
     size_t last_version_checked;
     bool linked_list_in_sections_judy; // when true, we use 'sections_judy', otherwise we use 'base'
-    struct pgc_queue_statistics *stats;
+    struct dbengine_cache_queue_stats *stats;
 };
 
 struct pgc {
@@ -141,7 +141,7 @@ struct pgc {
     struct pgc_queue clean;       // LRU is applied here to free memory from the cache
     struct pgc_queue dirty;       // in the dirty list, pages are ordered the way they were marked dirty
     struct pgc_queue hot;         // in the hot list, pages are order the way they were marked hot
-    struct pgc_statistics stats;        // statistics
+    struct dbengine_cache_stats stats;        // statistics
 
 #ifdef NETDATA_PGC_POINTER_CHECK
     netdata_mutex_t global_pointer_registry_mutex;
@@ -307,17 +307,17 @@ static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
 // ----------------------------------------------------------------------------
 // size histogram
 
-static void pgc_size_histogram_init(struct pgc_size_histogram *h) {
+static void pgc_size_histogram_init(struct dbengine_cache_size_histogram *h) {
     // the histogram needs to be all-inclusive for the possible sizes
     // so, we start from 0, and the last value is SIZE_MAX.
 
-    size_t values[PGC_SIZE_HISTOGRAM_ENTRIES] = {
+    size_t values[DBENGINE_CACHE_SIZE_HISTOGRAM_ENTRIES] = {
         0, 32, 64, 128, 256, 512, 1024, 2048,
         4096, 8192, 16384, 32768, 65536, 128 * 1024, SIZE_MAX
     };
 
     size_t last_value = 0;
-    for(size_t i = 0; i < PGC_SIZE_HISTOGRAM_ENTRIES; i++) {
+    for(size_t i = 0; i < DBENGINE_CACHE_SIZE_HISTOGRAM_ENTRIES; i++) {
         if(i > 0 && values[i] == 0)
             fatal("only the first value in the array can be zero");
 
@@ -329,7 +329,7 @@ static void pgc_size_histogram_init(struct pgc_size_histogram *h) {
     }
 }
 
-static inline size_t pgc_size_histogram_slot(struct pgc_size_histogram *h, size_t size) {
+static inline size_t pgc_size_histogram_slot(struct dbengine_cache_size_histogram *h, size_t size) {
     if(size <= h->array[0].upto)
         return 0;
 
@@ -348,7 +348,7 @@ static inline size_t pgc_size_histogram_slot(struct pgc_size_histogram *h, size_
     return low - 1;
 }
 
-static inline void pgc_size_histogram_add(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
+static inline void pgc_size_histogram_add(PGC *cache, struct dbengine_cache_size_histogram *h, PGC_PAGE *page) {
     size_t size;
     if(cache->config.nominal_page_size_cb)
         size = cache->config.nominal_page_size_cb(page->data);
@@ -361,7 +361,7 @@ static inline void pgc_size_histogram_add(PGC *cache, struct pgc_size_histogram 
     __atomic_add_fetch(&h->array[slot].count, 1, __ATOMIC_RELAXED);
 }
 
-static inline void pgc_size_histogram_del(PGC *cache, struct pgc_size_histogram *h, PGC_PAGE *page) {
+static inline void pgc_size_histogram_del(PGC *cache, struct dbengine_cache_size_histogram *h, PGC_PAGE *page) {
     size_t size;
     if(cache->config.nominal_page_size_cb)
         size = cache->config.nominal_page_size_cb(page->data);
@@ -2201,15 +2201,15 @@ PGC *pgc_create(const char *name,
 
     cache->hot.flags = PGC_PAGE_HOT;
     cache->hot.linked_list_in_sections_judy = true;
-    cache->hot.stats = &cache->stats.queues[PGC_QUEUE_HOT];
+    cache->hot.stats = &cache->stats.queues[DBENGINE_CACHE_QUEUE_HOT];
 
     cache->dirty.flags = PGC_PAGE_DIRTY;
     cache->dirty.linked_list_in_sections_judy = true;
-    cache->dirty.stats = &cache->stats.queues[PGC_QUEUE_DIRTY];
+    cache->dirty.stats = &cache->stats.queues[DBENGINE_CACHE_QUEUE_DIRTY];
 
     cache->clean.flags = PGC_PAGE_CLEAN;
     cache->clean.linked_list_in_sections_judy = false;
-    cache->clean.stats = &cache->stats.queues[PGC_QUEUE_CLEAN];
+    cache->clean.stats = &cache->stats.queues[DBENGINE_CACHE_QUEUE_CLEAN];
 
     pointer_index_init(cache);
     pgc_size_histogram_init(&cache->hot.stats->size_histogram);
@@ -2472,7 +2472,7 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
     if(additional_bytes) {
         page_transition_lock(cache, page);
 
-        struct pgc_queue_statistics *queue_stats = NULL;
+        struct dbengine_cache_queue_stats *queue_stats = NULL;
         if(page->flags & PGC_PAGE_HOT)
             queue_stats = cache->hot.stats;
         else if(page->flags & PGC_PAGE_DIRTY)
@@ -2545,7 +2545,7 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
     return page;
 }
 
-struct pgc_statistics pgc_get_statistics(PGC *cache) {
+struct dbengine_cache_stats pgc_get_statistics(PGC *cache) {
     // FIXME - get the statistics atomically
     return cache->stats;
 }
@@ -2633,7 +2633,7 @@ void pgc_open_cache_to_journal_v2(
     void *data,
     bool startup)
 {
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
     pgc_atomic_add_fetch(&cache->stats.p2_workers_jv2_flush, 1);
 
     pgc_queue_lock(cache, &cache->hot, PGC_QUEUE_LOCK_PRIO_LOW);
@@ -3039,7 +3039,7 @@ static bool match_page_data(PGC_PAGE *page, void *data) {
     return (page->data == data);
 }
 
-void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile) {
+void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct dbengine_datafile *datafile) {
     evict_pages_with_filter(cache, 0, 0, true, true, match_page_data, datafile);
 }
 
@@ -3443,7 +3443,7 @@ void unittest_stress_test(void) {
 }
 #endif
 
-int pgc_unittest(void) {
+int dbengine_cache_unittest(void) {
     PGC *cache = pgc_create("test",
                             32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, NULL, unittest_save_dirty_page_callback,

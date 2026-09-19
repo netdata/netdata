@@ -66,7 +66,7 @@ bool mrg_metric_set_writer(MRG *mrg, METRIC *metric);
 bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric);
 #endif
 
-void mrg_get_statistics(MRG *mrg, struct mrg_statistics *s);
+void mrg_get_statistics(MRG *mrg, struct dbengine_metrics_registry_stats *s);
 struct aral_statistics *mrg_aral_stats(void);
 
 void mrg_update_metric_retention_and_granularity_by_uuid(

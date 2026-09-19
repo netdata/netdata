@@ -4,7 +4,7 @@
 // the production scenario where higher tiers earn queries.
 //
 // A dedicated daemon caps tier0 at the minimum dbengine quota (25MB,
-// RRDENG_MIN_DISK_SPACE_MB), and a streaming replication fixture pushes
+// DBENGINE_MIN_DISK_SPACE_MB), and a streaming replication fixture pushes
 // enough incompressible samples that tier0's oldest datafiles rotate out
 // while tier1 keeps the full history. The tier0 head boundary is not
 // predicted — it is DISCOVERED from db.per_tier — and queries spanning it
@@ -253,7 +253,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	dd, err := daemon.Start(daemon.Options{
 		Binary:                 netdataBinary,
 		RunDir:                 t.TempDir(),
-		TierRetentionMB:        [3]int{25}, // RRDENG_MIN_DISK_SPACE_MB — the floor
+		TierRetentionMB:        [3]int{25}, // DBENGINE_MIN_DISK_SPACE_MB — the floor
 		ReplicationStepSeconds: 3600,
 	})
 	if err != nil {

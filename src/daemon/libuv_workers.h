@@ -9,7 +9,7 @@
 // shares; the storage engine owns the first block, the daemon's own jobs follow it
 #ifdef ENABLE_DBENGINE
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
-#define UV_EVENT_JOB_FIRST RRDENG_WORKER_JOB_MAX
+#define UV_EVENT_JOB_FIRST DBENGINE_WORKER_JOB_MAX
 #else
 #define UV_EVENT_JOB_FIRST 1
 #endif

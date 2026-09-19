@@ -32,7 +32,7 @@ typedef enum __attribute__ ((__packed__)) storage_priority {
 } STORAGE_PRIORITY;
 
 typedef enum __attribute__ ((__packed__)) {
-    STORAGE_ENGINE_BACKEND_RRDDIM = 1,
+    STORAGE_ENGINE_BACKEND_RAM = 1,
     STORAGE_ENGINE_BACKEND_DBENGINE = 2,
 } STORAGE_ENGINE_BACKEND;
 

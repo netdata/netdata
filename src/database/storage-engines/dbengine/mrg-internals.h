@@ -85,7 +85,7 @@ struct mrg {
         RW_SPINLOCK rw_spinlock;
         Pvoid_t uuid_judy;          // JudyL: each UUID has a JudyL of sections (tiers)
 
-        struct mrg_statistics stats;
+        struct dbengine_metrics_registry_stats stats;
     } __attribute__((aligned(64))) index[UUIDMAP_PARTITIONS];
 };
 
@@ -99,7 +99,7 @@ static inline void MRG_STATS_ADDED_METRIC(MRG *mrg, size_t partition, Word_t sec
     __atomic_add_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&mrg->index[partition].stats.additions, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
+    struct dbengine_tier *ctx = (struct dbengine_tier *) section;
     __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
 }
 
@@ -107,8 +107,8 @@ static inline void MRG_STATS_DELETED_METRIC(MRG *mrg, size_t partition, Word_t s
     __atomic_sub_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
     __atomic_add_fetch(&mrg->index[partition].stats.deletions, 1, __ATOMIC_RELAXED);
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
-    rrdeng_atomic_uint64_sub_saturating(ctx, &ctx->atomic.metrics, 1, "metrics", "deleting an MRG metric");
+    struct dbengine_tier *ctx = (struct dbengine_tier *) section;
+    dbengine_atomic_uint64_sub_saturating(ctx, &ctx->atomic.metrics, 1, "metrics", "deleting an MRG metric");
 }
 
 static inline void MRG_STATS_SEARCH_HIT(MRG *mrg, size_t partition) {
@@ -133,7 +133,7 @@ static inline void mrg_stats_judy_mem(MRG *mrg, size_t partition, int64_t judy_m
 }
 
 static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)metric->section;
+    struct dbengine_tier *ctx = (struct dbengine_tier *)metric->section;
 
     nd_uuid_t uuid;
     uuidmap_uuid(metric->uuid, uuid);

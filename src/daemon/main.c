@@ -431,7 +431,7 @@ int netdata_main(int argc, char **argv) {
 
                         if(strcmp(optarg, "pgd-tests") == 0) {
                             netdata_conf_dbengine_apply();
-                            return pgd_test(argc, argv);
+                            return dbengine_page_test(argc, argv);
                         }
 #endif
 
@@ -489,7 +489,7 @@ int netdata_main(int argc, char **argv) {
                             // set defaults for dbegnine unittest
                             inicfg_set(&netdata_config, CONFIG_SECTION_DB, "dbengine page type", "gorilla");
 #ifdef ENABLE_DBENGINE
-                            default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 256;
+                            default_dbengine_disk_quota_mb = default_multidb_disk_quota_mb = 256;
 #endif
 
                             if (sqlite_library_init())
@@ -567,7 +567,7 @@ int netdata_main(int argc, char **argv) {
                             if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
-                            if (mrg_unittest()) return 1;
+                            if (dbengine_metrics_registry_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
@@ -740,16 +740,16 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "pgctest") == 0) {
                             unittest_running = true;
                             netdata_conf_dbengine_apply();
-                            return pgc_unittest();
+                            return dbengine_cache_unittest();
                         }
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             netdata_conf_dbengine_apply();
-                            return mrg_unittest();
+                            return dbengine_metrics_registry_unittest();
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
-                            return mrg_retention_benchmark();
+                            return dbengine_metrics_registry_retention_benchmark();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;
@@ -840,8 +840,8 @@ int netdata_main(int argc, char **argv) {
 
                             // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
                             // before this option can still override it
-                            if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
-                                page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+                            if (page_cache_mb < DBENGINE_MIN_PAGE_CACHE_SIZE_MB)
+                                page_cache_mb = DBENGINE_MIN_PAGE_CACHE_SIZE_MB;
                             netdata_conf_dbengine.page_cache_mb = page_cache_mb;
 
                             char workers_str[16];

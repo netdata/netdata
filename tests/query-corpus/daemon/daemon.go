@@ -46,7 +46,7 @@ type Options struct {
 	// history — the plan-switching scenario. Retention TIME knobs are
 	// unusable at the fixed 2023 fixture epoch (wall-clock enforced), so
 	// rotation has to be driven by VOLUME. The engine floors any quota at
-	// RRDENG_MIN_DISK_SPACE_MB (25MiB).
+	// DBENGINE_MIN_DISK_SPACE_MB (25MiB).
 	TierRetentionMB [3]int
 	// TierGrouping sets "dbengine tier N update every iterations" (index
 	// 1..2, default 60 each). Lowering it brings the tiers closer together

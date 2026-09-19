@@ -7,16 +7,16 @@
 //
 // dbengine is netdata's tiered time-series store. Vocabulary used throughout this directory:
 //
-//   ctx (struct rrdengine_instance)   one tier of one database: a directory of datafiles and their journals;
-//                                     the daemon's tiers are multidb_ctx[]
+//   ctx (struct dbengine_tier)        one tier of one database: a directory of datafiles and their journals;
+//                                     the daemon's tiers are dbengine_multidb_tiers[]
 //   datafile / extent / page          on-disk container / a compressed group of pages / one metric's samples
 //   journalfile                       the per-datafile index of extents and metrics (v1 while writing, v2 when sealed)
 //   MRG, the metric registry          process-wide: every metric's uuid, section (its ctx) and retention (mrg.h)
 //   PGC, the page cache               process-wide caches shared by all ctxs (cache.h, pagecache.h)
 //   PDC, the page details control     the plan of one query: which pages, from cache or disk, in what order (pdc.h)
-//   the event loop (rrdeng_main)      the single libuv thread that owns datafile I/O, flushing and rotation
+//   the event loop (dbengine_main)    the single libuv thread that owns datafile I/O, flushing and rotation
 //
-// The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable, hands it its
+// The daemon drives the engine through dbengine-api.h behind the storage-engine vtable, hands it its
 // configuration and optional services through dbengine-config.h, and reads what the engine publishes
 // (statistics, worker job ids) through the engine's own headers. Those public headers include nothing
 // of this file: this header and everything it pulls in are the engine's private side. The engine, in
@@ -32,8 +32,11 @@
 
 // the process-wide configuration, copied once by dbengine_init() and read-only afterwards
 extern struct dbengine_config dbengine_cfg;
+bool dbengine_initialized(void);
 
-#define RRDENG_FD_BUDGET_PER_INSTANCE (50)
+#define DBENGINE_FD_BUDGET_PER_TIER (50)
+
+#define DBENGINE_PAGE_TYPE_MAX (2) // Maximum page type (inclusive)
 
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
@@ -43,13 +46,17 @@ extern size_t tier_page_size[];
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
-#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 #include "pagecache.h"
 #include "mrg.h"
 #include "cache.h"
 #include "pdc.h"
 #include "page.h"
 
+static ALWAYS_INLINE void time_and_count_add(struct dbengine_time_and_count *tc, usec_t dt) {
+    __atomic_add_fetch(&tc->count, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&tc->usec, dt, __ATOMIC_RELAXED);
+}
 
 #define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
 #define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)
@@ -77,33 +84,33 @@ extern size_t tier_page_size[];
     } while (0)
 
 /* Forward declarations */
-struct rrdengine_instance;
-struct rrdeng_cmd;
+struct dbengine_tier;
+struct dbengine_cmd;
 
 #define MAX_PAGES_PER_EXTENT (109) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 
-#define MAX_EXTENT_UNCOMPRESSED_SIZE (MAX_PAGES_PER_EXTENT * (RRDENG_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE))
+#define MAX_EXTENT_UNCOMPRESSED_SIZE (MAX_PAGES_PER_EXTENT * (DBENGINE_BLOCK_SIZE + RRDENG_GORILLA_32BIT_BUFFER_SIZE))
 
-static inline size_t rrdeng_min_extent_disk_size(void) {
-    return sizeof(struct rrdeng_df_extent_header) +
-           sizeof(struct rrdeng_extent_page_descr) +
-           sizeof(struct rrdeng_df_extent_trailer);
+static inline size_t dbengine_min_extent_disk_size(void) {
+    return sizeof(struct dbengine_df_extent_header) +
+           sizeof(struct dbengine_extent_page_descr) +
+           sizeof(struct dbengine_df_extent_trailer);
 }
 
-static inline size_t rrdeng_max_extent_disk_size(void) {
-    return sizeof(struct rrdeng_df_extent_header) +
-           sizeof(struct rrdeng_extent_page_descr) * MAX_PAGES_PER_EXTENT +
+static inline size_t dbengine_max_extent_disk_size(void) {
+    return sizeof(struct dbengine_df_extent_header) +
+           sizeof(struct dbengine_extent_page_descr) * MAX_PAGES_PER_EXTENT +
            MAX_EXTENT_UNCOMPRESSED_SIZE +
-           sizeof(struct rrdeng_df_extent_trailer);
+           sizeof(struct dbengine_df_extent_trailer);
 }
 
-static inline bool rrdeng_valid_extent_disk_size(size_t size) {
-    return size >= rrdeng_min_extent_disk_size() && size <= rrdeng_max_extent_disk_size();
+static inline bool dbengine_valid_extent_disk_size(size_t size) {
+    return size >= dbengine_min_extent_disk_size() && size <= dbengine_max_extent_disk_size();
 }
 
 
-#define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
-#define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
+#define DBENGINE_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
+#define DBENGINE_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
@@ -146,7 +153,7 @@ typedef enum __attribute__ ((__packed__)) {
 #define PDC_PAGE_QUERY_GLOBAL_SKIP_LIST (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED)
 
 typedef struct page_details_control {
-    struct rrdengine_instance *ctx;
+    struct dbengine_tier *ctx;
     struct metric *metric;
 
     struct completion prep_completion;
@@ -175,8 +182,8 @@ PDC *pdc_get(void);
 
 struct page_details {
     struct {
-        struct rrdengine_datafile *ptr;
-        uint32_t block;     // the block in the datafile. Offset in the datafile is block * RRDENG_BLOCK_SIZE
+        struct dbengine_datafile *ptr;
+        uint32_t block;     // the block in the datafile. Offset in the datafile is block * DBENGINE_BLOCK_SIZE
         uint32_t bytes;
     } datafile;
 
@@ -230,39 +237,39 @@ struct jv2_page_info {
 };
 
 typedef enum __attribute__ ((__packed__)) {
-    RRDENG_COLLECT_HANDLE_OPTION_NONE   = 0,
+    DBENGINE_COLLECT_HANDLE_OPTION_NONE   = 0,
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    RRDENG_1ST_METRIC_WRITER            = (1 << 0),
+    DBENGINE_1ST_METRIC_WRITER            = (1 << 0),
 #endif
-} RRDENG_COLLECT_HANDLE_OPTIONS;
+} DBENGINE_COLLECT_HANDLE_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) {
-    RRDENG_PAGE_PAST_COLLECTION       = (1 << 0),
-    RRDENG_PAGE_REPEATED_COLLECTION   = (1 << 1),
-    RRDENG_PAGE_BIG_GAP               = (1 << 2),
-    RRDENG_PAGE_GAP                   = (1 << 3),
-    RRDENG_PAGE_FUTURE_POINT          = (1 << 4),
-    RRDENG_PAGE_CREATED_IN_FUTURE     = (1 << 5),
-    RRDENG_PAGE_COMPLETED_IN_FUTURE   = (1 << 6),
-    RRDENG_PAGE_UNALIGNED             = (1 << 7),
-    RRDENG_PAGE_CONFLICT              = (1 << 8),
-    RRDENG_PAGE_FULL                  = (1 << 9),
-    RRDENG_PAGE_COLLECT_FINALIZE      = (1 << 10),
-    RRDENG_PAGE_UPDATE_EVERY_CHANGE   = (1 << 11),
-    RRDENG_PAGE_STEP_TOO_SMALL        = (1 << 12),
-    RRDENG_PAGE_STEP_UNALIGNED        = (1 << 13),
-    RRDENG_PAGE_RETENTION_RECORDED    = (1 << 14),
-} RRDENG_COLLECT_PAGE_FLAGS;
+    DBENGINE_PAGE_PAST_COLLECTION       = (1 << 0),
+    DBENGINE_PAGE_REPEATED_COLLECTION   = (1 << 1),
+    DBENGINE_PAGE_BIG_GAP               = (1 << 2),
+    DBENGINE_PAGE_GAP                   = (1 << 3),
+    DBENGINE_PAGE_FUTURE_POINT          = (1 << 4),
+    DBENGINE_PAGE_CREATED_IN_FUTURE     = (1 << 5),
+    DBENGINE_PAGE_COMPLETED_IN_FUTURE   = (1 << 6),
+    DBENGINE_PAGE_UNALIGNED             = (1 << 7),
+    DBENGINE_PAGE_CONFLICT              = (1 << 8),
+    DBENGINE_PAGE_FULL                  = (1 << 9),
+    DBENGINE_PAGE_COLLECT_FINALIZE      = (1 << 10),
+    DBENGINE_PAGE_UPDATE_EVERY_CHANGE   = (1 << 11),
+    DBENGINE_PAGE_STEP_TOO_SMALL        = (1 << 12),
+    DBENGINE_PAGE_STEP_UNALIGNED        = (1 << 13),
+    DBENGINE_PAGE_RETENTION_RECORDED    = (1 << 14),
+} DBENGINE_COLLECT_PAGE_FLAGS;
 
-struct rrdeng_collect_handle {
+struct dbengine_collect_handle {
     struct storage_collect_handle common; // has to be first item
 
-    RRDENG_COLLECT_PAGE_FLAGS page_flags;
-    RRDENG_COLLECT_HANDLE_OPTIONS options;
+    DBENGINE_COLLECT_PAGE_FLAGS page_flags;
+    DBENGINE_COLLECT_HANDLE_OPTIONS options;
     uint8_t type;
 
-    struct rrdengine_instance *ctx;
+    struct dbengine_tier *ctx;
     struct metric *metric;
     struct pgc_page *pgc_page;
     struct pgd *page_data;
@@ -274,10 +281,10 @@ struct rrdeng_collect_handle {
     usec_t update_every_ut;
 };
 
-struct rrdeng_query_handle {
+struct dbengine_query_handle {
     struct metric *metric;
     struct pgc_page *page;
-    struct rrdengine_instance *ctx;
+    struct dbengine_tier *ctx;
     struct pgd_cursor pgdc;
     struct page_details_control *pdc;
 
@@ -296,48 +303,48 @@ struct rrdeng_query_handle {
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t started_time_s;
     pid_t query_pid;
-    struct rrdeng_query_handle *prev, *next;
+    struct dbengine_query_handle *prev, *next;
 #endif
 };
 
-struct rrdeng_query_handle *rrdeng_query_handle_get(void);
-void rrdeng_query_handle_release(struct rrdeng_query_handle *handle);
+struct dbengine_query_handle *dbengine_query_handle_get(void);
+void dbengine_query_handle_release(struct dbengine_query_handle *handle);
 
-enum rrdeng_opcode {
+enum dbengine_opcode {
     /* can be used to return empty status or flush the command queue */
-    RRDENG_OPCODE_NOOP = 0,
+    DBENGINE_OPCODE_NOOP = 0,
 
-    RRDENG_OPCODE_QUERY,
-    RRDENG_OPCODE_EXTENT_WRITE,
-    RRDENG_OPCODE_EXTENT_READ,
-    RRDENG_OPCODE_DATABASE_ROTATE,
-    RRDENG_OPCODE_JOURNAL_INDEX,
-    RRDENG_OPCODE_FLUSH_MAIN,
-    RRDENG_OPCODE_EVICT_MAIN,
-    RRDENG_OPCODE_EVICT_OPEN,
-    RRDENG_OPCODE_EVICT_EXTENT,
-    RRDENG_OPCODE_CTX_SHUTDOWN,
-    RRDENG_OPCODE_CTX_FLUSH_DIRTY,
-    RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY,
-    RRDENG_OPCODE_CTX_QUIESCE,
-    RRDENG_OPCODE_CTX_POPULATE_MRG,
-    RRDENG_OPCODE_SHUTDOWN_EVLOOP,
-    RRDENG_OPCODE_EXTERNAL_WORK,
-    RRDENG_OPCODE_MRG_LOAD,
-    RRDENG_OPCODE_CLEANUP,
+    DBENGINE_OPCODE_QUERY,
+    DBENGINE_OPCODE_EXTENT_WRITE,
+    DBENGINE_OPCODE_EXTENT_READ,
+    DBENGINE_OPCODE_DATABASE_ROTATE,
+    DBENGINE_OPCODE_JOURNAL_INDEX,
+    DBENGINE_OPCODE_FLUSH_MAIN,
+    DBENGINE_OPCODE_EVICT_MAIN,
+    DBENGINE_OPCODE_EVICT_OPEN,
+    DBENGINE_OPCODE_EVICT_EXTENT,
+    DBENGINE_OPCODE_CTX_SHUTDOWN,
+    DBENGINE_OPCODE_CTX_FLUSH_DIRTY,
+    DBENGINE_OPCODE_CTX_FLUSH_HOT_DIRTY,
+    DBENGINE_OPCODE_CTX_QUIESCE,
+    DBENGINE_OPCODE_CTX_POPULATE_MRG,
+    DBENGINE_OPCODE_SHUTDOWN_EVLOOP,
+    DBENGINE_OPCODE_EXTERNAL_WORK,
+    DBENGINE_OPCODE_MRG_LOAD,
+    DBENGINE_OPCODE_CLEANUP,
 
-    RRDENG_OPCODE_MAX
+    DBENGINE_OPCODE_MAX
 };
 
 // WORKERS IDS:
-// RRDENG_MAX_OPCODE                     : reserved for the cleanup
-// RRDENG_MAX_OPCODE + opcode            : reserved for the callbacks of each opcode
-// RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE : reserved for the timer
-#define RRDENG_TIMER_CB (RRDENG_OPCODE_MAX + RRDENG_OPCODE_MAX)
-#define RRDENG_OPCODES_WAITING             (RRDENG_TIMER_CB + 1)
-#define RRDENG_WORKS_DISPATCHED            (RRDENG_TIMER_CB + 2)
-#define RRDENG_WORKS_EXECUTING             (RRDENG_TIMER_CB + 3)
-#define RRDENG_RETENTION_TIMER_CB          (RRDENG_TIMER_CB + 4)
+// DBENGINE_MAX_OPCODE                     : reserved for the cleanup
+// DBENGINE_MAX_OPCODE + opcode            : reserved for the callbacks of each opcode
+// DBENGINE_MAX_OPCODE + DBENGINE_MAX_OPCODE : reserved for the timer
+#define DBENGINE_TIMER_CB (DBENGINE_OPCODE_MAX + DBENGINE_OPCODE_MAX)
+#define DBENGINE_OPCODES_WAITING             (DBENGINE_TIMER_CB + 1)
+#define DBENGINE_WORKS_DISPATCHED            (DBENGINE_TIMER_CB + 2)
+#define DBENGINE_WORKS_EXECUTING             (DBENGINE_TIMER_CB + 3)
+#define DBENGINE_RETENTION_TIMER_CB          (DBENGINE_TIMER_CB + 4)
 
 struct extent_io_data {
     unsigned fileno;
@@ -355,7 +362,7 @@ struct extent_io_data {
 };
 
 struct extent_io_descriptor {
-    struct rrdengine_instance *ctx;
+    struct dbengine_tier *ctx;
     void *buf;
     uint64_t pos;
     uint32_t descr_count;
@@ -364,7 +371,7 @@ struct extent_io_descriptor {
     struct wal *wal;
     uv_file file;
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
-    struct rrdengine_datafile *datafile;
+    struct dbengine_datafile *datafile;
 };
 
 typedef struct wal {
@@ -379,49 +386,49 @@ typedef struct wal {
     } cache;
 } WAL;
 
-WAL *wal_get(struct rrdengine_instance *ctx, unsigned size);
+WAL *wal_get(struct dbengine_tier *ctx, unsigned size);
 void wal_release(WAL *wal);
 
 /*
  * Debug statistics not used by code logic.
- * They only describe operations since DB engine instance load time.
+ * They only describe operations since the tier was loaded.
  */
-struct rrdengine_statistics {
-    PAD64(rrdeng_stats_t) before_decompress_bytes;
-    PAD64(rrdeng_stats_t) after_decompress_bytes;
-    PAD64(rrdeng_stats_t) before_compress_bytes;
-    PAD64(rrdeng_stats_t) after_compress_bytes;
+struct dbengine_statistics {
+    PAD64(dbengine_stats_t) before_decompress_bytes;
+    PAD64(dbengine_stats_t) after_decompress_bytes;
+    PAD64(dbengine_stats_t) before_compress_bytes;
+    PAD64(dbengine_stats_t) after_compress_bytes;
 
-    PAD64(rrdeng_stats_t) io_write_bytes;
-    PAD64(rrdeng_stats_t) io_write_requests;
-    PAD64(rrdeng_stats_t) io_read_bytes;
-    PAD64(rrdeng_stats_t) io_read_requests;
+    PAD64(dbengine_stats_t) io_write_bytes;
+    PAD64(dbengine_stats_t) io_write_requests;
+    PAD64(dbengine_stats_t) io_read_bytes;
+    PAD64(dbengine_stats_t) io_read_requests;
 
-    PAD64(rrdeng_stats_t) datafile_creations;
-    PAD64(rrdeng_stats_t) datafile_deletions;
-    PAD64(rrdeng_stats_t) journalfile_creations;
-    PAD64(rrdeng_stats_t) journalfile_deletions;
+    PAD64(dbengine_stats_t) datafile_creations;
+    PAD64(dbengine_stats_t) datafile_deletions;
+    PAD64(dbengine_stats_t) journalfile_creations;
+    PAD64(dbengine_stats_t) journalfile_deletions;
 
-    PAD64(rrdeng_stats_t) io_errors;
-    PAD64(rrdeng_stats_t) fs_errors;
+    PAD64(dbengine_stats_t) io_errors;
+    PAD64(dbengine_stats_t) fs_errors;
 };
 
-struct rrdeng_global_stats {
+struct dbengine_global_stats {
     /* I/O errors global counter */
-    PAD64(rrdeng_stats_t) global_io_errors;
+    PAD64(dbengine_stats_t) global_io_errors;
 
     /* File-System errors global counter */
-    PAD64(rrdeng_stats_t) global_fs_errors;
+    PAD64(dbengine_stats_t) global_fs_errors;
 
     /* number of File-Descriptors that have been reserved by dbengine */
-    PAD64(rrdeng_stats_t) rrdeng_reserved_file_descriptors;
+    PAD64(dbengine_stats_t) dbengine_reserved_file_descriptors;
 
     /* inability to flush global counters */
-    PAD64(rrdeng_stats_t) global_pg_cache_over_half_dirty_events;
-    PAD64(rrdeng_stats_t) global_flushing_pressure_page_deletions; /* number of deleted pages */
+    PAD64(dbengine_stats_t) global_pg_cache_over_half_dirty_events;
+    PAD64(dbengine_stats_t) global_flushing_pressure_page_deletions; /* number of deleted pages */
 };
 
-extern struct rrdeng_global_stats global_stats;
+extern struct dbengine_global_stats global_stats;
 
 typedef struct tier_config_prototype {
     int tier;                                   // the tier of this ctx
@@ -433,7 +440,7 @@ typedef struct tier_config_prototype {
     char dbfiles_path[FILENAME_MAX + 1];
 } TIER_CONFIG_PROTOTYPE;
 
-struct rrdengine_instance {
+struct dbengine_tier {
     TIER_CONFIG_PROTOTYPE config;
 
     struct {
@@ -460,7 +467,7 @@ struct rrdengine_instance {
 
         PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
-        PAD64(bool) active;                                // set when rrdeng_init() succeeded, cleared by rrdeng_exit()
+        PAD64(bool) active;                                // set by a successful dbengine_tier_init(), cleared by dbengine_tier_exit()
         PAD64(bool) mrg_populated;                         // set when the metrics registry has been loaded from every journal
         PAD64(bool) migration_to_v2_running;
         PAD64(bool) now_deleting_files;
@@ -482,13 +489,13 @@ struct rrdengine_instance {
         bool create_new_datafile_pair;
     } loading;
 
-    struct rrdengine_statistics stats;
+    struct dbengine_statistics stats;
 };
 
 // Retention and indexing work wait until the registry has been loaded from every journal: rotating a
 // datafile before then would drop metrics the registry has not learned yet. The loader's own datafile references only
 // protect the files it is reading at that moment; this flag keeps rotation from starting at all.
-static inline bool rrdeng_ctx_is_mrg_populated(struct rrdengine_instance *ctx) {
+static inline bool dbengine_ctx_is_mrg_populated(struct dbengine_tier *ctx) {
     return __atomic_load_n(&ctx->atomic.mrg_populated, __ATOMIC_ACQUIRE);
 }
 
@@ -497,28 +504,28 @@ static inline bool rrdeng_ctx_is_mrg_populated(struct rrdengine_instance *ctx) {
 #define ctx_current_disk_space_increase(ctx, size) __atomic_add_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_decrease(ctx, size) __atomic_sub_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
 
-static inline void ctx_io_read_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
+static inline void ctx_io_read_op_bytes(struct dbengine_tier *ctx, size_t bytes) {
     __atomic_add_fetch(&ctx->stats.io_read_bytes, bytes, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ctx->stats.io_read_requests, 1, __ATOMIC_RELAXED);
 }
 
-static inline void ctx_io_write_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
+static inline void ctx_io_write_op_bytes(struct dbengine_tier *ctx, size_t bytes) {
     __atomic_add_fetch(&ctx->stats.io_write_bytes, bytes, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ctx->stats.io_write_requests, 1, __ATOMIC_RELAXED);
 }
 
-static inline void ctx_io_error(struct rrdengine_instance *ctx) {
+static inline void ctx_io_error(struct dbengine_tier *ctx) {
     __atomic_add_fetch(&ctx->stats.io_errors, 1, __ATOMIC_RELAXED);
     rrd_stat_atomic_add(&global_stats.global_io_errors, 1);
 }
 
-static inline void ctx_fs_error(struct rrdengine_instance *ctx) {
+static inline void ctx_fs_error(struct dbengine_tier *ctx) {
     __atomic_add_fetch(&ctx->stats.fs_errors, 1, __ATOMIC_RELAXED);
     rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
 }
 
-static inline bool rrdeng_retention_samples_delta(
-    struct rrdengine_instance *ctx,
+static inline bool dbengine_retention_samples_delta(
+    struct dbengine_tier *ctx,
     time_t first_time_s,
     time_t last_time_s,
     uint32_t update_every_s,
@@ -561,8 +568,8 @@ static inline bool rrdeng_retention_samples_delta(
     return *samples > 0;
 }
 
-static inline bool rrdeng_atomic_uint64_sub_saturating(
-    struct rrdengine_instance *ctx,
+static inline bool dbengine_atomic_uint64_sub_saturating(
+    struct dbengine_tier *ctx,
     uint64_t *counter,
     uint64_t value,
     const char *counter_name,
@@ -609,7 +616,7 @@ static inline bool rrdeng_atomic_uint64_sub_saturating(
     }
 }
 
-static inline void rrdeng_reset_accounting_if_fresh(struct rrdengine_instance *ctx, bool freshly_initialized_ctx) {
+static inline void dbengine_reset_accounting_if_fresh(struct dbengine_tier *ctx, bool freshly_initialized_ctx) {
     if(!freshly_initialized_ctx)
         return;
 
@@ -621,7 +628,7 @@ static inline void rrdeng_reset_accounting_if_fresh(struct rrdengine_instance *c
 #define ctx_last_fileno_increment(ctx) __atomic_add_fetch(&(ctx)->atomic.last_fileno, 1, __ATOMIC_RELAXED)
 
 #define ctx_last_flush_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_flush_fileno, __ATOMIC_RELAXED)
-static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, unsigned fileno) {
+static inline void ctx_last_flush_fileno_set(struct dbengine_tier *ctx, unsigned fileno) {
     unsigned old_fileno = ctx_last_flush_fileno_get(ctx);
 
     do {
@@ -633,32 +640,32 @@ static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, uns
 
 #define ctx_is_available_for_queries(ctx) (__atomic_load_n(&(ctx)->quiesce.enabled, __ATOMIC_RELAXED) == false && __atomic_load_n(&(ctx)->quiesce.exit_mode, __ATOMIC_RELAXED) == false)
 
-bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx);
-int init_rrd_files(struct rrdengine_instance *ctx);
-bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
+bool dbengine_ctx_tier_cap_exceeded(struct dbengine_tier *ctx);
+int init_rrd_files(struct dbengine_tier *ctx);
+bool dbengine_spawn(struct dbengine_tier *ctx);
 void dbengine_event_loop(void *arg);
 
-typedef void (*enqueue_callback_t)(struct rrdeng_cmd *cmd);
-typedef void (*dequeue_callback_t)(struct rrdeng_cmd *cmd);
+typedef void (*enqueue_callback_t)(struct dbengine_cmd *cmd);
+typedef void (*dequeue_callback_t)(struct dbengine_cmd *cmd);
 
-void rrdeng_enqueue_epdl_cmd(struct rrdeng_cmd *cmd);
-void rrdeng_dequeue_epdl_cmd(struct rrdeng_cmd *cmd);
+void dbengine_enqueue_epdl_cmd(struct dbengine_cmd *cmd);
+void dbengine_dequeue_epdl_cmd(struct dbengine_cmd *cmd);
 
-typedef struct rrdeng_cmd *(*requeue_callback_t)(void *data);
-void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority);
+typedef struct dbengine_cmd *(*requeue_callback_t)(void *data);
+void dbengine_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority);
 
-void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data,
+void dbengine_enq_cmd(struct dbengine_tier *ctx, enum dbengine_opcode opcode, void *data,
                 struct completion *completion, enum storage_priority priority,
                 enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb);
 
-void pdc_route_asynchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);
-void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);
-void pdc_route_synchronously_first(struct rrdengine_instance *ctx, struct page_details_control *pdc);
+void pdc_route_asynchronously(struct dbengine_tier *ctx, struct page_details_control *pdc);
+void pdc_route_synchronously(struct dbengine_tier *ctx, struct page_details_control *pdc);
+void pdc_route_synchronously_first(struct dbengine_tier *ctx, struct page_details_control *pdc);
 
 void pdc_acquire(PDC *pdc);
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router);
 
-uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx);
+uint64_t dbengine_target_data_file_size(struct dbengine_tier *ctx);
 
 struct page_descr_with_data *page_descriptor_get(void);
 
@@ -690,9 +697,9 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(nd_uuid_t *uuid,
                                         uint32_t overwrite_zero_update_every_s,
                                         bool have_read_error,
                                         const char *msg,
-                                        RRDENG_COLLECT_PAGE_FLAGS flags);
-VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error);
-void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags);
+                                        DBENGINE_COLLECT_PAGE_FLAGS flags);
+VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error);
+void collect_page_flags_to_buffer(BUFFER *wb, DBENGINE_COLLECT_PAGE_FLAGS flags);
 
 typedef enum {
     PAGE_IS_IN_THE_PAST   = -1,
@@ -707,8 +714,8 @@ static inline time_t max_acceptable_collected_time(void) {
 }
 
 void datafile_delete(
-    struct rrdengine_instance *ctx,
-    struct rrdengine_datafile *datafile,
+    struct dbengine_tier *ctx,
+    struct dbengine_datafile *datafile,
     bool update_retention,
     bool disk_time,
     bool worker);
@@ -726,15 +733,15 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// rrdeng_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
-uint64_t rrdeng_get_used_disk_space_unsafe(struct rrdengine_instance *ctx);
-// after rrdeng_exit(), on a static multidb tier only: close its datafiles
-void finalize_rrd_files(struct rrdengine_instance *ctx);
-size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
-struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
-struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
-struct rrdengine_datafile *
-get_next_datafile(struct rrdengine_datafile *this_datafile, struct rrdengine_instance *ctx, bool with_lock);
+// dbengine_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
+uint64_t dbengine_get_used_disk_space_unsafe(struct dbengine_tier *ctx);
+// after dbengine_tier_exit(), on a static multidb tier only: close its datafiles
+void finalize_rrd_files(struct dbengine_tier *ctx);
+size_t datafile_count(struct dbengine_tier *ctx, bool with_lock);
+struct dbengine_datafile *get_first_ctx_datafile(struct dbengine_tier *ctx, bool with_lock);
+struct dbengine_datafile *get_last_ctx_datafile(struct dbengine_tier *ctx, bool with_lock);
+struct dbengine_datafile *
+get_next_datafile(struct dbengine_datafile *this_datafile, struct dbengine_tier *ctx, bool with_lock);
 
 
 #endif /* NETDATA_RRDENGINE_H */
