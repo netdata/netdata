@@ -350,8 +350,8 @@ void journalfile_v2_data_unmount_cleanup(struct dbengine_engine *engine, time_t 
     // DO NOT WAIT ON ANY LOCK!!!
 
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
-        if(ctx->engine != engine || !dbengine_tier_is_active(ctx)) continue;
+        struct dbengine_tier *ctx = &engine->tiers[tier];
+        if(!dbengine_tier_is_active(ctx)) continue;
 
         struct dbengine_datafile *datafile;
         if(netdata_rwlock_tryrdlock(&ctx->datafiles.rwlock) != 0)

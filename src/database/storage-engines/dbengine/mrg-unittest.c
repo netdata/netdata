@@ -1672,8 +1672,8 @@ static int mrg_jv2_real_writer_unittest(const struct dbengine_config *cfg) {
     // A zeroed fixture is NOT enough: activation validates the datafile and takes
     // locks that must be constructed, not merely zeroed. Mirror what production does.
     //
-    //   - initialize_tier() (rrdengineapi.c) builds the two tier locks. It is
-    //     static, so they are constructed here: njfv2idx.spinlock is taken by
+    //   - dbengine_tier_reset() (rrdengineapi.c) builds the two tier locks, as it
+    //     does for an engine's own tiers: njfv2idx.spinlock is taken by
     //     njfv2idx_add(), which journalfile_v2_data_set() calls on activation.
     //   - datafile_alloc_and_init() (datafile.c) stamps DATAFILE_MAGIC and builds the
     //     datafile locks. It is static AND asserts tier == 1, so it is replicated.
@@ -1684,11 +1684,9 @@ static int mrg_jv2_real_writer_unittest(const struct dbengine_config *cfg) {
     //     builds unsafe.spinlock (read by journalfile_current_size()), sets
     //     mmap.fd = -1, and links itself to the datafile.
     struct dbengine_tier ctx;
-    memset(&ctx, 0, sizeof(ctx));
+    dbengine_tier_reset(&ctx);
     ctx.config.tier = 0;
     strncpyz(ctx.config.dbfiles_path, dbpath, sizeof(ctx.config.dbfiles_path) - 1);
-    fatal_assert(0 == netdata_rwlock_init(&ctx.datafiles.rwlock));
-    rw_spinlock_init(&ctx.njfv2idx.spinlock);
 
     struct dbengine_datafile datafile;
     memset(&datafile, 0, sizeof(datafile));

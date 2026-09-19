@@ -208,8 +208,9 @@ int dbengine_null_engine_unittest(void) {
     return errors;
 }
 
-// one engine's whole life on a scratch directory: made, refused a second engine, given a tier that collects and is
-// queried, stopped, refused a tier, destroyed with nothing referenced, and the static tiers released
+// one engine's whole life on a scratch directory: made, with a second engine made and unmade next to it, given a
+// tier that collects and is queried, stopped (blocking no other engine), refused a tier, destroyed with nothing
+// referenced
 static int engine_lifecycle_generation(const struct dbengine_config *cfg, const char *dir, const char *what) {
     int errors = 0;
 
@@ -224,9 +225,24 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
         return 1;
     }
 
-    if(dbengine_create(cfg)) {
-        fprintf(stderr, " >>> DBENGINE: %s: a second engine was made while the first owns the static tiers\n", what);
+    // the tiers are the engine's own: nothing in the process is claimed, and another engine can be made while
+    // this one lives
+    DBENGINE_ENGINE *other = dbengine_create(cfg);
+    if(!other) {
+        fprintf(stderr, " >>> DBENGINE: %s: a second engine could not be made while the first lives\n", what);
         errors++;
+    }
+    else {
+        dbengine_shutdown(other);
+        dbengine_destroy(other);
+    }
+
+    for(size_t i = 0; i < RRD_STORAGE_TIERS; i++) {
+        DBENGINE_TIER *tier = dbengine_tier(engine, i);
+        if(!tier || tier->engine != engine) {
+            fprintf(stderr, " >>> DBENGINE: %s: tier %zu is not the engine's\n", what, i);
+            errors++;
+        }
     }
 
     if(dbengine_tier(engine, RRD_STORAGE_TIERS)) {
@@ -264,23 +280,21 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
         errors++;
     }
 
-    // stopped but not destroyed: it still owns the static tiers
-    if(dbengine_create(cfg)) {
-        fprintf(stderr, " >>> DBENGINE: %s: an engine was made while a stopped one still owns the static tiers\n", what);
+    // stopped but not destroyed: it blocks no other engine either
+    other = dbengine_create(cfg);
+    if(!other) {
+        fprintf(stderr, " >>> DBENGINE: %s: an engine could not be made while a stopped one exists\n", what);
         errors++;
+    }
+    else {
+        dbengine_shutdown(other);
+        dbengine_destroy(other);
     }
 
     size_t referenced = dbengine_destroy(engine);
     if(referenced) {
         fprintf(stderr, " >>> DBENGINE: %s: %zu metrics stayed referenced across the destroy\n", what, referenced);
         errors++;
-    }
-
-    for(size_t i = 0; i < RRD_STORAGE_TIERS; i++) {
-        if(dbengine_multidb_tiers[i]->engine) {
-            fprintf(stderr, " >>> DBENGINE: %s: static tier %zu still points at an engine after the destroy\n", what, i);
-            errors++;
-        }
     }
 
     return errors;

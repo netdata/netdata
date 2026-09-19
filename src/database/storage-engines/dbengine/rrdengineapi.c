@@ -4,19 +4,7 @@
 #include "rrdengine.h"
 #include "dbengine-compression.h"
 
-/* the daemon's static multidb tiers */
-struct dbengine_tier multidb_tier_storage0 = { 0 };
-struct dbengine_tier multidb_tier_storage1 = { 0 };
-struct dbengine_tier multidb_tier_storage2 = { 0 };
-struct dbengine_tier multidb_tier_storage3 = { 0 };
-struct dbengine_tier multidb_tier_storage4 = { 0 };
-
 #define mrg_metric_ctx(metric) ((struct dbengine_tier *)mrg_metric_section(metric))
-
-#if RRD_STORAGE_TIERS != 5
-#error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
-#endif
-struct dbengine_tier *dbengine_multidb_tiers[RRD_STORAGE_TIERS] = { 0 };
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
@@ -34,21 +22,10 @@ size_t page_type_size[256] = {
         [DBENGINE_PAGE_TYPE_GORILLA_32BIT] = sizeof(storage_number)
 };
 
-static inline void initialize_tier(struct dbengine_tier *ctx) {
+void dbengine_tier_reset(struct dbengine_tier *ctx) {
     memset(ctx, 0, sizeof(*ctx));
     netdata_rwlock_init(&ctx->datafiles.rwlock);
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
-}
-
-__attribute__((constructor)) void initialize_multidb_tiers(void) {
-    dbengine_multidb_tiers[0] = &multidb_tier_storage0;
-    dbengine_multidb_tiers[1] = &multidb_tier_storage1;
-    dbengine_multidb_tiers[2] = &multidb_tier_storage2;
-    dbengine_multidb_tiers[3] = &multidb_tier_storage3;
-    dbengine_multidb_tiers[4] = &multidb_tier_storage4;
-
-    for(int i = 0; i < RRD_STORAGE_TIERS ; i++)
-        initialize_tier(dbengine_multidb_tiers[i]);
 }
 
 // ----------------------------------------------------------------------------
@@ -1153,7 +1130,7 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     uint32_t max_open_files;
 
     // the configuration first (a bad one is a programming error, fatal whatever the engine's state), then the
-    // engine and the tier, all before anything is written: a refused init must leave the static tier as it found it
+    // engine and the tier, all before anything is written: a refused init must leave the tier as it found it
     dbengine_tier_config_validate(tc);
 
     if(!engine)
@@ -1174,17 +1151,16 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     size_t tier = tc->tier;
     unsigned disk_space_mb = tc->disk_space_mb;
 
-    // the static tiers belong to the engine that claimed them at dbengine_create(); a tier opened against any other
-    // engine would charge its budget and its lifecycle to one engine and its exit to another
-    if(dbengine_multidb_tiers[tier]->engine != engine)
-        fatal("DBENGINE: dbengine_tier_init() for tier %zu called with an engine that does not own the tier", tier);
+    // the tier is the engine's own (the number was validated above), so its budget, its lifecycle and its exit
+    // are charged to the engine it was opened on and no other
+    struct dbengine_tier *ctx = dbengine_tier(engine, tier);
 
-    if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.active, __ATOMIC_ACQUIRE)) {
+    if(__atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE)) {
         netdata_log_error("DBENGINE: tier %zu is already up, the tier cannot be initialized again", tier);
         return UV_EALREADY;
     }
 
-    if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.came_up, __ATOMIC_ACQUIRE)) {
+    if(__atomic_load_n(&ctx->atomic.came_up, __ATOMIC_ACQUIRE)) {
         netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again on this engine", tier);
         return UV_EIO;
     }
@@ -1203,8 +1179,6 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
         rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
         return UV_EMFILE;
     }
-
-    struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tc->page_type;
@@ -1283,27 +1257,33 @@ size_t dbengine_destroy(struct dbengine_engine *engine) {
             engine->main_mrg = NULL;
     }
 
-    // the object outlives this call when a cache or the registry stays allocated: they and the tiers still point at it
+    // the object outlives this call when a cache or the registry stays allocated: they still point at it, and at
+    // its tiers (a page's or a metric's section is the tier)
     bool retained = engine->main_cache || engine->open_cache || engine->extent_cache || engine->main_mrg;
 
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
+        struct dbengine_tier *ctx = &engine->tiers[tier];
         if(ctx->datafiles.JudyL) {
             fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
             finalize_rrd_files(ctx);
         }
-        // back to the constructor's state. The lock is destroyed first: re-initialising a live rwlock is undefined
-        // and leaks what the platform allocated for it; every slot's lock is initialised (by the constructor at
-        // least) and nothing holds it any more. The memset stays: it drops the pointers to any datafile the
-        // finalization had to skip, so a leak checker reports them instead of seeing them reachable from here.
-        netdata_rwlock_destroy(&ctx->datafiles.rwlock);
-        initialize_tier(ctx);
-
-        // a tier that a retained cache or registry can still reach keeps its way to the engine
-        ctx->engine = retained ? engine : NULL;
     }
 
-    if(!retained)
+    if(retained) {
+        // the tiers stay allocated with the engine, back to the state dbengine_engine_alloc() left them in, so that
+        // nothing of the finalized datafiles is reachable from here (a leak checker reports what a finalization had
+        // to skip instead of seeing it reachable) and a retained cache or registry still finds its way to the
+        // engine through them. The lock is destroyed first: re-initialising a live rwlock is undefined and leaks
+        // what the platform allocated for it; every tier's lock is initialised (by the alloc at least) and nothing
+        // holds it any more
+        for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+            struct dbengine_tier *ctx = &engine->tiers[tier];
+            netdata_rwlock_destroy(&ctx->datafiles.rwlock);
+            dbengine_tier_reset(ctx);
+            ctx->engine = engine;
+        }
+    }
+    else
         dbengine_engine_free(engine);
 
     return metrics_referenced;
@@ -1348,7 +1328,7 @@ struct dbengine_tier *dbengine_tier(struct dbengine_engine *engine, size_t tier)
     if(!engine || tier >= RRD_STORAGE_TIERS)
         return NULL;
 
-    return dbengine_multidb_tiers[tier];
+    return &engine->tiers[tier];
 }
 
 // the tier verbs the embedder reaches through dbengine_tier() take NULL as a tier with nothing in it: the embedder

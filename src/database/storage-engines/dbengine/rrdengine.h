@@ -8,7 +8,7 @@
 // dbengine is netdata's tiered time-series store. Vocabulary used throughout this directory:
 //
 //   ctx (struct dbengine_tier)        one tier of one database: a directory of datafiles and their journals;
-//                                     the daemon's tiers are dbengine_multidb_tiers[]
+//                                     an engine's tiers are engine->tiers[], numbered
 //   datafile / extent / page          on-disk container / a compressed group of pages / one metric's samples
 //   journalfile                       the per-datafile index of extents and metrics (v1 while writing, v2 when sealed)
 //   the engine (struct dbengine_engine) what the tiers share: the event loop, the caches, the metric registry, the
@@ -53,9 +53,10 @@ struct dbengine_engine *dbengine_engine_alloc(const struct dbengine_config *cfg)
 // Only when no cache, registry or event loop of it exists any more
 void dbengine_engine_free(struct dbengine_engine *engine);
 
-// the daemon's static tiers, the tier list of the engine that claimed them at dbengine_create(); the embedder
-// reaches them by number through dbengine_tier()
-extern struct dbengine_tier *dbengine_multidb_tiers[RRD_STORAGE_TIERS];
+// a tier as dbengine_engine_alloc() hands it to the engine: zeroed, with its two locks initialised. Also what
+// dbengine_destroy() puts a retained engine's tiers back to (destroying the rwlock first). The tier's engine is
+// set by the caller
+void dbengine_tier_reset(struct dbengine_tier *ctx);
 
 #define DBENGINE_FD_BUDGET_PER_TIER (50)
 
@@ -494,7 +495,7 @@ struct dbengine_tier {
         PAD64(bool) came_up;                               // set on a successful init, just before active; never cleared by
                                                            // dbengine_tier_exit(): a tier that
                                                            // exited keeps its datafiles attached until dbengine_destroy() finalizes
-                                                           // them and initialize_tier() resets the slot, so it cannot come up again
+                                                           // them, so it cannot come up again on this engine
         PAD64(bool) mrg_populated;                         // set when the metrics registry has been loaded from every journal
         PAD64(bool) migration_to_v2_running;
         PAD64(bool) now_deleting_files;
@@ -519,10 +520,15 @@ struct dbengine_tier {
     struct dbengine_statistics stats;
 };
 
-// What the tiers of one database share. Everything but the tiers themselves (still the static
-// dbengine_multidb_tiers[]) hangs here: the event loop and its queues, the caches, the metric registry, the
-// configuration, the counters. The page allocators stay process-wide (dbengine-config.h: allocator).
+// One database: its tiers and what they share hang here: the event loop and its queues, the caches, the metric
+// registry, the configuration, the counters. The page allocators stay process-wide (dbengine-config.h: allocator).
 struct dbengine_engine {
+    // the tiers, by number. Embedded so that their addresses are stable for the engine's life: a registry metric's
+    // section, a cache page's section and a queued command's ctx are tier addresses, and a retained cache or
+    // registry keeps them after dbengine_destroy(), as it keeps the engine. Every tier is allocated whether or not
+    // the embedder brings it up; a tier's number is its index here and into the process-wide tier_page_size[]
+    struct dbengine_tier tiers[RRD_STORAGE_TIERS];
+
     // the event loop
     ND_THREAD *thread;
     uv_loop_t loop;
@@ -858,7 +864,7 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 // --------------------------------------------------------------------------------------------------------------------
 // dbengine_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
 uint64_t dbengine_get_used_disk_space_unsafe(struct dbengine_tier *ctx);
-// after dbengine_tier_exit(), on a static multidb tier only: close its datafiles
+// after dbengine_tier_exit(): close the tier's datafiles
 void finalize_rrd_files(struct dbengine_tier *ctx);
 size_t datafile_count(struct dbengine_tier *ctx, bool with_lock);
 struct dbengine_datafile *get_first_ctx_datafile(struct dbengine_tier *ctx, bool with_lock);
