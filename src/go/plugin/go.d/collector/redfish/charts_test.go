@@ -82,28 +82,6 @@ func statesetStates() map[string][]string {
 	return result
 }
 
-func TestSourceChartsPreserveCommonDimensions(t *testing.T) {
-	charts := templateCharts(t)
-	for context, dimension := range map[string]string{
-		"system.hw.sensor.temperature.input": "input",
-		"system.hw.sensor.voltage.input":     "input",
-		"system.hw.sensor.voltage.average":   "average",
-		"system.hw.sensor.fan.input":         "input",
-		"system.hw.sensor.current.input":     "input",
-		"system.hw.sensor.current.average":   "average",
-		"system.hw.sensor.power.input":       "input",
-		"system.hw.sensor.power.average":     "average",
-		"system.hw.sensor.energy.input":      "input",
-		"system.hw.sensor.humidity.input":    "input",
-		"system.hw.sensor.pressure.input":    "input",
-	} {
-		chart, ok := charts[context]
-		require.True(t, ok, context)
-		require.Len(t, chart.Dimensions, 1, context)
-		require.Equal(t, dimension, chart.Dimensions[0].Name, context)
-	}
-}
-
 func TestSourceHealthChartsAndRules(t *testing.T) {
 	charts := templateCharts(t)
 	var alarms int
@@ -111,14 +89,13 @@ func TestSourceHealthChartsAndRules(t *testing.T) {
 		require.False(t, strings.HasPrefix(context, "redfish.aggregate."), context)
 		require.False(t, strings.HasPrefix(context, "redfish.collection.detail_"), context)
 		require.NotEqual(t, "redfish.collection.selected_system", context)
-		if context != "redfish.reading.alarm" &&
-			!(strings.HasPrefix(context, "system.hw.sensor.") && strings.HasSuffix(context, ".alarm")) {
+		if context != "redfish.reading.alarm" {
 			continue
 		}
 		alarms++
 		require.Equal(t, []string{"clear", "warning", "critical"}, chartDimensionNames(t, chart), context)
 	}
-	require.Equal(t, 9, alarms)
+	require.Equal(t, 1, alarms)
 	// Every retained alert must attach to a chart provided by this collector.
 	raw, err := os.ReadFile("../../../../../health/health.d/redfish.conf")
 	require.NoError(t, err)

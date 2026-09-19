@@ -67,7 +67,7 @@ func TestDerivedHealthBoundariesAndSourceIndependence(t *testing.T) {
 			assert.Equal(t, wantHealth, result.Sensors[0].Health)
 			var sourceStates []string
 			for _, observation := range result.Observations {
-				if observation.Metric == "system_hw_sensor_temperature_alarm_status" {
+				if observation.Metric == "reading_alarm_status" {
 					sourceStates = append(sourceStates, observation.State)
 				}
 			}

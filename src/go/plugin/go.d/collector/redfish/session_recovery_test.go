@@ -174,7 +174,7 @@ func TestSessionRecoveryProjectsOnlyFinalAcquisition(t *testing.T) {
 			switch reading.Metric {
 			case "reading_power_value":
 				power = append(power, reading.Value)
-			case "system_hw_sensor_temperature_input":
+			case "reading_temperature_value":
 				temperatures = append(temperatures, reading.Value)
 			}
 		}

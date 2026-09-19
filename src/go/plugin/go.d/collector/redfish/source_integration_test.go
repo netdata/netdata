@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -209,17 +210,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 			assert.Equal(
 				t,
 				expectation.values,
-				sourceTestMetricByResource(t, reader, "system_hw_sensor_temperature_input", ""),
-			)
-			assert.Equal(
-				t,
-				sourceTestStateValues(expectation.alarms, []string{"clear", "warning", "critical"}),
-				sourceTestMetricByResource(
-					t,
-					reader,
-					"system_hw_sensor_temperature_alarm_status",
-					"system_hw_sensor_temperature_alarm_status",
-				),
+				sourceTestMetricByResource(t, reader, "reading_temperature_value", ""),
 			)
 			for metric, expected := range map[string]map[string]float64{
 				"storage_controller_pcie_lanes_active": {"Controller": 8},
@@ -247,12 +238,13 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 				),
 				sourceTestMetricByResource(t, reader, "storage_controller_health_status", "storage_controller_health_status"),
 			)
+			// Every reading shares one alarm state metric: the temperature sensors of
+			// this cycle plus the battery reading.
+			alarms := map[string]string{"Battery": "warning"}
+			maps.Copy(alarms, expectation.alarms)
 			assert.Equal(
 				t,
-				sourceTestStateValues(
-					map[string]string{"Battery": "warning"},
-					[]string{"clear", "warning", "critical"},
-				),
+				sourceTestStateValues(alarms, []string{"clear", "warning", "critical"}),
 				sourceTestMetricByResource(t, reader, "reading_alarm_status", "reading_alarm_status"),
 			)
 			var statuses []string
@@ -270,7 +262,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 				"redfish.battery.energy_capacity":       {"actual"},
 			}
 			if len(expectation.values) > 0 {
-				contexts["system.hw.sensor.temperature.input"] = []string{"input"}
+				contexts["redfish.reading.temperature"] = []string{"value"}
 			}
 			collecttest.AssertChartCoverage(
 				t,
@@ -289,16 +281,19 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 		assert.Equal(
 			t,
 			map[string]float64{"New sensor": 42},
-			sourceTestMetricByResource(t, reader, "system_hw_sensor_temperature_input", ""),
+			sourceTestMetricByResource(t, reader, "reading_temperature_value", ""),
 		)
 		assert.Equal(
 			t,
-			sourceTestStateValues(map[string]string{"New sensor": "clear"}, []string{"clear", "warning", "critical"}),
+			sourceTestStateValues(
+				map[string]string{"New sensor": "clear", "Battery": "warning"},
+				[]string{"clear", "warning", "critical"},
+			),
 			sourceTestMetricByResource(
 				t,
 				reader,
-				"system_hw_sensor_temperature_alarm_status",
-				"system_hw_sensor_temperature_alarm_status",
+				"reading_alarm_status",
+				"reading_alarm_status",
 			),
 		)
 		assert.Equal(
@@ -310,7 +305,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 			t,
 			fresh,
 			collecttest.ChartCoverageExpectation{
-				RequiredContexts: map[string][]string{"system.hw.sensor.temperature.input": {"input"}},
+				RequiredContexts: map[string][]string{"redfish.reading.temperature": {"value"}},
 			},
 		)
 	})
@@ -377,13 +372,13 @@ func TestDecodedCollectorPublishesEverySensorAboveFormerDetailCap(t *testing.T) 
 	assert.Equal(
 		t,
 		expected,
-		sourceTestMetricByResource(t, collector.MetricStore().Read(), "system_hw_sensor_temperature_input", ""),
+		sourceTestMetricByResource(t, collector.MetricStore().Read(), "reading_temperature_value", ""),
 	)
 	collecttest.AssertChartCoverage(
 		t,
 		collector,
 		collecttest.ChartCoverageExpectation{
-			RequiredContexts: map[string][]string{"system.hw.sensor.temperature.input": {"input"}},
+			RequiredContexts: map[string][]string{"redfish.reading.temperature": {"value"}},
 		},
 	)
 }
@@ -601,15 +596,15 @@ func TestDecodedCollectorMergesSensorExcerptWhenReadingIsAbsent(t *testing.T) {
 			collector := sourceTestDecodedCollector(t, server.URL)
 			sourceTestCollectCycle(t, collector)
 			reader := collector.MetricStore().Read(metrix.ReadFlatten())
-			assert.Equal(t, test.want, sourceTestMetricByResource(t, reader, "system_hw_sensor_temperature_input", ""))
+			assert.Equal(t, test.want, sourceTestMetricByResource(t, reader, "reading_temperature_value", ""))
 			assert.Equal(
 				t,
 				sourceTestStateValues(map[string]string{"Sensor": "warning"}, []string{"clear", "warning", "critical"}),
 				sourceTestMetricByResource(
 					t,
 					reader,
-					"system_hw_sensor_temperature_alarm_status",
-					"system_hw_sensor_temperature_alarm_status",
+					"reading_alarm_status",
+					"reading_alarm_status",
 				),
 			)
 		})
@@ -761,7 +756,7 @@ func TestDecodedCollectorRejectsWrongDescendantSchema(t *testing.T) {
 	got := sourceTestMetricByResource(
 		t,
 		c.MetricStore().Read(metrix.ReadFlatten()),
-		"system_hw_sensor_temperature_input",
+		"reading_temperature_value",
 		"",
 	)
 	assert.Equal(t, map[string]float64{"Valid sensor": 17}, got, "reject wrong schema and retain valid siblings")

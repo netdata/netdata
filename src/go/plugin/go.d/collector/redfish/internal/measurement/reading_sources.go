@@ -66,8 +66,8 @@ var fixedReadingFamilies = map[string]readingTypeDescriptor{
 // Chart presentation is authored independently in charts.yaml.
 var readingDescriptors = map[readingKey]readingDescriptor{
 	{"temperature", "zero", "input", "direct"}: {
-		"system_hw_sensor_temperature_input",
-		"system_hw_sensor_temperature_alarm_status",
+		"reading_temperature_value",
+		"reading_alarm_status",
 		true,
 	},
 	{"temperature", "zero", "average", ""}: {
@@ -156,8 +156,8 @@ var readingDescriptors = map[readingKey]readingDescriptor{
 		false,
 	},
 	{"humidity", "zero", "input", "direct"}: {
-		"system_hw_sensor_humidity_input",
-		"system_hw_sensor_humidity_alarm_status",
+		"reading_humidity_value",
+		"reading_alarm_status",
 		true,
 	},
 	{"humidity", "zero", "average", ""}: {
@@ -246,11 +246,11 @@ var readingDescriptors = map[readingKey]readingDescriptor{
 		false,
 	},
 	{"power", "zero", "input", "direct"}: {
-		"system_hw_sensor_power_input",
-		"system_hw_sensor_power_alarm_status",
+		"reading_power_value",
+		"reading_alarm_status",
 		true,
 	},
-	{"power", "zero", "average", "direct"}:          {"system_hw_sensor_power_average", "", false},
+	{"power", "zero", "average", "direct"}:          {"reading_power_value", "reading_alarm_status", false},
 	{"power", "zero", "lowest_interval", ""}:        {"reading_power_value", "reading_alarm_status", false},
 	{"power", "zero", "peak_interval", ""}:          {"reading_power_value", "reading_alarm_status", false},
 	{"power", "zero", "lowest_since_reset", ""}:     {"reading_power_value", "reading_alarm_status", false},
@@ -268,8 +268,8 @@ var readingDescriptors = map[readingKey]readingDescriptor{
 	{"power", "headroom", "lowest_since_reset", ""}: {"reading_power_value", "reading_alarm_status", false},
 	{"power", "headroom", "peak_since_reset", ""}:   {"reading_power_value", "reading_alarm_status", false},
 	{"energy", "zero", "input", "direct"}: {
-		"system_hw_sensor_energy_input",
-		"system_hw_sensor_energy_alarm_status",
+		"reading_energy_value",
+		"reading_alarm_status",
 		true,
 	},
 	{"energy", "zero", "average", ""}:                {"reading_energy_value", "reading_alarm_status", false},
@@ -308,11 +308,11 @@ var readingDescriptors = map[readingKey]readingDescriptor{
 	{"charge", "headroom", "lowest_since_reset", ""}: {"reading_charge_value", "reading_alarm_status", false},
 	{"charge", "headroom", "peak_since_reset", ""}:   {"reading_charge_value", "reading_alarm_status", false},
 	{"voltage", "zero", "input", "direct"}: {
-		"system_hw_sensor_voltage_input",
-		"system_hw_sensor_voltage_alarm_status",
+		"reading_voltage_value",
+		"reading_alarm_status",
 		true,
 	},
-	{"voltage", "zero", "average", "direct"}: {"system_hw_sensor_voltage_average", "", false},
+	{"voltage", "zero", "average", "direct"}: {"reading_voltage_value", "reading_alarm_status", false},
 	{"voltage", "zero", "lowest_interval", ""}: {
 		"reading_voltage_value",
 		"reading_alarm_status",
@@ -386,11 +386,11 @@ var readingDescriptors = map[readingKey]readingDescriptor{
 		false,
 	},
 	{"current", "zero", "input", "direct"}: {
-		"system_hw_sensor_current_input",
-		"system_hw_sensor_current_alarm_status",
+		"reading_current_value",
+		"reading_alarm_status",
 		true,
 	},
-	{"current", "zero", "average", "direct"}: {"system_hw_sensor_current_average", "", false},
+	{"current", "zero", "average", "direct"}: {"reading_current_value", "reading_alarm_status", false},
 	{"current", "zero", "lowest_interval", ""}: {
 		"reading_current_value",
 		"reading_alarm_status",
@@ -734,8 +734,8 @@ var readingDescriptors = map[readingKey]readingDescriptor{
 		false,
 	},
 	{"rotational_speed", "zero", "input", "fan"}: {
-		"system_hw_sensor_fan_input",
-		"system_hw_sensor_fan_alarm_status",
+		"reading_rotational_speed_value",
+		"reading_alarm_status",
 		true,
 	},
 	{"rotational_speed", "zero", "input", ""}: {
@@ -1009,8 +1009,8 @@ var readingDescriptors = map[readingKey]readingDescriptor{
 		false,
 	},
 	{"barometric_pressure", "zero", "input", "ambient_pressure"}: {
-		"system_hw_sensor_pressure_input",
-		"system_hw_sensor_pressure_alarm_status",
+		"reading_barometric_pressure_value",
+		"reading_alarm_status",
 		true,
 	},
 	{"barometric_pressure", "zero", "average", ""}: {

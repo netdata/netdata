@@ -670,38 +670,6 @@ modules:
         metric: redfish.volume.write_cache_state
         info: "Redfish ${label:resource_name} reports a non-healthy state for Volume Write Cache State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_current_alarm
-        metric: system.hw.sensor.current.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Current Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_energy_alarm
-        metric: system.hw.sensor.energy.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Energy Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_fan_alarm
-        metric: system.hw.sensor.fan.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Rotational Speed Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_humidity_alarm
-        metric: system.hw.sensor.humidity.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Relative Humidity Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_power_alarm
-        metric: system.hw.sensor.power.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Power Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_pressure_alarm
-        metric: system.hw.sensor.pressure.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Barometric Pressure Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_temperature_alarm
-        metric: system.hw.sensor.temperature.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Temperature Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
-      - name: redfish_system_hw_sensor_voltage_alarm
-        metric: system.hw.sensor.voltage.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Voltage Source Health State"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
     functions:
       description: |
         Inspect sensor readings, hardware health and BMC-retained events for one configured endpoint using the Instance selector.
@@ -1122,14 +1090,11 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        Charts appear when the endpoint exposes their source properties. Resource health includes BMC-provided HealthRollup;
-        common hardware readings use `system.hw.sensor.*` contexts with `_collect_module=redfish`.
+        Charts appear when the endpoint exposes their source properties. Resource health includes BMC-provided HealthRollup.
       availability: []
       dynamic_context_prefixes:
         - prefix: redfish.
           reason: Optional resource, reading, and collection charts depend on the properties the endpoint exposes.
-        - prefix: system.hw.sensor.
-          reason: Standard temperature, voltage, fan, current, power, energy, humidity, and pressure readings use common hardware-sensor contexts.
       scopes:
         - name: endpoint
           description: Collection state for one configured Redfish endpoint job.
@@ -4403,20 +4368,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.pressure.alarm
-              description: Barometric Pressure Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.pressure.input
-              description: Barometric Pressure Reading (Zero basis)
-              unit: pascals
-              chart_type: line
-              dimensions:
-                - name: input
             - name: redfish.reading.heat
               description: Heat Readings
               unit: watts
@@ -4429,20 +4380,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.humidity.alarm
-              description: Relative Humidity Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.humidity.input
-              description: Relative Humidity Reading (Zero basis)
-              unit: percentage
-              chart_type: line
-              dimensions:
-                - name: input
             - name: redfish.reading.linear_acceleration
               description: Linear Acceleration Readings
               unit: meters/second2
@@ -4497,20 +4434,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.fan.alarm
-              description: Rotational Speed Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.fan.input
-              description: Rotational Speed Reading (Zero basis)
-              unit: RPM
-              chart_type: line
-              dimensions:
-                - name: input
             - name: redfish.reading.rotational_velocity
               description: Rotational Velocity Readings
               unit: radians/second
@@ -4523,20 +4446,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.temperature.alarm
-              description: Temperature Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.temperature.input
-              description: Temperature Reading (Zero basis)
-              unit: Celsius
-              chart_type: line
-              dimensions:
-                - name: input
             - name: redfish.reading.valve_position
               description: Valve Position Readings
               unit: percentage
@@ -4573,46 +4482,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.current.average
-              description: Current Average (Zero basis)
-              unit: amperes
-              chart_type: line
-              dimensions:
-                - name: average
-            - name: system.hw.sensor.current.alarm
-              description: Current Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.current.input
-              description: Current Reading (Zero basis)
-              unit: amperes
-              chart_type: line
-              dimensions:
-                - name: input
             - name: redfish.reading.energy
               description: Energy Readings
               unit: joules
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.energy.alarm
-              description: Energy Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.energy.input
-              description: Energy Reading (Zero basis)
-              unit: joules
-              chart_type: line
-              dimensions:
-                - name: input
             - name: redfish.reading.frequency
               description: Frequency Readings
               unit: hertz
@@ -4637,26 +4512,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.power.average
-              description: Power Average (Zero basis)
-              unit: watts
-              chart_type: line
-              dimensions:
-                - name: average
-            - name: system.hw.sensor.power.alarm
-              description: Power Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.power.input
-              description: Power Reading (Zero basis)
-              unit: watts
-              chart_type: line
-              dimensions:
-                - name: input
             - name: redfish.reading.power_factor
               description: Power Factor Readings
               unit: ratio
@@ -4687,23 +4542,3 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
-            - name: system.hw.sensor.voltage.average
-              description: Voltage Average (Zero basis)
-              unit: volts
-              chart_type: line
-              dimensions:
-                - name: average
-            - name: system.hw.sensor.voltage.alarm
-              description: Voltage Source Health State
-              unit: state
-              chart_type: stacked
-              dimensions:
-                - name: clear
-                - name: warning
-                - name: critical
-            - name: system.hw.sensor.voltage.input
-              description: Voltage Reading (Zero basis)
-              unit: volts
-              chart_type: line
-              dimensions:
-                - name: input
