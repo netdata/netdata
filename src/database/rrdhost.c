@@ -445,7 +445,6 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
 static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_DB_MODE memory_mode, time_t period, time_t step) {
     host->stream.replication.period = period;
     host->stream.replication.step = step;
-    host->stream.rcv.status.replication.percent = 100.0;
 
     switch(memory_mode) {
         default:
@@ -944,6 +943,233 @@ RRDHOST *rrdhost_find_or_create(
     }
 
     return host;
+}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Test-only pause point, compiled out of production builds. It blocks ONE claiming thread in the
+// window between the accounting increment and the flag publish - the exact interleaving the claim-before-
+// publish ordering exists to make safe - so a unit test can drive a deterministic race instead of a
+// thread-soup that passes by luck. Same shape as the hooks in src/libnetdata/aral/aral.c.
+static struct {
+    RRDSET *st;             // fire only for this chart
+    bool enabled;
+    bool waiting;           // set by the paused claimer
+    bool release;           // set by the test to let it continue
+} rrdhost_receiver_replication_race_hook = { 0 };
+
+void rrdhost_receiver_replication_race_hook_arm(RRDSET *st) {
+    rrdhost_receiver_replication_race_hook.st = st;
+    rrdhost_receiver_replication_race_hook.waiting = false;
+    rrdhost_receiver_replication_race_hook.release = false;
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.enabled, true, __ATOMIC_RELEASE);
+}
+
+bool rrdhost_receiver_replication_race_hook_is_waiting(void) {
+    return __atomic_load_n(&rrdhost_receiver_replication_race_hook.waiting, __ATOMIC_ACQUIRE);
+}
+
+void rrdhost_receiver_replication_race_hook_release(void) {
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.release, true, __ATOMIC_RELEASE);
+}
+
+void rrdhost_receiver_replication_race_hook_disarm(void) {
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.enabled, false, __ATOMIC_RELEASE);
+    rrdhost_receiver_replication_race_hook.st = NULL;
+}
+
+static ALWAYS_INLINE void rrdhost_receiver_replication_race_pause(RRDSET *st) {
+    if(likely(!__atomic_load_n(&rrdhost_receiver_replication_race_hook.enabled, __ATOMIC_ACQUIRE)))
+        return;
+
+    if(rrdhost_receiver_replication_race_hook.st != st)
+        return;
+
+    __atomic_store_n(&rrdhost_receiver_replication_race_hook.waiting, true, __ATOMIC_RELEASE);
+    while(!__atomic_load_n(&rrdhost_receiver_replication_race_hook.release, __ATOMIC_ACQUIRE))
+        tinysleep();
+}
+#else
+#define rrdhost_receiver_replication_race_pause(st) debug_dummy()
+#endif
+
+// Defined below, next to the release it shares its underflow guard with.
+uint32_t rrdhost_receiver_replication_withdraw(RRDHOST *host);
+
+// ONE implementation of the receiver-replication claim, used by the parser and by the tests.
+// Returns true when THIS call caused the not-replicating -> replicating transition, i.e. when the
+// caller now owns the chart's contribution.
+//
+// Ordering, which the whole accounting rests on: both accounting halves are incremented together, and
+// only then is RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS published. Publishing first would make the
+// flag visible while the contribution does not yet exist, and any release site would then decrement
+// something nobody owns.
+//
+// The publish edge is atomic_flags_set_and_clear()'s CAS, which is __ATOMIC_RELEASE on success - that
+// is what keeps the relaxed accounting add above from being reordered after it. The matching ACQUIRE
+// is a fence in the release, NOT part of the flag op: the same helper's load is relaxed, so observing
+// the flag does not on its own order the observer against this add on a weak-memory target.
+bool rrdhost_receiver_replication_claim(RRDSET *st) {
+    // `st` cannot be freed under us: svc_rrdset_lock_for_deletion() (daemon/service.c) frees a chart
+    // only after last_accessed, last_updated and last_collected are ALL older than
+    // rrdset_free_obsolete_time_s (default 3600s), and the CHART that put this chart in the parser's
+    // scope touched it microseconds ago.
+    RRDHOST *host = st->rrdhost;
+
+    __atomic_add_fetch(&host->stream.rcv.status.replication.charts_started_and_remaining,
+                       RRDHOST_RCV_REPLICATION_UNIT, __ATOMIC_RELAXED);
+
+    rrdhost_receiver_replication_race_pause(st);
+
+    RRDSET_FLAGS old = rrdset_flag_set_and_clear(
+        st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+
+    if(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) {
+        // Lost the race, or a duplicate CHART_DEFINITION_END: the chart already holds a contribution,
+        // so ours is one too many. Withdraw our own increment - this is NOT a release of the chart's
+        // contribution and deliberately does not clear the flag. Withdraw both speculative accounting
+        // halves together, so a duplicate CHART_DEFINITION_END changes neither the cohort nor completion.
+        // Checked like a release: our own increment keeps the outstanding half above zero, so a refusal
+        // here means that reasoning has broken and a raw subtract would have eaten the cohort half.
+        if(rrdhost_receiver_replication_withdraw(host) == 0)
+            pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+
+        return false;
+    }
+
+    // Decide the pulse AFTER the CAS, the way the pre-extraction code did: the winner asks whether the
+    // host now holds exactly one outstanding contribution. Deciding it from this thread's own increment
+    // BEFORE the CAS is wrong - a claimer can increment 0->1, be preempted, and lose the CAS to a second
+    // claimer whose increment made it 2, so the winner would publish replication while nobody emits
+    // RCV_REPLICATING.
+    //
+    // Residual, and NOT fixed here: this is still a read separated from the CAS, so a concurrent
+    // duplicate claim that has added its unit but not yet withdrawn it makes the winner read 2 and
+    // skip the pulse, while the duplicate publishes nothing when it withdraws. Concretely, the gauge
+    // then stays on whatever the connection last published - RCV_REPLICATION_WAIT on a fresh
+    // connection - until something else moves it, and the parent streaming charts read that gauge.
+    // Bounded to the gauge, though: the accounting word, and therefore `InStatus`,
+    // `InReplInstances`, `InReplCompletion` and the idle-disconnect suppression, all read the counter
+    // and are unaffected. Fixing it needs the publish linearized with the CAS - a separate change,
+    // because deciding the pulse from this thread's own increment instead is wrong for the reason
+    // above.
+    if(rrdhost_receiver_replicating_charts(host) == 1)
+        pulse_host_status(host, PULSE_HOST_STATUS_RCV_REPLICATING, 0);
+
+    return true;
+}
+
+// ONE implementation of the receiver-replication release, used by replay completion (both branches),
+// the connect/disconnect reset, chart teardown, and the tests. `also_clear` carries any extra flags the
+// caller wants cleared in the same atomic transition (RRDSET_FLAG_SYNC_CLOCK for the replay paths).
+//
+// Returns the OLD flags, so a caller can additionally test what it found - the replay path uses it to
+// decide whether to log "there was no replication in progress for this chart".
+//
+// The contribution is released ONLY when this call is the one that cleared
+// RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS. Releasing on "was not FINISHED" is wrong: a chart can
+// be not-FINISHED without holding a contribution.
+RRDSET_FLAGS rrdhost_receiver_replication_release_with_caller(RRDSET *st, RRDSET_FLAGS also_clear, const char *function, bool pulse) {
+    RRDHOST *host = st->rrdhost;
+
+    RRDSET_FLAGS old = rrdset_flag_set_and_clear(
+        st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
+        RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | also_clear);
+
+    if(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) {
+        // We won the clear, so the claim that set the flag is the one whose contribution we are about
+        // to consume. atomic_flags_set_and_clear() is RELEASE on success and RELAXED on its load, so
+        // observing the flag does NOT by itself order us against that claim's accounting increment:
+        // on a weak-memory target (netdata ships armv6l, armv7l and aarch64) we could see the flag and
+        // a stale word, refuse the decrement, and leak the contribution - pinning the host in
+        // `replicating`, the exact failure this whole path exists to prevent. This ACQUIRE fence pairs
+        // with the claim's releasing flag CAS, which our load above read from.
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+        // `pulse` is false only for the connect/disconnect reset, which is draining the whole
+        // generation and whose caller has already published the receiver state this host is really in.
+        // Pulsing RCV_RUNNING from there would overwrite the RCV_OFFLINE that
+        // stream_receiver_remove_internal() published moments earlier and latch the disconnected child
+        // as running until it reconnects.
+        if(rrdhost_receiver_replicating_charts_decrement(host, function) == 0 && pulse)
+            pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+    }
+
+    return old;
+}
+
+NETDATA_DOUBLE rrdhost_receiver_replication_completion(RRDHOST *host, uint32_t *instances) {
+    uint64_t accounting = rrdhost_receiver_replication_accounting(host);
+    uint32_t remaining = (uint32_t)accounting;
+    uint32_t started = (uint32_t)(accounting >> 32);
+
+    if(instances)
+        *instances = remaining;
+
+    // nothing outstanding: complete, whatever the cohort was
+    if(!remaining)
+        return 100.0;
+
+    // Outstanding work with no cohort to measure it against. Unreachable by construction: every unit
+    // of `remaining` was added together with a unit of `started`, and releases only lower `remaining`.
+    // Retained as a corruption / lifecycle diagnostic: report an explicit unknown rather than invent a
+    // ratio. Reaches the API as `null`, so seeing one in the field means this reasoning has broken.
+    if(!started || started < remaining)
+        return NAN;
+
+    return (NETDATA_DOUBLE)(started - remaining) * 100.0 / (NETDATA_DOUBLE)started;
+}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Counts refused (would-be-underflow) releases. A test cannot see an over-release from the counter
+// alone: the refusal is exactly what stops it going below zero, so the counter still lands on its
+// baseline and the fault is invisible. Tests assert this is unchanged across their run.
+size_t rrdhost_receiver_replication_refusals = 0;
+#endif
+
+// Subtract `delta` from the packed accounting word, refusing when the outstanding half is already
+// zero. Both callers must be checked: on a 64-bit word an unguarded subtract does not merely wrap the
+// outstanding half to UINT32_MAX and pin the host in `replicating`, it BORROWS out of the cohort half
+// and destroys the completion denominator too.
+static uint32_t rrdhost_receiver_replication_subtract(RRDHOST *host, uint64_t delta, const char *what, const char *function) {
+    // Test EACH half against the matching half of delta. Testing only the outstanding half would be
+    // right for the release (delta moves that half alone) but not for the withdrawal (delta moves
+    // both): a word with an empty cohort and outstanding work would pass and the subtract would
+    // borrow the cohort down to UINT32_MAX - the corruption this guard exists to prevent.
+    uint32_t need_remaining = rrdhost_receiver_replication_remaining_of(delta);
+    uint32_t need_started = rrdhost_receiver_replication_started_of(delta);
+
+    uint64_t cur = rrdhost_receiver_replication_accounting(host);
+
+    while(rrdhost_receiver_replication_remaining_of(cur) >= need_remaining
+       && rrdhost_receiver_replication_started_of(cur) >= need_started) {
+        if(__atomic_compare_exchange_n(&host->stream.rcv.status.replication.charts_started_and_remaining, &cur, cur - delta,
+                                       true, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return rrdhost_receiver_replication_remaining_of(cur - delta);
+        // cur has been reloaded by the failed exchange; re-test it
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    __atomic_add_fetch(&rrdhost_receiver_replication_refusals, 1, __ATOMIC_RELAXED);
+#endif
+
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "STREAM REPLAY ERROR: 'host:%s': %s() %s a receiver replication contribution it does not own - "
+           "the counter is already zero. Refusing to wrap it.",
+           rrdhost_hostname(host), function, what);
+
+    return 0;
+}
+
+uint32_t rrdhost_receiver_replicating_charts_decrement(RRDHOST *host, const char *function) {
+    return rrdhost_receiver_replication_subtract(host, 1, "released", function);
+}
+
+// The duplicate-CHART_DEFINITION_END rollback: withdraw the speculative increment this same thread
+// just made. Both halves move together, so the attempt leaves the completion figure untouched. This
+// is NOT a release - it does not clear the flag, because the chart still holds its own contribution.
+uint32_t rrdhost_receiver_replication_withdraw(RRDHOST *host) {
+    return rrdhost_receiver_replication_subtract(host, RRDHOST_RCV_REPLICATION_UNIT, "withdrew",
+                                                 "rrdhost_receiver_replication_claim");
 }
 
 bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
