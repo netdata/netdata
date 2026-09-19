@@ -388,11 +388,15 @@ ALWAYS_INLINE void dbengine_query_handle_release(struct dbengine_engine *engine,
 // ----------------------------------------------------------------------------
 // WAL cache
 
-static size_t dbengine_active_tiers(void) {
+// this engine's tiers that are up: the static tiers belong to the engine that claimed them, but the sweep says
+// so explicitly, as the unmount sweep does, so that it holds once the tiers are the engine's own
+static size_t dbengine_active_tiers(struct dbengine_engine *engine) {
     size_t active = 0;
-    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if(dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
+        if(ctx->engine == engine && dbengine_tier_is_active(ctx))
             active++;
+    }
     return active;
 }
 
@@ -402,7 +406,7 @@ static void wal_cleanup1(struct dbengine_engine *engine) {
     if(!spinlock_trylock(&engine->wal.guarded.spinlock))
         return;
 
-    if(engine->wal.guarded.available_items && engine->wal.guarded.available > dbengine_active_tiers()) {
+    if(engine->wal.guarded.available_items && engine->wal.guarded.available > dbengine_active_tiers(engine)) {
         wal = engine->wal.guarded.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(engine->wal.guarded.available_items, wal, cache.prev, cache.next);
         engine->wal.guarded.available--;
@@ -2483,13 +2487,17 @@ bool dbengine_ctx_tier_cap_exceeded(struct dbengine_tier *ctx)
     return false;
 }
 
-static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
+static void retention_timer_cb(uv_timer_t *handle)
 {
+    struct dbengine_engine *engine = handle->data;
+
     worker_is_busy(DBENGINE_RETENTION_TIMER_CB);
 
+    // this engine's tiers only: a rotation is served by the engine's own loop, and a tier of another engine has
+    // its own timer
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
-        if (!dbengine_tier_is_active(ctx))
+        if (ctx->engine != engine || !dbengine_tier_is_active(ctx))
             continue;
         check_and_schedule_db_rotation(ctx);
     }
