@@ -18,8 +18,8 @@
 // no engine (it checks what the caches fall back to without a main cache), dbengine_null_engine_unittest()
 // needs no engine (it checks that the engine's verbs and getters take NULL as an engine with nothing in it),
 // dbengine_engine_lifecycle_unittest() runs before the daemon's own engine comes up (it makes, runs, stops and
-// destroys two engines of its own on scratch directories, and checks that nothing of the first is left for the
-// second),
+// destroys two engines of its own on scratch directories, one after the other and then both at once, and checks
+// that nothing of one is left for, or taken from, the other),
 // dbengine_allocator_unittest() runs before the engine is up too (it brings the process-wide page allocators up
 // with the given configuration's allocator settings and checks that a second, different configuration leaves them
 // as built; the engine that comes up afterwards reuses them), and dbengine_zero_page_cadence_unittest() collects

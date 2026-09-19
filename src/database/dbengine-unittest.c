@@ -707,7 +707,7 @@ int test_dbengine(void) {
     dbengine_shutdown(netdata_conf_dbengine_engine);
     rrd_wrunlock();
 
-    // tier 1 never came up in this process; a refusal that did not happen would have created its first datafile
+    // tier 1 never came up on this engine; a refusal that did not happen would have created its first datafile
     char probe_dir[FILENAME_MAX + 1];
     snprintfz(probe_dir, FILENAME_MAX, "%s/dbengine-tier1-probe", host->cache_dir);
     if(mkdir(probe_dir, 0700) != 0 && errno != EEXIST) {

@@ -300,6 +300,149 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
     return errors;
 }
 
+// Two engines alive at once, each with its tier 0 on a scratch directory of its own: the tiers are distinct
+// objects, each engine collects and is queried on its own tier, a metric one engine created is unknown to the
+// other's registry, the tier refusals are per engine (a second init of one engine's tier while the other's comes
+// up; a stopped engine's tier while the other still serves), and one engine is stopped and destroyed while the
+// other collects on, in the order the caller picks. The page allocator layer is untouched by the destroy.
+static int engines_coexist(const struct dbengine_config *cfg, const char *dir_a, const char *dir_b, bool destroy_a_first) {
+    int errors = 0;
+    const char *what = destroy_a_first ? "two engines, A destroyed first" : "two engines, B destroyed first";
+
+    if((mkdir(dir_a, 0700) != 0 && errno != EEXIST) || (mkdir(dir_b, 0700) != 0 && errno != EEXIST)) {
+        fprintf(stderr, " >>> DBENGINE: %s: cannot create the scratch directories\n", what);
+        return 1;
+    }
+
+    DBENGINE_ENGINE *a = dbengine_create(cfg);
+    if(!a) {
+        fprintf(stderr, " >>> DBENGINE: %s: engine A did not come up\n", what);
+        return 1;
+    }
+
+    DBENGINE_ENGINE *b = dbengine_create(cfg);
+    if(!b) {
+        fprintf(stderr, " >>> DBENGINE: %s: engine B did not come up while A runs\n", what);
+        dbengine_shutdown(a);
+        dbengine_destroy(a);
+        return 1;
+    }
+
+    struct dbengine_tier_config tc_a = {
+        .tier = 0,
+        .dbfiles_path = dir_a,
+        .disk_space_mb = 0,
+        .max_retention_s = 0,
+        .page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT,
+        .grouping = 1,
+    };
+    struct dbengine_tier_config tc_b = tc_a;
+    tc_b.dbfiles_path = dir_b;
+
+    int rc = dbengine_tier_init(a, &tc_a);
+    if(rc) {
+        fprintf(stderr, " >>> DBENGINE: %s: A's tier 0 did not come up: %s\n", what, uv_strerror(rc));
+        errors++;
+    }
+
+    // a second init of A's tier is refused on A alone: B's tier of the same number comes up
+    rc = dbengine_tier_init(a, &tc_a);
+    if(rc != UV_EALREADY) {
+        fprintf(stderr, " >>> DBENGINE: %s: A's tier 0 was initialized twice (returned %d)\n", what, rc);
+        errors++;
+    }
+    rc = dbengine_tier_init(b, &tc_b);
+    if(rc) {
+        fprintf(stderr, " >>> DBENGINE: %s: B's tier 0 did not come up while A's is up: %s\n", what, uv_strerror(rc));
+        errors++;
+    }
+
+    DBENGINE_TIER *tier_a = dbengine_tier(a, 0), *tier_b = dbengine_tier(b, 0);
+    if(!tier_a || !tier_b || tier_a == tier_b || tier_a->engine != a || tier_b->engine != b) {
+        fprintf(stderr, " >>> DBENGINE: %s: the two engines do not have a tier 0 each\n", what);
+        errors++;
+    }
+
+    if(dbengine_tier_is_active(tier_a))
+        dbengine_readiness_wait(tier_a);
+    if(dbengine_tier_is_active(tier_b))
+        dbengine_readiness_wait(tier_b);
+
+    if(dbengine_tier_is_active(tier_a) && dbengine_tier_is_active(tier_b)) {
+        // each collects and is queried on its own tier
+        errors += dbengine_zero_page_cadence_unittest(a, (STORAGE_INSTANCE *)tier_a);
+        errors += dbengine_zero_page_cadence_unittest(b, (STORAGE_INSTANCE *)tier_b);
+
+        // the registries are separate: a metric A created is unknown to B
+        nd_uuid_t uuid;
+        uuid_generate(uuid);
+        UUIDMAP_ID id = uuidmap_create(uuid);
+        STORAGE_METRIC_HANDLE *on_a = dbengine_metric_get_or_create_by_id((STORAGE_INSTANCE *)tier_a, id);
+        STORAGE_METRIC_HANDLE *on_b = dbengine_metric_get_by_uuid((STORAGE_INSTANCE *)tier_b, &uuid);
+        if(!on_a) {
+            fprintf(stderr, " >>> DBENGINE: %s: A did not create a metric on its tier\n", what);
+            errors++;
+        }
+        if(on_b) {
+            fprintf(stderr, " >>> DBENGINE: %s: B's registry knows a metric A created\n", what);
+            errors++;
+            dbengine_metric_release(on_b);
+        }
+        if(on_a)
+            dbengine_metric_release(on_a);
+        uuidmap_free(id);
+    }
+
+    // the first to go: its tier exits and it stops; its tier is refused on it while the other still serves
+    DBENGINE_ENGINE *first = destroy_a_first ? a : b, *second = destroy_a_first ? b : a;
+    DBENGINE_TIER *tier_first = destroy_a_first ? tier_a : tier_b, *tier_second = destroy_a_first ? tier_b : tier_a;
+    const struct dbengine_tier_config *tc_first = destroy_a_first ? &tc_a : &tc_b;
+
+    if(dbengine_tier_is_active(tier_first))
+        dbengine_tier_exit(tier_first);
+    dbengine_shutdown(first);
+
+    rc = dbengine_tier_init(first, tc_first);
+    if(rc != UV_EIO) {
+        fprintf(stderr, " >>> DBENGINE: %s: a tier came up on the stopped engine (returned %d)\n", what, rc);
+        errors++;
+    }
+    if(!dbengine_tier_is_active(tier_second)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the other engine's tier went down with the stopped one\n", what);
+        errors++;
+    }
+
+    uintptr_t layer = dbengine_allocator_layer_fingerprint();
+    size_t referenced = dbengine_destroy(first);
+    if(referenced) {
+        fprintf(stderr, " >>> DBENGINE: %s: %zu metrics stayed referenced across the first destroy\n", what, referenced);
+        errors++;
+    }
+    if(dbengine_allocator_layer_fingerprint() != layer) {
+        fprintf(stderr, " >>> DBENGINE: %s: destroying one engine changed the page allocators the other uses\n", what);
+        errors++;
+    }
+
+    // the survivor collects and is queried after the other engine is gone
+    if(!dbengine_tier_is_active(tier_second)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the surviving engine's tier is not active after the destroy\n", what);
+        errors++;
+    }
+    else
+        errors += dbengine_zero_page_cadence_unittest(second, (STORAGE_INSTANCE *)tier_second);
+
+    if(dbengine_tier_is_active(tier_second))
+        dbengine_tier_exit(tier_second);
+    dbengine_shutdown(second);
+    referenced = dbengine_destroy(second);
+    if(referenced) {
+        fprintf(stderr, " >>> DBENGINE: %s: %zu metrics stayed referenced across the second destroy\n", what, referenced);
+        errors++;
+    }
+
+    return errors;
+}
+
 static void engine_lifecycle_remove_dir(const char *dir) {
     DIR *d = opendir(dir);
     if(!d)
@@ -321,20 +464,23 @@ static void engine_lifecycle_remove_dir(const char *dir) {
 // A stopped and destroyed engine leaves nothing behind that a new engine trips over: the second one, made with a
 // differing configuration, comes up on the page allocators that already exist (the process-wide layer keeps its
 // settings, and logs that the new ones are ignored), runs a tier, and is destroyed the same way. The floors of the
-// caches and the NULL engine still hold between the two. Runs before the daemon's own engine, on two scratch
-// directories next to scratch_dir (its name with -a and -b), which it removes.
+// caches and the NULL engine still hold between the two. Then two engines at once, each on a tier of its own,
+// destroyed in either order (engines_coexist()). Runs before the daemon's own engine, on four scratch directories
+// next to scratch_dir (its name with -a to -d), which it removes.
 int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const char *scratch_dir) {
     int errors = 0;
-    fprintf(stderr, "\nTesting the life of two engines, one after the other...\n");
+    fprintf(stderr, "\nTesting the life of two engines, one after the other and at once...\n");
 
     // nothing of the daemon's: no preload from its metadata database, no rotation callback into its contexts
     struct dbengine_config first = *cfg;
     first.preload_metrics = NULL;
     first.on_db_rotation = NULL;
 
-    char dir_a[FILENAME_MAX + 1], dir_b[FILENAME_MAX + 1];
+    char dir_a[FILENAME_MAX + 1], dir_b[FILENAME_MAX + 1], dir_c[FILENAME_MAX + 1], dir_d[FILENAME_MAX + 1];
     snprintfz(dir_a, sizeof(dir_a), "%s-a", scratch_dir);
     snprintfz(dir_b, sizeof(dir_b), "%s-b", scratch_dir);
+    snprintfz(dir_c, sizeof(dir_c), "%s-c", scratch_dir);
+    snprintfz(dir_d, sizeof(dir_d), "%s-d", scratch_dir);
 
     errors += engine_lifecycle_generation(&first, dir_a, "the first engine");
 
@@ -351,6 +497,10 @@ int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const 
 
     errors += engine_lifecycle_generation(&second, dir_b, "the second engine");
 
+    // two at once, in both destroy orders; the second run re-opens the directories the first left its datafiles in
+    errors += engines_coexist(&first, dir_c, dir_d, true);
+    errors += engines_coexist(&first, dir_c, dir_d, false);
+
     if(dbengine_allocator_layer_fingerprint() != layer) {
         fprintf(stderr, " >>> DBENGINE: the second engine changed the page allocators the first one built\n");
         errors++;
@@ -361,8 +511,10 @@ int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const 
 
     engine_lifecycle_remove_dir(dir_a);
     engine_lifecycle_remove_dir(dir_b);
+    engine_lifecycle_remove_dir(dir_c);
+    engine_lifecycle_remove_dir(dir_d);
 
-    fprintf(stderr, "Two engines, one after the other: %d ERROR(S)\n", errors);
+    fprintf(stderr, "Two engines, one after the other and at once: %d ERROR(S)\n", errors);
     return errors;
 }
 
