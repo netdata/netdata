@@ -216,8 +216,8 @@ typedef enum dbengine_cache {
 // Every getter that takes the engine accepts NULL, the engine of an embedder that never brought one up (the daemon
 // in ram mode): it reports what an engine with nothing in it reports (false, zeros).
 //
-// A snapshot of one cache; false, with *out zeroed, when that cache does not exist (no tier came up yet, or the
-// caches were destroyed). The counters are copied as a whole, not under a lock and not atomically: a counter may
+// A snapshot of one cache; false, with *out zeroed, when that cache does not exist (no engine, or the caches were
+// destroyed). The counters are copied as a whole, not under a lock and not atomically: a counter may
 // be mid-update, and on a 32-bit target a 64-bit one may tear. Good enough for charts, not for accounting.
 bool dbengine_get_cache_stats(DBENGINE_ENGINE *engine, DBENGINE_CACHE which, struct dbengine_cache_stats *out);
 
@@ -383,8 +383,9 @@ struct dbengine_buffer_sizes dbengine_get_memory_sizes(DBENGINE_ENGINE *engine);
 const char *dbengine_mem_name(DBENGINE_MEM idx);   // the chart name of each slot
 
 // ---------------------------------------------------------------------------------------------------------------------
-// tier-0 gorilla compression counters, kept by the engine while compression_statistics is set; a snapshot
-// of the running totals (the daemon charts the buffer count incrementally and the byte totals as they are)
+// tier-0 gorilla compression counters, kept process-wide by the page allocator layer and counting while its
+// compression_statistics setting is on; a snapshot of the running totals (the daemon charts the buffer count
+// incrementally and the byte totals as they are)
 struct dbengine_gorilla_stats {
     uint64_t hot_buffers_added;         // gorilla buffers allocated for pages being collected
     uint64_t tier0_disk_actual_bytes;   // bytes the flushed pages occupy on disk

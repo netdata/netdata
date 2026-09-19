@@ -369,7 +369,6 @@ static ALWAYS_INLINE void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, P
 /*
 static bool epdl_check_if_pages_are_already_in_cache(struct dbengine_tier *ctx, EPDL *epdl, PDC_PAGE_STATUS tags)
 {
-    struct dbengine_engine *engine = ctx->engine;
     size_t count_remaining = 0;
     size_t found = 0;
 

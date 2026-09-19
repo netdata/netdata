@@ -10,12 +10,12 @@
 // The engine's self-tests and benchmarks. Each runs to completion on the calling thread.
 //
 // Four are command-line modes for the embedder and return a process exit code. None of them needs a tier or the
-// engine; dbengine_page_test(), dbengine_cache_unittest() and dbengine_metrics_registry_unittest() create a page
-// cache, or a throw-away engine holding one, so they take the configuration from the embedder;
-// dbengine_metrics_registry_retention_benchmark() needs nothing.
+// engine; dbengine_page_test() and dbengine_cache_unittest() create a page cache and
+// dbengine_metrics_registry_unittest() a throw-away engine holding a registry, so they take the configuration from
+// the embedder; dbengine_metrics_registry_retention_benchmark() needs nothing.
 //
-// Four are for a test driver that adds their failed-check counts to its own: dbengine_cache_floor_unittest() runs
-// before the engine is up (it checks what the caches fall back to without a main cache), dbengine_null_engine_unittest()
+// Five are for a test driver that adds their failed-check counts to its own: dbengine_cache_floor_unittest() needs
+// no engine (it checks what the caches fall back to without a main cache), dbengine_null_engine_unittest()
 // needs no engine (it checks that the engine's verbs and getters take NULL as an engine with nothing in it),
 // dbengine_engine_lifecycle_unittest() runs before the daemon's own engine comes up (it makes, runs, stops and
 // destroys two engines of its own on scratch directories, and checks that nothing of the first is left for the

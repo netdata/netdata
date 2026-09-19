@@ -620,7 +620,7 @@ int test_dbengine(void) {
     nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
-    // before the engine is up: the caches do not exist yet, which is the state this check needs
+    // needs no engine: the size the follower caches settle on without a main cache
     errors += (size_t)dbengine_cache_floor_unittest();
 
     // the daemon in ram mode has no engine and still calls the engine's getters with NULL
