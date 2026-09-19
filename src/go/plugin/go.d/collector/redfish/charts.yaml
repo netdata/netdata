@@ -72,224 +72,6 @@ groups:
             type: stacked
             dimensions:
               - selector: chassis_state
-      - family: Controls
-        context_namespace: control
-        metrics:
-          - control_acquisition_state
-          - control_conditions_critical
-          - control_conditions_ok
-          - control_conditions_unknown
-          - control_conditions_warning
-          - control_frequency_sensor
-          - control_frequency_setpoint
-          - control_frequency_setpoint_error
-          - control_health_rollup_status
-          - control_health_status
-          - control_linear_acceleration_sensor
-          - control_linear_acceleration_setpoint
-          - control_linear_acceleration_setpoint_error
-          - control_linear_position_sensor
-          - control_linear_position_setpoint
-          - control_linear_position_setpoint_error
-          - control_linear_velocity_sensor
-          - control_linear_velocity_setpoint
-          - control_linear_velocity_setpoint_error
-          - control_liquid_flow_sensor
-          - control_liquid_flow_setpoint
-          - control_liquid_flow_setpoint_error
-          - control_percentage_sensor
-          - control_percentage_setpoint
-          - control_percentage_setpoint_error
-          - control_power_sensor
-          - control_power_setpoint
-          - control_power_setpoint_error
-          - control_pressure_sensor
-          - control_pressure_setpoint
-          - control_pressure_setpoint_error
-          - control_rotational_acceleration_sensor
-          - control_rotational_acceleration_setpoint
-          - control_rotational_acceleration_setpoint_error
-          - control_rotational_position_sensor
-          - control_rotational_position_setpoint
-          - control_rotational_position_setpoint_error
-          - control_rotational_velocity_sensor
-          - control_rotational_velocity_setpoint
-          - control_rotational_velocity_setpoint_error
-          - control_state
-          - control_temperature_sensor
-          - control_temperature_setpoint
-          - control_temperature_setpoint_error
-          - control_valve_position_sensor
-          - control_valve_position_setpoint
-          - control_valve_position_setpoint_error
-        charts:
-          - title: Control Acquisition State
-            context: acquisition_state
-            units: state
-            type: stacked
-            dimensions:
-              - selector: control_acquisition_state
-          - title: Control Conditions
-            context: conditions
-            units: conditions
-            type: stacked
-            dimensions:
-              - selector: control_conditions_ok
-                name: ok
-              - selector: control_conditions_warning
-                name: warning
-              - selector: control_conditions_critical
-                name: critical
-              - selector: control_conditions_unknown
-                name: unknown
-          - title: Control Frequency
-            context: frequency
-            units: hertz
-            dimensions:
-              - selector: control_frequency_sensor
-                name: sensor
-              - selector: control_frequency_setpoint
-                name: setpoint
-              - selector: control_frequency_setpoint_error
-                name: setpoint_error
-          - title: Control Health
-            context: health
-            units: state
-            type: stacked
-            dimensions:
-              - selector: control_health_status
-          - title: Control Health Rollup
-            context: health_rollup
-            units: state
-            type: stacked
-            dimensions:
-              - selector: control_health_rollup_status
-          - title: Control Linear Acceleration
-            context: linear_acceleration
-            units: meters/second2
-            dimensions:
-              - selector: control_linear_acceleration_sensor
-                name: sensor
-              - selector: control_linear_acceleration_setpoint
-                name: setpoint
-              - selector: control_linear_acceleration_setpoint_error
-                name: setpoint_error
-          - title: Control Linear Position
-            context: linear_position
-            units: meters
-            dimensions:
-              - selector: control_linear_position_sensor
-                name: sensor
-              - selector: control_linear_position_setpoint
-                name: setpoint
-              - selector: control_linear_position_setpoint_error
-                name: setpoint_error
-          - title: Control Linear Velocity
-            context: linear_velocity
-            units: meters/second
-            dimensions:
-              - selector: control_linear_velocity_sensor
-                name: sensor
-              - selector: control_linear_velocity_setpoint
-                name: setpoint
-              - selector: control_linear_velocity_setpoint_error
-                name: setpoint_error
-          - title: Control Liquid Flow
-            context: liquid_flow
-            units: liters/minute
-            dimensions:
-              - selector: control_liquid_flow_sensor
-                name: sensor
-              - selector: control_liquid_flow_setpoint
-                name: setpoint
-              - selector: control_liquid_flow_setpoint_error
-                name: setpoint_error
-          - title: Control Percentage
-            context: percentage
-            units: percentage
-            dimensions:
-              - selector: control_percentage_sensor
-                name: sensor
-              - selector: control_percentage_setpoint
-                name: setpoint
-              - selector: control_percentage_setpoint_error
-                name: setpoint_error
-          - title: Control Power
-            context: power
-            units: watts
-            dimensions:
-              - selector: control_power_sensor
-                name: sensor
-              - selector: control_power_setpoint
-                name: setpoint
-              - selector: control_power_setpoint_error
-                name: setpoint_error
-          - title: Control Pressure
-            context: pressure
-            units: pascals
-            dimensions:
-              - selector: control_pressure_sensor
-                name: sensor
-              - selector: control_pressure_setpoint
-                name: setpoint
-              - selector: control_pressure_setpoint_error
-                name: setpoint_error
-          - title: Control Rotational Acceleration
-            context: rotational_acceleration
-            units: radians/second2
-            dimensions:
-              - selector: control_rotational_acceleration_sensor
-                name: sensor
-              - selector: control_rotational_acceleration_setpoint
-                name: setpoint
-              - selector: control_rotational_acceleration_setpoint_error
-                name: setpoint_error
-          - title: Control Rotational Position
-            context: rotational_position
-            units: radians
-            dimensions:
-              - selector: control_rotational_position_sensor
-                name: sensor
-              - selector: control_rotational_position_setpoint
-                name: setpoint
-              - selector: control_rotational_position_setpoint_error
-                name: setpoint_error
-          - title: Control Rotational Velocity
-            context: rotational_velocity
-            units: radians/second
-            dimensions:
-              - selector: control_rotational_velocity_sensor
-                name: sensor
-              - selector: control_rotational_velocity_setpoint
-                name: setpoint
-              - selector: control_rotational_velocity_setpoint_error
-                name: setpoint_error
-          - title: Control State
-            context: state
-            units: state
-            type: stacked
-            dimensions:
-              - selector: control_state
-          - title: Control Temperature
-            context: temperature
-            units: Celsius
-            dimensions:
-              - selector: control_temperature_sensor
-                name: sensor
-              - selector: control_temperature_setpoint
-                name: setpoint
-              - selector: control_temperature_setpoint_error
-                name: setpoint_error
-          - title: Control Valve Position
-            context: valve_position
-            units: percentage
-            dimensions:
-              - selector: control_valve_position_sensor
-                name: sensor
-              - selector: control_valve_position_setpoint
-                name: setpoint
-              - selector: control_valve_position_setpoint_error
-                name: setpoint_error
       - family: Redundancy
         context_namespace: redundancy
         metrics:
@@ -3565,10 +3347,234 @@ groups:
             dimensions:
               - selector: reading_valve_position_value
                 name: value
-  - family: Sensors
+  - family: Controls
     context_namespace: redfish
     chart_defaults:
       priority: 70800
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    metrics:
+      - control_acquisition_state
+      - control_conditions_critical
+      - control_conditions_ok
+      - control_conditions_unknown
+      - control_conditions_warning
+      - control_frequency_sensor
+      - control_frequency_setpoint
+      - control_frequency_setpoint_error
+      - control_health_rollup_status
+      - control_health_status
+      - control_linear_acceleration_sensor
+      - control_linear_acceleration_setpoint
+      - control_linear_acceleration_setpoint_error
+      - control_linear_position_sensor
+      - control_linear_position_setpoint
+      - control_linear_position_setpoint_error
+      - control_linear_velocity_sensor
+      - control_linear_velocity_setpoint
+      - control_linear_velocity_setpoint_error
+      - control_liquid_flow_sensor
+      - control_liquid_flow_setpoint
+      - control_liquid_flow_setpoint_error
+      - control_percentage_sensor
+      - control_percentage_setpoint
+      - control_percentage_setpoint_error
+      - control_power_sensor
+      - control_power_setpoint
+      - control_power_setpoint_error
+      - control_pressure_sensor
+      - control_pressure_setpoint
+      - control_pressure_setpoint_error
+      - control_rotational_acceleration_sensor
+      - control_rotational_acceleration_setpoint
+      - control_rotational_acceleration_setpoint_error
+      - control_rotational_position_sensor
+      - control_rotational_position_setpoint
+      - control_rotational_position_setpoint_error
+      - control_rotational_velocity_sensor
+      - control_rotational_velocity_setpoint
+      - control_rotational_velocity_setpoint_error
+      - control_state
+      - control_temperature_sensor
+      - control_temperature_setpoint
+      - control_temperature_setpoint_error
+      - control_valve_position_sensor
+      - control_valve_position_setpoint
+      - control_valve_position_setpoint_error
+    charts:
+      - title: Control Acquisition State
+        context: control.acquisition_state
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_acquisition_state
+      - title: Control Conditions
+        context: control.conditions
+        units: conditions
+        type: stacked
+        dimensions:
+          - selector: control_conditions_ok
+            name: ok
+          - selector: control_conditions_warning
+            name: warning
+          - selector: control_conditions_critical
+            name: critical
+          - selector: control_conditions_unknown
+            name: unknown
+      - title: Control Frequency
+        context: control.frequency
+        units: hertz
+        dimensions:
+          - selector: control_frequency_sensor
+            name: sensor
+          - selector: control_frequency_setpoint
+            name: setpoint
+          - selector: control_frequency_setpoint_error
+            name: setpoint_error
+      - title: Control Health
+        context: control.health
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_health_status
+      - title: Control Health Rollup
+        context: control.health_rollup
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_health_rollup_status
+      - title: Control Linear Acceleration
+        context: control.linear_acceleration
+        units: meters/second2
+        dimensions:
+          - selector: control_linear_acceleration_sensor
+            name: sensor
+          - selector: control_linear_acceleration_setpoint
+            name: setpoint
+          - selector: control_linear_acceleration_setpoint_error
+            name: setpoint_error
+      - title: Control Linear Position
+        context: control.linear_position
+        units: meters
+        dimensions:
+          - selector: control_linear_position_sensor
+            name: sensor
+          - selector: control_linear_position_setpoint
+            name: setpoint
+          - selector: control_linear_position_setpoint_error
+            name: setpoint_error
+      - title: Control Linear Velocity
+        context: control.linear_velocity
+        units: meters/second
+        dimensions:
+          - selector: control_linear_velocity_sensor
+            name: sensor
+          - selector: control_linear_velocity_setpoint
+            name: setpoint
+          - selector: control_linear_velocity_setpoint_error
+            name: setpoint_error
+      - title: Control Liquid Flow
+        context: control.liquid_flow
+        units: liters/minute
+        dimensions:
+          - selector: control_liquid_flow_sensor
+            name: sensor
+          - selector: control_liquid_flow_setpoint
+            name: setpoint
+          - selector: control_liquid_flow_setpoint_error
+            name: setpoint_error
+      - title: Control Percentage
+        context: control.percentage
+        units: percentage
+        dimensions:
+          - selector: control_percentage_sensor
+            name: sensor
+          - selector: control_percentage_setpoint
+            name: setpoint
+          - selector: control_percentage_setpoint_error
+            name: setpoint_error
+      - title: Control Power
+        context: control.power
+        units: watts
+        dimensions:
+          - selector: control_power_sensor
+            name: sensor
+          - selector: control_power_setpoint
+            name: setpoint
+          - selector: control_power_setpoint_error
+            name: setpoint_error
+      - title: Control Pressure
+        context: control.pressure
+        units: pascals
+        dimensions:
+          - selector: control_pressure_sensor
+            name: sensor
+          - selector: control_pressure_setpoint
+            name: setpoint
+          - selector: control_pressure_setpoint_error
+            name: setpoint_error
+      - title: Control Rotational Acceleration
+        context: control.rotational_acceleration
+        units: radians/second2
+        dimensions:
+          - selector: control_rotational_acceleration_sensor
+            name: sensor
+          - selector: control_rotational_acceleration_setpoint
+            name: setpoint
+          - selector: control_rotational_acceleration_setpoint_error
+            name: setpoint_error
+      - title: Control Rotational Position
+        context: control.rotational_position
+        units: radians
+        dimensions:
+          - selector: control_rotational_position_sensor
+            name: sensor
+          - selector: control_rotational_position_setpoint
+            name: setpoint
+          - selector: control_rotational_position_setpoint_error
+            name: setpoint_error
+      - title: Control Rotational Velocity
+        context: control.rotational_velocity
+        units: radians/second
+        dimensions:
+          - selector: control_rotational_velocity_sensor
+            name: sensor
+          - selector: control_rotational_velocity_setpoint
+            name: setpoint
+          - selector: control_rotational_velocity_setpoint_error
+            name: setpoint_error
+      - title: Control State
+        context: control.state
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_state
+      - title: Control Temperature
+        context: control.temperature
+        units: Celsius
+        dimensions:
+          - selector: control_temperature_sensor
+            name: sensor
+          - selector: control_temperature_setpoint
+            name: setpoint
+          - selector: control_temperature_setpoint_error
+            name: setpoint_error
+      - title: Control Valve Position
+        context: control.valve_position
+        units: percentage
+        dimensions:
+          - selector: control_valve_position_sensor
+            name: sensor
+          - selector: control_valve_position_setpoint
+            name: setpoint
+          - selector: control_valve_position_setpoint_error
+            name: setpoint_error
+  - family: Sensors
+    context_namespace: redfish
+    chart_defaults:
+      priority: 70900
       instances:
         by_labels:
           - endpoint_key
@@ -3665,7 +3671,7 @@ groups:
   - family: Management
     context_namespace: redfish
     chart_defaults:
-      priority: 70900
+      priority: 71000
       instances:
         by_labels:
           - endpoint_key
@@ -3884,7 +3890,7 @@ groups:
   - family: Collection
     context_namespace: redfish
     chart_defaults:
-      priority: 71000
+      priority: 71100
       instances:
         by_labels:
           - endpoint_key
@@ -3977,7 +3983,7 @@ groups:
   - family: Hardware Sensors
     context_namespace: system.hw.sensor
     chart_defaults:
-      priority: 70850
+      priority: 70950
       instances:
         by_labels:
           - endpoint_key
