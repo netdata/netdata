@@ -1591,6 +1591,13 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     // Reject models that are not newer than the newest accepted model. This
     // prevents an older model from being re-accepted after it has been evicted
     // from km_contexts and later loops back from downstream.
+    //
+    // This check does NOT depend on models persisted before a restart, which is
+    // why ml_dimension_new() may skip loading them for ML-excluded dimensions
+    // (see the comment there). Models are emitted only on install --
+    // ml_dimension_stream_kmeans() has a single caller, below -- and are never
+    // replayed on stream connect, so an arriving model is always newer than any
+    // pre-restart persisted model and would never have been rejected here.
     if (!Dim->km_contexts.empty()) {
         const auto &latest_km = Dim->km_contexts.back();
         if (req.inlined_km.before <= latest_km.before) {
