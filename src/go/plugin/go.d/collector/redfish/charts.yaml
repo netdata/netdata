@@ -3,6 +3,7 @@ groups:
   - family: Overview
     context_namespace: redfish
     chart_defaults:
+      priority: 70000
       instances:
         by_labels:
           - endpoint_key
@@ -26,14 +27,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 1660
             dimensions:
               - selector: chassis_acquisition_state
           - title: Chassis Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 1670
             dimensions:
               - selector: chassis_conditions_ok
                 name: ok
@@ -47,35 +46,30 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 1680
             dimensions:
               - selector: chassis_health_status
           - title: Chassis Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 1690
             dimensions:
               - selector: chassis_health_rollup_status
           - title: Chassis Intrusion State
             context: intrusion_state
             units: state
             type: stacked
-            priority: 1700
             dimensions:
               - selector: chassis_intrusion_state
           - title: Chassis Power State
             context: power_state
             units: state
             type: stacked
-            priority: 1710
             dimensions:
               - selector: chassis_power_state
           - title: Chassis State
             context: state
             units: state
             type: stacked
-            priority: 1720
             dimensions:
               - selector: chassis_state
       - family: Controls
@@ -133,14 +127,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2540
             dimensions:
               - selector: control_acquisition_state
           - title: Control Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 2550
             dimensions:
               - selector: control_conditions_ok
                 name: ok
@@ -153,7 +145,6 @@ groups:
           - title: Control Frequency
             context: frequency
             units: hertz
-            priority: 2560
             dimensions:
               - selector: control_frequency_sensor
                 name: sensor
@@ -165,20 +156,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2570
             dimensions:
               - selector: control_health_status
           - title: Control Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 2580
             dimensions:
               - selector: control_health_rollup_status
           - title: Control Linear Acceleration
             context: linear_acceleration
             units: meters/second2
-            priority: 2590
             dimensions:
               - selector: control_linear_acceleration_sensor
                 name: sensor
@@ -189,7 +177,6 @@ groups:
           - title: Control Linear Position
             context: linear_position
             units: meters
-            priority: 2600
             dimensions:
               - selector: control_linear_position_sensor
                 name: sensor
@@ -200,7 +187,6 @@ groups:
           - title: Control Linear Velocity
             context: linear_velocity
             units: meters/second
-            priority: 2610
             dimensions:
               - selector: control_linear_velocity_sensor
                 name: sensor
@@ -211,7 +197,6 @@ groups:
           - title: Control Liquid Flow
             context: liquid_flow
             units: liters/minute
-            priority: 2620
             dimensions:
               - selector: control_liquid_flow_sensor
                 name: sensor
@@ -222,7 +207,6 @@ groups:
           - title: Control Percentage
             context: percentage
             units: percentage
-            priority: 2630
             dimensions:
               - selector: control_percentage_sensor
                 name: sensor
@@ -233,7 +217,6 @@ groups:
           - title: Control Power
             context: power
             units: watts
-            priority: 2640
             dimensions:
               - selector: control_power_sensor
                 name: sensor
@@ -244,7 +227,6 @@ groups:
           - title: Control Pressure
             context: pressure
             units: pascals
-            priority: 2650
             dimensions:
               - selector: control_pressure_sensor
                 name: sensor
@@ -255,7 +237,6 @@ groups:
           - title: Control Rotational Acceleration
             context: rotational_acceleration
             units: radians/second2
-            priority: 2660
             dimensions:
               - selector: control_rotational_acceleration_sensor
                 name: sensor
@@ -266,7 +247,6 @@ groups:
           - title: Control Rotational Position
             context: rotational_position
             units: radians
-            priority: 2670
             dimensions:
               - selector: control_rotational_position_sensor
                 name: sensor
@@ -277,7 +257,6 @@ groups:
           - title: Control Rotational Velocity
             context: rotational_velocity
             units: radians/second
-            priority: 2680
             dimensions:
               - selector: control_rotational_velocity_sensor
                 name: sensor
@@ -289,13 +268,11 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 2690
             dimensions:
               - selector: control_state
           - title: Control Temperature
             context: temperature
             units: Celsius
-            priority: 2700
             dimensions:
               - selector: control_temperature_sensor
                 name: sensor
@@ -306,7 +283,6 @@ groups:
           - title: Control Valve Position
             context: valve_position
             units: percentage
-            priority: 2710
             dimensions:
               - selector: control_valve_position_sensor
                 name: sensor
@@ -334,14 +310,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 1750
             dimensions:
               - selector: redundancy_acquisition_state
           - title: Redundancy Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 1760
             dimensions:
               - selector: redundancy_conditions_ok
                 name: ok
@@ -355,27 +329,23 @@ groups:
             context: enabled
             units: state
             type: stacked
-            priority: 1770
             dimensions:
               - selector: redundancy_enabled_state
           - title: Redundancy Health
             context: health
             units: state
             type: stacked
-            priority: 1780
             dimensions:
               - selector: redundancy_health_status
           - title: Redundancy Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 1790
             dimensions:
               - selector: redundancy_health_rollup_status
           - title: Redundancy Members
             context: members
             units: members
-            priority: 1800
             dimensions:
               - selector: redundancy_members_active
                 name: active
@@ -385,14 +355,12 @@ groups:
             context: mode
             units: state
             type: stacked
-            priority: 1810
             dimensions:
               - selector: redundancy_mode
           - title: Redundancy State
             context: state
             units: state
             type: stacked
-            priority: 1820
             dimensions:
               - selector: redundancy_state
       - family: Service
@@ -404,7 +372,6 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 1880
             dimensions:
               - selector: service_acquisition_state
       - family: Systems
@@ -435,14 +402,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 1890
             dimensions:
               - selector: system_acquisition_state
           - title: System Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 1900
             dimensions:
               - selector: system_conditions_ok
                 name: ok
@@ -456,20 +421,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 1910
             dimensions:
               - selector: system_health_status
           - title: System Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 1920
             dimensions:
               - selector: system_health_rollup_status
           - title: System Memory Bandwidth
             context: memory_bandwidth
             units: percentage
-            priority: 1930
             dimensions:
               - selector: system_memory_bandwidth
                 name: bandwidth
@@ -477,27 +439,23 @@ groups:
             context: memory_summary_health
             units: state
             type: stacked
-            priority: 1940
             dimensions:
               - selector: system_memory_summary_health_status
           - title: System Memory Summary Health Rollup
             context: memory_summary_health_rollup
             units: state
             type: stacked
-            priority: 1950
             dimensions:
               - selector: system_memory_summary_health_rollup_status
           - title: System Memory Summary State
             context: memory_summary_state
             units: state
             type: stacked
-            priority: 1960
             dimensions:
               - selector: system_memory_summary_state
           - title: System Memory Utilization
             context: memory_utilization
             units: percentage
-            priority: 1970
             dimensions:
               - selector: system_memory_utilization
                 name: capacity
@@ -505,13 +463,11 @@ groups:
             context: power_state
             units: state
             type: stacked
-            priority: 1980
             dimensions:
               - selector: system_power_state
           - title: System Processor Bandwidth
             context: processor_bandwidth
             units: percentage
-            priority: 1990
             dimensions:
               - selector: system_processor_bandwidth
                 name: bandwidth
@@ -519,27 +475,23 @@ groups:
             context: processor_summary_health
             units: state
             type: stacked
-            priority: 2000
             dimensions:
               - selector: system_processor_summary_health_status
           - title: System Processor Summary Health Rollup
             context: processor_summary_health_rollup
             units: state
             type: stacked
-            priority: 2010
             dimensions:
               - selector: system_processor_summary_health_rollup_status
           - title: System Processor Summary State
             context: processor_summary_state
             units: state
             type: stacked
-            priority: 2020
             dimensions:
               - selector: system_processor_summary_state
           - title: System Processor Utilization
             context: processor_utilization
             units: percentage
-            priority: 2030
             dimensions:
               - selector: system_processor_utilization_kernel
                 name: kernel
@@ -549,12 +501,12 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 2040
             dimensions:
               - selector: system_state
   - family: Compute
     context_namespace: redfish
     chart_defaults:
+      priority: 70100
       instances:
         by_labels:
           - endpoint_key
@@ -577,13 +529,11 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2200
             dimensions:
               - selector: processor_core_acquisition_state
           - title: Processor Core Cycle Rate
             context: cycle_rate
             units: cycles/s
-            priority: 2210
             dimensions:
               - selector: processor_core_cycle_rate_io_stall
                 name: io_stall
@@ -594,7 +544,6 @@ groups:
           - title: Processor Core Error Rate
             context: error_rate
             units: errors/s
-            priority: 2220
             dimensions:
               - selector: processor_core_error_rate_correctable_core
                 name: correctable_core
@@ -607,7 +556,6 @@ groups:
           - title: Processor Core Instructions per Cycle
             context: instructions_per_cycle
             units: instructions/cycle
-            priority: 2230
             dimensions:
               - selector: processor_core_instructions_per_cycle
                 name: instructions
@@ -653,20 +601,17 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2050
             dimensions:
               - selector: processor_acquisition_state
           - title: Processor Bandwidth Utilization
             context: bandwidth_utilization
             units: percentage
-            priority: 2060
             dimensions:
               - selector: processor_bandwidth_utilization
                 name: bandwidth
           - title: Processor Clock Speed
             context: clock_speed
             units: MHz
-            priority: 2070
             dimensions:
               - selector: processor_clock_speed_operating
                 name: operating
@@ -674,7 +619,6 @@ groups:
             context: conditions
             units: conditions
             type: stacked
-            priority: 2080
             dimensions:
               - selector: processor_conditions_ok
                 name: ok
@@ -687,7 +631,6 @@ groups:
           - title: Processor Error Rate
             context: error_rate
             units: errors/s
-            priority: 2090
             dimensions:
               - selector: processor_error_rate_correctable_core
                 name: correctable_core
@@ -700,7 +643,6 @@ groups:
           - title: Processor Frequency Ratio
             context: frequency_ratio
             units: ratio
-            priority: 2100
             dimensions:
               - selector: processor_frequency_ratio
                 name: ratio
@@ -708,20 +650,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2110
             dimensions:
               - selector: processor_health_status
           - title: Processor Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 2120
             dimensions:
               - selector: processor_health_rollup_status
           - title: Processor PCIe Error Rate
             context: pcie_error_rate
             units: errors/s
-            priority: 2130
             dimensions:
               - selector: processor_pcie_error_rate_bad_dllp
                 name: bad_dllp
@@ -751,27 +690,23 @@ groups:
             context: power_state
             units: state
             type: stacked
-            priority: 2140
             dimensions:
               - selector: processor_power_state
           - title: Processor State
             context: state
             units: state
             type: stacked
-            priority: 2150
             dimensions:
               - selector: processor_state
           - title: Processor Thermal Headroom
             context: thermal_headroom
             units: Celsius
-            priority: 2160
             dimensions:
               - selector: processor_thermal_headroom
                 name: headroom
           - title: Processor Throttle Time
             context: throttle_time
             units: percentage
-            priority: 2170
             dimensions:
               - selector: processor_throttle_time_power_limit
                 name: power_limit
@@ -781,13 +716,11 @@ groups:
             context: throttling_state
             units: state
             type: stacked
-            priority: 2180
             dimensions:
               - selector: processor_throttling_state
           - title: Processor Utilization
             context: utilization
             units: percentage
-            priority: 2190
             dimensions:
               - selector: processor_utilization_user
                 name: user
@@ -796,6 +729,7 @@ groups:
   - family: Memory
     context_namespace: redfish
     chart_defaults:
+      priority: 70200
       instances:
         by_labels:
           - endpoint_key
@@ -836,20 +770,17 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2240
             dimensions:
               - selector: memory_acquisition_state
           - title: Memory Module Bandwidth Utilization
             context: bandwidth_utilization
             units: percentage
-            priority: 2250
             dimensions:
               - selector: memory_bandwidth_utilization
                 name: utilization
           - title: Memory Module Capacity Utilization
             context: capacity_utilization
             units: percentage
-            priority: 2260
             dimensions:
               - selector: memory_capacity_utilization
                 name: utilization
@@ -857,7 +788,6 @@ groups:
             context: conditions
             units: conditions
             type: stacked
-            priority: 2270
             dimensions:
               - selector: memory_conditions_ok
                 name: ok
@@ -870,14 +800,12 @@ groups:
           - title: Memory Module Dirty Shutdown Rate
             context: dirty_shutdown_rate
             units: shutdowns/s
-            priority: 2280
             dimensions:
               - selector: memory_dirty_shutdown_rate
                 name: shutdowns
           - title: Memory Module Error Rate
             context: error_rate
             units: errors/s
-            priority: 2290
             dimensions:
               - selector: memory_error_rate_correctable
                 name: correctable
@@ -891,14 +819,12 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2300
             dimensions:
               - selector: memory_health_status
           - title: Memory Health Flags
             context: health_flags
             units: flags
             type: stacked
-            priority: 2310
             dimensions:
               - selector: memory_health_flags_data_loss
                 name: data_loss
@@ -920,13 +846,11 @@ groups:
             context: health_rollup
             units: state
             type: stacked
-            priority: 2320
             dimensions:
               - selector: memory_health_rollup_status
           - title: Memory Module I/O
             context: io
             units: bytes/s
-            priority: 2330
             dimensions:
               - selector: memory_io_read
                 name: read
@@ -935,7 +859,6 @@ groups:
           - title: Memory Module Media Health
             context: media_health
             units: percentage
-            priority: 2340
             dimensions:
               - selector: memory_media_health_life_left
                 name: life_left
@@ -945,12 +868,12 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 2350
             dimensions:
               - selector: memory_state
   - family: Storage
     context_namespace: redfish
     chart_defaults:
+      priority: 70300
       instances:
         by_labels:
           - endpoint_key
@@ -981,35 +904,30 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4300
             dimensions:
               - selector: storage_controller_acquisition_state
           - title: Storage Controller Cache Health
             context: cache_health
             units: state
             type: stacked
-            priority: 4310
             dimensions:
               - selector: storage_controller_cache_health_status
           - title: Storage Controller Cache Health Rollup
             context: cache_health_rollup
             units: state
             type: stacked
-            priority: 4320
             dimensions:
               - selector: storage_controller_cache_health_rollup_status
           - title: Storage Controller Cache State
             context: cache_state
             units: state
             type: stacked
-            priority: 4330
             dimensions:
               - selector: storage_controller_cache_state
           - title: Storage Controller Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4340
             dimensions:
               - selector: storage_controller_conditions_ok
                 name: ok
@@ -1022,7 +940,6 @@ groups:
           - title: Storage Controller Error Rate
             context: error_rate
             units: errors/s
-            priority: 4350
             dimensions:
               - selector: storage_controller_error_rate_correctable_ecc
                 name: correctable_ecc
@@ -1036,20 +953,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 4360
             dimensions:
               - selector: storage_controller_health_status
           - title: Storage Controller Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4370
             dimensions:
               - selector: storage_controller_health_rollup_status
           - title: Storage Controller PCIe Lanes
             context: pcie_lanes
             units: lanes
-            priority: 4490
             dimensions:
               - selector: storage_controller_pcie_lanes_active
                 name: active
@@ -1057,13 +971,11 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 4500
             dimensions:
               - selector: storage_controller_state
           - title: Storage Controller State Change Rate
             context: state_change_rate
             units: changes/s
-            priority: 4510
             dimensions:
               - selector: storage_controller_state_change_rate
                 name: changes
@@ -1101,14 +1013,12 @@ groups:
               - title: Storage Controller NVMe Busy Time
                 context: busy_time
                 units: percentage
-                priority: 4380
                 dimensions:
                   - selector: storage_controller_nvme_busy_time_busy
                     name: busy
               - title: Storage Controller NVMe Commands
                 context: commands
                 units: commands/s
-                priority: 4390
                 dimensions:
                   - selector: storage_controller_nvme_commands_read
                     name: read
@@ -1118,7 +1028,6 @@ groups:
                 context: critical_warnings
                 units: flags
                 type: stacked
-                priority: 4400
                 dimensions:
                   - selector: storage_controller_nvme_critical_warnings_media_read_only
                     name: media_read_only
@@ -1139,7 +1048,6 @@ groups:
               - title: Storage Controller NVMe Error Rate
                 context: error_rate
                 units: errors/s
-                priority: 4410
                 dimensions:
                   - selector: storage_controller_nvme_error_rate_media_integrity
                     name: media_integrity
@@ -1148,7 +1056,6 @@ groups:
               - title: Storage Controller NVMe Event Rate
                 context: event_rate
                 units: events/s
-                priority: 4420
                 dimensions:
                   - selector: storage_controller_nvme_event_rate_unsafe_shutdowns
                     name: unsafe_shutdowns
@@ -1157,7 +1064,6 @@ groups:
               - title: Storage Controller NVMe I/O
                 context: io
                 units: bytes/s
-                priority: 4430
                 dimensions:
                   - selector: storage_controller_nvme_io_read
                     name: read
@@ -1166,21 +1072,18 @@ groups:
               - title: Storage Controller NVMe Spare
                 context: spare
                 units: percentage
-                priority: 4440
                 dimensions:
                   - selector: storage_controller_nvme_spare_available
                     name: available
               - title: Storage Controller NVMe Temperature
                 context: temperature
                 units: Celsius
-                priority: 4450
                 dimensions:
                   - selector: storage_controller_nvme_temperature_composite
                     name: composite
               - title: Storage Controller NVMe Thermal Time
                 context: thermal_time
                 units: percentage
-                priority: 4460
                 dimensions:
                   - selector: storage_controller_nvme_thermal_time_warning
                     name: warning
@@ -1193,7 +1096,6 @@ groups:
               - title: Storage Controller NVMe Thermal Transition Rate
                 context: thermal_transition_rate
                 units: transitions/s
-                priority: 4470
                 dimensions:
                   - selector: storage_controller_nvme_thermal_transition_rate_management_1
                     name: management_1
@@ -1202,7 +1104,6 @@ groups:
               - title: Storage Controller NVMe Wear
                 context: wear
                 units: percentage
-                priority: 4480
                 dimensions:
                   - selector: storage_controller_nvme_wear_used
                     name: used
@@ -1234,14 +1135,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3990
             dimensions:
               - selector: drive_acquisition_state
           - title: Drive Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4000
             dimensions:
               - selector: drive_conditions_ok
                 name: ok
@@ -1254,7 +1153,6 @@ groups:
           - title: Drive Error Rate
             context: error_rate
             units: errors/s
-            priority: 4010
             dimensions:
               - selector: drive_error_rate_correctable_read
                 name: correctable_read
@@ -1270,27 +1168,23 @@ groups:
             context: failure_predicted
             units: state
             type: stacked
-            priority: 4020
             dimensions:
               - selector: drive_failure_predicted_state
           - title: Drive Health
             context: health
             units: state
             type: stacked
-            priority: 4030
             dimensions:
               - selector: drive_health_status
           - title: Drive Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4040
             dimensions:
               - selector: drive_health_rollup_status
           - title: Drive I/O
             context: io
             units: bytes/s
-            priority: 4050
             dimensions:
               - selector: drive_io_read
                 name: read
@@ -1299,21 +1193,18 @@ groups:
           - title: Drive Link Speed
             context: link_speed
             units: bit/s
-            priority: 4060
             dimensions:
               - selector: drive_link_speed_negotiated
                 name: negotiated
           - title: Drive Media Life
             context: media_life
             units: percentage
-            priority: 4070
             dimensions:
               - selector: drive_media_life
                 name: remaining
           - title: Drive Queue Depth
             context: queue_depth
             units: commands
-            priority: 4190
             dimensions:
               - selector: drive_queue_depth
                 name: commands
@@ -1321,14 +1212,12 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 4200
             dimensions:
               - selector: drive_state
           - title: Drive Status Indicator
             context: status_indicator
             units: state
             type: stacked
-            priority: 4210
             dimensions:
               - selector: drive_status_indicator_state
         groups:
@@ -1365,14 +1254,12 @@ groups:
               - title: Drive NVMe Busy Time
                 context: busy_time
                 units: percentage
-                priority: 4080
                 dimensions:
                   - selector: drive_nvme_busy_time_busy
                     name: busy
               - title: Drive NVMe Commands
                 context: commands
                 units: commands/s
-                priority: 4090
                 dimensions:
                   - selector: drive_nvme_commands_read
                     name: read
@@ -1382,7 +1269,6 @@ groups:
                 context: critical_warnings
                 units: flags
                 type: stacked
-                priority: 4100
                 dimensions:
                   - selector: drive_nvme_critical_warnings_media_read_only
                     name: media_read_only
@@ -1403,7 +1289,6 @@ groups:
               - title: Drive NVMe Error Rate
                 context: error_rate
                 units: errors/s
-                priority: 4110
                 dimensions:
                   - selector: drive_nvme_error_rate_media_integrity
                     name: media_integrity
@@ -1412,7 +1297,6 @@ groups:
               - title: Drive NVMe Event Rate
                 context: event_rate
                 units: events/s
-                priority: 4120
                 dimensions:
                   - selector: drive_nvme_event_rate_unsafe_shutdowns
                     name: unsafe_shutdowns
@@ -1421,7 +1305,6 @@ groups:
               - title: Drive NVMe I/O
                 context: io
                 units: bytes/s
-                priority: 4130
                 dimensions:
                   - selector: drive_nvme_io_read
                     name: read
@@ -1430,21 +1313,18 @@ groups:
               - title: Drive NVMe Spare
                 context: spare
                 units: percentage
-                priority: 4140
                 dimensions:
                   - selector: drive_nvme_spare_available
                     name: available
               - title: Drive NVMe Temperature
                 context: temperature
                 units: Celsius
-                priority: 4150
                 dimensions:
                   - selector: drive_nvme_temperature_composite
                     name: composite
               - title: Drive NVMe Thermal Time
                 context: thermal_time
                 units: percentage
-                priority: 4160
                 dimensions:
                   - selector: drive_nvme_thermal_time_warning
                     name: warning
@@ -1457,7 +1337,6 @@ groups:
               - title: Drive NVMe Thermal Transition Rate
                 context: thermal_transition_rate
                 units: transitions/s
-                priority: 4170
                 dimensions:
                   - selector: drive_nvme_thermal_transition_rate_management_1
                     name: management_1
@@ -1466,7 +1345,6 @@ groups:
               - title: Drive NVMe Wear
                 context: wear
                 units: percentage
-                priority: 4180
                 dimensions:
                   - selector: drive_nvme_wear_used
                     name: used
@@ -1494,14 +1372,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4220
             dimensions:
               - selector: storage_acquisition_state
           - title: Storage Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4230
             dimensions:
               - selector: storage_conditions_ok
                 name: ok
@@ -1515,20 +1391,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 4240
             dimensions:
               - selector: storage_health_status
           - title: Storage Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4250
             dimensions:
               - selector: storage_health_rollup_status
           - title: Storage I/O
             context: io
             units: bytes/s
-            priority: 4260
             dimensions:
               - selector: storage_io_read
                 name: read
@@ -1537,7 +1410,6 @@ groups:
           - title: Storage IOPS
             context: iops
             units: requests/s
-            priority: 4270
             dimensions:
               - selector: storage_iops_read
                 name: read
@@ -1553,13 +1425,11 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 4280
             dimensions:
               - selector: storage_state
           - title: Storage State Change Rate
             context: state_change_rate
             units: changes/s
-            priority: 4290
             dimensions:
               - selector: storage_state_change_rate
                 name: changes
@@ -1602,14 +1472,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4520
             dimensions:
               - selector: volume_acquisition_state
           - title: Volume Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4530
             dimensions:
               - selector: volume_conditions_ok
                 name: ok
@@ -1622,7 +1490,6 @@ groups:
           - title: Volume Error Rate
             context: error_rate
             units: errors/s
-            priority: 4540
             dimensions:
               - selector: volume_error_rate_correctable_read
                 name: correctable_read
@@ -1639,7 +1506,6 @@ groups:
           - title: Volume Event Rate
             context: event_rate
             units: events/s
-            priority: 4550
             dimensions:
               - selector: volume_event_rate_consistency_checks
                 name: consistency_checks
@@ -1649,20 +1515,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 4560
             dimensions:
               - selector: volume_health_status
           - title: Volume Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4570
             dimensions:
               - selector: volume_health_rollup_status
           - title: Volume I/O
             context: io
             units: bytes/s
-            priority: 4580
             dimensions:
               - selector: volume_io_read
                 name: read
@@ -1671,7 +1534,6 @@ groups:
           - title: Volume I/O Time
             context: io_time
             units: percentage
-            priority: 4590
             dimensions:
               - selector: volume_io_time_read
                 name: read
@@ -1682,7 +1544,6 @@ groups:
           - title: Volume IOPS
             context: iops
             units: requests/s
-            priority: 4600
             dimensions:
               - selector: volume_iops_read
                 name: read
@@ -1697,14 +1558,12 @@ groups:
           - title: Volume Remaining Capacity
             context: remaining_capacity
             units: percentage
-            priority: 4610
             dimensions:
               - selector: volume_remaining_capacity
                 name: remaining
           - title: Volume Space Savings
             context: space_savings
             units: bytes
-            priority: 4620
             dimensions:
               - selector: volume_space_savings_compression
                 name: compression
@@ -1716,19 +1575,18 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 4630
             dimensions:
               - selector: volume_state
           - title: Volume Write Cache State
             context: write_cache_state
             units: state
             type: stacked
-            priority: 4640
             dimensions:
               - selector: volume_write_cache_state
   - family: Network
     context_namespace: redfish
     chart_defaults:
+      priority: 70400
       instances:
         by_labels:
           - endpoint_key
@@ -1752,14 +1610,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4650
             dimensions:
               - selector: ethernet_interface_acquisition_state
           - title: Ethernet Interface Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4660
             dimensions:
               - selector: ethernet_interface_conditions_ok
                 name: ok
@@ -1773,20 +1629,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 4670
             dimensions:
               - selector: ethernet_interface_health_status
           - title: Ethernet Interface Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4680
             dimensions:
               - selector: ethernet_interface_health_rollup_status
           - title: Ethernet Interface Link Speed
             context: link_speed
             units: bit/s
-            priority: 4690
             dimensions:
               - selector: ethernet_interface_link_speed
                 name: speed
@@ -1794,14 +1647,12 @@ groups:
             context: link_status
             units: state
             type: stacked
-            priority: 4700
             dimensions:
               - selector: ethernet_interface_link_status
           - title: Ethernet Interface State
             context: state
             units: state
             type: stacked
-            priority: 4710
             dimensions:
               - selector: ethernet_interface_state
       - family: Network Adapters
@@ -1833,14 +1684,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4720
             dimensions:
               - selector: network_adapter_acquisition_state
           - title: Network Adapter Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4730
             dimensions:
               - selector: network_adapter_conditions_ok
                 name: ok
@@ -1853,14 +1702,12 @@ groups:
           - title: Network Adapter CPU Utilization
             context: cpu_utilization
             units: percentage
-            priority: 4740
             dimensions:
               - selector: network_adapter_cpu_utilization
                 name: cpu
           - title: Network Adapter Frame Rate
             context: frames
             units: frames/s
-            priority: 4750
             dimensions:
               - selector: network_adapter_frames_received_unicast
                 name: received_unicast
@@ -1874,20 +1721,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 4760
             dimensions:
               - selector: network_adapter_health_status
           - title: Network Adapter Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4770
             dimensions:
               - selector: network_adapter_health_rollup_status
           - title: Network Adapter Host Bus Utilization
             context: host_bus_utilization
             units: percentage
-            priority: 4780
             dimensions:
               - selector: network_adapter_host_bus_utilization_received
                 name: received
@@ -1896,7 +1740,6 @@ groups:
           - title: Network Adapter NCSI Frame Rate
             context: ncsi_frames
             units: frames/s
-            priority: 4790
             dimensions:
               - selector: network_adapter_ncsi_frames_received
                 name: received
@@ -1905,7 +1748,6 @@ groups:
           - title: Network Adapter NCSI Traffic
             context: ncsi_traffic
             units: bytes/s
-            priority: 4800
             dimensions:
               - selector: network_adapter_ncsi_traffic_received
                 name: received
@@ -1915,13 +1757,11 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 4810
             dimensions:
               - selector: network_adapter_state
           - title: Network Adapter Traffic
             context: traffic
             units: bytes/s
-            priority: 4820
             dimensions:
               - selector: network_adapter_traffic_received
                 name: received
@@ -1957,14 +1797,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4830
             dimensions:
               - selector: network_device_function_acquisition_state
           - title: Network Device Function Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4840
             dimensions:
               - selector: network_device_function_conditions_ok
                 name: ok
@@ -1977,7 +1815,6 @@ groups:
           - title: Network Device Function Frame Rate
             context: frames
             units: frames/s
-            priority: 4850
             dimensions:
               - selector: network_device_function_frames_received
                 name: received
@@ -1995,20 +1832,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 4860
             dimensions:
               - selector: network_device_function_health_status
           - title: Network Device Function Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4870
             dimensions:
               - selector: network_device_function_health_rollup_status
           - title: Network Device Function Queue Depth
             context: queue_depth
             units: percentage
-            priority: 4880
             dimensions:
               - selector: network_device_function_queue_depth_received
                 name: received
@@ -2018,7 +1852,6 @@ groups:
             context: queue_empty_state
             units: flags
             type: stacked
-            priority: 4890
             dimensions:
               - selector: network_device_function_queue_empty_state_received
                 name: received
@@ -2027,7 +1860,6 @@ groups:
           - title: Network Device Function Full Queues
             context: queue_full
             units: queues
-            priority: 4900
             dimensions:
               - selector: network_device_function_queue_full_received
                 name: received
@@ -2037,13 +1869,11 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 4910
             dimensions:
               - selector: network_device_function_state
           - title: Network Device Function Traffic
             context: traffic
             units: bytes/s
-            priority: 4920
             dimensions:
               - selector: network_device_function_traffic_received
                 name: received
@@ -2065,14 +1895,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4930
             dimensions:
               - selector: network_interface_acquisition_state
           - title: Network Interface Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4940
             dimensions:
               - selector: network_interface_conditions_ok
                 name: ok
@@ -2086,21 +1914,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 4950
             dimensions:
               - selector: network_interface_health_status
           - title: Network Interface Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 4960
             dimensions:
               - selector: network_interface_health_rollup_status
           - title: Network Interface State
             context: state
             units: state
             type: stacked
-            priority: 4970
             dimensions:
               - selector: network_interface_state
       - family: Network Ports
@@ -2122,14 +1947,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 4980
             dimensions:
               - selector: network_port_acquisition_state
           - title: Network Port Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 4990
             dimensions:
               - selector: network_port_conditions_ok
                 name: ok
@@ -2143,20 +1966,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5000
             dimensions:
               - selector: network_port_health_status
           - title: Network Port Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5010
             dimensions:
               - selector: network_port_health_rollup_status
           - title: Network Port Link Speed
             context: link_speed
             units: bit/s
-            priority: 5020
             dimensions:
               - selector: network_port_link_speed
                 name: speed
@@ -2164,21 +1984,18 @@ groups:
             context: link_status
             units: state
             type: stacked
-            priority: 5030
             dimensions:
               - selector: network_port_link_status
           - title: Network Port Signal Detected
             context: signal_detected
             units: state
             type: stacked
-            priority: 5040
             dimensions:
               - selector: network_port_signal_detected_state
           - title: Network Port State
             context: state
             units: state
             type: stacked
-            priority: 5050
             dimensions:
               - selector: network_port_state
       - family: PCIe Devices
@@ -2198,14 +2015,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 5060
             dimensions:
               - selector: pcie_device_acquisition_state
           - title: PCIe Device Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 5070
             dimensions:
               - selector: pcie_device_conditions_ok
                 name: ok
@@ -2219,20 +2034,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5080
             dimensions:
               - selector: pcie_device_health_status
           - title: PCIe Device Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5090
             dimensions:
               - selector: pcie_device_health_rollup_status
           - title: PCIe Device Link Width
             context: link_width
             units: lanes
-            priority: 5100
             dimensions:
               - selector: pcie_device_link_width_active
                 name: active
@@ -2240,7 +2052,6 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 5110
             dimensions:
               - selector: pcie_device_state
       - family: PCIe Functions
@@ -2259,14 +2070,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 5120
             dimensions:
               - selector: pcie_function_acquisition_state
           - title: PCIe Function Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 5130
             dimensions:
               - selector: pcie_function_conditions_ok
                 name: ok
@@ -2280,21 +2089,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5140
             dimensions:
               - selector: pcie_function_health_status
           - title: PCIe Function Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5150
             dimensions:
               - selector: pcie_function_health_rollup_status
           - title: PCIe Function State
             context: state
             units: state
             type: stacked
-            priority: 5160
             dimensions:
               - selector: pcie_function_state
       - family: Ports
@@ -2366,14 +2172,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 5170
             dimensions:
               - selector: port_acquisition_state
           - title: Port Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 5180
             dimensions:
               - selector: port_conditions_ok
                 name: ok
@@ -2386,7 +2190,6 @@ groups:
           - title: Port Error Rate
             context: error_rate
             units: errors/s
-            priority: 5190
             dimensions:
               - selector: port_error_rate_received
                 name: received
@@ -2395,7 +2198,6 @@ groups:
           - title: Port Frame Rate
             context: frames
             units: frames/s
-            priority: 5200
             dimensions:
               - selector: port_frames_received
                 name: received
@@ -2417,20 +2219,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5210
             dimensions:
               - selector: port_health_status
           - title: Port Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5220
             dimensions:
               - selector: port_health_rollup_status
           - title: Port Link Speed
             context: link_speed
             units: bit/s
-            priority: 5230
             dimensions:
               - selector: port_link_speed_speed
                 name: speed
@@ -2438,27 +2237,23 @@ groups:
             context: link_state
             units: state
             type: stacked
-            priority: 5240
             dimensions:
               - selector: port_link_state
           - title: Port Link Status
             context: link_status
             units: state
             type: stacked
-            priority: 5250
             dimensions:
               - selector: port_link_status
           - title: Port Link Width
             context: link_width
             units: lanes
-            priority: 5260
             dimensions:
               - selector: port_link_width_active
                 name: active
           - title: Port Network Error Rate
             context: network_error_rate
             units: errors/s
-            priority: 5270
             dimensions:
               - selector: port_network_error_rate_received_discards
                 name: received_discards
@@ -2485,7 +2280,6 @@ groups:
           - title: Port PCIe Drop Rate
             context: pcie_drop_rate
             units: drops/s
-            priority: 5280
             dimensions:
               - selector: port_pcie_drop_rate_completion_credit
                 name: completion_credit
@@ -2496,7 +2290,6 @@ groups:
           - title: Port PCIe Error Rate
             context: pcie_error_rate
             units: errors/s
-            priority: 5290
             dimensions:
               - selector: port_pcie_error_rate_bad_dllp
                 name: bad_dllp
@@ -2525,7 +2318,6 @@ groups:
           - title: Port PCIe TLP Rate
             context: pcie_tlp_rate
             units: packets/s
-            priority: 5300
             dimensions:
               - selector: port_pcie_tlp_rate_completion
                 name: completion
@@ -2536,7 +2328,6 @@ groups:
           - title: Port PCIe Traffic
             context: pcie_traffic
             units: bytes/s
-            priority: 5310
             dimensions:
               - selector: port_pcie_traffic_completion
                 name: completion
@@ -2547,7 +2338,6 @@ groups:
           - title: Port RDMA Error Rate
             context: rdma_error_rate
             units: errors/s
-            priority: 5320
             dimensions:
               - selector: port_rdma_error_rate_protection
                 name: protection
@@ -2556,7 +2346,6 @@ groups:
           - title: Port RDMA Traffic
             context: rdma_traffic
             units: bytes/s
-            priority: 5330
             dimensions:
               - selector: port_rdma_traffic_received
                 name: received
@@ -2566,20 +2355,17 @@ groups:
             context: signal_detected
             units: state
             type: stacked
-            priority: 5340
             dimensions:
               - selector: port_signal_detected_state
           - title: Port State
             context: state
             units: state
             type: stacked
-            priority: 5350
             dimensions:
               - selector: port_state
           - title: Port Traffic
             context: traffic
             units: bytes/s
-            priority: 5360
             dimensions:
               - selector: port_traffic_received
                 name: received
@@ -2588,6 +2374,7 @@ groups:
   - family: Thermal
     context_namespace: redfish
     chart_defaults:
+      priority: 70500
       instances:
         by_labels:
           - endpoint_key
@@ -2606,7 +2393,6 @@ groups:
           - title: Air Flow Readings
             context: air_flow
             units: cubic-meters/minute
-            priority: 2490
             dimensions:
               - selector: reading_air_flow_value
                 name: value
@@ -2626,14 +2412,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2720
             dimensions:
               - selector: coolant_connector_acquisition_state
           - title: Coolant Connector Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 2730
             dimensions:
               - selector: coolant_connector_conditions_ok
                 name: ok
@@ -2647,21 +2431,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2740
             dimensions:
               - selector: coolant_connector_health_status
           - title: Coolant Connector Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 2750
             dimensions:
               - selector: coolant_connector_health_rollup_status
           - title: Coolant Connector State
             context: state
             units: state
             type: stacked
-            priority: 2760
             dimensions:
               - selector: coolant_connector_state
       - family: Fans
@@ -2680,14 +2461,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2770
             dimensions:
               - selector: fan_acquisition_state
           - title: Fan Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 2780
             dimensions:
               - selector: fan_conditions_ok
                 name: ok
@@ -2701,21 +2480,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2790
             dimensions:
               - selector: fan_health_status
           - title: Fan Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 2800
             dimensions:
               - selector: fan_health_rollup_status
           - title: Fan State
             context: state
             units: state
             type: stacked
-            priority: 2810
             dimensions:
               - selector: fan_state
       - family: Filters
@@ -2734,14 +2510,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2820
             dimensions:
               - selector: filter_acquisition_state
           - title: Filter Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 2830
             dimensions:
               - selector: filter_conditions_ok
                 name: ok
@@ -2755,21 +2529,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2840
             dimensions:
               - selector: filter_health_status
           - title: Filter Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 2850
             dimensions:
               - selector: filter_health_rollup_status
           - title: Filter State
             context: state
             units: state
             type: stacked
-            priority: 2860
             dimensions:
               - selector: filter_state
       - family: Heat
@@ -2785,7 +2556,6 @@ groups:
           - title: Heat Readings
             context: heat
             units: watts
-            priority: 2870
             dimensions:
               - selector: reading_heat_value
                 name: value
@@ -2807,14 +2577,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2880
             dimensions:
               - selector: heater_acquisition_state
           - title: Heater Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 2890
             dimensions:
               - selector: heater_conditions_ok
                 name: ok
@@ -2828,20 +2596,17 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2900
             dimensions:
               - selector: heater_health_status
           - title: Heater Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 2910
             dimensions:
               - selector: heater_health_rollup_status
           - title: Heater Heating Time
             context: heating_time
             units: percentage
-            priority: 2920
             dimensions:
               - selector: heater_heating_time_pre_power_on
                 name: pre_power_on
@@ -2851,7 +2616,6 @@ groups:
             context: state
             units: state
             type: stacked
-            priority: 2930
             dimensions:
               - selector: heater_state
       - family: Leak Detection
@@ -2870,14 +2634,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 2970
             dimensions:
               - selector: leak_detection_acquisition_state
           - title: Leak Detection Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 2980
             dimensions:
               - selector: leak_detection_conditions_ok
                 name: ok
@@ -2891,21 +2653,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 2990
             dimensions:
               - selector: leak_detection_health_status
           - title: Leak Detection Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3000
             dimensions:
               - selector: leak_detection_health_rollup_status
           - title: Leak Detection State
             context: state
             units: state
             type: stacked
-            priority: 3010
             dimensions:
               - selector: leak_detection_state
       - family: Leak Detector Groups
@@ -2924,14 +2683,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3080
             dimensions:
               - selector: leak_detector_group_acquisition_state
           - title: Leak Detector Group Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 3090
             dimensions:
               - selector: leak_detector_group_conditions_ok
                 name: ok
@@ -2945,21 +2702,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 3100
             dimensions:
               - selector: leak_detector_group_health_status
           - title: Leak Detector Group Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3110
             dimensions:
               - selector: leak_detector_group_health_rollup_status
           - title: Leak Detector Group State
             context: state
             units: state
             type: stacked
-            priority: 3120
             dimensions:
               - selector: leak_detector_group_state
       - family: Leak Detectors
@@ -2979,14 +2733,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3020
             dimensions:
               - selector: leak_detector_acquisition_state
           - title: Leak Detector Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 3030
             dimensions:
               - selector: leak_detector_conditions_ok
                 name: ok
@@ -3000,28 +2752,24 @@ groups:
             context: detector_state
             units: state
             type: stacked
-            priority: 3040
             dimensions:
               - selector: leak_detector_detector_state
           - title: Leak Detector Health
             context: health
             units: state
             type: stacked
-            priority: 3050
             dimensions:
               - selector: leak_detector_health_status
           - title: Leak Detector Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3060
             dimensions:
               - selector: leak_detector_health_rollup_status
           - title: Leak Detector State
             context: state
             units: state
             type: stacked
-            priority: 3070
             dimensions:
               - selector: leak_detector_state
       - family: Liquid Flow
@@ -3037,7 +2785,6 @@ groups:
           - title: Liquid Flow Readings
             context: liquid_flow
             units: liters/minute
-            priority: 3160
             dimensions:
               - selector: reading_liquid_flow_value
                 name: value
@@ -3054,7 +2801,6 @@ groups:
           - title: Liquid Level Readings
             context: liquid_level
             units: meters
-            priority: 3170
             dimensions:
               - selector: reading_liquid_level_value
                 name: value
@@ -3074,14 +2820,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3190
             dimensions:
               - selector: pump_acquisition_state
           - title: Pump Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 3200
             dimensions:
               - selector: pump_conditions_ok
                 name: ok
@@ -3095,21 +2839,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 3210
             dimensions:
               - selector: pump_health_status
           - title: Pump Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3220
             dimensions:
               - selector: pump_health_rollup_status
           - title: Pump State
             context: state
             units: state
             type: stacked
-            priority: 3230
             dimensions:
               - selector: pump_state
       - family: Rotational Speed
@@ -3125,7 +2866,6 @@ groups:
           - title: Rotational Speed Readings
             context: rotational_speed
             units: RPM
-            priority: 3260
             dimensions:
               - selector: reading_rotational_speed_value
                 name: value
@@ -3142,7 +2882,6 @@ groups:
           - title: Temperature Readings
             context: temperature
             units: Celsius
-            priority: 3300
             dimensions:
               - selector: reading_temperature_value
                 name: value
@@ -3162,14 +2901,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3330
             dimensions:
               - selector: thermal_subsystem_acquisition_state
           - title: Thermal Subsystem Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 3340
             dimensions:
               - selector: thermal_subsystem_conditions_ok
                 name: ok
@@ -3183,26 +2920,24 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 3350
             dimensions:
               - selector: thermal_subsystem_health_status
           - title: Thermal Subsystem Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3360
             dimensions:
               - selector: thermal_subsystem_health_rollup_status
           - title: Thermal Subsystem State
             context: state
             units: state
             type: stacked
-            priority: 3370
             dimensions:
               - selector: thermal_subsystem_state
   - family: Power
     context_namespace: redfish
     chart_defaults:
+      priority: 70600
       instances:
         by_labels:
           - endpoint_key
@@ -3221,7 +2956,6 @@ groups:
           - title: Apparent Energy Readings
             context: apparent_energy
             units: joule-equivalent
-            priority: 3450
             dimensions:
               - selector: reading_apparent_energy_value
                 name: value
@@ -3238,7 +2972,6 @@ groups:
           - title: Apparent Power Readings
             context: apparent_power
             units: volt-amperes
-            priority: 3460
             dimensions:
               - selector: reading_apparent_power_value
                 name: value
@@ -3266,20 +2999,17 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3470
             dimensions:
               - selector: battery_acquisition_state
           - title: Battery C-rate
             context: c_rate
             units: ratio
-            priority: 3480
             dimensions:
               - selector: battery_c_rate
                 name: rate
           - title: Battery Charge Capacity
             context: charge_capacity
             units: ampere-hours
-            priority: 3490
             dimensions:
               - selector: battery_charge_capacity_actual
                 name: actual
@@ -3287,14 +3017,12 @@ groups:
             context: charge_state
             units: state
             type: stacked
-            priority: 3500
             dimensions:
               - selector: battery_charge_state
           - title: Battery Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 3510
             dimensions:
               - selector: battery_conditions_ok
                 name: ok
@@ -3307,14 +3035,12 @@ groups:
           - title: Battery E-rate
             context: e_rate
             units: ratio
-            priority: 3520
             dimensions:
               - selector: battery_e_rate
                 name: rate
           - title: Battery Energy Capacity
             context: energy_capacity
             units: watt-hours
-            priority: 3530
             dimensions:
               - selector: battery_energy_capacity_actual
                 name: actual
@@ -3322,42 +3048,36 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 3540
             dimensions:
               - selector: battery_health_status
           - title: Battery Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3550
             dimensions:
               - selector: battery_health_rollup_status
           - title: Battery Metrics Health
             context: metrics_health
             units: state
             type: stacked
-            priority: 3560
             dimensions:
               - selector: battery_metrics_health_status
           - title: Battery Metrics Health Rollup
             context: metrics_health_rollup
             units: state
             type: stacked
-            priority: 3570
             dimensions:
               - selector: battery_metrics_health_rollup_status
           - title: Battery Metrics State
             context: metrics_state
             units: state
             type: stacked
-            priority: 3580
             dimensions:
               - selector: battery_metrics_state
           - title: Battery State
             context: state
             units: state
             type: stacked
-            priority: 3590
             dimensions:
               - selector: battery_state
       - family: Charge
@@ -3373,7 +3093,6 @@ groups:
           - title: Charge Readings
             context: charge
             units: ampere-hours
-            priority: 3600
             dimensions:
               - selector: reading_charge_value
                 name: value
@@ -3390,7 +3109,6 @@ groups:
           - title: Crest Factor Readings
             context: crest_factor
             units: ratio
-            priority: 3610
             dimensions:
               - selector: reading_crest_factor_value
                 name: value
@@ -3407,7 +3125,6 @@ groups:
           - title: Current Readings
             context: current
             units: amperes
-            priority: 3620
             dimensions:
               - selector: reading_current_value
                 name: value
@@ -3424,7 +3141,6 @@ groups:
           - title: Energy Readings
             context: energy
             units: joules
-            priority: 3660
             dimensions:
               - selector: reading_energy_value
                 name: value
@@ -3441,7 +3157,6 @@ groups:
           - title: Frequency Readings
             context: frequency
             units: hertz
-            priority: 3690
             dimensions:
               - selector: reading_frequency_value
                 name: value
@@ -3458,7 +3173,6 @@ groups:
           - title: Harmonic Distortion Readings
             context: harmonic_distortion
             units: percentage
-            priority: 3700
             dimensions:
               - selector: reading_harmonic_distortion_value
                 name: value
@@ -3475,7 +3189,6 @@ groups:
           - title: Phase Angle Readings
             context: phase_angle
             units: degrees
-            priority: 3710
             dimensions:
               - selector: reading_phase_angle_value
                 name: value
@@ -3492,7 +3205,6 @@ groups:
           - title: Power Readings
             context: power
             units: watts
-            priority: 3720
             dimensions:
               - selector: reading_power_value
                 name: value
@@ -3509,7 +3221,6 @@ groups:
           - title: Power Factor Readings
             context: power_factor
             units: ratio
-            priority: 3760
             dimensions:
               - selector: reading_power_factor_value
                 name: value
@@ -3531,13 +3242,11 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3770
             dimensions:
               - selector: power_subsystem_acquisition_state
           - title: Power Subsystem Capacity
             context: capacity
             units: watts
-            priority: 3780
             dimensions:
               - selector: power_subsystem_capacity_allocated
                 name: allocated
@@ -3547,7 +3256,6 @@ groups:
             context: conditions
             units: conditions
             type: stacked
-            priority: 3790
             dimensions:
               - selector: power_subsystem_conditions_ok
                 name: ok
@@ -3561,21 +3269,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 3800
             dimensions:
               - selector: power_subsystem_health_status
           - title: Power Subsystem Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3810
             dimensions:
               - selector: power_subsystem_health_rollup_status
           - title: Power Subsystem State
             context: state
             units: state
             type: stacked
-            priority: 3820
             dimensions:
               - selector: power_subsystem_state
       - family: Power Supplies
@@ -3598,14 +3303,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 3830
             dimensions:
               - selector: power_supply_acquisition_state
           - title: Power Supply Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 3840
             dimensions:
               - selector: power_supply_conditions_ok
                 name: ok
@@ -3619,49 +3322,42 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 3850
             dimensions:
               - selector: power_supply_health_status
           - title: Power Supply Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 3860
             dimensions:
               - selector: power_supply_health_rollup_status
           - title: Power Supply Line Input Status
             context: line_input_status
             units: state
             type: stacked
-            priority: 3870
             dimensions:
               - selector: power_supply_line_input_status
           - title: Power Supply Metrics Health
             context: metrics_health
             units: state
             type: stacked
-            priority: 3880
             dimensions:
               - selector: power_supply_metrics_health_status
           - title: Power Supply Metrics Health Rollup
             context: metrics_health_rollup
             units: state
             type: stacked
-            priority: 3890
             dimensions:
               - selector: power_supply_metrics_health_rollup_status
           - title: Power Supply Metrics State
             context: metrics_state
             units: state
             type: stacked
-            priority: 3900
             dimensions:
               - selector: power_supply_metrics_state
           - title: Power Supply State
             context: state
             units: state
             type: stacked
-            priority: 3910
             dimensions:
               - selector: power_supply_state
       - family: Reactive Energy
@@ -3677,7 +3373,6 @@ groups:
           - title: Reactive Energy Readings
             context: reactive_energy
             units: joule-equivalent
-            priority: 3920
             dimensions:
               - selector: reading_reactive_energy_value
                 name: value
@@ -3694,7 +3389,6 @@ groups:
           - title: Reactive Power Readings
             context: reactive_power
             units: vars
-            priority: 3930
             dimensions:
               - selector: reading_reactive_power_value
                 name: value
@@ -3711,7 +3405,6 @@ groups:
           - title: Stored Energy Readings
             context: stored_energy
             units: watt-hours
-            priority: 3940
             dimensions:
               - selector: reading_stored_energy_value
                 name: value
@@ -3728,13 +3421,13 @@ groups:
           - title: Voltage Readings
             context: voltage
             units: volts
-            priority: 3950
             dimensions:
               - selector: reading_voltage_value
                 name: value
   - family: Environment
     context_namespace: redfish
     chart_defaults:
+      priority: 70700
       instances:
         by_labels:
           - endpoint_key
@@ -3748,7 +3441,6 @@ groups:
           - title: Absolute Humidity Readings
             context: absolute_humidity
             units: grams/cubic-meter
-            priority: 2360
             dimensions:
               - selector: reading_absolute_humidity_value
                 name: value
@@ -3760,7 +3452,6 @@ groups:
           - title: Altitude Readings
             context: altitude
             units: meters
-            priority: 2500
             dimensions:
               - selector: reading_altitude_value
                 name: value
@@ -3772,7 +3463,6 @@ groups:
           - title: Barometric Pressure Readings
             context: barometric_pressure
             units: pascals
-            priority: 2510
             dimensions:
               - selector: reading_barometric_pressure_value
                 name: value
@@ -3784,7 +3474,6 @@ groups:
           - title: Relative Humidity Readings
             context: humidity
             units: percentage
-            priority: 2940
             dimensions:
               - selector: reading_humidity_value
                 name: value
@@ -3796,7 +3485,6 @@ groups:
           - title: Linear Acceleration Readings
             context: linear_acceleration
             units: meters/second2
-            priority: 3130
             dimensions:
               - selector: reading_linear_acceleration_value
                 name: value
@@ -3808,7 +3496,6 @@ groups:
           - title: Linear Position Readings
             context: linear_position
             units: meters
-            priority: 3140
             dimensions:
               - selector: reading_linear_position_value
                 name: value
@@ -3820,7 +3507,6 @@ groups:
           - title: Linear Velocity Readings
             context: linear_velocity
             units: meters/second
-            priority: 3150
             dimensions:
               - selector: reading_linear_velocity_value
                 name: value
@@ -3832,7 +3518,6 @@ groups:
           - title: Pressure Readings
             context: pressure
             units: pascals
-            priority: 3180
             dimensions:
               - selector: reading_pressure_value
                 name: value
@@ -3844,7 +3529,6 @@ groups:
           - title: Rotational Acceleration Readings
             context: rotational_acceleration
             units: radians/second2
-            priority: 3240
             dimensions:
               - selector: reading_rotational_acceleration_value
                 name: value
@@ -3856,7 +3540,6 @@ groups:
           - title: Rotational Position Readings
             context: rotational_position
             units: radians
-            priority: 3250
             dimensions:
               - selector: reading_rotational_position_value
                 name: value
@@ -3868,7 +3551,6 @@ groups:
           - title: Rotational Velocity Readings
             context: rotational_velocity
             units: radians/second
-            priority: 3290
             dimensions:
               - selector: reading_rotational_velocity_value
                 name: value
@@ -3880,13 +3562,13 @@ groups:
           - title: Valve Position Readings
             context: valve_position
             units: percentage
-            priority: 3380
             dimensions:
               - selector: reading_valve_position_value
                 name: value
   - family: Sensors
     context_namespace: redfish
     chart_defaults:
+      priority: 70800
       instances:
         by_labels:
           - endpoint_key
@@ -3905,7 +3587,6 @@ groups:
           - title: Percentage Readings
             context: percentage
             units: percentage
-            priority: 1730
             dimensions:
               - selector: reading_percentage_value
                 name: value
@@ -3924,14 +3605,12 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 1740
             dimensions:
               - selector: reading_alarm_status
           - title: Redfish Reading Derived Health (Thresholds)
             context: derived_health
             units: state
             type: stacked
-            priority: 1741
             dimensions:
               - selector: derived_health_status
       - family: Sensors
@@ -3950,14 +3629,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 1830
             dimensions:
               - selector: sensor_acquisition_state
           - title: Sensor Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 1840
             dimensions:
               - selector: sensor_conditions_ok
                 name: ok
@@ -3971,26 +3648,24 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 1850
             dimensions:
               - selector: sensor_health_status
           - title: Sensor Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 1860
             dimensions:
               - selector: sensor_health_rollup_status
           - title: Sensor State
             context: state
             units: state
             type: stacked
-            priority: 1870
             dimensions:
               - selector: sensor_state
   - family: Management
     context_namespace: redfish
     chart_defaults:
+      priority: 70900
       instances:
         by_labels:
           - endpoint_key
@@ -4012,14 +3687,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 5370
             dimensions:
               - selector: assembly_acquisition_state
           - title: Assembly Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 5380
             dimensions:
               - selector: assembly_conditions_ok
                 name: ok
@@ -4033,21 +3706,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5390
             dimensions:
               - selector: assembly_health_status
           - title: Assembly Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5400
             dimensions:
               - selector: assembly_health_rollup_status
           - title: Assembly State
             context: state
             units: state
             type: stacked
-            priority: 5410
             dimensions:
               - selector: assembly_state
       - family: Firmware
@@ -4066,14 +3736,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 5420
             dimensions:
               - selector: firmware_acquisition_state
           - title: Firmware Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 5430
             dimensions:
               - selector: firmware_conditions_ok
                 name: ok
@@ -4087,21 +3755,18 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5440
             dimensions:
               - selector: firmware_health_status
           - title: Firmware Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5450
             dimensions:
               - selector: firmware_health_rollup_status
           - title: Firmware State
             context: state
             units: state
             type: stacked
-            priority: 5460
             dimensions:
               - selector: firmware_state
       - family: Managers
@@ -4122,13 +3787,11 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 5470
             dimensions:
               - selector: manager_acquisition_state
           - title: Manager Clock Offset
             context: clock_offset
             units: seconds
-            priority: 5480
             dimensions:
               - selector: manager_clock_offset
                 name: offset
@@ -4136,7 +3799,6 @@ groups:
             context: conditions
             units: conditions
             type: stacked
-            priority: 5490
             dimensions:
               - selector: manager_conditions_ok
                 name: ok
@@ -4150,28 +3812,24 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5500
             dimensions:
               - selector: manager_health_status
           - title: Manager Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5510
             dimensions:
               - selector: manager_health_rollup_status
           - title: Manager Power State
             context: power_state
             units: state
             type: stacked
-            priority: 5520
             dimensions:
               - selector: manager_power_state
           - title: Manager State
             context: state
             units: state
             type: stacked
-            priority: 5530
             dimensions:
               - selector: manager_state
       - family: Software
@@ -4190,14 +3848,12 @@ groups:
             context: acquisition_state
             units: state
             type: stacked
-            priority: 5540
             dimensions:
               - selector: software_acquisition_state
           - title: Software Conditions
             context: conditions
             units: conditions
             type: stacked
-            priority: 5550
             dimensions:
               - selector: software_conditions_ok
                 name: ok
@@ -4211,26 +3867,24 @@ groups:
             context: health
             units: state
             type: stacked
-            priority: 5560
             dimensions:
               - selector: software_health_status
           - title: Software Health Rollup
             context: health_rollup
             units: state
             type: stacked
-            priority: 5570
             dimensions:
               - selector: software_health_rollup_status
           - title: Software State
             context: state
             units: state
             type: stacked
-            priority: 5580
             dimensions:
               - selector: software_state
   - family: Collection
     context_namespace: redfish
     chart_defaults:
+      priority: 71000
       instances:
         by_labels:
           - endpoint_key
@@ -4265,7 +3919,6 @@ groups:
           - title: Redfish Collection Duration
             context: duration
             units: seconds
-            priority: 5620
             dimensions:
               - selector: collection_duration_seconds
                 name: duration
@@ -4273,7 +3926,6 @@ groups:
             context: failures
             units: failures
             type: stacked
-            priority: 5630
             dimensions:
               - selector: collection_failures_auth
                 name: auth
@@ -4292,7 +3944,6 @@ groups:
           - title: Redfish Collection HTTP Requests
             context: http_requests
             units: requests/cycle
-            priority: 5640
             dimensions:
               - selector: collection_http_requests_started
                 name: started
@@ -4302,7 +3953,6 @@ groups:
             context: operations
             units: operations/cycle
             type: stacked
-            priority: 5650
             dimensions:
               - selector: collection_operations_successful
                 name: successful
@@ -4311,7 +3961,6 @@ groups:
           - title: Redfish Collection Resources
             context: resources
             units: resources
-            priority: 5660
             dimensions:
               - selector: collection_resources_discovered
                 name: discovered
@@ -4325,13 +3974,11 @@ groups:
             context: status
             units: state
             type: stacked
-            priority: 5680
             dimensions:
               - selector: collection_status
           - title: Redfish Collection Traffic
             context: traffic
             units: bytes/cycle
-            priority: 5690
             dimensions:
               - selector: collection_traffic_received_bytes
                 name: received
@@ -4353,20 +4000,17 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 3640
             dimensions:
               - selector: system_hw_sensor_current_alarm_status
           - title: Current Average (Zero basis)
             context: average
             units: amperes
-            priority: 3630
             dimensions:
               - selector: system_hw_sensor_current_average
                 name: average
           - title: Current Reading (Zero basis)
             context: input
             units: amperes
-            priority: 3650
             dimensions:
               - selector: system_hw_sensor_current_input
                 name: input
@@ -4380,13 +4024,11 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 3670
             dimensions:
               - selector: system_hw_sensor_energy_alarm_status
           - title: Energy Reading (Zero basis)
             context: input
             units: joules
-            priority: 3680
             dimensions:
               - selector: system_hw_sensor_energy_input
                 name: input
@@ -4400,13 +4042,11 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 3270
             dimensions:
               - selector: system_hw_sensor_fan_alarm_status
           - title: Rotational Speed Reading (Zero basis)
             context: input
             units: RPM
-            priority: 3280
             dimensions:
               - selector: system_hw_sensor_fan_input
                 name: input
@@ -4420,13 +4060,11 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 2950
             dimensions:
               - selector: system_hw_sensor_humidity_alarm_status
           - title: Relative Humidity Reading (Zero basis)
             context: input
             units: percentage
-            priority: 2960
             dimensions:
               - selector: system_hw_sensor_humidity_input
                 name: input
@@ -4441,20 +4079,17 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 3740
             dimensions:
               - selector: system_hw_sensor_power_alarm_status
           - title: Power Average (Zero basis)
             context: average
             units: watts
-            priority: 3730
             dimensions:
               - selector: system_hw_sensor_power_average
                 name: average
           - title: Power Reading (Zero basis)
             context: input
             units: watts
-            priority: 3750
             dimensions:
               - selector: system_hw_sensor_power_input
                 name: input
@@ -4468,13 +4103,11 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 2520
             dimensions:
               - selector: system_hw_sensor_pressure_alarm_status
           - title: Barometric Pressure Reading (Zero basis)
             context: input
             units: pascals
-            priority: 2530
             dimensions:
               - selector: system_hw_sensor_pressure_input
                 name: input
@@ -4488,13 +4121,11 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 3310
             dimensions:
               - selector: system_hw_sensor_temperature_alarm_status
           - title: Temperature Reading (Zero basis)
             context: input
             units: Celsius
-            priority: 3320
             dimensions:
               - selector: system_hw_sensor_temperature_input
                 name: input
@@ -4509,20 +4140,17 @@ groups:
             context: alarm
             units: state
             type: stacked
-            priority: 3970
             dimensions:
               - selector: system_hw_sensor_voltage_alarm_status
           - title: Voltage Average (Zero basis)
             context: average
             units: volts
-            priority: 3960
             dimensions:
               - selector: system_hw_sensor_voltage_average
                 name: average
           - title: Voltage Reading (Zero basis)
             context: input
             units: volts
-            priority: 3980
             dimensions:
               - selector: system_hw_sensor_voltage_input
                 name: input
