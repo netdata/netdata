@@ -35,7 +35,7 @@
       },
       "auth_method": {
         "title": "Authentication method",
-        "description": "How to authenticate with the BMC. `auto` prefers a Redfish session and falls back to HTTP basic authentication.",
+        "description": "How to authenticate with the BMC: `auto`, `session`, `basic`, or `none`. `auto` prefers a Redfish session and falls back to HTTP Basic.",
         "type": "string",
         "enum": [
           "auto",
@@ -64,7 +64,7 @@
       },
       "max_concurrent_requests": {
         "title": "Maximum concurrent requests",
-        "description": "Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit.",
+        "description": "Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit or respond slowly.",
         "type": "integer",
         "minimum": 1,
         "default": 3
@@ -97,7 +97,7 @@
       },
       "collect": {
         "title": "Collection families",
-        "description": "Simple pattern selecting which component families to collect: base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware. Base is always collected.",
+        "description": "Simple pattern selecting which component areas to collect: `base`, `compute`, `memory`, `thermal`, `power`, `storage`, `network`, `pcie`, `sensors`, `firmware`. Base is always collected.",
         "type": "string",
         "default": "*"
       }
