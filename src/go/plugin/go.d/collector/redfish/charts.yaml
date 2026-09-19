@@ -1,7 +1,7 @@
 version: v1
+context_namespace: redfish
 groups:
   - family: Overview
-    context_namespace: redfish
     chart_defaults:
       priority: 70000
       instances:
@@ -286,7 +286,6 @@ groups:
             dimensions:
               - selector: system_state
   - family: Compute
-    context_namespace: redfish
     chart_defaults:
       priority: 70100
       instances:
@@ -509,7 +508,6 @@ groups:
               - selector: processor_utilization_kernel
                 name: kernel
   - family: Memory
-    context_namespace: redfish
     chart_defaults:
       priority: 70200
       instances:
@@ -653,7 +651,6 @@ groups:
             dimensions:
               - selector: memory_state
   - family: Storage
-    context_namespace: redfish
     chart_defaults:
       priority: 70300
       instances:
@@ -1366,7 +1363,6 @@ groups:
             dimensions:
               - selector: volume_write_cache_state
   - family: Network
-    context_namespace: redfish
     chart_defaults:
       priority: 70400
       instances:
@@ -2154,7 +2150,6 @@ groups:
               - selector: port_traffic_sent
                 name: sent
   - family: Thermal
-    context_namespace: redfish
     chart_defaults:
       priority: 70500
       instances:
@@ -2717,7 +2712,6 @@ groups:
             dimensions:
               - selector: thermal_subsystem_state
   - family: Power
-    context_namespace: redfish
     chart_defaults:
       priority: 70600
       instances:
@@ -3207,7 +3201,6 @@ groups:
               - selector: reading_voltage_value
                 name: value
   - family: Environment
-    context_namespace: redfish
     chart_defaults:
       priority: 70700
       instances:
@@ -3348,7 +3341,6 @@ groups:
               - selector: reading_valve_position_value
                 name: value
   - family: Controls
-    context_namespace: redfish
     chart_defaults:
       priority: 70800
       instances:
@@ -3572,7 +3564,6 @@ groups:
           - selector: control_valve_position_setpoint_error
             name: setpoint_error
   - family: Sensors
-    context_namespace: redfish
     chart_defaults:
       priority: 70900
       instances:
@@ -3669,7 +3660,6 @@ groups:
             dimensions:
               - selector: sensor_state
   - family: Management
-    context_namespace: redfish
     chart_defaults:
       priority: 71000
       instances:
@@ -3888,7 +3878,6 @@ groups:
             dimensions:
               - selector: software_state
   - family: Collection
-    context_namespace: redfish
     chart_defaults:
       priority: 71100
       instances:
