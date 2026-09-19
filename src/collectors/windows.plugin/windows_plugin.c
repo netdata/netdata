@@ -100,7 +100,7 @@ static struct proc_module {
      .func = do_PerflibStorage,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_PerflibStorage_cleanup},
     {.name = "PerflibNetwork",
      .dim = "PerflibNetwork",
      .enabled = CONFIG_BOOLEAN_YES,

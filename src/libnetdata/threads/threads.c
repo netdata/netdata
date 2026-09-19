@@ -309,7 +309,21 @@ static void nd_thread_run_cleanup_callbacks(void) {
 
 // ----------------------------------------------------------------------------
 
-static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released);
+static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released, bool already_claimed);
+
+static bool nd_thread_try_claim_join(ND_THREAD *nti)
+{
+    NETDATA_THREAD_OPTIONS old_options;
+    do {
+        old_options = __atomic_load_n(&nti->options, __ATOMIC_ACQUIRE);
+        if(old_options & NETDATA_THREAD_STATUS_JOINED)
+            return false;
+    } while(!__atomic_compare_exchange_n(&nti->options, &old_options,
+                                          old_options | NETDATA_THREAD_STATUS_JOINED,
+                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE));
+
+    return true;
+}
 
 void nd_thread_join_threads()
 {
@@ -319,19 +333,26 @@ void nd_thread_join_threads()
     do {
         spinlock_lock(&threads_globals.exited.spinlock);
         nti = threads_globals.exited.list;
+        while(nti && !nd_thread_try_claim_join(nti))
+            nti = nti->next;
         if(nti) {
-            // Remove from exited list while holding the lock to prevent race condition
-            // where another thread with a direct pointer calls nd_thread_join() and frees
-            // the nti before we get a chance to use it
+            // Claim the wrapper before unlinking it. A direct owner may have the same pointer
+            // and can free it immediately after winning the JOINED CAS.
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
             nti->list = ND_THREAD_LIST_NONE;
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
 
+        if(nti && nd_thread_status_check(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN)) {
+            // The creator owns this wrapper and must join it directly. Keep it out of the generic
+            // drain until that owner releases it.
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(retained, nti, prev, next);
+            continue;
+        }
+
         // nd_thread_join_internal() handles NULL and will skip list removal since we already did it
-        // The atomic CAS in nd_thread_join_internal() still protects against direct callers racing with us
         bool wrapper_released = true;
-        nd_thread_join_internal(nti, &wrapper_released);
+        nd_thread_join_internal(nti, &wrapper_released, true);
 
         // a failed join keeps the wrapper alive; we already unlinked it from the
         // exited list, so keep it aside (the loop keeps draining) and restore it
@@ -528,22 +549,17 @@ bool nd_thread_signaled_to_cancel(void) {
 // wrapper is intentionally kept alive (failed join with the worker not proven
 // finished), so nd_thread_join_threads() can make it discoverable again after
 // having unlinked it from the exited list
-static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released) {
+static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released, bool already_claimed) {
     *wrapper_released = true;
 
     if(!nti)
         return ESRCH;
 
-    // Atomically check and set JOINED flag to prevent race conditions
-    // where two threads both try to join the same thread
-    NETDATA_THREAD_OPTIONS old_options;
-    do {
-        old_options = __atomic_load_n(&nti->options, __ATOMIC_ACQUIRE);
-        if(old_options & NETDATA_THREAD_STATUS_JOINED)
-            return 0;
-    } while(!__atomic_compare_exchange_n(&nti->options, &old_options,
-                                          old_options | NETDATA_THREAD_STATUS_JOINED,
-                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE));
+    // Atomically check and set JOINED flag to prevent race conditions where two threads both try
+    // to join the same thread. The exited-list drain may already have made this claim under its
+    // list lock, before unlinking the wrapper.
+    if(!already_claimed && !nd_thread_try_claim_join(nti))
+        return 0;
 
     int ret;
 
@@ -608,7 +624,7 @@ static int nd_thread_join_internal(ND_THREAD *nti, bool *wrapper_released) {
 
 int nd_thread_join(ND_THREAD *nti) {
     bool wrapper_released;
-    int ret = nd_thread_join_internal(nti, &wrapper_released);
+    int ret = nd_thread_join_internal(nti, &wrapper_released, false);
 
     // release our CAS ownership of the retained wrapper, so the caller
     // (which still holds the pointer) can retry the join
@@ -616,4 +632,9 @@ int nd_thread_join(ND_THREAD *nti) {
         nd_thread_status_clear(nti, NETDATA_THREAD_STATUS_JOINED);
 
     return ret;
+}
+
+void nd_thread_set_manual_join(ND_THREAD *nti) {
+    if (nti)
+        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN);
 }
