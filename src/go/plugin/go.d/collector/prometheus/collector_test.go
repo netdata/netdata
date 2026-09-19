@@ -2243,16 +2243,20 @@ func TestCollector_CephUnknownHealthCheckFallbackContract(t *testing.T) {
 		excluded = append(excluded, strings.TrimPrefix(field, "!"))
 	}
 	// A health check that a named template already covers must be excluded from
-	// the fallback, so one check never raises two alerts.
+	// the fallback, so one check never raises two alerts. A template on the same
+	// chart without a name filter would fire for every check, so it is an error.
 	for name, template := range templates {
 		if name == fallback || template["on"] != block["on"] {
 			continue
 		}
-		covered, ok := strings.CutPrefix(template["chart labels"], "name=")
-		if !ok {
-			continue
+		var covered string
+		for _, field := range strings.Fields(template["chart labels"]) {
+			if value, ok := strings.CutPrefix(field, "name="); ok {
+				covered = value
+			}
 		}
-		assert.Containsf(t, excluded, strings.Fields(covered)[0], "%s covers a health check the fallback does not exclude", name)
+		require.NotEmptyf(t, covered, "%s targets the health-check chart without a name filter", name)
+		assert.Containsf(t, excluded, covered, "%s covers a health check the fallback does not exclude", name)
 	}
 }
 

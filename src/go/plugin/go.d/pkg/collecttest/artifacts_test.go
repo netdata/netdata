@@ -137,6 +137,7 @@ modules:
 		"other selected":           {metadata: single + other, moduleID: "collector-other", want: MetadataModule{ID: "collector-other", Alerts: []MetadataAlert{{Name: "other_alert", Metric: "other.chart", Info: "other"}}}},
 		"several without selector": {metadata: single + other, wantErr: "expected exactly one module, got 2"},
 		"unknown id":               {metadata: single + other, moduleID: "ghost", wantErr: `no module with meta.id "ghost"`},
+		"duplicate id":             {metadata: single + other + other, moduleID: "collector-other", wantErr: `several modules with meta.id "collector-other"`},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -177,11 +178,10 @@ func TestParseHealthAlerts(t *testing.T) {
 
 func TestChartDimensionNames(t *testing.T) {
 	tests := map[string]struct {
-		chart    charttpl.Chart
-		want     []string
-		wantOK   bool
-		wantErr  string
-		statesOf map[string][]string
+		chart   charttpl.Chart
+		want    []string
+		wantOK  bool
+		wantErr string
 	}{
 		"static names":         {chart: testCharts()["app.requests"], want: []string{"ok", "failed"}, wantOK: true},
 		"stateset states":      {chart: testCharts()["app.worker.state"], want: []string{"idle", "busy"}, wantOK: true},
@@ -392,6 +392,9 @@ func TestCheckHealthAlertsMatchMetadataMetrics(t *testing.T) {
 		"pipe separated dimensions":  {alerts: alert(func(a *HealthAlert) { a.Lookup = "sum -5m unaligned of ok|failed" })},
 		"pattern dimensions skipped": {alerts: alert(func(a *HealthAlert) { a.Lookup = "average -5m anomaly-bit of *" })},
 		"negated pattern skipped":    {alerts: alert(func(a *HealthAlert) { a.Lookup = "sum -5m of !ok *" })},
+		"all keyword skipped":        {alerts: alert(func(a *HealthAlert) { a.Lookup = "sum -5m unaligned of all" })},
+		"foreach clause ignored":     {alerts: alert(func(a *HealthAlert) { a.Lookup = "average -5m anomaly-bit of failed foreach *" })},
+		"foreach without of":         {alerts: alert(func(a *HealthAlert) { a.Lookup = "average -5m anomaly-bit foreach *" })},
 		"lookup without dimensions":  {alerts: alert(func(a *HealthAlert) { a.Lookup = "min -5m unaligned" })},
 		"calc without lookup":        {alerts: alert(func(a *HealthAlert) { a.Lookup = "" })},
 		"shared file with prefix": {
@@ -413,4 +416,11 @@ func TestCheckHealthAlertsMatchMetadataMetrics(t *testing.T) {
 			require.ErrorContains(t, err, test.wantErr)
 		})
 	}
+
+	t.Run("duplicate metric is reported, not chosen", func(t *testing.T) {
+		metrics := append(testMetrics(), MetadataMetric{Name: "app.requests", Unit: "requests", Dimensions: []string{"dropped"}})
+		err := CheckHealthAlertsMatchMetadataMetrics(testHealthAlerts(), metrics, HealthAlertsCheck{})
+		require.ErrorContains(t, err, "app.requests: documented twice")
+		assert.NotContains(t, err.Error(), "documented unit", "the first declaration stays the validation target")
+	})
 }

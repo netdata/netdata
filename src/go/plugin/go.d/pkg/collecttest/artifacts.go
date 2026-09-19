@@ -172,9 +172,13 @@ func DecodeMetadataModule(metadataYAML []byte, moduleID string) (MetadataModule,
 		return MetadataModule{}, fmt.Errorf("metadata: expected exactly one module, got %d (select one by meta.id)", len(doc.Modules))
 	default:
 		for i := range doc.Modules {
-			if doc.Modules[i].Meta.ID == moduleID {
-				index = i
+			if doc.Modules[i].Meta.ID != moduleID {
+				continue
 			}
+			if index >= 0 {
+				return MetadataModule{}, fmt.Errorf("metadata: several modules with meta.id %q", moduleID)
+			}
+			index = i
 		}
 		if index < 0 {
 			return MetadataModule{}, fmt.Errorf("metadata: no module with meta.id %q", moduleID)
@@ -317,17 +321,23 @@ func ParseHealthAlerts(healthConfig []byte) []HealthAlert {
 }
 
 // lookupDimensions returns the dimension names a lookup line selects by name:
-// the comma- or pipe-separated list after "of", without pattern entries
-// (wildcards and negations), which cannot be resolved against documentation.
+// the comma- or pipe-separated list between "of" and an optional "foreach"
+// clause, without the "all" keyword and without pattern entries (wildcards and
+// negations), which cannot be resolved against documentation. The grammar is
+// the "of" branch of health_config.c.
 func lookupDimensions(lookup string) []string {
 	fields := strings.Fields(lookup)
 	start := slices.Index(fields, "of") + 1
-	if start == 0 || start >= len(fields) {
+	if start == 0 {
 		return nil
 	}
+	fields = fields[start:]
+	if end := slices.IndexFunc(fields, func(f string) bool { return strings.EqualFold(f, "foreach") }); end >= 0 {
+		fields = fields[:end]
+	}
 	var names []string
-	for _, entry := range strings.FieldsFunc(strings.Join(fields[start:], ","), func(r rune) bool { return r == ',' || r == '|' }) {
-		if !strings.ContainsAny(entry, "*!") {
+	for _, entry := range strings.FieldsFunc(strings.Join(fields, ","), func(r rune) bool { return r == ',' || r == '|' }) {
+		if !strings.EqualFold(entry, "all") && !strings.ContainsAny(entry, "*!") {
 			names = append(names, entry)
 		}
 	}
@@ -397,11 +407,15 @@ func AssertHealthAlertsTargetChartTemplateWith(t testing.TB, healthConfig []byte
 // look up only its documented dimensions. An alert whose lookup derives another
 // unit (a percentage of the window, an anomaly rate) does not fit this check.
 func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []MetadataMetric, opts HealthAlertsCheck) error {
+	var problems []error
 	byName := make(map[string]MetadataMetric, len(metrics))
 	for _, metric := range metrics {
+		if _, dup := byName[metric.Name]; dup {
+			problems = append(problems, fmt.Errorf("%s: documented twice", metric.Name))
+			continue
+		}
 		byName[metric.Name] = metric
 	}
-	var problems []error
 	for _, alert := range alerts {
 		if opts.ContextPrefix != "" && !strings.HasPrefix(alert.On, opts.ContextPrefix) {
 			continue

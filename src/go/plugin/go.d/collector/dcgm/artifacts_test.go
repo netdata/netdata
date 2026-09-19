@@ -25,13 +25,12 @@ type metadataMetric struct {
 	} `yaml:"dimensions"`
 }
 
-func readMetadata(t *testing.T) (map[string]metadataMetric, map[string]map[string]string) {
+func readMetadata(t *testing.T) map[string]metadataMetric {
 	t.Helper()
 	data, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
 	var doc struct {
 		Modules []struct {
-			Alerts  []map[string]string `yaml:"alerts"`
 			Metrics struct {
 				Scopes []struct {
 					Metrics []metadataMetric `yaml:"metrics"`
@@ -48,14 +47,10 @@ func readMetadata(t *testing.T) (map[string]metadataMetric, map[string]map[strin
 			rows[row.Name] = row
 		}
 	}
-	alerts := make(map[string]map[string]string)
-	for _, alert := range doc.Modules[0].Alerts {
-		alerts[alert["name"]] = alert
-	}
-	return rows, alerts
+	return rows
 }
 func TestCatalogMetadata(t *testing.T) {
-	rows, _ := readMetadata(t)
+	rows := readMetadata(t)
 	for name, row := range rows {
 		spec, ok := contextCatalog[name]
 		require.True(t, ok, name)
@@ -106,7 +101,7 @@ func TestCatalogMetadata(t *testing.T) {
 func TestExporterCSVSemantics(t *testing.T) {
 	data, err := os.ReadFile("dcgm-exporter-netdata.csv")
 	require.NoError(t, err)
-	rows, _ := readMetadata(t)
+	rows := readMetadata(t)
 	annotation := ""
 	enabled := 0
 	for _, line := range strings.Split(string(data), "\n") {
@@ -155,7 +150,7 @@ func TestNVSwitchLinkMetadata(t *testing.T) {
 	ch := chartByContext(c, "dcgm.nvlink.interconnect.nvswitch.link_sxid")
 	require.NotNil(t, ch)
 	require.NotEmpty(t, mx)
-	rows, _ := readMetadata(t)
+	rows := readMetadata(t)
 	row, ok := rows[ch.Ctx]
 	require.True(t, ok, "real switch-link context must be documented")
 	assert.Equal(t, ch.Title, row.Description)

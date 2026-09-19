@@ -149,9 +149,10 @@ a *leaf* is the innermost family that holds charts.
 - **Cross-check artifacts.** `collecttest.AssertMetadataDocumentsChartTemplate`,
   `collecttest.AssertHealthAlertsTargetChartTemplate`, `collecttest.AssertMetadataAlertsMatchHealthConfig` and
   `collecttest.AssertHealthAlertsMatchMetadata` (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare
-  metadata.yaml, health.d and the template with each other; the `...With` variants select a metadata module and narrow
-  a shared health.d file by context prefix. The metadata check compares stateset dimensions in declared order, not
-  rendered order.
+  metadata.yaml, health.d and the template with each other. The `...With` variants take options: `HealthAlertsCheck`
+  narrows a shared health.d file by context prefix (and, for the metadata comparison, selects the module by `meta.id`);
+  `MetadataAlertsCheck` selects the module and accepts a shared health.d file whose other alerts this module does not
+  document. The metadata check compares stateset dimensions in declared order, not rendered order.
 - **Never restate an artifact.** A test that names one of the template's own contexts, dimension lists or families, or
   pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and
   MUST NOT exist; health.d owns alert policy. An independent oracle, such as a V1 parity manifest during a migration or
