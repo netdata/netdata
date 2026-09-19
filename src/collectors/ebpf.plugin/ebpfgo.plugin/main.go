@@ -63,6 +63,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	processCfg, err := resolveProcessLegacyConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: process config load failed: %v\n", err)
+		os.Exit(1)
+	}
+
 	// The legacy C plugin treated --dcstat / --fd as module-selection flags: each
 	// disabled every other collector and enabled its own regardless of config.
 	if only != moduleSelectionNone {
@@ -71,6 +77,7 @@ func main() {
 		fdCfg.Enabled = false
 		socketCfg.Enabled = false
 		dnsCfg.Enabled = false
+		processCfg.Enabled = false
 
 		// The resolve*Config functions skip /proc/kallsyms when their module is
 		// disabled in config, so a selection flag has to resolve the targets
@@ -98,7 +105,7 @@ func main() {
 		}
 	}
 
-	if !anyProgramEnabled(cachestatCfg, dcstatCfg, fdCfg, socketCfg, dnsCfg) {
+	if !anyProgramEnabled(cachestatCfg, dcstatCfg, fdCfg, socketCfg, dnsCfg, processCfg) {
 		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: all eBPF programs disabled by configuration\n")
 		os.Exit(0)
 	}
@@ -126,6 +133,7 @@ func main() {
 	// per-PID rows land in the same shared-memory snapshot.
 	var store *ebpfSharedMemoryStore
 	needsStore := socketCfg.Enabled ||
+		(processCfg.Enabled && (processCfg.AppsEnabled || processCfg.CgroupsEnabled)) ||
 		(cachestatCfg.Enabled && (cachestatCfg.AppsEnabled || cachestatCfg.CgroupsEnabled)) ||
 		(dcstatCfg.Enabled && (dcstatCfg.AppsEnabled || dcstatCfg.CgroupsEnabled)) ||
 		(fdCfg.Enabled && (fdCfg.AppsEnabled || fdCfg.CgroupsEnabled))
@@ -144,6 +152,29 @@ func main() {
 	var cachestatWillPublish bool
 	var dcstatWillPublish bool
 	var fdWillPublish bool
+	var processWillPublish bool
+
+	// ---- process ----
+	if processCfg.Enabled {
+		ue := resolveUpdateEvery(updateEvery, processCfg.UpdateEvery, processDefaultUpdateEvery)
+		processCfg.UpdateEvery = ue
+		handle, herr := LoadProcessLegacy(processCfg)
+		if herr != nil {
+			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: process load failed: %v\n", herr)
+		} else if handle != nil && handle.Runtime != nil {
+			var processStore *ebpfSharedMemoryStore
+			if handle.AppsEnabled || handle.CgroupsEnabled {
+				processStore = store
+				processWillPublish = true
+			}
+			anyStarted = true
+			shouldPublish := processWillPublish
+			wg.Go(func() {
+				runProcessGlobalCollector(api, handle, stop, processStore, ue, shouldPublish)
+				handle.Close()
+			})
+		}
+	}
 
 	// ---- cachestat ----
 	if cachestatCfg.Enabled {
@@ -159,7 +190,7 @@ func main() {
 			var cachestatStore *ebpfSharedMemoryStore
 			if handle.AppsEnabled || handle.CgroupsEnabled {
 				cachestatStore = store
-				cachestatWillPublish = true
+				cachestatWillPublish = !processWillPublish
 			}
 			anyStarted = true
 			wg.Go(func() {
@@ -183,7 +214,7 @@ func main() {
 			var dcstatStore *ebpfSharedMemoryStore
 			if handle.AppsEnabled || handle.CgroupsEnabled {
 				dcstatStore = store
-				dcstatWillPublish = !cachestatWillPublish
+				dcstatWillPublish = !processWillPublish && !cachestatWillPublish
 			} else {
 				// dcstat is opt-in, so reaching here means an operator enabled it
 				// and will otherwise wonder why only the global charts appeared.
@@ -215,7 +246,7 @@ func main() {
 			var fdStore *ebpfSharedMemoryStore
 			if handle.AppsEnabled || handle.CgroupsEnabled {
 				fdStore = store
-				fdWillPublish = !cachestatWillPublish && !dcstatWillPublish
+				fdWillPublish = !processWillPublish && !cachestatWillPublish && !dcstatWillPublish
 			} else {
 				// fd is opt-in, so reaching here means an operator enabled it and
 				// will otherwise wonder why only the global charts appeared.
@@ -261,7 +292,7 @@ func main() {
 			// Socket owns the SHM publisher only when no earlier module is
 			// publishing; this lets socket cgroup charts work independently of the
 			// other modules.
-			socketShouldPublish := store != nil && !cachestatWillPublish && !dcstatWillPublish && !fdWillPublish
+			socketShouldPublish := store != nil && !processWillPublish && !cachestatWillPublish && !dcstatWillPublish && !fdWillPublish
 
 			wg.Go(func() {
 				runSocketGlobalCollector(api, handle, stop, ue, store, fnStore, socketShouldPublish)
@@ -380,6 +411,7 @@ func anyProgramEnabled(
 	fdCfg FDLegacyConfig,
 	socketCfg SocketLegacyConfig,
 	dnsCfg DNSLegacyConfig,
+	processCfg ProcessLegacyConfig,
 ) bool {
-	return cachestatCfg.Enabled || dcstatCfg.Enabled || fdCfg.Enabled || socketCfg.Enabled || dnsCfg.Enabled
+	return cachestatCfg.Enabled || dcstatCfg.Enabled || fdCfg.Enabled || socketCfg.Enabled || dnsCfg.Enabled || processCfg.Enabled
 }
