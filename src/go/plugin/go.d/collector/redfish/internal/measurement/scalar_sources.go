@@ -27,6 +27,9 @@ type sourceField struct {
 	Candidates       []scalarSource
 	Scale            valueScale
 	Algorithm        scalarAlgorithm
+	// Float marks an absolute source whose value is fractional; rates and
+	// duration percentages are always float.
+	Float bool
 }
 
 // Candidates are equivalent Redfish representations, in preference order.
@@ -38,6 +41,7 @@ var scalarFields = []sourceField{
 		Metric:    "system_processor_bandwidth",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_summary_metrics", Path: "BandwidthPercent"},
 			{Document: "", Path: "ProcessorSummary.Metrics.BandwidthPercent"},
@@ -49,6 +53,7 @@ var scalarFields = []sourceField{
 		Metric:    "system_processor_utilization_kernel",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_summary_metrics", Path: "KernelPercent"},
 			{Document: "", Path: "ProcessorSummary.Metrics.KernelPercent"},
@@ -60,6 +65,7 @@ var scalarFields = []sourceField{
 		Metric:    "system_processor_utilization_user",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_summary_metrics", Path: "UserPercent"},
 			{Document: "", Path: "ProcessorSummary.Metrics.UserPercent"},
@@ -71,6 +77,7 @@ var scalarFields = []sourceField{
 		Metric:    "system_memory_bandwidth",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "memory_summary_metrics", Path: "BandwidthPercent"},
 			{Document: "", Path: "MemorySummary.Metrics.BandwidthPercent"},
@@ -82,6 +89,7 @@ var scalarFields = []sourceField{
 		Metric:    "system_memory_utilization",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "memory_summary_metrics", Path: "CapacityUtilizationPercent"},
 			{Document: "", Path: "MemorySummary.Metrics.CapacityUtilizationPercent"},
@@ -93,6 +101,7 @@ var scalarFields = []sourceField{
 		Metric:    "processor_clock_speed_operating",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_metrics", Path: "OperatingSpeedMHz"},
 			{Document: "", Path: "OperatingSpeedMHz"},
@@ -105,6 +114,7 @@ var scalarFields = []sourceField{
 		Metric:    "processor_utilization_user",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_metrics", Path: "UserPercent"},
 		},
@@ -115,6 +125,7 @@ var scalarFields = []sourceField{
 		Metric:    "processor_utilization_kernel",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_metrics", Path: "KernelPercent"},
 		},
@@ -125,6 +136,7 @@ var scalarFields = []sourceField{
 		Metric:    "processor_bandwidth_utilization",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_metrics", Path: "BandwidthPercent"},
 		},
@@ -135,6 +147,7 @@ var scalarFields = []sourceField{
 		Metric:    "processor_frequency_ratio",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_metrics", Path: "FrequencyRatio"},
 		},
@@ -145,6 +158,7 @@ var scalarFields = []sourceField{
 		Metric:    "processor_thermal_headroom",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "processor_metrics", Path: "ThrottlingCelsius"},
 		},
@@ -215,6 +229,7 @@ var scalarFields = []sourceField{
 		Metric:    "memory_capacity_utilization",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "memory_metrics", Path: "CapacityUtilizationPercent"},
 		},
@@ -225,6 +240,7 @@ var scalarFields = []sourceField{
 		Metric:    "memory_bandwidth_utilization",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "memory_metrics", Path: "BandwidthPercent"},
 		},
@@ -245,6 +261,7 @@ var scalarFields = []sourceField{
 		Metric:    "memory_media_health_life_left",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "memory_metrics", Path: "HealthData.PredictedMediaLifeLeftPercent"},
 		},
@@ -255,6 +272,7 @@ var scalarFields = []sourceField{
 		Metric:    "memory_media_health_spare_remaining",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "memory_metrics", Path: "HealthData.RemainingSpareBlockPercentage"},
 		},
@@ -335,6 +353,7 @@ var scalarFields = []sourceField{
 		Metric:    "drive_link_speed_negotiated",
 		Scale:     valueScale{1000000000, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "NegotiatedSpeedGbs"},
 		},
@@ -345,6 +364,7 @@ var scalarFields = []sourceField{
 		Metric:    "drive_media_life",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "PredictedMediaLifeLeftPercent"},
 		},
@@ -435,6 +455,7 @@ var scalarFields = []sourceField{
 		Metric:    "volume_remaining_capacity",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "RemainingCapacityPercent"},
 		},
@@ -475,6 +496,7 @@ var scalarFields = []sourceField{
 		Metric:    "ethernet_interface_link_speed",
 		Scale:     valueScale{1000000, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "SpeedMbps"},
 		},
@@ -485,6 +507,7 @@ var scalarFields = []sourceField{
 		Metric:    "network_port_link_speed",
 		Scale:     valueScale{1000000, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "CurrentLinkSpeedMbps"},
 		},
@@ -495,6 +518,7 @@ var scalarFields = []sourceField{
 		Metric:    "port_link_speed_speed",
 		Scale:     valueScale{1000000000, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "CurrentSpeedGbps"},
 		},
@@ -605,6 +629,7 @@ var scalarFields = []sourceField{
 		Metric:    "power_subsystem_capacity_allocated",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "Allocation.AllocatedWatts"},
 		},
@@ -615,6 +640,7 @@ var scalarFields = []sourceField{
 		Metric:    "power_subsystem_capacity_requested",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "Allocation.RequestedWatts"},
 		},
@@ -625,6 +651,7 @@ var scalarFields = []sourceField{
 		Metric:    "battery_charge_capacity_actual",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "CapacityActualAmpHours"},
 		},
@@ -635,6 +662,7 @@ var scalarFields = []sourceField{
 		Metric:    "battery_energy_capacity_actual",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "CapacityActualWattHours"},
 		},
@@ -645,6 +673,7 @@ var scalarFields = []sourceField{
 		Metric:    "battery_c_rate",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "battery_metrics", Path: "CRate"},
 		},
@@ -655,6 +684,7 @@ var scalarFields = []sourceField{
 		Metric:    "battery_e_rate",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "battery_metrics", Path: "ERate"},
 		},
@@ -665,6 +695,7 @@ var scalarFields = []sourceField{
 		Metric:    "manager_clock_offset",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "DateTime"},
 		},
@@ -675,6 +706,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_processor_core_instructions_per_cycle",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "", Path: "InstructionsPerCycle"},
 		},
@@ -1087,6 +1119,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_temperature_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1102,6 +1135,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_temperature_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1117,6 +1151,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_temperature_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1132,6 +1167,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_power_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1147,6 +1183,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_power_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1162,6 +1199,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_power_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1177,6 +1215,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_frequency_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1198,6 +1237,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_frequency_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1219,6 +1259,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_frequency_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1240,6 +1281,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_pressure_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1261,6 +1303,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_pressure_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1282,6 +1325,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_pressure_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1303,6 +1347,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_valve_position_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1318,6 +1363,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_valve_position_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1333,6 +1379,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_valve_position_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1348,6 +1395,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_percentage_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1369,6 +1417,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_percentage_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1390,6 +1439,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_percentage_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1411,6 +1461,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_position_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1426,6 +1477,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_position_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1441,6 +1493,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_position_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1456,6 +1509,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_velocity_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1471,6 +1525,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_velocity_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1486,6 +1541,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_velocity_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1501,6 +1557,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_acceleration_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1516,6 +1573,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_acceleration_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1531,6 +1589,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_linear_acceleration_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1546,6 +1605,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_position_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1561,6 +1621,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_position_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1576,6 +1637,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_position_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1591,6 +1653,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_velocity_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1606,6 +1669,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_velocity_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1621,6 +1685,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_velocity_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1636,6 +1701,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_acceleration_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1651,6 +1717,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_acceleration_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1666,6 +1733,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_rotational_acceleration_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1681,6 +1749,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_liquid_flow_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1696,6 +1765,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_liquid_flow_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1711,6 +1781,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_control_liquid_flow_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{
 				Document: "",
@@ -1726,6 +1797,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_storage_controller_nvme_spare_available",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "storage_controller_metrics", Path: "NVMeSMART.AvailableSparePercent"},
 		},
@@ -1736,6 +1808,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_storage_controller_nvme_wear_used",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "storage_controller_metrics", Path: "NVMeSMART.PercentageUsed"},
 		},
@@ -1746,6 +1819,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_storage_controller_nvme_temperature_composite",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "storage_controller_metrics", Path: "NVMeSMART.CompositeTemperatureCelsius"},
 		},
@@ -1906,6 +1980,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_drive_nvme_spare_available",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "drive_metrics", Path: "NVMeSMART.AvailableSparePercent"},
 		},
@@ -1916,6 +1991,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_drive_nvme_wear_used",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "drive_metrics", Path: "NVMeSMART.PercentageUsed"},
 		},
@@ -1926,6 +2002,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_drive_nvme_temperature_composite",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "drive_metrics", Path: "NVMeSMART.CompositeTemperatureCelsius"},
 		},
@@ -2166,6 +2243,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_network_adapter_cpu_utilization",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "network_adapter_metrics", Path: "CPUCorePercent"},
 		},
@@ -2176,6 +2254,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_network_adapter_host_bus_utilization_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "network_adapter_metrics", Path: "HostBusRXPercent"},
 		},
@@ -2186,6 +2265,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_network_adapter_host_bus_utilization_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "network_adapter_metrics", Path: "HostBusTXPercent"},
 		},
@@ -2256,6 +2336,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_network_device_function_queue_depth_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "network_device_function_metrics", Path: "RXAvgQueueDepthPercent"},
 		},
@@ -2266,6 +2347,7 @@ var scalarFields = []sourceField{
 		Metric:    "redfish_network_device_function_queue_depth_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
+		Float:     true,
 		Candidates: []scalarSource{
 			{Document: "network_device_function_metrics", Path: "TXAvgQueueDepthPercent"},
 		},

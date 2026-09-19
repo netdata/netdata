@@ -125,8 +125,6 @@ groups:
             dimensions:
               - selector: reading_percentage_value
                 name: value
-                options:
-                  float: true
       - family: reading_alarm
         context_namespace: redfish
         metrics:
@@ -436,8 +434,6 @@ groups:
             dimensions:
               - selector: system_memory_bandwidth
                 name: bandwidth
-                options:
-                  float: true
           - id: redfish_system_memory_summary_health
             title: System Memory Summary Health
             context: system.memory_summary_health
@@ -470,8 +466,6 @@ groups:
             dimensions:
               - selector: system_memory_utilization
                 name: capacity
-                options:
-                  float: true
           - id: redfish_system_processor_bandwidth
             title: System Processor Bandwidth
             context: system.processor_bandwidth
@@ -480,8 +474,6 @@ groups:
             dimensions:
               - selector: system_processor_bandwidth
                 name: bandwidth
-                options:
-                  float: true
           - id: redfish_system_processor_summary_health
             title: System Processor Summary Health
             context: system.processor_summary_health
@@ -514,12 +506,8 @@ groups:
             dimensions:
               - selector: system_processor_utilization_kernel
                 name: kernel
-                options:
-                  float: true
               - selector: system_processor_utilization_user
                 name: user
-                options:
-                  float: true
       - family: system
         context_namespace: redfish
         metrics:
@@ -645,52 +633,28 @@ groups:
             dimensions:
               - selector: redfish_processor_pcie_error_rate_bad_dllp
                 name: bad_dllp
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_bad_tlp
                 name: bad_tlp
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_correctable
                 name: correctable
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_fatal
                 name: fatal
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_flow_control_timeout
                 name: flow_control_timeout
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_l0_to_recovery
                 name: l0_to_recovery
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_nak_received
                 name: nak_received
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_nak_sent
                 name: nak_sent
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_non_fatal
                 name: non_fatal
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_replay
                 name: replay
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_replay_rollover
                 name: replay_rollover
-                options:
-                  float: true
               - selector: redfish_processor_pcie_error_rate_unsupported_request
                 name: unsupported_request
-                options:
-                  float: true
       - family: processor
         context_namespace: redfish
         metrics:
@@ -753,8 +717,6 @@ groups:
             dimensions:
               - selector: processor_bandwidth_utilization
                 name: bandwidth
-                options:
-                  float: true
           - id: redfish_processor_clock_speed
             title: Processor Clock Speed
             context: processor.clock_speed
@@ -763,8 +725,6 @@ groups:
             dimensions:
               - selector: processor_clock_speed_operating
                 name: operating
-                options:
-                  float: true
           - id: redfish_processor_conditions
             title: Processor Conditions
             context: processor.conditions
@@ -788,20 +748,12 @@ groups:
             dimensions:
               - selector: processor_error_rate_correctable_core
                 name: correctable_core
-                options:
-                  float: true
               - selector: processor_error_rate_correctable_other
                 name: correctable_other
-                options:
-                  float: true
               - selector: processor_error_rate_uncorrectable_core
                 name: uncorrectable_core
-                options:
-                  float: true
               - selector: processor_error_rate_uncorrectable_other
                 name: uncorrectable_other
-                options:
-                  float: true
           - id: redfish_processor_frequency_ratio
             title: Processor Frequency Ratio
             context: processor.frequency_ratio
@@ -810,8 +762,6 @@ groups:
             dimensions:
               - selector: processor_frequency_ratio
                 name: ratio
-                options:
-                  float: true
           - id: redfish_processor_health
             title: Processor Health
             context: processor.health
@@ -852,8 +802,6 @@ groups:
             dimensions:
               - selector: processor_thermal_headroom
                 name: headroom
-                options:
-                  float: true
           - id: redfish_processor_throttle_time
             title: Processor Throttle Time
             context: processor.throttle_time
@@ -862,12 +810,8 @@ groups:
             dimensions:
               - selector: processor_throttle_time_power_limit
                 name: power_limit
-                options:
-                  float: true
               - selector: processor_throttle_time_thermal_limit
                 name: thermal_limit
-                options:
-                  float: true
           - id: redfish_processor_throttling_state
             title: Processor Throttling State
             context: processor.throttling_state
@@ -884,12 +828,8 @@ groups:
             dimensions:
               - selector: processor_utilization_user
                 name: user
-                options:
-                  float: true
               - selector: processor_utilization_kernel
                 name: kernel
-                options:
-                  float: true
       - family: processor_core
         context_namespace: redfish
         metrics:
@@ -955,16 +895,10 @@ groups:
             dimensions:
               - selector: redfish_processor_core_cycle_rate_io_stall
                 name: io_stall
-                options:
-                  float: true
               - selector: redfish_processor_core_cycle_rate_memory_stall
                 name: memory_stall
-                options:
-                  float: true
               - selector: redfish_processor_core_cycle_rate_unhalted
                 name: unhalted
-                options:
-                  float: true
           - id: redfish_processor_core_error_rate
             title: Processor Core Error Rate
             context: processor_core.error_rate
@@ -973,20 +907,12 @@ groups:
             dimensions:
               - selector: redfish_processor_core_error_rate_correctable_core
                 name: correctable_core
-                options:
-                  float: true
               - selector: redfish_processor_core_error_rate_correctable_other
                 name: correctable_other
-                options:
-                  float: true
               - selector: redfish_processor_core_error_rate_uncorrectable_core
                 name: uncorrectable_core
-                options:
-                  float: true
               - selector: redfish_processor_core_error_rate_uncorrectable_other
                 name: uncorrectable_other
-                options:
-                  float: true
           - id: redfish_processor_core_instructions_per_cycle
             title: Processor Core Instructions per Cycle
             context: processor_core.instructions_per_cycle
@@ -995,8 +921,6 @@ groups:
             dimensions:
               - selector: redfish_processor_core_instructions_per_cycle
                 name: instructions
-                options:
-                  float: true
   - family: Memory
     groups:
       - family: memory
@@ -1066,8 +990,6 @@ groups:
             dimensions:
               - selector: memory_bandwidth_utilization
                 name: utilization
-                options:
-                  float: true
           - id: redfish_memory_capacity_utilization
             title: Memory Module Capacity Utilization
             context: memory.capacity_utilization
@@ -1076,8 +998,6 @@ groups:
             dimensions:
               - selector: memory_capacity_utilization
                 name: utilization
-                options:
-                  float: true
           - id: redfish_memory_conditions
             title: Memory Module Conditions
             context: memory.conditions
@@ -1101,8 +1021,6 @@ groups:
             dimensions:
               - selector: memory_dirty_shutdown_rate
                 name: shutdowns
-                options:
-                  float: true
           - id: redfish_memory_error_rate
             title: Memory Module Error Rate
             context: memory.error_rate
@@ -1111,20 +1029,12 @@ groups:
             dimensions:
               - selector: redfish_memory_error_rate_correctable
                 name: correctable
-                options:
-                  float: true
               - selector: redfish_memory_error_rate_indeterminate_correctable
                 name: indeterminate_correctable
-                options:
-                  float: true
               - selector: redfish_memory_error_rate_uncorrectable
                 name: uncorrectable
-                options:
-                  float: true
               - selector: redfish_memory_error_rate_indeterminate_uncorrectable
                 name: indeterminate_uncorrectable
-                options:
-                  float: true
           - id: redfish_memory_health
             title: Memory Module Health
             context: memory.health
@@ -1172,12 +1082,8 @@ groups:
             dimensions:
               - selector: redfish_memory_io_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_memory_io_written
                 name: written
-                options:
-                  float: true
           - id: redfish_memory_media_health
             title: Memory Module Media Health
             context: memory.media_health
@@ -1186,12 +1092,8 @@ groups:
             dimensions:
               - selector: memory_media_health_life_left
                 name: life_left
-                options:
-                  float: true
               - selector: memory_media_health_spare_remaining
                 name: spare_remaining
-                options:
-                  float: true
           - id: redfish_memory_state
             title: Memory Module State
             context: memory.state
@@ -1236,8 +1138,6 @@ groups:
             dimensions:
               - selector: reading_absolute_humidity_value
                 name: value
-                options:
-                  float: true
       - family: air_flow
         context_namespace: redfish
         metrics:
@@ -1272,8 +1172,6 @@ groups:
             dimensions:
               - selector: reading_air_flow_value
                 name: value
-                options:
-                  float: true
       - family: altitude
         context_namespace: redfish
         metrics:
@@ -1308,8 +1206,6 @@ groups:
             dimensions:
               - selector: reading_altitude_value
                 name: value
-                options:
-                  float: true
       - family: barometric_pressure
         context_namespace: redfish
         metrics:
@@ -1344,8 +1240,6 @@ groups:
             dimensions:
               - selector: reading_barometric_pressure_value
                 name: value
-                options:
-                  float: true
       - family: barometric_pressure
         context_namespace: system.hw.sensor.pressure
         metrics:
@@ -1390,8 +1284,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_pressure_input
                 name: input
-                options:
-                  float: true
       - family: control
         context_namespace: redfish
         metrics:
@@ -1486,16 +1378,10 @@ groups:
             dimensions:
               - selector: redfish_control_frequency_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_frequency_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_frequency_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_health
             title: Control Health
             context: control.health
@@ -1520,16 +1406,10 @@ groups:
             dimensions:
               - selector: redfish_control_linear_acceleration_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_linear_acceleration_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_linear_acceleration_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_linear_position
             title: Control Linear Position
             context: control.linear_position
@@ -1538,16 +1418,10 @@ groups:
             dimensions:
               - selector: redfish_control_linear_position_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_linear_position_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_linear_position_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_linear_velocity
             title: Control Linear Velocity
             context: control.linear_velocity
@@ -1556,16 +1430,10 @@ groups:
             dimensions:
               - selector: redfish_control_linear_velocity_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_linear_velocity_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_linear_velocity_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_liquid_flow
             title: Control Liquid Flow
             context: control.liquid_flow
@@ -1574,16 +1442,10 @@ groups:
             dimensions:
               - selector: redfish_control_liquid_flow_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_liquid_flow_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_liquid_flow_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_percentage
             title: Control Percentage
             context: control.percentage
@@ -1592,16 +1454,10 @@ groups:
             dimensions:
               - selector: redfish_control_percentage_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_percentage_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_percentage_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_power
             title: Control Power
             context: control.power
@@ -1610,16 +1466,10 @@ groups:
             dimensions:
               - selector: redfish_control_power_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_power_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_power_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_pressure
             title: Control Pressure
             context: control.pressure
@@ -1628,16 +1478,10 @@ groups:
             dimensions:
               - selector: redfish_control_pressure_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_pressure_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_pressure_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_rotational_acceleration
             title: Control Rotational Acceleration
             context: control.rotational_acceleration
@@ -1646,16 +1490,10 @@ groups:
             dimensions:
               - selector: redfish_control_rotational_acceleration_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_rotational_acceleration_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_rotational_acceleration_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_rotational_position
             title: Control Rotational Position
             context: control.rotational_position
@@ -1664,16 +1502,10 @@ groups:
             dimensions:
               - selector: redfish_control_rotational_position_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_rotational_position_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_rotational_position_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_rotational_velocity
             title: Control Rotational Velocity
             context: control.rotational_velocity
@@ -1682,16 +1514,10 @@ groups:
             dimensions:
               - selector: redfish_control_rotational_velocity_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_rotational_velocity_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_rotational_velocity_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_state
             title: Control State
             context: control.state
@@ -1708,16 +1534,10 @@ groups:
             dimensions:
               - selector: redfish_control_temperature_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_temperature_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_temperature_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
           - id: redfish_control_valve_position
             title: Control Valve Position
             context: control.valve_position
@@ -1726,16 +1546,10 @@ groups:
             dimensions:
               - selector: redfish_control_valve_position_sensor
                 name: sensor
-                options:
-                  float: true
               - selector: redfish_control_valve_position_setpoint
                 name: setpoint
-                options:
-                  float: true
               - selector: redfish_control_valve_position_setpoint_error
                 name: setpoint_error
-                options:
-                  float: true
       - family: coolant_connector
         context_namespace: redfish
         metrics:
@@ -2007,8 +1821,6 @@ groups:
             dimensions:
               - selector: reading_heat_value
                 name: value
-                options:
-                  float: true
       - family: heater
         context_namespace: redfish
         metrics:
@@ -2090,12 +1902,8 @@ groups:
             dimensions:
               - selector: redfish_heater_heating_time_pre_power_on
                 name: pre_power_on
-                options:
-                  float: true
               - selector: redfish_heater_heating_time_runtime
                 name: runtime
-                options:
-                  float: true
           - id: redfish_heater_state
             title: Heater State
             context: heater.state
@@ -2138,8 +1946,6 @@ groups:
             dimensions:
               - selector: reading_humidity_value
                 name: value
-                options:
-                  float: true
       - family: humidity
         context_namespace: system.hw.sensor.humidity
         metrics:
@@ -2184,8 +1990,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_humidity_input
                 name: input
-                options:
-                  float: true
       - family: leak_detection
         context_namespace: redfish
         metrics:
@@ -2450,8 +2254,6 @@ groups:
             dimensions:
               - selector: reading_linear_acceleration_value
                 name: value
-                options:
-                  float: true
       - family: linear_position
         context_namespace: redfish
         metrics:
@@ -2486,8 +2288,6 @@ groups:
             dimensions:
               - selector: reading_linear_position_value
                 name: value
-                options:
-                  float: true
       - family: linear_velocity
         context_namespace: redfish
         metrics:
@@ -2522,8 +2322,6 @@ groups:
             dimensions:
               - selector: reading_linear_velocity_value
                 name: value
-                options:
-                  float: true
       - family: liquid_flow
         context_namespace: redfish
         metrics:
@@ -2558,8 +2356,6 @@ groups:
             dimensions:
               - selector: reading_liquid_flow_value
                 name: value
-                options:
-                  float: true
       - family: liquid_level
         context_namespace: redfish
         metrics:
@@ -2594,8 +2390,6 @@ groups:
             dimensions:
               - selector: reading_liquid_level_value
                 name: value
-                options:
-                  float: true
       - family: pressure
         context_namespace: redfish
         metrics:
@@ -2630,8 +2424,6 @@ groups:
             dimensions:
               - selector: reading_pressure_value
                 name: value
-                options:
-                  float: true
       - family: pump
         context_namespace: redfish
         metrics:
@@ -2745,8 +2537,6 @@ groups:
             dimensions:
               - selector: reading_rotational_acceleration_value
                 name: value
-                options:
-                  float: true
       - family: rotational_position
         context_namespace: redfish
         metrics:
@@ -2781,8 +2571,6 @@ groups:
             dimensions:
               - selector: reading_rotational_position_value
                 name: value
-                options:
-                  float: true
       - family: rotational_speed
         context_namespace: redfish
         metrics:
@@ -2817,8 +2605,6 @@ groups:
             dimensions:
               - selector: reading_rotational_speed_value
                 name: value
-                options:
-                  float: true
       - family: rotational_speed
         context_namespace: system.hw.sensor.fan
         metrics:
@@ -2863,8 +2649,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_fan_input
                 name: input
-                options:
-                  float: true
       - family: rotational_velocity
         context_namespace: redfish
         metrics:
@@ -2899,8 +2683,6 @@ groups:
             dimensions:
               - selector: reading_rotational_velocity_value
                 name: value
-                options:
-                  float: true
       - family: temperature
         context_namespace: redfish
         metrics:
@@ -2935,8 +2717,6 @@ groups:
             dimensions:
               - selector: reading_temperature_value
                 name: value
-                options:
-                  float: true
       - family: temperature
         context_namespace: system.hw.sensor.temperature
         metrics:
@@ -2981,8 +2761,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_temperature_input
                 name: input
-                options:
-                  float: true
       - family: thermal_subsystem
         context_namespace: redfish
         metrics:
@@ -3088,8 +2866,6 @@ groups:
             dimensions:
               - selector: reading_valve_position_value
                 name: value
-                options:
-                  float: true
   - family: Power
     groups:
       - family: apparent_energy
@@ -3126,8 +2902,6 @@ groups:
             dimensions:
               - selector: reading_apparent_energy_value
                 name: value
-                options:
-                  float: true
       - family: apparent_power
         context_namespace: redfish
         metrics:
@@ -3162,8 +2936,6 @@ groups:
             dimensions:
               - selector: reading_apparent_power_value
                 name: value
-                options:
-                  float: true
       - family: battery
         context_namespace: redfish
         metrics:
@@ -3220,8 +2992,6 @@ groups:
             dimensions:
               - selector: battery_c_rate
                 name: rate
-                options:
-                  float: true
           - id: redfish_battery_charge_capacity
             title: Battery Charge Capacity
             context: battery.charge_capacity
@@ -3230,8 +3000,6 @@ groups:
             dimensions:
               - selector: battery_charge_capacity_actual
                 name: actual
-                options:
-                  float: true
           - id: redfish_battery_charge_state
             title: Battery Charge State
             context: battery.charge_state
@@ -3263,8 +3031,6 @@ groups:
             dimensions:
               - selector: battery_e_rate
                 name: rate
-                options:
-                  float: true
           - id: redfish_battery_energy_capacity
             title: Battery Energy Capacity
             context: battery.energy_capacity
@@ -3273,8 +3039,6 @@ groups:
             dimensions:
               - selector: battery_energy_capacity_actual
                 name: actual
-                options:
-                  float: true
           - id: redfish_battery_health
             title: Battery Health
             context: battery.health
@@ -3357,8 +3121,6 @@ groups:
             dimensions:
               - selector: reading_charge_value
                 name: value
-                options:
-                  float: true
       - family: crest_factor
         context_namespace: redfish
         metrics:
@@ -3393,8 +3155,6 @@ groups:
             dimensions:
               - selector: reading_crest_factor_value
                 name: value
-                options:
-                  float: true
       - family: current
         context_namespace: redfish
         metrics:
@@ -3429,8 +3189,6 @@ groups:
             dimensions:
               - selector: reading_current_value
                 name: value
-                options:
-                  float: true
       - family: current
         context_namespace: system.hw.sensor.current
         metrics:
@@ -3468,8 +3226,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_current_average
                 name: average
-                options:
-                  float: true
           - id: system_hw_sensor_current_alarm
             title: Current Source Health State
             context: alarm
@@ -3486,8 +3242,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_current_input
                 name: input
-                options:
-                  float: true
       - family: energy
         context_namespace: redfish
         metrics:
@@ -3522,8 +3276,6 @@ groups:
             dimensions:
               - selector: reading_energy_value
                 name: value
-                options:
-                  float: true
       - family: energy
         context_namespace: system.hw.sensor.energy
         metrics:
@@ -3568,8 +3320,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_energy_input
                 name: input
-                options:
-                  float: true
       - family: frequency
         context_namespace: redfish
         metrics:
@@ -3604,8 +3354,6 @@ groups:
             dimensions:
               - selector: reading_frequency_value
                 name: value
-                options:
-                  float: true
       - family: harmonic_distortion
         context_namespace: redfish
         metrics:
@@ -3640,8 +3388,6 @@ groups:
             dimensions:
               - selector: reading_harmonic_distortion_value
                 name: value
-                options:
-                  float: true
       - family: phase_angle
         context_namespace: redfish
         metrics:
@@ -3676,8 +3422,6 @@ groups:
             dimensions:
               - selector: reading_phase_angle_value
                 name: value
-                options:
-                  float: true
       - family: power
         context_namespace: redfish
         metrics:
@@ -3712,8 +3456,6 @@ groups:
             dimensions:
               - selector: reading_power_value
                 name: value
-                options:
-                  float: true
       - family: power
         context_namespace: system.hw.sensor.power
         metrics:
@@ -3751,8 +3493,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_power_average
                 name: average
-                options:
-                  float: true
           - id: system_hw_sensor_power_alarm
             title: Power Source Health State
             context: alarm
@@ -3769,8 +3509,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_power_input
                 name: input
-                options:
-                  float: true
       - family: power_factor
         context_namespace: redfish
         metrics:
@@ -3805,8 +3543,6 @@ groups:
             dimensions:
               - selector: reading_power_factor_value
                 name: value
-                options:
-                  float: true
       - family: power_subsystem
         context_namespace: redfish
         metrics:
@@ -3849,12 +3585,8 @@ groups:
             dimensions:
               - selector: power_subsystem_capacity_allocated
                 name: allocated
-                options:
-                  float: true
               - selector: power_subsystem_capacity_requested
                 name: requested
-                options:
-                  float: true
           - id: redfish_power_subsystem_conditions
             title: Power Subsystem Conditions
             context: power_subsystem.conditions
@@ -4043,8 +3775,6 @@ groups:
             dimensions:
               - selector: reading_reactive_energy_value
                 name: value
-                options:
-                  float: true
       - family: reactive_power
         context_namespace: redfish
         metrics:
@@ -4079,8 +3809,6 @@ groups:
             dimensions:
               - selector: reading_reactive_power_value
                 name: value
-                options:
-                  float: true
       - family: stored_energy
         context_namespace: redfish
         metrics:
@@ -4115,8 +3843,6 @@ groups:
             dimensions:
               - selector: reading_stored_energy_value
                 name: value
-                options:
-                  float: true
       - family: voltage
         context_namespace: redfish
         metrics:
@@ -4151,8 +3877,6 @@ groups:
             dimensions:
               - selector: reading_voltage_value
                 name: value
-                options:
-                  float: true
       - family: voltage
         context_namespace: system.hw.sensor.voltage
         metrics:
@@ -4190,8 +3914,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_voltage_average
                 name: average
-                options:
-                  float: true
           - id: system_hw_sensor_voltage_alarm
             title: Voltage Source Health State
             context: alarm
@@ -4208,8 +3930,6 @@ groups:
             dimensions:
               - selector: system_hw_sensor_voltage_input
                 name: input
-                options:
-                  float: true
   - family: Storage
     groups:
       - family: drive
@@ -4313,24 +4033,14 @@ groups:
             dimensions:
               - selector: drive_error_rate_correctable_read
                 name: correctable_read
-                options:
-                  float: true
               - selector: drive_error_rate_correctable_write
                 name: correctable_write
-                options:
-                  float: true
               - selector: drive_error_rate_uncorrectable_read
                 name: uncorrectable_read
-                options:
-                  float: true
               - selector: drive_error_rate_uncorrectable_write
                 name: uncorrectable_write
-                options:
-                  float: true
               - selector: drive_error_rate_bad_blocks
                 name: bad_blocks
-                options:
-                  float: true
           - id: redfish_drive_failure_predicted
             title: Drive Failure Prediction
             context: drive.failure_predicted
@@ -4363,12 +4073,8 @@ groups:
             dimensions:
               - selector: drive_io_read
                 name: read
-                options:
-                  float: true
               - selector: drive_io_written
                 name: written
-                options:
-                  float: true
           - id: redfish_drive_link_speed
             title: Drive Link Speed
             context: drive.link_speed
@@ -4377,8 +4083,6 @@ groups:
             dimensions:
               - selector: drive_link_speed_negotiated
                 name: negotiated
-                options:
-                  float: true
           - id: redfish_drive_media_life
             title: Drive Media Life
             context: drive.media_life
@@ -4387,8 +4091,6 @@ groups:
             dimensions:
               - selector: drive_media_life
                 name: remaining
-                options:
-                  float: true
           - id: redfish_drive_nvme_busy_time
             title: Drive NVMe Busy Time
             context: drive.nvme.busy_time
@@ -4397,8 +4099,6 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_busy_time_busy
                 name: busy
-                options:
-                  float: true
           - id: redfish_drive_nvme_commands
             title: Drive NVMe Commands
             context: drive.nvme.commands
@@ -4407,12 +4107,8 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_commands_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_drive_nvme_commands_written
                 name: written
-                options:
-                  float: true
           - id: redfish_drive_nvme_critical_warnings
             title: Drive NVMe Critical Warnings
             context: drive.nvme.critical_warnings
@@ -4444,12 +4140,8 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_error_rate_media_integrity
                 name: media_integrity
-                options:
-                  float: true
               - selector: redfish_drive_nvme_error_rate_error_log_entries
                 name: error_log_entries
-                options:
-                  float: true
           - id: redfish_drive_nvme_event_rate
             title: Drive NVMe Event Rate
             context: drive.nvme.event_rate
@@ -4458,12 +4150,8 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_event_rate_unsafe_shutdowns
                 name: unsafe_shutdowns
-                options:
-                  float: true
               - selector: redfish_drive_nvme_event_rate_power_cycles
                 name: power_cycles
-                options:
-                  float: true
           - id: redfish_drive_nvme_io
             title: Drive NVMe I/O
             context: drive.nvme.io
@@ -4472,12 +4160,8 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_io_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_drive_nvme_io_written
                 name: written
-                options:
-                  float: true
           - id: redfish_drive_nvme_spare
             title: Drive NVMe Spare
             context: drive.nvme.spare
@@ -4486,8 +4170,6 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_spare_available
                 name: available
-                options:
-                  float: true
           - id: redfish_drive_nvme_temperature
             title: Drive NVMe Temperature
             context: drive.nvme.temperature
@@ -4496,8 +4178,6 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_temperature_composite
                 name: composite
-                options:
-                  float: true
           - id: redfish_drive_nvme_thermal_time
             title: Drive NVMe Thermal Time
             context: drive.nvme.thermal_time
@@ -4506,20 +4186,12 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_thermal_time_warning
                 name: warning
-                options:
-                  float: true
               - selector: redfish_drive_nvme_thermal_time_critical
                 name: critical
-                options:
-                  float: true
               - selector: redfish_drive_nvme_thermal_time_management_1
                 name: management_1
-                options:
-                  float: true
               - selector: redfish_drive_nvme_thermal_time_management_2
                 name: management_2
-                options:
-                  float: true
           - id: redfish_drive_nvme_thermal_transition_rate
             title: Drive NVMe Thermal Transition Rate
             context: drive.nvme.thermal_transition_rate
@@ -4528,12 +4200,8 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_thermal_transition_rate_management_1
                 name: management_1
-                options:
-                  float: true
               - selector: redfish_drive_nvme_thermal_transition_rate_management_2
                 name: management_2
-                options:
-                  float: true
           - id: redfish_drive_nvme_wear
             title: Drive NVMe Wear
             context: drive.nvme.wear
@@ -4542,8 +4210,6 @@ groups:
             dimensions:
               - selector: redfish_drive_nvme_wear_used
                 name: used
-                options:
-                  float: true
           - id: redfish_drive_queue_depth
             title: Drive Queue Depth
             context: drive.queue_depth
@@ -4647,12 +4313,8 @@ groups:
             dimensions:
               - selector: storage_io_read
                 name: read
-                options:
-                  float: true
               - selector: storage_io_written
                 name: written
-                options:
-                  float: true
           - id: redfish_storage_iops
             title: Storage IOPS
             context: storage.iops
@@ -4661,24 +4323,14 @@ groups:
             dimensions:
               - selector: storage_iops_read
                 name: read
-                options:
-                  float: true
               - selector: storage_iops_written
                 name: written
-                options:
-                  float: true
               - selector: redfish_storage_iops_read_hit
                 name: read_hit
-                options:
-                  float: true
               - selector: redfish_storage_iops_write_hit
                 name: write_hit
-                options:
-                  float: true
               - selector: redfish_storage_iops_non_io
                 name: non_io
-                options:
-                  float: true
           - id: redfish_storage_state
             title: Storage State
             context: storage.state
@@ -4695,8 +4347,6 @@ groups:
             dimensions:
               - selector: storage_state_change_rate
                 name: changes
-                options:
-                  float: true
       - family: storage_controller
         context_namespace: redfish
         metrics:
@@ -4819,20 +4469,12 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_error_rate_correctable_ecc
                 name: correctable_ecc
-                options:
-                  float: true
               - selector: redfish_storage_controller_error_rate_correctable_parity
                 name: correctable_parity
-                options:
-                  float: true
               - selector: redfish_storage_controller_error_rate_uncorrectable_ecc
                 name: uncorrectable_ecc
-                options:
-                  float: true
               - selector: redfish_storage_controller_error_rate_uncorrectable_parity
                 name: uncorrectable_parity
-                options:
-                  float: true
           - id: redfish_storage_controller_health
             title: Storage Controller Health
             context: storage_controller.health
@@ -4857,8 +4499,6 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_busy_time_busy
                 name: busy
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_commands
             title: Storage Controller NVMe Commands
             context: storage_controller.nvme.commands
@@ -4867,12 +4507,8 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_commands_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_commands_written
                 name: written
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_critical_warnings
             title: Storage Controller NVMe Critical Warnings
             context: storage_controller.nvme.critical_warnings
@@ -4904,12 +4540,8 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_error_rate_media_integrity
                 name: media_integrity
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_error_rate_error_log_entries
                 name: error_log_entries
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_event_rate
             title: Storage Controller NVMe Event Rate
             context: storage_controller.nvme.event_rate
@@ -4918,12 +4550,8 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_event_rate_unsafe_shutdowns
                 name: unsafe_shutdowns
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_event_rate_power_cycles
                 name: power_cycles
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_io
             title: Storage Controller NVMe I/O
             context: storage_controller.nvme.io
@@ -4932,12 +4560,8 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_io_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_io_written
                 name: written
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_spare
             title: Storage Controller NVMe Spare
             context: storage_controller.nvme.spare
@@ -4946,8 +4570,6 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_spare_available
                 name: available
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_temperature
             title: Storage Controller NVMe Temperature
             context: storage_controller.nvme.temperature
@@ -4956,8 +4578,6 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_temperature_composite
                 name: composite
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_thermal_time
             title: Storage Controller NVMe Thermal Time
             context: storage_controller.nvme.thermal_time
@@ -4966,20 +4586,12 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_thermal_time_warning
                 name: warning
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_thermal_time_critical
                 name: critical
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_thermal_time_management_1
                 name: management_1
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_thermal_time_management_2
                 name: management_2
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_thermal_transition_rate
             title: Storage Controller NVMe Thermal Transition Rate
             context: storage_controller.nvme.thermal_transition_rate
@@ -4988,12 +4600,8 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_thermal_transition_rate_management_1
                 name: management_1
-                options:
-                  float: true
               - selector: redfish_storage_controller_nvme_thermal_transition_rate_management_2
                 name: management_2
-                options:
-                  float: true
           - id: redfish_storage_controller_nvme_wear
             title: Storage Controller NVMe Wear
             context: storage_controller.nvme.wear
@@ -5002,8 +4610,6 @@ groups:
             dimensions:
               - selector: redfish_storage_controller_nvme_wear_used
                 name: used
-                options:
-                  float: true
           - id: redfish_storage_controller_pcie_lanes
             title: Storage Controller PCIe Lanes
             context: storage_controller.pcie_lanes
@@ -5028,8 +4634,6 @@ groups:
             dimensions:
               - selector: storage_controller_state_change_rate
                 name: changes
-                options:
-                  float: true
       - family: volume
         context_namespace: redfish
         metrics:
@@ -5108,28 +4712,16 @@ groups:
             dimensions:
               - selector: redfish_volume_error_rate_correctable_read
                 name: correctable_read
-                options:
-                  float: true
               - selector: redfish_volume_error_rate_correctable_write
                 name: correctable_write
-                options:
-                  float: true
               - selector: redfish_volume_error_rate_uncorrectable_read
                 name: uncorrectable_read
-                options:
-                  float: true
               - selector: redfish_volume_error_rate_uncorrectable_write
                 name: uncorrectable_write
-                options:
-                  float: true
               - selector: redfish_volume_error_rate_consistency_check
                 name: consistency_check
-                options:
-                  float: true
               - selector: redfish_volume_error_rate_rebuild
                 name: rebuild
-                options:
-                  float: true
           - id: redfish_volume_event_rate
             title: Volume Event Rate
             context: volume.event_rate
@@ -5138,12 +4730,8 @@ groups:
             dimensions:
               - selector: redfish_volume_event_rate_consistency_checks
                 name: consistency_checks
-                options:
-                  float: true
               - selector: redfish_volume_event_rate_state_changes
                 name: state_changes
-                options:
-                  float: true
           - id: redfish_volume_health
             title: Volume Health
             context: volume.health
@@ -5168,12 +4756,8 @@ groups:
             dimensions:
               - selector: redfish_volume_io_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_volume_io_written
                 name: written
-                options:
-                  float: true
           - id: redfish_volume_io_time
             title: Volume I/O Time
             context: volume.io_time
@@ -5182,16 +4766,10 @@ groups:
             dimensions:
               - selector: redfish_volume_io_time_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_volume_io_time_written
                 name: written
-                options:
-                  float: true
               - selector: redfish_volume_io_time_non_io
                 name: non_io
-                options:
-                  float: true
           - id: redfish_volume_iops
             title: Volume IOPS
             context: volume.iops
@@ -5200,24 +4778,14 @@ groups:
             dimensions:
               - selector: redfish_volume_iops_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_volume_iops_written
                 name: written
-                options:
-                  float: true
               - selector: redfish_volume_iops_read_hit
                 name: read_hit
-                options:
-                  float: true
               - selector: redfish_volume_iops_write_hit
                 name: write_hit
-                options:
-                  float: true
               - selector: redfish_volume_iops_non_io
                 name: non_io
-                options:
-                  float: true
           - id: redfish_volume_remaining_capacity
             title: Volume Remaining Capacity
             context: volume.remaining_capacity
@@ -5226,8 +4794,6 @@ groups:
             dimensions:
               - selector: volume_remaining_capacity
                 name: remaining
-                options:
-                  float: true
           - id: redfish_volume_space_savings
             title: Volume Space Savings
             context: volume.space_savings
@@ -5334,8 +4900,6 @@ groups:
             dimensions:
               - selector: ethernet_interface_link_speed
                 name: speed
-                options:
-                  float: true
           - id: redfish_ethernet_interface_link_status
             title: Ethernet Interface Link Status
             context: ethernet_interface.link_status
@@ -5423,8 +4987,6 @@ groups:
             dimensions:
               - selector: redfish_network_adapter_cpu_utilization
                 name: cpu
-                options:
-                  float: true
           - id: redfish_network_adapter_frames
             title: Network Adapter Frame Rate
             context: network_adapter.frames
@@ -5433,20 +4995,12 @@ groups:
             dimensions:
               - selector: redfish_network_adapter_frames_received_unicast
                 name: received_unicast
-                options:
-                  float: true
               - selector: redfish_network_adapter_frames_received_multicast
                 name: received_multicast
-                options:
-                  float: true
               - selector: redfish_network_adapter_frames_sent_unicast
                 name: sent_unicast
-                options:
-                  float: true
               - selector: redfish_network_adapter_frames_sent_multicast
                 name: sent_multicast
-                options:
-                  float: true
           - id: redfish_network_adapter_health
             title: Network Adapter Health
             context: network_adapter.health
@@ -5471,12 +5025,8 @@ groups:
             dimensions:
               - selector: redfish_network_adapter_host_bus_utilization_received
                 name: received
-                options:
-                  float: true
               - selector: redfish_network_adapter_host_bus_utilization_sent
                 name: sent
-                options:
-                  float: true
           - id: redfish_network_adapter_ncsi_frames
             title: Network Adapter NCSI Frame Rate
             context: network_adapter.ncsi_frames
@@ -5485,12 +5035,8 @@ groups:
             dimensions:
               - selector: redfish_network_adapter_ncsi_frames_received
                 name: received
-                options:
-                  float: true
               - selector: redfish_network_adapter_ncsi_frames_sent
                 name: sent
-                options:
-                  float: true
           - id: redfish_network_adapter_ncsi_traffic
             title: Network Adapter NCSI Traffic
             context: network_adapter.ncsi_traffic
@@ -5499,12 +5045,8 @@ groups:
             dimensions:
               - selector: redfish_network_adapter_ncsi_traffic_received
                 name: received
-                options:
-                  float: true
               - selector: redfish_network_adapter_ncsi_traffic_sent
                 name: sent
-                options:
-                  float: true
           - id: redfish_network_adapter_state
             title: Network Adapter State
             context: network_adapter.state
@@ -5521,12 +5063,8 @@ groups:
             dimensions:
               - selector: network_adapter_traffic_received
                 name: received
-                options:
-                  float: true
               - selector: network_adapter_traffic_sent
                 name: sent
-                options:
-                  float: true
       - family: network_device_function
         context_namespace: redfish
         metrics:
@@ -5599,28 +5137,16 @@ groups:
             dimensions:
               - selector: redfish_network_device_function_frames_received
                 name: received
-                options:
-                  float: true
               - selector: redfish_network_device_function_frames_sent
                 name: sent
-                options:
-                  float: true
               - selector: redfish_network_device_function_frames_received_unicast
                 name: received_unicast
-                options:
-                  float: true
               - selector: redfish_network_device_function_frames_sent_unicast
                 name: sent_unicast
-                options:
-                  float: true
               - selector: redfish_network_device_function_frames_received_multicast
                 name: received_multicast
-                options:
-                  float: true
               - selector: redfish_network_device_function_frames_sent_multicast
                 name: sent_multicast
-                options:
-                  float: true
           - id: redfish_network_device_function_health
             title: Network Device Function Health
             context: network_device_function.health
@@ -5645,12 +5171,8 @@ groups:
             dimensions:
               - selector: redfish_network_device_function_queue_depth_received
                 name: received
-                options:
-                  float: true
               - selector: redfish_network_device_function_queue_depth_sent
                 name: sent
-                options:
-                  float: true
           - id: redfish_network_device_function_queue_empty_state
             title: Network Device Function Empty Queue State
             context: network_device_function.queue_empty_state
@@ -5688,12 +5210,8 @@ groups:
             dimensions:
               - selector: network_device_function_traffic_received
                 name: received
-                options:
-                  float: true
               - selector: network_device_function_traffic_sent
                 name: sent
-                options:
-                  float: true
       - family: network_interface
         context_namespace: redfish
         metrics:
@@ -5845,8 +5363,6 @@ groups:
             dimensions:
               - selector: network_port_link_speed
                 name: speed
-                options:
-                  float: true
           - id: redfish_network_port_link_status
             title: Network Port Link Status
             context: network_port.link_status
@@ -6144,12 +5660,8 @@ groups:
             dimensions:
               - selector: port_error_rate_received
                 name: received
-                options:
-                  float: true
               - selector: port_error_rate_sent
                 name: sent
-                options:
-                  float: true
           - id: redfish_port_frames
             title: Port Frame Rate
             context: port.frames
@@ -6158,36 +5670,20 @@ groups:
             dimensions:
               - selector: redfish_port_frames_received
                 name: received
-                options:
-                  float: true
               - selector: redfish_port_frames_sent
                 name: sent
-                options:
-                  float: true
               - selector: redfish_port_frames_received_unicast
                 name: received_unicast
-                options:
-                  float: true
               - selector: redfish_port_frames_sent_unicast
                 name: sent_unicast
-                options:
-                  float: true
               - selector: redfish_port_frames_received_multicast
                 name: received_multicast
-                options:
-                  float: true
               - selector: redfish_port_frames_sent_multicast
                 name: sent_multicast
-                options:
-                  float: true
               - selector: redfish_port_frames_received_broadcast
                 name: received_broadcast
-                options:
-                  float: true
               - selector: redfish_port_frames_sent_broadcast
                 name: sent_broadcast
-                options:
-                  float: true
           - id: redfish_port_health
             title: Port Health
             context: port.health
@@ -6212,8 +5708,6 @@ groups:
             dimensions:
               - selector: port_link_speed_speed
                 name: speed
-                options:
-                  float: true
           - id: redfish_port_link_state
             title: Port Link State
             context: port.link_state
@@ -6246,48 +5740,26 @@ groups:
             dimensions:
               - selector: redfish_port_network_error_rate_received_discards
                 name: received_discards
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_sent_discards
                 name: sent_discards
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_received_fcs
                 name: received_fcs
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_received_false_carrier
                 name: received_false_carrier
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_received_alignment
                 name: received_alignment
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_received_oversize
                 name: received_oversize
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_received_undersize
                 name: received_undersize
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_sent_excessive_collisions
                 name: sent_excessive_collisions
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_sent_late_collisions
                 name: sent_late_collisions
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_sent_multiple_collisions
                 name: sent_multiple_collisions
-                options:
-                  float: true
               - selector: redfish_port_network_error_rate_sent_single_collisions
                 name: sent_single_collisions
-                options:
-                  float: true
           - id: redfish_port_pcie_drop_rate
             title: Port PCIe Drop Rate
             context: port.pcie_drop_rate
@@ -6296,16 +5768,10 @@ groups:
             dimensions:
               - selector: redfish_port_pcie_drop_rate_completion_credit
                 name: completion_credit
-                options:
-                  float: true
               - selector: redfish_port_pcie_drop_rate_non_posted_credit
                 name: non_posted_credit
-                options:
-                  float: true
               - selector: redfish_port_pcie_drop_rate_tag_unavailable
                 name: tag_unavailable
-                options:
-                  float: true
           - id: redfish_port_pcie_error_rate
             title: Port PCIe Error Rate
             context: port.pcie_error_rate
@@ -6314,52 +5780,28 @@ groups:
             dimensions:
               - selector: redfish_port_pcie_error_rate_bad_dllp
                 name: bad_dllp
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_bad_tlp
                 name: bad_tlp
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_correctable
                 name: correctable
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_fatal
                 name: fatal
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_flow_control_timeout
                 name: flow_control_timeout
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_l0_to_recovery
                 name: l0_to_recovery
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_nak_received
                 name: nak_received
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_nak_sent
                 name: nak_sent
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_non_fatal
                 name: non_fatal
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_replay
                 name: replay
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_replay_rollover
                 name: replay_rollover
-                options:
-                  float: true
               - selector: redfish_port_pcie_error_rate_unsupported_request
                 name: unsupported_request
-                options:
-                  float: true
           - id: redfish_port_pcie_tlp_rate
             title: Port PCIe TLP Rate
             context: port.pcie_tlp_rate
@@ -6368,16 +5810,10 @@ groups:
             dimensions:
               - selector: redfish_port_pcie_tlp_rate_completion
                 name: completion
-                options:
-                  float: true
               - selector: redfish_port_pcie_tlp_rate_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_port_pcie_tlp_rate_write
                 name: write
-                options:
-                  float: true
           - id: redfish_port_pcie_traffic
             title: Port PCIe Traffic
             context: port.pcie_traffic
@@ -6386,16 +5822,10 @@ groups:
             dimensions:
               - selector: redfish_port_pcie_traffic_completion
                 name: completion
-                options:
-                  float: true
               - selector: redfish_port_pcie_traffic_read
                 name: read
-                options:
-                  float: true
               - selector: redfish_port_pcie_traffic_write
                 name: write
-                options:
-                  float: true
           - id: redfish_port_rdma_error_rate
             title: Port RDMA Error Rate
             context: port.rdma_error_rate
@@ -6404,12 +5834,8 @@ groups:
             dimensions:
               - selector: redfish_port_rdma_error_rate_protection
                 name: protection
-                options:
-                  float: true
               - selector: redfish_port_rdma_error_rate_protocol
                 name: protocol
-                options:
-                  float: true
           - id: redfish_port_rdma_traffic
             title: Port RDMA Traffic
             context: port.rdma_traffic
@@ -6418,12 +5844,8 @@ groups:
             dimensions:
               - selector: redfish_port_rdma_traffic_received
                 name: received
-                options:
-                  float: true
               - selector: redfish_port_rdma_traffic_sent
                 name: sent
-                options:
-                  float: true
           - id: redfish_port_signal_detected
             title: Port Signal Detected
             context: port.signal_detected
@@ -6448,12 +5870,8 @@ groups:
             dimensions:
               - selector: port_traffic_received
                 name: received
-                options:
-                  float: true
               - selector: port_traffic_sent
                 name: sent
-                options:
-                  float: true
   - family: Management
     groups:
       - family: assembly
@@ -6640,8 +6058,6 @@ groups:
             dimensions:
               - selector: manager_clock_offset
                 name: offset
-                options:
-                  float: true
           - id: redfish_manager_conditions
             title: Manager Conditions
             context: manager.conditions
@@ -6798,8 +6214,6 @@ groups:
             dimensions:
               - selector: collection_duration_seconds
                 name: duration
-                options:
-                  float: true
           - id: redfish_collection_failures
             title: Redfish Collection Failures
             context: collection.failures
