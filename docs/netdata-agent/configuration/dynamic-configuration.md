@@ -183,6 +183,10 @@ Learn more about this access method: [From Space Settings](#quick-access-methods
 
 When you submit an alert or collector change from the UI, it is applied on the node **immediately** — there is no scheduled synchronization to wait for. Your edit is saved as a dynamic configuration that **overrides** the node's built-in alert definitions. Those stock files stay untouched and are simply superseded by your UI edit.
 
+These UI-managed configurations are persisted by the Agent in the Netdata library config directory, typically `/var/lib/netdata/config/`, as `.dyncfg` files. They are written and managed by the Agent and are not intended for manual editing.
+
+They are **not** stored in `/var/lib/netdata/cloud.d/`. That directory holds only the Agent-Cloud Link (ACLK) claiming credentials and keys (`cloud.conf`, `private.pem`, `public.pem`, `claimed_id`) used to authenticate the node to Netdata Cloud — not collector or alert configurations. So if you configured a collector or alert through the UI and cannot find it in `cloud.d/`, that is expected: look in `/var/lib/netdata/config/` instead.
+
 :::
 
 ## Collectors
