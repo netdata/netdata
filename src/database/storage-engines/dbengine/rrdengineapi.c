@@ -1174,6 +1174,11 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     size_t tier = tc->tier;
     unsigned disk_space_mb = tc->disk_space_mb;
 
+    // the static tiers belong to the engine that claimed them at dbengine_create(); a tier opened against any other
+    // engine would charge its budget and its lifecycle to one engine and its exit to another
+    if(dbengine_multidb_tiers[tier]->engine != engine)
+        fatal("DBENGINE: dbengine_tier_init() for tier %zu called with an engine that does not own the tier", tier);
+
     if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.active, __ATOMIC_ACQUIRE)) {
         netdata_log_error("DBENGINE: tier %zu is already up, the tier cannot be initialized again", tier);
         return UV_EALREADY;
