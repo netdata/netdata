@@ -105,7 +105,6 @@ static ALWAYS_INLINE void time_and_count_add(struct dbengine_time_and_count *tc,
 /* Forward declarations */
 struct dbengine_tier;
 struct dbengine_cmd;
-struct dbengine_engine;
 
 #define MAX_PAGES_PER_EXTENT (109) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 

@@ -13,8 +13,8 @@ struct dbengine_tier;
 typedef struct dbengine_tier DBENGINE_TIER;
 
 // The engine: what the tiers share (the event loop, the caches, the metrics registry, the configuration, the
-// counters). Opaque outside the engine; made by dbengine_create(), stopped by dbengine_shutdown(), freed by
-// dbengine_destroy().
+// counters). Opaque outside the engine; made by dbengine_create(), stopped by dbengine_shutdown(), and released by
+// dbengine_destroy() when no reference on a cache page or a registry metric remains (dbengine-api.h).
 struct dbengine_engine;
 typedef struct dbengine_engine DBENGINE_ENGINE;
 

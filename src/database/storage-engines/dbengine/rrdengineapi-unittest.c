@@ -180,7 +180,7 @@ int dbengine_null_engine_unittest(void) {
 static int engine_lifecycle_generation(const struct dbengine_config *cfg, const char *dir, const char *what) {
     int errors = 0;
 
-    if(mkdir(dir, 0775) != 0 && errno != EEXIST) {
+    if(mkdir(dir, 0700) != 0 && errno != EEXIST) {
         fprintf(stderr, " >>> DBENGINE: %s: cannot create the scratch directory '%s'\n", what, dir);
         return 1;
     }

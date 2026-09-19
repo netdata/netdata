@@ -865,6 +865,30 @@ static void mrg_test_engine_detach(struct dbengine_tier *ctx) {
     dbengine_engine_free(engine);
 }
 
+// the open-cache stand-in the jv2 tests write through: one partition, an extent_io_data per page, no engine
+static PGC *jv2_test_cache_create(const struct dbengine_config *cfg, const char *name) {
+    struct pgc_config cache_cfg = {
+        .name = name,
+        .clean_size_bytes = 32 * 1024 * 1024,
+        .free_clean_cb = jv2_stale_metric_free_clean_cb,
+        .max_dirty_pages_per_flush = 64,
+        .save_init_cb = NULL,
+        .save_dirty_cb = jv2_stale_metric_save_dirty_cb,
+        .max_pages_per_inline_eviction = 10,
+        .max_inline_evictors = 10,
+        .max_skip_pages_per_inline_eviction = 1000,
+        .max_flushes_inline = 10,
+        .options = PGC_OPTIONS_DEFAULT,
+        .partitions = 1,
+        .additional_bytes_per_page = sizeof(struct extent_io_data),
+        .statistics = cfg->cache_statistics,
+        .use_all_ram = cfg->use_all_ram_for_caches,
+        .out_of_memory_protection_bytes = cfg->out_of_memory_protection_bytes,
+        .cpus = cfg->cpus,
+    };
+    return pgc_create(&cache_cfg);
+}
+
 static int mrg_jv2_stale_metric_not_dereferenced_unittest(const struct dbengine_config *cfg) {
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\nTesting jv2 does not dereference a stale METRIC... SKIPPED (FSANITIZE_ADDRESS)\n");
@@ -884,25 +908,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(const struct dbengine_
     // pgc_open_cache_to_journal_v2() resolves metrics through the tier's engine
     mrg_test_engine_attach(&test_ctx_0, cfg, mrg);
 
-    PGC *cache = pgc_create(&(struct pgc_config){
-        .name = "jv2-stale-metric-test",
-        .clean_size_bytes = 32 * 1024 * 1024,
-        .free_clean_cb = jv2_stale_metric_free_clean_cb,
-        .max_dirty_pages_per_flush = 64,
-        .save_init_cb = NULL,
-        .save_dirty_cb = jv2_stale_metric_save_dirty_cb,
-        .max_pages_per_inline_eviction = 10,
-        .max_inline_evictors = 10,
-        .max_skip_pages_per_inline_eviction = 1000,
-        .max_flushes_inline = 10,
-        .options = PGC_OPTIONS_DEFAULT,
-        .partitions = 1,
-        .additional_bytes_per_page = sizeof(struct extent_io_data),
-        .statistics = cfg->cache_statistics,
-        .use_all_ram = cfg->use_all_ram_for_caches,
-        .out_of_memory_protection_bytes = cfg->out_of_memory_protection_bytes,
-        .cpus = cfg->cpus,
-    });
+    PGC *cache = jv2_test_cache_create(cfg, "jv2-stale-metric-test");
 
     // 1. a real metric, with no retention so it is deletable on release
     nd_uuid_t victim;
@@ -1382,25 +1388,7 @@ static int mrg_jv2_same_uuid_grouped_once_check(
     MRG *mrg = mrg_create_for_unittest();
     mrg_test_engine_attach(&test_ctx_0, cfg, mrg);
 
-    PGC *cache = pgc_create(&(struct pgc_config){
-        .name = "jv2-same-uuid-test",
-        .clean_size_bytes = 32 * 1024 * 1024,
-        .free_clean_cb = jv2_stale_metric_free_clean_cb,
-        .max_dirty_pages_per_flush = 64,
-        .save_init_cb = NULL,
-        .save_dirty_cb = jv2_stale_metric_save_dirty_cb,
-        .max_pages_per_inline_eviction = 10,
-        .max_inline_evictors = 10,
-        .max_skip_pages_per_inline_eviction = 1000,
-        .max_flushes_inline = 10,
-        .options = PGC_OPTIONS_DEFAULT,
-        .partitions = 1,
-        .additional_bytes_per_page = sizeof(struct extent_io_data),
-        .statistics = cfg->cache_statistics,
-        .use_all_ram = cfg->use_all_ram_for_caches,
-        .out_of_memory_protection_bytes = cfg->out_of_memory_protection_bytes,
-        .cpus = cfg->cpus,
-    });
+    PGC *cache = jv2_test_cache_create(cfg, "jv2-same-uuid-test");
 
     // declared before the goto below, so jumping to cleanup cannot skip an
     // initialization and leave the teardown reading indeterminate values
@@ -1721,25 +1709,7 @@ static int mrg_jv2_real_writer_unittest(const struct dbengine_config *cfg) {
     MRG *mrg = mrg_create_for_unittest();
     mrg_test_engine_attach(&ctx, cfg, mrg);
 
-    PGC *cache = pgc_create(&(struct pgc_config){
-        .name = "jv2-real-writer-test",
-        .clean_size_bytes = 32 * 1024 * 1024,
-        .free_clean_cb = jv2_stale_metric_free_clean_cb,
-        .max_dirty_pages_per_flush = 64,
-        .save_init_cb = NULL,
-        .save_dirty_cb = jv2_stale_metric_save_dirty_cb,
-        .max_pages_per_inline_eviction = 10,
-        .max_inline_evictors = 10,
-        .max_skip_pages_per_inline_eviction = 1000,
-        .max_flushes_inline = 10,
-        .options = PGC_OPTIONS_DEFAULT,
-        .partitions = 1,
-        .additional_bytes_per_page = sizeof(struct extent_io_data),
-        .statistics = cfg->cache_statistics,
-        .use_all_ram = cfg->use_all_ram_for_caches,
-        .out_of_memory_protection_bytes = cfg->out_of_memory_protection_bytes,
-        .cpus = cfg->cpus,
-    });
+    PGC *cache = jv2_test_cache_create(cfg, "jv2-real-writer-test");
 
     // everything the cleanup path can touch, and everything the gotos below jump
     // over, is declared and initialized up front
