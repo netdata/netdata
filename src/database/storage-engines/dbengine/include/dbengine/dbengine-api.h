@@ -24,11 +24,20 @@ extern "C" {
 //
 // A tier (struct dbengine_tier) is one tier of one database: a directory of datafiles and their journals. Outside
 // the engine it is an opaque pointer: the storage vtable's STORAGE_INSTANCE is this very pointer, cast by the
-// engine on either side, and the daemon only passes tiers around and indexes dbengine_multidb_tiers[], the static
-// tiers of the daemon's multi-host database, which belong to the one engine that is up.
+// engine on either side, and the daemon only passes tiers around and reaches them by number through
+// dbengine_tier(). The tiers are the static tiers of the daemon's multi-host database, which belong to the one
+// engine that is up.
 struct dbengine_tier;
 
+// the daemon's preload callback (dbengine-config.h) still indexes the static tiers by number, from inside
+// dbengine_create() where the daemon holds no engine yet; the array leaves this header with that callback
 extern DBENGINE_TIER *dbengine_multidb_tiers[RRD_STORAGE_TIERS];
+
+// the engine's tier by number, 0 to RRD_STORAGE_TIERS - 1: the tier that dbengine_tier_init() with that number
+// brings up, whether or not it has come up (the tier verbs below answer for one that never did, and take NULL as
+// a tier with nothing in it). NULL for a NULL engine or a number the engine does not have. A destroyed engine has
+// no tiers: like the engine, the pointer is not valid after dbengine_destroy()
+DBENGINE_TIER *dbengine_tier(DBENGINE_ENGINE *engine, size_t tier);
 
 // true when dbfiles_path holds at least one datafile named the way this engine names and scans
 // them. Reads the directory only, touches no engine state, so it can be called before any tier
@@ -62,7 +71,7 @@ time_t dbengine_latest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
 time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
-// bring the static tier dbengine_multidb_tiers[tc->tier] up on a running engine, once per engine: after
+// bring the engine's tier tc->tier (the one dbengine_tier() returns for that number) up on a running engine, once per engine: after
 // dbengine_create() (fatal without the engine), before dbengine_shutdown() (UV_EIO after it), not while the tier is
 // up (UV_EALREADY) and not after it came up and exited (UV_EIO: only dbengine_destroy() finalizes its datafiles and
 // resets the slot, for the next engine). An invalid tc is fatal before any of those checks (a programming error, whatever the state).

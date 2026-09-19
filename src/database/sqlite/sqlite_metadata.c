@@ -1325,7 +1325,7 @@ static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3
         bool no_retention = true;
         for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
             time_t first_time_t = 0, last_time_t = 0;
-            if (dbengine_metric_retention_by_uuid((void *) dbengine_multidb_tiers[tier], dim_uuid, &first_time_t, &last_time_t)) {
+            if (dbengine_metric_retention_by_uuid((void *) dbengine_tier(netdata_conf_dbengine_engine, tier), dim_uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0) {
                     no_retention = false;
                     break;

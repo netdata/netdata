@@ -160,6 +160,39 @@ int dbengine_null_engine_unittest(void) {
         }
     }
 
+    // no engine has a tier, and the tier verbs the daemon reaches through dbengine_tier() take that NULL as a
+    // tier with nothing in it (the daemon's shutdown asks every tier slot whether it is up, engine or no engine)
+    if(dbengine_tier(NULL, 0)) {
+        fprintf(stderr, " >>> DBENGINE: no engine has a tier 0\n");
+        errors++;
+    }
+    if(dbengine_tier_is_active(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no tier is active\n");
+        errors++;
+    }
+    if(dbengine_max_retention_s(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no tier has a retention limit\n");
+        errors++;
+    }
+    if(dbengine_collectors_running(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no tier has collectors running\n");
+        errors++;
+    }
+    if(dbengine_get_used_disk_space(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no tier uses disk space\n");
+        errors++;
+    }
+    if(dbengine_get_directory_free_bytes_space(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no tier has free space in its directory\n");
+        errors++;
+    }
+    struct dbengine_size_stats size_stats = dbengine_get_size_stats(NULL), zero_size_stats;
+    memset(&zero_size_stats, 0, sizeof(zero_size_stats));
+    if(memcmp(&size_stats, &zero_size_stats, sizeof(size_stats))) {
+        fprintf(stderr, " >>> DBENGINE: the size stats of no tier are not zeroed\n");
+        errors++;
+    }
+
     struct dbengine_work_request request = { .fn = NULL, .data = NULL };
     if(dbengine_work_available(NULL) || dbengine_enq_work(NULL, &request)) {
         fprintf(stderr, " >>> DBENGINE: no engine takes work\n");
@@ -196,6 +229,11 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
         errors++;
     }
 
+    if(dbengine_tier(engine, RRD_STORAGE_TIERS)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine has a tier %d\n", what, RRD_STORAGE_TIERS);
+        errors++;
+    }
+
     struct dbengine_tier_config tc = {
         .tier = 0,
         .dbfiles_path = dir,
@@ -210,7 +248,7 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
         errors++;
     }
     else {
-        DBENGINE_TIER *tier = dbengine_multidb_tiers[0];
+        DBENGINE_TIER *tier = dbengine_tier(engine, 0);
         dbengine_readiness_wait(tier);
 
         errors += dbengine_zero_page_cadence_unittest(engine, (STORAGE_INSTANCE *)tier);

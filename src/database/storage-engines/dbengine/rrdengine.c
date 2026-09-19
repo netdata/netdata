@@ -2438,6 +2438,9 @@ uint64_t dbengine_get_used_disk_space_unsafe(struct dbengine_tier *ctx)
 
 uint64_t dbengine_get_used_disk_space(struct dbengine_tier *ctx)
 {
+    if(!ctx)
+        return 0;
+
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     uint64_t estimated_disk_space = dbengine_get_used_disk_space_unsafe(ctx);
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -2715,6 +2718,9 @@ static inline void worker_dispatch_query_prep(struct dbengine_engine *engine, st
 
 uint64_t dbengine_get_directory_free_bytes_space(struct dbengine_tier *ctx)
 {
+    if(!ctx)
+        return 0;
+
     uint64_t free_bytes = 0;
     OS_SYSTEM_DISK_SPACE space = os_disk_space(ctx->config.dbfiles_path);
     free_bytes = OS_SYSTEM_DISK_SPACE_OK(space) ? space.free_bytes : 0;

@@ -1344,15 +1344,34 @@ bool dbengine_get_metrics_registry_stats(struct dbengine_engine *engine, struct 
     return true;
 }
 
+struct dbengine_tier *dbengine_tier(struct dbengine_engine *engine, size_t tier) {
+    if(!engine || tier >= RRD_STORAGE_TIERS)
+        return NULL;
+
+    return dbengine_multidb_tiers[tier];
+}
+
+// the tier verbs the embedder reaches through dbengine_tier() take NULL as a tier with nothing in it: the embedder
+// that has no engine (and so no tier) asks them anyway
+
 bool dbengine_tier_is_active(struct dbengine_tier *ctx) {
+    if(!ctx)
+        return false;
+
     return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
 }
 
 time_t dbengine_max_retention_s(struct dbengine_tier *ctx) {
+    if(!ctx)
+        return 0;
+
     return ctx->config.max_retention_s;
 }
 
 size_t dbengine_collectors_running(struct dbengine_tier *ctx) {
+    if(!ctx)
+        return 0;
+
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
 
@@ -1545,6 +1564,8 @@ release:
 
 struct dbengine_size_stats dbengine_get_size_stats(struct dbengine_tier *ctx) {
     struct dbengine_size_stats stats = { 0 };
+    if(!ctx)
+        return stats;
 
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct dbengine_datafile *df = NULL;
