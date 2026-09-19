@@ -113,7 +113,7 @@ netdata.strings_ops,,"inserts, deletes, searches, duplications, releases",ops/s,
 netdata.tcp_connected,,connected,sockets,statsd server TCP connected sockets,line,,statsd.plugin,stats
 netdata.tcp_connects,,"connects, disconnects",events,statsd server TCP connects and disconnects,line,,statsd.plugin,stats
 netdata.training_results,,"ok, invalid-queries, not-enough-values, null-acquired-dimensions, chart-under-replication",events,Training results,line,,ml.plugin,training
-netdata.training_status,,"untrained, pending-without-model, trained, pending-with-model, silenced",dimensions,Training status of dimensions,line,,ml.plugin,training
+netdata.training_status,,"untrained, pending-without-model, trained, pending-with-model, silenced, with-model",dimensions,Training status of dimensions,line,,ml.plugin,training
 netdata.training_time_stats,,"allotted, consumed, remaining",milliseconds,Training time stats,line,,ml.plugin,training
 netdata.uptime,,uptime,seconds,Netdata uptime,line,,netdata,stats
 netdata.workers.aclkquery.cpu,,"min, max, average",%,Netdata Workers CPU Utilization,area,,netdata,stats

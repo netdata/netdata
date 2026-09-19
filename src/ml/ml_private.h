@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "ml_config.h"
+#include "ml_host.h"   // ml_machine_learning_stats_t, used by ml_chart_stats_add() below
 
 void ml_train_main(void *arg);
 void ml_detect_main(void *arg);
