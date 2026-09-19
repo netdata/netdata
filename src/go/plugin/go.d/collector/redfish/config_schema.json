@@ -29,7 +29,7 @@
       },
       "url": {
         "title": "ServiceRoot URL",
-        "description": "URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS.",
+        "description": "URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS. Use HTTPS when the job sends credentials; over HTTP they travel in clear text, and the job logs a warning.",
         "type": "string",
         "format": "uri"
       },

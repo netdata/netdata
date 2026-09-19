@@ -42,7 +42,7 @@ modules:
           | Storage | Storage subsystems, controllers, drives, volumes. |
           | Network | Network adapters, ports, interfaces, device functions. |
           | PCIe | PCIe devices and functions. |
-          | Sensors | Individual temperature, voltage, current, and fan sensors. |
+          | Sensors | Individual sensor readings: thermal, electrical, rotational, and quantities derived from them. |
           | Firmware | Firmware and software inventory, update service, assemblies. |
 
           Every system the endpoint exposes appears on this job's virtual node, or on the collecting Agent when the job
@@ -127,7 +127,7 @@ modules:
               required: false
             - name: url
               group: Target
-              description: URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS.
+              description: URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS. Use HTTPS when the job sends credentials; over HTTP they travel in clear text, and the job logs a warning.
               default_value: ""
               required: true
             - name: vnode
@@ -216,7 +216,7 @@ modules:
     troubleshooting:
       errors:
         list:
-          - error: "`config validation: 'username' and 'password' are required for auth_method`"
+          - error: "`config validation: 'username' and 'password' are required for auth_method \"<method>\"`"
             when: |
               At job start, with `auth_method` set to `auto`, `session`, or `basic`.
             cause: |
@@ -236,16 +236,20 @@ modules:
               Point `url` at the service origin or its ServiceRoot path — `https://<bmc-address>` or
               `https://<bmc-address>/redfish/v1/`. Confirm with
               `curl -k https://<bmc-address>/redfish/v1/`, which must return JSON containing `RedfishVersion`.
-          - error: "`tls: failed to verify certificate: x509: certificate signed by unknown authority`"
+          - error: "`Redfish endpoint check: Redfish TLS certificate verification failed`"
             when: |
-              With an `https://` URL and a BMC presenting a self-signed or internally issued certificate.
+              With an `https://` URL and a BMC presenting a self-signed or internally issued certificate, or a
+              certificate issued for a different name than the one in `url`. During collection the same message
+              appears without the `Redfish endpoint check:` prefix.
             cause: |
-              The Agent host does not trust the certificate authority that signed the BMC's certificate. Most BMCs ship
-              with a self-signed certificate.
+              The Agent host does not trust the certificate authority that signed the BMC's certificate, or the
+              certificate does not cover the address in `url`. Most BMCs ship with a self-signed certificate. The
+              collector logs this summary rather than the underlying TLS error text.
             fix: |
               Point `tls_ca` at the CA bundle that signed the certificate, or install that CA in the Agent host's trust
-              store. `tls_skip_verify: true` will also connect, but it accepts any certificate and leaves the session
-              open to interception — use it to confirm the diagnosis, not as the permanent setting.
+              store; for a name mismatch, use the address the certificate was issued for. `tls_skip_verify: true` will
+              also connect, but it accepts any certificate and leaves the session open to interception — use it to
+              confirm the diagnosis, not as the permanent setting.
           - error: "The job starts and passes its check, then collects nothing"
             when: |
               With `auth_method` set to `auto` or `session`.
@@ -734,19 +738,21 @@ modules:
     functions:
       description: |
         Inspect one configured endpoint's latest sensor readings, hardware health, and BMC-retained events, selected with
-        the Instance parameter. Sensors and Hardware show the most recent completed collection and do not query the BMC
-        when you open them, so they are as fresh as the job's `update_every` (60 seconds by default) and the Observed
-        column says when each row was read; Logs queries the BMC on demand.
+        the Instance parameter. Sensors and Hardware show the latest completed collection and do not query the BMC when
+        you open them, so a row can be up to one `update_every` (60 seconds by default) plus that collection's duration
+        old; the Observed column is the start time of that collection and is the same for every row. Logs queries the
+        BMC on demand.
       list:
         - id: sensors
           name: Redfish Sensors
           description: |
             Inspect current sensor readings beside the health the BMC reports and an independently derived threshold
-            health, so a crossed limit can be told apart from a fault the BMC has declared. Average, peak, and threshold
-            companion values share their sensor's row instead of appearing separately, and power derived from energy is
-            labeled as such. Derived health reads OK when none of that sensor's own upper and lower limits is active
-            (the BMC may still report other faults), Not applicable when the sensor publishes no usable limits, and
-            Unavailable until enough readings have arrived to decide.
+            health, so a crossed limit can be told apart from a fault the BMC has declared. The table holds one row per
+            sensor with its current reading; the average, peak, and threshold values a sensor also publishes are not
+            rows here (they appear on the charts), and power derived from energy is labeled as such. Derived health
+            reads OK when none of that sensor's own upper and lower limits is active (the BMC may still report other
+            faults), Not applicable when the sensor publishes no limits, and Unavailable when the published limits
+            cannot be used, the reading itself is unavailable, or too few readings have arrived to decide.
           parameters:
             - id: __job
               name: Instance
