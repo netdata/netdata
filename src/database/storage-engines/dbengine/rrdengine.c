@@ -2817,15 +2817,14 @@ void dbengine_event_loop(void* arg) {
 
                 case DBENGINE_OPCODE_QUERY:;
 #if defined(OS_WINDOWS)
-                    static int max_timeout_count = 0;
                     if (uv_hrtime() - engine->last_async_callback > 1000UL * NSEC_PER_MSEC) {
-                        if (++max_timeout_count > 30) {
+                        if (++engine->async_timeout_count > 30) {
                             netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
                             __atomic_store_n(&engine->async_ready, false, __ATOMIC_RELEASE);
                             uv_close((uv_handle_t *)&engine->async, async_closed_cb);
-                            max_timeout_count = 0;
+                            engine->async_timeout_count = 0;
                         } else
-                            netdata_log_error("DBENGINE: async callback timeout detected count = %d", max_timeout_count);
+                            netdata_log_error("DBENGINE: async callback timeout detected count = %d", engine->async_timeout_count);
                     }
 #endif
                     worker_dispatch_query_prep(engine, cmd, false);

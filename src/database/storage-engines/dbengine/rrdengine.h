@@ -529,6 +529,8 @@ struct dbengine_engine {
 #if defined(OS_WINDOWS)
     bool async_ready;
     uint64_t last_async_callback;
+    int async_timeout_count;            // consecutive query rounds without an async callback; the loop re-creates
+                                        // the async handle when it passes its limit
 #endif
     uv_timer_t timer;
     uv_timer_t retention_timer;
