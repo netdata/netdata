@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -138,47 +139,13 @@ func TestExporterCSVSemantics(t *testing.T) {
 	}
 	assert.Equal(t, 123, enabled, "preserve the stock field selection")
 }
-func TestStockAlertContracts(t *testing.T) {
-	rows, metadataAlerts := readMetadata(t)
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "dcgm.conf"))
+func TestStockAlertsMatchMetadata(t *testing.T) {
+	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
-	var rules []map[string]string
-	for _, line := range strings.Split(string(data), "\n") {
-		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
-		if !ok {
-			continue
-		}
-		if key == "template" {
-			rules = append(rules, make(map[string]string))
-		}
-		if len(rules) > 0 {
-			rules[len(rules)-1][key] = strings.TrimSpace(value)
-		}
-	}
-	require.Len(t, rules, 5)
-	for _, rule := range rules {
-		name := rule["template"]
-		row, ok := rows[rule["on"]]
-		require.True(t, ok, name)
-		assert.Equal(t, row.Unit, rule["units"], name)
-		assert.Equal(t, rule["on"], metadataAlerts[name]["metric"], name)
-		assert.Equal(t, rule["info"], metadataAlerts[name]["info"], name)
-		assert.Equal(t, "$this > 0", rule["warn"], name)
-		assert.Equal(t, "30s", rule["every"], name)
-		assert.Equal(t, "sysadmin", rule["to"], name)
-		lookup := strings.Fields(rule["lookup"])
-		require.GreaterOrEqual(t, len(lookup), 6)
-		var dims []string
-		for _, d := range row.Dimensions {
-			dims = append(dims, d.Name)
-		}
-		assert.Contains(t, dims, lookup[len(lookup)-1], name)
-		if strings.Contains(rule["lookup"], "-5m") {
-			assert.Equal(t, "average", lookup[0], name)
-		} else {
-			assert.Equal(t, "max", lookup[0], name)
-		}
-	}
+	health, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "dcgm.conf"))
+	require.NoError(t, err)
+	collecttest.AssertMetadataAlertsMatchHealthConfig(t, metadata, health)
+	collecttest.AssertHealthAlertsMatchMetadata(t, health, metadata)
 }
 
 func TestNVSwitchLinkMetadata(t *testing.T) {
