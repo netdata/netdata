@@ -116,19 +116,25 @@ func TestChartDimensionNames(t *testing.T) {
 func TestCheckMetadataDocumentsChartTemplate(t *testing.T) {
 	tests := map[string]struct {
 		metadata string
+		template string
 		wantErr  []string
 	}{
-		"aligned":            {metadata: artifactsMetadata},
-		"undocumented chart": {metadata: removeLine(artifactsMetadata, "- name: app.latency", 5), wantErr: []string{"app.latency: in the chart template but not documented"}},
-		"unknown metric":     {metadata: artifactsMetadata + "            - name: app.ghost\n              description: Ghost\n", wantErr: []string{"app.ghost: documented but not in the chart template"}},
-		"title drift":        {metadata: replaceOnce(artifactsMetadata, "description: Requests", "description: Request rate"), wantErr: []string{`app.requests: description "Request rate", chart title "Requests"`}},
-		"unit drift":         {metadata: replaceOnce(artifactsMetadata, "unit: seconds", "unit: ms"), wantErr: []string{`app.latency: unit "ms", chart units "seconds"`}},
-		"type drift":         {metadata: replaceOnce(artifactsMetadata, "chart_type: stacked", "chart_type: line"), wantErr: []string{`app.worker.state: chart_type "line", chart type "stacked"`}},
-		"dimension drift":    {metadata: replaceOnce(artifactsMetadata, "- name: busy", "- name: running"), wantErr: []string{"app.worker.state: dimensions [idle running], chart renders [idle busy]"}},
+		"aligned":               {metadata: artifactsMetadata},
+		"undocumented chart":    {metadata: removeBlock(t, artifactsMetadata, "- name: app.latency"), wantErr: []string{"app.latency: in the chart template but not documented"}},
+		"unresolvable stateset": {template: replaceOnce(t, artifactsTemplate, "metrics: [requests_total, worker_state, latency_bucket]", "metrics: [requests_total, worker_state, latency_bucket, pool_state]") + "      - title: Pool State\n        context: pool\n        units: state\n        dimensions:\n          - selector: pool_state\n", metadata: artifactsMetadata + "            - name: app.pool\n              description: Pool State\n              unit: state\n              chart_type: line\n              dimensions:\n                - name: active\n", wantErr: []string{`app.pool: selector "pool_state" has no dimension name and metric "pool_state" has no declared states`}},
+		"unknown metric":        {metadata: artifactsMetadata + "            - name: app.ghost\n              description: Ghost\n", wantErr: []string{"app.ghost: documented but not in the chart template"}},
+		"title drift":           {metadata: replaceOnce(t, artifactsMetadata, "description: Requests", "description: Request rate"), wantErr: []string{`app.requests: description "Request rate", chart title "Requests"`}},
+		"unit drift":            {metadata: replaceOnce(t, artifactsMetadata, "unit: seconds", "unit: ms"), wantErr: []string{`app.latency: unit "ms", chart units "seconds"`}},
+		"type drift":            {metadata: replaceOnce(t, artifactsMetadata, "chart_type: stacked", "chart_type: line"), wantErr: []string{`app.worker.state: chart_type "line", chart type "stacked"`}},
+		"dimension drift":       {metadata: replaceOnce(t, artifactsMetadata, "- name: busy", "- name: running"), wantErr: []string{"app.worker.state: dimensions [idle running], chart renders [idle busy]"}},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := CheckMetadataDocumentsChartTemplate([]byte(test.metadata), artifactsTemplate, artifactsStates)
+			template := artifactsTemplate
+			if test.template != "" {
+				template = test.template
+			}
+			err := CheckMetadataDocumentsChartTemplate([]byte(test.metadata), template, artifactsStates)
 			if len(test.wantErr) == 0 {
 				require.NoError(t, err)
 				return
@@ -154,11 +160,13 @@ func TestCheckMetadataAlertsMatchHealthConfig(t *testing.T) {
 		health   string
 		wantErr  string
 	}{
-		"aligned":            {metadata: artifactsMetadata, health: artifactsHealth},
-		"undocumented alert": {metadata: artifactsMetadata, health: artifactsHealth + "\n template: app_other\n       on: app.latency\n     info: other\n", wantErr: "app_other: in the health configuration but not documented"},
-		"unknown alert":      {metadata: replaceOnce(artifactsMetadata, "name: app_requests_failed", "name: app_requests_dropped"), health: artifactsHealth, wantErr: "app_requests_dropped: documented but not in the health configuration"},
-		"metric drift":       {metadata: replaceOnce(artifactsMetadata, "metric: app.requests", "metric: app.latency"), health: artifactsHealth, wantErr: `app_requests_failed: metric "app.latency", alert on "app.requests"`},
-		"info drift":         {metadata: replaceOnce(artifactsMetadata, `info: "failed requests"`, `info: "requests failing"`), health: artifactsHealth, wantErr: `app_requests_failed: info "requests failing", alert info "failed requests"`},
+		"aligned":             {metadata: artifactsMetadata, health: artifactsHealth},
+		"undocumented alert":  {metadata: artifactsMetadata, health: artifactsHealth + "\n template: app_other\n       on: app.latency\n     info: other\n", wantErr: "app_other: in the health configuration but not documented"},
+		"unknown alert":       {metadata: replaceOnce(t, artifactsMetadata, "name: app_requests_failed", "name: app_requests_dropped"), health: artifactsHealth, wantErr: "app_requests_dropped: documented but not in the health configuration"},
+		"metric drift":        {metadata: replaceOnce(t, artifactsMetadata, "metric: app.requests", "metric: app.latency"), health: artifactsHealth, wantErr: `app_requests_failed: metric "app.latency", alert on "app.requests"`},
+		"info drift":          {metadata: replaceOnce(t, artifactsMetadata, `info: "failed requests"`, `info: "requests failing"`), health: artifactsHealth, wantErr: `app_requests_failed: info "requests failing", alert info "failed requests"`},
+		"identical variants":  {metadata: artifactsMetadata, health: artifactsHealth + artifactsHealth},
+		"conflicting variant": {metadata: artifactsMetadata, health: artifactsHealth + replaceOnce(t, artifactsHealth, "on: app.requests", "on: app.latency"), wantErr: `app_requests_failed: metric "app.requests", alert on "app.latency"`},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -172,20 +180,28 @@ func TestCheckMetadataAlertsMatchHealthConfig(t *testing.T) {
 	}
 }
 
-func replaceOnce(s, old, new string) string {
-	if !strings.Contains(s, old) {
-		panic("replaceOnce: " + old)
-	}
+func replaceOnce(t *testing.T, s, old, new string) string {
+	t.Helper()
+	require.Contains(t, s, old)
 	return strings.Replace(s, old, new, 1)
 }
 
-// removeLine drops the line containing marker and the n lines after it.
-func removeLine(s, marker string, n int) string {
+// removeBlock drops the YAML list item whose first line contains marker: that
+// line and every following line indented deeper than it.
+func removeBlock(t *testing.T, s, marker string) string {
+	t.Helper()
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
-		if strings.Contains(line, marker) {
-			return strings.Join(append(lines[:i:i], lines[i+n+1:]...), "\n")
+		if !strings.Contains(line, marker) {
+			continue
 		}
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		end := i + 1
+		for end < len(lines) && (strings.TrimSpace(lines[end]) == "" || len(lines[end])-len(strings.TrimLeft(lines[end], " ")) > indent) {
+			end++
+		}
+		return strings.Join(append(lines[:i:i], lines[end:]...), "\n")
 	}
-	panic("removeLine: " + marker)
+	t.Fatalf("removeBlock: %q not found", marker)
+	return ""
 }

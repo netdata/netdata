@@ -58,7 +58,8 @@ func ChartTemplateCharts(templateYAML string) (map[string]charttpl.Chart, error)
 // static names as written, and one dimension per declared state for a stateset
 // selector without a name (statesetStates maps metric name to its declared
 // states). It returns ok=false when a name is only known at runtime
-// (name_from_label, histogram buckets, summary quantiles).
+// (name_from_label, histogram buckets, summary quantiles) and an error when an
+// unnamed selector is neither of those and its metric has no declared states.
 func ChartDimensionNames(chart charttpl.Chart, statesetStates map[string][]string) ([]string, bool, error) {
 	var names []string
 	for _, dim := range chart.Dimensions {
@@ -73,18 +74,33 @@ func ChartDimensionNames(chart charttpl.Chart, statesetStates map[string][]strin
 		if err != nil {
 			return nil, false, fmt.Errorf("selector %q: %w", dim.Selector, err)
 		}
-		resolved := false
-		for _, metric := range compiled.Meta().MetricNames {
-			if states, ok := statesetStates[metric]; ok {
-				names = append(names, states...)
-				resolved = true
-			}
-		}
-		if !resolved {
+		meta := compiled.Meta()
+		if isRuntimeNamedSelector(meta) {
 			return nil, false, nil
+		}
+		for _, metric := range meta.MetricNames {
+			states, ok := statesetStates[metric]
+			if !ok {
+				return nil, false, fmt.Errorf("selector %q has no dimension name and metric %q has no declared states", dim.Selector, metric)
+			}
+			names = append(names, states...)
 		}
 	}
 	return names, true, nil
+}
+
+// isRuntimeNamedSelector reports histogram bucket and summary quantile
+// selectors, whose dimension names exist only at runtime.
+func isRuntimeNamedSelector(meta metrixselector.Meta) bool {
+	if slices.Contains(meta.ConstrainedLabelKeys, "le") || slices.Contains(meta.ConstrainedLabelKeys, "quantile") {
+		return true
+	}
+	for _, metric := range meta.MetricNames {
+		if strings.HasSuffix(metric, "_bucket") {
+			return true
+		}
+	}
+	return false
 }
 
 type metadataDocument struct {
@@ -263,9 +279,11 @@ func CheckMetadataAlertsMatchHealthConfig(metadataYAML, healthConfig []byte) err
 	if err != nil {
 		return err
 	}
-	shipped := make(map[string]HealthAlert)
+	// A health configuration may repeat a name for OS- or label-specific
+	// variants; every variant must match the single documented entry.
+	shipped := make(map[string][]HealthAlert)
 	for _, alert := range ParseHealthAlerts(healthConfig) {
-		shipped[alert.Name] = alert
+		shipped[alert.Name] = append(shipped[alert.Name], alert)
 	}
 	var problems []error
 	seen := make(map[string]bool)
@@ -275,16 +293,18 @@ func CheckMetadataAlertsMatchHealthConfig(metadataYAML, healthConfig []byte) err
 			continue
 		}
 		seen[alert.Name] = true
-		actual, ok := shipped[alert.Name]
+		variants, ok := shipped[alert.Name]
 		if !ok {
 			problems = append(problems, fmt.Errorf("%s: documented but not in the health configuration", alert.Name))
 			continue
 		}
-		if alert.Metric != actual.On {
-			problems = append(problems, fmt.Errorf("%s: metric %q, alert on %q", alert.Name, alert.Metric, actual.On))
-		}
-		if alert.Info != actual.Info {
-			problems = append(problems, fmt.Errorf("%s: info %q, alert info %q", alert.Name, alert.Info, actual.Info))
+		for _, actual := range variants {
+			if alert.Metric != actual.On {
+				problems = append(problems, fmt.Errorf("%s: metric %q, alert on %q", alert.Name, alert.Metric, actual.On))
+			}
+			if alert.Info != actual.Info {
+				problems = append(problems, fmt.Errorf("%s: info %q, alert info %q", alert.Name, alert.Info, actual.Info))
+			}
 		}
 	}
 	for name := range shipped {

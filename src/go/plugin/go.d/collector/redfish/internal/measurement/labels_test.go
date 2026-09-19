@@ -12,6 +12,21 @@ import (
 // The exported key lists must describe exactly what metricLabels attaches when a
 // resource and a reading report every field.
 func TestMetricLabelKeys(t *testing.T) {
+	node, reading := fullyLabeledFixture()
+	keys := func(labels []metrix.Label) []string {
+		out := make([]string, 0, len(labels))
+		for _, label := range labels {
+			out = append(out, label.Key)
+		}
+		return out
+	}
+	client := fixtureClient()
+	require.Equal(t, ResourceLabelKeys, keys(client.metricLabels(node, nil)))
+	require.Equal(t, ReadingLabelKeys, keys(client.metricLabels(node, reading)))
+}
+
+// fullyLabeledFixture reports every field metricLabels can attach.
+func fullyLabeledFixture() (*Resource, *normalizedReading) {
 	node := &Resource{
 		Kind: "processor",
 		Key:  "cpu-1",
@@ -32,38 +47,17 @@ func TestMetricLabelKeys(t *testing.T) {
 		Basis:              "zero",
 		Role:               "input",
 	}
-	keys := func(labels []metrix.Label) []string {
-		out := make([]string, 0, len(labels))
-		for _, label := range labels {
-			out = append(out, label.Key)
-		}
-		return out
-	}
-	client := fixtureClient()
-	require.Equal(t, ResourceLabelKeys, keys(client.metricLabels(node, nil)))
-	require.Equal(t, ReadingLabelKeys, keys(client.metricLabels(node, reading)))
+	return node, reading
 }
 
 // Label construction is O(the fixed label inventory); timing is a local trend,
 // while allocation counts measure the per-observation overhead.
 func BenchmarkMetricLabels(b *testing.B) {
 	client := fixtureClient()
-	node := &Resource{
-		Kind: "sensor",
-		Key:  "sensor",
-		Doc: Document{
-			Name: "Temperature",
-		},
-	}
-	reading := &normalizedReading{
-		Key:    "reading",
-		Family: "temperature",
-		Basis:  "zero",
-		Role:   "input",
-	}
+	node, reading := fullyLabeledFixture()
 	b.ReportAllocs()
 	for b.Loop() {
-		if len(client.metricLabels(node, reading)) != 10 {
+		if len(client.metricLabels(node, reading)) != len(ReadingLabelKeys) {
 			b.Fatal("labels missing")
 		}
 	}
