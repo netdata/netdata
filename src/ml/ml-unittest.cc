@@ -7,9 +7,11 @@
 #include "ml_private.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -1235,33 +1237,47 @@ static void test_cns_ring_reset_semantics()
 // looking correct everywhere else.
 //
 // This test does not enumerate the fields, because a second enumeration is the
-// bug. Every member is uint32_t, so it walks the struct as an array of
-// uint32_t: add a field and forget the accumulator and this fails immediately.
+// bug. Every member is uint32_t, so it treats the struct's object
+// representation as an array of uint32_t: add a field and forget the
+// accumulator and this fails immediately.
+//
+// The copies go through memcpy rather than a reinterpret_cast<uint32_t *> walk:
+// indexing one member's pointer across the following members is not valid array
+// pointer arithmetic, so the cast version was undefined behaviour that an
+// optimiser or sanitiser could turn into a silently passing guard.
 static void test_chart_stats_add_covers_every_field()
 {
     fprintf(stderr, "  test_chart_stats_add_covers_every_field...\n");
 
+    static_assert(std::is_trivially_copyable<ml_machine_learning_stats_t>::value,
+                  "stats struct must be trivially copyable for this test to copy its representation");
+    static_assert(std::has_unique_object_representations<ml_machine_learning_stats_t>::value,
+                  "stats struct must have no padding for this test to walk it as uint32_t");
     static_assert(sizeof(ml_machine_learning_stats_t) % sizeof(uint32_t) == 0,
                   "stats struct must be a whole number of uint32_t fields for this test to walk it");
-    const size_t nfields = sizeof(ml_machine_learning_stats_t) / sizeof(uint32_t);
+    constexpr size_t nfields = sizeof(ml_machine_learning_stats_t) / sizeof(uint32_t);
+
+    std::array<uint32_t, nfields> words;
+    for (size_t i = 0; i < nfields; i++)
+        words[i] = (uint32_t)(i + 1);
 
     ml_machine_learning_stats_t src = {};
-    uint32_t *sp = reinterpret_cast<uint32_t *>(&src);
-    for (size_t i = 0; i < nfields; i++)
-        sp[i] = (uint32_t)(i + 1);
+    memcpy(&src, words.data(), sizeof(src));
 
     ml_machine_learning_stats_t dst = {};
     ml_chart_stats_add(&dst, src);
 
-    const uint32_t *dp = reinterpret_cast<const uint32_t *>(&dst);
+    std::array<uint32_t, nfields> got;
+    memcpy(got.data(), &dst, sizeof(dst));
     for (size_t i = 0; i < nfields; i++)
-        ML_TEST_ASSERT(dp[i] == (uint32_t)(i + 1),
+        ML_TEST_ASSERT(got[i] == (uint32_t)(i + 1),
                        "every stats field must be accumulated (one is missing from ml_chart_stats_add)");
 
     // Accumulating is additive, not assignment.
     ml_chart_stats_add(&dst, src);
+    memcpy(got.data(), &dst, sizeof(dst));
     for (size_t i = 0; i < nfields; i++)
-        ML_TEST_ASSERT(dp[i] == (uint32_t)(2 * (i + 1)),
+        ML_TEST_ASSERT(got[i] == (uint32_t)(2 * (i + 1)),
                        "ml_chart_stats_add must add, not overwrite");
 }
 
