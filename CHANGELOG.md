@@ -372,6 +372,15 @@
 - Feat(health/alarm-notify): map legacy AWS SNS settings ([#23937](https://github.com/netdata/netdata/issues/23937))
 - Feat(health/alarm-notify): add producer notification context ([#23939](https://github.com/netdata/netdata/issues/23939))
 - Feat(go.d): support managed metadata for payload-aware functions ([#23940](https://github.com/netdata/netdata/issues/23940))
+- Feat(health/alarm-notify): support legacy custom senders ([#23941](https://github.com/netdata/netdata/issues/23941))
+- Feat(go.d/redfish): add on-demand BMC logs viewer ([#23943](https://github.com/netdata/netdata/issues/23943))
+- Fix(go.d): return job-scoped Function metadata ([#23944](https://github.com/netdata/netdata/issues/23944))
+- Fix(go.d): restore V2 collection status and duration charts ([#23946](https://github.com/netdata/netdata/issues/23946))
+- Feat(go.d/redfish): add independent sensor threshold health ([#23949](https://github.com/netdata/netdata/issues/23949))
+- Feat(go.d/redfish): enrich hardware inventory details ([#23950](https://github.com/netdata/netdata/issues/23950))
+- Regenerate integrations docs ([#23935](https://github.com/netdata/netdata/issues/23935))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.33.4 to 1.33.5 in /src/go ([#23953](https://github.com/netdata/netdata/issues/23953))
+- Build(deps): bump github.com/axiomhq/hyperloglog from 0.2.6 to 0.3.0 in /src/go ([#23951](https://github.com/netdata/netdata/issues/23951))
 
 ## [2.11.0] - 2026-08-12
 
