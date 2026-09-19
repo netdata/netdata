@@ -53,6 +53,10 @@ struct dbengine_engine *dbengine_engine_alloc(const struct dbengine_config *cfg)
 // Only when no cache, registry or event loop of it exists any more
 void dbengine_engine_free(struct dbengine_engine *engine);
 
+// the daemon's static tiers, the tier list of the engine that claimed them at dbengine_create(); the embedder
+// reaches them by number through dbengine_tier()
+extern struct dbengine_tier *dbengine_multidb_tiers[RRD_STORAGE_TIERS];
+
 #define DBENGINE_FD_BUDGET_PER_TIER (50)
 
 #define DBENGINE_PAGE_TYPE_MAX (2) // Maximum page type (inclusive)

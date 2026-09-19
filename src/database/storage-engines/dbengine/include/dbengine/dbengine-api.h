@@ -29,10 +29,6 @@ extern "C" {
 // engine that is up.
 struct dbengine_tier;
 
-// the daemon's preload callback (dbengine-config.h) still indexes the static tiers by number, from inside
-// dbengine_create() where the daemon holds no engine yet; the array leaves this header with that callback
-extern DBENGINE_TIER *dbengine_multidb_tiers[RRD_STORAGE_TIERS];
-
 // the engine's tier by number, 0 to RRD_STORAGE_TIERS - 1: the tier that dbengine_tier_init() with that number
 // brings up, whether or not it has come up (the tier verbs below answer for one that never did, and take NULL as
 // a tier with nothing in it). NULL for a NULL engine or a number the engine does not have. A destroyed engine has

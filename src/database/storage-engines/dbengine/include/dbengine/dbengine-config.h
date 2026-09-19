@@ -18,9 +18,11 @@ typedef struct dbengine_tier DBENGINE_TIER;
 struct dbengine_engine;
 typedef struct dbengine_engine DBENGINE_ENGINE;
 
-// Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
-// the engine.
-typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *tier, nd_uuid_t *uuid);
+// Receives one metric the embedder already knows, with the number of the tier it belongs to (the tier a
+// dbengine_tier_init() with that number brings up; a number the engine does not have is fatal); passed to
+// preload_metrics() by the engine. The embedder holds no engine while it runs (preload_metrics() is called from
+// inside dbengine_create()), so it names the tier and the engine resolves it.
+typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid);
 
 // The storage engine's configuration.
 //
