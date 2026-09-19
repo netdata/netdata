@@ -34,7 +34,7 @@ func templateCharts(t *testing.T) map[string]charttpl.Chart {
 		for _, group := range groups {
 			current := namespace
 			if group.ContextNamespace != "" {
-				current = group.ContextNamespace
+				current = strings.TrimPrefix(current+"."+group.ContextNamespace, ".")
 			}
 			for _, chart := range group.Charts {
 				context := chart.Context
