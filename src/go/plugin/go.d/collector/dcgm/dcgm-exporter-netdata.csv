@@ -7,8 +7,8 @@
 # Example:
 #   dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv -c 30000
 #
-# This profile contains 623 fields from its original DCGM source dataset.
-# Exactly 123 fields are enabled by default below (127 max per field group).
+# This profile contains 621 fields from its original DCGM source dataset.
+# Exactly 121 fields are enabled by default below (127 max per field group).
 # To enable a different field, uncomment one line and comment another enabled line.
 #
 # IMPORTANT: Fields with DCGM_FT_BINARY type (structs/blobs) MUST remain disabled.
@@ -906,9 +906,7 @@ DCGM_FI_DEV_PCIE_LINK_WIDTH, gauge, Pcie link width
 # context=dcgm.gpu.interconnect.pcie.error_rate family=gpu interconnect/pcie dimension=pcie_replay
 DCGM_FI_DEV_PCIE_REPLAY_COUNTER, counter, Pcie replay counter
 # numeric=dcgm.gpu.raw.dcgm_fi_dev_pcie_rx_throughput (raw; physical unit not established)
-DCGM_FI_DEV_PCIE_RX_THROUGHPUT, counter, Pcie rx throughput
 # numeric=dcgm.gpu.raw.dcgm_fi_dev_pcie_tx_throughput (raw; physical unit not established)
-DCGM_FI_DEV_PCIE_TX_THROUGHPUT, counter, Pcie tx throughput
 # metadata=dcgm_fi_dev_pci_busid
 # DCGM_FI_DEV_PCI_BUSID, label, Pci busid
 # numeric=dcgm.gpu.raw.dcgm_fi_dev_pci_combined_id (raw; physical unit not established)
