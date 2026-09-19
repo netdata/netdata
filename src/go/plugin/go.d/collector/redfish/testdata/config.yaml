@@ -1,4 +1,3 @@
-name: bmc
 vnode: existing-bmc
 update_every: 60
 autodetection_retry: 30

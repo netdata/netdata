@@ -37,7 +37,6 @@ func TestCollectorSessionRecoveryCleanupHonorsCollectionDeadline(t *testing.T) {
 	defer server.Close()
 	collector := New()
 	collector.Config = testConfig(server.URL, "session")
-	collector.Name = "recovery-deadline"
 	collector.UpdateEvery = 1
 	collector.Timeout = confopt.Duration(3 * time.Second)
 	require.NoError(t, collector.Init(t.Context()))

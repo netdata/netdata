@@ -125,7 +125,7 @@ func TestHardwareInventoryThroughCollection(t *testing.T) {
 		testutil.WriteJSON(w, doc)
 	}))
 	t.Cleanup(server.Close)
-	collector := newFunctionCollector(t, server.URL, "inventory")
+	collector := newFunctionCollector(t, server.URL)
 	handler := collectorapi.DefaultRegistry["redfish"].MethodHandler(functionTestJob{collector})
 	collectFunctionCycle(t, collector)
 	response := handler.Handle(t.Context(), "hardware", nil)

@@ -55,7 +55,7 @@ func TestDerivedHealthCollectionAndFunctionLifecycle(t *testing.T) {
 		}
 	}))
 	t.Cleanup(server.Close)
-	c := newFunctionCollector(t, server.URL, "thresholds")
+	c := newFunctionCollector(t, server.URL)
 	now := time.Unix(1000, 0)
 	c.now = func() time.Time { return now }
 

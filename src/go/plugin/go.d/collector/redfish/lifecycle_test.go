@@ -132,7 +132,6 @@ func TestCollectorSessionStartsDuringRunningCollection(t *testing.T) {
 	defer server.Close()
 	collector := New()
 	collector.Config = testConfig(server.URL, "session")
-	collector.Name = "endpoint"
 	defer collector.Cleanup(context.Background())
 	require.NoError(t, collector.Init(context.Background()))
 	require.NoError(t, collector.Check(context.Background()))

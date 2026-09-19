@@ -25,7 +25,7 @@ func TestRegisteredLogsFunctionReadsWithoutMetricSnapshot(t *testing.T) {
 		}
 	}))
 	t.Cleanup(server.Close)
-	collector := newFunctionCollector(t, server.URL, "logs-job")
+	collector := newFunctionCollector(t, server.URL)
 	require.Nil(t, collector.functionSnapshot.Load())
 	handler := collectorapi.DefaultRegistry["redfish"].MethodHandler(functionTestJob{collector}).(funcapi.RawMethodHandler)
 	response := handler.HandleRaw(t.Context(), funcapi.RawMethodRequest{

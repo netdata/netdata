@@ -53,7 +53,6 @@ func TestCollectorLogsSelectedAuthenticationMethodOnce(t *testing.T) {
 		URL:        "https://bmc.example.test",
 		AuthMethod: "none",
 	}
-	collector.Name = "endpoint-a"
 	collector.newClient = func(acquisition.Options, *http.Client) (endpointClient, error) {
 		return client, nil
 	}
@@ -109,7 +108,6 @@ func TestCollectorDerivesCollectionDeadlineFromUpdateEvery(t *testing.T) {
 	}
 	collector := New()
 	collector.UpdateEvery = 12
-	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
 	collector.measurement = measurement.New("https://fixture.example", nil)
@@ -135,7 +133,6 @@ func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 		err: context.DeadlineExceeded,
 	}
 	collector := New()
-	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
 	collector.measurement = measurement.New("https://fixture.example", nil)
@@ -162,7 +159,6 @@ func TestCollectorParentCancellationAbortsPartialResult(t *testing.T) {
 		},
 	}
 	collector := New()
-	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
 	collector.measurement = measurement.New("https://fixture.example", nil)
