@@ -287,7 +287,7 @@ void journalfile_v2_data_set(struct dbengine_journalfile *journalfile, int fd, v
 struct journal_v2_header *journalfile_v2_data_acquire(struct dbengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
 struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct dbengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint);
 void journalfile_v2_data_release(struct dbengine_journalfile *journalfile);
-void journalfile_v2_data_unmount_cleanup(time_t now_s);
+void journalfile_v2_data_unmount_cleanup(struct dbengine_engine *engine, time_t now_s);
 
 typedef struct {
     bool init;

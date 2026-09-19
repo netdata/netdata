@@ -451,11 +451,35 @@ TEST(PGD, RejectCorruptGorillaDiskNbits) {
 
 int dbengine_page_test(const struct dbengine_config *cfg, int argc, char *argv[])
 {
+    // the allocator layer partitions by the resolved cpus, as an engine's would: resolve a copy first
+    struct dbengine_config resolved = *cfg;
+    dbengine_config_resolve(&resolved);
+
     // Dummy/necessary initialization stuff
-    dbengine_config_set(cfg);
-    PGC *dummy_cache = pgc_create("pgd-tests-cache", 32 * 1024 * 1024, NULL, 64, NULL, NULL,
-                                  10, 10, 1000, 10, PGC_OPTIONS_NONE, 1, 11);
-    pgd_init_arals();
+    struct pgc_config dummy_cfg = {
+        .name = "pgd-tests-cache",
+        .clean_size_bytes = 32 * 1024 * 1024,
+        .free_clean_cb = NULL,
+        .max_dirty_pages_per_flush = 64,
+        .save_init_cb = NULL,
+        .save_dirty_cb = NULL,
+        .max_pages_per_inline_eviction = 10,
+        .max_inline_evictors = 10,
+        .max_skip_pages_per_inline_eviction = 1000,
+        .max_flushes_inline = 10,
+        .options = PGC_OPTIONS_NONE,
+        .partitions = 1,
+        .additional_bytes_per_page = 11,
+        .statistics = resolved.cache_statistics,
+        .use_all_ram = resolved.use_all_ram_for_caches,
+        .out_of_memory_protection_bytes = resolved.out_of_memory_protection_bytes,
+        .cpus = resolved.cpus,
+        .engine = NULL,
+        .dynamic_target_size_cb = NULL,
+        .nominal_page_size_cb = NULL,
+    };
+    PGC *dummy_cache = pgc_create(&dummy_cfg);
+    pgd_init_arals(&resolved.allocator);
 
     ::testing::InitGoogleTest(&argc, argv);
     int rc = RUN_ALL_TESTS();

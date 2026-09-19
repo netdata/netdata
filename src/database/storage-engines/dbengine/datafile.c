@@ -141,12 +141,13 @@ bool datafile_acquire_for_deletion(struct dbengine_datafile *df)
         return true;
 
     // during dbengine_destroy() the open cache may already be gone: then it holds no pages of this file
-    if(should_evict_open_pages && open_cache)
-        pgc_open_evict_clean_pages_of_datafile(open_cache, df);
+    struct dbengine_engine *engine = datafile_ctx(df)->engine;
+    if(should_evict_open_pages && engine->open_cache)
+        pgc_open_evict_clean_pages_of_datafile(engine->open_cache, df);
 
     usec_t time_to_scan_ut = now_monotonic_usec();
-    size_t clean_pages_in_open_cache = open_cache ? pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df) : 0;
-    size_t hot_pages_in_open_cache = open_cache ? pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df) : 0;
+    size_t clean_pages_in_open_cache = engine->open_cache ? pgc_count_clean_pages_having_data_ptr(engine->open_cache, (Word_t)datafile_ctx(df), df) : 0;
+    size_t hot_pages_in_open_cache = engine->open_cache ? pgc_count_hot_pages_having_data_ptr(engine->open_cache, (Word_t)datafile_ctx(df), df) : 0;
     time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
 
     spinlock_tracked_lock(&df->users.spinlock);
@@ -246,7 +247,7 @@ int create_data_file(struct dbengine_datafile *datafile)
     char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, dbengine_cfg.direct_io);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -330,7 +331,7 @@ static int load_data_file(struct dbengine_datafile *datafile)
     char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_RDWR, &file, dbengine_cfg.direct_io);
+    fd = open_file_for_io(path, O_RDWR, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -571,7 +572,7 @@ static int scan_data_files(struct dbengine_tier *ctx)
 /* Creates a datafile and a journalfile pair */
 int create_new_datafile_pair(struct dbengine_tier *ctx)
 {
-    __atomic_add_fetch(&dbengine_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->engine->cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
 
     struct dbengine_datafile *datafile;
     struct dbengine_journalfile *journalfile;
@@ -636,7 +637,7 @@ int init_data_files(struct dbengine_tier *ctx)
             create_new_datafile_pair(ctx);
     }
 
-    pgc_reset_hot_max(open_cache);
+    pgc_reset_hot_max(ctx->engine->open_cache);
     ctx->loading.create_new_datafile_pair = false;
     return 0;
 }

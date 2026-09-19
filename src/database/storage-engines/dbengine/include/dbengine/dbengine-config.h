@@ -12,29 +12,46 @@ extern "C" {
 struct dbengine_tier;
 typedef struct dbengine_tier DBENGINE_TIER;
 
+// The engine: what the tiers share (the event loop, the caches, the metrics registry, the configuration, the
+// counters). Opaque outside the engine; made by dbengine_create(), stopped by dbengine_shutdown(), and released by
+// dbengine_destroy() when no reference on a cache page or a registry metric remains (dbengine-api.h).
+struct dbengine_engine;
+typedef struct dbengine_engine DBENGINE_ENGINE;
+
 // Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
 // the engine.
 typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *tier, nd_uuid_t *uuid);
 
-// The storage engine's process-wide configuration.
+// The storage engine's configuration.
 //
 // Whoever embeds the engine (the daemon; a test) fills one of these from its own sources and
-// hands it to dbengine_init(), which brings the engine up with it. The engine keeps a private
+// hands it to dbengine_create(), which brings the engine up with it. The engine keeps a private
 // copy and reads nothing else afterwards. Per-tier settings (path, quota, retention, page type)
 // travel with dbengine_tier_init() instead.
+// The page allocator layer's settings. The layer (the page allocators, their size classes and the gorilla
+// counters) is process-wide and shared by every engine: the first engine to come up configures it with this group
+// and later engines reuse it (a differing group is logged and ignored). The size classes also depend on the
+// compile-time tier page sizes.
+struct dbengine_allocator_config {
+    size_t partitions;                          // allocator partitions; 0 = the engine's cpus
+    bool arals_for_large_pages;                 // keep allocators for page sizes above 4KiB (a parent expects such pages)
+    bool compression_statistics;                // count gorilla buffers and tier-0 compression bytes (pulse extended)
+};
+
 struct dbengine_config {
-    // caches - read once, when dbengine_init() brings up the caches shared by all tiers
+    // caches - read once, when dbengine_create() brings up the caches shared by all tiers
     size_t page_cache_mb;                       // [db] dbengine page cache size
     size_t extent_cache_mb;                     // [db] dbengine extent cache size
     uint64_t out_of_memory_protection_bytes;    // [db] dbengine out of memory protection; 0 disables it
     bool use_all_ram_for_caches;                // [db] dbengine use all ram for caches
 
     bool cache_statistics;                      // keep per-cache statistics (the daemon's pulse setting)
-    bool compression_statistics;                // count gorilla buffers and tier-0 compression bytes (pulse extended)
 
-    // sizing of partitions, evictors, flushers and metric-registry loaders
+    // sizing of cache partitions, evictors, flushers and metric-registry loaders: this engine's concurrency width
     size_t cpus;                                // 0 = detect the system's cpus
-    bool arals_for_large_pages;                 // keep ARALs for page sizes above 4KiB (a parent expects such pages)
+
+    // the process-wide page allocator layer (see above)
+    struct dbengine_allocator_config allocator;
 
     // files
     bool direct_io;                             // [db] dbengine use direct io
@@ -78,17 +95,21 @@ struct dbengine_config {
 #define DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB (32)
 #endif
 
-// The compiled defaults: the baseline a caller adjusts before dbengine_init(), which resolves the
-// 0-means-default fields (cpus, default_update_every_s, pages_per_extent, libuv_worker_threads) to concrete values.
+// The compiled defaults: the baseline a caller adjusts before dbengine_create(), which resolves the
+// 0-means-default fields (cpus, allocator.partitions, default_update_every_s, pages_per_extent,
+// libuv_worker_threads) to concrete values.
 #define DBENGINE_CONFIG_DEFAULTS {                              \
     .page_cache_mb = DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB,     \
     .extent_cache_mb = 0,                                       \
     .out_of_memory_protection_bytes = 0,                        \
     .use_all_ram_for_caches = false,                            \
     .cache_statistics = true,                                   \
-    .compression_statistics = false,                            \
     .cpus = 0,                                                  \
-    .arals_for_large_pages = false,                             \
+    .allocator = {                                              \
+        .partitions = 0,                                        \
+        .arals_for_large_pages = false,                         \
+        .compression_statistics = false,                        \
+    },                                                          \
     .direct_io = true,                                          \
     .pages_per_extent = DBENGINE_DEFAULT_PAGES_PER_EXTENT,      \
     .journal_integrity_check = false,                           \
@@ -112,20 +133,20 @@ struct dbengine_tier_config {
     size_t grouping;                            // points of tier 0 that make one point of this tier (1 for tier 0)
 };
 
-// Bring the engine up: copy cfg into it, resolving the 0-means-default fields (cpus, default_update_every_s,
+// Bring an engine up: copy cfg into it, resolving the 0-means-default fields (cpus, default_update_every_s,
 // pages_per_extent, libuv_worker_threads), then create the event loop, the caches, the metrics registry (which
 // preloads through cfg->preload_metrics, so the embedder's tier count must be final by now) and the engine's
 // thread, and start taking work. The only way up; tiers come after it. Fatal when the libuv pool is not larger
 // than the threads reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or
-// when default_update_every_s is negative. Returns 0, the libuv error that stopped the loop from coming up
-// (the engine is then down, as if never called), UV_EALREADY when the engine is already up (the configuration
-// is left alone), or UV_EIO after dbengine_shutdown() (the engine cannot be started again in this process).
-int dbengine_init(const struct dbengine_config *cfg);
+// when default_update_every_s is negative. Returns the engine, or NULL, with the reason logged: the libuv error
+// that stopped the loop from coming up (nothing is left behind, as if never called), or an engine that still owns
+// the daemon's static tiers (until its dbengine_destroy() released them).
+DBENGINE_ENGINE *dbengine_create(const struct dbengine_config *cfg);
 
 // Release the references preload_metrics() left on the registry, once every tier has come up (after the last
 // dbengine_readiness_wait()): until then they keep preloaded metrics from being evicted before their journals are
-// read. A no-op when there is no registry.
-void dbengine_preload_release(void);
+// read. A no-op when there is no engine or no registry.
+void dbengine_preload_release(DBENGINE_ENGINE *engine);
 
 #ifdef __cplusplus
 }

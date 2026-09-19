@@ -11,7 +11,7 @@ struct dbengine_tier multidb_tier_storage2 = { 0 };
 struct dbengine_tier multidb_tier_storage3 = { 0 };
 struct dbengine_tier multidb_tier_storage4 = { 0 };
 
-#define mrg_metric_ctx(metric) (struct dbengine_tier *)mrg_metric_section(main_mrg, metric)
+#define mrg_metric_ctx(metric) ((struct dbengine_tier *)mrg_metric_section(metric))
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
@@ -90,22 +90,22 @@ void dbengine_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE
 
 void dbengine_metric_release(STORAGE_METRIC_HANDLE *smh) {
     METRIC *metric = (METRIC *)smh;
-    mrg_metric_release(main_mrg, metric);
+    mrg_metric_release(mrg_metric_ctx(metric)->engine->main_mrg, metric);
 }
 
 STORAGE_METRIC_HANDLE *dbengine_metric_dup(STORAGE_METRIC_HANDLE *smh) {
     METRIC *metric = (METRIC *)smh;
-    return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
+    return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(mrg_metric_ctx(metric)->engine->main_mrg, metric);
 }
 
 STORAGE_METRIC_HANDLE *dbengine_metric_get_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
-    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_uuid(main_mrg, uuid, (Word_t)ctx);
+    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_uuid(ctx->engine->main_mrg, uuid, (Word_t)ctx);
 }
 
 STORAGE_METRIC_HANDLE *dbengine_metric_get_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
-    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
+    return (STORAGE_METRIC_HANDLE *)mrg_metric_get_and_acquire_by_id(ctx->engine->main_mrg, id, (Word_t)ctx);
 }
 
 static METRIC *dbengine_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
@@ -121,14 +121,15 @@ static METRIC *dbengine_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     };
 
     bool added;
-    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+    METRIC *metric = mrg_metric_add_and_acquire(ctx->engine->main_mrg, entry, &added);
     return metric;
 }
 
 STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
+    struct dbengine_engine *engine = ctx->engine;
 
-    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t) ctx);
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(engine->main_mrg, id, (Word_t) ctx);
     if(unlikely(!metric))
         metric = dbengine_metric_create(si, uuidmap_uuid_ptr(id));
 
@@ -137,12 +138,12 @@ STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create_by_id(STORAGE_INSTANCE *si,
         fatal("DBENGINE: mixed up db tiers, asked for metric from %p, got from %p",
               ctx, mrg_metric_ctx(metric));
 
-    if(!uuid_eq(*uuidmap_uuid_ptr(id), *mrg_metric_uuid(main_mrg, metric))) {
+    if(!uuid_eq(*uuidmap_uuid_ptr(id), *mrg_metric_uuid(engine->main_mrg, metric))) {
         char uuid1[UUID_STR_LEN + 1];
         char uuid2[UUID_STR_LEN + 1];
 
         uuid_unparse(*uuidmap_uuid_ptr(id), uuid1);
-        uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid2);
+        uuid_unparse(*mrg_metric_uuid(engine->main_mrg, metric), uuid2);
         fatal("DBENGINE: uuids do not match, asked for metric '%s', but got metric '%s'", uuid1, uuid2);
     }
 #endif
@@ -155,14 +156,16 @@ STORAGE_METRIC_HANDLE *dbengine_metric_get_or_create_by_id(STORAGE_INSTANCE *si,
 // collect ops
 
 static inline void check_and_fix_mrg_update_every(struct dbengine_collect_handle *handle) {
-    if(unlikely((uint32_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
+    struct dbengine_engine *engine = mrg_metric_ctx(handle->metric)->engine;
+
+    if(unlikely((uint32_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(engine->main_mrg, handle->metric))) {
         internal_error(true, "DBENGINE: collection handle has update every %u, but the metric registry has %u. Fixing it.",
-              (uint32_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
+              (uint32_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(engine->main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
-            handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
+            handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(engine->main_mrg, handle->metric) * USEC_PER_SEC;
         else
-            mrg_metric_set_update_every(main_mrg, handle->metric, (uint32_t)(handle->update_every_ut / USEC_PER_SEC));
+            mrg_metric_set_update_every(engine->main_mrg, handle->metric, (uint32_t)(handle->update_every_ut / USEC_PER_SEC));
     }
 }
 
@@ -173,7 +176,7 @@ static inline bool check_completed_page_consistency(struct dbengine_collect_hand
 
     struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
 
-    nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
+    nd_uuid_t *uuid = mrg_metric_uuid(ctx->engine->main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
     time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
     uint32_t update_every_s = pgc_page_update_every_s(handle->pgc_page);
@@ -211,14 +214,15 @@ static inline bool check_completed_page_consistency(struct dbengine_collect_hand
 STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
     METRIC *metric = (METRIC *)smh;
     struct dbengine_tier *ctx = mrg_metric_ctx(metric);
+    struct dbengine_engine *engine = ctx->engine;
 
     DBENGINE_COLLECT_HANDLE_OPTIONS options = 0;
 #ifdef NETDATA_INTERNAL_CHECKS
     bool is_1st_metric_writer = true;
-    if(!mrg_metric_set_writer(main_mrg, metric)) {
+    if(!mrg_metric_set_writer(engine->main_mrg, metric)) {
         is_1st_metric_writer = false;
         char uuid[UUID_STR_LEN + 1];
-        uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
+        uuid_unparse(*mrg_metric_uuid(engine->main_mrg, metric), uuid);
         netdata_log_error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
     }
     if(is_1st_metric_writer)
@@ -228,11 +232,11 @@ STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t
 
 #endif
 
-    metric = mrg_metric_dup(main_mrg, metric);
+    metric = mrg_metric_dup(engine->main_mrg, metric);
     if(!metric) {
 #ifdef NETDATA_INTERNAL_CHECKS
         if(is_1st_metric_writer)
-            mrg_metric_clear_writer(main_mrg, (METRIC *)smh);
+            mrg_metric_clear_writer(engine->main_mrg, (METRIC *)smh);
         else
             __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 #endif
@@ -255,7 +259,7 @@ STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t
 
     __atomic_add_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
 
-    mrg_metric_set_update_every(main_mrg, metric, update_every);
+    mrg_metric_set_update_every(engine->main_mrg, metric, update_every);
 
     handle->alignment = (struct pg_alignment *)smg;
     dbengine_page_alignment_acquire(handle->alignment);
@@ -266,7 +270,7 @@ STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t
     // clean pages may be found matching ours!
 
     time_t db_first_time_s, db_last_time_s;
-    mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, NULL);
+    mrg_metric_get_retention(engine->main_mrg, metric, &db_first_time_s, &db_last_time_s, NULL);
     handle->page_end_time_ut = (usec_t)db_last_time_s * USEC_PER_SEC;
 
     return (STORAGE_COLLECT_HANDLE *)handle;
@@ -274,30 +278,31 @@ STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t
 
 void dbengine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
     struct dbengine_collect_handle *handle = (struct dbengine_collect_handle *)sch;
+    struct dbengine_engine *engine = mrg_metric_ctx(handle->metric)->engine;
 
     if (unlikely(!handle->pgc_page))
         return;
 
     if(pgd_is_empty(handle->page_data))
-        pgc_page_to_clean_evict_or_release(main_cache, handle->pgc_page);
+        pgc_page_to_clean_evict_or_release(engine->main_cache, handle->pgc_page);
 
     else {
         check_completed_page_consistency(handle);
-        mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
+        mrg_metric_set_clean_latest_time_s(engine->main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
 
         struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
         time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
         time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
-        uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, handle->metric);
+        uint32_t update_every_s = mrg_metric_get_update_every_s(engine->main_mrg, handle->metric);
         if (end_time_s && start_time_s && end_time_s > start_time_s && update_every_s) {
             uint64_t add_samples = (end_time_s - start_time_s) / update_every_s;
             __atomic_add_fetch(&ctx->atomic.samples, add_samples, __ATOMIC_RELAXED);
         }
 
-        pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page, false);
+        pgc_page_hot_to_dirty_and_release(engine->main_cache, handle->pgc_page, false);
     }
 
-    mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
+    mrg_metric_set_hot_latest_time_s(engine->main_mrg, handle->metric, 0);
 
     handle->pgc_page = NULL;
     handle->page_flags = 0;
@@ -320,12 +325,13 @@ static void dbengine_store_metric_create_new_page(struct dbengine_collect_handle
                                                 struct dbengine_tier *ctx,
                                                 usec_t point_in_time_ut,
                                                 PGD *data) {
+    struct dbengine_engine *engine = ctx->engine;
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     const uint32_t update_every_s = (uint32_t)(handle->update_every_ut / USEC_PER_SEC);
 
     PGC_ENTRY page_entry = {
             .section = (Word_t) ctx,
-            .metric_id = mrg_metric_id(main_mrg, handle->metric),
+            .metric_id = mrg_metric_id(engine->main_mrg, handle->metric),
             .start_time_s = point_in_time_s,
             .end_time_s = point_in_time_s,
             .size = pgd_memory_footprint(data),
@@ -336,12 +342,12 @@ static void dbengine_store_metric_create_new_page(struct dbengine_collect_handle
 
     size_t conflicts = 0;
     bool added = true;
-    PGC_PAGE *pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+    PGC_PAGE *pgc_page = pgc_page_add_and_acquire(engine->main_cache, page_entry, &added);
     while (unlikely(!added)) {
         conflicts++;
 
         char uuid[UUID_STR_LEN + 1];
-        uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
+        uuid_unparse(*mrg_metric_uuid(engine->main_mrg, handle->metric), uuid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
         internal_error(true,
@@ -359,13 +365,13 @@ static void dbengine_store_metric_create_new_page(struct dbengine_collect_handle
                     pgc_page_start_time_s(pgc_page), pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
               );
 
-        pgc_page_release(main_cache, pgc_page);
+        pgc_page_release(engine->main_cache, pgc_page);
 
         point_in_time_ut -= handle->update_every_ut;
         point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
         page_entry.start_time_s = point_in_time_s;
         page_entry.end_time_s = point_in_time_s;
-        pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+        pgc_page = pgc_page_add_and_acquire(engine->main_cache, page_entry, &added);
     }
 
     handle->page_entries_max = pgd_capacity(data);
@@ -445,13 +451,15 @@ static ALWAYS_INLINE void dbengine_store_metric_first_retention(struct dbengine_
               pgd_is_empty(handle->page_data)))
         return;
 
+    struct dbengine_engine *engine = mrg_metric_ctx(handle->metric)->engine;
+
     // once the page holds a real (non-gap) value, record the page start as
     // the metric's retention start; gap-only pages are discarded at flush,
     // so they must not leave retention behind; without this stamp, a metric
     // without retention gets first_time_s set by the first retention reader
     // using the newest hot point, hiding all older points of this page from
     // queries (burst ingestion: replication catch-up)
-    mrg_metric_expand_retention(main_mrg, handle->metric, pgc_page_start_time_s(handle->pgc_page), 0, 0);
+    mrg_metric_expand_retention(engine->main_mrg, handle->metric, pgc_page_start_time_s(handle->pgc_page), 0, 0);
     handle->page_flags |= DBENGINE_PAGE_RETENTION_RECORDED;
 }
 
@@ -466,6 +474,7 @@ static ALWAYS_INLINE_HOT void dbengine_store_metric_append_point(STORAGE_COLLECT
 {
     struct dbengine_collect_handle *handle = (struct dbengine_collect_handle *)sch;
     struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_engine *engine = ctx->engine;
 
     if(unlikely(!handle->page_data))
         handle->page_data = dbengine_alloc_new_page_data(handle, point_in_time_ut);
@@ -487,7 +496,7 @@ static ALWAYS_INLINE_HOT void dbengine_store_metric_append_point(STORAGE_COLLECT
     }
     else {
         // update an existing page
-        pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page,
+        pgc_page_hot_set_end_time_s(engine->main_cache, handle->pgc_page,
                                     (time_t) (point_in_time_ut / USEC_PER_SEC), additional_bytes);
         handle->page_end_time_ut = point_in_time_ut;
 
@@ -503,16 +512,17 @@ static ALWAYS_INLINE_HOT void dbengine_store_metric_append_point(STORAGE_COLLECT
     timing_step(TIMING_STEP_DBENGINE_PAGE_FIN);
 
     // update the metric information
-    mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC));
+    mrg_metric_set_hot_latest_time_s(engine->main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC));
 
     timing_step(TIMING_STEP_DBENGINE_MRG_UPDATE);
 }
 
 static void store_metric_next_error_log(struct dbengine_collect_handle *handle __maybe_unused, usec_t point_in_time_ut __maybe_unused, const char *msg __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
+    struct dbengine_engine *engine = mrg_metric_ctx(handle->metric)->engine;
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     char uuid[UUID_STR_LEN + 1];
-    uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
+    uuid_unparse(*mrg_metric_uuid(engine->main_mrg, handle->metric), uuid);
 
     BUFFER *wb = NULL;
     if(handle->pgc_page && handle->page_flags) {
@@ -632,6 +642,7 @@ ALWAYS_INLINE_HOT void dbengine_store_next(
 int dbengine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
     struct dbengine_collect_handle *handle = (struct dbengine_collect_handle *)sch;
     struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_engine *engine = ctx->engine;
 
     handle->page_flags |= DBENGINE_PAGE_COLLECT_FINALIZE;
     dbengine_store_flush(sch);
@@ -643,14 +654,14 @@ int dbengine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
     if(!(handle->options & DBENGINE_1ST_METRIC_WRITER))
         __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
-    if((handle->options & DBENGINE_1ST_METRIC_WRITER) && !mrg_metric_clear_writer(main_mrg, handle->metric))
+    if((handle->options & DBENGINE_1ST_METRIC_WRITER) && !mrg_metric_clear_writer(engine->main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
 #endif
 
     time_t first_time_s, last_time_s;
-    mrg_metric_get_retention(main_mrg, handle->metric, &first_time_s, &last_time_s, NULL);
+    mrg_metric_get_retention(engine->main_mrg, handle->metric, &first_time_s, &last_time_s, NULL);
 
-    mrg_metric_release(main_mrg, handle->metric);
+    mrg_metric_release(engine->main_mrg, handle->metric);
     freez(handle);
 
     if(!first_time_s && !last_time_s)
@@ -661,6 +672,7 @@ int dbengine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
 
 void dbengine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
     struct dbengine_collect_handle *handle = (struct dbengine_collect_handle *)sch;
+    struct dbengine_engine *engine = mrg_metric_ctx(handle->metric)->engine;
     check_and_fix_mrg_update_every(handle);
 
     METRIC *metric = handle->metric;
@@ -671,7 +683,7 @@ void dbengine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int
 
     handle->page_flags |= DBENGINE_PAGE_UPDATE_EVERY_CHANGE;
     dbengine_store_flush(sch);
-    mrg_metric_set_update_every(main_mrg, metric, update_every);
+    mrg_metric_set_update_every(engine->main_mrg, metric, update_every);
     handle->update_every_ut = update_every_ut;
 }
 
@@ -718,9 +730,10 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
 
     METRIC *metric = (METRIC *)smh;
     struct dbengine_tier *ctx = mrg_metric_ctx(metric);
+    struct dbengine_engine *engine = ctx->engine;
     struct dbengine_query_handle *handle;
 
-    handle = dbengine_query_handle_get();
+    handle = dbengine_query_handle_get(engine);
     register_query_handle(handle);
 
     if (unlikely(priority < STORAGE_PRIORITY_HIGH))
@@ -740,7 +753,7 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
 
     time_t db_first_time_s, db_last_time_s;
     uint32_t db_update_every_s;
-    mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, &db_update_every_s);
+    mrg_metric_get_retention(engine->main_mrg, metric, &db_first_time_s, &db_last_time_s, &db_update_every_s);
 
     if(is_page_in_time_range(start_time_s, end_time_s, db_first_time_s, db_last_time_s) == PAGE_IS_IN_RANGE) {
         handle->start_time_s = MAX(start_time_s, db_first_time_s);
@@ -749,8 +762,8 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
 
         handle->dt_s = db_update_every_s;
         if (!handle->dt_s) {
-            handle->dt_s = dbengine_cfg.default_update_every_s;
-            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, dbengine_cfg.default_update_every_s);
+            handle->dt_s = engine->cfg.default_update_every_s;
+            mrg_metric_set_update_every_s_if_zero(engine->main_mrg, metric, engine->cfg.default_update_every_s);
         }
 
         seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
@@ -761,7 +774,7 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
 
         pg_cache_preload(handle);
 
-        time_and_count_add(&dbengine_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut);
+        time_and_count_add(&engine->cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut);
     }
     else {
         handle->start_time_s = start_time_s;
@@ -780,10 +793,11 @@ ALWAYS_INLINE_HOT void dbengine_query_init(
 static ALWAYS_INLINE_HOT bool dbengine_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
     struct dbengine_query_handle *handle = (struct dbengine_query_handle *)seqh->handle;
     struct dbengine_tier *ctx = mrg_metric_ctx(handle->metric);
+    struct dbengine_engine *engine = ctx->engine;
 
     if (likely(handle->page)) {
         // we have a page to release
-        pgc_page_release(main_cache, handle->page);
+        pgc_page_release(engine->main_cache, handle->page);
         handle->page = NULL;
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
     }
@@ -893,9 +907,10 @@ ALWAYS_INLINE int dbengine_query_is_finished(struct storage_engine_query_handle 
 ALWAYS_INLINE void dbengine_query_finalize(struct storage_engine_query_handle *seqh)
 {
     struct dbengine_query_handle *handle = (struct dbengine_query_handle *)seqh->handle;
+    struct dbengine_engine *engine = handle->ctx->engine;
 
     if (handle->page) {
-        pgc_page_release(main_cache, handle->page);
+        pgc_page_release(engine->main_cache, handle->page);
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
     }
 
@@ -905,7 +920,7 @@ ALWAYS_INLINE void dbengine_query_finalize(struct storage_engine_query_handle *s
     }
 
     unregister_query_handle(handle);
-    dbengine_query_handle_release(handle);
+    dbengine_query_handle_release(engine, handle);
     seqh->handle = NULL;
 }
 
@@ -926,7 +941,7 @@ ALWAYS_INLINE time_t dbengine_latest_time_s(STORAGE_METRIC_HANDLE *smh) {
     time_t latest_time_s = 0;
 
     if (metric)
-        latest_time_s = mrg_metric_get_latest_time_s(main_mrg, metric);
+        latest_time_s = mrg_metric_get_latest_time_s(mrg_metric_ctx(metric)->engine->main_mrg, metric);
 
     return latest_time_s;
 }
@@ -936,7 +951,7 @@ ALWAYS_INLINE time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh) {
 
     time_t oldest_time_s = 0;
     if (metric)
-        oldest_time_s = mrg_metric_get_first_time_s(main_mrg, metric);
+        oldest_time_s = mrg_metric_get_first_time_s(mrg_metric_ctx(metric)->engine->main_mrg, metric);
 
     return oldest_time_s;
 }
@@ -948,13 +963,14 @@ bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid
         return false;
     }
 
-    METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, dim_uuid, (Word_t)ctx);
+    struct dbengine_engine *engine = ctx->engine;
+    METRIC *metric = mrg_metric_get_and_acquire_by_uuid(engine->main_mrg, dim_uuid, (Word_t)ctx);
     if (unlikely(!metric))
         return false;
 
-    mrg_metric_get_retention(main_mrg, metric, first_entry_s, last_entry_s, NULL);
+    mrg_metric_get_retention(engine->main_mrg, metric, first_entry_s, last_entry_s, NULL);
 
-    mrg_metric_release(main_mrg, metric);
+    mrg_metric_release(engine->main_mrg, metric);
 
     return true;
 }
@@ -966,13 +982,14 @@ bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t
         return false;
     }
 
-    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
+    struct dbengine_engine *engine = ctx->engine;
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(engine->main_mrg, id, (Word_t)ctx);
     if (unlikely(!metric))
         return false;
 
-    mrg_metric_get_retention(main_mrg, metric, first_entry_s, last_entry_s, NULL);
+    mrg_metric_get_retention(engine->main_mrg, metric, first_entry_s, last_entry_s, NULL);
 
-    mrg_metric_release(main_mrg, metric);
+    mrg_metric_release(engine->main_mrg, metric);
 
     return true;
 }
@@ -984,12 +1001,13 @@ void dbengine_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id)
         return;
     }
 
-    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t)ctx);
+    struct dbengine_engine *engine = ctx->engine;
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(engine->main_mrg, id, (Word_t)ctx);
     if (unlikely(!metric))
         return;
 
-    mrg_metric_clear_retention(main_mrg, metric);
-    mrg_metric_release(main_mrg, metric);
+    mrg_metric_clear_retention(engine->main_mrg, metric);
+    mrg_metric_release(engine->main_mrg, metric);
 }
 
 uint64_t dbengine_disk_space_max(STORAGE_INSTANCE *si) {
@@ -1063,13 +1081,13 @@ void dbengine_get_stats(struct dbengine_tier *ctx, unsigned long long *array)
     array[27] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.page_cache_descriptors, __ATOMIC_RELAXED);
     array[28] = (uint64_t)__atomic_load_n(&ctx->stats.io_errors, __ATOMIC_RELAXED);
     array[29] = (uint64_t)__atomic_load_n(&ctx->stats.fs_errors, __ATOMIC_RELAXED);
-    array[30] = (uint64_t)__atomic_load_n(&global_stats.global_io_errors, __ATOMIC_RELAXED); // used
-    array[31] = (uint64_t)__atomic_load_n(&global_stats.global_fs_errors, __ATOMIC_RELAXED); // used
-    array[32] = (uint64_t)__atomic_load_n(&global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED); // used
+    array[30] = (uint64_t)__atomic_load_n(&ctx->engine->global_stats.global_io_errors, __ATOMIC_RELAXED); // used
+    array[31] = (uint64_t)__atomic_load_n(&ctx->engine->global_stats.global_fs_errors, __ATOMIC_RELAXED); // used
+    array[32] = (uint64_t)__atomic_load_n(&ctx->engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED); // used
     array[33] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.pg_cache_over_half_dirty_events, __ATOMIC_RELAXED);
-    array[34] = (uint64_t)__atomic_load_n(&global_stats.global_pg_cache_over_half_dirty_events, __ATOMIC_RELAXED); // used
+    array[34] = (uint64_t)__atomic_load_n(&ctx->engine->global_stats.global_pg_cache_over_half_dirty_events, __ATOMIC_RELAXED); // used
     array[35] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.flushing_pressure_page_deletions, __ATOMIC_RELAXED);
-    array[36] = (uint64_t)__atomic_load_n(&global_stats.global_flushing_pressure_page_deletions, __ATOMIC_RELAXED); // used
+    array[36] = (uint64_t)__atomic_load_n(&ctx->engine->global_stats.global_flushing_pressure_page_deletions, __ATOMIC_RELAXED); // used
     array[37] = 0; //(uint64_t)pg_cache->active_descriptors;
 
     fatal_assert(DBENGINE_STATS_COUNT == 38);
@@ -1079,12 +1097,13 @@ static void dbengine_populate_mrg(struct dbengine_tier *ctx)
 {
     size_t datafiles = datafile_count(ctx, false);
 
-    ssize_t cpus = (ssize_t)dbengine_cfg.cpus;
+    ssize_t cpus = (ssize_t)ctx->engine->cfg.cpus;
 
     netdata_log_info("DBENGINE: tier %d: populating retention to MRG from %zu journal files, using a shared pool of %zd threads...", ctx->config.tier, datafiles, cpus);
 
     completion_init(&ctx->loading.load_mrg);
     dbengine_enq_cmd(
+        ctx->engine,
         ctx,
         DBENGINE_OPCODE_CTX_POPULATE_MRG,
         NULL,
@@ -1129,7 +1148,7 @@ static void dbengine_tier_config_validate(const struct dbengine_tier_config *tc)
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
 }
 
-int dbengine_tier_init(const struct dbengine_tier_config *tc)
+int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tier_config *tc)
 {
     uint32_t max_open_files;
 
@@ -1137,9 +1156,12 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
     // engine and the tier, all before anything is written: a refused init must leave the static tier as it found it
     dbengine_tier_config_validate(tc);
 
-    switch(dbengine_lifecycle_state()) {
+    if(!engine)
+        fatal("DBENGINE: dbengine_tier_init() for tier %zu called without an engine", tc->tier);
+
+    switch(dbengine_engine_lifecycle_state(engine)) {
         case DBENGINE_LIFECYCLE_DOWN:
-            fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
+            fatal("DBENGINE: dbengine_tier_init() for tier %zu called on an engine that is not up", tc->tier);
 
         case DBENGINE_LIFECYCLE_STOPPED:
             netdata_log_error("DBENGINE: tier %zu: the engine was shut down, the tier cannot be initialized", tc->tier);
@@ -1152,28 +1174,33 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
     size_t tier = tc->tier;
     unsigned disk_space_mb = tc->disk_space_mb;
 
+    // the static tiers belong to the engine that claimed them at dbengine_create(); a tier opened against any other
+    // engine would charge its budget and its lifecycle to one engine and its exit to another
+    if(dbengine_multidb_tiers[tier]->engine != engine)
+        fatal("DBENGINE: dbengine_tier_init() for tier %zu called with an engine that does not own the tier", tier);
+
     if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.active, __ATOMIC_ACQUIRE)) {
         netdata_log_error("DBENGINE: tier %zu is already up, the tier cannot be initialized again", tier);
         return UV_EALREADY;
     }
 
     if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.came_up, __ATOMIC_ACQUIRE)) {
-        netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again in this process", tier);
+        netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again on this engine", tier);
         return UV_EIO;
     }
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
     /* reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier */
-    rrd_stat_atomic_add(&global_stats.dbengine_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
-    if (global_stats.dbengine_reserved_file_descriptors > max_open_files) {
+    rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
+    if (engine->global_stats.dbengine_reserved_file_descriptors > max_open_files) {
         netdata_log_error(
             "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine tier.",
-            (unsigned)global_stats.dbengine_reserved_file_descriptors,
+            (unsigned)engine->global_stats.dbengine_reserved_file_descriptors,
             (unsigned)max_open_files);
 
-        rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
-        rrd_stat_atomic_add(&global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
+        rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
+        rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
         return UV_EMFILE;
     }
 
@@ -1208,40 +1235,56 @@ int dbengine_tier_init(const struct dbengine_tier_config *tc)
         return 0;
     }
 
-    rrd_stat_atomic_add(&global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
+    rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
     return UV_EIO;
 }
 
-size_t dbengine_destroy(void) {
+size_t dbengine_destroy(struct dbengine_engine *engine) {
+    if(!engine)
+        return 0;
+
     // destroying the open and extent caches asks their sizing callbacks, which read the main cache, so they go
     // first; pages carry METRIC pointers, so the registry goes after the caches; an open cache page holds a
     // reference on its datafile, released when the page is freed, so the datafiles are finalized after the open
-    // cache. A global is cleared only when its object was freed: one with live references stays allocated (its
+    // cache. A pointer is cleared only when its object was freed: one with live references stays allocated (its
     // destroy says so), and a late release must still find it. Such a cache outlives the main cache it sizes
     // itself from; its callback (pagecache.c) falls back to its floor once the main cache is gone.
-    if(extent_cache) {
+    if(engine->extent_cache) {
         fprintf(stderr, "Destroying extent cache (PGC)...\n");
-        if(pgc_destroy(extent_cache, false))
-            extent_cache = NULL;
+        if(pgc_destroy(engine->extent_cache, false))
+            engine->extent_cache = NULL;
     }
-    if(open_cache) {
+    if(engine->open_cache) {
         fprintf(stderr, "Destroying open cache (PGC)...\n");
-        if(pgc_destroy(open_cache, false))
-            open_cache = NULL;
+        if(pgc_destroy(engine->open_cache, false))
+            engine->open_cache = NULL;
     }
-    if(main_cache) {
+    if(engine->main_cache) {
         fprintf(stderr, "Destroying main cache (PGC)...\n");
-        if(pgc_destroy(main_cache, false))
-            main_cache = NULL;
+        // the pointer goes before the cache: the thread that kept a follower cache allocated was not joined, and
+        // its sizing callback (pagecache.c) reads the pointer from that thread. Cleared first, a reader that comes
+        // after finds nothing rather than a cache being freed; a reader that loaded the pointer just before is
+        // beyond what a store can order (see the callback). A cache that stays allocated is reachable again once
+        // this is done: a release after the call must still find it. While pgc_destroy() runs, a thread that still
+        // holds a page of the main cache itself reads NULL here, where it used to read the cache; such a thread is
+        // outside the contract too, and a NULL is a louder failure than a cache being freed under it. The two
+        // follower pointers above are cleared plainly: nothing reads them from a thread that is not joined
+        PGC *main_cache = engine->main_cache;
+        __atomic_store_n(&engine->main_cache, NULL, __ATOMIC_RELEASE);
+        if(!pgc_destroy(main_cache, false))
+            __atomic_store_n(&engine->main_cache, main_cache, __ATOMIC_RELEASE);
     }
 
     size_t metrics_referenced = 0;
-    if(main_mrg) {
+    if(engine->main_mrg) {
         fprintf(stderr, "Destroying metrics registry (MRG)...\n");
-        metrics_referenced = mrg_destroy(main_mrg);
+        metrics_referenced = mrg_destroy(engine->main_mrg);
         if(!metrics_referenced)
-            main_mrg = NULL;
+            engine->main_mrg = NULL;
     }
+
+    // the object outlives this call when a cache or the registry stays allocated: they and the tiers still point at it
+    bool retained = engine->main_cache || engine->open_cache || engine->extent_cache || engine->main_mrg;
 
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
@@ -1255,22 +1298,30 @@ size_t dbengine_destroy(void) {
         // finalization had to skip, so a leak checker reports them instead of seeing them reachable from here.
         netdata_rwlock_destroy(&ctx->datafiles.rwlock);
         initialize_tier(ctx);
+
+        // a tier that a retained cache or registry can still reach keeps its way to the engine
+        ctx->engine = retained ? engine : NULL;
     }
+
+    if(!retained)
+        dbengine_engine_free(engine);
 
     return metrics_referenced;
 }
 
-void dbengine_preload_release(void) {
-    if(main_mrg)
-        mrg_metric_prepopulate_cleanup(main_mrg);
+void dbengine_preload_release(struct dbengine_engine *engine) {
+    if(engine && engine->main_mrg)
+        mrg_metric_prepopulate_cleanup(engine->main_mrg);
 }
 
-bool dbengine_get_cache_stats(DBENGINE_CACHE which, struct dbengine_cache_stats *out) {
+bool dbengine_get_cache_stats(struct dbengine_engine *engine, DBENGINE_CACHE which, struct dbengine_cache_stats *out) {
     PGC *cache = NULL;
-    switch(which) {
-        case DBENGINE_CACHE_MAIN:   cache = main_cache;   break;
-        case DBENGINE_CACHE_OPEN:   cache = open_cache;   break;
-        case DBENGINE_CACHE_EXTENT: cache = extent_cache; break;
+    if(engine) {
+        switch(which) {
+            case DBENGINE_CACHE_MAIN:   cache = engine->main_cache;   break;
+            case DBENGINE_CACHE_OPEN:   cache = engine->open_cache;   break;
+            case DBENGINE_CACHE_EXTENT: cache = engine->extent_cache; break;
+        }
     }
     if(!cache) {
         memset(out, 0, sizeof(*out));
@@ -1280,16 +1331,16 @@ bool dbengine_get_cache_stats(DBENGINE_CACHE which, struct dbengine_cache_stats 
     return true;
 }
 
-size_t dbengine_pages_pending_flush(void) {
-    return main_cache ? pgc_hot_and_dirty_entries(main_cache) : 0;
+size_t dbengine_pages_pending_flush(struct dbengine_engine *engine) {
+    return engine && engine->main_cache ? pgc_hot_and_dirty_entries(engine->main_cache) : 0;
 }
 
-bool dbengine_get_metrics_registry_stats(struct dbengine_metrics_registry_stats *out) {
-    if(!main_mrg) {
+bool dbengine_get_metrics_registry_stats(struct dbengine_engine *engine, struct dbengine_metrics_registry_stats *out) {
+    if(!engine || !engine->main_mrg) {
         memset(out, 0, sizeof(*out));
         return false;
     }
-    mrg_get_statistics(main_mrg, out);
+    mrg_get_statistics(engine->main_mrg, out);
     return true;
 }
 
@@ -1334,16 +1385,16 @@ int dbengine_tier_exit(struct dbengine_tier *ctx) {
         count--;
     }
 
-    pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
+    pgc_flush_all_hot_and_dirty_pages(ctx->engine->main_cache, (Word_t)ctx);
 
     struct completion completion = {};
     completion_init(&completion);
-    dbengine_enq_cmd(ctx, DBENGINE_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    dbengine_enq_cmd(ctx->engine, ctx, DBENGINE_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
 
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    rrd_stat_atomic_add(&global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
+    rrd_stat_atomic_add(&ctx->engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
     return 0;
 }
 
@@ -1352,7 +1403,7 @@ void dbengine_flush_dirty(struct dbengine_tier *ctx)
     if (NULL == ctx)
         return;
 
-    dbengine_enq_cmd(ctx, DBENGINE_OPCODE_CTX_FLUSH_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    dbengine_enq_cmd(ctx->engine, ctx, DBENGINE_OPCODE_CTX_FLUSH_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 void dbengine_flush_all(struct dbengine_tier *ctx)
@@ -1360,7 +1411,7 @@ void dbengine_flush_all(struct dbengine_tier *ctx)
     if (NULL == ctx)
         return;
 
-    dbengine_enq_cmd(ctx, DBENGINE_OPCODE_CTX_FLUSH_HOT_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    dbengine_enq_cmd(ctx->engine, ctx, DBENGINE_OPCODE_CTX_FLUSH_HOT_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 void dbengine_quiesce(struct dbengine_tier *ctx)
@@ -1368,7 +1419,7 @@ void dbengine_quiesce(struct dbengine_tier *ctx)
     if (NULL == ctx)
         return;
 
-    dbengine_enq_cmd(ctx, DBENGINE_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    dbengine_enq_cmd(ctx->engine, ctx, DBENGINE_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 static void populate_v2_statistics(struct dbengine_datafile *datafile, struct dbengine_size_stats *stats)
@@ -1455,7 +1506,7 @@ static void populate_v2_statistics(struct dbengine_datafile *datafile, struct db
                 if(likely(points > 1))
                     update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
                 else {
-                    update_every_s = (time_t) (dbengine_cfg.default_update_every_s * datafile_ctx(datafile)->config.grouping);
+                    update_every_s = (time_t) (datafile_ctx(datafile)->engine->cfg.default_update_every_s * datafile_ctx(datafile)->config.grouping);
                     stats->single_point_pages++;
                 }
 
@@ -1544,17 +1595,17 @@ struct dbengine_size_stats dbengine_get_size_stats(struct dbengine_tier *ctx) {
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = page_type_size[ctx->config.page_type];
     stats.sizeof_page_data = tier_page_size[ctx->config.tier];
-    stats.pages_per_extent = dbengine_cfg.pages_per_extent;
+    stats.pages_per_extent = ctx->engine->cfg.pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t)dbengine_cfg.default_update_every_s * ctx->config.grouping;
+    stats.default_granularity_secs = (size_t)ctx->engine->cfg.default_update_every_s * ctx->config.grouping;
 
     return stats;
 }
 
-struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(void) {
+struct dbengine_cache_efficiency_stats dbengine_get_cache_efficiency_stats(struct dbengine_engine *engine) {
     // FIXME - make cache efficiency stats atomic
-    return dbengine_cache_efficiency_stats;
+    return engine ? engine->cache_efficiency_stats : (struct dbengine_cache_efficiency_stats){ 0 };
 }

@@ -7,6 +7,9 @@
 
 typedef struct metric METRIC;
 typedef struct mrg MRG;
+struct dbengine_engine;
+
+DEFINE_JUDYL_TYPED(METRIC, METRIC *);
 
 typedef struct mrg_entry {
     nd_uuid_t *uuid;
@@ -16,7 +19,8 @@ typedef struct mrg_entry {
     uint32_t latest_update_every_s;
 } MRG_ENTRY;
 
-MRG *mrg_create(void);
+// the registry belongs to the engine: it reads the engine's configuration and keeps the engine's preload set
+MRG *mrg_create(struct dbengine_engine *engine);
 MRG *mrg_create_for_unittest(void);
 
 // returns the number of metrics still referenced; when non-zero the MRG is left allocated
@@ -41,7 +45,7 @@ UUIDMAP_ID mrg_metric_uuidmap_id_dup(MRG *mrg, METRIC *metric);
 // different metric. Taking a reference instead would make the holder an
 // owner, which is exactly what we want to avoid.
 UUIDMAP_ID mrg_metric_uuidmap_id(MRG *mrg, METRIC *metric);
-Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
+Word_t mrg_metric_section(METRIC *metric);
 
 bool mrg_metric_set_first_time_s(MRG *mrg, METRIC *metric, time_t first_time_s);
 bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg, METRIC *metric, time_t first_time_s);

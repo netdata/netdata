@@ -77,6 +77,8 @@ struct metric {
 extern struct aral_statistics mrg_aral_statistics;
 
 struct mrg {
+    struct dbengine_engine *engine;     // NULL for a registry made by the unit tests, which preloads nothing
+
     // each partition 64-aligned so the contended rw_spinlock words of
     // adjacent partitions do not false-share a cache line
     struct mrg_partition {
