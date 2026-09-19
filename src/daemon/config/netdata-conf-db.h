@@ -9,7 +9,7 @@ extern bool dbengine_enabled;
 extern bool dbengine_datafiles_present; // dbengine datafiles exist on disk, even if the agent is not currently running dbengine
 
 #ifdef ENABLE_DBENGINE
-#include "database/engine/include/dbengine/dbengine-config.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 // the engine's process-wide configuration as the daemon resolved it from netdata.conf; the
 // daemon reads its own copy, the engine gets it through netdata_conf_dbengine_apply()
 extern struct dbengine_config netdata_conf_dbengine;

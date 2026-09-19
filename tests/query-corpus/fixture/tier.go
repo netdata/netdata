@@ -18,7 +18,7 @@ import (
 //   - page slot layout:
 //     src/libnetdata/storage_number/storage_number.h:78-84
 //   - float32 page write/read, which does not retain generic flags:
-//     src/database/engine/page.c:954-967,1088-1099
+//     src/database/storage-engines/dbengine/page.c:954-967,1088-1099
 //
 // Sum/Min/Max already carry the single float32 page-write rounding. EndT is
 // the wall-clock-aligned window end and stored timestamp. Count and GapCount

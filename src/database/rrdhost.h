@@ -24,7 +24,7 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 //#include "streaming/stream-replication-tracking.h"
 #include "streaming/stream-parents.h"
 #include "streaming/stream-path.h"
-#include "storage-engine.h"
+#include "storage-engines/storage-engine.h"
 //#include "streaming/stream-traffic-types.h"
 #include "rrdlabels.h"
 #include "health/health-alert-log.h"

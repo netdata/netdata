@@ -26,7 +26,6 @@ extern "C" {
 #include "locks/benchmark-rw.h"
 #include "object-state/object-state.h"
 #include "storage-point.h"
-#include "storage-engine-types.h"
 #include "paths/paths.h"
 
 int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);

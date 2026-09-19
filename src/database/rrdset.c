@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdset.h"
-#include "storage-engine.h"
+#include "storage-engines/storage-engine.h"
 
 void rrdset_metadata_updated(RRDSET *st) {
     __atomic_add_fetch(&st->version, 1, __ATOMIC_RELAXED);

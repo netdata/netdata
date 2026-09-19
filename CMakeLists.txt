@@ -1170,7 +1170,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-item.h
         src/libnetdata/dictionary/dictionary-callbacks.h
         src/libnetdata/storage-point.h
-        src/libnetdata/storage-engine-types.h
         src/libnetdata/parsers/parsers.h
         src/libnetdata/parsers/duration.c
         src/libnetdata/parsers/duration-unittest.c
@@ -1850,10 +1849,11 @@ set(RRD_PLUGIN_FILES
         src/database/rrd-retention.c
         src/database/rrd-retention.h
         src/database/rrdset.c
-        src/database/storage-engine.c
-        src/database/storage-engine.h
-        src/database/ram/rrddim_mem.c
-        src/database/ram/rrddim_mem.h
+        src/database/storage-engines/storage-engine.c
+        src/database/storage-engines/storage-engine.h
+        src/database/storage-engines/storage-engine-types.h
+        src/database/storage-engines/ram/rrddim_mem.c
+        src/database/storage-engines/ram/rrddim_mem.h
         src/database/sqlite/sqlite_metadata.c
         src/database/sqlite/sqlite_metadata.h
         src/database/sqlite/sqlite_functions.c
@@ -1919,48 +1919,49 @@ if(ENABLE_DBENGINE)
     )
 
     # The engine. Its public headers live under include/dbengine/ and are included from the source root
-    # (database/engine/include/dbengine/<name>.h), which resolves through libnetdata's src/ include path; the
-    # target declares no include directories of its own, so the layout documents the public surface and the
-    # target compiles the engine as one unit. It is a statement, not a guard: libnetdata exports src/, so a private
-    # engine header stays reachable by its path. It is an object library, not a static archive, so every engine
-    # object is linked whether or not something references it by name: a constructor-only object cannot be dropped
-    # from the link. The published statistics structs (dbengine-stats.h) are assembled by both this target and
-    # netdata, and their layout depends on the compile-time switches in that header: never give one target a
-    # definition the other does not get, or the snapshots pulse copies across the boundary silently misalign.
+    # (database/storage-engines/dbengine/include/dbengine/<name>.h), which resolves through libnetdata's src/
+    # include path; the target declares no include directories of its own, so the layout documents the public
+    # surface and the target compiles the engine as one unit. It is a statement, not a guard: libnetdata exports
+    # src/, so a private engine header stays reachable by its path. It is an object library, not a static archive,
+    # so every engine object is linked whether or not something references it by name: a constructor-only object
+    # cannot be dropped from the link. The published statistics structs (dbengine-stats.h) are assembled by both
+    # this target and netdata, and their layout depends on the compile-time switches in that header: never give one
+    # target a definition the other does not get, or the snapshots pulse copies across the boundary silently
+    # misalign.
     set(DBENGINE_FILES
-            src/database/engine/include/dbengine/rrdengineapi.h
-            src/database/engine/include/dbengine/dbengine-config.h
-            src/database/engine/include/dbengine/dbengine-stats.h
-            src/database/engine/include/dbengine/dbengine-workers.h
-            src/database/engine/include/dbengine/dbengine-tests.h
-            src/database/engine/rrdengine.c
-            src/database/engine/rrdengine.h
-            src/database/engine/rrddiskprotocol.h
-            src/database/engine/datafile.c
-            src/database/engine/datafile.h
-            src/database/engine/journalfile.c
-            src/database/engine/journalfile.h
-            src/database/engine/rrdenginelib.c
-            src/database/engine/rrdenginelib.h
-            src/database/engine/rrdengineapi.c
-            src/database/engine/rrdengineapi-unittest.c
-            src/database/engine/pagecache.c
-            src/database/engine/pagecache.h
-            src/database/engine/page_test.cc
-            src/database/engine/page.c
-            src/database/engine/page.h
-            src/database/engine/cache.c
-            src/database/engine/cache.h
-            src/database/engine/mrg.c
-            src/database/engine/mrg.h
-            src/database/engine/mrg-internals.h
-            src/database/engine/mrg-unittest.c
-            src/database/engine/mrg-load.c
-            src/database/engine/pdc.c
-            src/database/engine/pdc.h
-            src/database/engine/dbengine-compression.c
-            src/database/engine/dbengine-compression.h
-            src/database/engine/dbengine-config.c
+            src/database/storage-engines/dbengine/include/dbengine/rrdengineapi.h
+            src/database/storage-engines/dbengine/include/dbengine/dbengine-config.h
+            src/database/storage-engines/dbengine/include/dbengine/dbengine-stats.h
+            src/database/storage-engines/dbengine/include/dbengine/dbengine-workers.h
+            src/database/storage-engines/dbengine/include/dbengine/dbengine-tests.h
+            src/database/storage-engines/dbengine/rrdengine.c
+            src/database/storage-engines/dbengine/rrdengine.h
+            src/database/storage-engines/dbengine/rrddiskprotocol.h
+            src/database/storage-engines/dbengine/datafile.c
+            src/database/storage-engines/dbengine/datafile.h
+            src/database/storage-engines/dbengine/journalfile.c
+            src/database/storage-engines/dbengine/journalfile.h
+            src/database/storage-engines/dbengine/rrdenginelib.c
+            src/database/storage-engines/dbengine/rrdenginelib.h
+            src/database/storage-engines/dbengine/rrdengineapi.c
+            src/database/storage-engines/dbengine/rrdengineapi-unittest.c
+            src/database/storage-engines/dbengine/pagecache.c
+            src/database/storage-engines/dbengine/pagecache.h
+            src/database/storage-engines/dbengine/page_test.cc
+            src/database/storage-engines/dbengine/page.c
+            src/database/storage-engines/dbengine/page.h
+            src/database/storage-engines/dbengine/cache.c
+            src/database/storage-engines/dbengine/cache.h
+            src/database/storage-engines/dbengine/mrg.c
+            src/database/storage-engines/dbengine/mrg.h
+            src/database/storage-engines/dbengine/mrg-internals.h
+            src/database/storage-engines/dbengine/mrg-unittest.c
+            src/database/storage-engines/dbengine/mrg-load.c
+            src/database/storage-engines/dbengine/pdc.c
+            src/database/storage-engines/dbengine/pdc.h
+            src/database/storage-engines/dbengine/dbengine-compression.c
+            src/database/storage-engines/dbengine/dbengine-compression.h
+            src/database/storage-engines/dbengine/dbengine-config.c
     )
 endif()
 
