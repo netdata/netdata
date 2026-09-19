@@ -4,9 +4,7 @@ package redfish
 
 import (
 	"os"
-	"regexp"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -25,53 +23,8 @@ func TestChartTemplate(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func templateCharts(t *testing.T) map[string]charttpl.Chart {
-	t.Helper()
-	spec, err := charttpl.DecodeYAML([]byte(chartTemplateYAML))
-	require.NoError(t, err)
-	result := make(map[string]charttpl.Chart)
-	var visit func([]charttpl.Group, string)
-	visit = func(groups []charttpl.Group, namespace string) {
-		for _, group := range groups {
-			current := namespace
-			if group.ContextNamespace != "" {
-				current = strings.TrimPrefix(current+"."+group.ContextNamespace, ".")
-			}
-			for _, chart := range group.Charts {
-				context := chart.Context
-				if current != "" {
-					context = current + "." + context
-				}
-				require.NotContains(t, result, context)
-				result[context] = chart
-			}
-			visit(group.Groups, current)
-		}
-	}
-	visit(spec.Groups, spec.ContextNamespace)
-	return result
-}
-
-// chartDimensionNames resolves the dimension names a template chart renders:
-// static names as written, and one dimension per declared state for a stateset
-// selector without a name. chartengine infers those names from the flattened
-// state series; it currently creates them in alphabetical order, so only the
-// set is a runtime contract, the order here is the declaration order.
-func chartDimensionNames(t *testing.T, chart charttpl.Chart) []string {
-	t.Helper()
-	var names []string
-	for _, dimension := range chart.Dimensions {
-		if dimension.Name != "" {
-			names = append(names, dimension.Name)
-			continue
-		}
-		states, ok := statesetStates()[dimension.Selector]
-		require.True(t, ok, "dimension %q has no name and is not a stateset", dimension.Selector)
-		names = append(names, states...)
-	}
-	return names
-}
-
+// statesetStates maps every stateset metric to its declared states, the names
+// chartengine renders for a stateset selector without an explicit name.
 func statesetStates() map[string][]string {
 	result := map[string][]string{"collection_status": collectionStates}
 	for _, definition := range measurement.Definitions() {
@@ -82,14 +35,25 @@ func statesetStates() map[string][]string {
 	return result
 }
 
-// Every alert in health.d must target a chart the template provides.
-func TestHealthAlertsTargetTemplateCharts(t *testing.T) {
-	charts := templateCharts(t)
-	raw, err := os.ReadFile("../../../../../health/health.d/redfish.conf")
+func readArtifact(t *testing.T, path string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
-	for _, match := range regexp.MustCompile(`(?m)^\s+on:\s+(\S+)`).FindAllStringSubmatch(string(raw), -1) {
-		require.Contains(t, charts, match[1])
-	}
+	return raw
+}
+
+const healthConfigPath = "../../../../../health/health.d/redfish.conf"
+
+func TestMetadataDocumentsChartTemplate(t *testing.T) {
+	collecttest.AssertMetadataDocumentsChartTemplate(t, readArtifact(t, "metadata.yaml"), chartTemplateYAML, statesetStates())
+}
+
+func TestHealthAlertsTargetChartTemplate(t *testing.T) {
+	collecttest.AssertHealthAlertsTargetChartTemplate(t, readArtifact(t, healthConfigPath), chartTemplateYAML)
+}
+
+func TestMetadataAlertsMatchHealthConfig(t *testing.T) {
+	collecttest.AssertMetadataAlertsMatchHealthConfig(t, readArtifact(t, "metadata.yaml"), readArtifact(t, healthConfigPath))
 }
 
 func TestMetadataDocumentsChartLabels(t *testing.T) {
@@ -126,46 +90,4 @@ func sortedLabelSets(in map[string][]string) map[string][]string {
 		out[scope] = slices.Sorted(slices.Values(labels))
 	}
 	return out
-}
-
-// Metadata and fixed chart definitions are maintained together after generator removal.
-func TestMetadataDocumentsEveryChart(t *testing.T) {
-	var metadata struct {
-		Modules []struct {
-			Metrics struct {
-				Scopes []struct {
-					Metrics []struct {
-						Name        string
-						Description string
-						Unit        string
-						ChartType   string `yaml:"chart_type"`
-						Dimensions  []struct{ Name string }
-					}
-				}
-			}
-		}
-	}
-	raw, err := os.ReadFile("metadata.yaml")
-	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(raw, &metadata))
-	require.Len(t, metadata.Modules, 1)
-	charts := templateCharts(t)
-	seen := make(map[string]bool)
-	for _, scope := range metadata.Modules[0].Metrics.Scopes {
-		for _, metric := range scope.Metrics {
-			require.False(t, seen[metric.Name], metric.Name)
-			seen[metric.Name] = true
-			chart, ok := charts[metric.Name]
-			require.True(t, ok, metric.Name)
-			require.Equal(t, chart.Title, metric.Description, metric.Name)
-			require.Equal(t, chart.Units, metric.Unit, metric.Name)
-			require.Equal(t, string(chart.Type), metric.ChartType, metric.Name)
-			var actual []string
-			for _, dimension := range metric.Dimensions {
-				actual = append(actual, dimension.Name)
-			}
-			require.Equal(t, chartDimensionNames(t, chart), actual, metric.Name)
-		}
-	}
-	require.Len(t, seen, len(charts))
 }
