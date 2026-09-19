@@ -86,7 +86,7 @@ type FunctionAvailability interface {
 }
 
 // CollectorV2EnginePolicy allows a V2 collector to provide chartengine policy
-// (series selector + autogen behavior).
+// (series selector, autogen behavior, and the collector's existing series limits).
 type CollectorV2EnginePolicy interface {
 	EnginePolicy() chartengine.EnginePolicy
 }

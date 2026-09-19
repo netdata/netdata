@@ -535,7 +535,7 @@ func validateComponent(
 	}
 	if err := requireEnum(field+".unit.quantity",
 		component.Unit.Quantity,
-		"count", "data", "duration", "duration_squared", "timestamp", "ratio", "currency", "temperature", "frequency", "state"); err != nil {
+		"count", "data", "data_rate", "duration", "duration_squared", "timestamp", "ratio", "currency", "temperature", "frequency", "state"); err != nil {
 		return err
 	}
 	for name, value := range map[string]string{
@@ -575,7 +575,7 @@ func validateSourceLabel(
 	} else if label.Presence.When.IsZero() {
 		return fmt.Errorf("%s.presence must be required, present, optional, or conditional", field)
 	}
-	if err := requireEnum(field+".domain.kind", label.Domain.Kind, "closed", "open"); err != nil {
+	if err := requireEnum(field+".domain.kind", label.Domain.Kind, "closed", "open", "unsigned_integer"); err != nil {
 		return err
 	}
 	if label.Domain.Kind == "closed" {
