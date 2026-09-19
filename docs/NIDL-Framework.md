@@ -299,9 +299,11 @@ connections/jms
 ```
 
 **Rules**:
-- No family can have both charts and subfamilies
-- Use "overview" only for metrics that don't fit subfamilies
-- Each leaf should have 3+ charts to justify existence
+- Name every level in the words an operator searches for; a leaf may hold a single chart when its name is that word,
+  because clicking a leaf is cheaper than scrolling a long one.
+- Keep the tree scannable when a section is expanded and keep leaf granularity consistent within a section.
+- A family may hold charts and subfamilies when the subfamily is an explicit jump (`Drives` with `Drives/NVMe`).
+- Use "overview" only for metrics that don't fit subfamilies.
 
 #### Step 3: Validate Metric Belonging and Instance Consistency
 
