@@ -8,7 +8,8 @@ size_t acquired_metrics_counter = 0;
 size_t acquired_metrics_deleted = 0;
 
 ALWAYS_INLINE
-static void mrg_metric_prepopulate(MRG *mrg, Word_t section, nd_uuid_t *uuid) {
+static void mrg_metric_prepopulate(void *mrg_ptr, Word_t section, nd_uuid_t *uuid) {
+    MRG *mrg = mrg_ptr;
     MRG_ENTRY entry = {
         .uuid = uuid,
         .section = section,
@@ -42,8 +43,11 @@ void mrg_metric_prepopulate_cleanup(MRG *mrg) {
     acquired_metrics_counter = 0;
 }
 
-// Main function to load metrics from the database
+// Pre-populate the registry from the embedder's list of known metrics, if it provides one
 bool mrg_load(MRG *mrg) {
-    size_t processed_metrics = populate_metrics_from_database(mrg, (void (*)(void *, Word_t, nd_uuid_t *))mrg_metric_prepopulate);
+    if(!dbengine_cfg.preload_metrics)
+        return false;
+
+    size_t processed_metrics = dbengine_cfg.preload_metrics(mrg, mrg_metric_prepopulate);
     return processed_metrics > 0;
 }

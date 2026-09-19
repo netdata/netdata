@@ -17,19 +17,11 @@ struct rrdengine_instance multidb_ctx_storage_tier4 = { 0 };
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS] = { 0 };
-uint8_t tier_page_type[RRD_STORAGE_TIERS] = {
-    RRDENG_PAGE_TYPE_GORILLA_32BIT,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1,
-    RRDENG_PAGE_TYPE_ARRAY_TIER1};
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
-size_t tier_quota_mb[RRD_STORAGE_TIERS] = {512, 512, 512, 0, 0};
 #else
 size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
-size_t tier_quota_mb[RRD_STORAGE_TIERS] = {1024, 1024, 1024, 128, 64};
 #endif
 
 #if RRDENG_PAGE_TYPE_MAX != 2
@@ -58,23 +50,6 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
     for(int i = 0; i < RRD_STORAGE_TIERS ; i++)
         initialize_single_ctx(multidb_ctx[i]);
 }
-
-uint64_t dbengine_out_of_memory_protection = 0;
-bool dbengine_use_all_ram_for_caches = false;
-int db_engine_journal_check = 0;
-bool new_dbengine_defaults = false;
-bool legacy_multihost_db_space = false;
-int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
-int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
-RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
-
-#if defined(ENV32BIT)
-int default_rrdeng_page_cache_mb = 16;
-int default_rrdeng_extent_cache_mb = 0;
-#else
-int default_rrdeng_page_cache_mb = 32;
-int default_rrdeng_extent_cache_mb = 0;
-#endif
 
 // ----------------------------------------------------------------------------
 // metrics groups
@@ -108,25 +83,6 @@ void rrdeng_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_M
 
     struct pg_alignment *pa = (struct pg_alignment *)smg;
     rrdeng_page_alignment_release(pa);
-}
-
-// ----------------------------------------------------------------------------
-// metric handle for legacy dbs
-
-/* This UUID is not unique across hosts */
-void rrdeng_generate_unittest_uuid(const char *dim_id, const char *chart_id, nd_uuid_t *ret_uuid)
-{
-    CLEAN_BUFFER *wb = buffer_create(100, NULL);
-    buffer_sprintf(wb,"%s.%s", dim_id, chart_id);
-    ND_UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
-    uuid_copy(*ret_uuid, uuid.uuid);
-}
-
-static METRIC *rrdeng_metric_unittest(STORAGE_INSTANCE *si, const char *rd_id, const char *st_id) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    nd_uuid_t legacy_uuid;
-    rrdeng_generate_unittest_uuid(rd_id, st_id, &legacy_uuid);
-    return mrg_metric_get_and_acquire_by_uuid(main_mrg, &legacy_uuid, (Word_t)ctx);
 }
 
 // ----------------------------------------------------------------------------
@@ -169,36 +125,26 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     return metric;
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    METRIC *metric;
 
-    metric = mrg_metric_get_and_acquire_by_id(main_mrg, rd->uuid, (Word_t) ctx);
-
-    if(unlikely(!metric)) {
-        if(unlikely(unittest_running)) {
-            metric = rrdeng_metric_unittest(si, rrddim_id(rd), rrdset_id(rd->rrdset));
-            if (metric)
-                rd->uuid = mrg_metric_uuidmap_id_dup(main_mrg, metric);
-        }
-
-        if(likely(!metric))
-            metric = rrdeng_metric_create(si, uuidmap_uuid_ptr(rd->uuid));
-    }
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, id, (Word_t) ctx);
+    if(unlikely(!metric))
+        metric = rrdeng_metric_create(si, uuidmap_uuid_ptr(id));
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(!uuid_eq(*uuidmap_uuid_ptr(rd->uuid), *mrg_metric_uuid(main_mrg, metric))) {
-        char uuid1[UUID_STR_LEN + 1];
-        char uuid2[UUID_STR_LEN + 1];
-
-        uuid_unparse(*uuidmap_uuid_ptr(rd->uuid), uuid1);
-        uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid2);
-        fatal("DBENGINE: uuids do not match, asked for metric '%s', but got metric '%s'", uuid1, uuid2);
-    }
-
     if(mrg_metric_ctx(metric) != ctx)
         fatal("DBENGINE: mixed up db instances, asked for metric from %p, got from %p",
               ctx, mrg_metric_ctx(metric));
+
+    if(!uuid_eq(*uuidmap_uuid_ptr(id), *mrg_metric_uuid(main_mrg, metric))) {
+        char uuid1[UUID_STR_LEN + 1];
+        char uuid2[UUID_STR_LEN + 1];
+
+        uuid_unparse(*uuidmap_uuid_ptr(id), uuid1);
+        uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid2);
+        fatal("DBENGINE: uuids do not match, asked for metric '%s', but got metric '%s'", uuid1, uuid2);
+    }
 #endif
 
     return (STORAGE_METRIC_HANDLE *)metric;
@@ -803,8 +749,8 @@ ALWAYS_INLINE_HOT void rrdeng_load_metric_init(
 
         handle->dt_s = db_update_every_s;
         if (!handle->dt_s) {
-            handle->dt_s = nd_profile.update_every;
-            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, nd_profile.update_every);
+            handle->dt_s = dbengine_cfg.default_update_every_s;
+            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, dbengine_cfg.default_update_every_s);
         }
 
         seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
@@ -1138,9 +1084,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx)
 {
     size_t datafiles = datafile_count(ctx, false);
 
-    ssize_t cpus = (ssize_t)netdata_conf_cpus();
-    if(cpus < 1)
-        cpus = 1;
+    ssize_t cpus = (ssize_t)dbengine_cfg.cpus;
 
     netdata_log_info("DBENGINE: tier %d: populating retention to MRG from %zu journal files, using a shared pool of %zd threads...", ctx->config.tier, datafiles, cpus);
 
@@ -1172,16 +1116,36 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(
-    struct rrdengine_instance **ctxp,
-    const char *dbfiles_path,
-    unsigned disk_space_mb,
-    size_t tier,
-    time_t max_retention_s)
+static void rrdeng_tier_config_validate(const struct rrdeng_tier_config *tc) {
+    if(tc->tier >= RRD_STORAGE_TIERS)
+        fatal("DBENGINE: tier %zu does not exist (the engine has %d tiers)", tc->tier, RRD_STORAGE_TIERS);
+
+    if(!tc->dbfiles_path || !*tc->dbfiles_path)
+        fatal("DBENGINE: tier %zu has no datafiles path", tc->tier);
+
+    // tier 0 stores samples; the tiers above it store aggregates, which only one page type can hold
+    bool valid_page_type = tc->tier == 0 ?
+        (tc->page_type == RRDENG_PAGE_TYPE_GORILLA_32BIT || tc->page_type == RRDENG_PAGE_TYPE_ARRAY_32BIT) :
+        (tc->page_type == RRDENG_PAGE_TYPE_ARRAY_TIER1);
+    if(!valid_page_type)
+        fatal("DBENGINE: page type %u is not valid for tier %zu", (unsigned)tc->page_type, tc->tier);
+
+    if(!tc->grouping)
+        fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
+}
+
+int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_config *tc)
 {
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
     bool freshly_initialized_ctx = false;
+
+    if(!dbengine_initialized())
+        fatal("DBENGINE: rrdeng_init() for tier %zu called before dbengine_init()", tc->tier);
+
+    rrdeng_tier_config_validate(tc);
+    size_t tier = tc->tier;
+    unsigned disk_space_mb = tc->disk_space_mb;
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
@@ -1207,10 +1171,11 @@ int rrdeng_init(
         ctx = multidb_ctx[tier];
 
     ctx->config.tier = (int)tier;
-    ctx->config.page_type = tier_page_type[tier];
+    ctx->config.page_type = tc->page_type;
+    ctx->config.grouping = tc->grouping;
     ctx->config.global_compress_alg = dbengine_default_compression();
 
-    strncpyz(ctx->config.dbfiles_path, dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
+    strncpyz(ctx->config.dbfiles_path, tc->dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
     ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';
 
     if (disk_space_mb && disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
@@ -1218,7 +1183,7 @@ int rrdeng_init(
 
     ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
 
-    ctx->config.max_retention_s = max_retention_s;
+    ctx->config.max_retention_s = tc->max_retention_s;
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
@@ -1229,18 +1194,28 @@ int rrdeng_init(
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too
+        __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
+        __atomic_store_n(&ctx->atomic.active, true, __ATOMIC_RELEASE);
         rrdeng_populate_mrg(ctx);
         return 0;
     }
 
-    if (unittest_running) {
+    if (ctxp) {
+        // the ctx was allocated above for this caller; hand nothing back
         freez(ctx);
-        if (ctxp)
-            *ctxp = NULL;
+        *ctxp = NULL;
     }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return UV_EIO;
+}
+
+size_t rrdeng_active_tiers(void) {
+    size_t active = 0;
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        if(rrdeng_ctx_is_active(multidb_ctx[tier]))
+            active++;
+    return active;
 }
 
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {
@@ -1254,6 +1229,11 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     if (NULL == ctx)
         return 1;
 
+    // no more periodic work for this tier from here on: the populated flag first, so that a rotation
+    // re-check already in flight on the event loop finds the gate closed before the tier goes inactive
+    __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&ctx->atomic.active, false, __ATOMIC_RELEASE);
+
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
     // 2. make new queries will not be accepted (this is quiesce that has already run)
@@ -1262,7 +1242,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     bool logged = false;
     size_t count = 10;
-    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count && !unittest_running) {
+    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count) {
         if(!logged) {
             netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", ctx->config.tier);
             logged = true;
@@ -1280,7 +1260,10 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    if(unittest_running)
+    // the static multidb contexts are never freed; anything else was allocated by
+    // rrdeng_init() for its caller (ctxp != NULL) and is released here
+    int tier = ctx->config.tier;
+    if(tier < 0 || tier >= RRD_STORAGE_TIERS || multidb_ctx[tier] != ctx)
         freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -1395,7 +1378,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
                 if(likely(points > 1))
                     update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
                 else {
-                    update_every_s = (time_t) (nd_profile.update_every * get_tier_grouping(datafile_ctx(datafile)->config.tier));
+                    update_every_s = (time_t) (dbengine_cfg.default_update_every_s * datafile_ctx(datafile)->config.grouping);
                     stats->single_point_pages++;
                 }
 
@@ -1484,12 +1467,12 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = page_type_size[ctx->config.page_type];
     stats.sizeof_page_data = tier_page_size[ctx->config.tier];
-    stats.pages_per_extent = rrdeng_pages_per_extent;
+    stats.pages_per_extent = dbengine_cfg.pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t)nd_profile.update_every * get_tier_grouping(ctx->config.tier);
+    stats.default_granularity_secs = (size_t)dbengine_cfg.default_update_every_s * ctx->config.grouping;
 
     return stats;
 }

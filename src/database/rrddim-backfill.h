@@ -9,6 +9,8 @@ typedef enum __attribute__ ((__packed__)) {
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
 
+extern RRD_BACKFILL default_backfill;
+
 #include "rrddim.h"
 
 bool backfill_tier_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);

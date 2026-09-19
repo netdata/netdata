@@ -430,6 +430,7 @@ int netdata_main(int argc, char **argv) {
                         char* stresstest_string = "stresstest=";
 
                         if(strcmp(optarg, "pgd-tests") == 0) {
+                            netdata_conf_dbengine_apply();
                             return pgd_test(argc, argv);
                         }
 #endif
@@ -738,10 +739,12 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "pgctest") == 0) {
                             unittest_running = true;
+                            netdata_conf_dbengine_apply();
                             return pgc_unittest();
                         }
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
+                            netdata_conf_dbengine_apply();
                             return mrg_unittest();
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
@@ -798,6 +801,10 @@ int netdata_main(int argc, char **argv) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
 
+                            // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
+                            // before this option can still override it
+                            netdata_conf_dbengine.page_cache_mb = 128;
+
                             if(unittest_libs_init())
                                 return 1;
 
@@ -830,6 +837,12 @@ int netdata_main(int argc, char **argv) {
 
                             if (workers > 1024)
                                 workers = 1024;
+
+                            // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
+                            // before this option can still override it
+                            if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
+                                page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+                            netdata_conf_dbengine.page_cache_mb = page_cache_mb;
 
                             char workers_str[16];
                             snprintf(workers_str, 15, "%u", workers);
