@@ -32,11 +32,8 @@ groups:
             title: Chassis Acquisition State
             context: chassis.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1660
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: chassis_acquisition_state{chassis_acquisition_state="readable"}
                 name: readable
@@ -48,11 +45,8 @@ groups:
             title: Chassis Conditions
             context: chassis.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 1670
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: chassis_conditions_ok
                 name: ok
@@ -66,11 +60,8 @@ groups:
             title: Chassis Health
             context: chassis.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1680
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: chassis_health{chassis_health="ok"}
                 name: ok
@@ -84,11 +75,8 @@ groups:
             title: Chassis Health Rollup
             context: chassis.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1690
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: chassis_health_rollup{chassis_health_rollup="ok"}
                 name: ok
@@ -102,11 +90,8 @@ groups:
             title: Chassis Intrusion State
             context: chassis.intrusion_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1700
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: chassis_intrusion_state{chassis_intrusion_state="normal"}
                 name: normal
@@ -120,11 +105,8 @@ groups:
             title: Chassis Power State
             context: chassis.power_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1710
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: chassis_power_state{chassis_power_state="on"}
                 name: "on"
@@ -142,11 +124,8 @@ groups:
             title: Chassis State
             context: chassis.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1720
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: chassis_state{chassis_state="enabled"}
                 name: enabled
@@ -206,11 +185,7 @@ groups:
             title: Percentage Readings
             context: reading.percentage
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 1730
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_percentage_value
                 name: value
@@ -246,11 +221,8 @@ groups:
             title: Redfish Reading Source Health State
             context: reading.alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1740
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_alarm{reading_alarm="clear"}
                 name: clear
@@ -288,11 +260,8 @@ groups:
             title: Redfish Reading Derived Health (Thresholds)
             context: reading.derived_health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1741
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: derived_health{derived_health="ok"}
                 name: ok
@@ -332,11 +301,8 @@ groups:
             title: Redundancy Acquisition State
             context: redundancy.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1750
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redundancy_acquisition_state{redundancy_acquisition_state="readable"}
                 name: readable
@@ -348,11 +314,8 @@ groups:
             title: Redundancy Conditions
             context: redundancy.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 1760
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redundancy_conditions_ok
                 name: ok
@@ -366,11 +329,8 @@ groups:
             title: Redundancy Enabled
             context: redundancy.enabled
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1770
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redundancy_enabled{redundancy_enabled="disabled"}
                 name: disabled
@@ -382,11 +342,8 @@ groups:
             title: Redundancy Health
             context: redundancy.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1780
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redundancy_health{redundancy_health="ok"}
                 name: ok
@@ -400,11 +357,8 @@ groups:
             title: Redundancy Health Rollup
             context: redundancy.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1790
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redundancy_health_rollup{redundancy_health_rollup="ok"}
                 name: ok
@@ -418,11 +372,7 @@ groups:
             title: Redundancy Members
             context: redundancy.members
             units: members
-            algorithm: absolute
-            type: line
             priority: 1800
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_redundancy_members_active
                 name: active
@@ -432,11 +382,8 @@ groups:
             title: Redundancy Mode
             context: redundancy.mode
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1810
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redundancy_mode{redundancy_mode="failover"}
                 name: failover
@@ -454,11 +401,8 @@ groups:
             title: Redundancy State
             context: redundancy.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1820
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redundancy_state{redundancy_state="enabled"}
                 name: enabled
@@ -525,11 +469,8 @@ groups:
             title: Sensor Acquisition State
             context: sensor.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1830
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: sensor_acquisition_state{sensor_acquisition_state="readable"}
                 name: readable
@@ -541,11 +482,8 @@ groups:
             title: Sensor Conditions
             context: sensor.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 1840
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: sensor_conditions_ok
                 name: ok
@@ -559,11 +497,8 @@ groups:
             title: Sensor Health
             context: sensor.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1850
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: sensor_health{sensor_health="ok"}
                 name: ok
@@ -577,11 +512,8 @@ groups:
             title: Sensor Health Rollup
             context: sensor.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1860
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: sensor_health_rollup{sensor_health_rollup="ok"}
                 name: ok
@@ -595,11 +527,8 @@ groups:
             title: Sensor State
             context: sensor.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1870
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: sensor_state{sensor_state="enabled"}
                 name: enabled
@@ -650,11 +579,8 @@ groups:
             title: Redfish Service Acquisition State
             context: service.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1880
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: service_acquisition_state{service_acquisition_state="readable"}
                 name: readable
@@ -693,11 +619,7 @@ groups:
             title: System Memory Bandwidth
             context: system.memory_bandwidth
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 1930
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_memory_bandwidth
                 name: bandwidth
@@ -707,11 +629,8 @@ groups:
             title: System Memory Summary Health
             context: system.memory_summary_health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1940
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_memory_summary_health{system_memory_summary_health="ok"}
                 name: ok
@@ -725,11 +644,8 @@ groups:
             title: System Memory Summary Health Rollup
             context: system.memory_summary_health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1950
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_memory_summary_health_rollup{system_memory_summary_health_rollup="ok"}
                 name: ok
@@ -743,11 +659,8 @@ groups:
             title: System Memory Summary State
             context: system.memory_summary_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1960
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_memory_summary_state{system_memory_summary_state="enabled"}
                 name: enabled
@@ -781,11 +694,7 @@ groups:
             title: System Memory Utilization
             context: system.memory_utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 1970
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_memory_utilization
                 name: capacity
@@ -795,11 +704,7 @@ groups:
             title: System Processor Bandwidth
             context: system.processor_bandwidth
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 1990
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_processor_bandwidth
                 name: bandwidth
@@ -809,11 +714,8 @@ groups:
             title: System Processor Summary Health
             context: system.processor_summary_health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2000
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_processor_summary_health{system_processor_summary_health="ok"}
                 name: ok
@@ -827,11 +729,8 @@ groups:
             title: System Processor Summary Health Rollup
             context: system.processor_summary_health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2010
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_processor_summary_health_rollup{system_processor_summary_health_rollup="ok"}
                 name: ok
@@ -845,11 +744,8 @@ groups:
             title: System Processor Summary State
             context: system.processor_summary_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2020
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_processor_summary_state{system_processor_summary_state="enabled"}
                 name: enabled
@@ -883,11 +779,7 @@ groups:
             title: System Processor Utilization
             context: system.processor_utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2030
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_processor_utilization_kernel
                 name: kernel
@@ -930,11 +822,8 @@ groups:
             title: System Acquisition State
             context: system.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1890
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_acquisition_state{system_acquisition_state="readable"}
                 name: readable
@@ -946,11 +835,8 @@ groups:
             title: System Conditions
             context: system.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 1900
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_conditions_ok
                 name: ok
@@ -964,11 +850,8 @@ groups:
             title: System Health
             context: system.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1910
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_health{system_health="ok"}
                 name: ok
@@ -982,11 +865,8 @@ groups:
             title: System Health Rollup
             context: system.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1920
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_health_rollup{system_health_rollup="ok"}
                 name: ok
@@ -1000,11 +880,8 @@ groups:
             title: System Power State
             context: system.power_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 1980
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_power_state{system_power_state="on"}
                 name: "on"
@@ -1022,11 +899,8 @@ groups:
             title: System State
             context: system.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2040
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_state{system_state="enabled"}
                 name: enabled
@@ -1093,11 +967,7 @@ groups:
             title: Processor PCIe Error Rate
             context: processor.pcie_error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 2130
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_processor_pcie_error_rate_bad_dllp
                 name: bad_dllp
@@ -1197,11 +1067,8 @@ groups:
             title: Processor Acquisition State
             context: processor.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2050
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_acquisition_state{processor_acquisition_state="readable"}
                 name: readable
@@ -1213,11 +1080,7 @@ groups:
             title: Processor Bandwidth Utilization
             context: processor.bandwidth_utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2060
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_bandwidth_utilization
                 name: bandwidth
@@ -1227,11 +1090,7 @@ groups:
             title: Processor Clock Speed
             context: processor.clock_speed
             units: MHz
-            algorithm: absolute
-            type: line
             priority: 2070
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_clock_speed_operating
                 name: operating
@@ -1241,11 +1100,8 @@ groups:
             title: Processor Conditions
             context: processor.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2080
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_conditions_ok
                 name: ok
@@ -1259,11 +1115,7 @@ groups:
             title: Processor Error Rate
             context: processor.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 2090
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_error_rate_correctable_core
                 name: correctable_core
@@ -1285,11 +1137,7 @@ groups:
             title: Processor Frequency Ratio
             context: processor.frequency_ratio
             units: ratio
-            algorithm: absolute
-            type: line
             priority: 2100
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_frequency_ratio
                 name: ratio
@@ -1299,11 +1147,8 @@ groups:
             title: Processor Health
             context: processor.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2110
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_health{processor_health="ok"}
                 name: ok
@@ -1317,11 +1162,8 @@ groups:
             title: Processor Health Rollup
             context: processor.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2120
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_health_rollup{processor_health_rollup="ok"}
                 name: ok
@@ -1335,11 +1177,8 @@ groups:
             title: Processor Power State
             context: processor.power_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2140
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_power_state{processor_power_state="on"}
                 name: "on"
@@ -1357,11 +1196,8 @@ groups:
             title: Processor State
             context: processor.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2150
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_state{processor_state="enabled"}
                 name: enabled
@@ -1395,11 +1231,7 @@ groups:
             title: Processor Thermal Headroom
             context: processor.thermal_headroom
             units: Celsius
-            algorithm: absolute
-            type: line
             priority: 2160
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_thermal_headroom
                 name: headroom
@@ -1409,11 +1241,7 @@ groups:
             title: Processor Throttle Time
             context: processor.throttle_time
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2170
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_throttle_time_power_limit
                 name: power_limit
@@ -1427,11 +1255,8 @@ groups:
             title: Processor Throttling State
             context: processor.throttling_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2180
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_throttling_state{processor_throttling_state="clear"}
                 name: clear
@@ -1443,11 +1268,7 @@ groups:
             title: Processor Utilization
             context: processor.utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2190
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_utilization_user
                 name: user
@@ -1478,11 +1299,8 @@ groups:
             title: Processor Core Acquisition State
             context: processor_core.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2200
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: processor_core_acquisition_state{processor_core_acquisition_state="readable"}
                 name: readable
@@ -1526,11 +1344,7 @@ groups:
             title: Processor Core Cycle Rate
             context: processor_core.cycle_rate
             units: cycles/s
-            algorithm: absolute
-            type: line
             priority: 2210
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_processor_core_cycle_rate_io_stall
                 name: io_stall
@@ -1548,11 +1362,7 @@ groups:
             title: Processor Core Error Rate
             context: processor_core.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 2220
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_processor_core_error_rate_correctable_core
                 name: correctable_core
@@ -1574,11 +1384,7 @@ groups:
             title: Processor Core Instructions per Cycle
             context: processor_core.instructions_per_cycle
             units: instructions/cycle
-            algorithm: absolute
-            type: line
             priority: 2230
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_processor_core_instructions_per_cycle
                 name: instructions
@@ -1641,11 +1447,8 @@ groups:
             title: Memory Module Acquisition State
             context: memory.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2240
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_acquisition_state{memory_acquisition_state="readable"}
                 name: readable
@@ -1657,11 +1460,7 @@ groups:
             title: Memory Module Bandwidth Utilization
             context: memory.bandwidth_utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2250
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_bandwidth_utilization
                 name: utilization
@@ -1671,11 +1470,7 @@ groups:
             title: Memory Module Capacity Utilization
             context: memory.capacity_utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2260
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_capacity_utilization
                 name: utilization
@@ -1685,11 +1480,8 @@ groups:
             title: Memory Module Conditions
             context: memory.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2270
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_conditions_ok
                 name: ok
@@ -1703,11 +1495,7 @@ groups:
             title: Memory Module Dirty Shutdown Rate
             context: memory.dirty_shutdown_rate
             units: shutdowns/s
-            algorithm: absolute
-            type: line
             priority: 2280
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_dirty_shutdown_rate
                 name: shutdowns
@@ -1717,11 +1505,7 @@ groups:
             title: Memory Module Error Rate
             context: memory.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 2290
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_memory_error_rate_correctable
                 name: correctable
@@ -1743,11 +1527,8 @@ groups:
             title: Memory Module Health
             context: memory.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2300
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_health{memory_health="ok"}
                 name: ok
@@ -1761,11 +1542,8 @@ groups:
             title: Memory Health Flags
             context: memory.health_flags
             units: flags
-            algorithm: absolute
             type: stacked
             priority: 2310
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_health_flags_data_loss
                 name: data_loss
@@ -1787,11 +1565,8 @@ groups:
             title: Memory Module Health Rollup
             context: memory.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2320
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_health_rollup{memory_health_rollup="ok"}
                 name: ok
@@ -1805,11 +1580,7 @@ groups:
             title: Memory Module I/O
             context: memory.io
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 2330
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_memory_io_read
                 name: read
@@ -1823,11 +1594,7 @@ groups:
             title: Memory Module Media Health
             context: memory.media_health
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2340
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_media_health_life_left
                 name: life_left
@@ -1841,11 +1608,8 @@ groups:
             title: Memory Module State
             context: memory.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2350
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: memory_state{memory_state="enabled"}
                 name: enabled
@@ -1907,11 +1671,7 @@ groups:
             title: Absolute Humidity Readings
             context: reading.absolute_humidity
             units: grams/cubic-meter
-            algorithm: absolute
-            type: line
             priority: 2360
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_absolute_humidity_value
                 name: value
@@ -1947,11 +1707,7 @@ groups:
             title: Air Flow Readings
             context: reading.air_flow
             units: cubic-meters/minute
-            algorithm: absolute
-            type: line
             priority: 2490
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_air_flow_value
                 name: value
@@ -1987,11 +1743,7 @@ groups:
             title: Altitude Readings
             context: reading.altitude
             units: meters
-            algorithm: absolute
-            type: line
             priority: 2500
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_altitude_value
                 name: value
@@ -2027,11 +1779,7 @@ groups:
             title: Barometric Pressure Readings
             context: reading.barometric_pressure
             units: pascals
-            algorithm: absolute
-            type: line
             priority: 2510
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_barometric_pressure_value
                 name: value
@@ -2069,11 +1817,8 @@ groups:
             title: Barometric Pressure Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2520
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_pressure_alarm{system_hw_sensor_pressure_alarm="clear"}
                 name: clear
@@ -2085,11 +1830,7 @@ groups:
             title: Barometric Pressure Reading (Zero basis)
             context: input
             units: pascals
-            algorithm: absolute
-            type: line
             priority: 2530
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_pressure_input
                 name: input
@@ -2162,11 +1903,8 @@ groups:
             title: Control Acquisition State
             context: control.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2540
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: control_acquisition_state{control_acquisition_state="readable"}
                 name: readable
@@ -2178,11 +1916,8 @@ groups:
             title: Control Conditions
             context: control.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2550
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: control_conditions_ok
                 name: ok
@@ -2196,11 +1931,7 @@ groups:
             title: Control Frequency
             context: control.frequency
             units: hertz
-            algorithm: absolute
-            type: line
             priority: 2560
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_frequency_sensor
                 name: sensor
@@ -2218,11 +1949,8 @@ groups:
             title: Control Health
             context: control.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2570
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: control_health{control_health="ok"}
                 name: ok
@@ -2236,11 +1964,8 @@ groups:
             title: Control Health Rollup
             context: control.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2580
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: control_health_rollup{control_health_rollup="ok"}
                 name: ok
@@ -2254,11 +1979,7 @@ groups:
             title: Control Linear Acceleration
             context: control.linear_acceleration
             units: meters/second2
-            algorithm: absolute
-            type: line
             priority: 2590
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_linear_acceleration_sensor
                 name: sensor
@@ -2276,11 +1997,7 @@ groups:
             title: Control Linear Position
             context: control.linear_position
             units: meters
-            algorithm: absolute
-            type: line
             priority: 2600
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_linear_position_sensor
                 name: sensor
@@ -2298,11 +2015,7 @@ groups:
             title: Control Linear Velocity
             context: control.linear_velocity
             units: meters/second
-            algorithm: absolute
-            type: line
             priority: 2610
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_linear_velocity_sensor
                 name: sensor
@@ -2320,11 +2033,7 @@ groups:
             title: Control Liquid Flow
             context: control.liquid_flow
             units: liters/minute
-            algorithm: absolute
-            type: line
             priority: 2620
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_liquid_flow_sensor
                 name: sensor
@@ -2342,11 +2051,7 @@ groups:
             title: Control Percentage
             context: control.percentage
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2630
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_percentage_sensor
                 name: sensor
@@ -2364,11 +2069,7 @@ groups:
             title: Control Power
             context: control.power
             units: watts
-            algorithm: absolute
-            type: line
             priority: 2640
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_power_sensor
                 name: sensor
@@ -2386,11 +2087,7 @@ groups:
             title: Control Pressure
             context: control.pressure
             units: pascals
-            algorithm: absolute
-            type: line
             priority: 2650
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_pressure_sensor
                 name: sensor
@@ -2408,11 +2105,7 @@ groups:
             title: Control Rotational Acceleration
             context: control.rotational_acceleration
             units: radians/second2
-            algorithm: absolute
-            type: line
             priority: 2660
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_rotational_acceleration_sensor
                 name: sensor
@@ -2430,11 +2123,7 @@ groups:
             title: Control Rotational Position
             context: control.rotational_position
             units: radians
-            algorithm: absolute
-            type: line
             priority: 2670
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_rotational_position_sensor
                 name: sensor
@@ -2452,11 +2141,7 @@ groups:
             title: Control Rotational Velocity
             context: control.rotational_velocity
             units: radians/second
-            algorithm: absolute
-            type: line
             priority: 2680
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_rotational_velocity_sensor
                 name: sensor
@@ -2474,11 +2159,8 @@ groups:
             title: Control State
             context: control.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2690
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: control_state{control_state="enabled"}
                 name: enabled
@@ -2512,11 +2194,7 @@ groups:
             title: Control Temperature
             context: control.temperature
             units: Celsius
-            algorithm: absolute
-            type: line
             priority: 2700
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_temperature_sensor
                 name: sensor
@@ -2534,11 +2212,7 @@ groups:
             title: Control Valve Position
             context: control.valve_position
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2710
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_control_valve_position_sensor
                 name: sensor
@@ -2588,11 +2262,8 @@ groups:
             title: Coolant Connector Acquisition State
             context: coolant_connector.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2720
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: coolant_connector_acquisition_state{coolant_connector_acquisition_state="readable"}
                 name: readable
@@ -2604,11 +2275,8 @@ groups:
             title: Coolant Connector Conditions
             context: coolant_connector.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2730
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: coolant_connector_conditions_ok
                 name: ok
@@ -2622,11 +2290,8 @@ groups:
             title: Coolant Connector Health
             context: coolant_connector.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2740
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: coolant_connector_health{coolant_connector_health="ok"}
                 name: ok
@@ -2640,11 +2305,8 @@ groups:
             title: Coolant Connector Health Rollup
             context: coolant_connector.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2750
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: coolant_connector_health_rollup{coolant_connector_health_rollup="ok"}
                 name: ok
@@ -2658,11 +2320,8 @@ groups:
             title: Coolant Connector State
             context: coolant_connector.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2760
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: coolant_connector_state{coolant_connector_state="enabled"}
                 name: enabled
@@ -2728,11 +2387,8 @@ groups:
             title: Fan Acquisition State
             context: fan.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2770
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: fan_acquisition_state{fan_acquisition_state="readable"}
                 name: readable
@@ -2744,11 +2400,8 @@ groups:
             title: Fan Conditions
             context: fan.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2780
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: fan_conditions_ok
                 name: ok
@@ -2762,11 +2415,8 @@ groups:
             title: Fan Health
             context: fan.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2790
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: fan_health{fan_health="ok"}
                 name: ok
@@ -2780,11 +2430,8 @@ groups:
             title: Fan Health Rollup
             context: fan.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2800
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: fan_health_rollup{fan_health_rollup="ok"}
                 name: ok
@@ -2798,11 +2445,8 @@ groups:
             title: Fan State
             context: fan.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2810
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: fan_state{fan_state="enabled"}
                 name: enabled
@@ -2868,11 +2512,8 @@ groups:
             title: Filter Acquisition State
             context: filter.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2820
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: filter_acquisition_state{filter_acquisition_state="readable"}
                 name: readable
@@ -2884,11 +2525,8 @@ groups:
             title: Filter Conditions
             context: filter.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2830
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: filter_conditions_ok
                 name: ok
@@ -2902,11 +2540,8 @@ groups:
             title: Filter Health
             context: filter.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2840
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: filter_health{filter_health="ok"}
                 name: ok
@@ -2920,11 +2555,8 @@ groups:
             title: Filter Health Rollup
             context: filter.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2850
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: filter_health_rollup{filter_health_rollup="ok"}
                 name: ok
@@ -2938,11 +2570,8 @@ groups:
             title: Filter State
             context: filter.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2860
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: filter_state{filter_state="enabled"}
                 name: enabled
@@ -3002,11 +2631,7 @@ groups:
             title: Heat Readings
             context: reading.heat
             units: watts
-            algorithm: absolute
-            type: line
             priority: 2870
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_heat_value
                 name: value
@@ -3050,11 +2675,8 @@ groups:
             title: Heater Acquisition State
             context: heater.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2880
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: heater_acquisition_state{heater_acquisition_state="readable"}
                 name: readable
@@ -3066,11 +2688,8 @@ groups:
             title: Heater Conditions
             context: heater.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2890
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: heater_conditions_ok
                 name: ok
@@ -3084,11 +2703,8 @@ groups:
             title: Heater Health
             context: heater.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2900
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: heater_health{heater_health="ok"}
                 name: ok
@@ -3102,11 +2718,8 @@ groups:
             title: Heater Health Rollup
             context: heater.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2910
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: heater_health_rollup{heater_health_rollup="ok"}
                 name: ok
@@ -3120,11 +2733,7 @@ groups:
             title: Heater Heating Time
             context: heater.heating_time
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2920
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_heater_heating_time_pre_power_on
                 name: pre_power_on
@@ -3138,11 +2747,8 @@ groups:
             title: Heater State
             context: heater.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2930
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: heater_state{heater_state="enabled"}
                 name: enabled
@@ -3202,11 +2808,7 @@ groups:
             title: Relative Humidity Readings
             context: reading.humidity
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2940
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_humidity_value
                 name: value
@@ -3244,11 +2846,8 @@ groups:
             title: Relative Humidity Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2950
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_humidity_alarm{system_hw_sensor_humidity_alarm="clear"}
                 name: clear
@@ -3260,11 +2859,7 @@ groups:
             title: Relative Humidity Reading (Zero basis)
             context: input
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 2960
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_humidity_input
                 name: input
@@ -3298,11 +2893,8 @@ groups:
             title: Leak Detection Acquisition State
             context: leak_detection.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2970
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detection_acquisition_state{leak_detection_acquisition_state="readable"}
                 name: readable
@@ -3314,11 +2906,8 @@ groups:
             title: Leak Detection Conditions
             context: leak_detection.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 2980
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detection_conditions_ok
                 name: ok
@@ -3332,11 +2921,8 @@ groups:
             title: Leak Detection Health
             context: leak_detection.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 2990
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detection_health{leak_detection_health="ok"}
                 name: ok
@@ -3350,11 +2936,8 @@ groups:
             title: Leak Detection Health Rollup
             context: leak_detection.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3000
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detection_health_rollup{leak_detection_health_rollup="ok"}
                 name: ok
@@ -3368,11 +2951,8 @@ groups:
             title: Leak Detection State
             context: leak_detection.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3010
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detection_state{leak_detection_state="enabled"}
                 name: enabled
@@ -3439,11 +3019,8 @@ groups:
             title: Leak Detector Acquisition State
             context: leak_detector.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3020
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_acquisition_state{leak_detector_acquisition_state="readable"}
                 name: readable
@@ -3455,11 +3032,8 @@ groups:
             title: Leak Detector Conditions
             context: leak_detector.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 3030
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_conditions_ok
                 name: ok
@@ -3473,11 +3047,8 @@ groups:
             title: Leak Detector State
             context: leak_detector.detector_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3040
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_detector_state{leak_detector_detector_state="ok"}
                 name: ok
@@ -3495,11 +3066,8 @@ groups:
             title: Leak Detector Health
             context: leak_detector.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3050
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_health{leak_detector_health="ok"}
                 name: ok
@@ -3513,11 +3081,8 @@ groups:
             title: Leak Detector Health Rollup
             context: leak_detector.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3060
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_health_rollup{leak_detector_health_rollup="ok"}
                 name: ok
@@ -3531,11 +3096,8 @@ groups:
             title: Leak Detector State
             context: leak_detector.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3070
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_state{leak_detector_state="enabled"}
                 name: enabled
@@ -3593,11 +3155,8 @@ groups:
             title: Leak Detector Group Acquisition State
             context: leak_detector_group.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3080
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_group_acquisition_state{leak_detector_group_acquisition_state="readable"}
                 name: readable
@@ -3609,11 +3168,8 @@ groups:
             title: Leak Detector Group Conditions
             context: leak_detector_group.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 3090
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_group_conditions_ok
                 name: ok
@@ -3627,11 +3183,8 @@ groups:
             title: Leak Detector Group Health
             context: leak_detector_group.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3100
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_group_health{leak_detector_group_health="ok"}
                 name: ok
@@ -3645,11 +3198,8 @@ groups:
             title: Leak Detector Group Health Rollup
             context: leak_detector_group.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3110
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_group_health_rollup{leak_detector_group_health_rollup="ok"}
                 name: ok
@@ -3663,11 +3213,8 @@ groups:
             title: Leak Detector Group State
             context: leak_detector_group.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3120
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: leak_detector_group_state{leak_detector_group_state="enabled"}
                 name: enabled
@@ -3727,11 +3274,7 @@ groups:
             title: Linear Acceleration Readings
             context: reading.linear_acceleration
             units: meters/second2
-            algorithm: absolute
-            type: line
             priority: 3130
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_linear_acceleration_value
                 name: value
@@ -3767,11 +3310,7 @@ groups:
             title: Linear Position Readings
             context: reading.linear_position
             units: meters
-            algorithm: absolute
-            type: line
             priority: 3140
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_linear_position_value
                 name: value
@@ -3807,11 +3346,7 @@ groups:
             title: Linear Velocity Readings
             context: reading.linear_velocity
             units: meters/second
-            algorithm: absolute
-            type: line
             priority: 3150
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_linear_velocity_value
                 name: value
@@ -3847,11 +3382,7 @@ groups:
             title: Liquid Flow Readings
             context: reading.liquid_flow
             units: liters/minute
-            algorithm: absolute
-            type: line
             priority: 3160
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_liquid_flow_value
                 name: value
@@ -3887,11 +3418,7 @@ groups:
             title: Liquid Level Readings
             context: reading.liquid_level
             units: meters
-            algorithm: absolute
-            type: line
             priority: 3170
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_liquid_level_value
                 name: value
@@ -3927,11 +3454,7 @@ groups:
             title: Pressure Readings
             context: reading.pressure
             units: pascals
-            algorithm: absolute
-            type: line
             priority: 3180
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_pressure_value
                 name: value
@@ -3973,11 +3496,8 @@ groups:
             title: Pump Acquisition State
             context: pump.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3190
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pump_acquisition_state{pump_acquisition_state="readable"}
                 name: readable
@@ -3989,11 +3509,8 @@ groups:
             title: Pump Conditions
             context: pump.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 3200
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pump_conditions_ok
                 name: ok
@@ -4007,11 +3524,8 @@ groups:
             title: Pump Health
             context: pump.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3210
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pump_health{pump_health="ok"}
                 name: ok
@@ -4025,11 +3539,8 @@ groups:
             title: Pump Health Rollup
             context: pump.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3220
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pump_health_rollup{pump_health_rollup="ok"}
                 name: ok
@@ -4043,11 +3554,8 @@ groups:
             title: Pump State
             context: pump.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3230
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pump_state{pump_state="enabled"}
                 name: enabled
@@ -4107,11 +3615,7 @@ groups:
             title: Rotational Acceleration Readings
             context: reading.rotational_acceleration
             units: radians/second2
-            algorithm: absolute
-            type: line
             priority: 3240
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_rotational_acceleration_value
                 name: value
@@ -4147,11 +3651,7 @@ groups:
             title: Rotational Position Readings
             context: reading.rotational_position
             units: radians
-            algorithm: absolute
-            type: line
             priority: 3250
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_rotational_position_value
                 name: value
@@ -4187,11 +3687,7 @@ groups:
             title: Rotational Speed Readings
             context: reading.rotational_speed
             units: RPM
-            algorithm: absolute
-            type: line
             priority: 3260
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_rotational_speed_value
                 name: value
@@ -4229,11 +3725,8 @@ groups:
             title: Rotational Speed Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3270
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_fan_alarm{system_hw_sensor_fan_alarm="clear"}
                 name: clear
@@ -4245,11 +3738,7 @@ groups:
             title: Rotational Speed Reading (Zero basis)
             context: input
             units: RPM
-            algorithm: absolute
-            type: line
             priority: 3280
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_fan_input
                 name: input
@@ -4285,11 +3774,7 @@ groups:
             title: Rotational Velocity Readings
             context: reading.rotational_velocity
             units: radians/second
-            algorithm: absolute
-            type: line
             priority: 3290
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_rotational_velocity_value
                 name: value
@@ -4325,11 +3810,7 @@ groups:
             title: Temperature Readings
             context: reading.temperature
             units: Celsius
-            algorithm: absolute
-            type: line
             priority: 3300
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_temperature_value
                 name: value
@@ -4367,11 +3848,8 @@ groups:
             title: Temperature Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3310
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_temperature_alarm{system_hw_sensor_temperature_alarm="clear"}
                 name: clear
@@ -4383,11 +3861,7 @@ groups:
             title: Temperature Reading (Zero basis)
             context: input
             units: Celsius
-            algorithm: absolute
-            type: line
             priority: 3320
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_temperature_input
                 name: input
@@ -4421,11 +3895,8 @@ groups:
             title: Thermal Subsystem Acquisition State
             context: thermal_subsystem.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3330
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: thermal_subsystem_acquisition_state{thermal_subsystem_acquisition_state="readable"}
                 name: readable
@@ -4437,11 +3908,8 @@ groups:
             title: Thermal Subsystem Conditions
             context: thermal_subsystem.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 3340
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: thermal_subsystem_conditions_ok
                 name: ok
@@ -4455,11 +3923,8 @@ groups:
             title: Thermal Subsystem Health
             context: thermal_subsystem.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3350
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: thermal_subsystem_health{thermal_subsystem_health="ok"}
                 name: ok
@@ -4473,11 +3938,8 @@ groups:
             title: Thermal Subsystem Health Rollup
             context: thermal_subsystem.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3360
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: thermal_subsystem_health_rollup{thermal_subsystem_health_rollup="ok"}
                 name: ok
@@ -4491,11 +3953,8 @@ groups:
             title: Thermal Subsystem State
             context: thermal_subsystem.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3370
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: thermal_subsystem_state{thermal_subsystem_state="enabled"}
                 name: enabled
@@ -4555,11 +4014,7 @@ groups:
             title: Valve Position Readings
             context: reading.valve_position
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 3380
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_valve_position_value
                 name: value
@@ -4597,11 +4052,7 @@ groups:
             title: Apparent Energy Readings
             context: reading.apparent_energy
             units: joule-equivalent
-            algorithm: absolute
-            type: line
             priority: 3450
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_apparent_energy_value
                 name: value
@@ -4637,11 +4088,7 @@ groups:
             title: Apparent Power Readings
             context: reading.apparent_power
             units: volt-amperes
-            algorithm: absolute
-            type: line
             priority: 3460
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_apparent_power_value
                 name: value
@@ -4691,11 +4138,8 @@ groups:
             title: Battery Acquisition State
             context: battery.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3470
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_acquisition_state{battery_acquisition_state="readable"}
                 name: readable
@@ -4707,11 +4151,7 @@ groups:
             title: Battery C-rate
             context: battery.c_rate
             units: ratio
-            algorithm: absolute
-            type: line
             priority: 3480
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_c_rate
                 name: rate
@@ -4721,11 +4161,7 @@ groups:
             title: Battery Charge Capacity
             context: battery.charge_capacity
             units: ampere-hours
-            algorithm: absolute
-            type: line
             priority: 3490
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_charge_capacity_actual
                 name: actual
@@ -4735,11 +4171,8 @@ groups:
             title: Battery Charge State
             context: battery.charge_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3500
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_charge_state{battery_charge_state="idle"}
                 name: idle
@@ -4753,11 +4186,8 @@ groups:
             title: Battery Conditions
             context: battery.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 3510
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_conditions_ok
                 name: ok
@@ -4771,11 +4201,7 @@ groups:
             title: Battery E-rate
             context: battery.e_rate
             units: ratio
-            algorithm: absolute
-            type: line
             priority: 3520
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_e_rate
                 name: rate
@@ -4785,11 +4211,7 @@ groups:
             title: Battery Energy Capacity
             context: battery.energy_capacity
             units: watt-hours
-            algorithm: absolute
-            type: line
             priority: 3530
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_energy_capacity_actual
                 name: actual
@@ -4799,11 +4221,8 @@ groups:
             title: Battery Health
             context: battery.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3540
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_health{battery_health="ok"}
                 name: ok
@@ -4817,11 +4236,8 @@ groups:
             title: Battery Health Rollup
             context: battery.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3550
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_health_rollup{battery_health_rollup="ok"}
                 name: ok
@@ -4835,11 +4251,8 @@ groups:
             title: Battery Metrics Health
             context: battery.metrics_health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3560
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_metrics_health{battery_metrics_health="ok"}
                 name: ok
@@ -4853,11 +4266,8 @@ groups:
             title: Battery Metrics Health Rollup
             context: battery.metrics_health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3570
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_metrics_health_rollup{battery_metrics_health_rollup="ok"}
                 name: ok
@@ -4871,11 +4281,8 @@ groups:
             title: Battery Metrics State
             context: battery.metrics_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3580
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_metrics_state{battery_metrics_state="enabled"}
                 name: enabled
@@ -4909,11 +4316,8 @@ groups:
             title: Battery State
             context: battery.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3590
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: battery_state{battery_state="enabled"}
                 name: enabled
@@ -4973,11 +4377,7 @@ groups:
             title: Charge Readings
             context: reading.charge
             units: ampere-hours
-            algorithm: absolute
-            type: line
             priority: 3600
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_charge_value
                 name: value
@@ -5013,11 +4413,7 @@ groups:
             title: Crest Factor Readings
             context: reading.crest_factor
             units: ratio
-            algorithm: absolute
-            type: line
             priority: 3610
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_crest_factor_value
                 name: value
@@ -5053,11 +4449,7 @@ groups:
             title: Current Readings
             context: reading.current
             units: amperes
-            algorithm: absolute
-            type: line
             priority: 3620
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_current_value
                 name: value
@@ -5096,11 +4488,7 @@ groups:
             title: Current Average (Zero basis)
             context: average
             units: amperes
-            algorithm: absolute
-            type: line
             priority: 3630
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_current_average
                 name: average
@@ -5110,11 +4498,8 @@ groups:
             title: Current Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3640
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_current_alarm{system_hw_sensor_current_alarm="clear"}
                 name: clear
@@ -5126,11 +4511,7 @@ groups:
             title: Current Reading (Zero basis)
             context: input
             units: amperes
-            algorithm: absolute
-            type: line
             priority: 3650
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_current_input
                 name: input
@@ -5166,11 +4547,7 @@ groups:
             title: Energy Readings
             context: reading.energy
             units: joules
-            algorithm: absolute
-            type: line
             priority: 3660
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_energy_value
                 name: value
@@ -5208,11 +4585,8 @@ groups:
             title: Energy Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3670
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_energy_alarm{system_hw_sensor_energy_alarm="clear"}
                 name: clear
@@ -5224,11 +4598,7 @@ groups:
             title: Energy Reading (Zero basis)
             context: input
             units: joules
-            algorithm: absolute
-            type: line
             priority: 3680
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_energy_input
                 name: input
@@ -5264,11 +4634,7 @@ groups:
             title: Frequency Readings
             context: reading.frequency
             units: hertz
-            algorithm: absolute
-            type: line
             priority: 3690
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_frequency_value
                 name: value
@@ -5304,11 +4670,7 @@ groups:
             title: Harmonic Distortion Readings
             context: reading.harmonic_distortion
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 3700
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_harmonic_distortion_value
                 name: value
@@ -5344,11 +4706,7 @@ groups:
             title: Phase Angle Readings
             context: reading.phase_angle
             units: degrees
-            algorithm: absolute
-            type: line
             priority: 3710
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_phase_angle_value
                 name: value
@@ -5384,11 +4742,7 @@ groups:
             title: Power Readings
             context: reading.power
             units: watts
-            algorithm: absolute
-            type: line
             priority: 3720
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_power_value
                 name: value
@@ -5427,11 +4781,7 @@ groups:
             title: Power Average (Zero basis)
             context: average
             units: watts
-            algorithm: absolute
-            type: line
             priority: 3730
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_power_average
                 name: average
@@ -5441,11 +4791,8 @@ groups:
             title: Power Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3740
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_power_alarm{system_hw_sensor_power_alarm="clear"}
                 name: clear
@@ -5457,11 +4804,7 @@ groups:
             title: Power Reading (Zero basis)
             context: input
             units: watts
-            algorithm: absolute
-            type: line
             priority: 3750
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_power_input
                 name: input
@@ -5497,11 +4840,7 @@ groups:
             title: Power Factor Readings
             context: reading.power_factor
             units: ratio
-            algorithm: absolute
-            type: line
             priority: 3760
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_power_factor_value
                 name: value
@@ -5537,11 +4876,8 @@ groups:
             title: Power Subsystem Acquisition State
             context: power_subsystem.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3770
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_subsystem_acquisition_state{power_subsystem_acquisition_state="readable"}
                 name: readable
@@ -5553,11 +4889,7 @@ groups:
             title: Power Subsystem Capacity
             context: power_subsystem.capacity
             units: watts
-            algorithm: absolute
-            type: line
             priority: 3780
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_subsystem_capacity_allocated
                 name: allocated
@@ -5571,11 +4903,8 @@ groups:
             title: Power Subsystem Conditions
             context: power_subsystem.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 3790
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_subsystem_conditions_ok
                 name: ok
@@ -5589,11 +4918,8 @@ groups:
             title: Power Subsystem Health
             context: power_subsystem.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3800
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_subsystem_health{power_subsystem_health="ok"}
                 name: ok
@@ -5607,11 +4933,8 @@ groups:
             title: Power Subsystem Health Rollup
             context: power_subsystem.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3810
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_subsystem_health_rollup{power_subsystem_health_rollup="ok"}
                 name: ok
@@ -5625,11 +4948,8 @@ groups:
             title: Power Subsystem State
             context: power_subsystem.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3820
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_subsystem_state{power_subsystem_state="enabled"}
                 name: enabled
@@ -5699,11 +5019,8 @@ groups:
             title: Power Supply Acquisition State
             context: power_supply.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3830
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_acquisition_state{power_supply_acquisition_state="readable"}
                 name: readable
@@ -5715,11 +5032,8 @@ groups:
             title: Power Supply Conditions
             context: power_supply.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 3840
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_conditions_ok
                 name: ok
@@ -5733,11 +5047,8 @@ groups:
             title: Power Supply Health
             context: power_supply.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3850
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_health{power_supply_health="ok"}
                 name: ok
@@ -5751,11 +5062,8 @@ groups:
             title: Power Supply Health Rollup
             context: power_supply.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3860
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_health_rollup{power_supply_health_rollup="ok"}
                 name: ok
@@ -5769,11 +5077,8 @@ groups:
             title: Power Supply Line Input Status
             context: power_supply.line_input_status
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3870
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_line_input_status{power_supply_line_input_status="normal"}
                 name: normal
@@ -5787,11 +5092,8 @@ groups:
             title: Power Supply Metrics Health
             context: power_supply.metrics_health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3880
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_metrics_health{power_supply_metrics_health="ok"}
                 name: ok
@@ -5805,11 +5107,8 @@ groups:
             title: Power Supply Metrics Health Rollup
             context: power_supply.metrics_health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3890
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_metrics_health_rollup{power_supply_metrics_health_rollup="ok"}
                 name: ok
@@ -5823,11 +5122,8 @@ groups:
             title: Power Supply Metrics State
             context: power_supply.metrics_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3900
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_metrics_state{power_supply_metrics_state="enabled"}
                 name: enabled
@@ -5861,11 +5157,8 @@ groups:
             title: Power Supply State
             context: power_supply.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3910
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: power_supply_state{power_supply_state="enabled"}
                 name: enabled
@@ -5925,11 +5218,7 @@ groups:
             title: Reactive Energy Readings
             context: reading.reactive_energy
             units: joule-equivalent
-            algorithm: absolute
-            type: line
             priority: 3920
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_reactive_energy_value
                 name: value
@@ -5965,11 +5254,7 @@ groups:
             title: Reactive Power Readings
             context: reading.reactive_power
             units: vars
-            algorithm: absolute
-            type: line
             priority: 3930
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_reactive_power_value
                 name: value
@@ -6005,11 +5290,7 @@ groups:
             title: Stored Energy Readings
             context: reading.stored_energy
             units: watt-hours
-            algorithm: absolute
-            type: line
             priority: 3940
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_stored_energy_value
                 name: value
@@ -6045,11 +5326,7 @@ groups:
             title: Voltage Readings
             context: reading.voltage
             units: volts
-            algorithm: absolute
-            type: line
             priority: 3950
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: reading_voltage_value
                 name: value
@@ -6088,11 +5365,7 @@ groups:
             title: Voltage Average (Zero basis)
             context: average
             units: volts
-            algorithm: absolute
-            type: line
             priority: 3960
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_voltage_average
                 name: average
@@ -6102,11 +5375,8 @@ groups:
             title: Voltage Source Health State
             context: alarm
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3970
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_voltage_alarm{system_hw_sensor_voltage_alarm="clear"}
                 name: clear
@@ -6118,11 +5388,7 @@ groups:
             title: Voltage Reading (Zero basis)
             context: input
             units: volts
-            algorithm: absolute
-            type: line
             priority: 3980
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: system_hw_sensor_voltage_input
                 name: input
@@ -6204,11 +5470,8 @@ groups:
             title: Drive Acquisition State
             context: drive.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 3990
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_acquisition_state{drive_acquisition_state="readable"}
                 name: readable
@@ -6220,11 +5483,8 @@ groups:
             title: Drive Conditions
             context: drive.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4000
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_conditions_ok
                 name: ok
@@ -6238,11 +5498,7 @@ groups:
             title: Drive Error Rate
             context: drive.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 4010
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_error_rate_correctable_read
                 name: correctable_read
@@ -6268,11 +5524,8 @@ groups:
             title: Drive Failure Prediction
             context: drive.failure_predicted
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4020
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_failure_predicted{drive_failure_predicted="clear"}
                 name: clear
@@ -6284,11 +5537,8 @@ groups:
             title: Drive Health
             context: drive.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4030
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_health{drive_health="ok"}
                 name: ok
@@ -6302,11 +5552,8 @@ groups:
             title: Drive Health Rollup
             context: drive.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4040
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_health_rollup{drive_health_rollup="ok"}
                 name: ok
@@ -6320,11 +5567,7 @@ groups:
             title: Drive I/O
             context: drive.io
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4050
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_io_read
                 name: read
@@ -6338,11 +5581,7 @@ groups:
             title: Drive Link Speed
             context: drive.link_speed
             units: bit/s
-            algorithm: absolute
-            type: line
             priority: 4060
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_link_speed_negotiated
                 name: negotiated
@@ -6352,11 +5591,7 @@ groups:
             title: Drive Media Life
             context: drive.media_life
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4070
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_media_life
                 name: remaining
@@ -6366,11 +5601,7 @@ groups:
             title: Drive NVMe Busy Time
             context: drive.nvme.busy_time
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4080
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_busy_time_busy
                 name: busy
@@ -6380,11 +5611,7 @@ groups:
             title: Drive NVMe Commands
             context: drive.nvme.commands
             units: commands/s
-            algorithm: absolute
-            type: line
             priority: 4090
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_commands_read
                 name: read
@@ -6398,11 +5625,8 @@ groups:
             title: Drive NVMe Critical Warnings
             context: drive.nvme.critical_warnings
             units: flags
-            algorithm: absolute
             type: stacked
             priority: 4100
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_nvme_critical_warnings_media_read_only
                 name: media_read_only
@@ -6424,11 +5648,7 @@ groups:
             title: Drive NVMe Error Rate
             context: drive.nvme.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 4110
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_error_rate_media_integrity
                 name: media_integrity
@@ -6442,11 +5662,7 @@ groups:
             title: Drive NVMe Event Rate
             context: drive.nvme.event_rate
             units: events/s
-            algorithm: absolute
-            type: line
             priority: 4120
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_event_rate_unsafe_shutdowns
                 name: unsafe_shutdowns
@@ -6460,11 +5676,7 @@ groups:
             title: Drive NVMe I/O
             context: drive.nvme.io
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4130
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_io_read
                 name: read
@@ -6478,11 +5690,7 @@ groups:
             title: Drive NVMe Spare
             context: drive.nvme.spare
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4140
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_spare_available
                 name: available
@@ -6492,11 +5700,7 @@ groups:
             title: Drive NVMe Temperature
             context: drive.nvme.temperature
             units: Celsius
-            algorithm: absolute
-            type: line
             priority: 4150
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_temperature_composite
                 name: composite
@@ -6506,11 +5710,7 @@ groups:
             title: Drive NVMe Thermal Time
             context: drive.nvme.thermal_time
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4160
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_thermal_time_warning
                 name: warning
@@ -6532,11 +5732,7 @@ groups:
             title: Drive NVMe Thermal Transition Rate
             context: drive.nvme.thermal_transition_rate
             units: transitions/s
-            algorithm: absolute
-            type: line
             priority: 4170
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_thermal_transition_rate_management_1
                 name: management_1
@@ -6550,11 +5746,7 @@ groups:
             title: Drive NVMe Wear
             context: drive.nvme.wear
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4180
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_drive_nvme_wear_used
                 name: used
@@ -6564,11 +5756,7 @@ groups:
             title: Drive Queue Depth
             context: drive.queue_depth
             units: commands
-            algorithm: absolute
-            type: line
             priority: 4190
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_queue_depth
                 name: commands
@@ -6576,11 +5764,8 @@ groups:
             title: Drive State
             context: drive.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4200
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_state{drive_state="enabled"}
                 name: enabled
@@ -6614,11 +5799,8 @@ groups:
             title: Drive Status Indicator
             context: drive.status_indicator
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4210
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: drive_status_indicator{drive_status_indicator="ok"}
                 name: ok
@@ -6672,11 +5854,8 @@ groups:
             title: Storage Acquisition State
             context: storage.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4220
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_acquisition_state{storage_acquisition_state="readable"}
                 name: readable
@@ -6688,11 +5867,8 @@ groups:
             title: Storage Conditions
             context: storage.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4230
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_conditions_ok
                 name: ok
@@ -6706,11 +5882,8 @@ groups:
             title: Storage Health
             context: storage.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4240
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_health{storage_health="ok"}
                 name: ok
@@ -6724,11 +5897,8 @@ groups:
             title: Storage Health Rollup
             context: storage.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4250
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_health_rollup{storage_health_rollup="ok"}
                 name: ok
@@ -6742,11 +5912,7 @@ groups:
             title: Storage I/O
             context: storage.io
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4260
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_io_read
                 name: read
@@ -6760,11 +5926,7 @@ groups:
             title: Storage IOPS
             context: storage.iops
             units: requests/s
-            algorithm: absolute
-            type: line
             priority: 4270
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_iops_read
                 name: read
@@ -6790,11 +5952,8 @@ groups:
             title: Storage State
             context: storage.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4280
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_state{storage_state="enabled"}
                 name: enabled
@@ -6828,11 +5987,7 @@ groups:
             title: Storage State Change Rate
             context: storage.state_change_rate
             units: changes/s
-            algorithm: absolute
-            type: line
             priority: 4290
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_state_change_rate
                 name: changes
@@ -6909,11 +6064,8 @@ groups:
             title: Storage Controller Acquisition State
             context: storage_controller.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4300
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_acquisition_state{storage_controller_acquisition_state="readable"}
                 name: readable
@@ -6925,11 +6077,8 @@ groups:
             title: Storage Controller Cache Health
             context: storage_controller.cache_health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4310
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_cache_health{storage_controller_cache_health="ok"}
                 name: ok
@@ -6943,11 +6092,8 @@ groups:
             title: Storage Controller Cache Health Rollup
             context: storage_controller.cache_health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4320
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_cache_health_rollup{storage_controller_cache_health_rollup="ok"}
                 name: ok
@@ -6961,11 +6107,8 @@ groups:
             title: Storage Controller Cache State
             context: storage_controller.cache_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4330
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_cache_state{storage_controller_cache_state="enabled"}
                 name: enabled
@@ -6999,11 +6142,8 @@ groups:
             title: Storage Controller Conditions
             context: storage_controller.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4340
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_conditions_ok
                 name: ok
@@ -7017,11 +6157,7 @@ groups:
             title: Storage Controller Error Rate
             context: storage_controller.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 4350
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_error_rate_correctable_ecc
                 name: correctable_ecc
@@ -7043,11 +6179,8 @@ groups:
             title: Storage Controller Health
             context: storage_controller.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4360
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_health{storage_controller_health="ok"}
                 name: ok
@@ -7061,11 +6194,8 @@ groups:
             title: Storage Controller Health Rollup
             context: storage_controller.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4370
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_health_rollup{storage_controller_health_rollup="ok"}
                 name: ok
@@ -7079,11 +6209,7 @@ groups:
             title: Storage Controller NVMe Busy Time
             context: storage_controller.nvme.busy_time
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4380
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_busy_time_busy
                 name: busy
@@ -7093,11 +6219,7 @@ groups:
             title: Storage Controller NVMe Commands
             context: storage_controller.nvme.commands
             units: commands/s
-            algorithm: absolute
-            type: line
             priority: 4390
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_commands_read
                 name: read
@@ -7111,11 +6233,8 @@ groups:
             title: Storage Controller NVMe Critical Warnings
             context: storage_controller.nvme.critical_warnings
             units: flags
-            algorithm: absolute
             type: stacked
             priority: 4400
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_nvme_critical_warnings_media_read_only
                 name: media_read_only
@@ -7137,11 +6256,7 @@ groups:
             title: Storage Controller NVMe Error Rate
             context: storage_controller.nvme.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 4410
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_error_rate_media_integrity
                 name: media_integrity
@@ -7155,11 +6270,7 @@ groups:
             title: Storage Controller NVMe Event Rate
             context: storage_controller.nvme.event_rate
             units: events/s
-            algorithm: absolute
-            type: line
             priority: 4420
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_event_rate_unsafe_shutdowns
                 name: unsafe_shutdowns
@@ -7173,11 +6284,7 @@ groups:
             title: Storage Controller NVMe I/O
             context: storage_controller.nvme.io
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4430
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_io_read
                 name: read
@@ -7191,11 +6298,7 @@ groups:
             title: Storage Controller NVMe Spare
             context: storage_controller.nvme.spare
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4440
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_spare_available
                 name: available
@@ -7205,11 +6308,7 @@ groups:
             title: Storage Controller NVMe Temperature
             context: storage_controller.nvme.temperature
             units: Celsius
-            algorithm: absolute
-            type: line
             priority: 4450
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_temperature_composite
                 name: composite
@@ -7219,11 +6318,7 @@ groups:
             title: Storage Controller NVMe Thermal Time
             context: storage_controller.nvme.thermal_time
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4460
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_thermal_time_warning
                 name: warning
@@ -7245,11 +6340,7 @@ groups:
             title: Storage Controller NVMe Thermal Transition Rate
             context: storage_controller.nvme.thermal_transition_rate
             units: transitions/s
-            algorithm: absolute
-            type: line
             priority: 4470
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_thermal_transition_rate_management_1
                 name: management_1
@@ -7263,11 +6354,7 @@ groups:
             title: Storage Controller NVMe Wear
             context: storage_controller.nvme.wear
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4480
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_storage_controller_nvme_wear_used
                 name: used
@@ -7277,11 +6364,7 @@ groups:
             title: Storage Controller PCIe Lanes
             context: storage_controller.pcie_lanes
             units: lanes
-            algorithm: absolute
-            type: line
             priority: 4490
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_pcie_lanes_active
                 name: active
@@ -7289,11 +6372,8 @@ groups:
             title: Storage Controller State
             context: storage_controller.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4500
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_state{storage_controller_state="enabled"}
                 name: enabled
@@ -7327,11 +6407,7 @@ groups:
             title: Storage Controller State Change Rate
             context: storage_controller.state_change_rate
             units: changes/s
-            algorithm: absolute
-            type: line
             priority: 4510
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: storage_controller_state_change_rate
                 name: changes
@@ -7388,11 +6464,8 @@ groups:
             title: Volume Acquisition State
             context: volume.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4520
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_acquisition_state{volume_acquisition_state="readable"}
                 name: readable
@@ -7404,11 +6477,8 @@ groups:
             title: Volume Conditions
             context: volume.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4530
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_conditions_ok
                 name: ok
@@ -7422,11 +6492,7 @@ groups:
             title: Volume Error Rate
             context: volume.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 4540
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_volume_error_rate_correctable_read
                 name: correctable_read
@@ -7456,11 +6522,7 @@ groups:
             title: Volume Event Rate
             context: volume.event_rate
             units: events/s
-            algorithm: absolute
-            type: line
             priority: 4550
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_volume_event_rate_consistency_checks
                 name: consistency_checks
@@ -7474,11 +6536,8 @@ groups:
             title: Volume Health
             context: volume.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4560
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_health{volume_health="ok"}
                 name: ok
@@ -7492,11 +6551,8 @@ groups:
             title: Volume Health Rollup
             context: volume.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4570
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_health_rollup{volume_health_rollup="ok"}
                 name: ok
@@ -7510,11 +6566,7 @@ groups:
             title: Volume I/O
             context: volume.io
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4580
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_volume_io_read
                 name: read
@@ -7528,11 +6580,7 @@ groups:
             title: Volume I/O Time
             context: volume.io_time
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4590
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_volume_io_time_read
                 name: read
@@ -7550,11 +6598,7 @@ groups:
             title: Volume IOPS
             context: volume.iops
             units: requests/s
-            algorithm: absolute
-            type: line
             priority: 4600
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_volume_iops_read
                 name: read
@@ -7580,11 +6624,7 @@ groups:
             title: Volume Remaining Capacity
             context: volume.remaining_capacity
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4610
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_remaining_capacity
                 name: remaining
@@ -7594,11 +6634,7 @@ groups:
             title: Volume Space Savings
             context: volume.space_savings
             units: bytes
-            algorithm: absolute
-            type: line
             priority: 4620
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_space_savings_compression
                 name: compression
@@ -7610,11 +6646,8 @@ groups:
             title: Volume State
             context: volume.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4630
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_state{volume_state="enabled"}
                 name: enabled
@@ -7648,11 +6681,8 @@ groups:
             title: Volume Write Cache State
             context: volume.write_cache_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4640
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: volume_write_cache_state{volume_write_cache_state="unprotected"}
                 name: unprotected
@@ -7697,11 +6727,8 @@ groups:
             title: Ethernet Interface Acquisition State
             context: ethernet_interface.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4650
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: ethernet_interface_acquisition_state{ethernet_interface_acquisition_state="readable"}
                 name: readable
@@ -7713,11 +6740,8 @@ groups:
             title: Ethernet Interface Conditions
             context: ethernet_interface.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4660
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: ethernet_interface_conditions_ok
                 name: ok
@@ -7731,11 +6755,8 @@ groups:
             title: Ethernet Interface Health
             context: ethernet_interface.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4670
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: ethernet_interface_health{ethernet_interface_health="ok"}
                 name: ok
@@ -7749,11 +6770,8 @@ groups:
             title: Ethernet Interface Health Rollup
             context: ethernet_interface.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4680
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: ethernet_interface_health_rollup{ethernet_interface_health_rollup="ok"}
                 name: ok
@@ -7767,11 +6785,7 @@ groups:
             title: Ethernet Interface Link Speed
             context: ethernet_interface.link_speed
             units: bit/s
-            algorithm: absolute
-            type: line
             priority: 4690
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: ethernet_interface_link_speed
                 name: speed
@@ -7781,11 +6795,8 @@ groups:
             title: Ethernet Interface Link Status
             context: ethernet_interface.link_status
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4700
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: ethernet_interface_link_status{ethernet_interface_link_status="link_up"}
                 name: link_up
@@ -7799,11 +6810,8 @@ groups:
             title: Ethernet Interface State
             context: ethernet_interface.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4710
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: ethernet_interface_state{ethernet_interface_state="enabled"}
                 name: enabled
@@ -7877,11 +6885,8 @@ groups:
             title: Network Adapter Acquisition State
             context: network_adapter.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4720
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_adapter_acquisition_state{network_adapter_acquisition_state="readable"}
                 name: readable
@@ -7893,11 +6898,8 @@ groups:
             title: Network Adapter Conditions
             context: network_adapter.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4730
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_adapter_conditions_ok
                 name: ok
@@ -7911,11 +6913,7 @@ groups:
             title: Network Adapter CPU Utilization
             context: network_adapter.cpu_utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4740
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_adapter_cpu_utilization
                 name: cpu
@@ -7925,11 +6923,7 @@ groups:
             title: Network Adapter Frame Rate
             context: network_adapter.frames
             units: frames/s
-            algorithm: absolute
-            type: line
             priority: 4750
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_adapter_frames_received_unicast
                 name: received_unicast
@@ -7951,11 +6945,8 @@ groups:
             title: Network Adapter Health
             context: network_adapter.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4760
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_adapter_health{network_adapter_health="ok"}
                 name: ok
@@ -7969,11 +6960,8 @@ groups:
             title: Network Adapter Health Rollup
             context: network_adapter.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4770
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_adapter_health_rollup{network_adapter_health_rollup="ok"}
                 name: ok
@@ -7987,11 +6975,7 @@ groups:
             title: Network Adapter Host Bus Utilization
             context: network_adapter.host_bus_utilization
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4780
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_adapter_host_bus_utilization_received
                 name: received
@@ -8005,11 +6989,7 @@ groups:
             title: Network Adapter NCSI Frame Rate
             context: network_adapter.ncsi_frames
             units: frames/s
-            algorithm: absolute
-            type: line
             priority: 4790
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_adapter_ncsi_frames_received
                 name: received
@@ -8023,11 +7003,7 @@ groups:
             title: Network Adapter NCSI Traffic
             context: network_adapter.ncsi_traffic
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4800
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_adapter_ncsi_traffic_received
                 name: received
@@ -8041,11 +7017,8 @@ groups:
             title: Network Adapter State
             context: network_adapter.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4810
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_adapter_state{network_adapter_state="enabled"}
                 name: enabled
@@ -8079,11 +7052,7 @@ groups:
             title: Network Adapter Traffic
             context: network_adapter.traffic
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4820
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_adapter_traffic_received
                 name: received
@@ -8138,11 +7107,8 @@ groups:
             title: Network Device Function Acquisition State
             context: network_device_function.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4830
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_device_function_acquisition_state{network_device_function_acquisition_state="readable"}
                 name: readable
@@ -8154,11 +7120,8 @@ groups:
             title: Network Device Function Conditions
             context: network_device_function.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4840
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_device_function_conditions_ok
                 name: ok
@@ -8172,11 +7135,7 @@ groups:
             title: Network Device Function Frame Rate
             context: network_device_function.frames
             units: frames/s
-            algorithm: absolute
-            type: line
             priority: 4850
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_device_function_frames_received
                 name: received
@@ -8206,11 +7165,8 @@ groups:
             title: Network Device Function Health
             context: network_device_function.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4860
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_device_function_health{network_device_function_health="ok"}
                 name: ok
@@ -8224,11 +7180,8 @@ groups:
             title: Network Device Function Health Rollup
             context: network_device_function.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4870
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_device_function_health_rollup{network_device_function_health_rollup="ok"}
                 name: ok
@@ -8242,11 +7195,7 @@ groups:
             title: Network Device Function Queue Depth
             context: network_device_function.queue_depth
             units: percentage
-            algorithm: absolute
-            type: line
             priority: 4880
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_device_function_queue_depth_received
                 name: received
@@ -8260,11 +7209,8 @@ groups:
             title: Network Device Function Empty Queue State
             context: network_device_function.queue_empty_state
             units: flags
-            algorithm: absolute
             type: stacked
             priority: 4890
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_device_function_queue_empty_state_received
                 name: received
@@ -8274,11 +7220,7 @@ groups:
             title: Network Device Function Full Queues
             context: network_device_function.queue_full
             units: queues
-            algorithm: absolute
-            type: line
             priority: 4900
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_network_device_function_queue_full_received
                 name: received
@@ -8288,11 +7230,8 @@ groups:
             title: Network Device Function State
             context: network_device_function.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4910
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_device_function_state{network_device_function_state="enabled"}
                 name: enabled
@@ -8326,11 +7265,7 @@ groups:
             title: Network Device Function Traffic
             context: network_device_function.traffic
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 4920
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_device_function_traffic_received
                 name: received
@@ -8371,11 +7306,8 @@ groups:
             title: Network Interface Acquisition State
             context: network_interface.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4930
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_interface_acquisition_state{network_interface_acquisition_state="readable"}
                 name: readable
@@ -8387,11 +7319,8 @@ groups:
             title: Network Interface Conditions
             context: network_interface.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4940
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_interface_conditions_ok
                 name: ok
@@ -8405,11 +7334,8 @@ groups:
             title: Network Interface Health
             context: network_interface.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4950
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_interface_health{network_interface_health="ok"}
                 name: ok
@@ -8423,11 +7349,8 @@ groups:
             title: Network Interface Health Rollup
             context: network_interface.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4960
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_interface_health_rollup{network_interface_health_rollup="ok"}
                 name: ok
@@ -8441,11 +7364,8 @@ groups:
             title: Network Interface State
             context: network_interface.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4970
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_interface_state{network_interface_state="enabled"}
                 name: enabled
@@ -8509,11 +7429,8 @@ groups:
             title: Network Port Acquisition State
             context: network_port.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 4980
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_acquisition_state{network_port_acquisition_state="readable"}
                 name: readable
@@ -8525,11 +7442,8 @@ groups:
             title: Network Port Conditions
             context: network_port.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 4990
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_conditions_ok
                 name: ok
@@ -8543,11 +7457,8 @@ groups:
             title: Network Port Health
             context: network_port.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5000
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_health{network_port_health="ok"}
                 name: ok
@@ -8561,11 +7472,8 @@ groups:
             title: Network Port Health Rollup
             context: network_port.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5010
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_health_rollup{network_port_health_rollup="ok"}
                 name: ok
@@ -8579,11 +7487,7 @@ groups:
             title: Network Port Link Speed
             context: network_port.link_speed
             units: bit/s
-            algorithm: absolute
-            type: line
             priority: 5020
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_link_speed
                 name: speed
@@ -8593,11 +7497,8 @@ groups:
             title: Network Port Link Status
             context: network_port.link_status
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5030
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_link_status{network_port_link_status="down"}
                 name: down
@@ -8613,11 +7514,8 @@ groups:
             title: Network Port Signal Detected
             context: network_port.signal_detected
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5040
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_signal_detected{network_port_signal_detected="clear"}
                 name: clear
@@ -8629,11 +7527,8 @@ groups:
             title: Network Port State
             context: network_port.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5050
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: network_port_state{network_port_state="enabled"}
                 name: enabled
@@ -8700,11 +7595,8 @@ groups:
             title: PCIe Device Acquisition State
             context: pcie_device.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5060
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_device_acquisition_state{pcie_device_acquisition_state="readable"}
                 name: readable
@@ -8716,11 +7608,8 @@ groups:
             title: PCIe Device Conditions
             context: pcie_device.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 5070
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_device_conditions_ok
                 name: ok
@@ -8734,11 +7623,8 @@ groups:
             title: PCIe Device Health
             context: pcie_device.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5080
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_device_health{pcie_device_health="ok"}
                 name: ok
@@ -8752,11 +7638,8 @@ groups:
             title: PCIe Device Health Rollup
             context: pcie_device.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5090
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_device_health_rollup{pcie_device_health_rollup="ok"}
                 name: ok
@@ -8770,11 +7653,7 @@ groups:
             title: PCIe Device Link Width
             context: pcie_device.link_width
             units: lanes
-            algorithm: absolute
-            type: line
             priority: 5100
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_device_link_width_active
                 name: active
@@ -8782,11 +7661,8 @@ groups:
             title: PCIe Device State
             context: pcie_device.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5110
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_device_state{pcie_device_state="enabled"}
                 name: enabled
@@ -8847,11 +7723,8 @@ groups:
             title: PCIe Function Acquisition State
             context: pcie_function.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5120
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_function_acquisition_state{pcie_function_acquisition_state="readable"}
                 name: readable
@@ -8863,11 +7736,8 @@ groups:
             title: PCIe Function Conditions
             context: pcie_function.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 5130
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_function_conditions_ok
                 name: ok
@@ -8881,11 +7751,8 @@ groups:
             title: PCIe Function Health
             context: pcie_function.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5140
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_function_health{pcie_function_health="ok"}
                 name: ok
@@ -8899,11 +7766,8 @@ groups:
             title: PCIe Function Health Rollup
             context: pcie_function.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5150
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_function_health_rollup{pcie_function_health_rollup="ok"}
                 name: ok
@@ -8917,11 +7781,8 @@ groups:
             title: PCIe Function State
             context: pcie_function.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5160
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: pcie_function_state{pcie_function_state="enabled"}
                 name: enabled
@@ -9035,11 +7896,8 @@ groups:
             title: Port Acquisition State
             context: port.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5170
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_acquisition_state{port_acquisition_state="readable"}
                 name: readable
@@ -9051,11 +7909,8 @@ groups:
             title: Port Conditions
             context: port.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 5180
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_conditions_ok
                 name: ok
@@ -9069,11 +7924,7 @@ groups:
             title: Port Error Rate
             context: port.error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 5190
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_error_rate_received
                 name: received
@@ -9087,11 +7938,7 @@ groups:
             title: Port Frame Rate
             context: port.frames
             units: frames/s
-            algorithm: absolute
-            type: line
             priority: 5200
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_frames_received
                 name: received
@@ -9129,11 +7976,8 @@ groups:
             title: Port Health
             context: port.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5210
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_health{port_health="ok"}
                 name: ok
@@ -9147,11 +7991,8 @@ groups:
             title: Port Health Rollup
             context: port.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5220
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_health_rollup{port_health_rollup="ok"}
                 name: ok
@@ -9165,11 +8006,7 @@ groups:
             title: Port Link Speed
             context: port.link_speed
             units: bit/s
-            algorithm: absolute
-            type: line
             priority: 5230
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_link_speed_speed
                 name: speed
@@ -9179,11 +8016,8 @@ groups:
             title: Port Link State
             context: port.link_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5240
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_link_state{port_link_state="enabled"}
                 name: enabled
@@ -9195,11 +8029,8 @@ groups:
             title: Port Link Status
             context: port.link_status
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5250
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_link_status{port_link_status="link_up"}
                 name: link_up
@@ -9217,11 +8048,7 @@ groups:
             title: Port Link Width
             context: port.link_width
             units: lanes
-            algorithm: absolute
-            type: line
             priority: 5260
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_link_width_active
                 name: active
@@ -9229,11 +8056,7 @@ groups:
             title: Port Network Error Rate
             context: port.network_error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 5270
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_network_error_rate_received_discards
                 name: received_discards
@@ -9283,11 +8106,7 @@ groups:
             title: Port PCIe Drop Rate
             context: port.pcie_drop_rate
             units: drops/s
-            algorithm: absolute
-            type: line
             priority: 5280
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_pcie_drop_rate_completion_credit
                 name: completion_credit
@@ -9305,11 +8124,7 @@ groups:
             title: Port PCIe Error Rate
             context: port.pcie_error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 5290
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_pcie_error_rate_bad_dllp
                 name: bad_dllp
@@ -9363,11 +8178,7 @@ groups:
             title: Port PCIe TLP Rate
             context: port.pcie_tlp_rate
             units: packets/s
-            algorithm: absolute
-            type: line
             priority: 5300
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_pcie_tlp_rate_completion
                 name: completion
@@ -9385,11 +8196,7 @@ groups:
             title: Port PCIe Traffic
             context: port.pcie_traffic
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 5310
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_pcie_traffic_completion
                 name: completion
@@ -9407,11 +8214,7 @@ groups:
             title: Port RDMA Error Rate
             context: port.rdma_error_rate
             units: errors/s
-            algorithm: absolute
-            type: line
             priority: 5320
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_rdma_error_rate_protection
                 name: protection
@@ -9425,11 +8228,7 @@ groups:
             title: Port RDMA Traffic
             context: port.rdma_traffic
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 5330
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: redfish_port_rdma_traffic_received
                 name: received
@@ -9443,11 +8242,8 @@ groups:
             title: Port Signal Detected
             context: port.signal_detected
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5340
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_signal_detected{port_signal_detected="clear"}
                 name: clear
@@ -9459,11 +8255,8 @@ groups:
             title: Port State
             context: port.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5350
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_state{port_state="enabled"}
                 name: enabled
@@ -9497,11 +8290,7 @@ groups:
             title: Port Traffic
             context: port.traffic
             units: bytes/s
-            algorithm: absolute
-            type: line
             priority: 5360
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: port_traffic_received
                 name: received
@@ -9541,11 +8330,8 @@ groups:
             title: Assembly Acquisition State
             context: assembly.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5370
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: assembly_acquisition_state{assembly_acquisition_state="readable"}
                 name: readable
@@ -9557,11 +8343,8 @@ groups:
             title: Assembly Conditions
             context: assembly.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 5380
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: assembly_conditions_ok
                 name: ok
@@ -9575,11 +8358,8 @@ groups:
             title: Assembly Health
             context: assembly.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5390
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: assembly_health{assembly_health="ok"}
                 name: ok
@@ -9593,11 +8373,8 @@ groups:
             title: Assembly Health Rollup
             context: assembly.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5400
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: assembly_health_rollup{assembly_health_rollup="ok"}
                 name: ok
@@ -9611,11 +8388,8 @@ groups:
             title: Assembly State
             context: assembly.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5410
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: assembly_state{assembly_state="enabled"}
                 name: enabled
@@ -9673,11 +8447,8 @@ groups:
             title: Firmware Acquisition State
             context: firmware.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5420
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: firmware_acquisition_state{firmware_acquisition_state="readable"}
                 name: readable
@@ -9689,11 +8460,8 @@ groups:
             title: Firmware Conditions
             context: firmware.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 5430
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: firmware_conditions_ok
                 name: ok
@@ -9707,11 +8475,8 @@ groups:
             title: Firmware Health
             context: firmware.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5440
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: firmware_health{firmware_health="ok"}
                 name: ok
@@ -9725,11 +8490,8 @@ groups:
             title: Firmware Health Rollup
             context: firmware.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5450
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: firmware_health_rollup{firmware_health_rollup="ok"}
                 name: ok
@@ -9743,11 +8505,8 @@ groups:
             title: Firmware State
             context: firmware.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5460
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: firmware_state{firmware_state="enabled"}
                 name: enabled
@@ -9807,11 +8566,8 @@ groups:
             title: Manager Acquisition State
             context: manager.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5470
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: manager_acquisition_state{manager_acquisition_state="readable"}
                 name: readable
@@ -9823,11 +8579,7 @@ groups:
             title: Manager Clock Offset
             context: manager.clock_offset
             units: seconds
-            algorithm: absolute
-            type: line
             priority: 5480
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: manager_clock_offset
                 name: offset
@@ -9837,11 +8589,8 @@ groups:
             title: Manager Conditions
             context: manager.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 5490
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: manager_conditions_ok
                 name: ok
@@ -9855,11 +8604,8 @@ groups:
             title: Manager Health
             context: manager.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5500
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: manager_health{manager_health="ok"}
                 name: ok
@@ -9873,11 +8619,8 @@ groups:
             title: Manager Health Rollup
             context: manager.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5510
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: manager_health_rollup{manager_health_rollup="ok"}
                 name: ok
@@ -9891,11 +8634,8 @@ groups:
             title: Manager Power State
             context: manager.power_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5520
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: manager_power_state{manager_power_state="on"}
                 name: "on"
@@ -9913,11 +8653,8 @@ groups:
             title: Manager State
             context: manager.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5530
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: manager_state{manager_state="enabled"}
                 name: enabled
@@ -9975,11 +8712,8 @@ groups:
             title: Software Acquisition State
             context: software.acquisition_state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5540
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: software_acquisition_state{software_acquisition_state="readable"}
                 name: readable
@@ -9991,11 +8725,8 @@ groups:
             title: Software Conditions
             context: software.conditions
             units: conditions
-            algorithm: absolute
             type: stacked
             priority: 5550
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: software_conditions_ok
                 name: ok
@@ -10009,11 +8740,8 @@ groups:
             title: Software Health
             context: software.health
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5560
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: software_health{software_health="ok"}
                 name: ok
@@ -10027,11 +8755,8 @@ groups:
             title: Software Health Rollup
             context: software.health_rollup
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5570
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: software_health_rollup{software_health_rollup="ok"}
                 name: ok
@@ -10045,11 +8770,8 @@ groups:
             title: Software State
             context: software.state
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5580
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: software_state{software_state="enabled"}
                 name: enabled
@@ -10113,11 +8835,7 @@ groups:
             title: Redfish Collection Duration
             context: collection.duration
             units: seconds
-            algorithm: absolute
-            type: line
             priority: 5620
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: collection_duration_seconds
                 name: duration
@@ -10127,11 +8845,8 @@ groups:
             title: Redfish Collection Failures
             context: collection.failures
             units: failures
-            algorithm: absolute
             type: stacked
             priority: 5630
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: collection_failures_auth
                 name: auth
@@ -10151,11 +8866,7 @@ groups:
             title: Redfish Collection HTTP Requests
             context: collection.http_requests
             units: requests/cycle
-            algorithm: absolute
-            type: line
             priority: 5640
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: collection_http_requests_started
                 name: started
@@ -10165,11 +8876,8 @@ groups:
             title: Redfish Collection Operations
             context: collection.operations
             units: operations/cycle
-            algorithm: absolute
             type: stacked
             priority: 5650
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: collection_operations_successful
                 name: successful
@@ -10179,11 +8887,7 @@ groups:
             title: Redfish Collection Resources
             context: collection.resources
             units: resources
-            algorithm: absolute
-            type: line
             priority: 5660
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: collection_resources_discovered
                 name: discovered
@@ -10197,11 +8901,8 @@ groups:
             title: Redfish Collection Status
             context: collection.status
             units: state
-            algorithm: absolute
             type: stacked
             priority: 5680
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: collection_status{collection_status="success"}
                 name: success
@@ -10213,11 +8914,7 @@ groups:
             title: Redfish Collection Traffic
             context: collection.traffic
             units: bytes/cycle
-            algorithm: absolute
-            type: line
             priority: 5690
-            lifecycle:
-              expire_after_cycles: 5
             dimensions:
               - selector: collection_traffic_received_bytes
                 name: received
