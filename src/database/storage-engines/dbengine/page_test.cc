@@ -451,12 +451,16 @@ TEST(PGD, RejectCorruptGorillaDiskNbits) {
 
 int dbengine_page_test(const struct dbengine_config *cfg, int argc, char *argv[])
 {
+    // the allocator layer partitions by the resolved cpus, as an engine's would: resolve a copy first
+    struct dbengine_config resolved = *cfg;
+    dbengine_config_resolve(&resolved);
+
     // Dummy/necessary initialization stuff
     PGC *dummy_cache = pgc_create("pgd-tests-cache", 32 * 1024 * 1024, NULL, 64, NULL, NULL,
                                   10, 10, 1000, 10, PGC_OPTIONS_NONE, 1, 11,
-                                  cfg->cache_statistics, cfg->use_all_ram_for_caches,
-                                  cfg->out_of_memory_protection_bytes, cfg->cpus);
-    pgd_init_arals(&cfg->allocator);
+                                  resolved.cache_statistics, resolved.use_all_ram_for_caches,
+                                  resolved.out_of_memory_protection_bytes, resolved.cpus);
+    pgd_init_arals(&resolved.allocator);
 
     ::testing::InitGoogleTest(&argc, argv);
     int rc = RUN_ALL_TESTS();
