@@ -591,6 +591,26 @@ static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
     return errors;
 }
 
+// a dbengine_tier_init() that must be refused. On the tier the host runs on: while it is up the path does not
+// exist, so a tier that was re-opened by mistake would show up as errors in the tests that follow; after it exited
+// its real path is used, so a re-open that is not refused is the real thing, not a path failure. After the shutdown:
+// a tier that never came up, in a real empty directory, so only the shutdown refusal can answer
+static size_t test_dbengine_tier_init_refused(size_t tier, int expected, const char *what, const char *path) {
+    struct dbengine_tier_config tc;
+    netdata_conf_dbengine_tier_config(tier, &tc);
+    if(!tc.grouping)
+        tc.grouping = 1;
+    tc.dbfiles_path = path;
+    tc.disk_space_mb = default_dbengine_disk_quota_mb;
+
+    int rc = dbengine_tier_init(&tc);
+    if(rc == expected)
+        return 0;
+
+    fprintf(stderr, "DBENGINE: dbengine_tier_init() on %s returned %d, expected %d\n", what, rc, expected);
+    return 1;
+}
+
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -600,14 +620,23 @@ int test_dbengine(void) {
     nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
-    // before any tier is up: the caches do not exist yet, which is the state this check needs
+    // before the engine is up: the caches do not exist yet, which is the state this check needs
     errors += (size_t)dbengine_cache_floor_unittest();
+
+    // the engine, then the host that brings the tier up on it
+    netdata_conf_dbengine_apply();
 
     default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
     RRDHOST *host = dbengine_rrdhost_find_or_create("unittest-dbengine");
     if(!host)
         fatal("Failed to initialize host");
+
+    // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
+    // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
+    dbengine_preload_release();
+
+    errors += test_dbengine_tier_init_refused(0, UV_EALREADY, "a tier that is up", "/nonexistent/dbengine");
 
     errors += test_dbengine_burst_retention(host);
 
@@ -656,12 +685,31 @@ int test_dbengine(void) {
     // prevent closing the database before the test is finished
     sleep(5);
 
+    char tier_path[FILENAME_MAX + 1];
+    snprintfz(tier_path, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+
     rrd_wrlock();
     dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
     dbengine_flush_all((DBENGINE_TIER *)host->db[0].si);
     dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
+    errors += test_dbengine_tier_init_refused(0, UV_EIO, "a tier that came up and exited", tier_path);
     dbengine_shutdown();
     rrd_wrunlock();
+
+    // tier 1 never came up in this process; a refusal that did not happen would have created its first datafile
+    char probe_dir[FILENAME_MAX + 1];
+    snprintfz(probe_dir, FILENAME_MAX, "%s/dbengine-tier1-probe", host->cache_dir);
+    if(mkdir(probe_dir, 0775) != 0 && errno != EEXIST) {
+        fprintf(stderr, "DBENGINE: cannot create the probe directory '%s'\n", probe_dir);
+        errors++;
+    }
+    else {
+        errors += test_dbengine_tier_init_refused(1, UV_EIO, "a tier on a shut-down engine", probe_dir);
+        if(dbengine_dir_has_datafiles(probe_dir)) {
+            fprintf(stderr, "DBENGINE: the shut-down engine opened a tier in '%s'\n", probe_dir);
+            errors++;
+        }
+    }
 
     return (int)(errors + value_errors + time_errors);
 }

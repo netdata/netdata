@@ -3443,7 +3443,9 @@ void unittest_stress_test(void) {
 }
 #endif
 
-int dbengine_cache_unittest(void) {
+int dbengine_cache_unittest(const struct dbengine_config *cfg) {
+    dbengine_config_set(cfg);
+
     PGC *cache = pgc_create("test",
                             32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, NULL, unittest_save_dirty_page_callback,

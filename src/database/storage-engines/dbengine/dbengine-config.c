@@ -9,29 +9,9 @@
 #define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (16)
 #endif
 
-// Written once by dbengine_init(), before any tier exists; read-only afterwards.
+// Written before the engine comes up, by dbengine_init() or (for the tests that need only the configuration) by
+// dbengine_config_set(); read-only while the engine is up.
 struct dbengine_config dbengine_cfg = DBENGINE_CONFIG_DEFAULTS;
-static bool dbengine_cfg_initialized = false;
-
-static bool dbengine_config_equal(const struct dbengine_config *a, const struct dbengine_config *b) {
-    return a->page_cache_mb == b->page_cache_mb &&
-           a->extent_cache_mb == b->extent_cache_mb &&
-           a->out_of_memory_protection_bytes == b->out_of_memory_protection_bytes &&
-           a->use_all_ram_for_caches == b->use_all_ram_for_caches &&
-           a->cache_statistics == b->cache_statistics &&
-           a->compression_statistics == b->compression_statistics &&
-           a->cpus == b->cpus &&
-           a->arals_for_large_pages == b->arals_for_large_pages &&
-           a->direct_io == b->direct_io &&
-           a->pages_per_extent == b->pages_per_extent &&
-           a->journal_integrity_check == b->journal_integrity_check &&
-           a->journal_v2_unmount_time_s == b->journal_v2_unmount_time_s &&
-           a->default_update_every_s == b->default_update_every_s &&
-           a->libuv_worker_threads == b->libuv_worker_threads &&
-           a->reserved_libuv_worker_threads == b->reserved_libuv_worker_threads &&
-           a->on_db_rotation == b->on_db_rotation &&
-           a->preload_metrics == b->preload_metrics;
-}
 
 // the 0-means-default fields become concrete values here, so the engine never has to re-check them
 static void dbengine_config_resolve(struct dbengine_config *cfg) {
@@ -65,23 +45,12 @@ static void dbengine_config_resolve(struct dbengine_config *cfg) {
               cfg->libuv_worker_threads, cfg->reserved_libuv_worker_threads);
 }
 
-void dbengine_init(const struct dbengine_config *cfg) {
+void dbengine_config_set(const struct dbengine_config *cfg) {
     if(!cfg)
-        fatal("DBENGINE: dbengine_init() called without a configuration");
+        fatal("DBENGINE: the engine was given no configuration");
 
     struct dbengine_config resolved = *cfg;
     dbengine_config_resolve(&resolved);
 
-    if(dbengine_cfg_initialized) {
-        if(!dbengine_config_equal(&resolved, &dbengine_cfg))
-            fatal("DBENGINE: dbengine_init() called again with a different configuration");
-        return;
-    }
-
     dbengine_cfg = resolved;
-    dbengine_cfg_initialized = true;
-}
-
-bool dbengine_initialized(void) {
-    return dbengine_cfg_initialized;
 }

@@ -156,9 +156,18 @@ void generate_dbengine_dataset(unsigned history_seconds)
     nd_log_limits_unlimited();
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
 
+    // the engine, then the host that brings the tier up on it
+    netdata_conf_dbengine_apply();
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
-    if (NULL == host)
+    if (NULL == host) {
+        // the engine is up with no tier: stop it, as the success path does at the end
+        dbengine_shutdown();
         return;
+    }
+
+    // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
+    // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
+    dbengine_preload_release();
 
     thread_info = mallocz(sizeof(*thread_info) * DSET_CHARTS);
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
@@ -193,7 +202,9 @@ void generate_dbengine_dataset(unsigned history_seconds)
 
     // shut the dbengine tier down before freeing the host: rrdhost_free() does
     // not do it, and destroying the charts under a live tier lets the flush
-    // workers touch freed memory. Same teardown as dbengine_stress_test() below.
+    // workers touch freed memory. The host's pointer to the (static, now inactive)
+    // tier is cleared so the free sees a host without a database. Same teardown
+    // as dbengine_stress_test() below.
     DBENGINE_TIER *tier = (DBENGINE_TIER *)host->db[0].si;
     dbengine_quiesce(tier);
     dbengine_tier_exit(tier);
@@ -362,9 +373,18 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
 
+    // the engine, then the host that brings the tier up on it
+    netdata_conf_dbengine_apply();
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
-    if (NULL == host)
+    if (NULL == host) {
+        // the engine is up with no tier: stop it, as the success path does at the end
+        dbengine_shutdown();
         return;
+    }
+
+    // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
+    // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
+    dbengine_preload_release();
 
     chart_threads = mallocz(sizeof(*chart_threads) * DSET_CHARTS);
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
@@ -459,9 +479,9 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         freez(query_threads[i]);
     }
     freez(query_threads);
-    // same teardown as generate_dbengine_dataset() above: dbengine_tier_exit() frees a
-    // tier that is not a multidb tier, so clear the host's pointer to it, and release
-    // the host we created before the caller tears the shared libraries down
+    // same teardown as generate_dbengine_dataset() above: exit the tier, clear the
+    // host's pointer to it, and release the host we created before the caller tears
+    // the shared libraries down
     rrd_wrlock();
     dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
     dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);

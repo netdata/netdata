@@ -429,10 +429,8 @@ int netdata_main(int argc, char **argv) {
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
 
-                        if(strcmp(optarg, "pgd-tests") == 0) {
-                            netdata_conf_dbengine_apply();
-                            return dbengine_page_test(argc, argv);
-                        }
+                        if(strcmp(optarg, "pgd-tests") == 0)
+                            return dbengine_page_test(netdata_conf_dbengine_resolved(), argc, argv);
 #endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
@@ -567,7 +565,7 @@ int netdata_main(int argc, char **argv) {
                             if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
-                            if (dbengine_metrics_registry_unittest()) return 1;
+                            if (dbengine_metrics_registry_unittest(netdata_conf_dbengine_resolved())) return 1;
 #endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
@@ -739,13 +737,11 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "pgctest") == 0) {
                             unittest_running = true;
-                            netdata_conf_dbengine_apply();
-                            return dbengine_cache_unittest();
+                            return dbengine_cache_unittest(netdata_conf_dbengine_resolved());
                         }
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
-                            netdata_conf_dbengine_apply();
-                            return dbengine_metrics_registry_unittest();
+                            return dbengine_metrics_registry_unittest(netdata_conf_dbengine_resolved());
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
@@ -801,8 +797,8 @@ int netdata_main(int argc, char **argv) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
 
-                            // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
-                            // before this option can still override it
+                            // the default for the page cache the dataset generator hands the engine through
+                            // netdata_conf_dbengine_apply(); a -c file given before this option can still override it
                             netdata_conf_dbengine.page_cache_mb = 128;
 
                             if(unittest_libs_init())
@@ -838,8 +834,8 @@ int netdata_main(int argc, char **argv) {
                             if (workers > 1024)
                                 workers = 1024;
 
-                            // the default for the page cache the configuration read in rrd_init() will hand the engine; a -c file given
-                            // before this option can still override it
+                            // the default for the page cache the stress test hands the engine through
+                            // netdata_conf_dbengine_apply(); a -c file given before this option can still override it
                             if (page_cache_mb < DBENGINE_MIN_PAGE_CACHE_SIZE_MB)
                                 page_cache_mb = DBENGINE_MIN_PAGE_CACHE_SIZE_MB;
                             netdata_conf_dbengine.page_cache_mb = page_cache_mb;
