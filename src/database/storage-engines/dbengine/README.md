@@ -208,7 +208,7 @@ compiles the engine as one unit. The public headers:
   is up, whether a directory holds data; and **work**: `dbengine_enq_work()` runs a function on the engine's worker
   pool while the engine is serving, `dbengine_work_available()` says whether it is, and a refused request is the
   caller's to run or drop. Every verb and getter about the engine takes it, and accepts NULL as an engine with
-  nothing in it.
+  nothing in it (`dbengine_tier_init()` alone is fatal without one).
 - **`dbengine-config.h`**: the embedder fills one `struct dbengine_config` and hands it to `dbengine_create()`, which
   brings an engine up and returns it; each tier then gets a `struct dbengine_tier_config` through
   `dbengine_tier_init()`. The same

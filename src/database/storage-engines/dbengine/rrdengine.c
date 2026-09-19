@@ -26,7 +26,8 @@ static inline struct dbengine_cmd dbengine_deq_cmd(struct dbengine_engine *engin
 static inline void worker_dispatch_extent_read(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 static inline void worker_dispatch_query_prep(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 
-// serialises the creation of engines: the claim on the daemon's static tiers is made under it
+// serialises the creation of engines: the claim on the daemon's static tiers is made under it. The release, in
+// dbengine_destroy(), relies on the embedder owning the engine from one thread, as the daemon does
 static SPINLOCK dbengine_create_spinlock = SPINLOCK_INITIALIZER;
 
 DBENGINE_LIFECYCLE_STATE dbengine_engine_lifecycle_state(struct dbengine_engine *engine) {

@@ -377,8 +377,8 @@ struct dbengine_buffer_sizes {
 };
 
 // The slots of the engine's own allocators (opcodes, handles, descriptors, workers, extent io) and the WAL are the
-// engine's; the others are process-wide and shared by every engine, and NULL until the first engine came up (the
-// allocators are made by it). Without an engine the engine's slots are NULL and the WAL is 0.
+// engine's; the others are process-wide and shared by every engine (the five page details allocators are made by the
+// first engine, and NULL until it came up). Without an engine the engine's slots are NULL and the WAL is 0.
 struct dbengine_buffer_sizes dbengine_get_memory_sizes(DBENGINE_ENGINE *engine);
 const char *dbengine_mem_name(DBENGINE_MEM idx);   // the chart name of each slot
 

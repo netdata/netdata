@@ -425,10 +425,8 @@ void pgd_init_arals(const struct dbengine_allocator_config *cfg) {
     spinlock_unlock(&pgd_arals_spinlock);
 }
 
-// the layer's own check: bringing it up twice, the second time with different settings, must leave it as the
-// first call built it (same partitions, same size classes, same allocators); run before any engine is up
 // A fingerprint of the page allocator layer as built: its settings, its size classes and the addresses of its
-// allocators. A later engine must leave it as it is.
+// allocators. A later engine must leave it as it is. Read only while no engine is coming up.
 uintptr_t dbengine_allocator_layer_fingerprint(void) {
     uintptr_t h = (uintptr_t)pgd_alloc_globals.partitions;
     h = h * 31 + (uintptr_t)aral_sizes_count;
@@ -440,6 +438,8 @@ uintptr_t dbengine_allocator_layer_fingerprint(void) {
     return h;
 }
 
+// the layer's own check: bringing it up twice, the second time with different settings, must leave it as the
+// first call built it (same partitions, same size classes, same allocators); run before any engine is up
 int dbengine_allocator_unittest(const struct dbengine_config *cfg) {
     int errors = 0;
 

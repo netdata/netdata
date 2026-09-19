@@ -96,9 +96,9 @@ int dbengine_cache_floor_unittest(void) {
 }
 
 // An embedder that never made an engine (the daemon in ram mode) still calls the engine's getters and verbs, with
-// NULL: each must answer as an engine with nothing in it would. dbengine_shutdown(NULL) is left out on purpose,
-// it records that no engine may be made afterwards. The buffers start as 0xff so that a getter that forgets to
-// write its answer shows.
+// NULL: each must answer as an engine with nothing in it would. dbengine_tier_init() is left out (it is fatal
+// without an engine) and so is dbengine_shutdown() (it does nothing). The buffers start as 0xff so that a getter
+// that forgets to write its answer shows.
 int dbengine_null_engine_unittest(void) {
     int errors = 0;
 
@@ -253,7 +253,7 @@ static void engine_lifecycle_remove_dir(const char *dir) {
 }
 
 // A stopped and destroyed engine leaves nothing behind that a new engine trips over: the second one, made with a
-// differing configuration, comes up on the page allocators the first one built (the process-wide layer keeps its
+// differing configuration, comes up on the page allocators that already exist (the process-wide layer keeps its
 // settings, and logs that the new ones are ignored), runs a tier, and is destroyed the same way. The floors of the
 // caches and the NULL engine still hold between the two. Runs before the daemon's own engine, on two scratch
 // directories inside scratch_dir, which it removes.
