@@ -1027,7 +1027,6 @@ time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si) {
     if(!ctx)
         return 0;
 
-
     time_t t = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
     if(t == LONG_MAX || t < 0)
         t = 0;

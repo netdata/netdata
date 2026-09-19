@@ -312,13 +312,13 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
     return errors;
 }
 
+static void engine_lifecycle_remove_dir(const char *dir);
+
 // Two engines alive at once, each with its tier 0 on a scratch directory of its own: the tiers are distinct
 // objects, each engine collects and is queried on its own tier, a metric one engine created is unknown to the
 // other's registry, the tier refusals are per engine (a second init of one engine's tier while the other's comes
 // up; a stopped engine's tier while the other still serves), and one engine is stopped and destroyed while the
 // other collects on, in the order the caller picks. The page allocator layer is untouched by the destroy.
-static void engine_lifecycle_remove_dir(const char *dir);
-
 static int engines_coexist(const struct dbengine_config *cfg, const char *dir_a, const char *dir_b, bool destroy_a_first) {
     int errors = 0;
     const char *what = destroy_a_first ? "two engines, A destroyed first" : "two engines, B destroyed first";
@@ -393,7 +393,9 @@ static int engines_coexist(const struct dbengine_config *cfg, const char *dir_a,
         errors += dbengine_zero_page_cadence_unittest(b, (STORAGE_INSTANCE *)tier_b);
 
         // the registries are separate: a metric A created is unknown to B, and only A's registry grew by it (a
-        // lookup on B's tier would miss in a shared registry too, since the sections differ; the counts would not)
+        // lookup on B's tier would miss in a shared registry too, since the sections differ; the counts would not).
+        // The counts are exact because nothing else moves them here: the registry loads are awaited, no preload,
+        // and the tiers have no quota and no retention limit, so nothing rotates or deletes
         struct dbengine_metrics_registry_stats a_before, b_before, a_after, b_after;
         dbengine_get_metrics_registry_stats(a, &a_before);
         dbengine_get_metrics_registry_stats(b, &b_before);
@@ -526,7 +528,8 @@ static void engine_lifecycle_remove_dir(const char *dir) {
 // settings, and logs that the new ones are ignored), runs a tier, and is destroyed the same way. The floors of the
 // caches and the NULL engine still hold between the two. Then two engines at once, each on a tier of its own,
 // destroyed in either order (engines_coexist()). Runs before the daemon's own engine, on four scratch directories
-// next to scratch_dir (its name with -a to -d), which it removes.
+// next to scratch_dir (its name with -a to -d), which it removes; the probe directories engines_coexist() makes
+// next to two of them are removed by it.
 int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const char *scratch_dir) {
     int errors = 0;
     fprintf(stderr, "\nTesting the life of two engines, one after the other and at once...\n");

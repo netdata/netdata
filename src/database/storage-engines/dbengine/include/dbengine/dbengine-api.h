@@ -30,10 +30,11 @@ extern "C" {
 struct dbengine_tier;
 
 // the engine's tier by number, 0 to RRD_STORAGE_TIERS - 1: the tier that dbengine_tier_init() with that number
-// brings up, whether or not it has come up (every verb and getter below that takes a tier answers for one that never
-// did, and takes NULL as a tier with nothing in it: verbs return, getters report false or zeros). NULL for a NULL
-// engine or a number the engine does not have. A destroyed engine has no tiers: like the engine, the pointer is not
-// to be used after dbengine_destroy()
+// brings up, whether or not it has come up. The tier lifecycle verbs and the readouts about a tier below answer for
+// one that never came up, and take NULL as a tier with nothing in it (verbs return, readouts report false or zeros);
+// the metric, collection and query operations need a tier that is up, and dbengine_readiness_wait() one whose init
+// succeeded. NULL for a NULL engine or a number the engine does not have. A destroyed engine has no tiers: like the
+// engine, the pointer is not to be used after dbengine_destroy()
 DBENGINE_TIER *dbengine_tier(DBENGINE_ENGINE *engine, size_t tier);
 
 // true when dbfiles_path holds at least one datafile named the way this engine names and scans
@@ -81,6 +82,7 @@ time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle
 // its tier inits at startup, long before any shutdown)
 int dbengine_tier_init(DBENGINE_ENGINE *engine, const struct dbengine_tier_config *tc);
 
+// wait until the tier's registry load is done: once, after a dbengine_tier_init() that returned 0; NULL returns at once
 void dbengine_readiness_wait(DBENGINE_TIER *tier);
 
 int dbengine_tier_exit(DBENGINE_TIER *tier);
