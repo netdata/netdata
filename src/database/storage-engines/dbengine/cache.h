@@ -34,19 +34,45 @@ typedef struct pgc_entry {
 typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
 typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *entries_array, PGC_PAGE **pages_array, size_t entries);
 typedef void (*save_dirty_init_callback)(PGC *cache, Word_t section);
-// create a cache
-// the last four parameters are the settings the cache follows, passed by the creator so that the cache reads no
-// engine configuration; cpus (>= 1) sizes the default partitions and the evictors and flushers the cache supports
-PGC *pgc_create(const char *name,
-                size_t clean_size_bytes, free_clean_page_callback pgc_free_clean_cb,
-                size_t max_dirty_pages_per_flush, save_dirty_init_callback pgc_save_init_cb, save_dirty_page_callback pgc_save_dirty_cb,
-                size_t max_pages_per_inline_eviction, size_t max_inline_evictors,
-                size_t max_skip_pages_per_inline_eviction,
-                size_t max_flushes_inline,
-                PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page,
-                bool statistics, bool use_all_ram, uint64_t out_of_memory_protection_bytes, size_t cpus);
+typedef int64_t (*dynamic_target_cache_size_callback)(PGC *cache);
+typedef size_t (*nominal_page_size_callback)(void *);
 
-// destroy the cache
+// everything a cache is made of. The cache copies it before its evictor thread starts and changes nothing of it
+// afterwards, so the thread, and every other one that touches the cache, sees the cache as it was made.
+struct pgc_config {
+    const char *name;                                   // up to PGC_NAME_MAX characters
+    size_t clean_size_bytes;                            // at least 1 MiB
+    free_clean_page_callback free_clean_cb;
+    size_t max_dirty_pages_per_flush;
+    save_dirty_init_callback save_init_cb;
+    save_dirty_page_callback save_dirty_cb;
+    size_t max_pages_per_inline_eviction;
+    size_t max_inline_evictors;
+    size_t max_skip_pages_per_inline_eviction;
+    size_t max_flushes_inline;
+    PGC_OPTIONS options;
+    size_t partitions;                                  // 0: twice the cpus; clamped to [4, 256]
+    size_t additional_bytes_per_page;
+
+    // the settings the cache follows, passed by the creator so that the cache reads no engine configuration;
+    // cpus (>= 1) sizes the default partitions and the evictors and flushers the cache supports
+    bool statistics;
+    bool use_all_ram;
+    uint64_t out_of_memory_protection_bytes;
+    size_t cpus;
+
+    // what the cache belongs to and asks
+    struct dbengine_engine *engine;                     // NULL for a cache that belongs to no engine (the tests')
+    dynamic_target_cache_size_callback dynamic_target_size_cb;  // asked, on every usage check, for the size to aim
+                                                        // at (it wins when larger than the cache's own); NULL: none
+    nominal_page_size_callback nominal_page_size_cb;    // the memory a page's data takes, when it is not the entry's
+                                                        // size; NULL: the entry's size
+};
+
+// create a cache from its configuration, which the caller may discard afterwards
+PGC *pgc_create(const struct pgc_config *cfg);
+
+// destroy the cache; its dirty pages are flushed, and saved through the save callbacks only when flush is set
 // false when the cache stays allocated: pages are still referenced (or there is no cache)
 bool pgc_destroy(PGC *cache, bool flush);
 
@@ -113,12 +139,6 @@ void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct dbengine_datafile
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 
-typedef int64_t (*dynamic_target_cache_size_callback)(PGC *cache);
-void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache_size_callback callback);
-
-typedef size_t (*nominal_page_size_callback)(void *);
-void pgc_set_nominal_page_size_callback(PGC *cache, nominal_page_size_callback callback);
-
 // return true when there is more work to do
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);
 bool pgc_flush_pages(PGC *cache);
@@ -142,9 +162,7 @@ static inline size_t pgc_evictors_for_cpus(size_t cpus) {
 size_t pgc_max_evictors(PGC *cache);
 size_t pgc_max_flushers(PGC *cache);
 
-// the engine the cache belongs to; NULL for a cache that belongs to none (the tests'). Set once, right after the
-// cache is created and before it is given a callback that reads it
+// the engine the cache was made for; NULL for a cache that belongs to none (the tests')
 struct dbengine_engine *pgc_engine(PGC *cache);
-void pgc_set_engine(PGC *cache, struct dbengine_engine *engine);
 
 #endif // DBENGINE_CACHE_H

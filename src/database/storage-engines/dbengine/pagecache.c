@@ -1166,15 +1166,19 @@ int64_t dbengine_follower_cache_size(PGC *main_cache_or_null, int64_t percent, i
 int64_t dynamic_open_cache_size(PGC *cache) {
     // a cache that dbengine_destroy() had to leave allocated is still asked for space by whoever releases its
     // pages, and by the finalization of its datafiles, after the main cache was freed: it then sizes itself from
-    // its floor. One read of the pointer, so the NULL check and the two uses in the helper cannot disagree; the
-    // store that clears it happens after every engine thread was joined, so nothing races it.
-    return dbengine_follower_cache_size(pgc_engine(cache)->main_cache, OPEN_CACHE_PERCENT, OPEN_CACHE_MIN_SIZE);
+    // its floor. One read of the pointer, so the NULL check and the two uses in the helper cannot disagree. The
+    // engine's own threads are joined before the store that clears it, but the thread holding the pages that kept
+    // this cache allocated is not: it acquires what dbengine_destroy() released, so a main cache it still sees
+    // is one that has not been freed yet.
+    PGC *main_cache = __atomic_load_n(&pgc_engine(cache)->main_cache, __ATOMIC_ACQUIRE);
+    return dbengine_follower_cache_size(main_cache, OPEN_CACHE_PERCENT, OPEN_CACHE_MIN_SIZE);
 }
 
 int64_t dynamic_extent_cache_size(PGC *cache) {
     // as for the open cache: a retained extent cache outlives the main cache too, though only a late page
     // release reaches it (datafile finalization never asks the extent cache for anything)
-    return dbengine_follower_cache_size(pgc_engine(cache)->main_cache, EXTENT_CACHE_PERCENT, EXTENT_CACHE_MIN_SIZE);
+    PGC *main_cache = __atomic_load_n(&pgc_engine(cache)->main_cache, __ATOMIC_ACQUIRE);
+    return dbengine_follower_cache_size(main_cache, EXTENT_CACHE_PERCENT, EXTENT_CACHE_MIN_SIZE);
 }
 
 size_t pgc_main_nominal_page_size(void *data) {
@@ -1203,60 +1207,74 @@ void pgc_and_mrg_initialize(struct dbengine_engine *engine)
     const size_t cpus = engine->cfg.cpus;
     const size_t max_evictors = pgc_evictors_for_cpus(cpus);
 
-    engine->main_cache = pgc_create(
-            "MAIN_PGC",
-            main_cache_size,
-            main_cache_free_clean_page_callback,
-            (size_t) engine->cfg.pages_per_extent,
-            main_cache_flush_dirty_page_init_callback,
-            main_cache_flush_dirty_page_callback,
-            2,
-            max_evictors,
-            1000,
-            1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
-            0,
-            0,
-            statistics, use_all_ram, oom_protection_bytes, cpus
-    );
-    pgc_set_engine(engine->main_cache, engine);
-    pgc_set_nominal_page_size_callback(engine->main_cache, pgc_main_nominal_page_size);
+    struct pgc_config main_cfg = {
+        .name = "MAIN_PGC",
+        .clean_size_bytes = main_cache_size,
+        .free_clean_cb = main_cache_free_clean_page_callback,
+        .max_dirty_pages_per_flush = (size_t) engine->cfg.pages_per_extent,
+        .save_init_cb = main_cache_flush_dirty_page_init_callback,
+        .save_dirty_cb = main_cache_flush_dirty_page_callback,
+        .max_pages_per_inline_eviction = 2,
+        .max_inline_evictors = max_evictors,
+        .max_skip_pages_per_inline_eviction = 1000,
+        .max_flushes_inline = 1,
+        .options = PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
+        .partitions = 0,
+        .additional_bytes_per_page = 0,
+        .statistics = statistics,
+        .use_all_ram = use_all_ram,
+        .out_of_memory_protection_bytes = oom_protection_bytes,
+        .cpus = cpus,
+        .engine = engine,
+        .nominal_page_size_cb = pgc_main_nominal_page_size,
+    };
+    engine->main_cache = pgc_create(&main_cfg);
 
-    engine->open_cache = pgc_create(
-            "OPEN_PGC",
-            open_cache_size,
-            open_cache_free_clean_page_callback,
-            2,
-            NULL,
-            open_cache_flush_dirty_page_callback,
-            1,
-            max_evictors,
-            1000,
-            1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
-            0,
-            sizeof(struct extent_io_data),
-            statistics, use_all_ram, oom_protection_bytes, cpus
-    );
-    pgc_set_engine(engine->open_cache, engine);
-    pgc_set_dynamic_target_cache_size_callback(engine->open_cache, dynamic_open_cache_size);
+    // the open and extent caches follow the main cache (their sizing callbacks), so the memory settings that would
+    // let them grow or shrink on their own are off: the main cache applies them for all three
+    struct pgc_config open_cfg = {
+        .name = "OPEN_PGC",
+        .clean_size_bytes = open_cache_size,
+        .free_clean_cb = open_cache_free_clean_page_callback,
+        .max_dirty_pages_per_flush = 2,
+        .save_init_cb = NULL,
+        .save_dirty_cb = open_cache_flush_dirty_page_callback,
+        .max_pages_per_inline_eviction = 1,
+        .max_inline_evictors = max_evictors,
+        .max_skip_pages_per_inline_eviction = 1000,
+        .max_flushes_inline = 1,
+        .options = PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
+        .partitions = 0,
+        .additional_bytes_per_page = sizeof(struct extent_io_data),
+        .statistics = statistics,
+        .use_all_ram = false,
+        .out_of_memory_protection_bytes = 0,
+        .cpus = cpus,
+        .engine = engine,
+        .dynamic_target_size_cb = dynamic_open_cache_size,
+    };
+    engine->open_cache = pgc_create(&open_cfg);
 
-    engine->extent_cache = pgc_create(
-            "EXTENT_PGC",
-            extent_cache_size,
-            extent_cache_free_clean_page_callback,
-            2,
-            NULL,
-            extent_cache_flush_dirty_page_callback,
-            1,
-            max_evictors,
-            1000,
-            1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE, // no flushing needed
-            0,
-            0,
-            statistics, use_all_ram, oom_protection_bytes, cpus
-    );
-    pgc_set_engine(engine->extent_cache, engine);
-    pgc_set_dynamic_target_cache_size_callback(engine->extent_cache, dynamic_extent_cache_size);
+    struct pgc_config extent_cfg = {
+        .name = "EXTENT_PGC",
+        .clean_size_bytes = extent_cache_size,
+        .free_clean_cb = extent_cache_free_clean_page_callback,
+        .max_dirty_pages_per_flush = 2,
+        .save_init_cb = NULL,
+        .save_dirty_cb = extent_cache_flush_dirty_page_callback,
+        .max_pages_per_inline_eviction = 1,
+        .max_inline_evictors = max_evictors,
+        .max_skip_pages_per_inline_eviction = 1000,
+        .max_flushes_inline = 1,
+        .options = PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE, // no flushing needed
+        .partitions = 0,
+        .additional_bytes_per_page = 0,
+        .statistics = statistics,
+        .use_all_ram = false,
+        .out_of_memory_protection_bytes = 0,
+        .cpus = cpus,
+        .engine = engine,
+        .dynamic_target_size_cb = dynamic_extent_cache_size,
+    };
+    engine->extent_cache = pgc_create(&extent_cfg);
 }

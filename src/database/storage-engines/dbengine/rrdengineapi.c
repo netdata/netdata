@@ -1261,8 +1261,10 @@ size_t dbengine_destroy(struct dbengine_engine *engine) {
     }
     if(engine->main_cache) {
         fprintf(stderr, "Destroying main cache (PGC)...\n");
+        // released for the thread that kept a follower cache allocated: its sizing callback (pagecache.c) reads
+        // this from that thread, which was not joined
         if(pgc_destroy(engine->main_cache, false))
-            engine->main_cache = NULL;
+            __atomic_store_n(&engine->main_cache, NULL, __ATOMIC_RELEASE);
     }
 
     size_t metrics_referenced = 0;
