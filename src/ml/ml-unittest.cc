@@ -1249,9 +1249,9 @@ static void test_chart_stats_add_covers_every_field()
 {
     fprintf(stderr, "  test_chart_stats_add_covers_every_field...\n");
 
-    static_assert(std::is_trivially_copyable<ml_machine_learning_stats_t>::value,
+    static_assert(std::is_trivially_copyable_v<ml_machine_learning_stats_t>,
                   "stats struct must be trivially copyable for this test to copy its representation");
-    static_assert(std::has_unique_object_representations<ml_machine_learning_stats_t>::value,
+    static_assert(std::has_unique_object_representations_v<ml_machine_learning_stats_t>,
                   "stats struct must have no padding for this test to walk it as uint32_t");
     static_assert(sizeof(ml_machine_learning_stats_t) % sizeof(uint32_t) == 0,
                   "stats struct must be a whole number of uint32_t fields for this test to walk it");
