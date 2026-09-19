@@ -48,7 +48,7 @@ func benchmarkProject(b *testing.B, thresholds bool) {
 					}
 				}
 			}
-			p := New("https://bmc.example.test", "benchmark", nil)
+			p := New("https://bmc.example.test", nil)
 			observed := time.Unix(1000, 0)
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -99,7 +99,7 @@ func BenchmarkProjectInventory(b *testing.B) {
 					Data:             data,
 				}
 			}
-			p := New("https://bmc.example.test", "benchmark", nil)
+			p := New("https://bmc.example.test", nil)
 			observed := time.Unix(1000, 0)
 			b.ReportAllocs()
 			b.ResetTimer()

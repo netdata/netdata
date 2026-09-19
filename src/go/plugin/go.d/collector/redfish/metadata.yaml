@@ -256,7 +256,7 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_collection_status
         metric: redfish.collection.status
-        info: "Redfish endpoint ${label:endpoint_job} reports a non-healthy state for Redfish Collection Status"
+        info: "Redfish endpoint ${label:_collect_job} reports a non-healthy state for Redfish Collection Status"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_control_conditions
         metric: redfish.control.conditions
@@ -1134,8 +1134,6 @@ modules:
         - name: endpoint
           description: Collection state for one configured Redfish endpoint job.
           labels:
-            - name: endpoint_job
-              description: Redfish job name.
             - name: endpoint_key
               description: Stable canonical endpoint key.
           metrics:
@@ -1201,8 +1199,14 @@ modules:
               description: Redfish resource kind.
             - name: resource_name
               description: Current resource display name.
-            - name: component_family
-              description: Hardware component family.
+            - name: slot
+              description: Slot, device locator, or socket, when the resource reports one.
+            - name: location
+              description: Service label of the physical location, when the resource reports one.
+            - name: manufacturer
+              description: Manufacturer, when the resource reports one.
+            - name: model
+              description: Model, when the resource reports one.
           metrics:
             - name: redfish.chassis.acquisition_state
               description: Chassis Acquisition State
@@ -4320,10 +4324,18 @@ modules:
         - name: reading
           description: One physical sensor reading or source-provided measurement excerpt.
           labels:
+            - name: resource_kind
+              description: Kind of the resource supplying the reading.
             - name: resource_name
               description: Resource supplying the reading.
             - name: reading_key
               description: Stable reading identity within the endpoint.
+            - name: reading_type
+              description: Reading type, such as temperature or voltage.
+            - name: physical_context
+              description: Redfish physical context of the sensor, when reported.
+            - name: physical_subcontext
+              description: Redfish physical sub-context of the sensor, when reported.
             - name: reading_basis
               description: Zero, delta, or headroom measurement basis.
             - name: reading_role

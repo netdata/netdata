@@ -13,7 +13,7 @@ import (
 
 func measurementTestProject(t *testing.T, client *Client, nodes ...*graphNode) []measurement.Observation {
 	t.Helper()
-	projector := measurement.New(client.origin, "", ReadingProvenanceResolver(client.root, client.origin))
+	projector := measurement.New(client.origin, ReadingProvenanceResolver(client.root, client.origin))
 	resources := make([]*measurement.Resource, 0, len(nodes))
 	for _, node := range nodes {
 		resources = append(resources, &node.Resource)

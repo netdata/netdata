@@ -25,7 +25,7 @@ func TestProjectComponentViewsUseCurrentSourceMetadata(t *testing.T) {
 		},
 		{Kind: "service", Key: "service", AcquisitionState: "readable", Data: map[string]any{}},
 	}
-	projector := measurement.New("https://fixture.example", "hardware", nil)
+	projector := measurement.New("https://fixture.example", nil)
 	result, err := projector.Project(resources, true, observed)
 	require.NoError(t, err)
 	require.Len(t, result.Components, 5, "service root is not hardware")
@@ -75,7 +75,7 @@ func TestProjectPreservesNullReadingViewsWithoutNumericMetrics(t *testing.T) {
 			resource.Key = "resource"
 			resource.AcquisitionState = "readable"
 			observed := time.Unix(100, 0)
-			projector := measurement.New("https://fixture.example", "hardware", nil)
+			projector := measurement.New("https://fixture.example", nil)
 			result, err := projector.Project([]*measurement.Resource{resource}, true, observed)
 			require.NoError(t, err)
 			require.Len(t, result.Sensors, 1, "an explicitly null reading remains visible")
@@ -93,7 +93,7 @@ func TestProjectPreservesNullReadingViewsWithoutNumericMetrics(t *testing.T) {
 }
 
 func TestProjectLegacyNullStillAllowsNumericFallback(t *testing.T) {
-	projector := measurement.New("https://fixture.example", "hardware", nil)
+	projector := measurement.New("https://fixture.example", nil)
 	resource := &measurement.Resource{
 		Key:              "temperature",
 		Kind:             "sensor",

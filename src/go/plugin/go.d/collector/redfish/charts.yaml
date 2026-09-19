@@ -16,13 +16,6 @@ groups:
           - chassis_power_state
           - chassis_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -96,22 +89,6 @@ groups:
         metrics:
           - reading_percentage_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -130,22 +107,6 @@ groups:
         metrics:
           - reading_alarm_status
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -164,22 +125,6 @@ groups:
         metrics:
           - derived_health_status
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -209,13 +154,6 @@ groups:
           - redundancy_mode
           - redundancy_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -306,22 +244,6 @@ groups:
           - sensor_health_rollup_status
           - sensor_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -379,13 +301,6 @@ groups:
         metrics:
           - service_acquisition_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -414,13 +329,6 @@ groups:
           - system_processor_utilization_kernel
           - system_processor_utilization_user
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -521,17 +429,6 @@ groups:
           - system_power_state
           - system_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - manufacturer
-            - model
-            - serial_number
-            - asset_tag
-            - bios_version
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -610,16 +507,6 @@ groups:
           - redfish_processor_pcie_error_rate_replay_rollover
           - redfish_processor_pcie_error_rate_unsupported_request
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -681,21 +568,6 @@ groups:
           - processor_utilization_kernel
           - processor_utilization_user
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -835,13 +707,6 @@ groups:
         metrics:
           - processor_core_acquisition_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -867,21 +732,6 @@ groups:
           - redfish_processor_core_error_rate_uncorrectable_other
           - redfish_processor_core_instructions_per_cycle
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -954,21 +804,6 @@ groups:
           - redfish_memory_io_read
           - redfish_memory_io_written
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -1109,22 +944,6 @@ groups:
         metrics:
           - reading_absolute_humidity_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -1143,22 +962,6 @@ groups:
         metrics:
           - reading_air_flow_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -1177,22 +980,6 @@ groups:
         metrics:
           - reading_altitude_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -1211,22 +998,6 @@ groups:
         metrics:
           - reading_barometric_pressure_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -1246,23 +1017,6 @@ groups:
           - system_hw_sensor_pressure_alarm_status
           - system_hw_sensor_pressure_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -1335,13 +1089,6 @@ groups:
           - redfish_control_valve_position_setpoint
           - redfish_control_valve_position_setpoint_error
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -1562,21 +1309,6 @@ groups:
           - coolant_connector_health_rollup_status
           - coolant_connector_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -1641,21 +1373,6 @@ groups:
           - fan_health_rollup_status
           - fan_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -1720,21 +1437,6 @@ groups:
           - filter_health_rollup_status
           - filter_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -1792,22 +1494,6 @@ groups:
         metrics:
           - reading_heat_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -1835,21 +1521,6 @@ groups:
           - redfish_heater_heating_time_pre_power_on
           - redfish_heater_heating_time_runtime
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -1917,22 +1588,6 @@ groups:
         metrics:
           - reading_humidity_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -1952,23 +1607,6 @@ groups:
           - system_hw_sensor_humidity_alarm_status
           - system_hw_sensor_humidity_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -2002,13 +1640,6 @@ groups:
           - leak_detection_health_rollup_status
           - leak_detection_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -2074,21 +1705,6 @@ groups:
           - leak_detector_health_rollup_status
           - leak_detector_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -2161,13 +1777,6 @@ groups:
           - leak_detector_group_health_rollup_status
           - leak_detector_group_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -2225,22 +1834,6 @@ groups:
         metrics:
           - reading_linear_acceleration_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2259,22 +1852,6 @@ groups:
         metrics:
           - reading_linear_position_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2293,22 +1870,6 @@ groups:
         metrics:
           - reading_linear_velocity_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2327,22 +1888,6 @@ groups:
         metrics:
           - reading_liquid_flow_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2361,22 +1906,6 @@ groups:
         metrics:
           - reading_liquid_level_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2395,22 +1924,6 @@ groups:
         metrics:
           - reading_pressure_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2436,21 +1949,6 @@ groups:
           - pump_health_rollup_status
           - pump_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -2508,22 +2006,6 @@ groups:
         metrics:
           - reading_rotational_acceleration_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2542,22 +2024,6 @@ groups:
         metrics:
           - reading_rotational_position_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2576,22 +2042,6 @@ groups:
         metrics:
           - reading_rotational_speed_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2611,23 +2061,6 @@ groups:
           - system_hw_sensor_fan_alarm_status
           - system_hw_sensor_fan_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -2654,22 +2087,6 @@ groups:
         metrics:
           - reading_rotational_velocity_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2688,22 +2105,6 @@ groups:
         metrics:
           - reading_temperature_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2723,23 +2124,6 @@ groups:
           - system_hw_sensor_temperature_alarm_status
           - system_hw_sensor_temperature_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -2773,13 +2157,6 @@ groups:
           - thermal_subsystem_health_rollup_status
           - thermal_subsystem_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -2837,22 +2214,6 @@ groups:
         metrics:
           - reading_valve_position_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2873,22 +2234,6 @@ groups:
         metrics:
           - reading_apparent_energy_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2907,22 +2252,6 @@ groups:
         metrics:
           - reading_apparent_power_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -2956,21 +2285,6 @@ groups:
           - battery_metrics_state
           - battery_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -3092,22 +2406,6 @@ groups:
         metrics:
           - reading_charge_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3126,22 +2424,6 @@ groups:
         metrics:
           - reading_crest_factor_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3160,22 +2442,6 @@ groups:
         metrics:
           - reading_current_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3196,23 +2462,6 @@ groups:
           - system_hw_sensor_current_average
           - system_hw_sensor_current_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -3247,22 +2496,6 @@ groups:
         metrics:
           - reading_energy_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3282,23 +2515,6 @@ groups:
           - system_hw_sensor_energy_alarm_status
           - system_hw_sensor_energy_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -3325,22 +2541,6 @@ groups:
         metrics:
           - reading_frequency_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3359,22 +2559,6 @@ groups:
         metrics:
           - reading_harmonic_distortion_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3393,22 +2577,6 @@ groups:
         metrics:
           - reading_phase_angle_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3427,22 +2595,6 @@ groups:
         metrics:
           - reading_power_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3463,23 +2615,6 @@ groups:
           - system_hw_sensor_power_average
           - system_hw_sensor_power_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -3514,22 +2649,6 @@ groups:
         metrics:
           - reading_power_factor_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3557,13 +2676,6 @@ groups:
           - power_subsystem_health_rollup_status
           - power_subsystem_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -3642,21 +2754,6 @@ groups:
           - power_supply_metrics_state
           - power_supply_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -3746,22 +2843,6 @@ groups:
         metrics:
           - reading_reactive_energy_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3780,22 +2861,6 @@ groups:
         metrics:
           - reading_reactive_power_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3814,22 +2879,6 @@ groups:
         metrics:
           - reading_stored_energy_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3848,22 +2897,6 @@ groups:
         metrics:
           - reading_voltage_value
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
           instances:
             by_labels:
               - endpoint_key
@@ -3884,23 +2917,6 @@ groups:
           - system_hw_sensor_voltage_average
           - system_hw_sensor_voltage_input
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - reading_key
-            - physical_context
-            - physical_subcontext
-            - reading_type
-            - reading_basis
-            - reading_role
-            - reading_source
-            - semantic_source_class
-            - implementation_type
-            - _collect_module
           instances:
             by_labels:
               - endpoint_key
@@ -3982,21 +2998,6 @@ groups:
           - redfish_drive_nvme_thermal_transition_rate_management_2
           - redfish_drive_nvme_wear_used
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -4254,13 +3255,6 @@ groups:
           - storage_state
           - storage_state_change_rate
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -4394,21 +3388,6 @@ groups:
           - storage_controller_state
           - storage_controller_state_change_rate
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -4669,13 +3648,6 @@ groups:
           - volume_state
           - volume_write_cache_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -4838,16 +3810,6 @@ groups:
           - ethernet_interface_link_status
           - ethernet_interface_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -4941,16 +3903,6 @@ groups:
           - redfish_network_adapter_ncsi_traffic_received
           - redfish_network_adapter_ncsi_traffic_sent
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -5091,16 +4043,6 @@ groups:
           - redfish_network_device_function_queue_full_received
           - redfish_network_device_function_queue_full_sent
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -5224,16 +4166,6 @@ groups:
           - network_interface_health_rollup_status
           - network_interface_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -5301,16 +4233,6 @@ groups:
           - network_port_signal_detected_state
           - network_port_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -5400,21 +4322,6 @@ groups:
           - pcie_device_link_width_active
           - pcie_device_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - slot
-            - location
-            - manufacturer
-            - model
-            - serial_number
-            - part_number
-            - spare_part_number
-            - firmware_version
           instances:
             by_labels:
               - endpoint_key
@@ -5487,16 +4394,6 @@ groups:
           - pcie_function_health_rollup_status
           - pcie_function_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -5614,16 +4511,6 @@ groups:
           - redfish_port_rdma_traffic_received
           - redfish_port_rdma_traffic_sent
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
-            - mac_address
-            - wwn
-            - link_type
           instances:
             by_labels:
               - endpoint_key
@@ -5886,13 +4773,6 @@ groups:
           - assembly_health_rollup_status
           - assembly_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -5957,13 +4837,6 @@ groups:
           - firmware_health_rollup_status
           - firmware_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -6030,13 +4903,6 @@ groups:
           - manager_power_state
           - manager_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -6117,13 +4983,6 @@ groups:
           - software_health_rollup_status
           - software_state
         chart_defaults:
-          label_promotion:
-            - endpoint_job
-            - endpoint_key
-            - resource_kind
-            - resource_name
-            - component_family
-            - source_model
           instances:
             by_labels:
               - endpoint_key
@@ -6200,8 +5059,6 @@ groups:
           - collection_status
           - collection_traffic_received_bytes
         chart_defaults:
-          label_promotion:
-            - endpoint_job
           instances:
             by_labels:
               - endpoint_key

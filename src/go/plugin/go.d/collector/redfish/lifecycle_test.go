@@ -65,7 +65,6 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			require.NoError(t, err)
 			labels := metrix.Labels{
 				"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
-				"endpoint_job": "endpoint-a",
 			}
 			point, ok := collector.MetricStore().Read().StateSet("collection_status", labels)
 			require.True(t, ok)
@@ -73,11 +72,8 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			hardwareSeries := 0
 			collector.MetricStore().
 				Read(metrix.ReadFlatten()).
-				ForEachByName("system_health_status", func(labels metrix.LabelView, value metrix.SampleValue) {
+				ForEachByName("system_health_status", func(metrix.LabelView, metrix.SampleValue) {
 					hardwareSeries++
-					job, found := labels.Get("endpoint_job")
-					require.True(t, found)
-					assert.Equal(t, "endpoint-a", job)
 				})
 			assert.Positive(t, hardwareSeries)
 			collecttest.AssertChartCoverage(t, collector, collecttest.ChartCoverageExpectation{})
@@ -186,7 +182,6 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 	require.NoError(t, err)
 	labels := metrix.Labels{
 		"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
-		"endpoint_job": "session",
 	}
 	for cycle := range 3 {
 		managed.CycleController().BeginCycle()

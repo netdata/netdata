@@ -23,7 +23,7 @@ type collectorMetrics struct {
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
-	vec := store.Write().SnapshotMeter("").Vec("endpoint_key", "endpoint_job")
+	vec := store.Write().SnapshotMeter("").Vec("endpoint_key")
 	return &collectorMetrics{
 		status: vec.StateSet(
 			"collection_status",
@@ -68,8 +68,8 @@ type cycleMetrics struct {
 	Duration float64
 }
 
-func (m *collectorMetrics) observe(endpointKey, endpointJob string, cycle cycleMetrics) {
-	labels := []string{endpointKey, endpointJob}
+func (m *collectorMetrics) observe(endpointKey string, cycle cycleMetrics) {
+	labels := []string{endpointKey}
 	if cycle.Status != "" {
 		m.status.WithLabelValues(labels...).Enable(cycle.Status)
 	}

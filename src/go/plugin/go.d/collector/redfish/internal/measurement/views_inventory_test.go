@@ -33,7 +33,7 @@ func TestProjectInventoryNumbers(t *testing.T) {
 		"NaN":              {raw: math.NaN()},
 	} {
 		t.Run(name, func(t *testing.T) {
-			p := measurement.New("https://bmc.example.test", "test", nil)
+			p := measurement.New("https://bmc.example.test", nil)
 			nodes := []*measurement.Resource{
 				{
 					Kind:             "processor",
@@ -84,7 +84,7 @@ func TestProjectInventoryNumbers(t *testing.T) {
 }
 
 func TestProjectInventoryMemoryScaleOverflow(t *testing.T) {
-	p := measurement.New("https://bmc.example.test", "test", nil)
+	p := measurement.New("https://bmc.example.test", nil)
 	result, err := p.Project([]*measurement.Resource{{
 		Kind: "memory", Key: "dimm", AcquisitionState: "readable", Data: map[string]any{"CapacityMiB": math.MaxFloat64},
 	}}, true, time.Unix(100, 0))

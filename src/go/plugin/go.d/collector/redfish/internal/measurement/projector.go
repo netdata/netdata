@@ -16,7 +16,6 @@ import (
 // Calls to Project must be serialized, as they are by the collector lifecycle.
 type Projector struct {
 	origin            string
-	endpointJob       string
 	resolveProvenance func(baseURI, raw string) (string, bool)
 	thresholdStates   map[string]*readingThresholdState
 	thresholdCycle    uint64
@@ -25,12 +24,11 @@ type Projector struct {
 	identities        identity.Registry
 }
 
-// New binds endpoint labels and the acquisition layer's pure URI policy. A nil
+// New binds the endpoint identity and the acquisition layer's pure URI policy. A nil
 // resolver retains source-path identity for readings without canonical provenance.
-func New(origin, job string, resolveProvenance func(baseURI, raw string) (string, bool)) *Projector {
+func New(origin string, resolveProvenance func(baseURI, raw string) (string, bool)) *Projector {
 	p := &Projector{
 		origin:            origin,
-		endpointJob:       job,
 		resolveProvenance: resolveProvenance,
 	}
 	p.rateBaselines = make(map[string]rateBaseline)

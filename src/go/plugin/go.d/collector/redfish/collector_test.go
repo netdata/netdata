@@ -128,7 +128,7 @@ func TestCollectorDerivesCollectionDeadlineFromUpdateEvery(t *testing.T) {
 	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
-	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
+	collector.measurement = measurement.New("https://fixture.example", nil)
 
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
 	require.True(t, ok)
@@ -154,7 +154,7 @@ func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
-	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
+	collector.measurement = measurement.New("https://fixture.example", nil)
 
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
 	require.True(t, ok)
@@ -165,7 +165,6 @@ func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 	point, ok := collector.store.Read().
 		StateSet("collection_status", metrix.Labels{
 			"endpoint_key": "endpoint-key",
-			"endpoint_job": "endpoint-a",
 		})
 	require.True(t, ok)
 	assert.True(t, point.States["partial"])
@@ -182,7 +181,7 @@ func TestCollectorParentCancellationAbortsPartialResult(t *testing.T) {
 	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
-	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
+	collector.measurement = measurement.New("https://fixture.example", nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

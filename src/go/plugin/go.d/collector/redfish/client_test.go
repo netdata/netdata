@@ -45,7 +45,7 @@ func TestProtocolClientBasicCheckAndCollect(t *testing.T) {
 	require.True(t, ok)
 	cycle := managed.CycleController()
 	cycle.BeginCycle()
-	coverage.metrics.observe("endpoint-key", "endpoint-job", result.Metrics)
+	coverage.metrics.observe("endpoint-key", result.Metrics)
 	coverage.hardware.observe(result.Hardware)
 	require.NoError(t, cycle.CommitCycleSuccess())
 	collecttest.AssertChartCoverage(t, coverage, collecttest.ChartCoverageExpectation{})

@@ -154,7 +154,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return fmt.Errorf("init Redfish client: %w", err)
 	}
 	c.functionLogs.Store(c.client.Logs())
-	c.measurement = measurement.New(origin, c.Name, acquisition.ReadingProvenanceResolver(root, origin))
+	c.measurement = measurement.New(origin, acquisition.ReadingProvenanceResolver(root, origin))
 	return nil
 }
 
@@ -188,7 +188,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 	}
 	c.functionSnapshot.Store(result.Snapshot)
 	c.warnCollectionDiagnostics(result.Diagnostics)
-	c.metrics.observe(c.endpointKey, c.Name, result.Metrics)
+	c.metrics.observe(c.endpointKey, result.Metrics)
 	c.hardware.observe(result.Hardware)
 
 	if err != nil {

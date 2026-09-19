@@ -12,7 +12,7 @@ import (
 )
 
 func TestProjectRateHistoryFollowsAcquisitionCompleteness(t *testing.T) {
-	projector := measurement.New("https://fixture.example", "hardware", nil)
+	projector := measurement.New("https://fixture.example", nil)
 	start := time.Unix(100, 0)
 	energy := func(value string) *measurement.Resource {
 		return &measurement.Resource{
@@ -76,7 +76,7 @@ func TestProjectLeavesAcquiredResourcesUnchanged(t *testing.T) {
 	}
 	before, err := json.Marshal(resources)
 	require.NoError(t, err)
-	projector := measurement.New("https://fixture.example", "hardware", nil)
+	projector := measurement.New("https://fixture.example", nil)
 	result, err := projector.Project(resources, true, time.Unix(100, 0))
 	require.NoError(t, err)
 	require.NotEmpty(t, result.Observations)

@@ -42,7 +42,7 @@ func TestElectricalAuxiliarySourceCoverage(t *testing.T) {
 				node.SensorExcerpts = []SensorExcerpt{{Path: "excerpt", Data: data}}
 			}
 			got := make(map[string]string)
-			for _, reading := range (New("", "", nil)).readingsForNode(node, time.Unix(1, 0)) {
+			for _, reading := range (New("", nil)).readingsForNode(node, time.Unix(1, 0)) {
 				require.True(t, reading.Valid, reading.SourcePath)
 				require.Zero(t, reading.Value, reading.SourcePath)
 				got[reading.Role] = reading.Family
