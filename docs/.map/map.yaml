@@ -1083,6 +1083,9 @@ sidebar:
                   label: Cursor
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/cursor.md
               - meta:
+                  label: Kiro
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/kiro.md
+              - meta:
                   label: Visual Studio Code
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/vs-code.md
               - meta:

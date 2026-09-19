@@ -663,6 +663,7 @@ For detailed configuration instructions for specific AI clients, see:
 **Chat Clients:**
 - [Claude Desktop](/docs/netdata-ai/mcp/mcp-clients/claude-desktop.md) - Anthropic's desktop AI assistant
 - [Cursor](/docs/netdata-ai/mcp/mcp-clients/cursor.md) - AI-powered code editor
+- [Kiro](/docs/netdata-ai/mcp/mcp-clients/kiro.md) - AI coding assistant with MCP support
 - [Visual Studio Code](/docs/netdata-ai/mcp/mcp-clients/vs-code.md) - VS Code with MCP support
 - [JetBrains IDEs](/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md) - IntelliJ, PyCharm, WebStorm, etc.
 
