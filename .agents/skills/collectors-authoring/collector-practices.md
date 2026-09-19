@@ -316,7 +316,8 @@ them; for SNMP, extend a profile rather than hardcode OIDs, and for Prometheus p
 
 ### 3.3 Chart priorities
 
-Chart priorities drive UI ordering; the dashboard orders equal-priority charts by name. C plugins follow
+Chart priorities drive UI ordering; equal-priority charts follow their names in the dashboard (dashboard behavior,
+not owned by this repository). C plugins follow
 `src/collectors/all.h`; go.d V1 charts step from `collectorapi.Priority`; go.d V2 templates optionally set
 `chart_defaults.priority` on top-level sections only, from the same engine default
 (`.agents/skills/collectors-go-framework-v2/chart-template.md#ordering`). Don't pick values arbitrarily; mirror an

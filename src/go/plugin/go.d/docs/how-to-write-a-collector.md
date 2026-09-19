@@ -229,10 +229,10 @@ charts are entity-scoped, and keep the default lifecycle unless a concrete reaso
 families, ordering, statesets, values, labels and shared contexts are owned by
 `.agents/skills/collectors-go-framework-v2/chart-template.md`.
 
-Metric labels and chart instance labels MUST be bounded and stable. Use IDs for identity. Attach the descriptive
-labels operators need at the source and let chartengine promote them; list `label_promotion` only to promote a
-subset. Do not blindly copy `instances.by_labels` from Cato or any other example; audit every label used for chart
-identity and record why it is stable enough for that collector.
+Metric labels and chart instance labels MUST be bounded and stable. Use IDs for identity. Which labels to attach
+and when to list `label_promotion` is owned by the chart template topic linked above. Do not blindly copy
+`instances.by_labels` from Cato or any other example; audit every label used for chart identity and record why it is
+stable enough for that collector.
 
 ## Host Scopes And Vnodes
 

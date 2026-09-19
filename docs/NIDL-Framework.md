@@ -276,8 +276,8 @@ This guide walks through the thought process of designing metrics for a new coll
 
 #### Step 2: Organize into Families
 
-**Decision**: flat (one level of families) or tree (sections with sub-families)? Choose the shape operators
-navigate best; the counts below are examples, not thresholds.
+**Decision**: flat (one level of families) or tree (families with sub-families)? Choose the shape operators
+navigate best; the examples below show shapes, not size thresholds.
 
 **PostgreSQL - Flat Structure**:
 ```
@@ -300,9 +300,9 @@ Connections/JMS
 ```
 
 **Rules**:
-- Name every level in the words an operator searches for; a leaf may hold a single chart when its name is that word,
-  because clicking a leaf is cheaper than scrolling a long one.
-- Keep the tree scannable when a section is expanded and keep leaf granularity consistent within a section.
+- Name every level in the words an operator searches for; an innermost family may hold a single chart when its name
+  is that word, because clicking a family is cheaper than scrolling a long one.
+- Keep the tree scannable when a top-level family is expanded and keep granularity consistent within it.
 - A family may hold charts and subfamilies when the subfamily is an explicit jump (`Drives` with `Drives/NVMe`).
 - An "Overview" family holds the whole-system view operators check first; it is not a bucket for metrics that fit
   nowhere else, which get their own family.
@@ -316,7 +316,7 @@ For each family/subfamily:
 3. **Identify the instance type** for each metric
 4. **Ensure 90%+ share the same instance definition**
 
-**Example - web/servlets**:
+**Example - Web/Servlets**:
 ```
 ✓ servlet.requests      → Instance: each servlet
 ✓ servlet.response_time → Instance: each servlet  
@@ -387,7 +387,7 @@ For each context, verify:
 #### Complete Example: PostgreSQL Tables Section
 
 ```
-Family: tables
+Family: Tables
 
 1. postgres.table.count
    Instance: server
@@ -417,8 +417,8 @@ Family: tables
 
 #### Final Checklist
 
-- [ ] Every family level is named in the words an operator searches for
-- [ ] Navigation structure is intuitive when a section is expanded
+- [ ] Each top-level family is a major functional area; every level is named in the words an operator searches for
+- [ ] Navigation structure is intuitive when a top-level family is expanded
 - [ ] All metrics in a family are about the same topic
 - [ ] Each context has consistent instance types
 - [ ] All instances in a context have identical dimensions
