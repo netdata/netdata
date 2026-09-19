@@ -3003,9 +3003,12 @@ void dbengine_shutdown(struct dbengine_engine *engine)
 
     // a loop its thread could not close on the way out still has a handle closing, or a work request on the thread
     // pool (a flush or a cleanup the last timer tick dispatched). Running it here finishes them while everything they
-    // touch is still allocated: this returns with nothing of the engine executing any more, which is what
-    // dbengine_destroy() relies on
+    // touch is still allocated: this returns with no work of the engine in flight, which is what dbengine_destroy()
+    // relies on. The after-work callbacks run on this thread, which becomes the loop's thread for that: the one
+    // the loop had is joined, and the callbacks check that they run on it. A command such a callback enqueues stays
+    // in the queue, which nothing serves any more, until the queue is freed with the engine
     if(engine->loop_open) {
+        engine->tid = gettid_cached();
         uv_run(&engine->loop, UV_RUN_DEFAULT);
         fatal_assert(0 == uv_loop_close(&engine->loop));
         engine->loop_open = false;

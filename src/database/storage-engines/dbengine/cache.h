@@ -40,7 +40,7 @@ typedef size_t (*nominal_page_size_callback)(void *);
 // everything a cache is made of. The cache copies it before its evictor thread starts and changes nothing of it
 // afterwards, so the thread, and every other one that touches the cache, sees the cache as it was made.
 struct pgc_config {
-    const char *name;                                   // up to PGC_NAME_MAX characters
+    const char *name;                                   // required; up to PGC_NAME_MAX characters are kept
     size_t clean_size_bytes;                            // at least 1 MiB
     free_clean_page_callback free_clean_cb;
     size_t max_dirty_pages_per_flush;

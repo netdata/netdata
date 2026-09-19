@@ -2264,7 +2264,10 @@ bool pgc_destroy(PGC *cache, bool flush) {
     // convert all hot pages to dirty
     all_hot_pages_to_dirty(cache, PGC_SECTION_ALL);
 
-    // make all dirty pages clean, saving them only when asked to
+    // make all dirty pages clean, saving them only when asked to. A cache this call has to leave allocated keeps
+    // its configuration, the save callbacks included: whoever still dirties its pages afterwards is outside the
+    // contract (nothing holds pages of a cache being destroyed), and a flush it triggers would save through an
+    // engine that is gone
     flush_pages(cache, 0, PGC_SECTION_ALL, true, true, flush);
 
     // free all unreferenced clean pages
@@ -3032,7 +3035,6 @@ void pgc_open_cache_to_journal_v2(
     pgc_atomic_sub_fetch(&cache->stats.p2_workers_jv2_flush, 1);
 
     // balance-parents: do not flush, there is nothing dirty
-    // flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL, false, false);
 }
 
 static bool match_page_data(PGC_PAGE *page, void *data) {

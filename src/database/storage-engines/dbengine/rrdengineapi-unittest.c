@@ -146,6 +146,20 @@ int dbengine_null_engine_unittest(void) {
         errors++;
     }
 
+    // the daemon runs every allocator statistics reader over every slot, the NULL ones included: a NULL slot (an
+    // engine's own, or a page-details allocator before the first engine) reads as zero bytes and crashes nothing.
+    // The process-wide slots are real statistics here and may well hold bytes.
+    for(size_t i = 0; i < DBENGINE_MEM_MAX; i++) {
+        if(sizes.as[i])
+            continue;
+
+        if(aral_structures_bytes_from_stats(sizes.as[i]) || aral_free_bytes_from_stats(sizes.as[i]) ||
+           aral_used_bytes_from_stats(sizes.as[i]) || aral_padding_bytes_from_stats(sizes.as[i])) {
+            fprintf(stderr, " >>> DBENGINE: the NULL memory slot %d reports bytes\n", (int)i);
+            errors++;
+        }
+    }
+
     struct dbengine_work_request request = { .fn = NULL, .data = NULL };
     if(dbengine_work_available(NULL) || dbengine_enq_work(NULL, &request)) {
         fprintf(stderr, " >>> DBENGINE: no engine takes work\n");
