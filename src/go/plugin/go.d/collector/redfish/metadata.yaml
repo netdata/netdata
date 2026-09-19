@@ -568,7 +568,7 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_reading_alarm
         metric: redfish.reading.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Redfish Reading Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Redfish Reading Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_redundancy_conditions
         metric: redfish.redundancy.conditions
@@ -672,35 +672,35 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_current_alarm
         metric: system.hw.sensor.current.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Current Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Current Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_energy_alarm
         metric: system.hw.sensor.energy.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Energy Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Energy Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_fan_alarm
         metric: system.hw.sensor.fan.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Rotational Speed Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Rotational Speed Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_humidity_alarm
         metric: system.hw.sensor.humidity.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Relative Humidity Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Relative Humidity Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_power_alarm
         metric: system.hw.sensor.power.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Power Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Power Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_pressure_alarm
         metric: system.hw.sensor.pressure.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Barometric Pressure Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Barometric Pressure Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_temperature_alarm
         metric: system.hw.sensor.temperature.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Temperature Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Temperature Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
       - name: redfish_system_hw_sensor_voltage_alarm
         metric: system.hw.sensor.voltage.alarm
-        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Voltage Alarm State"
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Voltage Source Health State"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
     functions:
       description: |
@@ -1195,6 +1195,10 @@ modules:
         - name: resource
           description: Measurements and health states for each supported resource exposed by the endpoint.
           labels:
+            - name: endpoint_key
+              description: Stable canonical endpoint key.
+            - name: resource_key
+              description: Stable resource identity within the endpoint.
             - name: resource_kind
               description: Redfish resource kind.
             - name: resource_name
@@ -1810,7 +1814,7 @@ modules:
                 - name: critical
                 - name: unknown
             - name: redfish.memory.health_flags
-              description: Memory Health Flags
+              description: Memory Module Health Flags
               unit: flags
               chart_type: stacked
               dimensions:
@@ -4324,10 +4328,22 @@ modules:
         - name: reading
           description: One physical sensor reading or source-provided measurement excerpt.
           labels:
+            - name: endpoint_key
+              description: Stable canonical endpoint key.
+            - name: resource_key
+              description: Stable identity of the resource supplying the reading.
             - name: resource_kind
               description: Kind of the resource supplying the reading.
             - name: resource_name
               description: Resource supplying the reading.
+            - name: slot
+              description: Slot, device locator, or socket of the supplying resource, when reported.
+            - name: location
+              description: Service label of the supplying resource's physical location, when reported.
+            - name: manufacturer
+              description: Manufacturer of the supplying resource, when reported.
+            - name: model
+              description: Model of the supplying resource, when reported.
             - name: reading_key
               description: Stable reading identity within the endpoint.
             - name: reading_type

@@ -92,7 +92,7 @@ func componentView(node *Resource, observedAt time.Time) Component {
 			Severity: severity,
 		})
 	}
-	// Share the source-field mapping used by metric labels, without label-size limits.
+	// Identity fields are shown in full here; chart labels get a subset.
 	addResourceIdentity(func(key, value string) {
 		switch key {
 		case "manufacturer":

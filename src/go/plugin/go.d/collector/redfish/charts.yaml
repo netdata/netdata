@@ -821,7 +821,7 @@ groups:
             type: stacked
             dimensions:
               - selector: memory_health_status
-          - title: Memory Health Flags
+          - title: Memory Module Health Flags
             context: health_flags
             units: flags
             type: stacked
@@ -1348,7 +1348,7 @@ groups:
                 dimensions:
                   - selector: drive_nvme_wear_used
                     name: used
-      - family: Storage
+      - family: Storage Subsystems
         context_namespace: storage
         metrics:
           - storage_acquisition_state
@@ -2380,7 +2380,7 @@ groups:
           - endpoint_key
           - resource_key
     groups:
-      - family: Air Flow
+      - family: Air Flow Readings
         context_namespace: reading
         metrics:
           - reading_air_flow_value
@@ -2543,7 +2543,7 @@ groups:
             type: stacked
             dimensions:
               - selector: filter_state
-      - family: Heat
+      - family: Heat Readings
         context_namespace: reading
         metrics:
           - reading_heat_value
@@ -2772,7 +2772,7 @@ groups:
             type: stacked
             dimensions:
               - selector: leak_detector_state
-      - family: Liquid Flow
+      - family: Liquid Flow Readings
         context_namespace: reading
         metrics:
           - reading_liquid_flow_value
@@ -2788,7 +2788,7 @@ groups:
             dimensions:
               - selector: reading_liquid_flow_value
                 name: value
-      - family: Liquid Level
+      - family: Liquid Level Readings
         context_namespace: reading
         metrics:
           - reading_liquid_level_value
@@ -2853,7 +2853,7 @@ groups:
             type: stacked
             dimensions:
               - selector: pump_state
-      - family: Rotational Speed
+      - family: Rotational Speed Readings
         context_namespace: reading
         metrics:
           - reading_rotational_speed_value
@@ -2869,7 +2869,7 @@ groups:
             dimensions:
               - selector: reading_rotational_speed_value
                 name: value
-      - family: Temperature
+      - family: Temperature Readings
         context_namespace: reading
         metrics:
           - reading_temperature_value
@@ -2943,7 +2943,7 @@ groups:
           - endpoint_key
           - resource_key
     groups:
-      - family: Apparent Energy
+      - family: Apparent Energy Readings
         context_namespace: reading
         metrics:
           - reading_apparent_energy_value
@@ -2959,7 +2959,7 @@ groups:
             dimensions:
               - selector: reading_apparent_energy_value
                 name: value
-      - family: Apparent Power
+      - family: Apparent Power Readings
         context_namespace: reading
         metrics:
           - reading_apparent_power_value
@@ -3080,7 +3080,7 @@ groups:
             type: stacked
             dimensions:
               - selector: battery_state
-      - family: Charge
+      - family: Charge Readings
         context_namespace: reading
         metrics:
           - reading_charge_value
@@ -3096,7 +3096,7 @@ groups:
             dimensions:
               - selector: reading_charge_value
                 name: value
-      - family: Crest Factor
+      - family: Crest Factor Readings
         context_namespace: reading
         metrics:
           - reading_crest_factor_value
@@ -3112,7 +3112,7 @@ groups:
             dimensions:
               - selector: reading_crest_factor_value
                 name: value
-      - family: Current
+      - family: Current Readings
         context_namespace: reading
         metrics:
           - reading_current_value
@@ -3128,7 +3128,7 @@ groups:
             dimensions:
               - selector: reading_current_value
                 name: value
-      - family: Energy
+      - family: Energy Readings
         context_namespace: reading
         metrics:
           - reading_energy_value
@@ -3144,7 +3144,7 @@ groups:
             dimensions:
               - selector: reading_energy_value
                 name: value
-      - family: Frequency
+      - family: Frequency Readings
         context_namespace: reading
         metrics:
           - reading_frequency_value
@@ -3160,7 +3160,7 @@ groups:
             dimensions:
               - selector: reading_frequency_value
                 name: value
-      - family: Harmonic Distortion
+      - family: Harmonic Distortion Readings
         context_namespace: reading
         metrics:
           - reading_harmonic_distortion_value
@@ -3176,7 +3176,7 @@ groups:
             dimensions:
               - selector: reading_harmonic_distortion_value
                 name: value
-      - family: Phase Angle
+      - family: Phase Angle Readings
         context_namespace: reading
         metrics:
           - reading_phase_angle_value
@@ -3192,23 +3192,7 @@ groups:
             dimensions:
               - selector: reading_phase_angle_value
                 name: value
-      - family: Power
-        context_namespace: reading
-        metrics:
-          - reading_power_value
-        chart_defaults:
-          instances:
-            by_labels:
-              - endpoint_key
-              - reading_key
-        charts:
-          - title: Power Readings
-            context: power
-            units: watts
-            dimensions:
-              - selector: reading_power_value
-                name: value
-      - family: Power Factor
+      - family: Power Factor Readings
         context_namespace: reading
         metrics:
           - reading_power_factor_value
@@ -3223,6 +3207,22 @@ groups:
             units: ratio
             dimensions:
               - selector: reading_power_factor_value
+                name: value
+      - family: Power Readings
+        context_namespace: reading
+        metrics:
+          - reading_power_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Power Readings
+            context: power
+            units: watts
+            dimensions:
+              - selector: reading_power_value
                 name: value
       - family: Power Subsystems
         context_namespace: power_subsystem
@@ -3360,7 +3360,7 @@ groups:
             type: stacked
             dimensions:
               - selector: power_supply_state
-      - family: Reactive Energy
+      - family: Reactive Energy Readings
         context_namespace: reading
         metrics:
           - reading_reactive_energy_value
@@ -3376,7 +3376,7 @@ groups:
             dimensions:
               - selector: reading_reactive_energy_value
                 name: value
-      - family: Reactive Power
+      - family: Reactive Power Readings
         context_namespace: reading
         metrics:
           - reading_reactive_power_value
@@ -3392,7 +3392,7 @@ groups:
             dimensions:
               - selector: reading_reactive_power_value
                 name: value
-      - family: Stored Energy
+      - family: Stored Energy Readings
         context_namespace: reading
         metrics:
           - reading_stored_energy_value
@@ -3408,7 +3408,7 @@ groups:
             dimensions:
               - selector: reading_stored_energy_value
                 name: value
-      - family: Voltage
+      - family: Voltage Readings
         context_namespace: reading
         metrics:
           - reading_voltage_value
@@ -3433,7 +3433,7 @@ groups:
           - endpoint_key
           - reading_key
     groups:
-      - family: Absolute Humidity
+      - family: Absolute Humidity Readings
         context_namespace: reading
         metrics:
           - reading_absolute_humidity_value
@@ -3444,7 +3444,7 @@ groups:
             dimensions:
               - selector: reading_absolute_humidity_value
                 name: value
-      - family: Altitude
+      - family: Altitude Readings
         context_namespace: reading
         metrics:
           - reading_altitude_value
@@ -3455,7 +3455,7 @@ groups:
             dimensions:
               - selector: reading_altitude_value
                 name: value
-      - family: Barometric Pressure
+      - family: Barometric Pressure Readings
         context_namespace: reading
         metrics:
           - reading_barometric_pressure_value
@@ -3466,7 +3466,7 @@ groups:
             dimensions:
               - selector: reading_barometric_pressure_value
                 name: value
-      - family: Humidity
+      - family: Humidity Readings
         context_namespace: reading
         metrics:
           - reading_humidity_value
@@ -3477,7 +3477,7 @@ groups:
             dimensions:
               - selector: reading_humidity_value
                 name: value
-      - family: Linear Acceleration
+      - family: Linear Acceleration Readings
         context_namespace: reading
         metrics:
           - reading_linear_acceleration_value
@@ -3488,7 +3488,7 @@ groups:
             dimensions:
               - selector: reading_linear_acceleration_value
                 name: value
-      - family: Linear Position
+      - family: Linear Position Readings
         context_namespace: reading
         metrics:
           - reading_linear_position_value
@@ -3499,7 +3499,7 @@ groups:
             dimensions:
               - selector: reading_linear_position_value
                 name: value
-      - family: Linear Velocity
+      - family: Linear Velocity Readings
         context_namespace: reading
         metrics:
           - reading_linear_velocity_value
@@ -3510,7 +3510,7 @@ groups:
             dimensions:
               - selector: reading_linear_velocity_value
                 name: value
-      - family: Pressure
+      - family: Pressure Readings
         context_namespace: reading
         metrics:
           - reading_pressure_value
@@ -3521,7 +3521,7 @@ groups:
             dimensions:
               - selector: reading_pressure_value
                 name: value
-      - family: Rotational Acceleration
+      - family: Rotational Acceleration Readings
         context_namespace: reading
         metrics:
           - reading_rotational_acceleration_value
@@ -3532,7 +3532,7 @@ groups:
             dimensions:
               - selector: reading_rotational_acceleration_value
                 name: value
-      - family: Rotational Position
+      - family: Rotational Position Readings
         context_namespace: reading
         metrics:
           - reading_rotational_position_value
@@ -3543,7 +3543,7 @@ groups:
             dimensions:
               - selector: reading_rotational_position_value
                 name: value
-      - family: Rotational Velocity
+      - family: Rotational Velocity Readings
         context_namespace: reading
         metrics:
           - reading_rotational_velocity_value
@@ -3554,7 +3554,7 @@ groups:
             dimensions:
               - selector: reading_rotational_velocity_value
                 name: value
-      - family: Valve Position
+      - family: Valve Position Readings
         context_namespace: reading
         metrics:
           - reading_valve_position_value
@@ -3574,7 +3574,7 @@ groups:
           - endpoint_key
           - resource_key
     groups:
-      - family: Percentage
+      - family: Percentage Readings
         context_namespace: reading
         metrics:
           - reading_percentage_value
@@ -3613,7 +3613,7 @@ groups:
             type: stacked
             dimensions:
               - selector: derived_health_status
-      - family: Sensors
+      - family: Sensor Resources
         context_namespace: sensor
         metrics:
           - sensor_acquisition_state
@@ -3888,102 +3888,96 @@ groups:
       instances:
         by_labels:
           - endpoint_key
-          - resource_key
-    groups:
-      - family: Collection
-        context_namespace: collection
-        metrics:
-          - collection_duration_seconds
-          - collection_failures_auth
-          - collection_failures_internal
-          - collection_failures_limit
-          - collection_failures_protocol
-          - collection_failures_timeout
-          - collection_failures_tls
-          - collection_failures_transport
-          - collection_http_requests_redirected
-          - collection_http_requests_started
-          - collection_operations_failed
-          - collection_operations_successful
-          - collection_resources_discovered
-          - collection_resources_readable
-          - collection_resources_unknown
-          - collection_resources_unreadable
-          - collection_status
-          - collection_traffic_received_bytes
-        chart_defaults:
-          instances:
-            by_labels:
-              - endpoint_key
-        charts:
-          - title: Redfish Collection Duration
-            context: duration
-            units: seconds
-            dimensions:
-              - selector: collection_duration_seconds
-                name: duration
-          - title: Redfish Collection Failures
-            context: failures
-            units: failures
-            type: stacked
-            dimensions:
-              - selector: collection_failures_auth
-                name: auth
-              - selector: collection_failures_tls
-                name: tls
-              - selector: collection_failures_transport
-                name: transport
-              - selector: collection_failures_timeout
-                name: timeout
-              - selector: collection_failures_protocol
-                name: protocol
-              - selector: collection_failures_limit
-                name: limit
-              - selector: collection_failures_internal
-                name: internal
-          - title: Redfish Collection HTTP Requests
-            context: http_requests
-            units: requests/cycle
-            dimensions:
-              - selector: collection_http_requests_started
-                name: started
-              - selector: collection_http_requests_redirected
-                name: redirected
-          - title: Redfish Collection Operations
-            context: operations
-            units: operations/cycle
-            type: stacked
-            dimensions:
-              - selector: collection_operations_successful
-                name: successful
-              - selector: collection_operations_failed
-                name: failed
-          - title: Redfish Collection Resources
-            context: resources
-            units: resources
-            dimensions:
-              - selector: collection_resources_discovered
-                name: discovered
-              - selector: collection_resources_readable
-                name: readable
-              - selector: collection_resources_unreadable
-                name: unreadable
-              - selector: collection_resources_unknown
-                name: unknown
-          - title: Redfish Collection Status
-            context: status
-            units: state
-            type: stacked
-            dimensions:
-              - selector: collection_status
-          - title: Redfish Collection Traffic
-            context: traffic
-            units: bytes/cycle
-            dimensions:
-              - selector: collection_traffic_received_bytes
-                name: received
-  - context_namespace: system.hw.sensor
+    metrics:
+      - collection_duration_seconds
+      - collection_failures_auth
+      - collection_failures_internal
+      - collection_failures_limit
+      - collection_failures_protocol
+      - collection_failures_timeout
+      - collection_failures_tls
+      - collection_failures_transport
+      - collection_http_requests_redirected
+      - collection_http_requests_started
+      - collection_operations_failed
+      - collection_operations_successful
+      - collection_resources_discovered
+      - collection_resources_readable
+      - collection_resources_unknown
+      - collection_resources_unreadable
+      - collection_status
+      - collection_traffic_received_bytes
+    charts:
+      - title: Redfish Collection Duration
+        context: collection.duration
+        units: seconds
+        dimensions:
+          - selector: collection_duration_seconds
+            name: duration
+      - title: Redfish Collection Failures
+        context: collection.failures
+        units: failures
+        type: stacked
+        dimensions:
+          - selector: collection_failures_auth
+            name: auth
+          - selector: collection_failures_tls
+            name: tls
+          - selector: collection_failures_transport
+            name: transport
+          - selector: collection_failures_timeout
+            name: timeout
+          - selector: collection_failures_protocol
+            name: protocol
+          - selector: collection_failures_limit
+            name: limit
+          - selector: collection_failures_internal
+            name: internal
+      - title: Redfish Collection HTTP Requests
+        context: collection.http_requests
+        units: requests/cycle
+        dimensions:
+          - selector: collection_http_requests_started
+            name: started
+          - selector: collection_http_requests_redirected
+            name: redirected
+      - title: Redfish Collection Operations
+        context: collection.operations
+        units: operations/cycle
+        type: stacked
+        dimensions:
+          - selector: collection_operations_successful
+            name: successful
+          - selector: collection_operations_failed
+            name: failed
+      - title: Redfish Collection Resources
+        context: collection.resources
+        units: resources
+        dimensions:
+          - selector: collection_resources_discovered
+            name: discovered
+          - selector: collection_resources_readable
+            name: readable
+          - selector: collection_resources_unreadable
+            name: unreadable
+          - selector: collection_resources_unknown
+            name: unknown
+      - title: Redfish Collection Status
+        context: collection.status
+        units: state
+        type: stacked
+        dimensions:
+          - selector: collection_status
+      - title: Redfish Collection Traffic
+        context: collection.traffic
+        units: bytes/cycle
+        dimensions:
+          - selector: collection_traffic_received_bytes
+            name: received
+  - family: Hardware Sensors
+    context_namespace: system.hw.sensor
     chart_defaults:
+      priority: 70850
       instances:
         by_labels:
           - endpoint_key

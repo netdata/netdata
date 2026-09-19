@@ -115,12 +115,6 @@ func (c *Collector) Configuration() any { return c.Config }
 
 func (c *Collector) Init(ctx context.Context) error {
 	c.Config.applyDefaults()
-	if c.Name == "" {
-		return errors.New("config validation: job name is required")
-	}
-	if len(c.Name) > measurement.MaxLabelValueBytes {
-		return fmt.Errorf("config validation: job name must not exceed %d bytes", measurement.MaxLabelValueBytes)
-	}
 	if err := c.Config.validate(); err != nil {
 		return fmt.Errorf("config validation: %w", err)
 	}

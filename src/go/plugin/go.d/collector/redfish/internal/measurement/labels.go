@@ -3,6 +3,7 @@
 package measurement
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -11,6 +12,19 @@ import (
 
 // MaxLabelValueBytes is the limit for resource and reading label values.
 const MaxLabelValueBytes = 256
+
+// ResourceLabelKeys and ReadingLabelKeys are the label keys resource and reading
+// metrics carry, in attachment order. metadata.yaml documents the same sets; the
+// label tests keep code, lists and documentation aligned.
+var (
+	ResourceLabelKeys = []string{
+		"endpoint_key", "resource_key", "resource_kind", "resource_name",
+		"manufacturer", "model", "slot", "location",
+	}
+	ReadingLabelKeys = append(slices.Clone(ResourceLabelKeys),
+		"reading_key", "physical_context", "physical_subcontext", "reading_type", "reading_basis", "reading_role",
+	)
+)
 
 func (c *Projector) metricLabels(node *Resource, reading *normalizedReading) []metrix.Label {
 	labels := []metrix.Label{
@@ -41,8 +55,8 @@ func (c *Projector) metricLabels(node *Resource, reading *normalizedReading) []m
 	return labels
 }
 
-// addResourceIdentity reports every identity field a resource document carries.
-// The Hardware Function shows all of them; charts carry only chartIdentityLabels.
+// addResourceIdentity reports the identity fields the Hardware Function shows;
+// charts carry only chartIdentityLabels.
 func addResourceIdentity(add func(string, string), node *Resource) {
 	if node == nil || node.Data == nil {
 		return
@@ -65,14 +79,10 @@ func addResourceIdentity(add func(string, string), node *Resource) {
 	addPath("serial_number", "SerialNumber")
 	addPath("asset_tag", "AssetTag")
 	addPath("part_number", "PartNumber")
-	addPath("spare_part_number", "SparePartNumber")
 	addPath("firmware_version", "FirmwareVersion")
 	addPath("bios_version", "BiosVersion")
 	addPath("slot", "Slot", "DeviceLocator", "Socket")
 	addPath("location", "Location.PartLocation.ServiceLabel", "PhysicalLocation.PartLocation.ServiceLabel")
-	addPath("mac_address", "MACAddress", "Ethernet.MACAddress")
-	addPath("wwn", "FibreChannel.WWPN", "FibreChannel.WWNN")
-	addPath("link_type", "LinkNetworkTechnology", "ActiveLinkTechnology")
 }
 
 // chartIdentityLabels are the identity fields an operator needs on a chart: to

@@ -5,6 +5,7 @@ package redfish
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -53,7 +54,9 @@ func templateCharts(t *testing.T) map[string]charttpl.Chart {
 
 // chartDimensionNames resolves the dimension names a template chart renders:
 // static names as written, and one dimension per declared state for a stateset
-// selector without a name, which is how chartengine infers them at runtime.
+// selector without a name. chartengine infers those names from the flattened
+// state series; it currently creates them in alphabetical order, so only the
+// set is a runtime contract, the order here is the declaration order.
 func chartDimensionNames(t *testing.T, chart charttpl.Chart) []string {
 	t.Helper()
 	var names []string
@@ -125,6 +128,42 @@ func TestSourceHealthChartsAndRules(t *testing.T) {
 	require.NotContains(t, string(raw), "$cap")
 	require.NotContains(t, string(raw), "$emergency")
 	require.NotContains(t, string(raw), "$fault")
+}
+
+func TestMetadataDocumentsChartLabels(t *testing.T) {
+	var metadata struct {
+		Modules []struct {
+			Metrics struct {
+				Scopes []struct {
+					Name   string
+					Labels []struct{ Name string }
+				}
+			}
+		}
+	}
+	raw, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(raw, &metadata))
+	require.Len(t, metadata.Modules, 1)
+	documented := make(map[string][]string)
+	for _, scope := range metadata.Modules[0].Metrics.Scopes {
+		for _, label := range scope.Labels {
+			documented[scope.Name] = append(documented[scope.Name], label.Name)
+		}
+	}
+	require.Equal(t, map[string][]string{
+		"endpoint": {"endpoint_key"},
+		"resource": slices.Sorted(slices.Values(measurement.ResourceLabelKeys)),
+		"reading":  slices.Sorted(slices.Values(measurement.ReadingLabelKeys)),
+	}, sortedLabelSets(documented))
+}
+
+func sortedLabelSets(in map[string][]string) map[string][]string {
+	out := make(map[string][]string, len(in))
+	for scope, labels := range in {
+		out[scope] = slices.Sorted(slices.Values(labels))
+	}
+	return out
 }
 
 // Metadata and fixed chart definitions are maintained together after generator removal.

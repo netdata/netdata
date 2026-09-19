@@ -90,22 +90,6 @@ func TestCollectorLogsCollectionDiagnosticsOnceWithinFixedBound(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(output.String(), "additional distinct diagnostics are suppressed"))
 }
 
-func TestCollectorRejectsOversizedJobNameBeforeClientConstruction(t *testing.T) {
-	collector := New()
-	collector.Config = Config{
-		URL:        "https://bmc.example.test",
-		AuthMethod: "none",
-	}
-	collector.Name = strings.Repeat("x", measurement.MaxLabelValueBytes+1)
-	collector.newClient = func(acquisition.Options, *http.Client) (endpointClient, error) {
-		t.Fatal("oversized job name reached client construction")
-		return nil, nil
-	}
-
-	err := collector.Init(context.Background())
-	require.ErrorContains(t, err, "job name must not exceed 256 bytes")
-}
-
 func TestCollectorCollectionErrorCanAbortMetricCycle(t *testing.T) {
 	collector := New()
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
