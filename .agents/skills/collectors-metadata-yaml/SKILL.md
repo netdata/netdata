@@ -59,6 +59,9 @@ Facts every rule below relies on (`integrations/templates/overview/collector.md`
   field for the question it sits under.
 - Readers stop when they have enough. The first paragraph of every field MUST stand alone; detail follows in
   decreasing importance.
+- `metrics_description` and `method_description` carry the page. They sit above the fold, most visitors read no
+  further, and the first sentence of `metrics_description` becomes the catalog row that decides whether anyone opens
+  the page at all. When writing or reviewing time is short, spend it on those two.
 - Readers skip walls of text ("I ain't reading all that"). Long content is fine when it is structured: one idea per
   paragraph, lists for enumerations, tables for items that share attributes, an admonition for what must not be
   missed. Length is a symptom to check, not the rule; an unstructured 120-word paragraph fails, a 400-word field made
@@ -95,6 +98,21 @@ Content that does not answer its field's question does not stay in the field. Ro
 - It is developer content (internal stages, caches, bounds nobody configures, ownership resolution). It belongs in the
   collector's `ARCHITECTURE.md` or in code, is never linked from the page, and leaves the page.
 - Nothing owns it: cut it.
+
+Noticing is the hard part, because the content feels relevant while you are writing it — you are describing the
+collector you just built. Hold the draft against these four shapes. They are developer notes nearly every time they
+appear in a field, at any length:
+
+- **Failure narration.** What happens on an error, how many times it retries, when it gives up.
+- **State between runs.** What is kept, discarded, replayed, or invalidated from one collection to the next.
+- **Algorithm.** Preference order, evaluation rules, dwell and hysteresis, bounds the code applies to itself.
+- **Internal vocabulary.** A term that appears nowhere the operator can see: not an option name, not a chart, not a
+  log message, not a label in the UI. Public protocol and API names (`ServiceRoot`, a vendor operation) are the
+  exception and stay.
+
+An operator-visible *consequence* of any of these can belong on the page; the mechanism behind it does not. "Some
+charts skip a cycle when the walk overruns" is a consequence and lives in `limits`. How the walk resumes afterwards is
+the mechanism, and leaves.
 
 ## Safety Of The Markdown
 
