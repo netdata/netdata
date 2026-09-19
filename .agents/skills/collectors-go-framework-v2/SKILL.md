@@ -1,6 +1,6 @@
 ---
 name: collectors-go-framework-v2
-description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml/charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
+description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml authoring (defaults, families, ordering, statesets, labels), charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
 ---
 
 # Writing Go go.d Modules With Framework V2
@@ -28,6 +28,7 @@ also needs its compatibility guide. Follow dependencies when a change reaches ad
 | Metric-store cycles, descriptors or caching | `src/go/pkg/metrix/README.md` and Metrics And Charts below |
 | Runtime chart output or lifecycle | `src/go/plugin/framework/chartengine/README.md` |
 | Template format, identity or reducers | `src/go/plugin/framework/charttpl/README.md` and Chart Label Identity below |
+| Writing or reviewing a `charts.yaml`: defaults, families, ordering, statesets, labels, shared contexts, tests | `./chart-template.md` |
 | Host scopes or vnodes | `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md` and Host Scopes below |
 
 Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`. Use focused pieces, not the whole collector
@@ -118,9 +119,10 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - Use `Vec(...)` for labels, `Gauge` for current values,
   `Counter.ObserveTotal()` for source counters, and `StateSet` for fixed
   one-active-state values.
-- Metric names MUST be stable and selected by `charts.yaml`.
-- In `charts.yaml`, use `version: v1`, `context_namespace`, `instances.by_labels`,
-  `instances.optional_by_labels`, and `label_promotion` where their operator-facing behavior is needed.
+- Metric names MUST be stable and selected by `charts.yaml`; stateset metric naming is owned by
+  `./chart-template.md#statesets`.
+- Template authoring (defaults, contexts, families, ordering, statesets, values, labels, shared contexts, tests) is
+  owned by `./chart-template.md`; the bullets below are the runtime contracts it relies on.
 - Charts SHOULD omit `algorithm` for normal type-driven behavior. At runtime,
   chartengine maps `metrix` counters to `incremental` dimensions and gauges or
   other kinds to `absolute`, including dynamically built `charttpl.Chart`
@@ -142,8 +144,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   bare `le` upper-bound value and ordered numerically with `+Inf` last. Do NOT
   add collector-local cumulative-bucket workaround metrics or a bucket-mode
   option for V2 charts.
-- Put multipliers, divisors, hidden flags, and float formatting in the chart
-  template, not ad hoc chart-emission code.
+- Multipliers, divisors and hidden flags belong in the chart template, not ad hoc chart-emission code; the float
+  flag is instrument metadata (`./chart-template.md#values`).
 - When instance identity omits labels—either because `instances.by_labels` does not select them or an
   `instances.optional_by_labels` key is absent—multiple source series can map to one rendered dimension. The effective
   `aggregation` MUST match the metric meaning. Set it on the chart; it applies to every dimension. Absence means
@@ -272,7 +274,8 @@ applicable coverage and required validation evidence without creating a new PR/S
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
 - explicit metric-store cycle tests with `BeginCycle`, success commit, and abort
   on expected collection errors;
-- chart-template schema/decode/validate/compile coverage;
+- chart-template schema/decode/validate/compile coverage and the artifact drift checks in
+  `src/go/plugin/go.d/pkg/collecttest/artifacts.go` (`./chart-template.md#tests`);
 - chart coverage assertions for fixtures expected to materialize all dimensions;
 - host-scope tests when scopes/vnodes are used.
 

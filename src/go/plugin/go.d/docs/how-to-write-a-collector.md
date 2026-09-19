@@ -225,12 +225,14 @@ Use the right instrument:
 - `context_namespace`;
 
 Templates SHOULD also group charts by operational area, use `instances.by_labels` for stable instance identity when
-charts are entity-scoped, use `label_promotion` for descriptive labels that should not define uniqueness, and keep the
-default lifecycle unless a concrete reason exists to override it.
+charts are entity-scoped, and keep the default lifecycle unless a concrete reason exists to override it. Defaults,
+families, ordering, statesets, values, labels and shared contexts are owned by
+`.agents/skills/collectors-go-framework-v2/chart-template.md`.
 
-Metric labels and chart instance labels MUST be bounded and stable. Use IDs for identity. Mutable display names SHOULD
-be promoted with `label_promotion`. Do not blindly copy `instances.by_labels` from Cato or any other example; audit
-every label used for chart identity and record why it is stable enough for that collector.
+Metric labels and chart instance labels MUST be bounded and stable. Use IDs for identity. Which labels to attach
+and when to list `label_promotion` is owned by the chart template topic linked above. Do not blindly copy
+`instances.by_labels` from Cato or any other example; audit every label used for chart identity and record why it is
+stable enough for that collector.
 
 ## Host Scopes And Vnodes
 
@@ -321,6 +323,8 @@ Recommended test coverage:
 - chart-template schema validation with `collecttest.AssertChartTemplateSchema` and chart-template compile validation
   through the chartengine path used by nearby V2 collectors;
 - post-collect chart coverage with `collecttest.AssertChartCoverage`;
+- artifact drift checks between `metadata.yaml`, `charts.yaml` and `health.d` with the `collecttest` checks named in
+  `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`; never restate template contexts or dimensions;
 - state-set values for every known state and unknown fallback;
 - host-scope routing when scopes/vnodes are used;
 - Function handler tests with fake deps when Functions exist;

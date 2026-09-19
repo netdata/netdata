@@ -733,7 +733,8 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `collectors-go-design`: go.d collector/discoverer contract design and review, plus `config_schema.json` forms;
     selective product, operator-surface, identity, state/mutation and design-evidence guidance
   - `collectors-go-framework-v2`: implementing, migrating or reviewing a go.d V2 collector; `CollectorV2`,
-    `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, V2 tests
+    `metrix.CollectorStore`, `ChartTemplateYAML`/`charts.yaml` authoring (defaults, families, ordering, statesets,
+    labels), `charttpl`, `chartengine`, V2 host scopes, V2 tests
   - `collectors-metadata-yaml`: what every collector `metadata.yaml` field says and how it reads: overview,
     permissions, auto-detection (including service discovery), limits and cost, prerequisites, option rows, examples,
     the known-errors troubleshooting catalog, metrics scopes, alerts, identity and keywords; a page that reads as a
