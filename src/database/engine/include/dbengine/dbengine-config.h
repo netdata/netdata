@@ -5,8 +5,15 @@
 
 #include "libnetdata/libnetdata.h"
 
-// Receives one metric the embedder already knows; passed to preload_metrics() by the engine.
-typedef void (*dbengine_preload_add_fn)(void *mrg, Word_t section, nd_uuid_t *uuid);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct rrdengine_instance;
+
+// Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
+// the engine.
+typedef void (*dbengine_preload_add_fn)(void *mrg, struct rrdengine_instance *ctx, nd_uuid_t *uuid);
 
 // The storage engine's process-wide configuration.
 //
@@ -50,6 +57,20 @@ struct dbengine_config {
 };
 
 #define DBENGINE_DEFAULT_PAGES_PER_EXTENT (109)
+
+// Page types. The value is the page-type byte of the on-disk format (rrddiskprotocol.h), so an
+// existing type is never renumbered; a new one takes the next value and raises the maximum.
+#define RRDENG_PAGE_TYPE_ARRAY_32BIT    (0)
+#define RRDENG_PAGE_TYPE_ARRAY_TIER1    (1)
+#define RRDENG_PAGE_TYPE_GORILLA_32BIT  (2)
+#define RRDENG_PAGE_TYPE_MAX            (2) // Maximum page type (inclusive)
+
+// the floor the engine enforces on a tier's disk space (rrdeng_init() raises a smaller value), the floor the embedder
+// is expected to keep the page cache above (the engine does not check it: below it the cache split underflows), and
+// the disk-space default the engine leaves to the embedder
+#define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
+#define RRDENG_MIN_DISK_SPACE_MB (25)
+#define RRDENG_DEFAULT_TIER_DISK_SPACE_MB (1024)
 
 // the smallest libuv pool the engine assumes when the embedder does not say
 #if defined(ENV32BIT)
@@ -103,5 +124,15 @@ struct rrdeng_tier_config {
 // default_update_every_s is negative. Call it once, from one thread, before the first rrdeng_init();
 // a second call with an equal configuration is a no-op, with a different one it is fatal.
 void dbengine_init(const struct dbengine_config *cfg);
+bool dbengine_initialized(void);
+
+// Release the references preload_metrics() left on the registry, once every tier has come up (after the last
+// rrdeng_readiness_wait()): until then they keep preloaded metrics from being evicted before their journals are
+// read. A no-op when there is no registry.
+void dbengine_preload_release(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // NETDATA_DBENGINE_CONFIG_H

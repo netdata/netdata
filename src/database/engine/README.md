@@ -191,32 +191,43 @@ DBENGINE uses 150 bytes of memory for every metric for which retention is mainta
 
 ## Boundary with the rest of Netdata
 
-The engine is a component of the `netdata` binary, but its sources under `src/database/engine/` do not include or call
-anything of the daemon. What the engine needs from its embedder flows through the engine's own headers:
+The engine is a component of the `netdata` binary, sealed in both directions. Its sources under
+`src/database/engine/` include or call nothing of the daemon, and the daemon sees the engine only through its public
+headers under `include/dbengine/`, included from the source root as `database/engine/include/dbengine/<name>.h`;
+`rrdengineapi.h` does not include the private `rrdengine.h`, so an engine instance is an opaque pointer outside this
+directory (the storage vtable's `STORAGE_INSTANCE` is that pointer). The engine is built as its own object library
+target, `dbengine`, linked into `netdata`; the target declares no include directories, so the layout states the
+public surface and the build compiles the engine as one unit. The public headers:
 
-- **Configuration** (`dbengine-config.h`): the embedder fills one `struct dbengine_config` and hands it to
-  `dbengine_init()` once, before the first tier; each tier gets a `struct rrdeng_tier_config` through `rrdeng_init()`.
-  The same struct carries the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest
-  datafile) and `preload_metrics` (the list of metric uuids the embedder already knows, fed into the metrics registry
-  before the journals load).
-- **Published statistics** (`dbengine-stats.h`): the engine keeps its own counters and exposes snapshot getters, such as
-  `rrdeng_get_cache_efficiency_stats()`, `rrdeng_get_gorilla_stats()` and `rrdeng_get_memory_sizes()` with
-  `rrdeng_mem_name()`; the daemon's pulse subsystem reads them each cycle. The engine never pushes into daemon charts.
-  The page cache and metrics registry counters are not published this way yet: pulse calls `pgc_get_statistics()` and
-  `mrg_get_statistics()` on the engine's own `main_cache`, `open_cache`, `extent_cache` and `main_mrg`, reaching them
-  through the internal headers.
-- **Work** (`rrdengineapi.h`): the embedder can run a function on the engine's worker pool with `rrdeng_enq_work()`.
-- **Worker job ids** (`dbengine-workers.h`): the engine's jobs occupy the first block of the shared libuv pool's job
-  id space; an embedder numbers its own jobs from `RRDENG_WORKER_JOB_MAX`. Pool-thread setup is
-  `libuv_worker_thread_init()` in libnetdata.
-- **Tests**: `mrg-unittest.c` and `page_test.cc` live here and use engine headers only; the daemon-side tests
-  (`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through `RRDHOST`,
-  `RRDSET` and `RRDDIM`.
+- **`rrdengineapi.h`**: the metric, collection and query operations behind the storage-engine vtable; the tier
+  lifecycle (`rrdeng_init()`, `rrdeng_readiness_wait()`, `rrdeng_exit()`, `rrdeng_ctx_is_active()`,
+  `dbengine_shutdown()`, and `dbengine_destroy()` for a leak-checking exit); what the embedder reads about a tier
+  (retention limit, disk space, metrics, samples, first time); `rrdeng_datafiles_present()` to learn, before any tier
+  is up, whether a directory holds data; and **work**: `rrdeng_enq_work()` runs a function on the engine's worker
+  pool while the engine is serving, `rrdeng_work_available()` says whether it is, and a refused request is the
+  caller's to run or drop.
+- **`dbengine-config.h`**: the embedder fills one `struct dbengine_config` and hands it to `dbengine_init()` once,
+  before the first tier; each tier gets a `struct rrdeng_tier_config` through `rrdeng_init()`. The same struct carries
+  the optional services the embedder may provide: `on_db_rotation` (a tier deleted its oldest datafile) and
+  `preload_metrics` (the metric uuids the embedder already knows, fed into the metrics registry before the journals
+  load; `dbengine_preload_release()` drops the references once every tier is up). The page types and the tier
+  limits live here too.
+- **`dbengine-stats.h`**: what the engine publishes about itself, as snapshot getters the daemon's pulse subsystem
+  reads each cycle: the page caches (`rrdeng_get_cache_statistics()`, `rrdeng_pages_pending_flush()`), the metrics
+  registry (`rrdeng_get_mrg_statistics()`), cache efficiency, gorilla and memory sizes. The engine never pushes into
+  daemon charts.
+- **`dbengine-workers.h`**: the engine's jobs occupy the first block of the shared libuv pool's job id space; an
+  embedder numbers its own jobs from `RRDENG_WORKER_JOB_MAX`. Pool-thread setup is `libuv_worker_thread_init()` in
+  libnetdata.
+- **`dbengine-tests.h`**: the self-tests and benchmarks the daemon offers as command-line modes.
+
+Tests: `mrg-unittest.c`, `page_test.cc` and `rrdengineapi-unittest.c` live here and use engine headers only; the
+daemon-side tests (`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through
+`RRDHOST`, `RRDSET` and `RRDDIM` and its public headers. A check that needs an engine object, such as the page a
+collect handle holds, belongs in `rrdengineapi-unittest.c`, which the daemon driver calls with the tier it brought up.
 
 The daemon depends on the engine, not the other way round, and owns `netdata.conf` parsing, sqlite, streaming and the
-charts. That direction is not sealed yet: the daemon also reaches past `rrdengineapi.h` into the engine's internals. It
-names the caches and the metrics registry directly (above), reads `multidb_ctx[tier]->config.max_retention_s` for the
-retention charts, and in `FSANITIZE_ADDRESS` builds destroys the caches and the registry itself at shutdown. Because
-`rrdengineapi.h` includes `rrdengine.h`, every translation unit that includes `database/rrd.h` sees the engine's
-internal types. Publishing the remaining counters, giving the engine instance an opaque handle and splitting the
-engine's public and private headers is separate work.
+charts. The seal is enforced by review, not by the build: libnetdata exports the whole `src/` tree as an include
+path, so a private engine header is still reachable from anywhere by its path, and the `dbengine` target is a
+statement of the boundary rather than a guard. Being an object library, every engine object is linked whether or not
+something references it by name, so a constructor-only object cannot be dropped from the link.

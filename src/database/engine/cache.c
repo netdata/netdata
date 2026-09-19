@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "cache.h"
+#include "database/engine/include/dbengine/dbengine-tests.h"
 
 // relaxed atomics for the cache statistics; the engine keeps its own names for them
 #define pgc_atomic_add_fetch(variable, value) __atomic_add_fetch(variable, value, __ATOMIC_RELAXED)
@@ -2239,9 +2240,9 @@ void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
     flush_pages(cache, 0, section, true, true);
 }
 
-void pgc_destroy(PGC *cache, bool flush) {
+bool pgc_destroy(PGC *cache, bool flush) {
     if(!cache)
-        return;
+        return false;
 
     if(!flush) {
         cache->config.pgc_save_init_cb = NULL;
@@ -2257,14 +2258,16 @@ void pgc_destroy(PGC *cache, bool flush) {
     // free all unreferenced clean pages
     free_all_unreferenced_clean_pages(cache);
 
-    // stop the eviction thread
+    // stop the eviction thread. Its completion lives as long as the cache does: a cache left allocated below is
+    // still signalled by whoever asks it for space, and a signal with no thread waiting is a no-op.
     nd_thread_signal_cancel(cache->evictor.thread);
     completion_mark_complete_a_job(&cache->evictor.completion);
     nd_thread_join(cache->evictor.thread);
-    completion_destroy(&cache->evictor.completion);
 
-    if(PGC_REFERENCED_PAGES(cache))
+    if(PGC_REFERENCED_PAGES(cache)) {
         netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
+        return false;
+    }
     else {
         pointer_destroy_index(cache);
 
@@ -2280,9 +2283,11 @@ void pgc_destroy(PGC *cache, bool flush) {
         waitq_destroy(&cache->dirty.wq);
         waitq_destroy(&cache->clean.wq);
 #endif
+        completion_destroy(&cache->evictor.completion);
         freez(cache->index);
         freez(cache);
     }
+    return true;
 }
 
 ALWAYS_INLINE PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {
@@ -3431,7 +3436,7 @@ void unittest_stress_test(void) {
     for(size_t i = 0; i < pgc_uts.query_threads ;i++)
         nd_thread_join(queries_threads[i],NULL);
 
-    pgc_destroy(pgc_uts.cache);
+    pgc_destroy(pgc_uts.cache, true);
 
     freez(pgc_uts.metrics);
     freez(pgc_uts.random_data);

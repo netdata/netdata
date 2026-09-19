@@ -645,29 +645,29 @@ void pulse_dbengine_do(bool extended) {
     static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {}; (void)mrg_stats_old;
 
     pgc_main_stats_old = pgc_main_stats;
-    pgc_main_stats = pgc_get_statistics(main_cache);
+    bool have_main_cache = rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
 
     pgc_open_stats_old = pgc_open_stats;
-    pgc_open_stats = pgc_get_statistics(open_cache);
+    rrdeng_get_cache_statistics(RRDENG_CACHE_OPEN, &pgc_open_stats);
 
     pgc_extent_stats_old = pgc_extent_stats;
-    pgc_extent_stats = pgc_get_statistics(extent_cache);
+    rrdeng_get_cache_statistics(RRDENG_CACHE_EXTENT, &pgc_extent_stats);
 
     cache_efficiency_stats_old = cache_efficiency_stats;
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
     mrg_stats_old = mrg_stats;
+    bool have_mrg = rrdeng_get_mrg_statistics(&mrg_stats);
 
     struct rrdeng_buffer_sizes dbmem = rrdeng_get_memory_sizes();
 
     int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 
-    int64_t aral_structures_total_size = 0, aral_used_total_size = 0;
+    int64_t aral_structures_total_size = 0;
     int64_t aral_padding_total_size = 0;
     for(size_t i = 0; i < RRDENG_MEM_MAX ; i++) {
         buffers_total_size += (int64_t)aral_free_bytes_from_stats(dbmem.as[i]);
         aral_structures_total_size += (int64_t)aral_structures_bytes_from_stats(dbmem.as[i]);
-        aral_used_total_size += (int64_t)aral_used_bytes_from_stats(dbmem.as[i]);
         aral_padding_total_size += (int64_t)aral_padding_bytes_from_stats(dbmem.as[i]);
     }
 
@@ -677,13 +677,12 @@ void pulse_dbengine_do(bool extended) {
         buffers_total_size + aral_structures_total_size + aral_padding_total_size + (int64_t)pgd_padding_bytes();
 
     // we need all the above for the total dbengine memory as reported by the non-extended netdata memory chart
-    if(!main_cache || !main_mrg || !extended)
+    if(!have_main_cache || !have_mrg || !extended)
         return;
 
     dbengine2_cache_statistics_charts(&main_cache_ptrs, &pgc_main_stats, &pgc_main_stats_old, "main", 135100);
     dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
     dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
-    mrg_get_statistics(main_mrg, &mrg_stats);
 
     int priority = 135000;
     {

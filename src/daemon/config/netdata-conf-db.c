@@ -416,6 +416,8 @@ void netdata_conf_section_db(void) {
     // that still back that data (agent temporarily switched dbengine -> ram/alloc).
     // Only meaningful in a dbengine-capable build; without dbengine the data can
     // never be read back, so the flag stays false and RAM cleanup proceeds.
+    // The engine decides what counts as a datafile (an unrelated *.ndf entry is
+    // not persisted data); the daemon only knows where each tier keeps them.
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS && !dbengine_datafiles_present; tier++) {
         char dbenginepath[FILENAME_MAX + 1];
         if (tier == 0)
@@ -423,24 +425,7 @@ void netdata_conf_section_db(void) {
         else
             snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
-        DIR *dir = opendir(dbenginepath);
-        if (!dir)
-            continue;
-
-        struct dirent *de;
-        while ((de = readdir(dir))) {
-            // Validate the name exactly as dbengine generates and scans it
-            // ("datafile-<tier>-<fileno>.ndf"), using the same sscanf template as
-            // scan_data_files(). Requiring both numeric fields to parse means an
-            // unrelated *.ndf entry is not mistaken for persisted data.
-            unsigned int df_tier, df_fileno;
-            if (sscanf(de->d_name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION,
-                       &df_tier, &df_fileno) == 2) {
-                dbengine_datafiles_present = true;
-                break;
-            }
-        }
-        closedir(dir);
+        dbengine_datafiles_present = rrdeng_datafiles_present(dbenginepath);
     }
 #endif
 

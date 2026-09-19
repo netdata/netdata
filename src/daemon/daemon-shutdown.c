@@ -114,7 +114,7 @@ static void rrdeng_quiesce_all()
 static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
-    if(!pgc_hot_and_dirty_entries(main_cache))
+    if(!rrdeng_pages_pending_flush())
         return;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
@@ -128,7 +128,8 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
             rrdeng_flush_all(multidb_ctx[tier]);
     }
 
-    struct pgc_statistics pgc_main_stats = pgc_get_statistics(main_cache);
+    struct pgc_statistics pgc_main_stats;
+    rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
     size_t size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
     size_t entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
     if(size_to_flush > starting_size_to_flush || !starting_size_to_flush)
@@ -155,7 +156,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
         return;
 
     for(size_t iterations = 0; true ;iterations++) {
-        pgc_main_stats = pgc_get_statistics(main_cache);
+        rrdeng_get_cache_statistics(RRDENG_CACHE_MAIN, &pgc_main_stats);
         size_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].size + pgc_main_stats.queues[PGC_QUEUE_DIRTY].size;
         entries_to_flush = pgc_main_stats.queues[PGC_QUEUE_HOT].entries + pgc_main_stats.queues[PGC_QUEUE_DIRTY].entries;
         if(!starting_size_to_flush || size_to_flush > starting_size_to_flush)
@@ -465,26 +466,12 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     dictionary_print_still_allocated_stacktraces();
 
 #ifdef ENABLE_DBENGINE
-    // destroy the caches in reverse order (extent and open depend on main cache)
-    fprintf(stderr, "Destroying extent cache (PGC)...\n");
-    pgc_destroy(extent_cache, false);
-    fprintf(stderr, "Destroying open cache (PGC)...\n");
-    pgc_destroy(open_cache, false);
-    fprintf(stderr, "Destroying main cache (PGC)...\n");
-    pgc_destroy(main_cache, false);
-
-    fprintf(stderr, "Destroying metrics registry (MRG)...\n");
-    size_t metrics_referenced = mrg_destroy(main_mrg);
-    if(metrics_referenced)
-        fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
-            metrics_referenced);
-
-    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        if(dbengine_tier_up[tier]) {
-            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
-            finalize_rrd_files(multidb_ctx[tier]);
-            memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
-        }
+    // the engine's own teardown, only once the normal path above stopped every tier and the engine's loop;
+    // an abnormal exit skipped both, and destroying the caches under a live loop would be a second crash
+    if(!abnormal) {
+        size_t metrics_referenced = dbengine_destroy();
+        if(metrics_referenced)
+            fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n", metrics_referenced);
     }
 #endif
 

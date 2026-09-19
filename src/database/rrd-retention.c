@@ -99,7 +99,7 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
                 tier_info->requested_retention = 0;
 #ifdef ENABLE_DBENGINE
                 if(eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE)
-                    tier_info->requested_retention = multidb_ctx[tier]->config.max_retention_s;
+                    tier_info->requested_retention = rrdeng_max_retention_s(multidb_ctx[tier]);
 #endif
 
                 // Format human-readable requested retention

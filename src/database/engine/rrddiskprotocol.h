@@ -37,13 +37,9 @@ struct rrdeng_df_sb {
 } __attribute__ ((packed));
 
 /*
- * Page types
+ * Page types (the type byte of the page descriptor below): RRDENG_PAGE_TYPE_* in dbengine-config.h,
+ * where the embedder picks a tier's type.
  */
-
-#define RRDENG_PAGE_TYPE_ARRAY_32BIT    (0)
-#define RRDENG_PAGE_TYPE_ARRAY_TIER1    (1)
-#define RRDENG_PAGE_TYPE_GORILLA_32BIT  (2)
-#define RRDENG_PAGE_TYPE_MAX            (2) // Maximum page type (inclusive)
 
 /*
  * Data file page descriptor

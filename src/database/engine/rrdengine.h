@@ -18,17 +18,17 @@
 //
 // The daemon drives the engine through rrdengineapi.h behind the storage-engine vtable, hands it its
 // configuration and optional services through dbengine-config.h, and reads what the engine publishes
-// (statistics, worker job ids) through the engine's own headers. The engine includes nothing of the
-// daemon.
+// (statistics, worker job ids) through the engine's own headers. Those public headers include nothing
+// of this file: this header and everything it pulls in are the engine's private side. The engine, in
+// turn, includes nothing of the daemon.
 
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include "../storage-engine-types.h"
-#include "dbengine-config.h"
-#include "dbengine-workers.h"
+#include "database/engine/include/dbengine/dbengine-config.h"
+#include "database/engine/include/dbengine/dbengine-workers.h"
 
 // the process-wide configuration, copied once by dbengine_init() and read-only afterwards
 extern struct dbengine_config dbengine_cfg;
@@ -38,13 +38,12 @@ extern struct dbengine_config dbengine_cfg;
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
-bool dbengine_initialized(void);
 
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
 #include "datafile.h"
 #include "journalfile.h"
-#include "rrdengineapi.h"
+#include "database/engine/include/dbengine/rrdengineapi.h"
 #include "pagecache.h"
 #include "mrg.h"
 #include "cache.h"
@@ -486,11 +485,6 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-// a tier that came up and has not been shut down; the event loop's periodic work covers exactly these
-static inline bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
-    return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
-}
-
 // Retention and indexing work wait until the registry has been loaded from every journal: rotating a
 // datafile before then would drop metrics the registry has not learned yet. The loader's own datafile references only
 // protect the files it is reading at that moment; this flag keeps rotation from starting at all.
@@ -732,7 +726,10 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-void dbengine_shutdown(void);
+// rrdeng_get_used_disk_space() for a caller that already holds ctx->datafiles.rwlock
+uint64_t rrdeng_get_used_disk_space_unsafe(struct rrdengine_instance *ctx);
+// after rrdeng_exit(), on a static multidb tier only: close its datafiles
+void finalize_rrd_files(struct rrdengine_instance *ctx);
 size_t datafile_count(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_first_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
 struct rrdengine_datafile *get_last_ctx_datafile(struct rrdengine_instance *ctx, bool with_lock);
