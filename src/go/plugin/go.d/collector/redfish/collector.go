@@ -115,12 +115,6 @@ func (c *Collector) Configuration() any { return c.Config }
 
 func (c *Collector) Init(ctx context.Context) error {
 	c.Config.applyDefaults()
-	if c.Name == "" {
-		return errors.New("config validation: job name is required")
-	}
-	if len(c.Name) > measurement.MaxLabelValueBytes {
-		return fmt.Errorf("config validation: job name must not exceed %d bytes", measurement.MaxLabelValueBytes)
-	}
 	if err := c.Config.validate(); err != nil {
 		return fmt.Errorf("config validation: %w", err)
 	}
@@ -154,7 +148,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		return fmt.Errorf("init Redfish client: %w", err)
 	}
 	c.functionLogs.Store(c.client.Logs())
-	c.measurement = measurement.New(origin, c.Name, acquisition.ReadingProvenanceResolver(root, origin))
+	c.measurement = measurement.New(origin, acquisition.ReadingProvenanceResolver(root, origin))
 	return nil
 }
 
@@ -188,7 +182,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 	}
 	c.functionSnapshot.Store(result.Snapshot)
 	c.warnCollectionDiagnostics(result.Diagnostics)
-	c.metrics.observe(c.endpointKey, c.Name, result.Metrics)
+	c.metrics.observe(c.endpointKey, result.Metrics)
 	c.hardware.observe(result.Hardware)
 
 	if err != nil {

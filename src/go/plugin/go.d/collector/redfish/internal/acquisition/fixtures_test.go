@@ -97,8 +97,8 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	require.Equal(t, "OK", redundancy[0].Doc.Status.Health)
 	require.Equal(t, embeddedLocator(thermal.Locator, "FanRedundancy", "", 0), redundancy[0].Locator)
 	observations := measurementTestProject(t, client, redundancy[0])
-	measurementTestRequireValue(t, observations, "redfish_redundancy_members_active", 1)
-	measurementTestRequireValue(t, observations, "redfish_redundancy_members_total", 2)
+	measurementTestRequireValue(t, observations, "redundancy_members_active", 1)
+	measurementTestRequireValue(t, observations, "redundancy_members_total", 2)
 
 	withoutCount := *redundancy[0]
 	withoutCount.Data = cloneJSONMap(redundancy[0].Data)
@@ -106,7 +106,7 @@ func TestDMTF2026_1EmbeddedComponents(t *testing.T) {
 	_, present := withoutCount.Data["ActiveRedundancyGroup@odata.count"]
 	require.False(t, present)
 	for _, observation := range measurementTestProject(t, client, &withoutCount) {
-		require.NotEqual(t, "redfish_redundancy_members_active", observation.Metric)
+		require.NotEqual(t, "redundancy_members_active", observation.Metric)
 	}
 
 	leakDetection := fixtureGraphParent(t, "leak_detection", fixture["leak_detection"])

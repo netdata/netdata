@@ -24,7 +24,7 @@ type functionTestJob struct{ collector *Collector }
 
 func (j functionTestJob) FullName() string   { return "redfish_" + j.Name() }
 func (j functionTestJob) ModuleName() string { return "redfish" }
-func (j functionTestJob) Name() string       { return j.collector.Name }
+func (j functionTestJob) Name() string       { return "test-job" }
 func (j functionTestJob) IsRunning() bool    { return true }
 func (j functionTestJob) Collector() any     { return j.collector }
 
@@ -84,7 +84,7 @@ func TestFunctionsFollowRealCollection(t *testing.T) {
 		}
 	}))
 	t.Cleanup(server.Close)
-	collector := newFunctionCollector(t, server.URL, "first")
+	collector := newFunctionCollector(t, server.URL)
 	now := time.Unix(1000, 0)
 	collector.now = func() time.Time { return now }
 	handler := collectorapi.DefaultRegistry["redfish"].MethodHandler(functionTestJob{collector})
@@ -182,8 +182,8 @@ func TestFunctionsFollowRealCollection(t *testing.T) {
 func TestFunctionSnapshotsAreJobOwnedAndConcurrent(t *testing.T) {
 	server := testutil.NewServer(t, testutil.ServerConfig{})
 	t.Cleanup(server.Close)
-	first := newFunctionCollector(t, server.URL, "first")
-	second := newFunctionCollector(t, server.URL, "second")
+	first := newFunctionCollector(t, server.URL)
+	second := newFunctionCollector(t, server.URL)
 	collectFunctionCycle(t, first)
 	assert.Equal(t, 503, second.funcRouter.Handle(t.Context(), "hardware", nil).Status)
 	collectFunctionCycle(t, second)
@@ -206,11 +206,10 @@ func TestFunctionSnapshotsAreJobOwnedAndConcurrent(t *testing.T) {
 	assert.Equal(t, 200, second.funcRouter.Handle(t.Context(), "hardware", nil).Status)
 }
 
-func newFunctionCollector(t *testing.T, url, name string) *Collector {
+func newFunctionCollector(t *testing.T, url string) *Collector {
 	t.Helper()
 	c := New()
 	c.Config = testConfig(url, "none")
-	c.Name = name
 	require.NoError(t, c.Init(t.Context()))
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	return c

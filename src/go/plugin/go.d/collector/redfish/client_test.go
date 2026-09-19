@@ -45,7 +45,7 @@ func TestProtocolClientBasicCheckAndCollect(t *testing.T) {
 	require.True(t, ok)
 	cycle := managed.CycleController()
 	cycle.BeginCycle()
-	coverage.metrics.observe("endpoint-key", "endpoint-job", result.Metrics)
+	coverage.metrics.observe("endpoint-key", result.Metrics)
 	coverage.hardware.observe(result.Hardware)
 	require.NoError(t, cycle.CommitCycleSuccess())
 	collecttest.AssertChartCoverage(t, coverage, collecttest.ChartCoverageExpectation{})
@@ -74,7 +74,7 @@ func TestProtocolClientRetainsLastCompleteMembershipWithoutReplayingCurrentState
 	foundSystem := false
 	for _, observation := range second.Hardware {
 		switch observation.Metric {
-		case "system_health", "system_state":
+		case "system_health_status", "system_state":
 			t.Errorf("failed membership replayed prior source state: %s=%s", observation.Metric, observation.State)
 		case "system_acquisition_state":
 			foundSystem = true
@@ -125,7 +125,7 @@ func TestProtocolClientRetainsPartialMembershipUntilAuthoritativeRemoval(t *test
 	require.Error(t, err)
 	assert.Equal(t, map[string]int{"discovered": 2, "readable": 1, "unknown": 1}, second.Metrics.Resources)
 	for _, metric := range second.Hardware {
-		assert.NotEqual(t, "system_health", metric.Metric, "previous health must never be replayed")
+		assert.NotEqual(t, "system_health_status", metric.Metric, "previous health must never be replayed")
 	}
 	phase.Store(2)
 	third, err := client.collect(context.Background())
@@ -171,6 +171,6 @@ func TestMalformedBaseLinkRetainsUnknownMembership(t *testing.T) {
 		if observation.Metric == "system_acquisition_state" {
 			assert.Equal(t, "unknown", observation.State)
 		}
-		assert.NotEqual(t, "system_health", observation.Metric)
+		assert.NotEqual(t, "system_health_status", observation.Metric)
 	}
 }

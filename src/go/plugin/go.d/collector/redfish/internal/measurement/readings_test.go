@@ -30,7 +30,7 @@ func TestLegacyPowerReadingRequiresActualConsumption(t *testing.T) {
 				Data:        test.data,
 			}
 			var got []float64
-			for _, reading := range (New("", "", nil)).readingsForNode(node, time.Now()) {
+			for _, reading := range (New("", nil)).readingsForNode(node, time.Now()) {
 				if reading.Valid {
 					got = append(got, reading.Value)
 				}
@@ -51,7 +51,7 @@ func TestExcerptSourceFormsProduceOneReading(t *testing.T) {
 				Kind: "fan",
 				Data: map[string]any{"SpeedPercent": source},
 			}
-			readings := (New("", "", nil)).readingsForNode(node, time.Now())
+			readings := (New("", nil)).readingsForNode(node, time.Now())
 			if !assert.Len(t, readings, 1) {
 				return
 			}
@@ -132,7 +132,7 @@ func TestReadingSourceHealthIsIndependentOfNumericValue(t *testing.T) {
 					data["Status"] = map[string]any{"Health": test.health}
 				}
 				node := makeNode(data)
-				client := New("", "", nil)
+				client := New("", nil)
 				readings := client.readingsForNode(node, time.Now())
 				if !assert.Len(t, readings, 1) {
 					return
@@ -176,7 +176,7 @@ func TestStoredEnergyExcerptKeepsGaugeSemantics(t *testing.T) {
 					"battery_metrics": {Data: map[string]any{"StoredEnergyWattHours": source}},
 				},
 			}
-			client := New("", "", nil)
+			client := New("", nil)
 			for _, at := range []time.Time{time.Unix(1000, 0), time.Unix(1060, 0)} {
 				readings := client.readingsForNode(node, at)
 				if !assert.Len(t, readings, 1) {

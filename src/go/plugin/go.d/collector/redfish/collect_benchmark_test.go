@@ -49,7 +49,6 @@ func BenchmarkCollectionCycle(b *testing.B) {
 	cfg := testConfig(server.URL, "none")
 	client := New()
 	client.Config = cfg
-	client.Name = "test-job"
 	if err := client.Init(b.Context()); err != nil {
 		b.Fatal(err)
 	}

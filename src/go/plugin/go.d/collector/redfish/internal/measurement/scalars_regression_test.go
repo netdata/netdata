@@ -54,7 +54,7 @@ func TestScalarFallbackRetainsAllInvalidSourceDiagnostics(t *testing.T) {
 			"processor_summary_metrics": {Data: map[string]any{"BandwidthPercent": nil}},
 		},
 	}
-	values := (New("", "", nil)).scalarValues(node, time.Now())
+	values := (New("", nil)).scalarValues(node, time.Now())
 	require.Len(t, values, 1)
 	require.False(t, values[0].Valid)
 	require.False(t, values[0].Emit)

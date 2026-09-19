@@ -37,7 +37,6 @@ func TestCollectorSessionRecoveryCleanupHonorsCollectionDeadline(t *testing.T) {
 	defer server.Close()
 	collector := New()
 	collector.Config = testConfig(server.URL, "session")
-	collector.Name = "recovery-deadline"
 	collector.UpdateEvery = 1
 	collector.Timeout = confopt.Duration(3 * time.Second)
 	require.NoError(t, collector.Init(t.Context()))
@@ -174,7 +173,7 @@ func TestSessionRecoveryProjectsOnlyFinalAcquisition(t *testing.T) {
 			switch reading.Metric {
 			case "reading_power_value":
 				power = append(power, reading.Value)
-			case "system_hw_sensor_temperature_input":
+			case "reading_temperature_value":
 				temperatures = append(temperatures, reading.Value)
 			}
 		}

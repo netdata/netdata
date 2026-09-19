@@ -176,7 +176,7 @@ func (c *Projector) readingObservations(node *Resource, reading normalizedReadin
 		result = append(result, stateObservation(reading.AlarmMetric, reading.SourceAlarm, labels))
 	}
 	if reading.DerivedHealth != "" && reading.DerivedHealth != "unavailable" {
-		result = append(result, stateObservation("derived_health", reading.DerivedHealth, labels))
+		result = append(result, stateObservation("derived_health_status", reading.DerivedHealth, labels))
 	}
 	return result
 }

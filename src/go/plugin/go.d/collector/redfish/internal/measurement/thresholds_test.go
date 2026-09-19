@@ -32,7 +32,7 @@ func projectThresholdStatus(t *testing.T, p *Projector, node *Resource, seconds 
 	assert.Equal(t, want, result.Sensors[0].DerivedHealth)
 	var states []string
 	for _, observation := range result.Observations {
-		if observation.Metric == "derived_health" {
+		if observation.Metric == "derived_health_status" {
 			states = append(states, observation.State)
 		}
 	}
@@ -62,12 +62,12 @@ func TestDerivedHealthBoundariesAndSourceIndependence(t *testing.T) {
 		for _, health := range []any{"OK", "Warning", "Critical", "vendor-status", nil} {
 			node := thresholdTestSensor(test.value, limits)
 			node.Data["Status"] = map[string]any{"Health": health}
-			result := projectThresholdStatus(t, New("", "", nil), node, 0, test.want)
+			result := projectThresholdStatus(t, New("", nil), node, 0, test.want)
 			wantHealth, _ := health.(string)
 			assert.Equal(t, wantHealth, result.Sensors[0].Health)
 			var sourceStates []string
 			for _, observation := range result.Observations {
-				if observation.Metric == "system_hw_sensor_temperature_alarm" {
+				if observation.Metric == "reading_alarm_status" {
 					sourceStates = append(sourceStates, observation.State)
 				}
 			}
@@ -116,7 +116,7 @@ func TestDerivedHealthUnavailableAndInapplicable(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			node := thresholdTestSensor(20, map[string]any{"UpperCritical": map[string]any{"Reading": 10}})
 			test.change(node)
-			projectThresholdStatus(t, New("", "", nil), node, 0, test.want)
+			projectThresholdStatus(t, New("", nil), node, 0, test.want)
 		})
 	}
 	for _, setting := range []struct {
@@ -130,7 +130,7 @@ func TestDerivedHealthUnavailableAndInapplicable(t *testing.T) {
 	} {
 		config := map[string]any{"Reading": 10, setting.key: setting.value}
 		node := thresholdTestSensor(20, map[string]any{"UpperCritical": config})
-		projectThresholdStatus(t, New("", "", nil), node, 0, "unavailable")
+		projectThresholdStatus(t, New("", nil), node, 0, "unavailable")
 	}
 }
 
@@ -145,7 +145,7 @@ func TestDerivedHealthObservedDwellAndIndependentClearingConditions(t *testing.T
 			"Reading": 100, "Activation": direction, "DwellTime": "PT10S",
 			"HysteresisDuration": "PT10S", "HysteresisReading": offset,
 		}})
-		p := New("", "", nil)
+		p := New("", nil)
 		for _, step := range []struct {
 			seconds, value int
 			want           string
@@ -193,7 +193,7 @@ func TestDerivedHealthResetsTemporalEvidence(t *testing.T) {
 				101,
 				map[string]any{"UpperCritical": map[string]any{"Reading": 100, "DwellTime": "PT10S"}},
 			)
-			p := New("", "", nil)
+			p := New("", nil)
 			projectThresholdStatus(t, p, node, 0, "unavailable")
 			interrupt(t, p, node)
 			projectThresholdStatus(t, p, node, 10, "unavailable")
@@ -205,11 +205,11 @@ func TestDerivedHealthResetsTemporalEvidence(t *testing.T) {
 			101,
 			map[string]any{"UpperCritical": map[string]any{"Reading": 100, "DwellTime": "PT10S"}},
 		)
-		p := New("", "", nil)
+		p := New("", nil)
 		projectThresholdStatus(t, p, node, 0, "unavailable")
 		projectThresholdStatus(t, p, node, 10, "critical")
 		projectThresholdStatus(t, p, node, seconds, "unavailable")
-		projectThresholdStatus(t, New("", "", nil), node, 20, "unavailable")
+		projectThresholdStatus(t, New("", nil), node, 20, "unavailable")
 	}
 }
 
@@ -228,7 +228,7 @@ func TestDerivedHealthLegacyNullPlaceholders(t *testing.T) {
 			Data: map[string]any{source.property: 25, "LowerThresholdCritical": nil,
 				"UpperThresholdNonCritical": 43, "UpperThresholdCritical": 47, "UpperThresholdFatal": 50},
 		}
-		p := New("", "", nil)
+		p := New("", nil)
 		projectThresholdStatus(t, p, node, 0, "ok")
 		node.Data[source.property] = 44
 		projectThresholdStatus(t, p, node, 1, "warning")
@@ -244,7 +244,7 @@ func TestDerivedHealthPreservesThresholdUnitsThroughExcerptFallback(t *testing.T
 	node.SensorExcerpts = []SensorExcerpt{
 		{Path: "EnergyJoules", Type: "EnergyJoules", Units: "J", Data: map[string]any{"Reading": 360000}},
 	}
-	p := New("", "", nil)
+	p := New("", nil)
 	projectThresholdStatus(t, p, node, 0, "critical")
 	node.SensorExcerpts[0].Data["Reading"] = 396000
 	result := projectThresholdStatus(t, p, node, 10, "critical")
@@ -258,7 +258,7 @@ func TestDerivedHealthKeepsKnownMaximumSeverity(t *testing.T) {
 		"UpperCritical": map[string]any{"Reading": 100},
 		"UpperCaution":  map[string]any{"Reading": 90, "DwellTime": "PT30S"},
 	})
-	projectThresholdStatus(t, New("", "", nil), node, 0, "critical")
+	projectThresholdStatus(t, New("", nil), node, 0, "critical")
 }
 
 func TestDerivedHealthStoredEnergyUsesWattHours(t *testing.T) {
@@ -283,7 +283,7 @@ func TestDerivedHealthStoredEnergyUsesWattHours(t *testing.T) {
 					"battery_metrics": {Data: map[string]any{"StoredEnergyWattHours": source}},
 				},
 			}
-			p := New("", "", nil)
+			p := New("", nil)
 			result := projectThresholdStatus(t, p, node, 0, "critical")
 			assert.Equal(t, "watt-hours", result.Sensors[0].Units)
 			assert.Equal(t, float64(50), result.Sensors[0].Value)
@@ -305,7 +305,7 @@ func TestDerivedHealthNullableSensorAvailability(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			node := thresholdTestSensor(20, map[string]any{"UpperCritical": map[string]any{"Reading": 10}})
 			change(node)
-			p := New("", "", nil)
+			p := New("", nil)
 			projectThresholdStatus(t, p, node, 0, "critical")
 			node.Data["Reading"] = 5
 			projectThresholdStatus(t, p, node, 1, "ok")

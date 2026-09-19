@@ -78,10 +78,10 @@ func (c *Projector) statusObservations(node *Resource) []Observation {
 	}
 	if status.Status {
 		if state, present, _ := categoricalStringState(node.Data, "Status.Health", normalizeHealth); present {
-			result = append(result, stateObservation(prefix+"_health", state, labels))
+			result = append(result, stateObservation(prefix+"_health_status", state, labels))
 		}
 		if state, present, _ := categoricalStringState(node.Data, "Status.HealthRollup", normalizeHealth); present {
-			result = append(result, stateObservation(prefix+"_health_rollup", state, labels))
+			result = append(result, stateObservation(prefix+"_health_rollup_status", state, labels))
 		}
 		if state, present, _ := categoricalStringState(node.Data, "Status.State", normalizeResourceState); present {
 			result = append(result, stateObservation(prefix+"_state", state, labels))
@@ -104,7 +104,7 @@ func (c *Projector) statusObservations(node *Resource) []Observation {
 					state = "clear"
 				}
 			}
-			result = append(result, stateObservation(prefix+"_failure_predicted", state, labels))
+			result = append(result, stateObservation(prefix+"_failure_predicted_state", state, labels))
 		}
 	}
 	if status.Status {

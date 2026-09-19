@@ -29,7 +29,7 @@ func TestValidateReadingIdentitiesRejectsOnlyDifferentPreimages(t *testing.T) {
 }
 
 func TestReadingIdentityRegistryRejectsCrossCycleKeyReuse(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	const key = "0123456789abcdef0123456789abcdef"
 	require.NoError(t, client.validateAndRegisterReadingIdentities(map[string][]normalizedReading{
 		"node-a": {{Key: key, IdentitySource: "Sensor.Reading"}},
@@ -82,7 +82,7 @@ func TestManagerClockValueRequiresExplicitOffset(t *testing.T) {
 func TestControlMetricsRequireApprovedTypeUnitPair(t *testing.T) {
 	for _, controlType := range []string{"Pressure", "PressurekPa"} {
 		t.Run(controlType, func(t *testing.T) {
-			client := New("", "", nil)
+			client := New("", nil)
 			node := &Resource{
 				Kind: "control",
 				Data: map[string]any{
@@ -109,7 +109,7 @@ func TestControlMetricsRequireApprovedTypeUnitPair(t *testing.T) {
 }
 
 func TestMemoryThroughputUsesTopLevelBlockSize(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	node := &Resource{
 		Kind: "memory",
 		Enrichment: map[string]Enrichment{
@@ -159,7 +159,7 @@ func TestScalarFallbackRetainsSelectedSourceAndPreferredFailureProvenance(t *tes
 		},
 	}
 
-	values := (New("", "", nil)).scalarValues(node, time.Now())
+	values := (New("", nil)).scalarValues(node, time.Now())
 	if len(values) != 1 {
 		t.Fatalf("scalarValues() returned %d values, want 1", len(values))
 	}
@@ -188,7 +188,7 @@ func TestFindEnrichmentRejectsAmbiguousDocumentKind(t *testing.T) {
 }
 
 func TestEverySourceStateAndFlagHasRuntimeProducer(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	for _, source := range additionalStateSources {
 		t.Run("state/"+source.Metric, func(t *testing.T) {
 			node := &Resource{
@@ -298,7 +298,7 @@ func TestEverySourceReadingSurfaceHasRuntimeNormalizer(t *testing.T) {
 					surface,
 				)
 			}
-			observations := (New("", "", nil)).readingObservations(node, reading)
+			observations := (New("", nil)).readingObservations(node, reading)
 			if observationByMetric(observations, surface.Metric) == nil {
 				t.Fatalf("surface metric %q has no runtime observation", surface.Metric)
 			}
@@ -353,7 +353,7 @@ func requireSourceDescriptorRuntimeValue(
 		setSourceTestPath(multiplierDocument, source.MultiplierPath, json.Number("2"))
 	}
 
-	client := New("", "", nil)
+	client := New("", nil)
 	values := client.scalarValues(node, at)
 	first, ok := scalarValueByID(values, descriptor.ID)
 	if !ok {
@@ -514,14 +514,14 @@ func TestReadingSourceAlarmSurvivesInvalidNumericValue(t *testing.T) {
 		t.Fatalf("invalid numeric reading lost source alarm: %+v", reading)
 	}
 
-	observations := (New("", "", nil)).readingObservations(node, reading)
+	observations := (New("", nil)).readingObservations(node, reading)
 	if len(observations) != 1 || observations[0].Metric != reading.AlarmMetric {
 		t.Fatalf("observations = %+v, want only source alarm %q", observations, reading.AlarmMetric)
 	}
 }
 
 func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	node := &Resource{
 		Kind: "sensor",
 		Key:  "sensor",
@@ -530,7 +530,7 @@ func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T
 		reading := normalizedReading{
 			Key:         "reading",
 			Metric:      "reading_temperature_zero_input",
-			AlarmMetric: "reading_temperature_zero_input_alarm",
+			AlarmMetric: "reading_temperature_zero_input_alarm_status",
 			Valid:       true,
 			SourceAlarm: state,
 		}
@@ -542,7 +542,7 @@ func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T
 	reading := normalizedReading{
 		Key:         "reading",
 		Metric:      "reading_temperature_zero_input",
-		AlarmMetric: "reading_temperature_zero_input_alarm",
+		AlarmMetric: "reading_temperature_zero_input_alarm_status",
 		Valid:       true,
 	}
 	if observation := observationByMetric(client.readingObservations(node, reading), reading.AlarmMetric); observation != nil {
@@ -551,7 +551,7 @@ func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T
 }
 
 func TestDerivedPowerResetsBaselineOnReadingSemanticChange(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	node := &Resource{
 		Kind: "sensor",
 		Key:  "energy-sensor",
@@ -586,7 +586,7 @@ func TestDerivedPowerResetsBaselineOnReadingSemanticChange(t *testing.T) {
 }
 
 func TestRateBaselineResetsWhenMultiplierChanges(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	t0 := time.Unix(100, 0)
 
 	_, emit := client.rateValue("memory-blocks", "100", 512, t0, algorithmRate, "epoch")
@@ -670,7 +670,7 @@ func TestRateEpochsDigestOversizedBMCValues(t *testing.T) {
 func TestDerivedPowerResetsBaselineOnDecreaseAndEpochChange(t *testing.T) {
 	t.Parallel()
 
-	client := New("", "", nil)
+	client := New("", nil)
 	node := &Resource{
 		Kind: "sensor",
 		Key:  "energy-sensor-reset",
@@ -699,7 +699,7 @@ func TestDerivedPowerResetsBaselineOnDecreaseAndEpochChange(t *testing.T) {
 }
 
 func TestFlagObservationsDoNotFabricateMissingSiblingValues(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	node := &Resource{
 		Kind: "memory",
 		Enrichment: map[string]Enrichment{
@@ -724,7 +724,7 @@ func TestFlagObservationsDoNotFabricateMissingSiblingValues(t *testing.T) {
 }
 
 func TestCommonStatusPresenceAndTypeSemantics(t *testing.T) {
-	client := New("", "", nil)
+	client := New("", nil)
 	node := &Resource{
 		Kind: "drive",
 		Data: map[string]any{
@@ -734,19 +734,19 @@ func TestCommonStatusPresenceAndTypeSemantics(t *testing.T) {
 	}
 
 	observations := client.statusObservations(node)
-	if observationByMetric(observations, "drive_health") != nil {
+	if observationByMetric(observations, "drive_health_status") != nil {
 		t.Fatal("null Status.Health emitted a sample")
 	}
 	state := observationByMetric(observations, "drive_state")
 	if state == nil || state.State != "unknown" {
 		t.Fatalf("wrong-typed present Status.State = %#v, want unknown", state)
 	}
-	if observationByMetric(observations, "drive_failure_predicted") != nil {
+	if observationByMetric(observations, "drive_failure_predicted_state") != nil {
 		t.Fatal("null FailurePredicted emitted a sample")
 	}
 
 	node.Data["FailurePredicted"] = "yes"
-	prediction := observationByMetric(client.statusObservations(node), "drive_failure_predicted")
+	prediction := observationByMetric(client.statusObservations(node), "drive_failure_predicted_state")
 	if prediction == nil || prediction.State != "unknown" {
 		t.Fatalf("wrong-typed present FailurePredicted = %#v, want unknown", prediction)
 	}
@@ -876,7 +876,7 @@ func TestReadingEpochMetadataPreservesSourcePresence(t *testing.T) {
 				if test.present {
 					node.Data[field] = test.value
 				}
-				client := New("", "", nil)
+				client := New("", nil)
 				readings := client.readingsForNode(node, time.Unix(100, 0))
 				require.Len(t, readings, 1)
 				got := readings[0].SensorResetTime

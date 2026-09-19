@@ -7,17 +7,19 @@ package measurement
 type Definition struct {
 	Name   string
 	States []string
+	Float  bool
 }
 
 // Definitions returns fresh metric definitions for instrument registration.
 func Definitions() []Definition {
 	var result []Definition
 	seen := make(map[string]bool)
-	gauge := func(name string) {
+	gauge := func(name string, float bool) {
 		if !seen[name] {
 			seen[name] = true
 			result = append(result, Definition{
-				Name: name,
+				Name:  name,
+				Float: float,
 			})
 		}
 	}
@@ -30,12 +32,12 @@ func Definitions() []Definition {
 			})
 		}
 	}
-	states("derived_health", []string{"ok", "warning", "critical"})
+	states("derived_health_status", []string{"ok", "warning", "critical"})
 	for _, field := range scalarFields {
-		gauge(field.Metric)
+		gauge(field.Metric, field.Float || field.Algorithm != algorithmAbsolute)
 	}
 	for _, reading := range readingDescriptors {
-		gauge(reading.Metric)
+		gauge(reading.Metric, true)
 		if reading.AlarmMetric != "" {
 			states(reading.AlarmMetric, alarmStates)
 		}
@@ -43,18 +45,18 @@ func Definitions() []Definition {
 	for kind, status := range sourceStatusByKind {
 		states(kind+"_acquisition_state", acquisitionStates)
 		if status.Status {
-			states(kind+"_health", healthStates)
-			states(kind+"_health_rollup", healthStates)
+			states(kind+"_health_status", healthStates)
+			states(kind+"_health_rollup_status", healthStates)
 			states(kind+"_state", resourceStates)
 			for _, state := range healthStates {
-				gauge(kind + "_conditions_" + state)
+				gauge(kind+"_conditions_"+state, false)
 			}
 		}
 		if status.PowerState {
 			states(kind+"_power_state", powerStates)
 		}
 		if status.FailurePredicted {
-			states(kind+"_failure_predicted", failureStates)
+			states(kind+"_failure_predicted_state", failureStates)
 		}
 	}
 	for _, source := range additionalStateSources {
@@ -62,7 +64,7 @@ func Definitions() []Definition {
 	}
 	for _, set := range sourceFlagSets {
 		for _, member := range set.Members {
-			gauge(set.Metric + "_" + member.Role)
+			gauge(set.Metric+"_"+member.Role, false)
 		}
 	}
 	return result

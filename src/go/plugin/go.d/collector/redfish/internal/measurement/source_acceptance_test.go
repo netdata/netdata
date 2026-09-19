@@ -45,7 +45,7 @@ func TestEverySourceReadingHasPresenceNullAndTypeSemantics(t *testing.T) {
 		})
 	}
 
-	client := New("", "", nil)
+	client := New("", nil)
 	if readings := client.readingsForNode(
 		&Resource{
 			Kind: "sensor",
@@ -67,7 +67,7 @@ func TestEverySourceNumericConversionUsesItsDeclaredScale(t *testing.T) {
 		t.Run("scalar/"+descriptor.ID, func(t *testing.T) {
 			source := descriptor.Candidates[0]
 			node := scalarTestNode(descriptor, source, json.Number("2"))
-			client := New("", "", nil)
+			client := New("", nil)
 			value, ok := scalarValueByID(client.scalarValues(node, time.Unix(100, 0)), descriptor.ID)
 			if !ok || !value.Valid {
 				t.Fatalf("scaled source did not normalize: %+v present=%t", value, ok)
@@ -142,7 +142,7 @@ func TestEverySourceScalarFieldHasPresenceNullAndTypeSemantics(t *testing.T) {
 		t.Run(descriptor.ID, func(t *testing.T) {
 			source := descriptor.Candidates[0]
 			node := scalarTestNode(descriptor, source, json.Number("0"))
-			client := New("", "", nil)
+			client := New("", nil)
 			value, ok := scalarValueByID(client.scalarValues(node, time.Unix(100, 0)), descriptor.ID)
 			if !ok || !value.Present || !value.Valid || value.Value != 0 {
 				t.Fatalf("valid zero source = %+v present=%t", value, ok)
@@ -207,7 +207,7 @@ func TestEverySourceScalarFallbackHasPrecedenceAndFailureProvenance(t *testing.T
 				setSourceTestPath(selectedDocument, selected.Path, json.Number(fmt.Sprint(selectedIndex+10)))
 				setScalarTestMultiplier(node, selected)
 
-				client := New("", "", nil)
+				client := New("", nil)
 				values := client.scalarValues(node, time.Unix(100, 0))
 				value, ok := scalarValueByID(values, descriptor.ID)
 				if !ok || !value.Valid {
@@ -279,7 +279,7 @@ func TestEverySourceRateFieldResetsOnDecreaseAndEpochChange(t *testing.T) {
 			source := descriptor.Candidates[0]
 			node := scalarTestNode(descriptor, source, json.Number("10"))
 			document := sourceTestDocument(node, source.Document)
-			client := New("", "", nil)
+			client := New("", nil)
 			at := time.Unix(100, 0)
 
 			if value := requireScalarValue(t, client, node, descriptor.ID, at); value.Emit {
@@ -415,7 +415,7 @@ func TestExplicitlyRejectedMetricClassesStayUncharted(t *testing.T) {
 				Data:       test.data,
 				Enrichment: test.enrichment,
 			}
-			client := New("", "", nil)
+			client := New("", nil)
 			for _, value := range client.scalarValues(node, time.Unix(100, 0)) {
 				if value.Emit {
 					t.Errorf("rejected class emitted scalar metric %q", value.Descriptor.Metric)
@@ -532,7 +532,7 @@ func BenchmarkMatchReadingSurface(b *testing.B) {
 // Scalar selection is linear in the fixed per-kind candidate inventory.
 // Allocations track observations and diagnostics; ns/op is a local-machine trend.
 func BenchmarkHardwareScalarValues(b *testing.B) {
-	client := New("", "", nil)
+	client := New("", nil)
 	node := &Resource{
 		Kind: "memory",
 		Key:  "dimm-1",
