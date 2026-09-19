@@ -43,7 +43,7 @@ func TestDecodedCollectorPreservesEndpointJobIdentity(t *testing.T) {
 			require.NoError(t, collector.Check(t.Context()))
 			sourceTestCollectCycle(t, collector)
 			reader := collector.MetricStore().Read(metrix.ReadFlatten())
-			for _, metric := range []string{"collection_duration_seconds", "system_health"} {
+			for _, metric := range []string{"collection_duration_seconds", "system_health_status"} {
 				seen := false
 				reader.ForEachByName(metric, func(labels metrix.LabelView, _ metrix.SampleValue) {
 					seen = true

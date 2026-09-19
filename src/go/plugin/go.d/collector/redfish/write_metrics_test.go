@@ -18,9 +18,9 @@ func TestHardwareWriterPublishesDeclaredAlarmStates(t *testing.T) {
 			require.True(t, ok)
 			cycle := managed.CycleController()
 			cycle.BeginCycle()
-			collector.hardware.observe([]measurement.Observation{{Metric: "reading_alarm", State: state}})
+			collector.hardware.observe([]measurement.Observation{{Metric: "reading_alarm_status", State: state}})
 			require.NoError(t, cycle.CommitCycleSuccess())
-			point, ok := collector.store.Read().StateSet("reading_alarm", nil)
+			point, ok := collector.store.Read().StateSet("reading_alarm_status", nil)
 			require.True(t, ok)
 			expected := map[string]bool{"clear": false, "warning": false, "critical": false}
 			expected[state] = true

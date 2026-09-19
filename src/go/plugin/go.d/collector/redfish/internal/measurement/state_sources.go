@@ -70,7 +70,7 @@ var additionalStateSources = []stateSource{
 	{
 		Kind:   "drive",
 		Path:   "StatusIndicator",
-		Metric: "drive_status_indicator",
+		Metric: "drive_status_indicator_state",
 		States: []string{
 			"ok",
 			"fail",
@@ -103,7 +103,7 @@ var additionalStateSources = []stateSource{
 	{
 		Kind:         "network_port",
 		Path:         "SignalDetected",
-		Metric:       "network_port_signal_detected",
+		Metric:       "network_port_signal_detected_state",
 		BooleanFalse: "clear",
 		BooleanTrue:  "detected",
 		States:       []string{"clear", "detected", "unknown"},
@@ -118,7 +118,7 @@ var additionalStateSources = []stateSource{
 	{
 		Kind:         "port",
 		Path:         "SignalDetected",
-		Metric:       "port_signal_detected",
+		Metric:       "port_signal_detected_state",
 		BooleanFalse: "clear",
 		BooleanTrue:  "detected",
 		States:       []string{"clear", "detected", "unknown"},
@@ -145,7 +145,7 @@ var additionalStateSources = []stateSource{
 	{
 		Kind:         "redundancy",
 		Path:         "RedundancyEnabled",
-		Metric:       "redundancy_enabled",
+		Metric:       "redundancy_enabled_state",
 		BooleanFalse: "disabled",
 		BooleanTrue:  "enabled",
 		States:       []string{"disabled", "enabled", "unknown"},
@@ -159,13 +159,13 @@ var additionalStateSources = []stateSource{
 	{
 		Kind:   "system",
 		Path:   "ProcessorSummary.Status.Health",
-		Metric: "system_processor_summary_health",
+		Metric: "system_processor_summary_health_status",
 		States: []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
 		Kind:   "system",
 		Path:   "ProcessorSummary.Status.HealthRollup",
-		Metric: "system_processor_summary_health_rollup",
+		Metric: "system_processor_summary_health_rollup_status",
 		States: []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
@@ -192,13 +192,13 @@ var additionalStateSources = []stateSource{
 	{
 		Kind:   "system",
 		Path:   "MemorySummary.Status.Health",
-		Metric: "system_memory_summary_health",
+		Metric: "system_memory_summary_health_status",
 		States: []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
 		Kind:   "system",
 		Path:   "MemorySummary.Status.HealthRollup",
-		Metric: "system_memory_summary_health_rollup",
+		Metric: "system_memory_summary_health_rollup_status",
 		States: []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
@@ -225,13 +225,13 @@ var additionalStateSources = []stateSource{
 	{
 		Kind:   "storage_controller",
 		Path:   "CacheSummary.Status.Health",
-		Metric: "storage_controller_cache_health",
+		Metric: "storage_controller_cache_health_status",
 		States: []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
 		Kind:   "storage_controller",
 		Path:   "CacheSummary.Status.HealthRollup",
-		Metric: "storage_controller_cache_health_rollup",
+		Metric: "storage_controller_cache_health_rollup_status",
 		States: []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
@@ -259,14 +259,14 @@ var additionalStateSources = []stateSource{
 		Kind:     "power_supply",
 		Document: "power_supply_metrics",
 		Path:     "Status.Health",
-		Metric:   "power_supply_metrics_health",
+		Metric:   "power_supply_metrics_health_status",
 		States:   []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
 		Kind:     "power_supply",
 		Document: "power_supply_metrics",
 		Path:     "Status.HealthRollup",
-		Metric:   "power_supply_metrics_health_rollup",
+		Metric:   "power_supply_metrics_health_rollup_status",
 		States:   []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
@@ -295,14 +295,14 @@ var additionalStateSources = []stateSource{
 		Kind:     "battery",
 		Document: "battery_metrics",
 		Path:     "Status.Health",
-		Metric:   "battery_metrics_health",
+		Metric:   "battery_metrics_health_status",
 		States:   []string{"ok", "warning", "critical", "unknown"},
 	},
 	{
 		Kind:     "battery",
 		Document: "battery_metrics",
 		Path:     "Status.HealthRollup",
-		Metric:   "battery_metrics_health_rollup",
+		Metric:   "battery_metrics_health_rollup_status",
 		States:   []string{"ok", "warning", "critical", "unknown"},
 	},
 	{

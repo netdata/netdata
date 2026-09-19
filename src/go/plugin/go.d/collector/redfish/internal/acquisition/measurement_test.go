@@ -57,7 +57,7 @@ func measurementTestRequireAlarm(t *testing.T, observations []measurement.Observ
 	t.Helper()
 	var alarms []string
 	for _, observation := range observations {
-		if strings.HasSuffix(observation.Metric, "_alarm") && measurementTestLabel(observation, "reading_key") != "" {
+		if strings.HasSuffix(observation.Metric, "_alarm_status") && measurementTestLabel(observation, "reading_key") != "" {
 			alarms = append(alarms, observation.State)
 		}
 	}

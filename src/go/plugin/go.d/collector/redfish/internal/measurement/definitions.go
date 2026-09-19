@@ -30,7 +30,7 @@ func Definitions() []Definition {
 			})
 		}
 	}
-	states("derived_health", []string{"ok", "warning", "critical"})
+	states("derived_health_status", []string{"ok", "warning", "critical"})
 	for _, field := range scalarFields {
 		gauge(field.Metric)
 	}
@@ -43,8 +43,8 @@ func Definitions() []Definition {
 	for kind, status := range sourceStatusByKind {
 		states(kind+"_acquisition_state", acquisitionStates)
 		if status.Status {
-			states(kind+"_health", healthStates)
-			states(kind+"_health_rollup", healthStates)
+			states(kind+"_health_status", healthStates)
+			states(kind+"_health_rollup_status", healthStates)
 			states(kind+"_state", resourceStates)
 			for _, state := range healthStates {
 				gauge(kind + "_conditions_" + state)
@@ -54,7 +54,7 @@ func Definitions() []Definition {
 			states(kind+"_power_state", powerStates)
 		}
 		if status.FailurePredicted {
-			states(kind+"_failure_predicted", failureStates)
+			states(kind+"_failure_predicted_state", failureStates)
 		}
 	}
 	for _, source := range additionalStateSources {

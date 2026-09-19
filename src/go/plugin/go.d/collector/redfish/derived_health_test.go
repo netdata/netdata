@@ -69,9 +69,9 @@ func TestDerivedHealthCollectionAndFunctionLifecycle(t *testing.T) {
 		assert.Equal(t, want, rows[0]["Derived health (thresholds)"])
 		var active []string
 		c.store.Read(metrix.ReadFlatten()).
-			ForEachByName("derived_health", func(labels metrix.LabelView, value metrix.SampleValue) {
+			ForEachByName("derived_health_status", func(labels metrix.LabelView, value metrix.SampleValue) {
 				if value > 0 {
-					state, _ := labels.Get("derived_health")
+					state, _ := labels.Get("derived_health_status")
 					active = append(active, state)
 				}
 			})

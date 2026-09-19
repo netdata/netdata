@@ -73,7 +73,7 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			hardwareSeries := 0
 			collector.MetricStore().
 				Read(metrix.ReadFlatten()).
-				ForEachByName("system_health", func(labels metrix.LabelView, value metrix.SampleValue) {
+				ForEachByName("system_health_status", func(labels metrix.LabelView, value metrix.SampleValue) {
 					hardwareSeries++
 					job, found := labels.Get("endpoint_job")
 					require.True(t, found)
@@ -198,7 +198,7 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 		var hardwareSeries int
 		collector.MetricStore().
 			Read(metrix.ReadFlatten()).
-			ForEachByName("system_health", func(metrix.LabelView, metrix.SampleValue) {
+			ForEachByName("system_health_status", func(metrix.LabelView, metrix.SampleValue) {
 				hardwareSeries++
 			})
 		assert.Positive(t, hardwareSeries, "session recovery must not leave a hardware gap")

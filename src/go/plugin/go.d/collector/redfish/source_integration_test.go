@@ -217,8 +217,8 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 				sourceTestMetricByResource(
 					t,
 					reader,
-					"system_hw_sensor_temperature_alarm",
-					"system_hw_sensor_temperature_alarm",
+					"system_hw_sensor_temperature_alarm_status",
+					"system_hw_sensor_temperature_alarm_status",
 				),
 			)
 			for metric, expected := range map[string]map[string]float64{
@@ -237,7 +237,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 					map[string]string{"System A": "ok", "System B": "warning"},
 					[]string{"ok", "warning", "critical", "unknown"},
 				),
-				sourceTestMetricByResource(t, reader, "system_health", "system_health"),
+				sourceTestMetricByResource(t, reader, "system_health_status", "system_health_status"),
 			)
 			assert.Equal(
 				t,
@@ -245,7 +245,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 					map[string]string{"Controller": "warning"},
 					[]string{"ok", "warning", "critical", "unknown"},
 				),
-				sourceTestMetricByResource(t, reader, "storage_controller_health", "storage_controller_health"),
+				sourceTestMetricByResource(t, reader, "storage_controller_health_status", "storage_controller_health_status"),
 			)
 			assert.Equal(
 				t,
@@ -253,7 +253,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 					map[string]string{"Battery": "warning"},
 					[]string{"clear", "warning", "critical"},
 				),
-				sourceTestMetricByResource(t, reader, "reading_alarm", "reading_alarm"),
+				sourceTestMetricByResource(t, reader, "reading_alarm_status", "reading_alarm_status"),
 			)
 			var statuses []string
 			reader.ForEachByName("collection_status", func(labels metrix.LabelView, value metrix.SampleValue) {
@@ -297,8 +297,8 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 			sourceTestMetricByResource(
 				t,
 				reader,
-				"system_hw_sensor_temperature_alarm",
-				"system_hw_sensor_temperature_alarm",
+				"system_hw_sensor_temperature_alarm_status",
+				"system_hw_sensor_temperature_alarm_status",
 			),
 		)
 		assert.Equal(
@@ -501,7 +501,7 @@ func TestDecodedCollectorKeepsSharedResourceAfterEarlierBranchFailure(t *testing
 	t.Cleanup(server.Close)
 	c := sourceTestDecodedCollector(t, server.URL)
 	sourceTestCollectCycle(t, c)
-	want := sourceTestMetricByResource(t, c.MetricStore().Read(metrix.ReadFlatten()), "memory_health", "memory_health")
+	want := sourceTestMetricByResource(t, c.MetricStore().Read(metrix.ReadFlatten()), "memory_health_status", "memory_health_status")
 	assert.Equal(
 		t,
 		sourceTestStateValues(
@@ -512,7 +512,7 @@ func TestDecodedCollectorKeepsSharedResourceAfterEarlierBranchFailure(t *testing
 	)
 	phase.Store(1)
 	sourceTestCollectCycle(t, c)
-	got := sourceTestMetricByResource(t, c.MetricStore().Read(metrix.ReadFlatten()), "memory_health", "memory_health")
+	got := sourceTestMetricByResource(t, c.MetricStore().Read(metrix.ReadFlatten()), "memory_health_status", "memory_health_status")
 	assert.Equal(
 		t,
 		want,
@@ -608,8 +608,8 @@ func TestDecodedCollectorMergesSensorExcerptWhenReadingIsAbsent(t *testing.T) {
 				sourceTestMetricByResource(
 					t,
 					reader,
-					"system_hw_sensor_temperature_alarm",
-					"system_hw_sensor_temperature_alarm",
+					"system_hw_sensor_temperature_alarm_status",
+					"system_hw_sensor_temperature_alarm_status",
 				),
 			)
 		})
@@ -868,7 +868,7 @@ func TestDecodedCollectorSensorExcerptIdentityIsOrderIndependent(t *testing.T) {
 						map[string]string{"Sensor": "warning"},
 						[]string{"clear", "warning", "critical"},
 					),
-					sourceTestMetricByResource(t, reader, "reading_alarm", "reading_alarm"),
+					sourceTestMetricByResource(t, reader, "reading_alarm_status", "reading_alarm_status"),
 				)
 				sensorKeys := func(reader metrix.Reader) map[string]bool {
 					keys := make(map[string]bool)

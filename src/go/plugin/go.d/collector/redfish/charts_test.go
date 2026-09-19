@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish/internal/measurement"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -50,6 +51,34 @@ func templateCharts(t *testing.T) map[string]charttpl.Chart {
 	return result
 }
 
+// chartDimensionNames resolves the dimension names a template chart renders:
+// static names as written, and one dimension per declared state for a stateset
+// selector without a name, which is how chartengine infers them at runtime.
+func chartDimensionNames(t *testing.T, chart charttpl.Chart) []string {
+	t.Helper()
+	var names []string
+	for _, dimension := range chart.Dimensions {
+		if dimension.Name != "" {
+			names = append(names, dimension.Name)
+			continue
+		}
+		states, ok := statesetStates()[dimension.Selector]
+		require.True(t, ok, "dimension %q has no name and is not a stateset", dimension.Selector)
+		names = append(names, states...)
+	}
+	return names
+}
+
+func statesetStates() map[string][]string {
+	result := map[string][]string{"collection_status": collectionStates}
+	for _, definition := range measurement.Definitions() {
+		if len(definition.States) > 0 {
+			result[definition.Name] = definition.States
+		}
+	}
+	return result
+}
+
 func TestSourceChartsPreserveCommonDimensions(t *testing.T) {
 	charts := templateCharts(t)
 	for context, dimension := range map[string]string{
@@ -84,11 +113,7 @@ func TestSourceHealthChartsAndRules(t *testing.T) {
 			continue
 		}
 		alarms++
-		var states []string
-		for _, dimension := range chart.Dimensions {
-			states = append(states, dimension.Name)
-		}
-		require.Equal(t, []string{"clear", "warning", "critical"}, states, context)
+		require.Equal(t, []string{"clear", "warning", "critical"}, chartDimensionNames(t, chart), context)
 	}
 	require.Equal(t, 9, alarms)
 	// Every retained alert must attach to a chart provided by this collector.
@@ -134,14 +159,11 @@ func TestMetadataDocumentsEveryChart(t *testing.T) {
 			require.Equal(t, chart.Title, metric.Description, metric.Name)
 			require.Equal(t, chart.Units, metric.Unit, metric.Name)
 			require.Equal(t, string(chart.Type), metric.ChartType, metric.Name)
-			var expected, actual []string
-			for _, dimension := range chart.Dimensions {
-				expected = append(expected, dimension.Name)
-			}
+			var actual []string
 			for _, dimension := range metric.Dimensions {
 				actual = append(actual, dimension.Name)
 			}
-			require.Equal(t, expected, actual, metric.Name)
+			require.Equal(t, chartDimensionNames(t, chart), actual, metric.Name)
 		}
 	}
 	require.Len(t, seen, len(charts))

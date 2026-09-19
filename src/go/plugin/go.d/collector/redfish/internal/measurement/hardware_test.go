@@ -530,7 +530,7 @@ func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T
 		reading := normalizedReading{
 			Key:         "reading",
 			Metric:      "reading_temperature_zero_input",
-			AlarmMetric: "reading_temperature_zero_input_alarm",
+			AlarmMetric: "reading_temperature_zero_input_alarm_status",
 			Valid:       true,
 			SourceAlarm: state,
 		}
@@ -542,7 +542,7 @@ func TestReadingAlarmEmitsEverySourceStateWithoutFabricatingMissing(t *testing.T
 	reading := normalizedReading{
 		Key:         "reading",
 		Metric:      "reading_temperature_zero_input",
-		AlarmMetric: "reading_temperature_zero_input_alarm",
+		AlarmMetric: "reading_temperature_zero_input_alarm_status",
 		Valid:       true,
 	}
 	if observation := observationByMetric(client.readingObservations(node, reading), reading.AlarmMetric); observation != nil {
@@ -734,19 +734,19 @@ func TestCommonStatusPresenceAndTypeSemantics(t *testing.T) {
 	}
 
 	observations := client.statusObservations(node)
-	if observationByMetric(observations, "drive_health") != nil {
+	if observationByMetric(observations, "drive_health_status") != nil {
 		t.Fatal("null Status.Health emitted a sample")
 	}
 	state := observationByMetric(observations, "drive_state")
 	if state == nil || state.State != "unknown" {
 		t.Fatalf("wrong-typed present Status.State = %#v, want unknown", state)
 	}
-	if observationByMetric(observations, "drive_failure_predicted") != nil {
+	if observationByMetric(observations, "drive_failure_predicted_state") != nil {
 		t.Fatal("null FailurePredicted emitted a sample")
 	}
 
 	node.Data["FailurePredicted"] = "yes"
-	prediction := observationByMetric(client.statusObservations(node), "drive_failure_predicted")
+	prediction := observationByMetric(client.statusObservations(node), "drive_failure_predicted_state")
 	if prediction == nil || prediction.State != "unknown" {
 		t.Fatalf("wrong-typed present FailurePredicted = %#v, want unknown", prediction)
 	}
