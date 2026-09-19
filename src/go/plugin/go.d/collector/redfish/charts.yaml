@@ -141,8 +141,8 @@ groups:
       - family: redundancy
         context_namespace: redfish
         metrics:
-          - redfish_redundancy_members_active
-          - redfish_redundancy_members_total
+          - redundancy_members_active
+          - redundancy_members_total
           - redundancy_acquisition_state
           - redundancy_conditions_critical
           - redundancy_conditions_ok
@@ -212,9 +212,9 @@ groups:
             units: members
             priority: 1800
             dimensions:
-              - selector: redfish_redundancy_members_active
+              - selector: redundancy_members_active
                 name: active
-              - selector: redfish_redundancy_members_total
+              - selector: redundancy_members_total
                 name: total
           - id: redfish_redundancy_mode
             title: Redundancy Mode
@@ -494,18 +494,18 @@ groups:
       - family: processor
         context_namespace: redfish
         metrics:
-          - redfish_processor_pcie_error_rate_bad_dllp
-          - redfish_processor_pcie_error_rate_bad_tlp
-          - redfish_processor_pcie_error_rate_correctable
-          - redfish_processor_pcie_error_rate_fatal
-          - redfish_processor_pcie_error_rate_flow_control_timeout
-          - redfish_processor_pcie_error_rate_l0_to_recovery
-          - redfish_processor_pcie_error_rate_nak_received
-          - redfish_processor_pcie_error_rate_nak_sent
-          - redfish_processor_pcie_error_rate_non_fatal
-          - redfish_processor_pcie_error_rate_replay
-          - redfish_processor_pcie_error_rate_replay_rollover
-          - redfish_processor_pcie_error_rate_unsupported_request
+          - processor_pcie_error_rate_bad_dllp
+          - processor_pcie_error_rate_bad_tlp
+          - processor_pcie_error_rate_correctable
+          - processor_pcie_error_rate_fatal
+          - processor_pcie_error_rate_flow_control_timeout
+          - processor_pcie_error_rate_l0_to_recovery
+          - processor_pcie_error_rate_nak_received
+          - processor_pcie_error_rate_nak_sent
+          - processor_pcie_error_rate_non_fatal
+          - processor_pcie_error_rate_replay
+          - processor_pcie_error_rate_replay_rollover
+          - processor_pcie_error_rate_unsupported_request
         chart_defaults:
           instances:
             by_labels:
@@ -518,29 +518,29 @@ groups:
             units: errors/s
             priority: 2130
             dimensions:
-              - selector: redfish_processor_pcie_error_rate_bad_dllp
+              - selector: processor_pcie_error_rate_bad_dllp
                 name: bad_dllp
-              - selector: redfish_processor_pcie_error_rate_bad_tlp
+              - selector: processor_pcie_error_rate_bad_tlp
                 name: bad_tlp
-              - selector: redfish_processor_pcie_error_rate_correctable
+              - selector: processor_pcie_error_rate_correctable
                 name: correctable
-              - selector: redfish_processor_pcie_error_rate_fatal
+              - selector: processor_pcie_error_rate_fatal
                 name: fatal
-              - selector: redfish_processor_pcie_error_rate_flow_control_timeout
+              - selector: processor_pcie_error_rate_flow_control_timeout
                 name: flow_control_timeout
-              - selector: redfish_processor_pcie_error_rate_l0_to_recovery
+              - selector: processor_pcie_error_rate_l0_to_recovery
                 name: l0_to_recovery
-              - selector: redfish_processor_pcie_error_rate_nak_received
+              - selector: processor_pcie_error_rate_nak_received
                 name: nak_received
-              - selector: redfish_processor_pcie_error_rate_nak_sent
+              - selector: processor_pcie_error_rate_nak_sent
                 name: nak_sent
-              - selector: redfish_processor_pcie_error_rate_non_fatal
+              - selector: processor_pcie_error_rate_non_fatal
                 name: non_fatal
-              - selector: redfish_processor_pcie_error_rate_replay
+              - selector: processor_pcie_error_rate_replay
                 name: replay
-              - selector: redfish_processor_pcie_error_rate_replay_rollover
+              - selector: processor_pcie_error_rate_replay_rollover
                 name: replay_rollover
-              - selector: redfish_processor_pcie_error_rate_unsupported_request
+              - selector: processor_pcie_error_rate_unsupported_request
                 name: unsupported_request
       - family: processor
         context_namespace: redfish
@@ -723,14 +723,14 @@ groups:
       - family: processor_core
         context_namespace: redfish
         metrics:
-          - redfish_processor_core_cycle_rate_io_stall
-          - redfish_processor_core_cycle_rate_memory_stall
-          - redfish_processor_core_cycle_rate_unhalted
-          - redfish_processor_core_error_rate_correctable_core
-          - redfish_processor_core_error_rate_correctable_other
-          - redfish_processor_core_error_rate_uncorrectable_core
-          - redfish_processor_core_error_rate_uncorrectable_other
-          - redfish_processor_core_instructions_per_cycle
+          - processor_core_cycle_rate_io_stall
+          - processor_core_cycle_rate_memory_stall
+          - processor_core_cycle_rate_unhalted
+          - processor_core_error_rate_correctable_core
+          - processor_core_error_rate_correctable_other
+          - processor_core_error_rate_uncorrectable_core
+          - processor_core_error_rate_uncorrectable_other
+          - processor_core_instructions_per_cycle
         chart_defaults:
           instances:
             by_labels:
@@ -743,11 +743,11 @@ groups:
             units: cycles/s
             priority: 2210
             dimensions:
-              - selector: redfish_processor_core_cycle_rate_io_stall
+              - selector: processor_core_cycle_rate_io_stall
                 name: io_stall
-              - selector: redfish_processor_core_cycle_rate_memory_stall
+              - selector: processor_core_cycle_rate_memory_stall
                 name: memory_stall
-              - selector: redfish_processor_core_cycle_rate_unhalted
+              - selector: processor_core_cycle_rate_unhalted
                 name: unhalted
           - id: redfish_processor_core_error_rate
             title: Processor Core Error Rate
@@ -755,13 +755,13 @@ groups:
             units: errors/s
             priority: 2220
             dimensions:
-              - selector: redfish_processor_core_error_rate_correctable_core
+              - selector: processor_core_error_rate_correctable_core
                 name: correctable_core
-              - selector: redfish_processor_core_error_rate_correctable_other
+              - selector: processor_core_error_rate_correctable_other
                 name: correctable_other
-              - selector: redfish_processor_core_error_rate_uncorrectable_core
+              - selector: processor_core_error_rate_uncorrectable_core
                 name: uncorrectable_core
-              - selector: redfish_processor_core_error_rate_uncorrectable_other
+              - selector: processor_core_error_rate_uncorrectable_other
                 name: uncorrectable_other
           - id: redfish_processor_core_instructions_per_cycle
             title: Processor Core Instructions per Cycle
@@ -769,7 +769,7 @@ groups:
             units: instructions/cycle
             priority: 2230
             dimensions:
-              - selector: redfish_processor_core_instructions_per_cycle
+              - selector: processor_core_instructions_per_cycle
                 name: instructions
   - family: Memory
     groups:
@@ -797,12 +797,12 @@ groups:
           - memory_media_health_life_left
           - memory_media_health_spare_remaining
           - memory_state
-          - redfish_memory_error_rate_correctable
-          - redfish_memory_error_rate_indeterminate_correctable
-          - redfish_memory_error_rate_indeterminate_uncorrectable
-          - redfish_memory_error_rate_uncorrectable
-          - redfish_memory_io_read
-          - redfish_memory_io_written
+          - memory_error_rate_correctable
+          - memory_error_rate_indeterminate_correctable
+          - memory_error_rate_indeterminate_uncorrectable
+          - memory_error_rate_uncorrectable
+          - memory_io_read
+          - memory_io_written
         chart_defaults:
           instances:
             by_labels:
@@ -862,13 +862,13 @@ groups:
             units: errors/s
             priority: 2290
             dimensions:
-              - selector: redfish_memory_error_rate_correctable
+              - selector: memory_error_rate_correctable
                 name: correctable
-              - selector: redfish_memory_error_rate_indeterminate_correctable
+              - selector: memory_error_rate_indeterminate_correctable
                 name: indeterminate_correctable
-              - selector: redfish_memory_error_rate_uncorrectable
+              - selector: memory_error_rate_uncorrectable
                 name: uncorrectable
-              - selector: redfish_memory_error_rate_indeterminate_uncorrectable
+              - selector: memory_error_rate_indeterminate_uncorrectable
                 name: indeterminate_uncorrectable
           - id: redfish_memory_health
             title: Memory Module Health
@@ -915,9 +915,9 @@ groups:
             units: bytes/s
             priority: 2330
             dimensions:
-              - selector: redfish_memory_io_read
+              - selector: memory_io_read
                 name: read
-              - selector: redfish_memory_io_written
+              - selector: memory_io_written
                 name: written
           - id: redfish_memory_media_health
             title: Memory Module Media Health
@@ -1049,45 +1049,45 @@ groups:
           - control_health_status
           - control_health_rollup_status
           - control_state
-          - redfish_control_frequency_sensor
-          - redfish_control_frequency_setpoint
-          - redfish_control_frequency_setpoint_error
-          - redfish_control_linear_acceleration_sensor
-          - redfish_control_linear_acceleration_setpoint
-          - redfish_control_linear_acceleration_setpoint_error
-          - redfish_control_linear_position_sensor
-          - redfish_control_linear_position_setpoint
-          - redfish_control_linear_position_setpoint_error
-          - redfish_control_linear_velocity_sensor
-          - redfish_control_linear_velocity_setpoint
-          - redfish_control_linear_velocity_setpoint_error
-          - redfish_control_liquid_flow_sensor
-          - redfish_control_liquid_flow_setpoint
-          - redfish_control_liquid_flow_setpoint_error
-          - redfish_control_percentage_sensor
-          - redfish_control_percentage_setpoint
-          - redfish_control_percentage_setpoint_error
-          - redfish_control_power_sensor
-          - redfish_control_power_setpoint
-          - redfish_control_power_setpoint_error
-          - redfish_control_pressure_sensor
-          - redfish_control_pressure_setpoint
-          - redfish_control_pressure_setpoint_error
-          - redfish_control_rotational_acceleration_sensor
-          - redfish_control_rotational_acceleration_setpoint
-          - redfish_control_rotational_acceleration_setpoint_error
-          - redfish_control_rotational_position_sensor
-          - redfish_control_rotational_position_setpoint
-          - redfish_control_rotational_position_setpoint_error
-          - redfish_control_rotational_velocity_sensor
-          - redfish_control_rotational_velocity_setpoint
-          - redfish_control_rotational_velocity_setpoint_error
-          - redfish_control_temperature_sensor
-          - redfish_control_temperature_setpoint
-          - redfish_control_temperature_setpoint_error
-          - redfish_control_valve_position_sensor
-          - redfish_control_valve_position_setpoint
-          - redfish_control_valve_position_setpoint_error
+          - control_frequency_sensor
+          - control_frequency_setpoint
+          - control_frequency_setpoint_error
+          - control_linear_acceleration_sensor
+          - control_linear_acceleration_setpoint
+          - control_linear_acceleration_setpoint_error
+          - control_linear_position_sensor
+          - control_linear_position_setpoint
+          - control_linear_position_setpoint_error
+          - control_linear_velocity_sensor
+          - control_linear_velocity_setpoint
+          - control_linear_velocity_setpoint_error
+          - control_liquid_flow_sensor
+          - control_liquid_flow_setpoint
+          - control_liquid_flow_setpoint_error
+          - control_percentage_sensor
+          - control_percentage_setpoint
+          - control_percentage_setpoint_error
+          - control_power_sensor
+          - control_power_setpoint
+          - control_power_setpoint_error
+          - control_pressure_sensor
+          - control_pressure_setpoint
+          - control_pressure_setpoint_error
+          - control_rotational_acceleration_sensor
+          - control_rotational_acceleration_setpoint
+          - control_rotational_acceleration_setpoint_error
+          - control_rotational_position_sensor
+          - control_rotational_position_setpoint
+          - control_rotational_position_setpoint_error
+          - control_rotational_velocity_sensor
+          - control_rotational_velocity_setpoint
+          - control_rotational_velocity_setpoint_error
+          - control_temperature_sensor
+          - control_temperature_setpoint
+          - control_temperature_setpoint_error
+          - control_valve_position_sensor
+          - control_valve_position_setpoint
+          - control_valve_position_setpoint_error
         chart_defaults:
           instances:
             by_labels:
@@ -1123,11 +1123,11 @@ groups:
             units: hertz
             priority: 2560
             dimensions:
-              - selector: redfish_control_frequency_sensor
+              - selector: control_frequency_sensor
                 name: sensor
-              - selector: redfish_control_frequency_setpoint
+              - selector: control_frequency_setpoint
                 name: setpoint
-              - selector: redfish_control_frequency_setpoint_error
+              - selector: control_frequency_setpoint_error
                 name: setpoint_error
           - id: redfish_control_health
             title: Control Health
@@ -1151,11 +1151,11 @@ groups:
             units: meters/second2
             priority: 2590
             dimensions:
-              - selector: redfish_control_linear_acceleration_sensor
+              - selector: control_linear_acceleration_sensor
                 name: sensor
-              - selector: redfish_control_linear_acceleration_setpoint
+              - selector: control_linear_acceleration_setpoint
                 name: setpoint
-              - selector: redfish_control_linear_acceleration_setpoint_error
+              - selector: control_linear_acceleration_setpoint_error
                 name: setpoint_error
           - id: redfish_control_linear_position
             title: Control Linear Position
@@ -1163,11 +1163,11 @@ groups:
             units: meters
             priority: 2600
             dimensions:
-              - selector: redfish_control_linear_position_sensor
+              - selector: control_linear_position_sensor
                 name: sensor
-              - selector: redfish_control_linear_position_setpoint
+              - selector: control_linear_position_setpoint
                 name: setpoint
-              - selector: redfish_control_linear_position_setpoint_error
+              - selector: control_linear_position_setpoint_error
                 name: setpoint_error
           - id: redfish_control_linear_velocity
             title: Control Linear Velocity
@@ -1175,11 +1175,11 @@ groups:
             units: meters/second
             priority: 2610
             dimensions:
-              - selector: redfish_control_linear_velocity_sensor
+              - selector: control_linear_velocity_sensor
                 name: sensor
-              - selector: redfish_control_linear_velocity_setpoint
+              - selector: control_linear_velocity_setpoint
                 name: setpoint
-              - selector: redfish_control_linear_velocity_setpoint_error
+              - selector: control_linear_velocity_setpoint_error
                 name: setpoint_error
           - id: redfish_control_liquid_flow
             title: Control Liquid Flow
@@ -1187,11 +1187,11 @@ groups:
             units: liters/minute
             priority: 2620
             dimensions:
-              - selector: redfish_control_liquid_flow_sensor
+              - selector: control_liquid_flow_sensor
                 name: sensor
-              - selector: redfish_control_liquid_flow_setpoint
+              - selector: control_liquid_flow_setpoint
                 name: setpoint
-              - selector: redfish_control_liquid_flow_setpoint_error
+              - selector: control_liquid_flow_setpoint_error
                 name: setpoint_error
           - id: redfish_control_percentage
             title: Control Percentage
@@ -1199,11 +1199,11 @@ groups:
             units: percentage
             priority: 2630
             dimensions:
-              - selector: redfish_control_percentage_sensor
+              - selector: control_percentage_sensor
                 name: sensor
-              - selector: redfish_control_percentage_setpoint
+              - selector: control_percentage_setpoint
                 name: setpoint
-              - selector: redfish_control_percentage_setpoint_error
+              - selector: control_percentage_setpoint_error
                 name: setpoint_error
           - id: redfish_control_power
             title: Control Power
@@ -1211,11 +1211,11 @@ groups:
             units: watts
             priority: 2640
             dimensions:
-              - selector: redfish_control_power_sensor
+              - selector: control_power_sensor
                 name: sensor
-              - selector: redfish_control_power_setpoint
+              - selector: control_power_setpoint
                 name: setpoint
-              - selector: redfish_control_power_setpoint_error
+              - selector: control_power_setpoint_error
                 name: setpoint_error
           - id: redfish_control_pressure
             title: Control Pressure
@@ -1223,11 +1223,11 @@ groups:
             units: pascals
             priority: 2650
             dimensions:
-              - selector: redfish_control_pressure_sensor
+              - selector: control_pressure_sensor
                 name: sensor
-              - selector: redfish_control_pressure_setpoint
+              - selector: control_pressure_setpoint
                 name: setpoint
-              - selector: redfish_control_pressure_setpoint_error
+              - selector: control_pressure_setpoint_error
                 name: setpoint_error
           - id: redfish_control_rotational_acceleration
             title: Control Rotational Acceleration
@@ -1235,11 +1235,11 @@ groups:
             units: radians/second2
             priority: 2660
             dimensions:
-              - selector: redfish_control_rotational_acceleration_sensor
+              - selector: control_rotational_acceleration_sensor
                 name: sensor
-              - selector: redfish_control_rotational_acceleration_setpoint
+              - selector: control_rotational_acceleration_setpoint
                 name: setpoint
-              - selector: redfish_control_rotational_acceleration_setpoint_error
+              - selector: control_rotational_acceleration_setpoint_error
                 name: setpoint_error
           - id: redfish_control_rotational_position
             title: Control Rotational Position
@@ -1247,11 +1247,11 @@ groups:
             units: radians
             priority: 2670
             dimensions:
-              - selector: redfish_control_rotational_position_sensor
+              - selector: control_rotational_position_sensor
                 name: sensor
-              - selector: redfish_control_rotational_position_setpoint
+              - selector: control_rotational_position_setpoint
                 name: setpoint
-              - selector: redfish_control_rotational_position_setpoint_error
+              - selector: control_rotational_position_setpoint_error
                 name: setpoint_error
           - id: redfish_control_rotational_velocity
             title: Control Rotational Velocity
@@ -1259,11 +1259,11 @@ groups:
             units: radians/second
             priority: 2680
             dimensions:
-              - selector: redfish_control_rotational_velocity_sensor
+              - selector: control_rotational_velocity_sensor
                 name: sensor
-              - selector: redfish_control_rotational_velocity_setpoint
+              - selector: control_rotational_velocity_setpoint
                 name: setpoint
-              - selector: redfish_control_rotational_velocity_setpoint_error
+              - selector: control_rotational_velocity_setpoint_error
                 name: setpoint_error
           - id: redfish_control_state
             title: Control State
@@ -1279,11 +1279,11 @@ groups:
             units: Celsius
             priority: 2700
             dimensions:
-              - selector: redfish_control_temperature_sensor
+              - selector: control_temperature_sensor
                 name: sensor
-              - selector: redfish_control_temperature_setpoint
+              - selector: control_temperature_setpoint
                 name: setpoint
-              - selector: redfish_control_temperature_setpoint_error
+              - selector: control_temperature_setpoint_error
                 name: setpoint_error
           - id: redfish_control_valve_position
             title: Control Valve Position
@@ -1291,11 +1291,11 @@ groups:
             units: percentage
             priority: 2710
             dimensions:
-              - selector: redfish_control_valve_position_sensor
+              - selector: control_valve_position_sensor
                 name: sensor
-              - selector: redfish_control_valve_position_setpoint
+              - selector: control_valve_position_setpoint
                 name: setpoint
-              - selector: redfish_control_valve_position_setpoint_error
+              - selector: control_valve_position_setpoint_error
                 name: setpoint_error
       - family: coolant_connector
         context_namespace: redfish
@@ -1518,8 +1518,8 @@ groups:
           - heater_health_status
           - heater_health_rollup_status
           - heater_state
-          - redfish_heater_heating_time_pre_power_on
-          - redfish_heater_heating_time_runtime
+          - heater_heating_time_pre_power_on
+          - heater_heating_time_runtime
         chart_defaults:
           instances:
             by_labels:
@@ -1571,9 +1571,9 @@ groups:
             units: percentage
             priority: 2920
             dimensions:
-              - selector: redfish_heater_heating_time_pre_power_on
+              - selector: heater_heating_time_pre_power_on
                 name: pre_power_on
-              - selector: redfish_heater_heating_time_runtime
+              - selector: heater_heating_time_runtime
                 name: runtime
           - id: redfish_heater_state
             title: Heater State
@@ -2979,24 +2979,24 @@ groups:
           - drive_queue_depth
           - drive_state
           - drive_status_indicator_state
-          - redfish_drive_nvme_busy_time_busy
-          - redfish_drive_nvme_commands_read
-          - redfish_drive_nvme_commands_written
-          - redfish_drive_nvme_error_rate_error_log_entries
-          - redfish_drive_nvme_error_rate_media_integrity
-          - redfish_drive_nvme_event_rate_power_cycles
-          - redfish_drive_nvme_event_rate_unsafe_shutdowns
-          - redfish_drive_nvme_io_read
-          - redfish_drive_nvme_io_written
-          - redfish_drive_nvme_spare_available
-          - redfish_drive_nvme_temperature_composite
-          - redfish_drive_nvme_thermal_time_critical
-          - redfish_drive_nvme_thermal_time_management_1
-          - redfish_drive_nvme_thermal_time_management_2
-          - redfish_drive_nvme_thermal_time_warning
-          - redfish_drive_nvme_thermal_transition_rate_management_1
-          - redfish_drive_nvme_thermal_transition_rate_management_2
-          - redfish_drive_nvme_wear_used
+          - drive_nvme_busy_time_busy
+          - drive_nvme_commands_read
+          - drive_nvme_commands_written
+          - drive_nvme_error_rate_error_log_entries
+          - drive_nvme_error_rate_media_integrity
+          - drive_nvme_event_rate_power_cycles
+          - drive_nvme_event_rate_unsafe_shutdowns
+          - drive_nvme_io_read
+          - drive_nvme_io_written
+          - drive_nvme_spare_available
+          - drive_nvme_temperature_composite
+          - drive_nvme_thermal_time_critical
+          - drive_nvme_thermal_time_management_1
+          - drive_nvme_thermal_time_management_2
+          - drive_nvme_thermal_time_warning
+          - drive_nvme_thermal_transition_rate_management_1
+          - drive_nvme_thermal_transition_rate_management_2
+          - drive_nvme_wear_used
         chart_defaults:
           instances:
             by_labels:
@@ -3098,7 +3098,7 @@ groups:
             units: percentage
             priority: 4080
             dimensions:
-              - selector: redfish_drive_nvme_busy_time_busy
+              - selector: drive_nvme_busy_time_busy
                 name: busy
           - id: redfish_drive_nvme_commands
             title: Drive NVMe Commands
@@ -3106,9 +3106,9 @@ groups:
             units: commands/s
             priority: 4090
             dimensions:
-              - selector: redfish_drive_nvme_commands_read
+              - selector: drive_nvme_commands_read
                 name: read
-              - selector: redfish_drive_nvme_commands_written
+              - selector: drive_nvme_commands_written
                 name: written
           - id: redfish_drive_nvme_critical_warnings
             title: Drive NVMe Critical Warnings
@@ -3139,9 +3139,9 @@ groups:
             units: errors/s
             priority: 4110
             dimensions:
-              - selector: redfish_drive_nvme_error_rate_media_integrity
+              - selector: drive_nvme_error_rate_media_integrity
                 name: media_integrity
-              - selector: redfish_drive_nvme_error_rate_error_log_entries
+              - selector: drive_nvme_error_rate_error_log_entries
                 name: error_log_entries
           - id: redfish_drive_nvme_event_rate
             title: Drive NVMe Event Rate
@@ -3149,9 +3149,9 @@ groups:
             units: events/s
             priority: 4120
             dimensions:
-              - selector: redfish_drive_nvme_event_rate_unsafe_shutdowns
+              - selector: drive_nvme_event_rate_unsafe_shutdowns
                 name: unsafe_shutdowns
-              - selector: redfish_drive_nvme_event_rate_power_cycles
+              - selector: drive_nvme_event_rate_power_cycles
                 name: power_cycles
           - id: redfish_drive_nvme_io
             title: Drive NVMe I/O
@@ -3159,9 +3159,9 @@ groups:
             units: bytes/s
             priority: 4130
             dimensions:
-              - selector: redfish_drive_nvme_io_read
+              - selector: drive_nvme_io_read
                 name: read
-              - selector: redfish_drive_nvme_io_written
+              - selector: drive_nvme_io_written
                 name: written
           - id: redfish_drive_nvme_spare
             title: Drive NVMe Spare
@@ -3169,7 +3169,7 @@ groups:
             units: percentage
             priority: 4140
             dimensions:
-              - selector: redfish_drive_nvme_spare_available
+              - selector: drive_nvme_spare_available
                 name: available
           - id: redfish_drive_nvme_temperature
             title: Drive NVMe Temperature
@@ -3177,7 +3177,7 @@ groups:
             units: Celsius
             priority: 4150
             dimensions:
-              - selector: redfish_drive_nvme_temperature_composite
+              - selector: drive_nvme_temperature_composite
                 name: composite
           - id: redfish_drive_nvme_thermal_time
             title: Drive NVMe Thermal Time
@@ -3185,13 +3185,13 @@ groups:
             units: percentage
             priority: 4160
             dimensions:
-              - selector: redfish_drive_nvme_thermal_time_warning
+              - selector: drive_nvme_thermal_time_warning
                 name: warning
-              - selector: redfish_drive_nvme_thermal_time_critical
+              - selector: drive_nvme_thermal_time_critical
                 name: critical
-              - selector: redfish_drive_nvme_thermal_time_management_1
+              - selector: drive_nvme_thermal_time_management_1
                 name: management_1
-              - selector: redfish_drive_nvme_thermal_time_management_2
+              - selector: drive_nvme_thermal_time_management_2
                 name: management_2
           - id: redfish_drive_nvme_thermal_transition_rate
             title: Drive NVMe Thermal Transition Rate
@@ -3199,9 +3199,9 @@ groups:
             units: transitions/s
             priority: 4170
             dimensions:
-              - selector: redfish_drive_nvme_thermal_transition_rate_management_1
+              - selector: drive_nvme_thermal_transition_rate_management_1
                 name: management_1
-              - selector: redfish_drive_nvme_thermal_transition_rate_management_2
+              - selector: drive_nvme_thermal_transition_rate_management_2
                 name: management_2
           - id: redfish_drive_nvme_wear
             title: Drive NVMe Wear
@@ -3209,7 +3209,7 @@ groups:
             units: percentage
             priority: 4180
             dimensions:
-              - selector: redfish_drive_nvme_wear_used
+              - selector: drive_nvme_wear_used
                 name: used
           - id: redfish_drive_queue_depth
             title: Drive Queue Depth
@@ -3238,9 +3238,9 @@ groups:
       - family: storage
         context_namespace: redfish
         metrics:
-          - redfish_storage_iops_non_io
-          - redfish_storage_iops_read_hit
-          - redfish_storage_iops_write_hit
+          - storage_iops_non_io
+          - storage_iops_read_hit
+          - storage_iops_write_hit
           - storage_acquisition_state
           - storage_conditions_critical
           - storage_conditions_ok
@@ -3319,11 +3319,11 @@ groups:
                 name: read
               - selector: storage_iops_written
                 name: written
-              - selector: redfish_storage_iops_read_hit
+              - selector: storage_iops_read_hit
                 name: read_hit
-              - selector: redfish_storage_iops_write_hit
+              - selector: storage_iops_write_hit
                 name: write_hit
-              - selector: redfish_storage_iops_non_io
+              - selector: storage_iops_non_io
                 name: non_io
           - id: redfish_storage_state
             title: Storage State
@@ -3344,28 +3344,28 @@ groups:
       - family: storage_controller
         context_namespace: redfish
         metrics:
-          - redfish_storage_controller_error_rate_correctable_ecc
-          - redfish_storage_controller_error_rate_correctable_parity
-          - redfish_storage_controller_error_rate_uncorrectable_ecc
-          - redfish_storage_controller_error_rate_uncorrectable_parity
-          - redfish_storage_controller_nvme_busy_time_busy
-          - redfish_storage_controller_nvme_commands_read
-          - redfish_storage_controller_nvme_commands_written
-          - redfish_storage_controller_nvme_error_rate_error_log_entries
-          - redfish_storage_controller_nvme_error_rate_media_integrity
-          - redfish_storage_controller_nvme_event_rate_power_cycles
-          - redfish_storage_controller_nvme_event_rate_unsafe_shutdowns
-          - redfish_storage_controller_nvme_io_read
-          - redfish_storage_controller_nvme_io_written
-          - redfish_storage_controller_nvme_spare_available
-          - redfish_storage_controller_nvme_temperature_composite
-          - redfish_storage_controller_nvme_thermal_time_critical
-          - redfish_storage_controller_nvme_thermal_time_management_1
-          - redfish_storage_controller_nvme_thermal_time_management_2
-          - redfish_storage_controller_nvme_thermal_time_warning
-          - redfish_storage_controller_nvme_thermal_transition_rate_management_1
-          - redfish_storage_controller_nvme_thermal_transition_rate_management_2
-          - redfish_storage_controller_nvme_wear_used
+          - storage_controller_error_rate_correctable_ecc
+          - storage_controller_error_rate_correctable_parity
+          - storage_controller_error_rate_uncorrectable_ecc
+          - storage_controller_error_rate_uncorrectable_parity
+          - storage_controller_nvme_busy_time_busy
+          - storage_controller_nvme_commands_read
+          - storage_controller_nvme_commands_written
+          - storage_controller_nvme_error_rate_error_log_entries
+          - storage_controller_nvme_error_rate_media_integrity
+          - storage_controller_nvme_event_rate_power_cycles
+          - storage_controller_nvme_event_rate_unsafe_shutdowns
+          - storage_controller_nvme_io_read
+          - storage_controller_nvme_io_written
+          - storage_controller_nvme_spare_available
+          - storage_controller_nvme_temperature_composite
+          - storage_controller_nvme_thermal_time_critical
+          - storage_controller_nvme_thermal_time_management_1
+          - storage_controller_nvme_thermal_time_management_2
+          - storage_controller_nvme_thermal_time_warning
+          - storage_controller_nvme_thermal_transition_rate_management_1
+          - storage_controller_nvme_thermal_transition_rate_management_2
+          - storage_controller_nvme_wear_used
           - storage_controller_acquisition_state
           - storage_controller_cache_health_status
           - storage_controller_cache_health_rollup_status
@@ -3446,13 +3446,13 @@ groups:
             units: errors/s
             priority: 4350
             dimensions:
-              - selector: redfish_storage_controller_error_rate_correctable_ecc
+              - selector: storage_controller_error_rate_correctable_ecc
                 name: correctable_ecc
-              - selector: redfish_storage_controller_error_rate_correctable_parity
+              - selector: storage_controller_error_rate_correctable_parity
                 name: correctable_parity
-              - selector: redfish_storage_controller_error_rate_uncorrectable_ecc
+              - selector: storage_controller_error_rate_uncorrectable_ecc
                 name: uncorrectable_ecc
-              - selector: redfish_storage_controller_error_rate_uncorrectable_parity
+              - selector: storage_controller_error_rate_uncorrectable_parity
                 name: uncorrectable_parity
           - id: redfish_storage_controller_health
             title: Storage Controller Health
@@ -3476,7 +3476,7 @@ groups:
             units: percentage
             priority: 4380
             dimensions:
-              - selector: redfish_storage_controller_nvme_busy_time_busy
+              - selector: storage_controller_nvme_busy_time_busy
                 name: busy
           - id: redfish_storage_controller_nvme_commands
             title: Storage Controller NVMe Commands
@@ -3484,9 +3484,9 @@ groups:
             units: commands/s
             priority: 4390
             dimensions:
-              - selector: redfish_storage_controller_nvme_commands_read
+              - selector: storage_controller_nvme_commands_read
                 name: read
-              - selector: redfish_storage_controller_nvme_commands_written
+              - selector: storage_controller_nvme_commands_written
                 name: written
           - id: redfish_storage_controller_nvme_critical_warnings
             title: Storage Controller NVMe Critical Warnings
@@ -3517,9 +3517,9 @@ groups:
             units: errors/s
             priority: 4410
             dimensions:
-              - selector: redfish_storage_controller_nvme_error_rate_media_integrity
+              - selector: storage_controller_nvme_error_rate_media_integrity
                 name: media_integrity
-              - selector: redfish_storage_controller_nvme_error_rate_error_log_entries
+              - selector: storage_controller_nvme_error_rate_error_log_entries
                 name: error_log_entries
           - id: redfish_storage_controller_nvme_event_rate
             title: Storage Controller NVMe Event Rate
@@ -3527,9 +3527,9 @@ groups:
             units: events/s
             priority: 4420
             dimensions:
-              - selector: redfish_storage_controller_nvme_event_rate_unsafe_shutdowns
+              - selector: storage_controller_nvme_event_rate_unsafe_shutdowns
                 name: unsafe_shutdowns
-              - selector: redfish_storage_controller_nvme_event_rate_power_cycles
+              - selector: storage_controller_nvme_event_rate_power_cycles
                 name: power_cycles
           - id: redfish_storage_controller_nvme_io
             title: Storage Controller NVMe I/O
@@ -3537,9 +3537,9 @@ groups:
             units: bytes/s
             priority: 4430
             dimensions:
-              - selector: redfish_storage_controller_nvme_io_read
+              - selector: storage_controller_nvme_io_read
                 name: read
-              - selector: redfish_storage_controller_nvme_io_written
+              - selector: storage_controller_nvme_io_written
                 name: written
           - id: redfish_storage_controller_nvme_spare
             title: Storage Controller NVMe Spare
@@ -3547,7 +3547,7 @@ groups:
             units: percentage
             priority: 4440
             dimensions:
-              - selector: redfish_storage_controller_nvme_spare_available
+              - selector: storage_controller_nvme_spare_available
                 name: available
           - id: redfish_storage_controller_nvme_temperature
             title: Storage Controller NVMe Temperature
@@ -3555,7 +3555,7 @@ groups:
             units: Celsius
             priority: 4450
             dimensions:
-              - selector: redfish_storage_controller_nvme_temperature_composite
+              - selector: storage_controller_nvme_temperature_composite
                 name: composite
           - id: redfish_storage_controller_nvme_thermal_time
             title: Storage Controller NVMe Thermal Time
@@ -3563,13 +3563,13 @@ groups:
             units: percentage
             priority: 4460
             dimensions:
-              - selector: redfish_storage_controller_nvme_thermal_time_warning
+              - selector: storage_controller_nvme_thermal_time_warning
                 name: warning
-              - selector: redfish_storage_controller_nvme_thermal_time_critical
+              - selector: storage_controller_nvme_thermal_time_critical
                 name: critical
-              - selector: redfish_storage_controller_nvme_thermal_time_management_1
+              - selector: storage_controller_nvme_thermal_time_management_1
                 name: management_1
-              - selector: redfish_storage_controller_nvme_thermal_time_management_2
+              - selector: storage_controller_nvme_thermal_time_management_2
                 name: management_2
           - id: redfish_storage_controller_nvme_thermal_transition_rate
             title: Storage Controller NVMe Thermal Transition Rate
@@ -3577,9 +3577,9 @@ groups:
             units: transitions/s
             priority: 4470
             dimensions:
-              - selector: redfish_storage_controller_nvme_thermal_transition_rate_management_1
+              - selector: storage_controller_nvme_thermal_transition_rate_management_1
                 name: management_1
-              - selector: redfish_storage_controller_nvme_thermal_transition_rate_management_2
+              - selector: storage_controller_nvme_thermal_transition_rate_management_2
                 name: management_2
           - id: redfish_storage_controller_nvme_wear
             title: Storage Controller NVMe Wear
@@ -3587,7 +3587,7 @@ groups:
             units: percentage
             priority: 4480
             dimensions:
-              - selector: redfish_storage_controller_nvme_wear_used
+              - selector: storage_controller_nvme_wear_used
                 name: used
           - id: redfish_storage_controller_pcie_lanes
             title: Storage Controller PCIe Lanes
@@ -3616,24 +3616,24 @@ groups:
       - family: volume
         context_namespace: redfish
         metrics:
-          - redfish_volume_error_rate_consistency_check
-          - redfish_volume_error_rate_correctable_read
-          - redfish_volume_error_rate_correctable_write
-          - redfish_volume_error_rate_rebuild
-          - redfish_volume_error_rate_uncorrectable_read
-          - redfish_volume_error_rate_uncorrectable_write
-          - redfish_volume_event_rate_consistency_checks
-          - redfish_volume_event_rate_state_changes
-          - redfish_volume_io_read
-          - redfish_volume_io_time_non_io
-          - redfish_volume_io_time_read
-          - redfish_volume_io_time_written
-          - redfish_volume_io_written
-          - redfish_volume_iops_non_io
-          - redfish_volume_iops_read
-          - redfish_volume_iops_read_hit
-          - redfish_volume_iops_write_hit
-          - redfish_volume_iops_written
+          - volume_error_rate_consistency_check
+          - volume_error_rate_correctable_read
+          - volume_error_rate_correctable_write
+          - volume_error_rate_rebuild
+          - volume_error_rate_uncorrectable_read
+          - volume_error_rate_uncorrectable_write
+          - volume_event_rate_consistency_checks
+          - volume_event_rate_state_changes
+          - volume_io_read
+          - volume_io_time_non_io
+          - volume_io_time_read
+          - volume_io_time_written
+          - volume_io_written
+          - volume_iops_non_io
+          - volume_iops_read
+          - volume_iops_read_hit
+          - volume_iops_write_hit
+          - volume_iops_written
           - volume_acquisition_state
           - volume_conditions_critical
           - volume_conditions_ok
@@ -3682,17 +3682,17 @@ groups:
             units: errors/s
             priority: 4540
             dimensions:
-              - selector: redfish_volume_error_rate_correctable_read
+              - selector: volume_error_rate_correctable_read
                 name: correctable_read
-              - selector: redfish_volume_error_rate_correctable_write
+              - selector: volume_error_rate_correctable_write
                 name: correctable_write
-              - selector: redfish_volume_error_rate_uncorrectable_read
+              - selector: volume_error_rate_uncorrectable_read
                 name: uncorrectable_read
-              - selector: redfish_volume_error_rate_uncorrectable_write
+              - selector: volume_error_rate_uncorrectable_write
                 name: uncorrectable_write
-              - selector: redfish_volume_error_rate_consistency_check
+              - selector: volume_error_rate_consistency_check
                 name: consistency_check
-              - selector: redfish_volume_error_rate_rebuild
+              - selector: volume_error_rate_rebuild
                 name: rebuild
           - id: redfish_volume_event_rate
             title: Volume Event Rate
@@ -3700,9 +3700,9 @@ groups:
             units: events/s
             priority: 4550
             dimensions:
-              - selector: redfish_volume_event_rate_consistency_checks
+              - selector: volume_event_rate_consistency_checks
                 name: consistency_checks
-              - selector: redfish_volume_event_rate_state_changes
+              - selector: volume_event_rate_state_changes
                 name: state_changes
           - id: redfish_volume_health
             title: Volume Health
@@ -3726,9 +3726,9 @@ groups:
             units: bytes/s
             priority: 4580
             dimensions:
-              - selector: redfish_volume_io_read
+              - selector: volume_io_read
                 name: read
-              - selector: redfish_volume_io_written
+              - selector: volume_io_written
                 name: written
           - id: redfish_volume_io_time
             title: Volume I/O Time
@@ -3736,11 +3736,11 @@ groups:
             units: percentage
             priority: 4590
             dimensions:
-              - selector: redfish_volume_io_time_read
+              - selector: volume_io_time_read
                 name: read
-              - selector: redfish_volume_io_time_written
+              - selector: volume_io_time_written
                 name: written
-              - selector: redfish_volume_io_time_non_io
+              - selector: volume_io_time_non_io
                 name: non_io
           - id: redfish_volume_iops
             title: Volume IOPS
@@ -3748,15 +3748,15 @@ groups:
             units: requests/s
             priority: 4600
             dimensions:
-              - selector: redfish_volume_iops_read
+              - selector: volume_iops_read
                 name: read
-              - selector: redfish_volume_iops_written
+              - selector: volume_iops_written
                 name: written
-              - selector: redfish_volume_iops_read_hit
+              - selector: volume_iops_read_hit
                 name: read_hit
-              - selector: redfish_volume_iops_write_hit
+              - selector: volume_iops_write_hit
                 name: write_hit
-              - selector: redfish_volume_iops_non_io
+              - selector: volume_iops_non_io
                 name: non_io
           - id: redfish_volume_remaining_capacity
             title: Volume Remaining Capacity
@@ -3891,17 +3891,17 @@ groups:
           - network_adapter_state
           - network_adapter_traffic_received
           - network_adapter_traffic_sent
-          - redfish_network_adapter_cpu_utilization
-          - redfish_network_adapter_frames_received_multicast
-          - redfish_network_adapter_frames_received_unicast
-          - redfish_network_adapter_frames_sent_multicast
-          - redfish_network_adapter_frames_sent_unicast
-          - redfish_network_adapter_host_bus_utilization_received
-          - redfish_network_adapter_host_bus_utilization_sent
-          - redfish_network_adapter_ncsi_frames_received
-          - redfish_network_adapter_ncsi_frames_sent
-          - redfish_network_adapter_ncsi_traffic_received
-          - redfish_network_adapter_ncsi_traffic_sent
+          - network_adapter_cpu_utilization
+          - network_adapter_frames_received_multicast
+          - network_adapter_frames_received_unicast
+          - network_adapter_frames_sent_multicast
+          - network_adapter_frames_sent_unicast
+          - network_adapter_host_bus_utilization_received
+          - network_adapter_host_bus_utilization_sent
+          - network_adapter_ncsi_frames_received
+          - network_adapter_ncsi_frames_sent
+          - network_adapter_ncsi_traffic_received
+          - network_adapter_ncsi_traffic_sent
         chart_defaults:
           instances:
             by_labels:
@@ -3937,7 +3937,7 @@ groups:
             units: percentage
             priority: 4740
             dimensions:
-              - selector: redfish_network_adapter_cpu_utilization
+              - selector: network_adapter_cpu_utilization
                 name: cpu
           - id: redfish_network_adapter_frames
             title: Network Adapter Frame Rate
@@ -3945,13 +3945,13 @@ groups:
             units: frames/s
             priority: 4750
             dimensions:
-              - selector: redfish_network_adapter_frames_received_unicast
+              - selector: network_adapter_frames_received_unicast
                 name: received_unicast
-              - selector: redfish_network_adapter_frames_received_multicast
+              - selector: network_adapter_frames_received_multicast
                 name: received_multicast
-              - selector: redfish_network_adapter_frames_sent_unicast
+              - selector: network_adapter_frames_sent_unicast
                 name: sent_unicast
-              - selector: redfish_network_adapter_frames_sent_multicast
+              - selector: network_adapter_frames_sent_multicast
                 name: sent_multicast
           - id: redfish_network_adapter_health
             title: Network Adapter Health
@@ -3975,9 +3975,9 @@ groups:
             units: percentage
             priority: 4780
             dimensions:
-              - selector: redfish_network_adapter_host_bus_utilization_received
+              - selector: network_adapter_host_bus_utilization_received
                 name: received
-              - selector: redfish_network_adapter_host_bus_utilization_sent
+              - selector: network_adapter_host_bus_utilization_sent
                 name: sent
           - id: redfish_network_adapter_ncsi_frames
             title: Network Adapter NCSI Frame Rate
@@ -3985,9 +3985,9 @@ groups:
             units: frames/s
             priority: 4790
             dimensions:
-              - selector: redfish_network_adapter_ncsi_frames_received
+              - selector: network_adapter_ncsi_frames_received
                 name: received
-              - selector: redfish_network_adapter_ncsi_frames_sent
+              - selector: network_adapter_ncsi_frames_sent
                 name: sent
           - id: redfish_network_adapter_ncsi_traffic
             title: Network Adapter NCSI Traffic
@@ -3995,9 +3995,9 @@ groups:
             units: bytes/s
             priority: 4800
             dimensions:
-              - selector: redfish_network_adapter_ncsi_traffic_received
+              - selector: network_adapter_ncsi_traffic_received
                 name: received
-              - selector: redfish_network_adapter_ncsi_traffic_sent
+              - selector: network_adapter_ncsi_traffic_sent
                 name: sent
           - id: redfish_network_adapter_state
             title: Network Adapter State
@@ -4032,16 +4032,16 @@ groups:
           - network_device_function_state
           - network_device_function_traffic_received
           - network_device_function_traffic_sent
-          - redfish_network_device_function_frames_received
-          - redfish_network_device_function_frames_received_multicast
-          - redfish_network_device_function_frames_received_unicast
-          - redfish_network_device_function_frames_sent
-          - redfish_network_device_function_frames_sent_multicast
-          - redfish_network_device_function_frames_sent_unicast
-          - redfish_network_device_function_queue_depth_received
-          - redfish_network_device_function_queue_depth_sent
-          - redfish_network_device_function_queue_full_received
-          - redfish_network_device_function_queue_full_sent
+          - network_device_function_frames_received
+          - network_device_function_frames_received_multicast
+          - network_device_function_frames_received_unicast
+          - network_device_function_frames_sent
+          - network_device_function_frames_sent_multicast
+          - network_device_function_frames_sent_unicast
+          - network_device_function_queue_depth_received
+          - network_device_function_queue_depth_sent
+          - network_device_function_queue_full_received
+          - network_device_function_queue_full_sent
         chart_defaults:
           instances:
             by_labels:
@@ -4077,17 +4077,17 @@ groups:
             units: frames/s
             priority: 4850
             dimensions:
-              - selector: redfish_network_device_function_frames_received
+              - selector: network_device_function_frames_received
                 name: received
-              - selector: redfish_network_device_function_frames_sent
+              - selector: network_device_function_frames_sent
                 name: sent
-              - selector: redfish_network_device_function_frames_received_unicast
+              - selector: network_device_function_frames_received_unicast
                 name: received_unicast
-              - selector: redfish_network_device_function_frames_sent_unicast
+              - selector: network_device_function_frames_sent_unicast
                 name: sent_unicast
-              - selector: redfish_network_device_function_frames_received_multicast
+              - selector: network_device_function_frames_received_multicast
                 name: received_multicast
-              - selector: redfish_network_device_function_frames_sent_multicast
+              - selector: network_device_function_frames_sent_multicast
                 name: sent_multicast
           - id: redfish_network_device_function_health
             title: Network Device Function Health
@@ -4111,9 +4111,9 @@ groups:
             units: percentage
             priority: 4880
             dimensions:
-              - selector: redfish_network_device_function_queue_depth_received
+              - selector: network_device_function_queue_depth_received
                 name: received
-              - selector: redfish_network_device_function_queue_depth_sent
+              - selector: network_device_function_queue_depth_sent
                 name: sent
           - id: redfish_network_device_function_queue_empty_state
             title: Network Device Function Empty Queue State
@@ -4132,9 +4132,9 @@ groups:
             units: queues
             priority: 4900
             dimensions:
-              - selector: redfish_network_device_function_queue_full_received
+              - selector: network_device_function_queue_full_received
                 name: received
-              - selector: redfish_network_device_function_queue_full_sent
+              - selector: network_device_function_queue_full_sent
                 name: sent
           - id: redfish_network_device_function_state
             title: Network Device Function State
@@ -4466,50 +4466,50 @@ groups:
           - port_state
           - port_traffic_received
           - port_traffic_sent
-          - redfish_port_frames_received
-          - redfish_port_frames_received_broadcast
-          - redfish_port_frames_received_multicast
-          - redfish_port_frames_received_unicast
-          - redfish_port_frames_sent
-          - redfish_port_frames_sent_broadcast
-          - redfish_port_frames_sent_multicast
-          - redfish_port_frames_sent_unicast
-          - redfish_port_network_error_rate_received_alignment
-          - redfish_port_network_error_rate_received_discards
-          - redfish_port_network_error_rate_received_false_carrier
-          - redfish_port_network_error_rate_received_fcs
-          - redfish_port_network_error_rate_received_oversize
-          - redfish_port_network_error_rate_received_undersize
-          - redfish_port_network_error_rate_sent_discards
-          - redfish_port_network_error_rate_sent_excessive_collisions
-          - redfish_port_network_error_rate_sent_late_collisions
-          - redfish_port_network_error_rate_sent_multiple_collisions
-          - redfish_port_network_error_rate_sent_single_collisions
-          - redfish_port_pcie_drop_rate_completion_credit
-          - redfish_port_pcie_drop_rate_non_posted_credit
-          - redfish_port_pcie_drop_rate_tag_unavailable
-          - redfish_port_pcie_error_rate_bad_dllp
-          - redfish_port_pcie_error_rate_bad_tlp
-          - redfish_port_pcie_error_rate_correctable
-          - redfish_port_pcie_error_rate_fatal
-          - redfish_port_pcie_error_rate_flow_control_timeout
-          - redfish_port_pcie_error_rate_l0_to_recovery
-          - redfish_port_pcie_error_rate_nak_received
-          - redfish_port_pcie_error_rate_nak_sent
-          - redfish_port_pcie_error_rate_non_fatal
-          - redfish_port_pcie_error_rate_replay
-          - redfish_port_pcie_error_rate_replay_rollover
-          - redfish_port_pcie_error_rate_unsupported_request
-          - redfish_port_pcie_tlp_rate_completion
-          - redfish_port_pcie_tlp_rate_read
-          - redfish_port_pcie_tlp_rate_write
-          - redfish_port_pcie_traffic_completion
-          - redfish_port_pcie_traffic_read
-          - redfish_port_pcie_traffic_write
-          - redfish_port_rdma_error_rate_protection
-          - redfish_port_rdma_error_rate_protocol
-          - redfish_port_rdma_traffic_received
-          - redfish_port_rdma_traffic_sent
+          - port_frames_received
+          - port_frames_received_broadcast
+          - port_frames_received_multicast
+          - port_frames_received_unicast
+          - port_frames_sent
+          - port_frames_sent_broadcast
+          - port_frames_sent_multicast
+          - port_frames_sent_unicast
+          - port_network_error_rate_received_alignment
+          - port_network_error_rate_received_discards
+          - port_network_error_rate_received_false_carrier
+          - port_network_error_rate_received_fcs
+          - port_network_error_rate_received_oversize
+          - port_network_error_rate_received_undersize
+          - port_network_error_rate_sent_discards
+          - port_network_error_rate_sent_excessive_collisions
+          - port_network_error_rate_sent_late_collisions
+          - port_network_error_rate_sent_multiple_collisions
+          - port_network_error_rate_sent_single_collisions
+          - port_pcie_drop_rate_completion_credit
+          - port_pcie_drop_rate_non_posted_credit
+          - port_pcie_drop_rate_tag_unavailable
+          - port_pcie_error_rate_bad_dllp
+          - port_pcie_error_rate_bad_tlp
+          - port_pcie_error_rate_correctable
+          - port_pcie_error_rate_fatal
+          - port_pcie_error_rate_flow_control_timeout
+          - port_pcie_error_rate_l0_to_recovery
+          - port_pcie_error_rate_nak_received
+          - port_pcie_error_rate_nak_sent
+          - port_pcie_error_rate_non_fatal
+          - port_pcie_error_rate_replay
+          - port_pcie_error_rate_replay_rollover
+          - port_pcie_error_rate_unsupported_request
+          - port_pcie_tlp_rate_completion
+          - port_pcie_tlp_rate_read
+          - port_pcie_tlp_rate_write
+          - port_pcie_traffic_completion
+          - port_pcie_traffic_read
+          - port_pcie_traffic_write
+          - port_rdma_error_rate_protection
+          - port_rdma_error_rate_protocol
+          - port_rdma_traffic_received
+          - port_rdma_traffic_sent
         chart_defaults:
           instances:
             by_labels:
@@ -4555,21 +4555,21 @@ groups:
             units: frames/s
             priority: 5200
             dimensions:
-              - selector: redfish_port_frames_received
+              - selector: port_frames_received
                 name: received
-              - selector: redfish_port_frames_sent
+              - selector: port_frames_sent
                 name: sent
-              - selector: redfish_port_frames_received_unicast
+              - selector: port_frames_received_unicast
                 name: received_unicast
-              - selector: redfish_port_frames_sent_unicast
+              - selector: port_frames_sent_unicast
                 name: sent_unicast
-              - selector: redfish_port_frames_received_multicast
+              - selector: port_frames_received_multicast
                 name: received_multicast
-              - selector: redfish_port_frames_sent_multicast
+              - selector: port_frames_sent_multicast
                 name: sent_multicast
-              - selector: redfish_port_frames_received_broadcast
+              - selector: port_frames_received_broadcast
                 name: received_broadcast
-              - selector: redfish_port_frames_sent_broadcast
+              - selector: port_frames_sent_broadcast
                 name: sent_broadcast
           - id: redfish_port_health
             title: Port Health
@@ -4625,27 +4625,27 @@ groups:
             units: errors/s
             priority: 5270
             dimensions:
-              - selector: redfish_port_network_error_rate_received_discards
+              - selector: port_network_error_rate_received_discards
                 name: received_discards
-              - selector: redfish_port_network_error_rate_sent_discards
+              - selector: port_network_error_rate_sent_discards
                 name: sent_discards
-              - selector: redfish_port_network_error_rate_received_fcs
+              - selector: port_network_error_rate_received_fcs
                 name: received_fcs
-              - selector: redfish_port_network_error_rate_received_false_carrier
+              - selector: port_network_error_rate_received_false_carrier
                 name: received_false_carrier
-              - selector: redfish_port_network_error_rate_received_alignment
+              - selector: port_network_error_rate_received_alignment
                 name: received_alignment
-              - selector: redfish_port_network_error_rate_received_oversize
+              - selector: port_network_error_rate_received_oversize
                 name: received_oversize
-              - selector: redfish_port_network_error_rate_received_undersize
+              - selector: port_network_error_rate_received_undersize
                 name: received_undersize
-              - selector: redfish_port_network_error_rate_sent_excessive_collisions
+              - selector: port_network_error_rate_sent_excessive_collisions
                 name: sent_excessive_collisions
-              - selector: redfish_port_network_error_rate_sent_late_collisions
+              - selector: port_network_error_rate_sent_late_collisions
                 name: sent_late_collisions
-              - selector: redfish_port_network_error_rate_sent_multiple_collisions
+              - selector: port_network_error_rate_sent_multiple_collisions
                 name: sent_multiple_collisions
-              - selector: redfish_port_network_error_rate_sent_single_collisions
+              - selector: port_network_error_rate_sent_single_collisions
                 name: sent_single_collisions
           - id: redfish_port_pcie_drop_rate
             title: Port PCIe Drop Rate
@@ -4653,11 +4653,11 @@ groups:
             units: drops/s
             priority: 5280
             dimensions:
-              - selector: redfish_port_pcie_drop_rate_completion_credit
+              - selector: port_pcie_drop_rate_completion_credit
                 name: completion_credit
-              - selector: redfish_port_pcie_drop_rate_non_posted_credit
+              - selector: port_pcie_drop_rate_non_posted_credit
                 name: non_posted_credit
-              - selector: redfish_port_pcie_drop_rate_tag_unavailable
+              - selector: port_pcie_drop_rate_tag_unavailable
                 name: tag_unavailable
           - id: redfish_port_pcie_error_rate
             title: Port PCIe Error Rate
@@ -4665,29 +4665,29 @@ groups:
             units: errors/s
             priority: 5290
             dimensions:
-              - selector: redfish_port_pcie_error_rate_bad_dllp
+              - selector: port_pcie_error_rate_bad_dllp
                 name: bad_dllp
-              - selector: redfish_port_pcie_error_rate_bad_tlp
+              - selector: port_pcie_error_rate_bad_tlp
                 name: bad_tlp
-              - selector: redfish_port_pcie_error_rate_correctable
+              - selector: port_pcie_error_rate_correctable
                 name: correctable
-              - selector: redfish_port_pcie_error_rate_fatal
+              - selector: port_pcie_error_rate_fatal
                 name: fatal
-              - selector: redfish_port_pcie_error_rate_flow_control_timeout
+              - selector: port_pcie_error_rate_flow_control_timeout
                 name: flow_control_timeout
-              - selector: redfish_port_pcie_error_rate_l0_to_recovery
+              - selector: port_pcie_error_rate_l0_to_recovery
                 name: l0_to_recovery
-              - selector: redfish_port_pcie_error_rate_nak_received
+              - selector: port_pcie_error_rate_nak_received
                 name: nak_received
-              - selector: redfish_port_pcie_error_rate_nak_sent
+              - selector: port_pcie_error_rate_nak_sent
                 name: nak_sent
-              - selector: redfish_port_pcie_error_rate_non_fatal
+              - selector: port_pcie_error_rate_non_fatal
                 name: non_fatal
-              - selector: redfish_port_pcie_error_rate_replay
+              - selector: port_pcie_error_rate_replay
                 name: replay
-              - selector: redfish_port_pcie_error_rate_replay_rollover
+              - selector: port_pcie_error_rate_replay_rollover
                 name: replay_rollover
-              - selector: redfish_port_pcie_error_rate_unsupported_request
+              - selector: port_pcie_error_rate_unsupported_request
                 name: unsupported_request
           - id: redfish_port_pcie_tlp_rate
             title: Port PCIe TLP Rate
@@ -4695,11 +4695,11 @@ groups:
             units: packets/s
             priority: 5300
             dimensions:
-              - selector: redfish_port_pcie_tlp_rate_completion
+              - selector: port_pcie_tlp_rate_completion
                 name: completion
-              - selector: redfish_port_pcie_tlp_rate_read
+              - selector: port_pcie_tlp_rate_read
                 name: read
-              - selector: redfish_port_pcie_tlp_rate_write
+              - selector: port_pcie_tlp_rate_write
                 name: write
           - id: redfish_port_pcie_traffic
             title: Port PCIe Traffic
@@ -4707,11 +4707,11 @@ groups:
             units: bytes/s
             priority: 5310
             dimensions:
-              - selector: redfish_port_pcie_traffic_completion
+              - selector: port_pcie_traffic_completion
                 name: completion
-              - selector: redfish_port_pcie_traffic_read
+              - selector: port_pcie_traffic_read
                 name: read
-              - selector: redfish_port_pcie_traffic_write
+              - selector: port_pcie_traffic_write
                 name: write
           - id: redfish_port_rdma_error_rate
             title: Port RDMA Error Rate
@@ -4719,9 +4719,9 @@ groups:
             units: errors/s
             priority: 5320
             dimensions:
-              - selector: redfish_port_rdma_error_rate_protection
+              - selector: port_rdma_error_rate_protection
                 name: protection
-              - selector: redfish_port_rdma_error_rate_protocol
+              - selector: port_rdma_error_rate_protocol
                 name: protocol
           - id: redfish_port_rdma_traffic
             title: Port RDMA Traffic
@@ -4729,9 +4729,9 @@ groups:
             units: bytes/s
             priority: 5330
             dimensions:
-              - selector: redfish_port_rdma_traffic_received
+              - selector: port_rdma_traffic_received
                 name: received
-              - selector: redfish_port_rdma_traffic_sent
+              - selector: port_rdma_traffic_sent
                 name: sent
           - id: redfish_port_signal_detected
             title: Port Signal Detected

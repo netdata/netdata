@@ -703,7 +703,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_instructions_per_cycle",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_instructions_per_cycle",
+		Metric:    "processor_core_instructions_per_cycle",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -714,7 +714,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_correctable_core_error_count",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_error_rate_correctable_core",
+		Metric:    "processor_core_error_rate_correctable_core",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -724,7 +724,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_correctable_other_error_count",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_error_rate_correctable_other",
+		Metric:    "processor_core_error_rate_correctable_other",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -734,7 +734,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_uncorrectable_core_error_count",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_error_rate_uncorrectable_core",
+		Metric:    "processor_core_error_rate_uncorrectable_core",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -744,7 +744,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_uncorrectable_other_error_count",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_error_rate_uncorrectable_other",
+		Metric:    "processor_core_error_rate_uncorrectable_other",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -754,7 +754,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_iostall_count",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_cycle_rate_io_stall",
+		Metric:    "processor_core_cycle_rate_io_stall",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -764,7 +764,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_memory_stall_count",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_cycle_rate_memory_stall",
+		Metric:    "processor_core_cycle_rate_memory_stall",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -774,7 +774,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_core_unhalted_cycles",
 		Kind:      "processor_core",
-		Metric:    "redfish_processor_core_cycle_rate_unhalted",
+		Metric:    "processor_core_cycle_rate_unhalted",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -784,7 +784,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "memory_current_period_blocks_read",
 		Kind:      "memory",
-		Metric:    "redfish_memory_io_read",
+		Metric:    "memory_io_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -800,7 +800,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "memory_current_period_blocks_written",
 		Kind:      "memory",
-		Metric:    "redfish_memory_io_written",
+		Metric:    "memory_io_written",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -816,7 +816,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "memory_memory_metrics_current_period_correctable_eccerror_count",
 		Kind:      "memory",
-		Metric:    "redfish_memory_error_rate_correctable",
+		Metric:    "memory_error_rate_correctable",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -826,7 +826,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "memory_memory_metrics_current_period_indeterminate_correctable_error_count",
 		Kind:      "memory",
-		Metric:    "redfish_memory_error_rate_indeterminate_correctable",
+		Metric:    "memory_error_rate_indeterminate_correctable",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -836,7 +836,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "memory_memory_metrics_current_period_uncorrectable_eccerror_count",
 		Kind:      "memory",
-		Metric:    "redfish_memory_error_rate_uncorrectable",
+		Metric:    "memory_error_rate_uncorrectable",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -846,7 +846,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "memory_memory_metrics_current_period_indeterminate_uncorrectable_error_count",
 		Kind:      "memory",
-		Metric:    "redfish_memory_error_rate_indeterminate_uncorrectable",
+		Metric:    "memory_error_rate_indeterminate_uncorrectable",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -856,7 +856,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_storage_metrics_iostatistics_read_hit_iorequests",
 		Kind:      "storage",
-		Metric:    "redfish_storage_iops_read_hit",
+		Metric:    "storage_iops_read_hit",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -866,7 +866,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_storage_metrics_iostatistics_write_hit_iorequests",
 		Kind:      "storage",
-		Metric:    "redfish_storage_iops_write_hit",
+		Metric:    "storage_iops_write_hit",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -876,7 +876,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_storage_metrics_iostatistics_non_iorequests",
 		Kind:      "storage",
-		Metric:    "redfish_storage_iops_non_io",
+		Metric:    "storage_iops_non_io",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -886,7 +886,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_storage_controller_metrics_correctable_eccerror_count",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_error_rate_correctable_ecc",
+		Metric:    "storage_controller_error_rate_correctable_ecc",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -896,7 +896,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_storage_controller_metrics_correctable_parity_error_count",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_error_rate_correctable_parity",
+		Metric:    "storage_controller_error_rate_correctable_parity",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -906,7 +906,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_storage_controller_metrics_uncorrectable_eccerror_count",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_error_rate_uncorrectable_ecc",
+		Metric:    "storage_controller_error_rate_uncorrectable_ecc",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -916,7 +916,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_storage_controller_metrics_uncorrectable_parity_error_count",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_error_rate_uncorrectable_parity",
+		Metric:    "storage_controller_error_rate_uncorrectable_parity",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -926,7 +926,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_read_ioki_bytes",
 		Kind:      "volume",
-		Metric:    "redfish_volume_io_read",
+		Metric:    "volume_io_read",
 		Scale:     valueScale{1024, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -937,7 +937,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_write_ioki_bytes",
 		Kind:      "volume",
-		Metric:    "redfish_volume_io_written",
+		Metric:    "volume_io_written",
 		Scale:     valueScale{1024, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -948,7 +948,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_read_iorequests",
 		Kind:      "volume",
-		Metric:    "redfish_volume_iops_read",
+		Metric:    "volume_iops_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -959,7 +959,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_write_iorequests",
 		Kind:      "volume",
-		Metric:    "redfish_volume_iops_written",
+		Metric:    "volume_iops_written",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -970,7 +970,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_read_hit_iorequests",
 		Kind:      "volume",
-		Metric:    "redfish_volume_iops_read_hit",
+		Metric:    "volume_iops_read_hit",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -981,7 +981,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_write_hit_iorequests",
 		Kind:      "volume",
-		Metric:    "redfish_volume_iops_write_hit",
+		Metric:    "volume_iops_write_hit",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -992,7 +992,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_non_iorequests",
 		Kind:      "volume",
-		Metric:    "redfish_volume_iops_non_io",
+		Metric:    "volume_iops_non_io",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1003,7 +1003,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_read_iorequest_time",
 		Kind:      "volume",
-		Metric:    "redfish_volume_io_time_read",
+		Metric:    "volume_io_time_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1014,7 +1014,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_write_iorequest_time",
 		Kind:      "volume",
-		Metric:    "redfish_volume_io_time_written",
+		Metric:    "volume_io_time_written",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1025,7 +1025,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_io_statistics_non_iorequest_time",
 		Kind:      "volume",
-		Metric:    "redfish_volume_io_time_non_io",
+		Metric:    "volume_io_time_non_io",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1036,7 +1036,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_correctable_ioread_error_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_error_rate_correctable_read",
+		Metric:    "volume_error_rate_correctable_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1046,7 +1046,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_correctable_iowrite_error_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_error_rate_correctable_write",
+		Metric:    "volume_error_rate_correctable_write",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1056,7 +1056,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_uncorrectable_ioread_error_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_error_rate_uncorrectable_read",
+		Metric:    "volume_error_rate_uncorrectable_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1066,7 +1066,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_uncorrectable_iowrite_error_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_error_rate_uncorrectable_write",
+		Metric:    "volume_error_rate_uncorrectable_write",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1076,7 +1076,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_consistency_check_error_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_error_rate_consistency_check",
+		Metric:    "volume_error_rate_consistency_check",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1086,7 +1086,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_rebuild_error_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_error_rate_rebuild",
+		Metric:    "volume_error_rate_rebuild",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1096,7 +1096,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_consistency_check_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_event_rate_consistency_checks",
+		Metric:    "volume_event_rate_consistency_checks",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1106,7 +1106,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "volume_volume_metrics_state_change_count",
 		Kind:      "volume",
-		Metric:    "redfish_volume_event_rate_state_changes",
+		Metric:    "volume_event_rate_state_changes",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1116,7 +1116,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_temperature_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_temperature_sensor",
+		Metric:    "control_temperature_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1132,7 +1132,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_temperature_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_temperature_setpoint",
+		Metric:    "control_temperature_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1148,7 +1148,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_temperature_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_temperature_setpoint_error",
+		Metric:    "control_temperature_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1164,7 +1164,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_power_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_power_sensor",
+		Metric:    "control_power_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1180,7 +1180,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_power_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_power_setpoint",
+		Metric:    "control_power_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1196,7 +1196,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_power_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_power_setpoint_error",
+		Metric:    "control_power_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1212,7 +1212,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_frequency_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_frequency_sensor",
+		Metric:    "control_frequency_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1234,7 +1234,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_frequency_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_frequency_setpoint",
+		Metric:    "control_frequency_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1256,7 +1256,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_frequency_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_frequency_setpoint_error",
+		Metric:    "control_frequency_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1278,7 +1278,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_pressure_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_pressure_sensor",
+		Metric:    "control_pressure_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1300,7 +1300,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_pressure_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_pressure_setpoint",
+		Metric:    "control_pressure_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1322,7 +1322,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_pressure_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_pressure_setpoint_error",
+		Metric:    "control_pressure_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1344,7 +1344,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_valve_position_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_valve_position_sensor",
+		Metric:    "control_valve_position_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1360,7 +1360,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_valve_position_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_valve_position_setpoint",
+		Metric:    "control_valve_position_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1376,7 +1376,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_valve_position_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_valve_position_setpoint_error",
+		Metric:    "control_valve_position_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1392,7 +1392,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_percentage_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_percentage_sensor",
+		Metric:    "control_percentage_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1414,7 +1414,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_percentage_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_percentage_setpoint",
+		Metric:    "control_percentage_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1436,7 +1436,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_percentage_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_percentage_setpoint_error",
+		Metric:    "control_percentage_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1458,7 +1458,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_position_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_position_sensor",
+		Metric:    "control_linear_position_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1474,7 +1474,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_position_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_position_setpoint",
+		Metric:    "control_linear_position_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1490,7 +1490,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_position_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_position_setpoint_error",
+		Metric:    "control_linear_position_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1506,7 +1506,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_velocity_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_velocity_sensor",
+		Metric:    "control_linear_velocity_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1522,7 +1522,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_velocity_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_velocity_setpoint",
+		Metric:    "control_linear_velocity_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1538,7 +1538,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_velocity_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_velocity_setpoint_error",
+		Metric:    "control_linear_velocity_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1554,7 +1554,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_acceleration_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_acceleration_sensor",
+		Metric:    "control_linear_acceleration_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1570,7 +1570,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_acceleration_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_acceleration_setpoint",
+		Metric:    "control_linear_acceleration_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1586,7 +1586,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_linear_acceleration_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_linear_acceleration_setpoint_error",
+		Metric:    "control_linear_acceleration_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1602,7 +1602,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_position_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_position_sensor",
+		Metric:    "control_rotational_position_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1618,7 +1618,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_position_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_position_setpoint",
+		Metric:    "control_rotational_position_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1634,7 +1634,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_position_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_position_setpoint_error",
+		Metric:    "control_rotational_position_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1650,7 +1650,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_velocity_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_velocity_sensor",
+		Metric:    "control_rotational_velocity_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1666,7 +1666,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_velocity_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_velocity_setpoint",
+		Metric:    "control_rotational_velocity_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1682,7 +1682,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_velocity_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_velocity_setpoint_error",
+		Metric:    "control_rotational_velocity_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1698,7 +1698,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_acceleration_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_acceleration_sensor",
+		Metric:    "control_rotational_acceleration_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1714,7 +1714,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_acceleration_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_acceleration_setpoint",
+		Metric:    "control_rotational_acceleration_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1730,7 +1730,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_rotational_acceleration_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_rotational_acceleration_setpoint_error",
+		Metric:    "control_rotational_acceleration_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1746,7 +1746,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_liquid_flow_sensor",
 		Kind:      "control",
-		Metric:    "redfish_control_liquid_flow_sensor",
+		Metric:    "control_liquid_flow_sensor",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1762,7 +1762,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_liquid_flow_setpoint",
 		Kind:      "control",
-		Metric:    "redfish_control_liquid_flow_setpoint",
+		Metric:    "control_liquid_flow_setpoint",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1778,7 +1778,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "control_liquid_flow_setpoint_error",
 		Kind:      "control",
-		Metric:    "redfish_control_liquid_flow_setpoint_error",
+		Metric:    "control_liquid_flow_setpoint_error",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1794,7 +1794,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_available_spare_percent",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_spare_available",
+		Metric:    "storage_controller_nvme_spare_available",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1805,7 +1805,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_percentage_used",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_wear_used",
+		Metric:    "storage_controller_nvme_wear_used",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1816,7 +1816,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_composite_temperature_celsius",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_temperature_composite",
+		Metric:    "storage_controller_nvme_temperature_composite",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1827,7 +1827,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_data_units_read",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_io_read",
+		Metric:    "storage_controller_nvme_io_read",
 		Scale:     valueScale{512000, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1837,7 +1837,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_data_units_written",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_io_written",
+		Metric:    "storage_controller_nvme_io_written",
 		Scale:     valueScale{512000, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1847,7 +1847,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_host_read_commands",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_commands_read",
+		Metric:    "storage_controller_nvme_commands_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1857,7 +1857,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_host_write_commands",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_commands_written",
+		Metric:    "storage_controller_nvme_commands_written",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1867,7 +1867,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_controller_busy_time_minutes",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_busy_time_busy",
+		Metric:    "storage_controller_nvme_busy_time_busy",
 		Scale:     valueScale{60, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1877,7 +1877,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_media_and_data_integrity_errors",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_error_rate_media_integrity",
+		Metric:    "storage_controller_nvme_error_rate_media_integrity",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1887,7 +1887,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_number_of_error_information_log_entries",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_error_rate_error_log_entries",
+		Metric:    "storage_controller_nvme_error_rate_error_log_entries",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1897,7 +1897,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_unsafe_shutdowns",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_event_rate_unsafe_shutdowns",
+		Metric:    "storage_controller_nvme_event_rate_unsafe_shutdowns",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1907,7 +1907,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_power_cycles",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_event_rate_power_cycles",
+		Metric:    "storage_controller_nvme_event_rate_power_cycles",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1917,7 +1917,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_warning_composite_temp_time_minutes",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_thermal_time_warning",
+		Metric:    "storage_controller_nvme_thermal_time_warning",
 		Scale:     valueScale{60, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1927,7 +1927,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_critical_composite_temp_time_minutes",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_thermal_time_critical",
+		Metric:    "storage_controller_nvme_thermal_time_critical",
 		Scale:     valueScale{60, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1937,7 +1937,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_thermal_mgmt_temp1_total_time_seconds",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_thermal_time_management_1",
+		Metric:    "storage_controller_nvme_thermal_time_management_1",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1947,7 +1947,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_thermal_mgmt_temp2_total_time_seconds",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_thermal_time_management_2",
+		Metric:    "storage_controller_nvme_thermal_time_management_2",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -1957,7 +1957,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_thermal_mgmt_temp1_transition_count",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_thermal_transition_rate_management_1",
+		Metric:    "storage_controller_nvme_thermal_transition_rate_management_1",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1967,7 +1967,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "storage_controller_nvme_thermal_mgmt_temp2_transition_count",
 		Kind:      "storage_controller",
-		Metric:    "redfish_storage_controller_nvme_thermal_transition_rate_management_2",
+		Metric:    "storage_controller_nvme_thermal_transition_rate_management_2",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -1977,7 +1977,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_available_spare_percent",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_spare_available",
+		Metric:    "drive_nvme_spare_available",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1988,7 +1988,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_percentage_used",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_wear_used",
+		Metric:    "drive_nvme_wear_used",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -1999,7 +1999,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_composite_temperature_celsius",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_temperature_composite",
+		Metric:    "drive_nvme_temperature_composite",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -2010,7 +2010,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_data_units_read",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_io_read",
+		Metric:    "drive_nvme_io_read",
 		Scale:     valueScale{512000, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2020,7 +2020,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_data_units_written",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_io_written",
+		Metric:    "drive_nvme_io_written",
 		Scale:     valueScale{512000, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2030,7 +2030,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_host_read_commands",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_commands_read",
+		Metric:    "drive_nvme_commands_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2040,7 +2040,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_host_write_commands",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_commands_written",
+		Metric:    "drive_nvme_commands_written",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2050,7 +2050,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_controller_busy_time_minutes",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_busy_time_busy",
+		Metric:    "drive_nvme_busy_time_busy",
 		Scale:     valueScale{60, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -2060,7 +2060,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_media_and_data_integrity_errors",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_error_rate_media_integrity",
+		Metric:    "drive_nvme_error_rate_media_integrity",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2070,7 +2070,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_number_of_error_information_log_entries",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_error_rate_error_log_entries",
+		Metric:    "drive_nvme_error_rate_error_log_entries",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2080,7 +2080,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_unsafe_shutdowns",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_event_rate_unsafe_shutdowns",
+		Metric:    "drive_nvme_event_rate_unsafe_shutdowns",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2090,7 +2090,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_power_cycles",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_event_rate_power_cycles",
+		Metric:    "drive_nvme_event_rate_power_cycles",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2100,7 +2100,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_warning_composite_temp_time_minutes",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_thermal_time_warning",
+		Metric:    "drive_nvme_thermal_time_warning",
 		Scale:     valueScale{60, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -2110,7 +2110,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_critical_composite_temp_time_minutes",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_thermal_time_critical",
+		Metric:    "drive_nvme_thermal_time_critical",
 		Scale:     valueScale{60, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -2120,7 +2120,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_thermal_mgmt_temp1_total_time_seconds",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_thermal_time_management_1",
+		Metric:    "drive_nvme_thermal_time_management_1",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -2130,7 +2130,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_thermal_mgmt_temp2_total_time_seconds",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_thermal_time_management_2",
+		Metric:    "drive_nvme_thermal_time_management_2",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -2140,7 +2140,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_thermal_mgmt_temp1_transition_count",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_thermal_transition_rate_management_1",
+		Metric:    "drive_nvme_thermal_transition_rate_management_1",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2150,7 +2150,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "drive_nvme_thermal_mgmt_temp2_transition_count",
 		Kind:      "drive",
-		Metric:    "redfish_drive_nvme_thermal_transition_rate_management_2",
+		Metric:    "drive_nvme_thermal_transition_rate_management_2",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2160,7 +2160,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_rxunicast_frames",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_frames_received_unicast",
+		Metric:    "network_adapter_frames_received_unicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2170,7 +2170,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_rxmulticast_frames",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_frames_received_multicast",
+		Metric:    "network_adapter_frames_received_multicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2180,7 +2180,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_txunicast_frames",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_frames_sent_unicast",
+		Metric:    "network_adapter_frames_sent_unicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2190,7 +2190,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_txmulticast_frames",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_frames_sent_multicast",
+		Metric:    "network_adapter_frames_sent_multicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2200,7 +2200,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_ncsirxbytes",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_ncsi_traffic_received",
+		Metric:    "network_adapter_ncsi_traffic_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2210,7 +2210,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_ncsitxbytes",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_ncsi_traffic_sent",
+		Metric:    "network_adapter_ncsi_traffic_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2220,7 +2220,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_ncsirxframes",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_ncsi_frames_received",
+		Metric:    "network_adapter_ncsi_frames_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2230,7 +2230,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_ncsitxframes",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_ncsi_frames_sent",
+		Metric:    "network_adapter_ncsi_frames_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2240,7 +2240,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_cpucore_percent",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_cpu_utilization",
+		Metric:    "network_adapter_cpu_utilization",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -2251,7 +2251,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_host_bus_rxpercent",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_host_bus_utilization_received",
+		Metric:    "network_adapter_host_bus_utilization_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -2262,7 +2262,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_adapter_network_adapter_metrics_host_bus_txpercent",
 		Kind:      "network_adapter",
-		Metric:    "redfish_network_adapter_host_bus_utilization_sent",
+		Metric:    "network_adapter_host_bus_utilization_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -2273,7 +2273,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_rxframes",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_frames_received",
+		Metric:    "network_device_function_frames_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2283,7 +2283,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_txframes",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_frames_sent",
+		Metric:    "network_device_function_frames_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2293,7 +2293,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_rxunicast_frames",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_frames_received_unicast",
+		Metric:    "network_device_function_frames_received_unicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2303,7 +2303,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_txunicast_frames",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_frames_sent_unicast",
+		Metric:    "network_device_function_frames_sent_unicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2313,7 +2313,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_rxmulticast_frames",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_frames_received_multicast",
+		Metric:    "network_device_function_frames_received_multicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2323,7 +2323,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_txmulticast_frames",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_frames_sent_multicast",
+		Metric:    "network_device_function_frames_sent_multicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2333,7 +2333,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_rxavg_queue_depth_percent",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_queue_depth_received",
+		Metric:    "network_device_function_queue_depth_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -2344,7 +2344,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_txavg_queue_depth_percent",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_queue_depth_sent",
+		Metric:    "network_device_function_queue_depth_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Float:     true,
@@ -2355,7 +2355,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_rxqueues_full",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_queue_full_received",
+		Metric:    "network_device_function_queue_full_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Candidates: []scalarSource{
@@ -2365,7 +2365,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "network_device_function_network_device_function_metrics_txqueues_full",
 		Kind:      "network_device_function",
-		Metric:    "redfish_network_device_function_queue_full_sent",
+		Metric:    "network_device_function_queue_full_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Candidates: []scalarSource{
@@ -2375,7 +2375,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxframes",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_received",
+		Metric:    "port_frames_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2385,7 +2385,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txframes",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_sent",
+		Metric:    "port_frames_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2395,7 +2395,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxunicast_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_received_unicast",
+		Metric:    "port_frames_received_unicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2405,7 +2405,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txunicast_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_sent_unicast",
+		Metric:    "port_frames_sent_unicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2415,7 +2415,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxmulticast_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_received_multicast",
+		Metric:    "port_frames_received_multicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2425,7 +2425,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txmulticast_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_sent_multicast",
+		Metric:    "port_frames_sent_multicast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2435,7 +2435,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxbroadcast_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_received_broadcast",
+		Metric:    "port_frames_received_broadcast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2445,7 +2445,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txbroadcast_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_frames_sent_broadcast",
+		Metric:    "port_frames_sent_broadcast",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2455,7 +2455,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rdmarxbytes",
 		Kind:      "port",
-		Metric:    "redfish_port_rdma_traffic_received",
+		Metric:    "port_rdma_traffic_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2465,7 +2465,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rdmatxbytes",
 		Kind:      "port",
-		Metric:    "redfish_port_rdma_traffic_sent",
+		Metric:    "port_rdma_traffic_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2475,7 +2475,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rdmaprotection_errors",
 		Kind:      "port",
-		Metric:    "redfish_port_rdma_error_rate_protection",
+		Metric:    "port_rdma_error_rate_protection",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2485,7 +2485,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rdmaprotocol_errors",
 		Kind:      "port",
-		Metric:    "redfish_port_rdma_error_rate_protocol",
+		Metric:    "port_rdma_error_rate_protocol",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2495,7 +2495,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxdiscards",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_received_discards",
+		Metric:    "port_network_error_rate_received_discards",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2505,7 +2505,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txdiscards",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_sent_discards",
+		Metric:    "port_network_error_rate_sent_discards",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2515,7 +2515,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxfcserrors",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_received_fcs",
+		Metric:    "port_network_error_rate_received_fcs",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2525,7 +2525,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxfalse_carrier_errors",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_received_false_carrier",
+		Metric:    "port_network_error_rate_received_false_carrier",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2535,7 +2535,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxframe_alignment_errors",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_received_alignment",
+		Metric:    "port_network_error_rate_received_alignment",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2545,7 +2545,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxoversize_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_received_oversize",
+		Metric:    "port_network_error_rate_received_oversize",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2555,7 +2555,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_rxundersize_frames",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_received_undersize",
+		Metric:    "port_network_error_rate_received_undersize",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2565,7 +2565,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txexcessive_collisions",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_sent_excessive_collisions",
+		Metric:    "port_network_error_rate_sent_excessive_collisions",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2575,7 +2575,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txlate_collisions",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_sent_late_collisions",
+		Metric:    "port_network_error_rate_sent_late_collisions",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2585,7 +2585,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txmultiple_collisions",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_sent_multiple_collisions",
+		Metric:    "port_network_error_rate_sent_multiple_collisions",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2595,7 +2595,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_networking_txsingle_collisions",
 		Kind:      "port",
-		Metric:    "redfish_port_network_error_rate_sent_single_collisions",
+		Metric:    "port_network_error_rate_sent_single_collisions",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2605,7 +2605,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_bad_dllpcount",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_bad_dllp",
+		Metric:    "processor_pcie_error_rate_bad_dllp",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2615,7 +2615,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_bad_tlpcount",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_bad_tlp",
+		Metric:    "processor_pcie_error_rate_bad_tlp",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2625,7 +2625,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_correctable_error_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_correctable",
+		Metric:    "processor_pcie_error_rate_correctable",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2635,7 +2635,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_fatal_error_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_fatal",
+		Metric:    "processor_pcie_error_rate_fatal",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2645,7 +2645,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_flow_control_timeout_errors",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_flow_control_timeout",
+		Metric:    "processor_pcie_error_rate_flow_control_timeout",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2655,7 +2655,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_l0_to_recovery_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_l0_to_recovery",
+		Metric:    "processor_pcie_error_rate_l0_to_recovery",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2665,7 +2665,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_nakreceived_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_nak_received",
+		Metric:    "processor_pcie_error_rate_nak_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2675,7 +2675,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_naksent_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_nak_sent",
+		Metric:    "processor_pcie_error_rate_nak_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2685,7 +2685,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_non_fatal_error_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_non_fatal",
+		Metric:    "processor_pcie_error_rate_non_fatal",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2695,7 +2695,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_replay_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_replay",
+		Metric:    "processor_pcie_error_rate_replay",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2705,7 +2705,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_replay_rollover_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_replay_rollover",
+		Metric:    "processor_pcie_error_rate_replay_rollover",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2715,7 +2715,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "processor_pcie_errors_unsupported_request_count",
 		Kind:      "processor",
-		Metric:    "redfish_processor_pcie_error_rate_unsupported_request",
+		Metric:    "processor_pcie_error_rate_unsupported_request",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2725,7 +2725,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_bad_dllpcount",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_bad_dllp",
+		Metric:    "port_pcie_error_rate_bad_dllp",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2735,7 +2735,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_bad_tlpcount",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_bad_tlp",
+		Metric:    "port_pcie_error_rate_bad_tlp",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2745,7 +2745,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_correctable_error_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_correctable",
+		Metric:    "port_pcie_error_rate_correctable",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2755,7 +2755,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_fatal_error_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_fatal",
+		Metric:    "port_pcie_error_rate_fatal",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2765,7 +2765,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_flow_control_timeout_errors",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_flow_control_timeout",
+		Metric:    "port_pcie_error_rate_flow_control_timeout",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2775,7 +2775,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_l0_to_recovery_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_l0_to_recovery",
+		Metric:    "port_pcie_error_rate_l0_to_recovery",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2785,7 +2785,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_nakreceived_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_nak_received",
+		Metric:    "port_pcie_error_rate_nak_received",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2795,7 +2795,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_naksent_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_nak_sent",
+		Metric:    "port_pcie_error_rate_nak_sent",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2805,7 +2805,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_non_fatal_error_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_non_fatal",
+		Metric:    "port_pcie_error_rate_non_fatal",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2815,7 +2815,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_replay_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_replay",
+		Metric:    "port_pcie_error_rate_replay",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2825,7 +2825,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_replay_rollover_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_replay_rollover",
+		Metric:    "port_pcie_error_rate_replay_rollover",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2835,7 +2835,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_errors_unsupported_request_count",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_error_rate_unsupported_request",
+		Metric:    "port_pcie_error_rate_unsupported_request",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2845,7 +2845,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_outbound_completion_tlpbytes",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_traffic_completion",
+		Metric:    "port_pcie_traffic_completion",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2855,7 +2855,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_outbound_read_tlpbytes",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_traffic_read",
+		Metric:    "port_pcie_traffic_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2865,7 +2865,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_outbound_write_tlpbytes",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_traffic_write",
+		Metric:    "port_pcie_traffic_write",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2875,7 +2875,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_outbound_completion_tlpcount",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_tlp_rate_completion",
+		Metric:    "port_pcie_tlp_rate_completion",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2885,7 +2885,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_outbound_read_tlpcount",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_tlp_rate_read",
+		Metric:    "port_pcie_tlp_rate_read",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2895,7 +2895,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_outbound_write_tlpcount",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_tlp_rate_write",
+		Metric:    "port_pcie_tlp_rate_write",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2905,7 +2905,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_completion_credit_exhaustion_drops",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_drop_rate_completion_credit",
+		Metric:    "port_pcie_drop_rate_completion_credit",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2915,7 +2915,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_npcredit_exhaustion_drops",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_drop_rate_non_posted_credit",
+		Metric:    "port_pcie_drop_rate_non_posted_credit",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2925,7 +2925,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "port_pcie_metrics_tag_unavailability_drops",
 		Kind:      "port",
-		Metric:    "redfish_port_pcie_drop_rate_tag_unavailable",
+		Metric:    "port_pcie_drop_rate_tag_unavailable",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmRate,
 		Candidates: []scalarSource{
@@ -2935,7 +2935,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "redundancy_members_active",
 		Kind:      "redundancy",
-		Metric:    "redfish_redundancy_members_active",
+		Metric:    "redundancy_members_active",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Candidates: []scalarSource{
@@ -2946,7 +2946,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "redundancy_members_total",
 		Kind:      "redundancy",
-		Metric:    "redfish_redundancy_members_total",
+		Metric:    "redundancy_members_total",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmAbsolute,
 		Candidates: []scalarSource{
@@ -2957,7 +2957,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "heater_heater_metrics_pre_power_on_heating_time_seconds",
 		Kind:      "heater",
-		Metric:    "redfish_heater_heating_time_pre_power_on",
+		Metric:    "heater_heating_time_pre_power_on",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
@@ -2967,7 +2967,7 @@ var scalarFields = []sourceField{
 	{
 		ID:        "heater_heater_metrics_runtime_heating_time_seconds",
 		Kind:      "heater",
-		Metric:    "redfish_heater_heating_time_runtime",
+		Metric:    "heater_heating_time_runtime",
 		Scale:     valueScale{1, 1},
 		Algorithm: algorithmDurationPercent,
 		Candidates: []scalarSource{
