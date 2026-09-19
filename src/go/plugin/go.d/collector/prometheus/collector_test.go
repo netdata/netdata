@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/internal/promprofile/testutil"
+	promtestutil "github.com/netdata/netdata/go/plugins/internal/promprofile/testutil"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -1764,66 +1764,6 @@ func TestCollector_CephRGWAlertChartsMaterialize(t *testing.T) {
 	require.Equal(t, 1, created["prometheus.ceph.object_gateway_multisite.replication_log_request_errors"])
 }
 
-func TestCollector_CephRGWAlertBoundaries(t *testing.T) {
-	templates := cephHealthAlertTemplates(t)
-	occurrence := map[string]struct {
-		lookup    string
-		condition string
-		recipient string
-	}{
-		"rgw_notification_event_lost":            {"max -1m unaligned of event_lost", "crit: ($this == nan or $this == inf) ? (nan) : ($this > 0)", "sysadmin"},
-		"rgw_notification_missing_configuration": {"max -1m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)", "sysadmin"},
-		"rgw_lua_script_failed":                  {"max -1m unaligned of failure", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)", "sysadmin"},
-	}
-	for name, expected := range occurrence {
-		t.Run(name, func(t *testing.T) {
-			block, ok := templates[name]
-			require.Truef(t, ok, "template %s is absent", name)
-			assert.Equal(t, expected.lookup, block["lookup"])
-			assert.Equal(t, expected.condition, block["condition"])
-			assert.Equal(t, expected.recipient, block["to"])
-		})
-	}
-
-	sustained := map[string]struct {
-		lookup    string
-		condition string
-	}{
-		"rgw_failed_request_rate_fallback":        {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
-		"rgw_notification_push_or_store_failures": {"min -5m unaligned of push_failed,store_fail", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
-		"rgw_notification_inflight_pressure":      {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)"},
-		"rgw_notification_store_backlog":          {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)"},
-		"rgw_request_queue_pressure":              {"min -5m unaligned of qlen", "warn: ($this == nan or $this == inf) ? (nan) : ($this >= 1000)"},
-		"rgw_multisite_fetch_errors":              {"min -5m unaligned of errors", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
-		"rgw_multisite_poll_errors":               {"min -5m unaligned of value", "warn: ($this == nan or $this == inf) ? (nan) : ($this > 0)"},
-	}
-	for name, expected := range sustained {
-		t.Run(name, func(t *testing.T) {
-			block, ok := templates[name]
-			require.Truef(t, ok, "template %s is absent", name)
-			assert.Equal(t, expected.lookup, block["lookup"])
-			assert.Equal(t, expected.condition, block["condition"])
-			assert.Equal(t, "silent", block["to"])
-		})
-	}
-
-	// max preserves any failure occurrence in the window, independent of event volume.
-	anyOccurrence := func(samples []float64) float64 {
-		if len(samples) == 0 {
-			return math.NaN()
-		}
-		maximum := samples[0]
-		for _, sample := range samples[1:] {
-			if sample > maximum {
-				maximum = sample
-			}
-		}
-		return maximum
-	}
-	assert.InDelta(t, .1, anyOccurrence([]float64{0, .1, 0}), 1e-12)
-	assert.InDelta(t, float64(0), anyOccurrence([]float64{0, 0, 0}), 1e-12)
-	assert.True(t, math.IsNaN(anyOccurrence(nil)))
-}
 func TestCollector_CephMGRAlertContract(t *testing.T) {
 	manifest := loadCephAlertManifest(t)
 	templates := cephHealthAlertTemplates(t)
@@ -1837,50 +1777,6 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		return block, ok
 	}
 
-	require.Equal(t, "v1", manifest.Version)
-	require.Equal(t, "source-alert-map", manifest.Kind)
-	require.Equal(t, "ceph", manifest.Profile)
-	require.Equal(t, "10s", manifest.NetdataAlertCadence)
-	require.Equal(t, "SHA-256 of the UTF-8 canonical JSON for the complete parsed source alert rule, with object keys sorted "+
-		"lexicographically, no insignificant whitespace, and non-ASCII characters preserved", manifest.DefinitionSHA256Contract)
-	require.Equal(t, map[string]cephAlertSource{
-		"reef": {
-			Tag: "v18.2.8", Commit: "efac5a54607c13fa50d4822e50242b86e6e446df",
-			Path:   "monitoring/ceph-mixin/prometheus_alerts.yml",
-			SHA256: "0325e5c481d00c674f7faf759e00f6c5c22028dbcc8bb95491404d600c6f3efd",
-		},
-		"squid": {
-			Tag: "v19.2.5", Commit: "abc7aa7f2701e5d46878fd5e6bb7e2955f1a395a",
-			Path:   "monitoring/ceph-mixin/prometheus_alerts.yml",
-			SHA256: "259ee363694d174f46427a443ba0a8952b28df0c17af2bb65a2378511bc321ba",
-		},
-		"tentacle": {
-			Tag: "v20.2.3", Commit: "06c2f9c35b67055a8a6fb99d1be236b3c4832ace",
-			Path:   "monitoring/ceph-mixin/prometheus_alerts.yml",
-			SHA256: "09308346d3d143ff128813f1142f1499142799174da4e0505ddad7144b8d8716",
-		},
-	}, manifest.Sources)
-	require.ElementsMatch(t, []string{
-		"CEPH-001", "CEPH-002", "CEPH-003", "CEPH-004", "CEPH-005", "CEPH-013", "CEPH-014", "CEPH-015",
-		"CEPH-016", "CEPH-017", "CEPH-018", "CEPH-019", "CEPH-020", "CEPH-021", "CEPH-025", "CEPH-027",
-		"CEPH-028", "CEPH-029", "CEPH-030", "CEPH-032", "CEPH-033", "CEPH-034", "CEPH-035", "CEPH-036",
-		"CEPH-037", "CEPH-038", "CEPH-039", "CEPH-063", "CEPH-064", "CEPH-065", "CEPH-066", "CEPH-067",
-		"CEPH-068", "CEPH-069", "CEPH-070", "CEPH-071", "CEPH-072", "CEPH-073", "CEPH-074", "CEPH-075",
-		"CEPH-076", "CEPH-077", "CEPH-098", "CEPH-099", "CEPH-100", "CEPH-101", "CEPH-102", "CEPH-103",
-		"CEPH-006", "CEPH-007", "CEPH-008", "CEPH-009", "CEPH-010", "CEPH-011", "CEPH-012", "CEPH-055",
-		"CEPH-056", "CEPH-057", "CEPH-058", "CEPH-104", "CEPH-040", "CEPH-040-HELPER", "CEPH-041", "CEPH-043", "CEPH-044", "CEPH-045",
-		"CEPH-046", "CEPH-046-HELPER", "CEPH-047", "CEPH-047-HELPER", "CEPH-048", "CEPH-049", "CEPH-050",
-		"CEPH-051", "CEPH-052", "CEPH-054", "CEPH-059", "CEPH-060", "CEPH-061", "CEPH-062",
-		"CEPH-078", "CEPH-080", "CEPH-080-HELPER-PERSIST", "CEPH-082", "CEPH-082-HELPER-READ-TIME",
-		"CEPH-082-HELPER-READ-OPS", "CEPH-083", "CEPH-083-HELPER-WRITE-TIME", "CEPH-083-HELPER-WRITE-OPS",
-		"CEPH-084", "CEPH-092", "CEPH-094", "CEPH-094-HELPER-GATEWAY",
-	}, cephManifestSOWIDs(manifest.Alerts))
-	require.ElementsMatch(t, []string{
-		"CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02", "RGW-M-08", "RGW-M-09", "RGW-M-10",
-		"RGW-S-04", "RGW-S-12", "RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20", "RGW-S-20",
-		"RGW-M-03", "RGW-M-04", "RGW-S-01", "RGW-S-02", "RGW-S-03", "RGW-S-09", "RGW-S-13", "RGW-S-14",
-		"RGW-S-15", "RGW-M-05", "RGW-M-05", "RGW-M-05", "RGW-M-11", "RGW-S-24", "RGW-S-25",
-	}, cephManifestExtensionSOWIDs(manifest.NetdataExtensions))
 	for name, extension := range manifest.NetdataExtensions {
 		require.NotEmptyf(t, extension.Reason, "%s has no extension rationale", name)
 		if extension.Fidelity == "UNSUPPORTED" {
@@ -1905,23 +1801,11 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 		}
 		require.NotEmptyf(t, extension.Fidelity, "%s has no extension fidelity", name)
 		require.NotEmptyf(t, extension.Owner, "%s has no extension owner", name)
-		switch extension.SOWID {
-		case "RGW-M-08", "RGW-M-09", "RGW-M-10":
-			require.Equal(t, "rgw_categorical_counter_occurrence", extension.Adaptation)
-		case "RGW-S-04", "RGW-S-16":
-			require.Equal(t, "rgw_counter_rate_window", extension.Adaptation)
-		}
 		if extension.Adaptation != "" {
 			_, ok := manifest.AdaptationContracts[extension.Adaptation]
 			require.Truef(t, ok, "%s references unknown adaptation %q", name, extension.Adaptation)
 		}
 	}
-
-	inventoryAdaptation := manifest.AdaptationContracts["local_nvmeof_inventory_limit"]
-	require.NotContains(t, strings.Join(inventoryAdaptation.Preserved, "\n"), "one-minute observation",
-		"current-only namespace-capacity rule must not claim a persisted observation window")
-	require.NotContains(t, strings.Join(inventoryAdaptation.Differences, "\n"), "persistence uses every available sample",
-		"current-only namespace-capacity rule must disclose that source persistence is not represented")
 
 	for name, mapping := range manifest.Alerts {
 		require.Truef(t, mapping.SourceAlert != "" || len(mapping.SourceAlerts) > 0,
@@ -1997,17 +1881,10 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 			}
 			assert.Equal(t, mapping.Netdata.Units, block["units"])
 			assert.Equal(t, manifest.NetdataAlertCadence, block["every"])
-			assert.Empty(t, block["delay"], "source persistence adaptation must not use notification delay")
 			assert.Equal(t, mapping.Netdata.Condition, block["condition"])
 			assert.Equal(t, mapping.Netdata.Recipient, block["to"])
 			assert.Contains(t, []string{"NETDATA-ADAPTED", "CORRECTED-INTENT"}, mapping.Netdata.Fidelity)
 			assert.True(t, strings.HasPrefix(block["on"], "prometheus.ceph."))
-			if mapping.Netdata.Calc == "" {
-				assert.Contains(t, block["info"], "available")
-			} else {
-				assert.Contains(t, block["info"], "current")
-			}
-			assert.NotContains(t, block["info"], "continuously")
 		})
 	}
 
@@ -2035,106 +1912,6 @@ func TestCollector_CephMGRAlertContract(t *testing.T) {
 	// The Dashboard API collector owns this separate native collection-integrity alert.
 	assert.Equal(t, manifest.NetdataExtensions["ceph_component_collection_failed"].Context,
 		templates["ceph_component_collection_failed"]["on"])
-	assert.NotContains(t, templates, "ceph_mgr_prometheus_module_inactive")
-}
-
-func TestCollector_CephRGWGenericOwnerExamples(t *testing.T) {
-	for _, tc := range []struct {
-		module  string
-		matches func(*testing.T, yaml.Node) bool
-	}{
-		{
-			module: "httpcheck",
-			matches: func(t *testing.T, node yaml.Node) bool {
-				var job struct {
-					URL              string `yaml:"url"`
-					AcceptedStatuses []int  `yaml:"status_accepted"`
-				}
-				require.NoError(t, node.Decode(&job))
-				slices.Sort(job.AcceptedStatuses)
-				return job.URL != "" && slices.Equal(job.AcceptedStatuses, []int{200, 204, 403, 405})
-			},
-		},
-		{
-			module: "x509check",
-			matches: func(t *testing.T, node yaml.Node) bool {
-				var job struct {
-					Source          string `yaml:"source"`
-					CheckRevocation bool   `yaml:"check_revocation_status"`
-				}
-				require.NoError(t, node.Decode(&job))
-				return job.Source != "" && job.CheckRevocation
-			},
-		},
-		{
-			module: "weblog",
-			matches: func(t *testing.T, node yaml.Node) bool {
-				var job struct {
-					JSONConfig struct {
-						Mapping map[string]string `yaml:"mapping"`
-					} `yaml:"json_config"`
-					CustomNumericFields []struct {
-						Name  string `yaml:"name"`
-						Units string `yaml:"units"`
-					} `yaml:"custom_numeric_fields"`
-				}
-				require.NoError(t, node.Decode(&job))
-				return job.JSONConfig.Mapping["total_time"] == "total_time" &&
-					len(job.CustomNumericFields) == 1 &&
-					job.CustomNumericFields[0].Name == "total_time" &&
-					job.CustomNumericFields[0].Units == "milliseconds"
-			},
-		},
-	} {
-		t.Run(tc.module, func(t *testing.T) {
-			var metadata struct {
-				Modules []struct {
-					Setup struct {
-						Configuration struct {
-							Examples struct {
-								List []struct {
-									Config string `yaml:"config"`
-								} `yaml:"list"`
-							} `yaml:"examples"`
-						} `yaml:"configuration"`
-					} `yaml:"setup"`
-				} `yaml:"modules"`
-			}
-			content, err := os.ReadFile(filepath.Join("..", tc.module, "metadata.yaml"))
-			require.NoError(t, err)
-			require.NoError(t, yaml.Unmarshal(content, &metadata))
-			require.NotEmpty(t, metadata.Modules)
-
-			for _, module := range metadata.Modules {
-				for _, example := range module.Setup.Configuration.Examples.List {
-					var config struct {
-						Jobs []yaml.Node `yaml:"jobs"`
-					}
-					require.NoError(t, yaml.Unmarshal([]byte(example.Config), &config))
-					for _, node := range config.Jobs {
-						if tc.matches(t, node) {
-							return
-						}
-					}
-				}
-			}
-			t.Fatalf("%s metadata has no Ceph RGW configuration example", tc.module)
-		})
-	}
-
-	manifest := loadCephAlertManifest(t)
-	require.Equal(t, "x509check.revocation_status", manifest.NetdataExtensions["rgw_tls_certificate_revoked"].Context)
-	require.Equal(t, "httpcheck.status", manifest.NetdataExtensions["rgw_basic_endpoint_unavailable"].Context)
-	require.Equal(t,
-		"web_log.custom_numeric_field_total_time_summary",
-		manifest.NetdataExtensions["rgw_overall_request_latency"].Context)
-
-	x509Templates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "x509check.conf"))
-	require.Equal(t, "x509check.revocation_status", x509Templates["x509check_revocation_status"]["on"])
-	httpcheckTemplates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "httpcheck.conf"))
-	require.Equal(t, "httpcheck.status", httpcheckTemplates["httpcheck_web_service_up"]["on"])
-	weblogTemplates := healthAlertTemplatesFromFile(t, filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "web_log.conf"))
-	require.Equal(t, "web_log.request_processing_time", weblogTemplates["web_log_web_slow"]["on"])
 }
 
 func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
@@ -2179,48 +1956,6 @@ func TestCollector_CephS3CheckManifestMatchesCollectorArtifacts(t *testing.T) {
 		require.Equalf(t, extension.Recipient, templates[name]["to"], "%s recipient", name)
 		require.Equalf(t, info[name], templates[name]["info"], "%s metadata info", name)
 	}
-}
-
-func TestCollector_CephDeliveredAlertMatrixComplete(t *testing.T) {
-	manifest := loadCephAlertManifest(t)
-	got := append(cephManifestSOWIDs(manifest.Alerts), cephManifestExtensionSOWIDs(manifest.NetdataExtensions)...)
-
-	// The native physical-capacity policy is owned directly by the native collector health
-	// configuration and metadata; it is not part of the Prometheus source-alert manifest.
-	got = append(got, "CEPH-ND-003")
-
-	want := []string{
-		// M01
-		"CEPH-001", "CEPH-002", "CEPH-013", "CEPH-014", "CEPH-015", "CEPH-016", "CEPH-059",
-		"CEPH-060", "CEPH-061", "CEPH-062", "CEPH-ND-001", "CEPH-ND-002", "RGW-M-01", "RGW-M-02",
-		// M02
-		"CEPH-003", "CEPH-004", "CEPH-005", "CEPH-017", "CEPH-018", "CEPH-019", "CEPH-020",
-		"CEPH-021", "CEPH-025", "CEPH-027", "CEPH-028", "CEPH-029", "CEPH-030", "CEPH-032",
-		"CEPH-033", "CEPH-034", "CEPH-035", "CEPH-036", "CEPH-037", "CEPH-038", "CEPH-039",
-		// M03
-		"CEPH-063", "CEPH-064", "CEPH-065", "CEPH-066", "CEPH-067", "CEPH-068", "CEPH-069",
-		"CEPH-070", "CEPH-071", "CEPH-072", "CEPH-073", "CEPH-074", "CEPH-075", "CEPH-076",
-		"CEPH-077", "CEPH-098", "CEPH-099", "CEPH-100", "CEPH-101", "CEPH-102", "CEPH-103", "CEPH-104",
-		// M04
-		"CEPH-040", "CEPH-040-HELPER", "CEPH-041", "CEPH-043", "CEPH-044", "CEPH-045", "CEPH-046",
-		"CEPH-046-HELPER", "CEPH-047", "CEPH-047-HELPER", "CEPH-048", "CEPH-049", "CEPH-050",
-		"CEPH-051", "CEPH-052", "CEPH-054", "CEPH-ND-003",
-		// M05
-		"CEPH-006", "CEPH-007", "CEPH-008", "CEPH-009", "CEPH-010", "CEPH-011", "CEPH-012",
-		"CEPH-055", "CEPH-056", "CEPH-057", "CEPH-058",
-		// M06
-		"CEPH-078", "CEPH-080", "CEPH-080-HELPER-PERSIST", "CEPH-082", "CEPH-082-HELPER-READ-TIME",
-		"CEPH-082-HELPER-READ-OPS", "CEPH-083", "CEPH-083-HELPER-WRITE-TIME", "CEPH-083-HELPER-WRITE-OPS",
-		"CEPH-084", "CEPH-092", "CEPH-094", "CEPH-094-HELPER-GATEWAY",
-		// M07
-		"RGW-M-03", "RGW-M-04", "RGW-M-08", "RGW-M-09", "RGW-M-10", "RGW-S-01", "RGW-S-02",
-		"RGW-S-03", "RGW-S-04", "RGW-S-09", "RGW-S-12", "RGW-S-13", "RGW-S-14", "RGW-S-15",
-		"RGW-S-16", "RGW-S-17", "RGW-S-18", "RGW-S-19", "RGW-S-20",
-		// P2-M01/P2-M02
-		"RGW-M-05", "RGW-M-11", "RGW-S-24", "RGW-S-25",
-	}
-
-	require.ElementsMatch(t, want, slices.Compact(slices.Sorted(slices.Values(got))))
 }
 
 func TestCollector_CephMGRAlertSourcePins(t *testing.T) {
@@ -2483,16 +2218,17 @@ func cephObservationWindowState(
 }
 
 func TestCollector_CephUnknownHealthCheckFallbackContract(t *testing.T) {
+	const fallback = "ceph_unknown_health_check"
 	manifest := loadCephAlertManifest(t)
-	extension := manifest.NetdataExtensions["ceph_unknown_health_check"]
-	block := cephHealthAlertTemplates(t)["ceph_unknown_health_check"]
+	extension := manifest.NetdataExtensions[fallback]
+	templates := cephHealthAlertTemplates(t)
+	block := templates[fallback]
 	require.Equal(t, "NETDATA-ADAPTED", extension.Fidelity)
 	require.NotEmpty(t, extension.LabelsPolicy)
 	assert.Equal(t, extension.Context, block["on"])
 	assert.Equal(t, extension.Lookup, block["lookup"])
 	assert.Equal(t, extension.Units, block["units"])
 	assert.Equal(t, manifest.NetdataAlertCadence, block["every"])
-	assert.Empty(t, block["delay"])
 	assert.Equal(t, extension.Condition, block["condition"])
 	assert.Equal(t, extension.Recipient, block["to"])
 	labels, ok := strings.CutPrefix(block["chart labels"], "name=")
@@ -2501,24 +2237,27 @@ func TestCollector_CephUnknownHealthCheckFallbackContract(t *testing.T) {
 	require.NotEmpty(t, fields)
 	require.Equal(t, "*", fields[len(fields)-1], "negative label matches require a final positive match")
 
-	got := make([]string, 0, len(fields)-1)
+	excluded := make([]string, 0, len(fields)-1)
 	for _, field := range fields[:len(fields)-1] {
 		require.Truef(t, strings.HasPrefix(field, "!"), "fallback matcher %q is not a name exclusion", field)
-		got = append(got, strings.TrimPrefix(field, "!"))
+		excluded = append(excluded, strings.TrimPrefix(field, "!"))
 	}
-	assert.ElementsMatch(t, []string{
-		"BLUESTORE_DISK_SIZE_MISMATCH", "BLUESTORE_SPURIOUS_READ_ERRORS", "CEPHADM_CERT_ERROR",
-		"CEPHADM_CERT_WARNING", "CEPHADM_FAILED_DAEMON", "CEPHADM_PAUSED", "DEVICE_HEALTH",
-		"DEVICE_HEALTH_IN_USE", "DEVICE_HEALTH_TOOMANY", "FS_DEGRADED", "FS_WITH_FAILED_MDS",
-		"HARDWARE_FANS", "HARDWARE_MEMORY", "HARDWARE_NETWORK", "HARDWARE_POWER", "HARDWARE_PROCESSOR",
-		"HARDWARE_STORAGE", "MDS_ALL_DOWN", "MDS_DAMAGE", "MDS_HEALTH_READ_ONLY", "MDS_INSUFFICIENT_STANDBY",
-		"MDS_UP_LESS_THAN_MAX", "MON_CLOCK_SKEW", "MON_DISK_CRIT", "MON_DISK_LOW", "MON_DOWN",
-		"OBJECT_UNFOUND", "OSD_BACKFILLFULL", "OSD_DOWN", "OSD_FULL", "OSD_HOST_DOWN", "OSD_NEARFULL",
-		"OSD_SCRUB_ERRORS", "OSD_SLOW_PING_TIME_BACK", "OSD_SLOW_PING_TIME_FRONT", "OSD_TOO_MANY_REPAIRS",
-		"PG_AVAILABILITY", "PG_BACKFILL_FULL", "PG_DAMAGED", "PG_NOT_DEEP_SCRUBBED", "PG_NOT_SCRUBBED",
-		"PG_RECOVERY_FULL", "POOL_BACKFILLFULL", "POOL_FULL", "POOL_NEAR_FULL", "RECENT_CRASH",
-		"RECENT_MGR_MODULE_CRASH", "SLOW_OPS", "TOO_MANY_PGS", "UPGRADE_EXCEPTION",
-	}, got)
+	// A health check that a named template already covers must be excluded from
+	// the fallback, so one check never raises two alerts. A template on the same
+	// chart without a name filter would fire for every check, so it is an error.
+	for name, template := range templates {
+		if name == fallback || template["on"] != block["on"] {
+			continue
+		}
+		var covered string
+		for _, field := range strings.Fields(template["chart labels"]) {
+			if value, ok := strings.CutPrefix(field, "name="); ok {
+				covered = value
+			}
+		}
+		require.NotEmptyf(t, covered, "%s targets the health-check chart without a name filter", name)
+		assert.Containsf(t, excluded, covered, "%s covers a health check the fallback does not exclude", name)
+	}
 }
 
 func TestCollector_CephNVMeoFAlertsAreOwnedByLocalExporter(t *testing.T) {
@@ -2551,14 +2290,12 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal(content, &metadata))
 
 	actual := make(map[string]string)
-	info := make(map[string]string)
 	for _, module := range metadata.Modules {
 		if module.Meta.ID != "collector-go.d.plugin-prometheus-ceph" {
 			continue
 		}
 		for _, alert := range module.Alerts {
 			actual[alert.Name] = alert.Metric
-			info[alert.Name] = alert.Info
 		}
 		break
 	}
@@ -2581,23 +2318,21 @@ func TestCollector_CephMetadataAlertsMatchMGRAlertTemplates(t *testing.T) {
 		}
 	}
 	assert.Equal(t, expected, actual)
-	templates := cephHealthAlertTemplates(t)
-	for name, metadataInfo := range info {
-		assert.Equalf(t, templates[name]["info"], metadataInfo,
-			"metadata alert %q does not exactly match its shipped health-template info", name)
-	}
+	health, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
+	require.NoError(t, err)
+	// ceph.conf also carries the go.d ceph collector's own alerts.
+	collecttest.AssertMetadataAlertsMatchHealthConfigWith(t, content, health, collecttest.MetadataAlertsCheck{
+		ModuleID:           "collector-go.d.plugin-prometheus-ceph",
+		SharedHealthConfig: true,
+	})
 }
 
 type cephAlertManifest struct {
-	Version                  string                            `yaml:"version"`
-	Kind                     string                            `yaml:"kind"`
-	Profile                  string                            `yaml:"profile"`
-	NetdataAlertCadence      string                            `yaml:"netdata_alert_cadence"`
-	DefinitionSHA256Contract string                            `yaml:"definition_sha256_contract"`
-	Sources                  map[string]cephAlertSource        `yaml:"sources"`
-	AdaptationContracts      map[string]cephAdaptationContract `yaml:"adaptation_contracts"`
-	Alerts                   map[string]cephAlertMapping       `yaml:"alerts"`
-	NetdataExtensions        map[string]cephNetdataExtension   `yaml:"netdata_extensions"`
+	NetdataAlertCadence string                            `yaml:"netdata_alert_cadence"`
+	Sources             map[string]cephAlertSource        `yaml:"sources"`
+	AdaptationContracts map[string]cephAdaptationContract `yaml:"adaptation_contracts"`
+	Alerts              map[string]cephAlertMapping       `yaml:"alerts"`
+	NetdataExtensions   map[string]cephNetdataExtension   `yaml:"netdata_extensions"`
 }
 
 type cephAlertSource struct {
@@ -2666,22 +2401,6 @@ func loadCephAlertManifest(t *testing.T) cephAlertManifest {
 	var manifest cephAlertManifest
 	require.NoError(t, yaml.Unmarshal(content, &manifest))
 	return manifest
-}
-
-func cephManifestSOWIDs(alerts map[string]cephAlertMapping) []string {
-	ids := make([]string, 0, len(alerts))
-	for _, alert := range alerts {
-		ids = append(ids, alert.SOWID)
-	}
-	return ids
-}
-
-func cephManifestExtensionSOWIDs(extensions map[string]cephNetdataExtension) []string {
-	ids := make([]string, 0, len(extensions))
-	for _, extension := range extensions {
-		ids = append(ids, extension.SOWID)
-	}
-	return ids
 }
 
 func cephHealthAlertTemplates(t *testing.T) map[string]map[string]string {

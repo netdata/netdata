@@ -147,12 +147,16 @@ a *leaf* is the innermost family that holds charts.
 - **Validate.** `collecttest.AssertChartTemplateSchema` (`src/go/plugin/go.d/pkg/collecttest/chart_template_schema.go`),
   then `charttpl.DecodeYAML` and `chartengine.Compile`.
 - **Cross-check artifacts.** `collecttest.AssertMetadataDocumentsChartTemplate`,
-  `collecttest.AssertHealthAlertsTargetChartTemplate` and `collecttest.AssertMetadataAlertsMatchHealthConfig`
-  (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare metadata.yaml, health.d and the template with each other.
-  The metadata check compares stateset dimensions in declared order, not rendered order.
-- **Never restate the template.** A test that names one of the template's own contexts, dimension lists or families
-  pins whatever the template said when it was written and MUST NOT exist. An independent oracle, such as a V1 parity
-  manifest during a migration, is not a restatement.
+  `collecttest.AssertHealthAlertsTargetChartTemplate`, `collecttest.AssertMetadataAlertsMatchHealthConfig` and
+  `collecttest.AssertHealthAlertsMatchMetadata` (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare
+  metadata.yaml, health.d and the template with each other. The `...With` variants take options: `HealthAlertsCheck`
+  narrows a shared health.d file by context prefix (and, for the metadata comparison, selects the module by `meta.id`);
+  `MetadataAlertsCheck` selects the module and accepts a shared health.d file whose other alerts this module does not
+  document. The metadata check compares stateset dimensions in declared order, not rendered order.
+- **Never restate an artifact.** A test that names one of the template's own contexts, dimension lists or families, or
+  pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and
+  MUST NOT exist; health.d owns alert policy. An independent oracle, such as a V1 parity manifest during a migration or
+  upstream alert rules with a recorded mapping, is not a restatement.
 - **Coverage.** `collecttest.AssertChartCoverage` (`src/go/plugin/go.d/pkg/collecttest/chart_coverage.go`) derives the
   expected charts and dimensions from the template; do not add `RequiredContexts` that repeat it.
 - **Refactor proof.** To show a template change alters nothing, a throwaway local test writes every metric definition
@@ -168,4 +172,4 @@ a *leaf* is the innermost family that holds charts.
 - Statesets use inferred dimensions unless order or naming needs explicit ones; state metrics carry a state suffix.
 - Labels attached at the source are the documented set; no stamped labels re-added.
 - No host-owned contexts from a remote-target collector.
-- Go tests validate and cross-check artifacts; none restates template content.
+- Go tests validate and cross-check artifacts; none restates template or alert content.

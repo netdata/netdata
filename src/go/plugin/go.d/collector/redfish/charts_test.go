@@ -56,6 +56,10 @@ func TestMetadataAlertsMatchHealthConfig(t *testing.T) {
 	collecttest.AssertMetadataAlertsMatchHealthConfig(t, readArtifact(t, "metadata.yaml"), readArtifact(t, healthConfigPath))
 }
 
+func TestHealthAlertsMatchMetadata(t *testing.T) {
+	collecttest.AssertHealthAlertsMatchMetadata(t, readArtifact(t, healthConfigPath), readArtifact(t, "metadata.yaml"))
+}
+
 func TestMetadataDocumentsChartLabels(t *testing.T) {
 	var metadata struct {
 		Modules []struct {

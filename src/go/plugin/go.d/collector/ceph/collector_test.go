@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -205,13 +204,11 @@ func TestCollector_V2CollectionAndChartCoverage(t *testing.T) {
 		},
 	})
 
-	chartFamilies := make(map[string]string)
 	componentCharts := make(map[string]map[string]string)
 	var clusterWrite, osdRead, poolRead *chartengine.CreateDimensionAction
 	for _, action := range prepareChartPlan(t, c).Actions {
 		switch action := action.(type) {
 		case chartengine.CreateChartAction:
-			chartFamilies[action.Meta.Context] = action.Meta.Family
 			if action.Meta.Context == "ceph.component_collection_status" {
 				componentCharts[action.ChartID] = action.Labels
 			}
@@ -226,7 +223,6 @@ func TestCollector_V2CollectionAndChartCoverage(t *testing.T) {
 			}
 		}
 	}
-	assert.Equal(t, expectedChartFamilies(), chartFamilies)
 	assert.Equal(t, map[string]map[string]string{
 		"component_collection_status_health": {"component": "health", "fsid": "synthetic-fsid"},
 		"component_collection_status_osds":   {"component": "osds", "fsid": "synthetic-fsid"},
@@ -776,222 +772,27 @@ func TestPoolSampleRejectsInvalidUpstreamValues(t *testing.T) {
 func TestCollector_ChartTemplateContract(t *testing.T) {
 	template := New().ChartTemplateYAML()
 	collecttest.AssertChartTemplateSchema(t, template)
+	// Defaults are not restated; ordering follows the framework default.
 	assert.NotContains(t, template, "priority:")
 	assert.NotContains(t, template, "lifecycle:")
 	assert.NotContains(t, template, "expire_after_cycles:")
-
 	spec, err := charttpl.DecodeYAML([]byte(template))
 	require.NoError(t, err)
-	assert.Equal(t, "ceph", spec.ContextNamespace)
-	require.Len(t, spec.Groups, 4)
-
-	rootGroups := make(map[string]charttpl.Group, len(spec.Groups))
-	for _, group := range spec.Groups {
-		rootGroups[group.Family] = group
-	}
-	require.Contains(t, rootGroups, "Internal")
-	require.Contains(t, rootGroups, "Cluster")
-	require.Contains(t, rootGroups, "OSD")
-	require.Contains(t, rootGroups, "Pool")
-
-	require.NotNil(t, rootGroups["Internal"].ChartDefaults)
-	require.NotNil(t, rootGroups["Internal"].ChartDefaults.Instances)
-	assert.Equal(t, []string{"component"}, rootGroups["Internal"].ChartDefaults.Instances.ByLabels)
-	assert.Equal(t, []string{"fsid"}, rootGroups["Internal"].ChartDefaults.LabelPromoted)
-	require.NotNil(t, rootGroups["Cluster"].ChartDefaults)
-	assert.Equal(t, []string{"fsid"}, rootGroups["Cluster"].ChartDefaults.LabelPromoted)
-	require.NotNil(t, rootGroups["OSD"].ChartDefaults)
-	require.NotNil(t, rootGroups["OSD"].ChartDefaults.Instances)
-	assert.Equal(t, []string{"osd_uuid"}, rootGroups["OSD"].ChartDefaults.Instances.ByLabels)
-	assert.Equal(t, []string{"fsid", "osd_name", "device_class"}, rootGroups["OSD"].ChartDefaults.LabelPromoted)
-	require.NotNil(t, rootGroups["Pool"].ChartDefaults)
-	require.NotNil(t, rootGroups["Pool"].ChartDefaults.Instances)
-	assert.Equal(t, []string{"pool_name"}, rootGroups["Pool"].ChartDefaults.Instances.ByLabels)
-	assert.Equal(t, []string{"fsid"}, rootGroups["Pool"].ChartDefaults.LabelPromoted)
-
-	actualFamilies := make(map[string]string)
-	var visit func(parent string, groups []charttpl.Group)
-	visit = func(parent string, groups []charttpl.Group) {
-		for _, group := range groups {
-			family := group.Family
-			if parent != "" {
-				family = parent + "/" + family
-			}
-			for _, chart := range group.Charts {
-				assert.Zero(t, chart.Priority)
-				assert.Nil(t, chart.Lifecycle)
-				assert.Empty(t, chart.Family)
-				ctx := spec.ContextNamespace + "." + chart.Context
-				if _, ok := actualFamilies[ctx]; ok {
-					t.Fatalf("duplicate chart context %q", ctx)
-				}
-				actualFamilies[ctx] = family
-			}
-			visit(family, group.Groups)
-		}
-	}
-	visit("", spec.Groups)
-	assert.Equal(t, expectedChartFamilies(), actualFamilies)
-}
-
-func cephHealthAlertBlock(t *testing.T, template string) string {
-	t.Helper()
-	alert, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
+	_, err = chartengine.Compile(spec, 1)
 	require.NoError(t, err)
-
-	config := string(alert)
-	start := strings.Index(config, "template: "+template)
-	require.NotEqual(t, -1, start)
-	block := config[start:]
-	if end := strings.Index(block, "\n template:"); end >= 0 {
-		block = block[:end]
-	}
-	return block
 }
 
-func TestCollector_PhysicalCapacityAlertContract(t *testing.T) {
-	block := cephHealthAlertBlock(t, "ceph_cluster_physical_capacity_utilization")
-	assert.Contains(t, block, "on: ceph.cluster_physical_capacity_utilization")
-	assert.Contains(t, block, "calc: $utilization")
-	assert.Contains(t, block, "to: silent")
-	assert.Contains(t, block, "silent by default")
-	assert.Contains(t, block, "warn: $this > (($status >= $WARNING ) ? (85) : (90))")
-	assert.Contains(t, block, "crit: $this > (($status == $CRITICAL) ? (90) : (98))")
-}
-
-func cephHealthTemplates(t *testing.T) map[string]map[string]string {
-	t.Helper()
-	content, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
+func TestCollector_ArtifactsAgree(t *testing.T) {
+	template := New().ChartTemplateYAML()
+	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
-
-	templates := make(map[string]map[string]string)
-	var current map[string]string
-	for source := range strings.SplitSeq(string(content), "\n") {
-		line := strings.TrimSpace(source)
-		if name, ok := strings.CutPrefix(line, "template:"); ok {
-			current = make(map[string]string)
-			templates[strings.TrimSpace(name)] = current
-			continue
-		}
-		if current == nil {
-			continue
-		}
-		if value, ok := strings.CutPrefix(line, "info:"); ok {
-			current["info"] = strings.TrimSpace(value)
-		}
-	}
-	return templates
-}
-
-func TestCollector_PublicAlertInfoMatchesHealthTemplates(t *testing.T) {
-	templates := cephHealthTemplates(t)
-
-	var metadata struct {
-		Modules []struct {
-			Meta struct {
-				ModuleName string `yaml:"module_name"`
-			} `yaml:"meta"`
-			Alerts []struct {
-				Name string `yaml:"name"`
-				Info string `yaml:"info"`
-			} `yaml:"alerts"`
-		} `yaml:"modules"`
-	}
-	content, err := os.ReadFile("metadata.yaml")
+	health, err := os.ReadFile("../../../../../health/health.d/ceph.conf")
 	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(content, &metadata))
-
-	var public []struct {
-		Name string `yaml:"name"`
-		Info string `yaml:"info"`
-	}
-	for _, module := range metadata.Modules {
-		if module.Meta.ModuleName == "ceph" {
-			public = module.Alerts
-			break
-		}
-	}
-	require.Len(t, public, 2)
-	for _, alert := range public {
-		assert.Equalf(t, templates[alert.Name]["info"], alert.Info,
-			"metadata alert %q does not exactly match its shipped health-template info", alert.Name)
-	}
-}
-
-func TestCollector_ComponentCollectionAlertContract(t *testing.T) {
-	block := cephHealthAlertBlock(t, "ceph_component_collection_failed")
-	assert.Contains(t, block, "on: ceph.component_collection_status")
-	assert.Contains(t, block, "calc: $failed")
-	assert.Contains(t, block, "${label:component}")
-	assert.NotContains(t, block, "$health_collection_failed")
-	assert.NotContains(t, block, "$osd_collection_failed")
-	assert.NotContains(t, block, "$pool_collection_failed")
-}
-
-func expectedChartFamilies() map[string]string {
-	contextsByFamily := map[string][]string{
-		"Internal": {
-			"component_collection_status",
-		},
-		"Cluster/Status": {
-			"cluster_status",
-			"cluster_hosts_count",
-			"cluster_monitors_count",
-			"cluster_osds_count",
-			"cluster_osds_by_status_count",
-			"cluster_managers_count",
-			"cluster_object_gateways_count",
-			"cluster_iscsi_gateways_count",
-			"cluster_iscsi_gateways_by_status_count",
-		},
-		"Cluster/Capacity": {
-			"cluster_physical_capacity_utilization",
-			"cluster_physical_capacity_usage",
-			"cluster_objects_count",
-			"cluster_object_copies_health",
-			"cluster_objects_unfound",
-			"cluster_pools_count",
-			"cluster_pgs_count",
-			"cluster_pgs_by_status_count",
-			"cluster_pgs_per_osd_count",
-		},
-		"Cluster/Performance": {
-			"cluster_client_io",
-			"cluster_client_iops",
-			"cluster_recovery_throughput",
-			"cluster_scrub_status",
-		},
-		"OSD/Status": {
-			"osd_status",
-		},
-		"OSD/Space": {
-			"osd_space_usage",
-		},
-		"OSD/Operations": {
-			"osd_io",
-			"osd_iops",
-			"osd_latency",
-		},
-		"Pool/Space": {
-			"pool_space_utilization",
-			"pool_space_usage",
-		},
-		"Pool/Objects": {
-			"pool_objects_count",
-		},
-		"Pool/Operations": {
-			"pool_io",
-			"pool_iops",
-		},
-	}
-
-	families := make(map[string]string)
-	for family, contexts := range contextsByFamily {
-		for _, ctx := range contexts {
-			families["ceph."+ctx] = family
-		}
-	}
-	return families
+	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, template, nil)
+	// ceph.conf also carries the Prometheus ceph module's alerts.
+	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, template, collecttest.HealthAlertsCheck{ContextPrefix: "ceph."})
+	collecttest.AssertMetadataAlertsMatchHealthConfigWith(t, metadata, health, collecttest.MetadataAlertsCheck{SharedHealthConfig: true})
+	collecttest.AssertHealthAlertsMatchMetadataWith(t, health, metadata, collecttest.HealthAlertsCheck{ContextPrefix: "ceph."})
 }
 
 func TestPGStatusCategoryAllTargetReleaseStates(t *testing.T) {
