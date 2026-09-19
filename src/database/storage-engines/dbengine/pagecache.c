@@ -1165,14 +1165,15 @@ int64_t dbengine_follower_cache_size(PGC *main_cache_or_null, int64_t percent, i
 
 int64_t dynamic_open_cache_size(PGC *cache) {
     // a cache that dbengine_destroy() had to leave allocated is still asked for space by whoever releases its
-    // pages, and by the finalization of its datafiles, after the main cache was freed: it then sizes itself from
+    // pages, and by the finalization of its datafiles, when the main cache is gone: it then sizes itself from
     // its floor. One read of the pointer, so the NULL check and the two uses in the helper cannot disagree. The
     // engine's own threads are joined before dbengine_destroy() clears the pointer, but the thread holding the
     // pages that kept this cache allocated is not: it reads the pointer here. The pointer is cleared before the
-    // main cache is destroyed, so a read that comes after the clear finds nothing; a read that came just before
-    // it holds a cache that is being freed, and no store can order that. Such a thread is outside the contract
-    // (every tier exited before the shutdown, nothing holds pages after it) and this path exists only for the
-    // destroy that a checker build runs at exit.
+    // main cache is destroyed and put back only when that cache stayed allocated, so a read that comes after the
+    // clear finds nothing, or a cache that is alive; a read that came just before the clear may hold a cache that
+    // is being freed, and no store can order that. Such a thread is outside the contract (every tier exited
+    // before the shutdown, nothing holds pages after it) and this path exists only for the destroy that a checker
+    // build runs at exit.
     PGC *main_cache = __atomic_load_n(&pgc_engine(cache)->main_cache, __ATOMIC_ACQUIRE);
     return dbengine_follower_cache_size(main_cache, OPEN_CACHE_PERCENT, OPEN_CACHE_MIN_SIZE);
 }

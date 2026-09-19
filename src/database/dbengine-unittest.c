@@ -710,7 +710,7 @@ int test_dbengine(void) {
     // tier 1 never came up in this process; a refusal that did not happen would have created its first datafile
     char probe_dir[FILENAME_MAX + 1];
     snprintfz(probe_dir, FILENAME_MAX, "%s/dbengine-tier1-probe", host->cache_dir);
-    if(mkdir(probe_dir, 0775) != 0 && errno != EEXIST) {
+    if(mkdir(probe_dir, 0700) != 0 && errno != EEXIST) {
         fprintf(stderr, "DBENGINE: cannot create the probe directory '%s'\n", probe_dir);
         errors++;
     }

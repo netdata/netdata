@@ -1264,8 +1264,11 @@ size_t dbengine_destroy(struct dbengine_engine *engine) {
         // the pointer goes before the cache: the thread that kept a follower cache allocated was not joined, and
         // its sizing callback (pagecache.c) reads the pointer from that thread. Cleared first, a reader that comes
         // after finds nothing rather than a cache being freed; a reader that loaded the pointer just before is
-        // beyond what a store can order (see the callback). A cache that stays allocated is reachable again: a
-        // late release must still find it
+        // beyond what a store can order (see the callback). A cache that stays allocated is reachable again once
+        // this is done: a release after the call must still find it. While pgc_destroy() runs, a thread that still
+        // holds a page of the main cache itself reads NULL here, where it used to read the cache; such a thread is
+        // outside the contract too, and a NULL is a louder failure than a cache being freed under it. The two
+        // follower pointers above are cleared plainly: nothing reads them from a thread that is not joined
         PGC *main_cache = engine->main_cache;
         __atomic_store_n(&engine->main_cache, NULL, __ATOMIC_RELEASE);
         if(!pgc_destroy(main_cache, false))

@@ -270,7 +270,7 @@ static void engine_lifecycle_remove_dir(const char *dir) {
 // differing configuration, comes up on the page allocators that already exist (the process-wide layer keeps its
 // settings, and logs that the new ones are ignored), runs a tier, and is destroyed the same way. The floors of the
 // caches and the NULL engine still hold between the two. Runs before the daemon's own engine, on two scratch
-// directories inside scratch_dir, which it removes.
+// directories next to scratch_dir (its name with -a and -b), which it removes.
 int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const char *scratch_dir) {
     int errors = 0;
     fprintf(stderr, "\nTesting the life of two engines, one after the other...\n");
