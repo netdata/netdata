@@ -26,55 +26,73 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor standard DMTF Redfish resources exposed by a baseboard management controller (BMC).
+          Monitor server hardware through the DMTF Redfish API of a baseboard management controller (BMC). One job
+          covers the health, environmental readings, and inventory of everything behind a single BMC endpoint.
 
-          The collector covers endpoint health, systems, chassis, managers, processors, memory, storage, drives, volumes,
-          network adapters and ports, PCIe, power, cooling, environmental sensors, batteries, leak detection, firmware,
-          and assemblies. Each supported component has its own readings and BMC-reported health/state charts.
-          All systems from the endpoint appear on this job's configured virtual node, or on the collecting Agent.
+          The collector reads these areas. Each component reports its own readings alongside the health and state the
+          BMC publishes for it.
+
+          | Area | Components |
+          |---|---|
+          | Base | ServiceRoot, systems, chassis, managers. Always collected. |
+          | Compute | Processors and processor metrics. |
+          | Memory | Memory modules and memory metrics. |
+          | Thermal | Fans, pumps, coolant connectors, filters, heaters, leak detection, environmental readings. |
+          | Power | Power subsystem, power supplies, batteries. |
+          | Storage | Storage subsystems, controllers, drives, volumes. |
+          | Network | Network adapters, ports, interfaces, device functions. |
+          | PCIe | PCIe devices and functions. |
+          | Sensors | Individual sensor readings: thermal, electrical, rotational, and quantities derived from them. |
+          | Firmware | Firmware and software inventory, update service, assemblies. |
+
+          Every system the endpoint exposes appears on this job's virtual node, or on the collecting Agent when the job
+          has no virtual node.
         method_description: |
-          The collector authenticates to the Redfish ServiceRoot over HTTP or HTTPS, reads supported standard resource types
-          and follows their same-origin links. It prefers session authentication in `auto` mode and falls back to HTTP Basic
-          authentication when sessions are not advertised or are unsupported. Requests are bounded by the configured timeout
-          and concurrency.
-          If a session read returns HTTP 401, the collector reconnects once and repeats acquisition within the same
-          collection cycle. A failed login, a second HTTP 401 or the collection deadline ends recovery.
-          Other failures are retried on the next scheduled cycle.
-          The only remote writes create and delete the collector's own sessions.
+          The collector connects to the Redfish ServiceRoot over HTTP or HTTPS and reads the standard resource types,
+          following links within the same origin. It walks the endpoint once per collection interval, sending several
+          requests at a time up to `max_concurrent_requests`.
 
-          For session and auto authentication, the configuration test identifies the endpoint without creating a session.
-          Credentials are validated when collection starts. Session authentication requires an origin-relative `Links.Sessions`
-          endpoint; use Basic authentication if the BMC does not provide one.
+          Authentication is set by `auth_method`:
 
-          BMC health states are reported directly. Sensor thresholds are evaluated separately as derived health, without
-          replacing BMC-reported health. Derived health describes observed threshold conditions, not overall hardware health.
+          | Mode | Behavior |
+          |---|---|
+          | `auto` | Uses a Redfish session when the BMC advertises one, otherwise HTTP Basic. The default. |
+          | `session` | Always uses a session. The BMC must publish an origin-relative `Links.Sessions` endpoint. |
+          | `basic` | Sends HTTP Basic credentials with every request. |
+          | `none` | Sends no credentials. |
 
-          Collection is best-effort: one unreadable resource does not stop independently reachable resources. Missing current
-          values produce gaps rather than zeroes. Complete membership scans obsolete removed components; partial scans retain
-          prior membership evidence without replaying stale readings.
+          The only writes it makes are creating and deleting its own Redfish sessions. Everything else is read-only: it
+          changes no setting on the BMC and touches nothing on the systems behind it.
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
         description: |
-          A read-only Redfish account is normally required. No local elevated privileges are needed.
+          A read-only Redfish account on the BMC. No elevated privileges are needed on the Agent host.
       default_behavior:
         auto_detection:
           description: |
-            Endpoints are not automatically detected. Configure each endpoint through a static or DynCfg job.
+            Endpoints are not auto-detected. Configure each BMC as a static or DynCfg job.
         limits:
           description: |
-            Only supported standard Redfish properties are collected; vendor-specific OEM extensions are not included.
-            The endpoint must finish responding within the configured request timeout and collection interval.
+            Only standard Redfish properties are collected. Vendor-specific OEM extensions are not.
+
+            A reading the endpoint does not return leaves a gap on the chart rather than a zero. Each request must
+            finish within `timeout` (15 seconds by default) and the whole walk within `update_every` (60 seconds by
+            default); when a walk runs out of time the collector publishes what it finished and starts fresh at the
+            next interval, so some charts skip that cycle.
         performance_impact:
           description: |
-            The default interval is 60 seconds. BMCs are often slow and may serialize requests internally. The collector starts
-            conservatively with three concurrent requests and uses the configured ceiling unless the ServiceRoot explicitly
-            prohibits multiple HTTP requests, in which case it uses one. It does not probe or automatically change the job's
-            cadence. The complete endpoint walk is also bounded by the configured `update_every`; when it cannot finish, the
-            collector publishes completed data as partial and starts a fresh scan at the next interval.
-            Use a larger `update_every`, narrower `collect` pattern, or lower concurrency if the BMC becomes overloaded.
+            On the Agent host the cost is negligible — HTTP requests and JSON parsing.
+
+            On the BMC it scales with how many components the endpoint exposes, since one collection walks every
+            selected resource. The collector sends up to `max_concurrent_requests` at a time (3 by default, or one
+            when the ServiceRoot declares it cannot serve concurrent requests). BMCs are frequently slow and serialize
+            work internally, so a large chassis can keep the controller busy for much of the interval.
+
+            If the BMC struggles, raise `update_every`, lower `max_concurrent_requests`, or narrow `collect` to the
+            areas you need.
     setup:
       prerequisites:
         list:
@@ -109,7 +127,7 @@ modules:
               required: false
             - name: url
               group: Target
-              description: URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS.
+              description: URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS. Use HTTPS when the job sends credentials; over HTTP they travel in clear text, and the job logs a warning.
               default_value: ""
               required: true
             - name: vnode
@@ -119,7 +137,7 @@ modules:
               required: false
             - name: auth_method
               group: Authentication
-              description: How to authenticate with the BMC. `auto` prefers a Redfish session and falls back to HTTP basic authentication.
+              description: "How to authenticate with the BMC: `auto`, `session`, `basic`, or `none`. `auto` prefers a Redfish session and falls back to HTTP Basic."
               default_value: auto
               required: false
             - name: username
@@ -139,7 +157,7 @@ modules:
               required: false
             - name: max_concurrent_requests
               group: HTTP
-              description: Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit.
+              description: Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit or respond slowly.
               default_value: 3
               required: false
             - name: proxy_url
@@ -169,7 +187,7 @@ modules:
               required: false
             - name: collect
               group: Collection
-              description: "Simple pattern selecting which component families to collect: base, compute, memory, thermal, power, storage, network, pcie, sensors, and firmware. Base is always collected."
+              description: "Simple pattern selecting which component areas to collect: `base`, `compute`, `memory`, `thermal`, `power`, `storage`, `network`, `pcie`, `sensors`, `firmware`. Base is always collected."
               default_value: "*"
               required: false
         examples:
@@ -196,23 +214,70 @@ modules:
                     username: monitoring
                     password: ${file:/etc/netdata/redfish-password}
     troubleshooting:
-      problems:
+      errors:
         list:
-          - name: The endpoint check fails
-            description: |
-              Verify the ServiceRoot URL, reachability, authentication mode, proxy policy, and TLS trust.
-              With session or auto authentication, a successful configuration test does not validate credentials; check
-              the username, password, and account permissions if collection then fails.
-              `tls_skip_verify: true` can diagnose certificate problems but is not a secure permanent fix.
-          - name: Collection takes close to or longer than the interval
-            description: |
-              BMCs can be slow and frequently serialize work. Lower `max_concurrent_requests`, increase `timeout` only when
-              responses genuinely need it, increase `update_every`, or narrow `collect`.
-          - name: A standard resource is missing or incomplete
-            description: |
-              Compatibility tests cover standard schema types and sanitized or synthetic legacy and modern payloads.
-              They do not establish support for every vendor/model/firmware combination. Inspect collection diagnostics
-              and report the affected vendor, model, firmware, and a sanitized payload when a supported reading is missing.
+          - error: "`config validation: 'username' and 'password' are required for auth_method \"<method>\"`"
+            when: |
+              At job start, with `auth_method` set to `auto`, `session`, or `basic`.
+            cause: |
+              Only these three modes send credentials, and both `username` and `password` must be set for them. The
+              message also appears the other way round (`must be empty for auth_method "none"`) when credentials are
+              left in place after switching a job to `none`.
+            fix: |
+              Set both fields, or switch `auth_method` to `none` for an endpoint that takes no credentials. Values may
+              be secret references such as `${file:/etc/netdata/redfish-password}` rather than literals.
+          - error: "`ServiceRoot has no RedfishVersion`"
+            when: |
+              At job start or on the first collection, after the URL responded.
+            cause: |
+              The address answered, but what it returned is not a Redfish ServiceRoot. Usually `url` points at the BMC's
+              web UI, a load balancer, or a captive portal rather than at the Redfish service.
+            fix: |
+              Point `url` at the service origin or its ServiceRoot path — `https://<bmc-address>` or
+              `https://<bmc-address>/redfish/v1/`. Confirm with
+              `curl -k https://<bmc-address>/redfish/v1/`, which must return JSON containing `RedfishVersion`.
+          - error: "`Redfish endpoint check: Redfish TLS certificate verification failed`"
+            when: |
+              With an `https://` URL and a BMC presenting a self-signed or internally issued certificate, or a
+              certificate issued for a different name than the one in `url`. During collection the same message
+              appears without the `Redfish endpoint check:` prefix.
+            cause: |
+              The Agent host does not trust the certificate authority that signed the BMC's certificate, or the
+              certificate does not cover the address in `url`. Most BMCs ship with a self-signed certificate. The
+              collector logs this summary rather than the underlying TLS error text.
+            fix: |
+              Point `tls_ca` at the CA bundle that signed the certificate, or install that CA in the Agent host's trust
+              store; for a name mismatch, use the address the certificate was issued for. `tls_skip_verify: true` will
+              also connect, but it accepts any certificate and leaves the session open to interception — use it to
+              confirm the diagnosis, not as the permanent setting.
+          - error: "The job starts and passes its check, then collects nothing"
+            when: |
+              With `auth_method` set to `auto` or `session`.
+            cause: |
+              In these modes the configuration test identifies the endpoint without opening a session, so it succeeds
+              before the credentials are ever used. They are validated when collection starts.
+            fix: |
+              Check the username and password, and that the BMC account may read the systems, chassis, managers,
+              sensors, and storage you expect. `auth_method: basic` exercises the credentials on every request and
+              fails more visibly while you are diagnosing.
+          - error: "Collection takes as long as, or longer than, the interval"
+            cause: |
+              The endpoint exposes more components than it can serve within `update_every`. BMCs are frequently slow and
+              many serialize requests internally, so the walk cannot be shortened by concurrency alone. The collector
+              publishes what it finished and starts fresh at the next interval, leaving gaps on some charts.
+            fix: |
+              Raise `update_every`, narrow `collect` to the areas you need, or lower `max_concurrent_requests` for a
+              controller that degrades under parallel load. Raise `timeout` only when individual responses genuinely
+              need longer.
+          - error: "A component or reading is missing from the charts"
+            cause: |
+              The collector reads standard Redfish properties only; vendor-specific OEM extensions are skipped. A BMC
+              may also omit a property, or expose it in a shape the standard schemas do not describe. Its area may also
+              be excluded by `collect`.
+            fix: |
+              Check `collect` covers the area first. If it does, report the vendor, model, and firmware version with a
+              sanitized payload from the affected resource so support can be added.
+
     alerts:
       - name: redfish_assembly_conditions
         metric: redfish.assembly.conditions
@@ -672,24 +737,22 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
     functions:
       description: |
-        Inspect sensor readings, hardware health and BMC-retained events for one configured endpoint using the Instance selector.
-        The Sensors and Hardware tables refresh every 60 seconds and show the latest completed collection. Collection timing follows the
-        job's `update_every` (60 seconds by default); the Observed column shows when each row was collected.
-        Opening Sensors or Hardware does not query the BMC. Partial collections show current available data and identify gaps;
-        a total collection failure makes both snapshot Functions unavailable instead of showing old readings. Logs queries the BMC on demand.
+        Inspect one configured endpoint's latest sensor readings, hardware health, and BMC-retained events, selected with
+        the Instance parameter. Sensors and Hardware show the latest completed collection and do not query the BMC when
+        you open them, so a row can be up to one `update_every` (60 seconds by default) plus that collection's duration
+        old; the Observed column is the start time of that collection and is the same for every row. Logs queries the
+        BMC on demand.
       list:
         - id: sensors
           name: Redfish Sensors
           description: |
-            Inspect current primary sensor readings, BMC-reported health and independently derived threshold health. Average, peak and threshold companion values are not separate rows. Power calculated from energy is explicitly labeled.
-
-            Derived health evaluates supplied numeric upper and lower thresholds independently of BMC health, including when BMC health is present.
-            OK means none of the evaluated thresholds is active; the BMC may report other faults. Legacy temperature, fan and voltage limits and modern Sensor thresholds are supported.
-
-            Modern thresholds honor increasing upper/decreasing lower activation, dwell time and clearing hysteresis using successive observed samples.
-            Omitted timing settings add no delay; explicit unknown settings, unsupported crossing directions, disabled sensors and unusable readings show Unavailable and leave a metric gap.
-            Missing or null numeric limits supply no threshold. Without usable enabled thresholds, derived health is Not applicable.
-            Collection gaps, restarts and threshold changes discard timing history; evaluation may remain unavailable until enough new samples establish a status.
+            Inspect current sensor readings beside the health the BMC reports and an independently derived threshold
+            health, so a crossed limit can be told apart from a fault the BMC has declared. The table holds one row per
+            sensor with its current reading; the average, peak, and threshold values a sensor also publishes are not
+            rows here (they appear on the charts), and power derived from energy is labeled as such. Derived health
+            reads OK when none of that sensor's own upper and lower limits is active (the BMC may still report other
+            faults), Not applicable when the sensor publishes no limits, and Unavailable when the published limits
+            cannot be used, the reading itself is unavailable, or too few readings have arrived to decide.
           parameters:
             - id: __job
               name: Instance
