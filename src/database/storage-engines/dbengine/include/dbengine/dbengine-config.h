@@ -15,7 +15,10 @@ typedef struct dbengine_tier DBENGINE_TIER;
 // The engine: its tiers and what they share (the event loop, the caches, the metrics registry, the configuration,
 // the counters). Opaque outside the engine; made by dbengine_create(), stopped by dbengine_shutdown(), and released
 // by dbengine_destroy() when no reference on a cache page or a registry metric remains (dbengine-api.h). A process
-// may hold several; they share only the page allocator layer below.
+// may hold several. What they share is process-wide by design: the page allocator layer below and the tier page
+// sizes it is built from, the page-details and extent-buffer allocators (dbengine-stats.h names them), the libuv
+// thread pool, and the process's file-descriptor limit, which each engine budgets against on its own. Calls to
+// dbengine_create() and dbengine_destroy() are not thread-safe against one another: the embedder serialises them.
 struct dbengine_engine;
 typedef struct dbengine_engine DBENGINE_ENGINE;
 

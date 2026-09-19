@@ -30,9 +30,10 @@ extern "C" {
 struct dbengine_tier;
 
 // the engine's tier by number, 0 to RRD_STORAGE_TIERS - 1: the tier that dbengine_tier_init() with that number
-// brings up, whether or not it has come up (the tier verbs below answer for one that never did, and take NULL as
-// a tier with nothing in it). NULL for a NULL engine or a number the engine does not have. A destroyed engine has
-// no tiers: like the engine, the pointer is not valid after dbengine_destroy()
+// brings up, whether or not it has come up (every verb and getter below that takes a tier answers for one that never
+// did, and takes NULL as a tier with nothing in it: verbs return, getters report false or zeros). NULL for a NULL
+// engine or a number the engine does not have. A destroyed engine has no tiers: like the engine, the pointer is not
+// to be used after dbengine_destroy()
 DBENGINE_TIER *dbengine_tier(DBENGINE_ENGINE *engine, size_t tier);
 
 // true when dbfiles_path holds at least one datafile named the way this engine names and scans
@@ -71,7 +72,8 @@ time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle
 // per engine: after dbengine_create() (fatal without the engine), before dbengine_shutdown() (UV_EIO after it), not
 // while the tier is up (UV_EALREADY) and not after it came up and exited (UV_EIO: its datafiles stay attached until
 // dbengine_destroy() finalizes them). An invalid tc is fatal before any of those checks (a programming error,
-// whatever the state).
+// whatever the state). The directory is the embedder's to keep exclusive: nothing refuses a second tier, of this
+// engine or of another, on a directory a tier already runs on, and two tiers writing one directory corrupt it.
 // Those refusals leave the tier untouched; an init that fails opening the datafiles returns
 // UV_EIO with the tier's configuration already written. Two inits of the same tier must not overlap, nothing
 // serialises them. A tier init and the shutdown must not overlap either: the check is made when the tier starts,
@@ -103,8 +105,9 @@ void dbengine_flush_all(DBENGINE_TIER *tier);
 // tier's datafiles, then the engine's own allocators and the engine with its tiers, in the order their dependencies
 // allow. Only after every tier's dbengine_tier_exit() and dbengine_shutdown(); never on an exit that skipped them
 // (the loop is still running). A cache or the registry with live references stays allocated and reachable, and so
-// does the engine they belong to, with its tiers (their addresses are what those references hold); the embedder's
-// handle, and every tier pointer it took from dbengine_tier(), is not valid after the call either way. Another
+// does the engine they belong to, with its tiers (their addresses are what those references hold, so a retained
+// engine keeps its tiers allocated for them); the embedder's handle, and every tier pointer it took from
+// dbengine_tier(), is not to be used after the call either way. Another
 // engine can be made at any time, before or after this (with a differing configuration if it likes: the page
 // allocators are process-wide and keep what the first engine gave them). Returns the registry metrics still
 // referenced, 0 when there were none; 0 for NULL.

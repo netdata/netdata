@@ -2546,8 +2546,8 @@ static void dbengine_spawn_unwind(struct dbengine_engine *engine, bool timer_ope
     engine->loop_open = false;
 }
 
-// the loop, its handles, the structures and the thread; with the process lock held. A failed step closes what
-// came before it and leaves the engine not spawned, so dbengine_create() reports the error and frees it
+// the loop, its handles, the structures and the thread. A failed step closes what came before it and leaves the
+// engine not spawned, so dbengine_create() reports the error and frees it
 static int dbengine_spawn(struct dbengine_engine *engine) {
     int ret;
 

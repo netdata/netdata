@@ -987,28 +987,46 @@ void dbengine_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id)
     mrg_metric_release(engine->main_mrg, metric);
 }
 
+// the getters about a tier take NULL as a tier with nothing in it (the embedder's tier binding is NULL when it has
+// no engine)
+
 uint64_t dbengine_disk_space_max(STORAGE_INSTANCE *si) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
+    if(!ctx)
+        return 0;
+
     return ctx->config.max_disk_space;
 }
 
 uint64_t dbengine_disk_space_used(STORAGE_INSTANCE *si) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
+    if(!ctx)
+        return 0;
+
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
 }
 
 uint64_t dbengine_metrics(STORAGE_INSTANCE *si) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
+    if(!ctx)
+        return 0;
+
     return __atomic_load_n(&ctx->atomic.metrics, __ATOMIC_RELAXED);
 }
 
 uint64_t dbengine_samples(STORAGE_INSTANCE *si) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
+    if(!ctx)
+        return 0;
+
     return __atomic_load_n(&ctx->atomic.samples, __ATOMIC_RELAXED);
 }
 
 time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
+    if(!ctx)
+        return 0;
+
 
     time_t t = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
     if(t == LONG_MAX || t < 0)
@@ -1091,6 +1109,9 @@ static void dbengine_populate_mrg(struct dbengine_tier *ctx)
 }
 
 void dbengine_readiness_wait(struct dbengine_tier *ctx) {
+    if(!ctx)
+        return;
+
     completion_wait_for(&ctx->loading.load_mrg);
     completion_destroy(&ctx->loading.load_mrg);
 

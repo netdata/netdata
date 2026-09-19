@@ -192,6 +192,12 @@ int dbengine_null_engine_unittest(void) {
         fprintf(stderr, " >>> DBENGINE: the size stats of no tier are not zeroed\n");
         errors++;
     }
+    dbengine_readiness_wait(NULL);
+    if(dbengine_disk_space_max(NULL) || dbengine_disk_space_used(NULL) || dbengine_metrics(NULL) ||
+       dbengine_samples(NULL) || dbengine_global_first_time_s(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no tier reports a disk quota, disk space, metrics, samples or a first time\n");
+        errors++;
+    }
 
     struct dbengine_work_request request = { .fn = NULL, .data = NULL };
     if(dbengine_work_available(NULL) || dbengine_enq_work(NULL, &request)) {
@@ -234,7 +240,10 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
     }
     else {
         dbengine_shutdown(other);
-        dbengine_destroy(other);
+        if(dbengine_destroy(other)) {
+            fprintf(stderr, " >>> DBENGINE: %s: the second engine kept referenced metrics across its destroy\n", what);
+            errors++;
+        }
     }
 
     for(size_t i = 0; i < RRD_STORAGE_TIERS; i++) {
@@ -288,7 +297,10 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
     }
     else {
         dbengine_shutdown(other);
-        dbengine_destroy(other);
+        if(dbengine_destroy(other)) {
+            fprintf(stderr, " >>> DBENGINE: %s: the engine made next to the stopped one kept referenced metrics\n", what);
+            errors++;
+        }
     }
 
     size_t referenced = dbengine_destroy(engine);
@@ -305,6 +317,8 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
 // other's registry, the tier refusals are per engine (a second init of one engine's tier while the other's comes
 // up; a stopped engine's tier while the other still serves), and one engine is stopped and destroyed while the
 // other collects on, in the order the caller picks. The page allocator layer is untouched by the destroy.
+static void engine_lifecycle_remove_dir(const char *dir);
+
 static int engines_coexist(const struct dbengine_config *cfg, const char *dir_a, const char *dir_b, bool destroy_a_first) {
     int errors = 0;
     const char *what = destroy_a_first ? "two engines, A destroyed first" : "two engines, B destroyed first";
@@ -356,6 +370,11 @@ static int engines_coexist(const struct dbengine_config *cfg, const char *dir_a,
         fprintf(stderr, " >>> DBENGINE: %s: B's tier 0 did not come up while A's is up: %s\n", what, uv_strerror(rc));
         errors++;
     }
+    rc = dbengine_tier_init(b, &tc_b);
+    if(rc != UV_EALREADY) {
+        fprintf(stderr, " >>> DBENGINE: %s: B's tier 0 was initialized twice (returned %d)\n", what, rc);
+        errors++;
+    }
 
     DBENGINE_TIER *tier_a = dbengine_tier(a, 0), *tier_b = dbengine_tier(b, 0);
     if(!tier_a || !tier_b || tier_a == tier_b || tier_a->engine != a || tier_b->engine != b) {
@@ -373,14 +392,25 @@ static int engines_coexist(const struct dbengine_config *cfg, const char *dir_a,
         errors += dbengine_zero_page_cadence_unittest(a, (STORAGE_INSTANCE *)tier_a);
         errors += dbengine_zero_page_cadence_unittest(b, (STORAGE_INSTANCE *)tier_b);
 
-        // the registries are separate: a metric A created is unknown to B
+        // the registries are separate: a metric A created is unknown to B, and only A's registry grew by it (a
+        // lookup on B's tier would miss in a shared registry too, since the sections differ; the counts would not)
+        struct dbengine_metrics_registry_stats a_before, b_before, a_after, b_after;
+        dbengine_get_metrics_registry_stats(a, &a_before);
+        dbengine_get_metrics_registry_stats(b, &b_before);
         nd_uuid_t uuid;
         uuid_generate(uuid);
         UUIDMAP_ID id = uuidmap_create(uuid);
         STORAGE_METRIC_HANDLE *on_a = dbengine_metric_get_or_create_by_id((STORAGE_INSTANCE *)tier_a, id);
         STORAGE_METRIC_HANDLE *on_b = dbengine_metric_get_by_uuid((STORAGE_INSTANCE *)tier_b, &uuid);
+        dbengine_get_metrics_registry_stats(a, &a_after);
+        dbengine_get_metrics_registry_stats(b, &b_after);
         if(!on_a) {
             fprintf(stderr, " >>> DBENGINE: %s: A did not create a metric on its tier\n", what);
+            errors++;
+        }
+        if(a_after.entries != a_before.entries + 1 || b_after.entries != b_before.entries) {
+            fprintf(stderr, " >>> DBENGINE: %s: the registries are not separate (A %zu -> %zu, B %zu -> %zu)\n",
+                    what, a_before.entries, a_after.entries, b_before.entries, b_after.entries);
             errors++;
         }
         if(on_b) {
@@ -406,6 +436,36 @@ static int engines_coexist(const struct dbengine_config *cfg, const char *dir_a,
     if(rc != UV_EIO) {
         fprintf(stderr, " >>> DBENGINE: %s: a tier came up on the stopped engine (returned %d)\n", what, rc);
         errors++;
+    }
+
+    // a tier that never came up on the stopped engine is refused as well: the refusal above is the tier's own
+    // (it came up and exited); this one can only be the engine's, and a refusal that did not happen would have
+    // created the tier's first datafile
+    char probe_dir[FILENAME_MAX + 1];
+    snprintfz(probe_dir, sizeof(probe_dir), "%s-probe", tc_first->dbfiles_path);
+    if(mkdir(probe_dir, 0700) != 0 && errno != EEXIST) {
+        fprintf(stderr, " >>> DBENGINE: %s: cannot create the probe directory\n", what);
+        errors++;
+    }
+    else {
+        struct dbengine_tier_config tc_probe = {
+            .tier = 1,
+            .dbfiles_path = probe_dir,
+            .disk_space_mb = 0,
+            .max_retention_s = 0,
+            .page_type = DBENGINE_PAGE_TYPE_ARRAY_TIER1,
+            .grouping = 60,
+        };
+        rc = dbengine_tier_init(first, &tc_probe);
+        if(rc != UV_EIO) {
+            fprintf(stderr, " >>> DBENGINE: %s: a never-used tier came up on the stopped engine (returned %d)\n", what, rc);
+            errors++;
+        }
+        if(dbengine_dir_has_datafiles(probe_dir)) {
+            fprintf(stderr, " >>> DBENGINE: %s: the stopped engine opened a tier in the probe directory\n", what);
+            errors++;
+        }
+        engine_lifecycle_remove_dir(probe_dir);
     }
     if(!dbengine_tier_is_active(tier_second)) {
         fprintf(stderr, " >>> DBENGINE: %s: the other engine's tier went down with the stopped one\n", what);
