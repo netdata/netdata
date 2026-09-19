@@ -304,7 +304,8 @@ question*. Use labels for instance and context annotations. Pick the right chart
 Common bugs: `absolute` on a counter (counters are `incremental`); `line` when `stacked` is the right shape (CPU states,
 disk-time breakdown). Reuse shared metric definitions from `src/collectors/common-contexts/` for C plugins that
 describe the Agent host; a collector polling a remote target keeps its own contexts and uses a vnode for placement
-(§1.9, `.agents/skills/collectors-go-framework-v2/chart-template.md#shared-contexts`).
+(§1.9). Writing a go.d V2 `charts.yaml` (defaults, families, ordering, statesets, labels, shared contexts, tests) is
+owned by `.agents/skills/collectors-go-framework-v2/chart-template.md`.
 
 ### 3.2 Mechanisms per ingestion path
 
@@ -315,10 +316,11 @@ them; for SNMP, extend a profile rather than hardcode OIDs, and for Prometheus p
 
 ### 3.3 Chart priorities
 
-Chart priorities drive UI ordering; charts with equal priority follow their names. C plugins and go.d V1 set a
-`priority` per chart following `src/collectors/all.h`; go.d V2 templates set `chart_defaults.priority` on top-level
-sections only (`.agents/skills/collectors-go-framework-v2/chart-template.md#ordering`). Don't pick values arbitrarily;
-mirror an adjacent collector's range.
+Chart priorities drive UI ordering; the dashboard orders equal-priority charts by name. C plugins follow
+`src/collectors/all.h`; go.d V1 charts step from `collectorapi.Priority`; go.d V2 templates optionally set
+`chart_defaults.priority` on top-level sections only, from the same engine default
+(`.agents/skills/collectors-go-framework-v2/chart-template.md#ordering`). Don't pick values arbitrarily; mirror an
+adjacent collector of the same kind.
 
 ## 4. Production-quality criteria & pre-PR checklist
 

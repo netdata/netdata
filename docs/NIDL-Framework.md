@@ -276,26 +276,27 @@ This guide walks through the thought process of designing metrics for a new coll
 
 #### Step 2: Organize into Families
 
-**Decision**: Flat structure (\<10 families) or Tree structure (\>10 families)?
+**Decision**: flat (one level of families) or tree (sections with sub-families)? Choose the shape operators
+navigate best; the counts below are examples, not thresholds.
 
 **PostgreSQL - Flat Structure**:
 ```
-connections
-queries  
-databases
-tables
-replication
+Connections
+Queries
+Databases
+Tables
+Replication
 ```
 
 **WebSphere - Tree Structure**:
 ```
-jvm/memory
-jvm/gc
-jvm/threads
-web/servlets
-web/sessions
-connections/jdbc
-connections/jms
+JVM/Memory
+JVM/GC
+JVM/Threads
+Web/Servlets
+Web/Sessions
+Connections/JDBC
+Connections/JMS
 ```
 
 **Rules**:
@@ -303,7 +304,8 @@ connections/jms
   because clicking a leaf is cheaper than scrolling a long one.
 - Keep the tree scannable when a section is expanded and keep leaf granularity consistent within a section.
 - A family may hold charts and subfamilies when the subfamily is an explicit jump (`Drives` with `Drives/NVMe`).
-- Use "overview" only for metrics that don't fit subfamilies.
+- An "Overview" family holds the whole-system view operators check first; it is not a bucket for metrics that fit
+  nowhere else, which get their own family.
 
 #### Step 3: Validate Metric Belonging and Instance Consistency
 
@@ -415,8 +417,8 @@ Family: tables
 
 #### Final Checklist
 
-- [ ] Each family represents a major functional area
-- [ ] Navigation structure is intuitive (\<10 flat, \>10 tree)
+- [ ] Every family level is named in the words an operator searches for
+- [ ] Navigation structure is intuitive when a section is expanded
 - [ ] All metrics in a family are about the same topic
 - [ ] Each context has consistent instance types
 - [ ] All instances in a context have identical dimensions

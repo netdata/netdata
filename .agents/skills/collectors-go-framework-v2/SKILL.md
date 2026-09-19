@@ -1,6 +1,6 @@
 ---
 name: collectors-go-framework-v2
-description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml/charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
+description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml authoring (defaults, families, ordering, statesets, labels), charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
 ---
 
 # Writing Go go.d Modules With Framework V2
@@ -119,9 +119,9 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - Use `Vec(...)` for labels, `Gauge` for current values,
   `Counter.ObserveTotal()` for source counters, and `StateSet` for fixed
   one-active-state values.
-- Metric names MUST be stable and selected by `charts.yaml`; stateset metric names end in `_state`, `_status` or
-  `_mode` so the template can leave their dimensions to chartengine (`./chart-template.md#statesets`).
-- Template authoring (what to leave to defaults, families and ordering, statesets, labels, shared contexts, tests) is
+- Metric names MUST be stable and selected by `charts.yaml`; stateset metric naming is owned by
+  `./chart-template.md#statesets`.
+- Template authoring (defaults, contexts, families, ordering, statesets, values, labels, shared contexts, tests) is
   owned by `./chart-template.md`; the bullets below are the runtime contracts it relies on.
 - Charts SHOULD omit `algorithm` for normal type-driven behavior. At runtime,
   chartengine maps `metrix` counters to `incremental` dimensions and gauges or
@@ -144,8 +144,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   bare `le` upper-bound value and ordered numerically with `+Inf` last. Do NOT
   add collector-local cumulative-bucket workaround metrics or a bucket-mode
   option for V2 charts.
-- Put multipliers, divisors and hidden flags in the chart template, not ad hoc chart-emission code. The float flag
-  is metric metadata: set it with `metrix.WithFloat` on the instrument; chartengine inherits it.
+- Multipliers, divisors and hidden flags belong in the chart template, not ad hoc chart-emission code; the float
+  flag is instrument metadata (`./chart-template.md#values`).
 - When instance identity omits labels—either because `instances.by_labels` does not select them or an
   `instances.optional_by_labels` key is absent—multiple source series can map to one rendered dimension. The effective
   `aggregation` MUST match the metric meaning. Set it on the chart; it applies to every dimension. Absence means
