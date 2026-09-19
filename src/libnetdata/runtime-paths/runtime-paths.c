@@ -6,6 +6,210 @@
 
 #include "../libnetdata.h"
 
+// =====================================================================================================================
+// Windows: derive runtime install prefix from binary location
+
+#if defined(OS_WINDOWS)
+static char *windows_install_prefix_unittest_override = NULL;
+
+char *nd_windows_install_prefix_from_executable_path(const char *executable_path) {
+    if (!executable_path)
+        return NULL;
+
+    // Netdata installs as <prefix>/usr/bin/netdata.exe, so stripping
+    // three path components gives <prefix> (e.g. C:\Program Files\Netdata).
+    char *install_prefix = strdupz(executable_path);
+
+    // Normalize backslashes to forward slashes.
+    // UCRT64's CRT (no msys-2.0.dll) accepts C:/... everywhere that
+    // it accepts C:\... — forward slashes are valid Windows path separators.
+    for (char *p = install_prefix; *p; p++)
+        if (*p == '\\') *p = '/';
+
+    // Strip three components: netdata.exe, bin, usr.
+    for (int i = 0; i < 3; i++) {
+        char *sep = strrchr(install_prefix, '/');
+        if (!sep) {
+            freez(install_prefix);
+            return NULL;
+        }
+        *sep = '\0';
+    }
+    return install_prefix;
+}
+
+static bool nd_windows_directory_exists(const char *path) {
+    int wpath_length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if (wpath_length <= 0)
+        return false;
+
+    wchar_t *wpath = mallocz((size_t)wpath_length * sizeof(*wpath));
+    DWORD attributes = INVALID_FILE_ATTRIBUTES;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wpath, wpath_length) > 0)
+        attributes = GetFileAttributesW(wpath);
+
+    bool exists = attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    freez(wpath);
+    return exists;
+}
+
+static char *nd_windows_temp_path_utf8(void) {
+    DWORD capacity = MAX_PATH;
+    for (;;) {
+        wchar_t *wide = mallocz((size_t)capacity * sizeof(*wide));
+        DWORD length = GetTempPathW(capacity, wide);
+        if (!length) {
+            freez(wide);
+            return NULL;
+        }
+        if (length < capacity) {
+            int utf8_length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                                                  wide, (int)length, NULL, 0, NULL, NULL);
+            if (utf8_length <= 0) {
+                freez(wide);
+                return NULL;
+            }
+            char *utf8 = mallocz((size_t)utf8_length + 1);
+            if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+                                     wide, (int)length, utf8, utf8_length, NULL, NULL)) {
+                freez(wide);
+                freez(utf8);
+                return NULL;
+            }
+            utf8[utf8_length] = '\0';
+            freez(wide);
+            return utf8;
+        }
+        freez(wide);
+        capacity = length + 1;
+    }
+}
+
+static char *nd_windows_detect_install_prefix_once(void) {
+    CLEAN_CHAR_P *exe_path = os_get_process_path();
+    CLEAN_CHAR_P *install_prefix = nd_windows_install_prefix_from_executable_path(exe_path);
+    if (!install_prefix)
+        return NULL;
+
+    // Validate that the expected config directory exists under this prefix
+    // before committing to the override.
+    // NOSONAR (c:S5813) — install_prefix comes from os_get_process_path(); bounded by FILENAME_MAX.
+    size_t test_path_size = strlen(install_prefix) + sizeof("/etc/netdata"); // NOSONAR (c:S5813)
+    CLEAN_CHAR_P *test_path = mallocz(test_path_size);
+    snprintfz(test_path, test_path_size, "%s/etc/netdata", install_prefix);
+    if (!nd_windows_directory_exists(test_path))
+        return NULL;
+
+    return strdupz(install_prefix);
+}
+
+char *nd_windows_detect_install_prefix(void) {
+    static volatile int initialized = 0;
+    static char *install_prefix = NULL;
+
+    if (windows_install_prefix_unittest_override)
+        return strdupz(windows_install_prefix_unittest_override);
+
+    if (__atomic_load_n(&initialized, __ATOMIC_ACQUIRE) != 2) {
+        int expected = 0;
+        if (__atomic_compare_exchange_n(&initialized, &expected, 1, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+            install_prefix = nd_windows_detect_install_prefix_once();
+            __atomic_store_n(&initialized, 2, __ATOMIC_RELEASE);
+        }
+        else {
+            while (__atomic_load_n(&initialized, __ATOMIC_ACQUIRE) != 2)
+                ;
+        }
+    }
+
+    return install_prefix ? strdupz(install_prefix) : NULL;
+}
+
+void nd_windows_set_install_prefix_for_unittest(const char *install_prefix) {
+    freez(windows_install_prefix_unittest_override);
+    windows_install_prefix_unittest_override = install_prefix ? strdupz(install_prefix) : NULL;
+}
+
+void nd_windows_detect_prefix_and_override_paths(void) {
+    CLEAN_CHAR_P *install_prefix = nd_windows_detect_install_prefix();
+    if (!install_prefix)
+        return;
+
+    // Override all runtime path globals with Windows-native form (C:/...).
+    // reformat_path() in inicfg_api.c normalizes paths to this same form on every
+    // inicfg_get_path() call, so the globals remain C:/... throughout the lifetime
+    // of the process regardless of how the config file was authored.
+    //
+    // Small one-time startup leak: these allocations are later
+    // overwritten by nd_runtime_paths_load_directories_from_inicfg() which
+    // stores the value in the config intern pool and returns a different
+    // pointer. The original pointers are orphaned but not freed. The
+    // total leaked memory is a few hundred bytes on every startup — acceptable
+    // for a long-running daemon.
+#define SET_PATH(var, suffix) \
+    do { \
+        size_t _size = strlen(install_prefix) + sizeof(suffix); \
+        char *_buf = mallocz(_size); \
+        snprintfz(_buf, _size, "%s" suffix, install_prefix); \
+        (var) = _buf; \
+    } while(0)
+
+    SET_PATH(netdata_configured_user_config_dir,     "/etc/netdata");
+    SET_PATH(netdata_configured_stock_config_dir,    "/usr/lib/netdata/conf.d");
+    SET_PATH(netdata_configured_stock_data_dir,      "/usr/share/netdata");
+    SET_PATH(netdata_configured_log_dir,             "/var/log/netdata");
+    SET_PATH(netdata_configured_primary_plugins_dir, "/usr/libexec/netdata/plugins.d");
+    SET_PATH(netdata_configured_web_dir,             "/usr/share/netdata/web");
+    SET_PATH(netdata_configured_cache_dir,           "/var/cache/netdata");
+    SET_PATH(netdata_configured_varlib_dir,          "/var/lib/netdata");
+    SET_PATH(netdata_configured_cloud_dir,           "/var/lib/netdata/cloud.d");
+    SET_PATH(netdata_configured_home_dir,            "/var/lib/netdata");
+
+#undef SET_PATH
+
+    // Pre-create the run directory and advertise it via NETDATA_RUN_DIR
+    // in the Windows-compatible C:/... form.  os_run_dir() calls stat()
+    // directly without POSIX translation, so the path must be in a form
+    // that UCRT64's CRT handles natively (C:/... works; /c/... does not).
+    // NOSONAR (c:S5813) — install_prefix is bounded by FILENAME_MAX; not user-controlled.
+    size_t run_parent_size = strlen(install_prefix) + sizeof("/run"); // NOSONAR (c:S5813)
+    size_t run_dir_size = strlen(install_prefix) + sizeof("/run/netdata"); // NOSONAR (c:S5813)
+    CLEAN_CHAR_P *run_parent = mallocz(run_parent_size);
+    CLEAN_CHAR_P *run_dir = mallocz(run_dir_size);
+    snprintfz(run_parent, run_parent_size, "%s/run", install_prefix);
+    snprintfz(run_dir, run_dir_size, "%s/run/netdata", install_prefix);
+    (void)mkdir(run_parent, 0755);
+    (void)mkdir(run_dir,    0755);
+
+    // An interactive, non-elevated installation cannot create directories
+    // below a protected prefix such as "Program Files".  Do not publish a
+    // path that does not exist: os_run_dir() validates it before startup and
+    // would otherwise abort the agent.  A per-user temporary location is
+    // writable in both interactive and service contexts.
+    if (!nd_windows_directory_exists(run_dir)) {
+        char *temp_path = nd_windows_temp_path_utf8();
+        if (temp_path) {
+            size_t fallback_size = strlen(temp_path) + sizeof("netdata/run");
+            CLEAN_CHAR_P *fallback_parent = mallocz(fallback_size);
+            CLEAN_CHAR_P *fallback = mallocz(fallback_size);
+            snprintfz(fallback_parent, fallback_size, "%snetdata", temp_path);
+            snprintfz(fallback, fallback_size, "%snetdata/run", temp_path);
+            (void)mkdir(fallback_parent, 0755);
+            (void)mkdir(fallback, 0755);
+            if (nd_windows_directory_exists(fallback))
+                nd_setenv("NETDATA_RUN_DIR", fallback, 1);
+            else
+                nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+            freez(temp_path);
+        }
+        else
+            nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+    }
+    else
+        nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+}
+#endif
+
 const char *netdata_configured_hostname            = NULL;
 const char *netdata_configured_user_config_dir     = CONFIG_DIR;
 const char *netdata_configured_stock_config_dir    = LIBCONFIG_DIR;

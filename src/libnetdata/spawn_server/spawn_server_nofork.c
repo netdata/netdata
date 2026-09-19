@@ -1249,7 +1249,10 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
     int wanted_signals[] = {SIGTERM, SIGCHLD};
     signals_unblock(wanted_signals, _countof(wanted_signals));
 
-    // Set up the signal handler for SIGCHLD and SIGTERM
+    // Set up the signal handler for SIGCHLD and SIGTERM. Windows does not
+    // provide POSIX sigaction/SIGCHLD; process completion is handled by the
+    // native wait path below, so do not abort startup on the unsupported shim.
+#if !defined(OS_WINDOWS)
     struct sigaction sa;
     sa.sa_handler = spawn_server_sigchld_handler;
     sigemptyset(&sa.sa_mask);
@@ -1264,6 +1267,7 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: sigaction() failed for SIGTERM");
         return 1;
     }
+#endif
 
     struct status_report sr = {
         .status = STATUS_REPORT_STARTED,

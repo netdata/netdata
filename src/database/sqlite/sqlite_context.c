@@ -38,7 +38,10 @@ int sql_init_context_database(int memory)
     else
         strcpy(sqlite_database, ":memory:");
 
-    rc = sqlite3_open(sqlite_database, &db_context_meta);
+    // UCRT64 SQLite uses Win32 CreateFile, which requires native Windows paths.
+    char native_ctx_db[FILENAME_MAX + 1];
+    os_translate_path(native_ctx_db, sqlite_database, sizeof(native_ctx_db));
+    rc = sqlite3_open(native_ctx_db, &db_context_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
         sqlite3_close(db_context_meta);
@@ -59,8 +62,12 @@ int sql_init_context_database(int memory)
     if (configure_sqlite_database(db_context_meta, target_version, "context_config"))
         return 1;
 
-    if (likely(!memory))
-        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta", netdata_configured_cache_dir);
+    if (likely(!memory)) {
+        // SQLite ATTACH also uses Win32 CreateFile; use native path form.
+        char native_attach_dir[FILENAME_MAX + 1];
+        os_translate_path(native_attach_dir, netdata_configured_cache_dir, sizeof(native_attach_dir));
+        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta", native_attach_dir);
+    }
     else
         snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE ':memory:' as meta");
 

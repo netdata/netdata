@@ -43,7 +43,9 @@ void health_load_config_defaults(void) {
     if(done) return;
     done = true;
 
+#ifndef OS_WINDOWS
     char filename[FILENAME_MAX + 1];
+#endif
 
     health_globals.config.enabled =
         inicfg_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH,
@@ -73,9 +75,16 @@ void health_load_config_defaults(void) {
     health_globals.config.health_log_retention_s =
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH, "health log retention", HEALTH_LOG_RETENTION_DEFAULT);
 
+#ifdef OS_WINDOWS
+    // Windows notifications require an explicitly configured native executable.
+    if(inicfg_exists(&netdata_config, CONFIG_SECTION_HEALTH, "script to execute on alarm"))
+        health_globals.config.default_exec = string_strdupz(inicfg_get_filename(
+            &netdata_config, CONFIG_SECTION_HEALTH, "script to execute on alarm", NULL));
+#else
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     health_globals.config.default_exec =
         string_strdupz(inicfg_get_filename(&netdata_config, CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
+#endif
 
     health_globals.config.enabled_alerts =
         simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_HEALTH, "enabled alarms", "*"),

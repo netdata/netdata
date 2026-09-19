@@ -106,10 +106,15 @@ static void jemalloc_free(void * PWord, Word_t Words __maybe_unused) {
 // --------------------------------------------------------------------------------------------------------------------
 // Judy API
 
-inline Word_t JudyMalloc(Word_t Words)
+Word_t JudyMalloc(Word_t Words)
 {
     Word_t Addr;
 
+#ifdef OS_WINDOWS
+    // On Windows, skip ARAL: use the same plain heap as JudyFree so alloc and
+    // free always go through the same allocator, avoiding heap corruption.
+    Addr = (Word_t)mallocz(Words * sizeof(Word_t));
+#else
 #ifdef HAVE_JEMALLOC_ARENA_API
     if(jemalloc_initialized)
         Addr = (Word_t)jemalloc_malloc(Words);
@@ -122,13 +127,19 @@ inline Word_t JudyMalloc(Word_t Words)
         else
             Addr = (Word_t)mallocz(Words * sizeof(Word_t));
     }
+#endif /* OS_WINDOWS */
 
     judy_allocated += Words * sizeof(Word_t);
 
     return(Addr);
 }
 
-inline void JudyFree(void * PWord, Word_t Words) {
+void JudyFree(void * PWord, Word_t Words) {
+#ifdef OS_WINDOWS
+    // On Windows, skip ARAL: mirror JudyMalloc's plain-heap path.
+    (void)Words;
+    freez(PWord);
+#else
 #ifdef HAVE_JEMALLOC_ARENA_API
     if(jemalloc_initialized)
         jemalloc_free(PWord, Words);
@@ -141,6 +152,7 @@ inline void JudyFree(void * PWord, Word_t Words) {
         else
             freez(PWord);
     }
+#endif /* OS_WINDOWS */
 
     judy_allocated -= Words * sizeof(Word_t);
 }

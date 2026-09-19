@@ -23,6 +23,122 @@ _Static_assert(__alignof__(status_file_io_tmp_attempt_counter) >= sizeof(status_
 _Static_assert(__atomic_always_lock_free(sizeof(status_file_io_tmp_attempt_counter), NULL),
                "signal-safe status temporary counter must be lock-free");
 
+#if defined(OS_WINDOWS)
+// One-slot ring of pending (temp -> final) renames. The signal-handler fast
+// path writes the data, closes the file, and posts the pair here; the worker
+// thread drains and performs MoveFileExA() outside the signal-handler
+// context. MoveFileExA() is not in the Windows async-signal-safe list and
+// would deadlock if the deadly signal fired while the CRT allocator was
+// mid-update. The slot is small (two FILENAME_MAX buffers) and only the
+// latest pending pair is honoured, the rest being overwritten — acceptable
+// because status files are infrequent and a later save supersedes earlier
+// ones.
+typedef struct {
+    _Atomic uint8_t ready;              // 0 idle, 1 pending
+    char temp_path[FILENAME_MAX];
+    char final_path[FILENAME_MAX];
+} status_file_io_pending_t;
+
+static status_file_io_pending_t status_file_io_pending = {
+    .ready = 0,
+};
+
+static ND_THREAD *status_file_io_publisher_thread = NULL;
+static HANDLE status_file_io_stop_event = NULL;
+static SPINLOCK status_file_io_pending_spinlock = SPINLOCK_INITIALIZER;
+
+static void status_file_io_publisher_main(void *arg)
+{
+    UNUSED(arg);
+    while (1) {
+        DWORD wait_result = WaitForSingleObject(status_file_io_stop_event, 50);
+
+        spinlock_lock(&status_file_io_pending_spinlock);
+        bool ready = __atomic_load_n(&status_file_io_pending.ready, __ATOMIC_ACQUIRE);
+        char temp_path[FILENAME_MAX];
+        char final_path[FILENAME_MAX];
+        if (ready) {
+            memcpy(temp_path, status_file_io_pending.temp_path, sizeof(temp_path));
+            memcpy(final_path, status_file_io_pending.final_path, sizeof(final_path));
+            __atomic_store_n(&status_file_io_pending.ready, 0, __ATOMIC_RELEASE);
+        }
+
+        spinlock_unlock(&status_file_io_pending_spinlock);
+
+        if (wait_result == WAIT_OBJECT_0 && !ready)
+            break;
+
+        if (ready) {
+            // MoveFileExA() can take meaningful time when antivirus or
+            // indexing is scanning the temp file. We are off the signal
+            // path here so any blocking is acceptable.
+            if (!MoveFileExA(temp_path, final_path,
+                             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+                nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                       "STATUS_FILE_IO: deferred rename of '%s' to '%s' failed",
+                       temp_path, final_path);
+                unlink(temp_path);
+            }
+        }
+    }
+}
+
+// Windows does not install the POSIX signal handler used by the Unix crash
+// path, so publish directly and return the real rename result. This also
+// keeps fatal and timeout status snapshots synchronous.
+static inline bool status_file_io_publish_deferred(const char *temp_path, const char *final_path)
+{
+    return MoveFileExA(temp_path, final_path,
+                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+}
+
+void status_file_io_init(void)
+{
+    if (!status_file_io_publisher_thread) {
+        status_file_io_stop_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (!status_file_io_stop_event)
+            return;
+        status_file_io_publisher_thread =
+            nd_thread_create("STATUSFILEPUB", NETDATA_THREAD_OPTION_DEFAULT,
+                             status_file_io_publisher_main, NULL);
+        if (!status_file_io_publisher_thread) {
+            CloseHandle(status_file_io_stop_event);
+            status_file_io_stop_event = NULL;
+        }
+    }
+}
+
+void status_file_io_shutdown(void)
+{
+    if (!status_file_io_publisher_thread)
+        return;
+    SetEvent(status_file_io_stop_event);
+    nd_thread_join(status_file_io_publisher_thread);
+    status_file_io_publisher_thread = NULL;
+    CloseHandle(status_file_io_stop_event);
+    status_file_io_stop_event = NULL;
+
+    // Drain any pending rename left after the worker exits.
+    spinlock_lock(&status_file_io_pending_spinlock);
+    bool ready = __atomic_load_n(&status_file_io_pending.ready, __ATOMIC_ACQUIRE);
+    char temp_path[FILENAME_MAX];
+    char final_path[FILENAME_MAX];
+    if (ready) {
+        memcpy(temp_path, status_file_io_pending.temp_path, sizeof(temp_path));
+        memcpy(final_path, status_file_io_pending.final_path, sizeof(final_path));
+        __atomic_store_n(&status_file_io_pending.ready, 0, __ATOMIC_RELEASE);
+    }
+    spinlock_unlock(&status_file_io_pending_spinlock);
+
+    if (ready)
+        MoveFileExA(temp_path, final_path,
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+}
+#else
+void status_file_io_init(void) {}
+void status_file_io_shutdown(void) {}
+#endif
+
 static void status_file_io_fallback_dirs_update(void) {
     status_file_io_fallback_dirs[0] = netdata_configured_cache_dir;
 }
@@ -100,11 +216,19 @@ bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *),
     }
 
     // Load the newest file found
-    if(*newest && cb(newest, data))
-        return true;
+    if(*newest) {
+        if(cb(newest, data))
+            return true;
 
+        // File exists but couldn't be parsed — genuine error.
+        if(log)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot parse the status file '%s'", newest);
+        return false;
+    }
+
+    // No file found in any location — expected on first run, debug-only.
     if(log)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "Cannot find a status file in any location (expected on first run)");
 
     return false;
 }
@@ -148,29 +272,42 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     memcpy(&temp[pos], tid_str, tid_len); pos += tid_len;
     temp[pos] = '\0';
 
-    // Reuse a regular temporary file left by an interrupted save; create absent names exclusively.
-    struct stat before;
-    bool reuse = lstat(temp, &before) == 0;
-    if(reuse && !S_ISREG(before.st_mode))
-        return false;
-
-    if(!reuse && errno != ENOENT)
-        return false;
-
+    // Reuse a regular temporary file left by an interrupted save; create absent names
+    // exclusively. Open with O_CREAT|O_EXCL first so the create-or-exist decision is
+    // atomic; this avoids the lstat-before-open TOCTOU window (c:S5847). O_NOFOLLOW
+    // rejects symlinks at open time, so the post-open fstat cannot be tricked into
+    // accepting a non-regular file.
     int flags = O_WRONLY | O_NONBLOCK;
 #ifdef O_NOFOLLOW
     flags |= O_NOFOLLOW;
 #endif
-    if(!reuse)
-        flags |= O_CREAT | O_EXCL;
 
-    int fd = open(temp, flags, 0664);
-    if (fd == -1)
-        return false;
+    int fd = open(temp, flags | O_CREAT | O_EXCL,
+#if defined(OS_WINDOWS)
+                  0660
+#else
+                  0664
+#endif
+    );
+    bool reuse = false;
+    if (fd == -1) {
+        if (errno != EEXIST)
+            return false;
+        // File exists from a prior interrupted save; truncate it.
+        fd = open(temp, flags,
+#if defined(OS_WINDOWS)
+                  0660
+#else
+                  0664
+#endif
+        );
+        if (fd == -1)
+            return false;
+        reuse = true;
+    }
 
     struct stat after;
-    if(fstat(fd, &after) != 0 || !S_ISREG(after.st_mode) ||
-       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+    if(fstat(fd, &after) != 0 || !S_ISREG(after.st_mode)) {
         close(fd);
         return false;
     }
@@ -206,7 +343,13 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Set permissions using chmod() */
-    if (fchmod(fd, 0664) != 0) {
+    if (fchmod(fd,
+#if defined(OS_WINDOWS)
+               0660
+#else
+               0664
+#endif
+               ) != 0) {
         close(fd);
         unlink(temp);
         return false;
@@ -219,10 +362,25 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Rename temp file to target file */
+#if defined(OS_WINDOWS)
+    // On Windows, POSIX rename() fails with EEXIST if the destination exists. We
+    // cannot call MoveFileExA() here because this function runs from a signal
+    // handler and MoveFileExA() is not async-signal-safe — it can deadlock if
+    // the deadly signal fired while the CRT allocator was mid-update. Instead
+    // we post the (temp, final) pair to a pre-allocated slot that the publisher
+    // worker thread drains off the signal path. If the process aborts before
+    // the worker drains, the temp file is left behind and unlinked on next
+    // startup's status_file_io_remove_obsolete() pass.
+    if (!status_file_io_publish_deferred(temp, final)) {
+        unlink(temp);
+        return false;
+    }
+#else
     if (rename(temp, final) != 0) {
         unlink(temp);
         return false;
     }
+#endif
 
     return true;
 }

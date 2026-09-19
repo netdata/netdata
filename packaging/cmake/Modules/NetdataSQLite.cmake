@@ -42,14 +42,56 @@ function(netdata_bundle_sqlite3)
                 )
         endif()
 
+        if(OS_WINDOWS)
+                # ExternalProject_Add invokes CONFIGURE_COMMAND via cmd.exe on Windows,
+                # which cannot execute POSIX shell scripts. Locate MSYS2 bash explicitly
+                # so configure and make run in the correct POSIX environment.
+                # Requires: bash, make, and tclsh (pacman -S bash make tcl).
+                find_program(_ND_SQLITE_BASH NAMES bash.exe bash
+                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                                   "C:/msys64/usr/bin"
+                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
+                             NO_DEFAULT_PATH)
+                if(NOT _ND_SQLITE_BASH)
+                        find_program(_ND_SQLITE_BASH NAMES bash.exe bash)
+                endif()
+                if(NOT _ND_SQLITE_BASH)
+                        message(FATAL_ERROR
+                                "bash not found — required to build the SQLite amalgamation on Windows. "
+                                "Install MSYS2 and run: pacman -S bash make tcl")
+                endif()
+                get_filename_component(_ND_SQLITE_MSYS_BIN "${_ND_SQLITE_BASH}" DIRECTORY)
+                find_program(_ND_SQLITE_MAKE NAMES make.exe make
+                             HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
+                find_program(_ND_SQLITE_TCLSH NAMES tclsh.exe tclsh
+                             HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
+                if(NOT _ND_SQLITE_MAKE)
+                        find_program(_ND_SQLITE_MAKE NAMES make.exe make)
+                endif()
+                if(NOT _ND_SQLITE_TCLSH)
+                        find_program(_ND_SQLITE_TCLSH NAMES tclsh.exe tclsh)
+                endif()
+                if(NOT _ND_SQLITE_MAKE OR NOT _ND_SQLITE_TCLSH)
+                        message(FATAL_ERROR "MSYS2 make and tclsh are required to build SQLite")
+                endif()
+                set(_SQLITE_CONFIGURE_CMD "${_ND_SQLITE_BASH}" -c "PATH='${_ND_SQLITE_MSYS_BIN}':\$PATH '${sqlite_SOURCE_DIR}/configure' --enable-update-limit")
+                # CMake may be launched outside an MSYS2 login shell.  Put the
+                # discovered MSYS2 tools first so bash resolves the matching
+                # make/tcl runtime rather than an unrelated PATH installation.
+                set(_SQLITE_BUILD_CMD     "${_ND_SQLITE_BASH}" -c "PATH='${_ND_SQLITE_MSYS_BIN}':\$PATH MAKEFLAGS= '${_ND_SQLITE_MAKE}' sqlite3.c sqlite3.h")
+        else()
+                set(_SQLITE_CONFIGURE_CMD "${sqlite_SOURCE_DIR}/configure" --enable-update-limit)
+                set(_SQLITE_BUILD_CMD     "${CMAKE_COMMAND}" -E env MAKEFLAGS= make sqlite3.c sqlite3.h)
+        endif()
+
         ExternalProject_Add(
                 sqlite_project
                 ${SQLITE_FETCH_ARGS}
                 SOURCE_DIR "${sqlite_SOURCE_DIR}"
                 BINARY_DIR "${sqlite_BINARY_DIR}"
-                CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
+                CONFIGURE_COMMAND ${_SQLITE_CONFIGURE_CMD}
                 # GNU Make jobserver flags are not understood by FreeBSD make.
-                BUILD_COMMAND "${CMAKE_COMMAND}" -E env MAKEFLAGS= make sqlite3.c sqlite3.h
+                BUILD_COMMAND ${_SQLITE_BUILD_CMD}
                 INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
                         "${sqlite_BINARY_DIR}/sqlite3.c"
                         "${sqlite_BINARY_DIR}/sqlite3.h"

@@ -135,6 +135,16 @@ static int stream_receiver_response_too_busy_now(struct web_client *w) {
     return HTTP_RESP_SERVICE_UNAVAILABLE;
 }
 
+int stream_receiver_response_initializing(struct web_client *w) {
+    // Senders byte-match this payload (see stream_connect_validate_first_response()).
+    // Using the protocol string instead of a generic HTTP body is what makes a child
+    // retry after the short initialization delay, rather than logging the response as
+    // not understood and backing off for a minute.
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, START_STREAMING_ERROR_INITIALIZATION);
+    return HTTP_RESP_SERVICE_UNAVAILABLE;
+}
+
 static void stream_receiver_takeover_web_connection(struct web_client *w, struct receiver_state *rpt) {
     // Set the file descriptor and ssl from the web client
     rpt->sock.fd = w->fd;

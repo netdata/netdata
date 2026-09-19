@@ -21,6 +21,21 @@ struct health_raised_summary {
     } active_alerts;
 };
 
+#if defined(OS_WINDOWS)
+static bool health_exec_is_legacy_alarm_notify_script(const char *exec) {
+    if(!exec || !*exec)
+        return false;
+
+    const char *basename = exec;
+    for(const char *p = exec; *p; p++) {
+        if(*p == '/' || *p == '\\')
+            basename = p + 1;
+    }
+
+    return !strcasecmp(basename, "alarm-notify.sh");
+}
+#endif
+
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     // this has to ALWAYS remove the given alarm entry from the queue
 
@@ -446,12 +461,29 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         goto done;
     }
 
+    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.default_exec);
+    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.default_recipient);
+
+    if(!exec || !*exec) {
+        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' (no notification command configured)",
+                          ae_chart_id(ae), ae_name(ae));
+        goto done;
+    }
+
+#if defined(OS_WINDOWS)
+    // The legacy notifier is a shell script and Windows installations do not provide
+    // a supported shell runtime. Native executables remain available for explicit use.
+    if(health_exec_is_legacy_alarm_notify_script(exec)) {
+        netdata_log_debug(D_HEALTH,
+                          "Health not sending notification for alarm '%s.%s' (alarm-notify.sh is disabled on Windows)",
+                          ae_chart_id(ae), ae_name(ae));
+        goto done;
+    }
+#endif
+
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "[%s]: Sending notification for alarm '%s.%s' status %s.",
            rrdhost_hostname(host), ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
-
-    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.default_exec);
-    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.default_recipient);
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
 

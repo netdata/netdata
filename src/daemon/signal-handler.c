@@ -55,6 +55,10 @@ typedef void (*SIGNAL_SIGACTION)(int, siginfo_t *, void *);
 static SIGNAL_HANDLER original_handlers[NSIG] = {0};
 static SIGNAL_SIGACTION original_sigactions[NSIG] = {0};
 
+static inline bool signal_number_supported(int signo) {
+    return signo >= 0 && signo < NSIG;
+}
+
 // Signal-handler atomics must never fall back to a locking runtime helper.
 _Static_assert(__atomic_always_lock_free(sizeof(original_handlers[0]), original_handlers),
                "signal handler pointers must be lock-free");
@@ -72,10 +76,14 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
         __atomic_fetch_add(&signals_waiting[i].count, 1, __ATOMIC_RELAXED);
 
         if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
-            SIGNAL_SIGACTION original_sigaction =
-                __atomic_load_n(&original_sigactions[signo], __ATOMIC_ACQUIRE);
-            SIGNAL_HANDLER original_handler =
-                __atomic_load_n(&original_handlers[signo], __ATOMIC_ACQUIRE);
+            SIGNAL_SIGACTION original_sigaction = NULL;
+            SIGNAL_HANDLER original_handler = NULL;
+            if (signal_number_supported(signo)) {
+                original_sigaction =
+                    __atomic_load_n(&original_sigactions[signo], __ATOMIC_ACQUIRE);
+                original_handler =
+                    __atomic_load_n(&original_handlers[signo], __ATOMIC_ACQUIRE);
+            }
             bool chained_handler = original_sigaction ||
                 (original_handler && original_handler != SIG_IGN && original_handler != SIG_DFL);
 
@@ -152,6 +160,9 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
 // Unmask all signals the netdata main signal handler uses.
 // All other signals remain masked.
 static void posix_unmask_my_signals(void) {
+#if defined(OS_WINDOWS)
+    return;
+#else
     sigset_t sigset;
     sigemptyset(&sigset);
 
@@ -160,9 +171,13 @@ static void posix_unmask_my_signals(void) {
 
     if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) != 0)
         netdata_log_error("SIGNAL: cannot unmask netdata signals");
+#endif
 }
 
 void nd_cleanup_deadly_signals(void) {
+#if defined(OS_WINDOWS)
+    return;
+#else
     struct sigaction act;
     memset(&act, 0, sizeof(struct sigaction));
 
@@ -184,9 +199,14 @@ void nd_cleanup_deadly_signals(void) {
         __atomic_store_n(&original_handlers[signo], (SIGNAL_HANDLER)0, __ATOMIC_RELEASE);
         __atomic_store_n(&original_sigactions[signo], (SIGNAL_SIGACTION)0, __ATOMIC_RELEASE);
     }
+#endif
 }
 
 void nd_initialize_signals(bool chain_existing) {
+#if defined(OS_WINDOWS)
+    (void)chain_existing;
+    return;
+#else
     signals_block_all_except_deadly();
     
     // Set the signal handler name for stack trace filtering
@@ -209,10 +229,12 @@ void nd_initialize_signals(bool chain_existing) {
             sigaction(signo, NULL, &old_act) == 0 &&
             (uintptr_t)old_act.sa_handler != (uintptr_t)nd_signal_handler) {
             // Save the original handlers for chaining
-            if (old_act.sa_flags & SA_SIGINFO)
-                __atomic_store_n(&original_sigactions[signo], old_act.sa_sigaction, __ATOMIC_RELEASE);
-            else
-                __atomic_store_n(&original_handlers[signo], old_act.sa_handler, __ATOMIC_RELEASE);
+            if (signal_number_supported(signo)) {
+                if (old_act.sa_flags & SA_SIGINFO)
+                    __atomic_store_n(&original_sigactions[signo], old_act.sa_sigaction, __ATOMIC_RELEASE);
+                else
+                    __atomic_store_n(&original_handlers[signo], old_act.sa_handler, __ATOMIC_RELEASE);
+            }
         }
 
         switch (signals_waiting[i].action) {
@@ -229,6 +251,7 @@ void nd_initialize_signals(bool chain_existing) {
         if (sigaction(signals_waiting[i].signo, &act, NULL) == -1)
             netdata_log_error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
     }
+#endif
 }
 
 NEVER_INLINE

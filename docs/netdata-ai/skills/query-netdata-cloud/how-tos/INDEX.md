@@ -44,6 +44,10 @@ Only existing recipes are listed. Add a link when the recipe is written.
 
 - [`diagnose-no-data-on-zoom-parent-retention-gaps.md`](./diagnose-no-data-on-zoom-parent-retention-gaps.md) -- why a node shows "No data" when zooming in while wider zoom renders fine: identify the serving agent from jsonwrap `.agents`, compare forced-tier queries (tier 0 vs 1 vs 2), reduce all-null rows to gap runs, run the decisive control test (does the PARENT's own local data have the same tier0 hole?), read the parent's daemon log via the `windows-events`/`systemd-journal` Function for `DBENGINE` write errors, and quantify child streaming flapping via `netdata.streaming_outbound` `replicating` buckets.
 
+### Collectors / jobs
+
+- [`diagnose-cloud-function-timeouts.md`](./diagnose-cloud-function-timeouts.md) -- distinguish a slow agent Function from an ACLK/Cloud transport timeout using matching direct and Cloud requests.
+
 ### Topology / flows
 
 - [`group-network-topology-by-kubernetes-pod.md`](./group-network-topology-by-kubernetes-pod.md) -- summarize `topology:network-connections` process actors by Kubernetes pod and namespace through Cloud.

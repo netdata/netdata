@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 
 . "$PSScriptRoot\functions.ps1"
 
+$env:MSYSTEM = 'UCRT64'
 $msysbash = Get-MSYS2Bash "$msysprefix"
 $env:CHERE_INVOKING = 'yes'
 
