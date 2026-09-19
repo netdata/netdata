@@ -63,6 +63,12 @@ Facts every rule below relies on (`integrations/templates/overview/collector.md`
   paragraph, lists for enumerations, tables for items that share attributes, an admonition for what must not be
   missed. Length is a symptom to check, not the rule; an unstructured 120-word paragraph fails, a 400-word field made
   of a table and three short paragraphs may pass.
+- Paragraph breaks are not structure, and no shape test decides this. A field can sit under every length bound, break
+  cleanly into four paragraphs, and still be a wall, because the reader must read all of it to find the part that
+  concerns them; `redfish` shipped exactly that (`overview.md` section 3). Conversely `s3check`'s `method_description`
+  is three plain paragraphs, the longest 114 words, and passes, because every sentence in it is a consequence the
+  operator can act on. Judge the field by the question it answers and by what the reader can do with each sentence,
+  never by its silhouette.
 - Operator voice. The page describes what the collector does as the operator sees it: connections, requests,
   commands, files, permissions, what it creates and deletes, what it never touches. Unexplained implementation
   mechanics that do not affect operation MUST NOT appear. Preserve operator-visible terms and exact public names
@@ -121,7 +127,10 @@ complete the validation and preview before committing:
 4. Empty `auto_detection`, `limits`, or `performance_impact` only where the placeholder sentence is true. A collector
    covered by a service-discovery rule, or with a cardinality cap or a metered API, fills them.
 5. No irrelevant implementation mechanics; unfamiliar operator terms defined at first use; no developer links
-   (`ARCHITECTURE.md`, source files).
+   (`ARCHITECTURE.md`, source files). The test is per sentence, not per field: ask what the operator does differently
+   for having read it. "Nothing" means it belongs to another field, to `ARCHITECTURE.md`, or nowhere — see the worked
+   routing example in `overview.md` section 3. A field can pass every length and structure check and still fail this
+   one, which is the failure mode that reaches production.
 6. Statements verified against the code, not against the previous prose: permissions, defaults, what is created or
    deleted, limits, addresses probed.
 7. Markdown safety items above; for authorized changes run

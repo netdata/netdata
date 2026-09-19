@@ -60,6 +60,25 @@ most visitors read.
   content (developer documentation, never linked from the page). "Plan, discover, query" is how the code is organized,
   not how the operator experiences it.
 
+**Worked example: routing an over-scoped field.** `redfish` shipped this field as four paragraphs, 206 words, longest
+paragraph 104 words — inside every length bound in `SKILL.md`, and still unreadable. Its first paragraph answered the
+question and the rest did not; each stray piece had a different owner:
+
+| What it said | Where it belonged |
+|---|---|
+| Reconnects once on HTTP 401 inside the cycle | Off the page: state handling |
+| Partial scans retain prior membership evidence | Off the page: ownership resolution |
+| How derived sensor health evaluates thresholds | `functions`, the `sensors` entry that displays it |
+| Session and auto config tests skip credentials | `troubleshooting.errors` |
+| Missing values produce gaps, not zeroes | `default_behavior.limits` |
+
+What remained answers the field's own question in three paragraphs and one table: what it connects to, over what
+protocol, how often, how it authenticates (four `auth_method` modes, so a table), and that its only writes are its own
+sessions.
+
+The test that catches this is not length. For each sentence, ask what the operator does differently for having read
+it; when the answer is nothing, that sentence has an owner elsewhere or no owner at all.
+
 ## 4. `supported_platforms` And `multi_instance`
 
 These are data, rendered as fixed sentences.
