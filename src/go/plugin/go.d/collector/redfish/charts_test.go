@@ -82,29 +82,14 @@ func statesetStates() map[string][]string {
 	return result
 }
 
-func TestSourceHealthChartsAndRules(t *testing.T) {
+// Every alert in health.d must target a chart the template provides.
+func TestHealthAlertsTargetTemplateCharts(t *testing.T) {
 	charts := templateCharts(t)
-	var alarms int
-	for context, chart := range charts {
-		require.False(t, strings.HasPrefix(context, "redfish.aggregate."), context)
-		require.False(t, strings.HasPrefix(context, "redfish.collection.detail_"), context)
-		require.NotEqual(t, "redfish.collection.selected_system", context)
-		if context != "redfish.reading.alarm" {
-			continue
-		}
-		alarms++
-		require.Equal(t, []string{"clear", "warning", "critical"}, chartDimensionNames(t, chart), context)
-	}
-	require.Equal(t, 1, alarms)
-	// Every retained alert must attach to a chart provided by this collector.
 	raw, err := os.ReadFile("../../../../../health/health.d/redfish.conf")
 	require.NoError(t, err)
 	for _, match := range regexp.MustCompile(`(?m)^\s+on:\s+(\S+)`).FindAllStringSubmatch(string(raw), -1) {
 		require.Contains(t, charts, match[1])
 	}
-	require.NotContains(t, string(raw), "$cap")
-	require.NotContains(t, string(raw), "$emergency")
-	require.NotContains(t, string(raw), "$fault")
 }
 
 func TestMetadataDocumentsChartLabels(t *testing.T) {

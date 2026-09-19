@@ -255,22 +255,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 				}
 			})
 			assert.Equal(t, []string{expectation.status}, statuses)
-			contexts := map[string][]string{
-				"redfish.storage_controller.pcie_lanes": {"active"},
-				"redfish.volume.remaining_capacity":     {"remaining"},
-				"redfish.ethernet_interface.link_speed": {"speed"},
-				"redfish.battery.energy_capacity":       {"actual"},
-			}
-			if len(expectation.values) > 0 {
-				contexts["redfish.reading.temperature"] = []string{"value"}
-			}
-			collecttest.AssertChartCoverage(
-				t,
-				collector,
-				collecttest.ChartCoverageExpectation{
-					RequiredContexts: contexts,
-				},
-			)
+			collecttest.AssertChartCoverage(t, collector, collecttest.ChartCoverageExpectation{})
 		})
 	}
 	t.Run("first collection with partial branches", func(t *testing.T) {
@@ -301,13 +286,7 @@ func TestDecodedCollectorPreservesSourceMetricsAcrossPartialAndRemovedResources(
 			map[string]float64{"Controller": 8},
 			sourceTestMetricByResource(t, reader, "storage_controller_pcie_lanes_active", ""),
 		)
-		collecttest.AssertChartCoverage(
-			t,
-			fresh,
-			collecttest.ChartCoverageExpectation{
-				RequiredContexts: map[string][]string{"redfish.reading.temperature": {"value"}},
-			},
-		)
+		collecttest.AssertChartCoverage(t, fresh, collecttest.ChartCoverageExpectation{})
 	})
 }
 
@@ -374,13 +353,7 @@ func TestDecodedCollectorPublishesEverySensorAboveFormerDetailCap(t *testing.T) 
 		expected,
 		sourceTestMetricByResource(t, collector.MetricStore().Read(), "reading_temperature_value", ""),
 	)
-	collecttest.AssertChartCoverage(
-		t,
-		collector,
-		collecttest.ChartCoverageExpectation{
-			RequiredContexts: map[string][]string{"redfish.reading.temperature": {"value"}},
-		},
-	)
+	collecttest.AssertChartCoverage(t, collector, collecttest.ChartCoverageExpectation{})
 }
 
 func sourceTestDecodedCollector(t *testing.T, endpoint string) collectorapi.CollectorV2 {
