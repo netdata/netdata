@@ -2,7 +2,7 @@
 
 `chartengine` compiles chart templates and builds deterministic chart plans (`create`, `update`, `remove`) from `metrix.Reader` snapshots.
 
-**Audience**: `ModuleV2` collector authors and framework contributors.
+**Audience**: `CollectorV2` collector authors and framework contributors.
 
 **See also**: [charttpl](/src/go/plugin/framework/charttpl/README.md) (template DSL),
 [metrix](/src/go/pkg/metrix/README.md) (metrics storage and read API).
@@ -218,7 +218,7 @@ flag, so validation tooling does not reproduce compiler or planner precedence ru
 | Static named dimensions only                                                   | `Read(...)` is sufficient (no flatten needed)                              |
 | Inferred dimensions (`name` and `name_from_label` omitted)                     | Must use flattened reader metadata (`ReadFlatten`)                         |
 | Structured autogen families (`Histogram`, `Summary`, `StateSet`, `MeasureSet`) | Must use flattened reader metadata (`ReadFlatten`) or they are not visible |
-| Runtime/default `ModuleV2` path                                                | `Read(ReadRaw(), ReadFlatten())`                                           |
+| Runtime/default `CollectorV2` path                                                | `Read(ReadRaw(), ReadFlatten())`                                           |
 
 If inferred dimensions are present without flattened reader metadata, `PreparePlan` returns an explicit error.
 

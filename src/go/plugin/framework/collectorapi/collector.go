@@ -64,7 +64,8 @@ type StaticChartTemplateProvider interface {
 // ChartTemplateSetProvider supplies the complete desired native set. The getter
 // is captured after Check and once after each successful Collect, before metric
 // commit. It must be cheap and return the same immutable pointer until content
-// changes. Nil is invalid; use an empty TemplateSet for no authored entries.
+// changes. Nil and the zero value are invalid. For no authored entries, construct
+// an empty set with chartengine.NewTemplateSet(chartengine.TemplateSetSpec{}).
 // Calls run on the job goroutine, serialized with Collect. If other goroutines
 // share the stored pointer across replacements, synchronize its reads and writes.
 type ChartTemplateSetProvider interface {
