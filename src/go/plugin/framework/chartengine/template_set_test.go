@@ -91,7 +91,7 @@ func TestTemplateSetIdentityAndLayout(t *testing.T) {
 	assert.Equal(t, "g0.c0", x.LocalTemplateID)
 	assert.Equal(t, "g0.c0", x.RoutingOrder)
 	assert.Equal(t, "g1.c0", y.RoutingOrder)
-	assert.Equal(t, "g10.g2.c1", templateRoutingOrder("g1.g2.c1", 9))
+	assert.Equal(t, "g10.2.c1", templateRoutingOrder("g1.2.c1", 9))
 }
 
 func TestTemplateSetPolicyBinding(t *testing.T) {
@@ -132,4 +132,26 @@ func TestTemplateSetGlobalNormalization(t *testing.T) {
 	c, err := NewTemplateSet(TemplateSetSpec{FallbackContextNamespace: "different"})
 	require.NoError(t, err)
 	assert.False(t, a.SameGlobalPolicy(c))
+}
+
+func TestTemplateSetCompilerNormalizedEquality(t *testing.T) {
+	entry := nativeEntry("profile", "requests", "requests")
+	original, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}})
+	require.NoError(t, err)
+	entry.Groups[0].Charts[0].Priority = 70000
+	entry.Groups[0].Charts[0].Title = " Requests "
+	explicit, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}})
+	require.NoError(t, err)
+	assert.True(t, explicit.preservesEntry(original, "profile"))
+}
+
+func TestTemplateSetNormalizedGlobalRuleEquality(t *testing.T) {
+	policy := EnginePolicy{Autogen: &AutogenPolicy{Enabled: true, Rules: []AutogenRule{{Scope: "private_*", Selector: metrixselector.Expr{Deny: []string{"*"}}}}}}
+	original, err := NewTemplateSet(TemplateSetSpec{Policy: policy})
+	require.NoError(t, err)
+	policy.Autogen.Rules[0].Scope = " private_* "
+	policy.Autogen.Rules[0].Selector.Deny[0] = " * "
+	explicit, err := NewTemplateSet(TemplateSetSpec{Policy: policy})
+	require.NoError(t, err)
+	assert.True(t, explicit.SameGlobalPolicy(original))
 }

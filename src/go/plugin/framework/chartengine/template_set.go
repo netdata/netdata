@@ -38,6 +38,7 @@ type TemplateSetSpec struct {
 // chart lifecycle. Returned entry data is detached from the snapshot.
 type TemplateSet struct {
 	entries    []TemplateEntry
+	content    []templateEntryContent
 	entryByID  map[string]int
 	program    *program.Program
 	index      matchIndex
@@ -91,7 +92,7 @@ func NewTemplateSetYAML(data []byte) (*TemplateSet, error) {
 func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, policy effectiveEnginePolicy, legacy, normalized bool) (*TemplateSet, error) {
 	set := &TemplateSet{
 		entryByID: make(map[string]int, len(entries)),
-		global:    global,
+		global:    normalizedGlobalPolicy(global),
 		policy:    policy,
 		legacy:    legacy,
 	}
@@ -106,7 +107,7 @@ func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, po
 		}
 		entry := input
 		entry.ContextNamespace = strings.Join(normalizeOptional(input.ContextNamespace), ".")
-		entry.AutogenRules = cloneAutogenRules(input.AutogenRules)
+		entry.AutogenRules = normalizedAutogenRules(input.AutogenRules)
 		var err error
 		if normalized {
 			entry.Groups = cloneTemplateGroups(input.Groups)
@@ -127,6 +128,7 @@ func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, po
 		if err := c.compileSpec(&charttpl.Spec{Version: charttpl.VersionV1, ContextNamespace: entry.ContextNamespace, Groups: entry.Groups}); err != nil {
 			return nil, fmt.Errorf("chartengine: entry %q: %w", input.ID, err)
 		}
+		set.content = append(set.content, normalizedEntryContent(entry, c.charts[start:]))
 		for i := start; i < len(c.charts); i++ {
 			chart := &c.charts[i]
 			if !legacy {
@@ -203,6 +205,7 @@ func PrepareTemplateSet(set *TemplateSet, opts ...Option) (*TemplateSet, error) 
 	out := *set
 	if cfg.autogenOverride.set {
 		out.global.autogen = cloneAutogenPolicy(cfg.autogenOverride.value)
+		out.global.autogen.Rules = normalizedAutogenRules(out.global.autogen.Rules)
 		out.policy.autogen = out.global.autogen
 		out.policy.autogenRules = append(slices.Clone(cfg.autogenRulesOverride.value), set.entryRules...)
 	}
@@ -239,5 +242,66 @@ func (s *TemplateSet) preservesEntry(previous *TemplateSet, entryID string) bool
 	}
 	nextIndex, nextOK := s.entryByID[entryID]
 	oldIndex, oldOK := previous.entryByID[entryID]
-	return nextOK && oldOK && reflect.DeepEqual(s.entries[nextIndex], previous.entries[oldIndex])
+	return nextOK && oldOK && reflect.DeepEqual(s.content[nextIndex], previous.content[oldIndex])
+}
+
+// Compare compiled values so identity follows the same defaults as runtime.
+// Retain local structure and declarations, but exclude compiled matcher objects
+// and set-wide routing positions. Selector equivalence beyond trimming is not inferred.
+type templateEntryContent struct {
+	namespace string
+	groups    []templateGroupShape
+	charts    []program.Chart
+	rules     []charttpl.EngineAutogenRule
+}
+
+type templateGroupShape struct {
+	groups  int
+	charts  int
+	metrics []string
+}
+
+func normalizedEntryContent(entry TemplateEntry, charts []program.Chart) templateEntryContent {
+	out := templateEntryContent{namespace: entry.ContextNamespace, rules: entry.AutogenRules}
+	var visit func([]charttpl.Group)
+	visit = func(groups []charttpl.Group) {
+		for _, group := range groups {
+			metrics := normalizeUnique(group.Metrics)
+			slices.Sort(metrics)
+			out.groups = append(out.groups, templateGroupShape{groups: len(group.Groups), charts: len(group.Charts), metrics: metrics})
+			visit(group.Groups)
+		}
+	}
+	visit(entry.Groups)
+	out.charts = slices.Clone(charts)
+	for i := range out.charts {
+		chart := &out.charts[i]
+		chart.Dimensions = slices.Clone(chart.Dimensions)
+		for j := range chart.Dimensions {
+			selector := &chart.Dimensions[j].Selector
+			selector.Matcher = nil
+			selector.Expression = strings.TrimSpace(selector.Expression)
+		}
+	}
+	return out
+}
+
+func normalizedAutogenRules(rules []charttpl.EngineAutogenRule) []charttpl.EngineAutogenRule {
+	out := cloneAutogenRules(rules)
+	for i := range out {
+		out[i].Scope = strings.TrimSpace(out[i].Scope)
+		for _, values := range [][]string{out[i].Selector.Allow, out[i].Selector.Deny} {
+			for j := range values {
+				values[j] = strings.TrimSpace(values[j])
+			}
+		}
+		out[i].Selector.Allow = append([]string(nil), out[i].Selector.Allow...)
+		out[i].Selector.Deny = append([]string(nil), out[i].Selector.Deny...)
+	}
+	return out
+}
+
+func normalizedGlobalPolicy(global templateGlobalPolicy) templateGlobalPolicy {
+	global.autogen.Rules = normalizedAutogenRules(global.autogen.Rules)
+	return global
 }

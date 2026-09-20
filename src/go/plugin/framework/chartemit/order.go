@@ -14,6 +14,8 @@ func makeDimensionOptions(hidden, obsolete, float bool) string {
 	}
 	if float {
 		parts = append(parts, "type=float")
+	} else {
+		parts = append(parts, "type=int")
 	}
 	return strings.Join(parts, " ")
 }

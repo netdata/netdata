@@ -56,6 +56,9 @@ func buildMatchIndex(charts []program.Chart) matchIndex {
 	}
 
 	for _, chart := range charts {
+		if chart.RoutingOrder == "" {
+			chart.RoutingOrder = chart.TemplateID
+		}
 		index.chartsByID[chart.TemplateID] = chart
 		index.labelPolicies[chart.TemplateID] = compileChartLabelPolicy(chart)
 		for i, dim := range chart.Dimensions {
@@ -221,12 +224,17 @@ func (e *Engine) resolveSeriesRoutes(
 		})
 	}
 
+	typedOrder := e.state.templateSet != nil && !e.state.templateSet.legacy
 	sort.Slice(routes, func(i, j int) bool {
 		if routes[i].ChartID != routes[j].ChartID {
 			return routes[i].ChartID < routes[j].ChartID
 		}
 		if routes[i].ChartTemplateID != routes[j].ChartTemplateID {
-			return routes[i].ChartTemplateID < routes[j].ChartTemplateID
+			left, right := routes[i].ChartTemplateID, routes[j].ChartTemplateID
+			if typedOrder {
+				left, right = index.chartsByID[left].RoutingOrder, index.chartsByID[right].RoutingOrder
+			}
+			return left < right
 		}
 		if routes[i].DimensionIndex != routes[j].DimensionIndex {
 			return routes[i].DimensionIndex < routes[j].DimensionIndex

@@ -26,6 +26,7 @@ type planAttemptState struct {
 	engine       *Engine
 	plan         Plan
 	materialized materializedState
+	transition   *templateTransition
 	epoch        uint64
 	commitSeq    uint64
 	attemptID    uint64
@@ -54,6 +55,7 @@ func (a PlanAttempt) Commit() error {
 	reserved := a.state.reserved
 	engine := a.state.engine
 	materialized := a.state.materialized
+	transition := a.state.transition
 	epoch := a.state.epoch
 	commitSeq := a.state.commitSeq
 	attemptID := a.state.attemptID
@@ -65,7 +67,7 @@ func (a PlanAttempt) Commit() error {
 	if engine == nil {
 		return fmt.Errorf("chartengine: nil engine on commit")
 	}
-	return engine.commitAttempt(materialized, epoch, commitSeq, attemptID)
+	return engine.commitAttempt(materialized, transition, epoch, commitSeq, attemptID)
 }
 
 func (a PlanAttempt) Abort() {
@@ -119,15 +121,56 @@ func newNoopAttempt(plan Plan) PlanAttempt {
 	}
 }
 
+// PlanOptions selects a complete desired snapshot and an optional host reset.
+// Nil TemplateSet keeps the current program. ResetMaterialized starts a new host's
+// presentation; it never emits retirements for the previous host.
+type PlanOptions struct {
+	TemplateSet       *TemplateSet
+	ResetMaterialized bool
+}
+
 func (e *Engine) PreparePlan(reader metrix.Reader) (PlanAttempt, error) {
-	plan, materialized, epoch, commitSeq, attemptID, reserved, err := e.preparePlan(reader)
+	return e.PreparePlanWithOptions(reader, PlanOptions{})
+}
+
+// PreparePlanWithOptions stages template and lifecycle changes together. Neither
+// becomes visible to subsequent plans until the returned attempt is committed.
+func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) (PlanAttempt, error) {
+	if e == nil {
+		return PlanAttempt{}, fmt.Errorf("chartengine: nil engine")
+	}
+	if reader == nil {
+		return PlanAttempt{}, fmt.Errorf("chartengine: nil metrics reader")
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.state.outstanding != 0 {
+		return PlanAttempt{}, ErrOutstandingPlanAttempt
+	}
+
+	view, transition, retired, err := e.prepareTemplateTransition(opts)
 	if err != nil {
 		return PlanAttempt{}, err
 	}
-	if !reserved {
+	plan, materialized, prepared, err := view.buildPlan(reader, retired)
+	if view != e {
+		// Attempt diagnostics describe builds, including aborted builds. They are
+		// independent of the committed presentation and its candidate program.
+		e.state.hints = view.state.hints
+		e.state.buildSeq = view.state.buildSeq
+		e.state.plannerBuildSeq = view.state.plannerBuildSeq
+	}
+	if err != nil {
+		return PlanAttempt{}, err
+	}
+	if !prepared {
 		return newNoopAttempt(plan), nil
 	}
-	return newPreparedAttempt(e, plan, materialized, epoch, commitSeq, attemptID), nil
+	attemptID := e.nextAttemptIDLocked()
+	e.state.outstanding = attemptID
+	attempt := newPreparedAttempt(e, plan, materialized, e.state.engineEpoch, e.state.commitSeq, attemptID)
+	attempt.state.transition = transition
+	return attempt, nil
 }
 
 func (e *Engine) nextAttemptIDLocked() uint64 {
@@ -138,7 +181,7 @@ func (e *Engine) nextAttemptIDLocked() uint64 {
 	return e.state.nextAttempt
 }
 
-func (e *Engine) commitAttempt(materialized materializedState, epoch, commitSeq, attemptID uint64) error {
+func (e *Engine) commitAttempt(materialized materializedState, transition *templateTransition, epoch, commitSeq, attemptID uint64) error {
 	if e == nil {
 		return fmt.Errorf("chartengine: nil engine")
 	}
@@ -153,6 +196,9 @@ func (e *Engine) commitAttempt(materialized materializedState, epoch, commitSeq,
 		return ErrStalePlanAttempt
 	}
 
+	if transition != nil {
+		transition.install(&e.state)
+	}
 	e.state.materialized = materialized
 	e.state.commitSeq++
 	e.state.outstanding = 0
