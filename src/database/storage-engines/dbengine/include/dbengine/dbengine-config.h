@@ -17,8 +17,10 @@ typedef struct dbengine_tier DBENGINE_TIER;
 // by dbengine_destroy() when no reference on a cache page or a registry metric remains (dbengine-api.h). A process
 // may hold several. What they share is process-wide by design: the page allocator layer below and the tier page
 // sizes it is built from, the page-details and extent-buffer allocators (dbengine-stats.h names them), the libuv
-// thread pool, and the process's file-descriptor limit, which each engine budgets against on its own. Calls to
-// dbengine_create() and dbengine_destroy() are not thread-safe against one another: the embedder serialises them.
+// worker pool (sized by the embedder, never by the engine: libuv_worker_threads below says what that means and
+// what a wrong size does), and the process's file-descriptor limit, which each engine budgets against on its own.
+// Calls to dbengine_create() and dbengine_destroy() are not thread-safe against one another: the embedder
+// serialises them. That is all the serialisation is for; it has no bearing on the pool.
 struct dbengine_engine;
 typedef struct dbengine_engine DBENGINE_ENGINE;
 
@@ -67,8 +69,29 @@ struct dbengine_config {
 
     // runtime
     time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1, < 0 is fatal
-    int libuv_worker_threads;                   // size of the libuv thread pool the engine dispatches work into;
-                                                // 0 = the engine's compiled default
+
+    // The libuv worker pool. There is one per process, and libuv sizes it once, at the process's first use of it,
+    // from the UV_THREADPOOL_SIZE environment variable (4 threads when unset); nothing resizes it afterwards. The
+    // engine dispatches every piece of work it does off its event loop into it: extent writes and reads, flushes,
+    // the registry loads of a tier coming up, journal indexing, datafile rotation, query preparation. The engine
+    // neither sizes the pool nor can read its size: libuv_worker_threads is what the embedder tells it the size is,
+    // and it must equal the real one, so the embedder sets UV_THREADPOOL_SIZE to the same number before the process
+    // first touches the pool (the daemon does, from the variable it hands here: netdata-conf-global.c). The engine
+    // counts the work it has in flight against that figure: once fewer than reserved_libuv_worker_threads are left
+    // it dispatches only its own internal-priority work (queries and extent reads wait), so that the embedder's
+    // own uv_queue_work() calls find a thread. Its internal-priority work is never held back by the count.
+    //
+    // Why the figure must be right: two of the engine's own work items wait, on the pool thread they hold, for a
+    // work item they queued behind them (a flush waits for its extent write, pagecache.c; a tier's registry load
+    // waits for the per-datafile loaders it queued, rrdengine.c), and both run at the internal priority the count
+    // never holds back. On a pool smaller than libuv_worker_threads every thread can end up held by a waiting
+    // parent whose child can never run, and the process hangs, silently and for good. With the two figures equal
+    // the daemon is safe by arithmetic (its pool is cpus x 6 threads, never fewer than 16, against roughly
+    // cpus + 2 x tiers such parents), not by a rule the engine enforces. The rule its work items should keep, and
+    // these two do not yet: no work item waits for another work item while it holds a pool thread.
+    int libuv_worker_threads;                   // the pool's size, as the embedder set it; 0 = the engine's compiled
+                                                // default (16; 8 on a 32-bit build), which is then the number the
+                                                // embedder must have set UV_THREADPOOL_SIZE to
     int reserved_libuv_worker_threads;          // pool threads the engine must leave free for the embedder's own work
 
     // services the embedder may provide; NULL = not provided
