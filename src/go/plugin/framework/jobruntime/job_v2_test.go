@@ -646,7 +646,7 @@ CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_b
 CLABEL 'instance' 'localhost' '2'
 CLABEL '_collect_job' 'job' '1'
 CLABEL_COMMIT
-DIMENSION 'busy' 'busy' 'absolute' '1' '1' ''
+DIMENSION 'busy' 'busy' 'absolute' '1' '1' 'type=int'
 BEGIN 'module_job.workers_busy'
 SET 'busy' = 7
 END`, chartengine.Priority))
@@ -808,15 +808,15 @@ CLABEL 'instance' 'localhost' '2'
 CLABEL 'nic' 'eth0' '1'
 CLABEL '_collect_job' 'job' '1'
 CLABEL_COMMIT
-DIMENSION 'received' 'received' 'incremental' '1' '1' ''
-DIMENSION 'sent' 'sent' 'incremental' '1' '1' ''
+DIMENSION 'received' 'received' 'incremental' '1' '1' 'type=int'
+DIMENSION 'sent' 'sent' 'incremental' '1' '1' 'type=int'
 CHART 'module_job.win_nic_traffic_eth1' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '%d' '1' '' 'plugin' 'module'
 CLABEL 'instance' 'localhost' '2'
 CLABEL 'nic' 'eth1' '1'
 CLABEL '_collect_job' 'job' '1'
 CLABEL_COMMIT
-DIMENSION 'received' 'received' 'incremental' '1' '1' ''
-DIMENSION 'sent' 'sent' 'incremental' '1' '1' ''
+DIMENSION 'received' 'received' 'incremental' '1' '1' 'type=int'
+DIMENSION 'sent' 'sent' 'incremental' '1' '1' 'type=int'
 BEGIN 'module_job.win_nic_traffic_eth0'
 SET 'received' = 100
 SET 'sent' = 80

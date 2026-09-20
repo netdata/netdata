@@ -56,8 +56,10 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - `New()` SHOULD own scalar defaults, `metrix.NewCollectorStore()`, typed metric instruments, and test seams;
   conditional or mode-dependent defaults follow `collectors-go-design/operator-surface.md` §4.
 - V2 collectors MUST write metrics through `metrix.CollectorStore` during
-  `Collect()` and provide chart template YAML through `ChartTemplateYAML()`;
-  embedded `charts.yaml` is RECOMMENDED.
+  `Collect()` and expose exactly one chart provider. Embedded `charts.yaml` through `ChartTemplateYAML()` is
+  RECOMMENDED for static definitions. Changing native membership uses `ChartTemplateSet()`; its ownership,
+  normalization, fixed-policy and replacement contracts are in
+  `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`.
 - `Collect(ctx)` MUST return `error` and write metrics to `metrix`; it MUST NOT
   return a V1 `map[string]int64`.
 - Long-running side-effect loops that must start only with the running job MAY
@@ -176,13 +178,15 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - To reproduce a V1 chart context in a migration, inject `context_namespace` (the
   fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
   `prefix.<app>.<metric>` without hand-built chart IDs.
-- When a collector builds its chart template at RUNTIME (not a static `charts.yaml`):
+- When a collector builds a static YAML document at runtime (the supported `ChartTemplateYAML` capability):
   - Emit it with `charttpl.Spec.MarshalTemplate()` (runs `Validate()` only, then
     marshals with `yaml.v2`, the decoder's library). Do NOT hand-roll `Validate()` +
     `yaml.Marshal`, and do NOT marshal with `yaml.v3`.
   - If you mutate a `charttpl.Group` borrowed from a shared profile/catalog, deep-copy
     it first with `Group.Clone()` so per-job edits cannot corrupt the shared template.
     A `Group` you decoded yourself per job is already owned and needs no clone.
+- For native snapshots, handle `NewTemplateSet` errors where content is selected and retain the resulting pointer.
+  Use the live provider and store with `collecttest.AssertChartCoverage`; do not reconstruct a second test-only set.
 - Skip empty distributions -- e.g. a summary whose every quantile is NaN -- so a
   chart waits for real data, matching how scalar NaN values are already skipped.
 - For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is

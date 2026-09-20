@@ -2,6 +2,30 @@
 
 `Job` and `JobV2` manage collector lifecycle and protocol publication for V1 and V2 collectors.
 
+## V2 Template Capture And Publication
+
+Metric jobs implement exactly one of `collectorapi.StaticChartTemplateProvider` or
+`collectorapi.ChartTemplateSetProvider`. After successful Check, `ChartTemplateSource` captures the initial template
+and optional `CollectorV2EnginePolicy`. Static YAML is read once. A native getter is called once after each successful
+Collect, before metric commit, and returns a stable immutable pointer until the desired set changes. See
+[chartengine's named-set contract](/src/go/plugin/framework/chartengine/README.md#named-active-template-sets).
+
+Invalid candidates (including nil or unprepared snapshots and effective global policy changes) abort the entire staged
+metric cycle. Previous committed series and presentation remain intact apart from failed-attempt metadata. Collect
+errors/panics and metric-commit failures cannot publish a candidate.
+
+After metric commit, each live or previously materialized host scope prepares the same captured candidate against its
+own last published state. Complete output admission commits that scope's program, route cache and lifecycle together.
+A failed scope retains its previous state and may jump directly to a newer candidate on a later collection. Successful
+peer scopes are not rolled back. Empty output can commit state. There is no intermediate-version queue, cross-host
+transaction, replay, or Agent acknowledgment; short writes retain existing output-poison behavior.
+
+Cleanup inventories belong to the host that last accepted nonempty chart output. Failed or empty host switches
+retain that inventory; the next nonempty admission on a different host replaces it.
+
+Host changes stage materialized reset in the plan attempt. Rejected output preserves the old host's state, and old-host
+retirements are never sent to the new host. Function-only jobs do not require a chart provider.
+
 ## Per-job collection charts
 
 Both runtimes own two self-monitoring charts. They MUST emit them on the local Agent host (`HOST ''`), outside the
@@ -17,9 +41,10 @@ metric store or multiply them per target scope.
 plugin/module identity, configured job labels, `_collect_job`, and the job's collection interval.
 
 - V1 success means at least one collector chart was updated with a value, preserving its existing contract.
-- V2 success follows its existing overall cycle result. An empty cycle without errors is successful. Collection or
-  metric-store commit errors fail the cycle. Scope emission retains partial-success semantics: one accepted scope can
-  keep the cycle successful when another scope fails; failure of every attempted scope fails the cycle.
+- V2 success follows its existing overall cycle result. An empty cycle without errors is successful.
+  Collection, template-capture or metric-store commit errors fail the cycle. Scope emission retains partial-success
+  semantics: one accepted scope can keep the cycle successful when another scope fails; failure of every attempted
+  scope fails the cycle.
 - Status reports complementary `success`/`failed` values on ordinary cycles. Duration is sampled only on success and
   measured before output I/O, so output backpressure is excluded. A panic does not publish self samples.
 - Autodetection and function-only jobs do not publish these charts.

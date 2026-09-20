@@ -625,7 +625,7 @@ test_requests_total{method="get"} 5
 // TestCollector_ChartCoverage verifies the collector's own ChartTemplateYAML() (the per-job
 // autogen template built at Check from the configured app) plus the collected store materialize
 // the expected chart contexts and dimensions. Unlike the manifest parity test (which builds the
-// template directly), this exercises the real CollectorV2.ChartTemplateYAML() method and the
+// template directly), this exercises the real Collector.ChartTemplateYAML() method and the
 // "prometheus" / "prometheus.<app>" context namespace end-to-end via chartengine autogen.
 func TestCollector_ChartCoverage(t *testing.T) {
 	tests := map[string]struct {

@@ -2,7 +2,7 @@
 
 `chartengine` compiles chart templates and builds deterministic chart plans (`create`, `update`, `remove`) from `metrix.Reader` snapshots.
 
-**Audience**: `ModuleV2` collector authors and framework contributors.
+**Audience**: `CollectorV2` collector authors and framework contributors.
 
 **See also**: [charttpl](/src/go/plugin/framework/charttpl/README.md) (template DSL),
 [metrix](/src/go/pkg/metrix/README.md) (metrics storage and read API).
@@ -18,12 +18,12 @@
 
 ## Collector-Facing Contract
 
-For `ModuleV2` collectors, the runtime integration expects:
+For `CollectorV2` collectors, the runtime integration expects:
 
 | Requirement                                                               | Why it matters                                                      |
 |---------------------------------------------------------------------------|---------------------------------------------------------------------|
 | `MetricStore()` returns `metrix.CollectorStore` (cycle-managed)           | Job runtime controls cycle boundaries and success/failure semantics |
-| `ChartTemplateYAML()` returns valid `charttpl` YAML                       | Loaded once at autodetection/post-check                             |
+| Exactly one chart provider: `StaticChartTemplateProvider` or `ChartTemplateSetProvider` | Static YAML is captured after Check; native sets can change with Collect |
 | Collector writes metrics during `Collect()` only                          | Planner runs after a successful cycle commit                        |
 | Metric names used in template selectors are present in group metric scope | Compile/validate consistency                                        |
 
@@ -33,6 +33,10 @@ For `ModuleV2` collectors, the runtime integration expects:
 |-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `New(opts...)`                                      | Create engine with policy/runtime options                                                                                                                               |
 | `Load(spec, revision)` / `LoadYAML(data, revision)` | Compile and publish program revision                                                                                                                                    |
+| `NewTemplateSet(spec)` / `NewTemplateSetYAML(data)` | Prepare an immutable named native set or a compatible singleton document |
+| `PrepareTemplateSet(set, opts...)` | Bind fixed global job overrides without recompiling entries |
+| `PreparePlanWithOptions(reader, PlanOptions{...})` | Stage a desired set and optional host reset with the plan |
+| `TemplateSet.Entries()` / `GlobalPolicy()` | Inspect detached definitions and effective global policy |
 | `PreparePlan(reader)`                               | Build deterministic action plan from reader snapshot and return an explicit attempt                                                                                     |
 | `RuntimeStore()`                                    | Access chartengine internal runtime metrics store                                                                                                                       |
 | `WithEnginePolicy(...)`                             | Configure selector + autogen behavior                                                                                                                                   |
@@ -43,6 +47,76 @@ For `ModuleV2` collectors, the runtime integration expects:
 | `WithPlanRouteDiagnosticObserver(...)`              | Stream complete, synchronous route facts for one plan attempt; intended for validation and tests                                                                        |
 | `ChartTemplateIDAt(...)`                            | Correlate an authored chart position with the compiler-assigned template identity used by route facts                                                                   |
 | `ResolveInstanceLabelPolicy(...)`                   | Inspect `instances.by_labels` through the same parsing and exclusion-precedence rules used by the planner                                                               |
+
+## Named Active Template Sets
+
+A collector with changing template membership implements
+`collectorapi.ChartTemplateSetProvider.ChartTemplateSet() *chartengine.TemplateSet`.
+Build the snapshot where errors can be handled, normally during `Init` or `Collect`:
+
+```go
+set, err := chartengine.NewTemplateSet(chartengine.TemplateSetSpec{
+    Entries: []chartengine.TemplateEntry{{
+        ID: "application",
+        ContextNamespace: "myapp",
+        Groups: groups,
+    }},
+    FallbackContextNamespace: "myapp",
+    Policy: chartengine.EnginePolicy{
+        Autogen: &chartengine.AutogenPolicy{Enabled: true},
+    },
+})
+// Handle err, then retain set for the provider getter.
+```
+
+Construction deep-copies native definitions, applies the same inherited defaults as YAML, validates and compiles.
+The getter returns the same immutable pointer until desired content changes. An empty set is valid; nil and a zero-value
+`TemplateSet` are invalid. `Entries()` and `GlobalPolicy()` return detached data for tooling. Applicability and source
+preprocessing remain collector responsibilities; the framework combines the selected entries and shared fallback.
+
+The getter runs on the job goroutine, serialized with `Collect`. Keeping the stored snapshot pointer owned by that
+same goroutine needs no additional synchronization. If `Run` or another goroutine shares the pointer across
+replacements, synchronize pointer reads and writes.
+
+Entry IDs identify independently owned definitions within a job. A new snapshot may reuse an ID. Equal normalized
+content preserves chart/dimension state and expiry timestamps, regardless of entry-list order. Equality uses compiled
+metadata and defaults, local chart paths, group structure, declared metrics and entry restrictions; it does not infer
+mathematical equivalence between differently written selectors. A changed entry is replaced as a whole: all its old
+reservations are released, observed charts recreate, quiet siblings retire, and Go expiry bookkeeping restarts.
+
+Ownership is independent of routing precedence. For unowned collisions, native entry order acts like concatenated root
+groups with the existing lexical `g<path>.c<index>` comparison. Reordering can change future unowned winners but preserves
+current active and quiet incumbents. Authored charts retain precedence over fallback. Replacement retirement compares
+old public identities with final survivors; a surviving chart or dimension is never also marked obsolete, and dimension
+retirement headers use the surviving chart's metadata. Existing Agent redefinition, history, counter and context behavior
+applies; this API makes no stronger continuity guarantee for changed definitions.
+
+Dimension definitions explicitly emit `type=float` or `type=int`. Integer is the initial Agent default, but omitting
+this option during redefinition preserves the existing numeric mode. Explicit `type=int` clears a prior float mode,
+including when the Agent retains a dimension across a collector restart.
+
+Global selector/autogen policy and fallback namespace are fixed for a running job. `CollectorV2EnginePolicy` is captured
+once and overrides global fields. An explicit autogen override replaces the entire global autogen policy and its rules.
+Entry `AutogenRules` are independent restrictions: they combine with global rules and disappear when the entry is removed.
+Overrides cannot remove them. Later effective global changes require job recreation; entry content and restrictions can
+change. Rules replaced by an override in a legacy YAML document do not become permanent entry restrictions.
+
+`collectorapi.ChartTemplateSource` resolves providers and captures policy for runtime and coverage helpers. Static YAML
+remains a supported singleton, preserving original group paths and diagnostics. Existing collectors may retain their
+composition and cached-YAML getters; native providers require no YAML getter. Metric jobs with both or neither provider
+fail startup validation. Function-only jobs retain their exemption.
+
+Direct engine callers bind job overrides with `PrepareTemplateSet` before passing the snapshot to
+`PreparePlanWithOptions`. `PlanOptions.TemplateSet` selects the desired prepared snapshot; nil keeps the loaded program.
+`ResetMaterialized` stages a new host's presentation without retiring the previous host on the new host. Commit the
+attempt only after complete output admission; abort preserves the previously committed program and presentation.
+`Load`, `LoadYAML`, `Compile`, `ChartTemplateIDAt` and immediate `ResetMaterialized` retain their document/component
+contracts. `Load` and `Compile` still expect defaults already applied; active-set transitions do not call destructive Load.
+
+The unchanged-snapshot path adds constant bookkeeping to the existing planner. Changed snapshots compare template
+content and filter retained charts once, then clone retained lifecycle state through the ordinary planner. Retirement
+comparison visits only replaced or transferred chart identities and their dimensions. Programs/indexes are shared
+between scopes; mutable route caches and lifecycle state remain scope-owned.
 
 ## End-to-End Example (Single Flow)
 
@@ -112,6 +186,7 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 | Lifecycle caps  | Enforce chart/dimension cap policy                                                             |
 | Materialize     | Emit create/update actions from accumulated state                                              |
 | Expiry          | Emit removals for stale charts/dimensions                                                      |
+| Reconcile       | Retire only old identities absent from the final presentation after replacement or ownership transfer |
 | Sort            | Deterministically sort inferred dimension output                                               |
 
 ## Route Diagnostics and Policy Inspection
@@ -128,7 +203,9 @@ autogen displacement, collisions, lifecycle rejection, and unmatched series.
   expose the effective context, family, units, algorithm, aggregation, presentation, series kind, scale, and label-promotion
   policy. They do not include the full input label set; a rendered chart or dynamic dimension name can itself be derived
   from label values and must be handled accordingly by consumers.
-- `ChartTemplateIDAt` correlates compiler facts with a decoded template's group/chart position.
+- `ChartTemplateIDAt` correlates legacy document facts with a decoded template's group/chart position. Named sets
+  additionally expose `TemplateEntryID` and `LocalChartTemplateID`, corresponding fields for an existing collision owner,
+  and entry/local provenance for rejected autogen rules. Consumers need not parse encoded ownership strings.
 
 `ResolveInstanceLabelPolicy` is the corresponding read-only inspection helper for `instances.by_labels` and
 `instances.optional_by_labels`. It returns the runtime-normalized required keys, optional keys, exclusions, and include-all
@@ -141,7 +218,7 @@ flag, so validation tooling does not reproduce compiler or planner precedence ru
 | Static named dimensions only                                                   | `Read(...)` is sufficient (no flatten needed)                              |
 | Inferred dimensions (`name` and `name_from_label` omitted)                     | Must use flattened reader metadata (`ReadFlatten`)                         |
 | Structured autogen families (`Histogram`, `Summary`, `StateSet`, `MeasureSet`) | Must use flattened reader metadata (`ReadFlatten`) or they are not visible |
-| Runtime/default `ModuleV2` path                                                | `Read(ReadRaw(), ReadFlatten())`                                           |
+| Runtime/default `CollectorV2` path                                                | `Read(ReadRaw(), ReadFlatten())`                                           |
 
 If inferred dimensions are present without flattened reader metadata, `PreparePlan` returns an explicit error.
 
@@ -319,7 +396,7 @@ Notes:
 | Program            | Immutable compiled IR per revision                                                                                                          |
 | Engine state       | Serialized under `Engine.mu` for load/build transitions                                                                                     |
 | Route cache        | Series identity + revision keyed authored/autogen discovery; autogen validates current metadata and kinds; retained by successful sequence, pruned on each build                                               |
-| Materialized state | Tracks existing chart/dimension instances for incremental create/update/remove decisions; persists across cycles, resets on template reload |
+| Materialized state | Tracks existing chart/dimension instances for incremental create/update/remove decisions; persists across cycles; direct Load resets it, active sets preserve unchanged entries |
 | Determinism        | Sorted chart IDs and inferred dimensions provide stable action ordering                                                                     |
 
 ## Performance Validation
