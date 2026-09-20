@@ -69,6 +69,9 @@ type ImplementedFunction struct {
 // job-backed Function of a per-job collector; a single-instance collector has none.
 const FunctionJobParameter = "__job"
 
+// functionJobParameterName is the label the framework gives that selector.
+const functionJobParameterName = "Instance"
+
 // FunctionResponseColumns reduces a table response to the column rows the Live
 // Data section documents, in index order.
 func FunctionResponseColumns(response *funcapi.FunctionResponse) ([]MetadataFunctionColumn, error) {
@@ -109,8 +112,8 @@ func FunctionResponseColumns(response *funcapi.FunctionResponse) ([]MetadataFunc
 // the implemented ones: every id both ways, the same parameters (id, name,
 // type, options) and the same columns in order (name, type, unit, visibility).
 // When jobSelectable is set, every documented Function must also document the
-// framework's Instance selector as a select parameter; its options are job
-// names known only at runtime and are not compared. Otherwise documenting that
+// framework's Instance selector as a select parameter named Instance; its
+// options are job names known only at runtime and are not compared. Otherwise documenting that
 // selector is drift.
 func CheckMetadataFunctionsMatch(documented []MetadataFunction, implemented []ImplementedFunction, jobSelectable bool) error {
 	byID := make(map[string]ImplementedFunction, len(implemented))
@@ -176,6 +179,8 @@ func checkFunctionParameters(documented MetadataFunction, actual ImplementedFunc
 				problems = append(problems, fmt.Errorf("%s: parameter %s documented, but the collector is single-instance", documented.ID, param.ID))
 			case param.Type != funcapi.ParamSelect.String():
 				problems = append(problems, fmt.Errorf("%s: parameter %s type %q, framework selector is %q", documented.ID, param.ID, param.Type, funcapi.ParamSelect))
+			case param.Name != functionJobParameterName:
+				problems = append(problems, fmt.Errorf("%s: parameter %s name %q, framework selector is %q", documented.ID, param.ID, param.Name, functionJobParameterName))
 			}
 			continue
 		}

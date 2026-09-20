@@ -197,6 +197,16 @@ func TestCheckMetadataFunctionsMatch(t *testing.T) {
 				return f
 			}()},
 		},
+		"job selector name drift": {
+			documented: documented(func(f *MetadataFunction) {
+				p := jobParam
+				p.Name = "Job"
+				f.Parameters = append(f.Parameters, p)
+			}),
+			implemented:   []ImplementedFunction{testImplementedFunction()},
+			jobSelectable: true,
+			wantErr:       `inventory: parameter __job name "Job", framework selector is "Instance"`,
+		},
 		"job selector type drift": {
 			documented: documented(func(f *MetadataFunction) {
 				p := jobParam
