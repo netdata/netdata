@@ -1148,7 +1148,7 @@ static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) 
     if(!tc->grouping)
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
 
-    if(strlen(tc->dbfiles_path) > DBENGINE_DBFILES_PATH_MAX) {
+    if(strnlen(tc->dbfiles_path, DBENGINE_DBFILES_PATH_MAX + 1) > DBENGINE_DBFILES_PATH_MAX) {
         netdata_log_error("DBENGINE: tier %zu: the datafiles path is longer than %d characters, the tier cannot be initialized",
                           tc->tier, (int)DBENGINE_DBFILES_PATH_MAX);
         return UV_ENAMETOOLONG;
@@ -1198,18 +1198,23 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
         return UV_EIO;
     }
 
-    // reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier, out of the engine's resolved budget
-    rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
-    if (engine->global_stats.dbengine_reserved_file_descriptors > engine->cfg.max_reserved_file_descriptors) {
-        netdata_log_error(
-            "Exceeded the budget of available file descriptors (%zu/%zu), cannot create new dbengine tier.",
-            (size_t)engine->global_stats.dbengine_reserved_file_descriptors,
-            engine->cfg.max_reserved_file_descriptors);
+    // reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier, out of the engine's resolved budget. The
+    // check and the reservation are one atomic step: tiers coming up in parallel (the daemon brings them up on a
+    // thread each) can neither take the engine past its budget nor refuse one another while one of them fits
+    dbengine_stats_t reserved = __atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED);
+    do {
+        if (reserved + DBENGINE_FD_BUDGET_PER_TIER > engine->cfg.max_reserved_file_descriptors) {
+            netdata_log_error(
+                "Exceeded the budget of available file descriptors (%zu/%zu), cannot create new dbengine tier.",
+                (size_t)(reserved + DBENGINE_FD_BUDGET_PER_TIER),
+                engine->cfg.max_reserved_file_descriptors);
 
-        rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
-        rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
-        return UV_EMFILE;
-    }
+            rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
+            return UV_EMFILE;
+        }
+    } while(!__atomic_compare_exchange_n(&engine->global_stats.dbengine_reserved_file_descriptors, &reserved,
+                                         reserved + DBENGINE_FD_BUDGET_PER_TIER, false,
+                                         __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tc->page_type;

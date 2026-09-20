@@ -88,7 +88,9 @@ struct dbengine_config {
     // touches the pool (the daemon does, from the variable it hands here: netdata-conf-global.c). The engine counts
     // the work it has in flight against that figure: once no more than reserved_libuv_worker_threads are left it
     // dispatches only its own internal-priority work (queries and extent reads wait), so that the embedder's own
-    // uv_queue_work() calls find a thread. Its internal-priority work is never held back by the count.
+    // uv_queue_work() calls find a thread. Its internal-priority work is never held back by the count, so the
+    // reservation is best effort: it keeps the engine's lower-priority work off those threads, and nothing keeps
+    // its flushes, loads and rotations off them.
     //
     // Why the figure must be right: two of the engine's own work items wait, on the pool thread they hold, for a
     // work item they queued behind them (a flush waits for its extent write, pagecache.c; a tier's registry load
