@@ -14,6 +14,7 @@ extern "C" {
 #include "database/storage-engines/dbengine/dbengine-compression.h"
 }
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -55,6 +56,9 @@ std::vector<uint8_t> incompressible_payload(size_t size) {
 
 // The real codecs this build has: NONE is an algorithm the engine accepts, but it is a statement that a payload is
 // stored as it is, not something to compress or decompress with.
+// Every case that compresses something iterates this. If it were ever empty those cases would pass having done
+// nothing, and the case count CI gates on would not move - so the cases assert it is not empty rather than trusting
+// the build to have a codec.
 std::vector<uint8_t> available_codecs() {
     std::vector<uint8_t> codecs;
 
@@ -101,12 +105,19 @@ TEST(Compression, TheDefaultAlgorithmIsOneThisBuildSupports) {
     EXPECT_TRUE(dbengine_valid_compression_algorithm(dbengine_default_compression()));
 }
 
-TEST(Compression, UnknownAlgorithmsAreRejected) {
-    // Everything above the highest defined value, and the gap the defined ones leave. A codec byte comes off disk,
-    // so an unknown one must be refused rather than trusted.
-    for (unsigned algorithm = DBENGINE_COMPRESSION_ZSTD + 1; algorithm <= 255; algorithm++) {
+TEST(Compression, OnlyTheAlgorithmsThisBuildHasAreAccepted) {
+    // Every byte, not just the ones above the highest name. A codec byte comes off disk, so one this build cannot
+    // decode must be refused rather than trusted - and in a build configured without a codec, that codec's own byte
+    // is one of those. Walking the whole range checks that too, which a loop starting past the last name cannot.
+    const std::vector<uint8_t> available = available_algorithms();
+
+    for (unsigned algorithm = 0; algorithm <= 255; algorithm++) {
         SCOPED_TRACE(algorithm);
-        EXPECT_FALSE(dbengine_valid_compression_algorithm(static_cast<uint8_t>(algorithm)));
+
+        const bool expected =
+            std::find(available.begin(), available.end(), static_cast<uint8_t>(algorithm)) != available.end();
+
+        EXPECT_EQ(dbengine_valid_compression_algorithm(static_cast<uint8_t>(algorithm)), expected);
     }
 }
 
@@ -117,6 +128,7 @@ TEST(Compression, UncompressedIsAlwaysAvailable) {
 }
 
 TEST(Compression, RoundTripsAPayload) {
+    ASSERT_FALSE(available_codecs().empty()) << "this build has no compression codec, so this case would test nothing";
     for (uint8_t algorithm : available_codecs()) {
         SCOPED_TRACE(algorithm_name(algorithm));
 
@@ -142,6 +154,7 @@ TEST(Compression, RoundTripsAPayload) {
 }
 
 TEST(Compression, ACompressiblePayloadGetsSmaller) {
+    ASSERT_FALSE(available_codecs().empty()) << "this build has no compression codec, so this case would test nothing";
     for (uint8_t algorithm : available_codecs()) {
         SCOPED_TRACE(algorithm_name(algorithm));
 
@@ -159,6 +172,7 @@ TEST(Compression, ACompressiblePayloadGetsSmaller) {
 }
 
 TEST(Compression, AnIncompressiblePayloadIsLeftAlone) {
+    ASSERT_FALSE(available_codecs().empty()) << "this build has no compression codec, so this case would test nothing";
     for (uint8_t algorithm : available_codecs()) {
         SCOPED_TRACE(algorithm_name(algorithm));
 
@@ -212,6 +226,7 @@ TEST(Compression, TheBoundIsNeverBelowTheInput) {
 }
 
 TEST(Compression, ASinglePageOfDataRoundTrips) {
+    ASSERT_FALSE(available_codecs().empty()) << "this build has no compression codec, so this case would test nothing";
     // The size the engine actually works in: extents are built from pages, and a page is the smallest thing that
     // reaches these codecs in production.
     for (uint8_t algorithm : available_codecs()) {
@@ -223,6 +238,10 @@ TEST(Compression, ASinglePageOfDataRoundTrips) {
         memcpy(buffer.data(), original.data(), original.size());
 
         const size_t compressed_size = dbengine_compress(buffer.data(), original.size(), algorithm);
+
+        // Decompressing is only legal for a payload that was compressed; 0 means it was not, and the call would
+        // trap in a build with internal checks on.
+        ASSERT_GT(compressed_size, 0u) << "a repetitive page did not compress, so there is nothing to decompress";
 
         std::vector<uint8_t> restored(original.size());
         EXPECT_EQ(dbengine_decompress(restored.data(), buffer.data(), restored.size(), compressed_size, algorithm),

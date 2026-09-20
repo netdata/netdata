@@ -131,8 +131,8 @@ TEST_F(PgdTest, MemoryFootprintGrowsWithTheDataHeld) {
     for (uint32_t slot = 0; slot < 512; slot++)
         append(pg, slot, slot % 7);
 
-    EXPECT_GE(pgd_memory_footprint(pg), empty_footprint)
-        << "the footprint shrank while the page was being filled";
+    EXPECT_GT(pgd_memory_footprint(pg), empty_footprint)
+        << "the footprint did not grow while 512 points were appended to the page";
 
     pgd_free(pg);
 }

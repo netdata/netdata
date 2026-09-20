@@ -2,6 +2,12 @@
 
 #include "support.h"
 
+// Reached today through the public headers, named here because this suite's whole point is what those headers do
+// and do not have to drag in.
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <string>
 #include <vector>
 
@@ -24,7 +30,6 @@ public:
     Scratch() {
         char tmpl[] = "/tmp/dbengine-test-XXXXXX";
         const char *made = mkdtemp(tmpl);
-        EXPECT_NE(made, nullptr);
         if (made)
             path_ = made;
     }
@@ -49,6 +54,9 @@ public:
     Scratch(const Scratch &) = delete;
     Scratch &operator=(const Scratch &) = delete;
 
+    // A tier refuses an empty path by ending the process, so a case must never reach one. Checked where the
+    // directory is made rather than hoped for here.
+    bool valid() const { return !path_.empty(); }
     const char *c_str() const { return path_.c_str(); }
 
 private:
@@ -60,6 +68,8 @@ private:
 class CollectQueryTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        ASSERT_TRUE(scratch_.valid()) << "could not make a scratch directory";
+
         const struct dbengine_config cfg = netdata_test_config();
 
         engine_ = dbengine_create(&cfg);
@@ -291,6 +301,12 @@ TEST_F(CollectQueryTest, AQueryOutsideTheStoredRangeReturnsNothing) {
     dbengine_store_flush(sch);
 
     const std::vector<STORAGE_POINT> got = query_all(smh, BASE_TIME + 1000, BASE_TIME + 2000);
+
+    // The claim in the name, asserted: a window past everything stored yields no points at all. Without this the
+    // case says nothing, because the loop below has nothing to iterate over.
+    EXPECT_TRUE(got.empty()) << "a query past the stored range returned " << got.size() << " points";
+
+    // And if that ever becomes "gaps rather than nothing", they must at least be gaps.
     for (const STORAGE_POINT &sp : got)
         EXPECT_TRUE(storage_point_is_gap(sp)) << "a query past the data returned a point that is not a gap";
 
@@ -303,10 +319,12 @@ TEST_F(CollectQueryTest, AQueryOutsideTheStoredRangeReturnsNothing) {
 TEST_F(CollectQueryTest, TheTierReportsWhatItHolds) {
     const UUIDMAP_ID id = make_metric_id();
 
+    // Before the create, not after: a count sampled after the metric exists already includes it, and the
+    // comparison below would then only be asking whether a counter went backwards.
+    const uint64_t metrics_before = dbengine_metrics(si_);
+
     STORAGE_METRIC_HANDLE *smh = dbengine_metric_get_or_create_by_id(si_, id);
     ASSERT_NE(smh, nullptr);
-
-    const uint64_t metrics_before = dbengine_metrics(si_);
 
     STORAGE_METRICS_GROUP *smg = dbengine_metrics_group_get();
     STORAGE_COLLECT_HANDLE *sch = dbengine_store_init(smh, 1, smg);
@@ -316,7 +334,7 @@ TEST_F(CollectQueryTest, TheTierReportsWhatItHolds) {
     store_point(sch, BASE_TIME + 2, 2);
     dbengine_store_flush(sch);
 
-    EXPECT_GE(dbengine_metrics(si_), metrics_before) << "the tier lost a metric it was given";
+    EXPECT_EQ(dbengine_metrics(si_), metrics_before + 1) << "the tier did not count the metric it was given";
     EXPECT_GT(dbengine_samples(si_), 0u) << "the tier reports no samples after two were stored";
 
     dbengine_store_finalize(sch);

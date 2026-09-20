@@ -2,6 +2,12 @@
 
 #include "support.h"
 
+// Reached today through the public headers, named here because this suite's whole point is what those headers do
+// and do not have to drag in.
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <string>
 
 // The engine's lifecycle and configuration surface, as dbengine-api.h and dbengine-config.h state them: an engine
@@ -18,7 +24,6 @@ public:
     Scratch() {
         char tmpl[] = "/tmp/dbengine-test-XXXXXX";
         const char *made = mkdtemp(tmpl);
-        EXPECT_NE(made, nullptr) << "could not make a scratch directory";
         if (made)
             path_ = made;
     }
@@ -44,6 +49,9 @@ public:
     Scratch(const Scratch &) = delete;
     Scratch &operator=(const Scratch &) = delete;
 
+    // A tier refuses an empty path by ending the process, so every case checks this before using the directory
+    // rather than letting a full disk take the whole binary down.
+    bool valid() const { return !path_.empty(); }
     const char *c_str() const { return path_.c_str(); }
 
 private:
@@ -132,6 +140,11 @@ TEST(EngineLifecycle, TwoEnginesHaveTiersOfTheirOwn) {
     ASSERT_TRUE(first);
 
     // An engine is no obstacle to another: each has its tiers of its own, and nothing in the process is claimed.
+    //
+    // Neither engine is given a tier here, and that is not incidental. Both are told the pool has
+    // DBENGINE_TEST_UV_THREADS threads while the process has one pool of that size between them, and support.h
+    // explains what an over-stated figure costs: the process hangs and does not come back. With no tier there is
+    // nothing to dispatch. Do not add one to this case.
     Engine second(cfg);
     ASSERT_TRUE(second) << "a second engine could not be made while the first lives";
 
@@ -148,6 +161,7 @@ TEST(EngineLifecycle, TwoEnginesHaveTiersOfTheirOwn) {
 TEST(EngineLifecycle, ATierComesUpAndGoesDown) {
     const struct dbengine_config cfg = netdata_test_config();
     const Scratch scratch;
+    ASSERT_TRUE(scratch.valid()) << "could not make a scratch directory";
 
     Engine engine(cfg);
     ASSERT_TRUE(engine);
@@ -170,6 +184,7 @@ TEST(EngineLifecycle, ATierComesUpAndGoesDown) {
 TEST(TierInit, RefusesATierThatIsAlreadyUp) {
     const struct dbengine_config cfg = netdata_test_config();
     const Scratch scratch;
+    ASSERT_TRUE(scratch.valid()) << "could not make a scratch directory";
 
     Engine engine(cfg);
     ASSERT_TRUE(engine);
@@ -186,6 +201,7 @@ TEST(TierInit, RefusesATierThatIsAlreadyUp) {
 TEST(TierInit, RefusesATierThatCameUpAndExited) {
     const struct dbengine_config cfg = netdata_test_config();
     const Scratch scratch;
+    ASSERT_TRUE(scratch.valid()) << "could not make a scratch directory";
 
     Engine engine(cfg);
     ASSERT_TRUE(engine);
@@ -204,6 +220,7 @@ TEST(TierInit, RefusesATierThatCameUpAndExited) {
 TEST(TierInit, RefusesATierOnAStoppedEngine) {
     const struct dbengine_config cfg = netdata_test_config();
     const Scratch scratch;
+    ASSERT_TRUE(scratch.valid()) << "could not make a scratch directory";
 
     DBENGINE_ENGINE *engine = dbengine_create(&cfg);
     ASSERT_NE(engine, nullptr);
@@ -227,8 +244,8 @@ TEST(TierInit, RefusesAPathWithNoRoomForTheFileNames) {
     tc.page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT;
     tc.grouping = 1;
 
-    // Once with a path that overflows the buffer the tier builds its file names in, and once with one that fits the
-    // buffer but leaves no room for the names the engine appends to it.
+    // Two lengths either side of the limit. They meet the same single check rather than two different ones, so
+    // this is one contract sampled twice, not two code paths.
     const size_t lengths[] = {FILENAME_MAX + 32, DBENGINE_DBFILES_PATH_MAX + 1};
 
     for (size_t length : lengths) {
@@ -326,6 +343,7 @@ TEST(EngineConfig, AGivenFileDescriptorBudgetIsKept) {
 
 TEST(EngineDir, ReportsWhetherADirectoryHoldsDatafiles) {
     const Scratch scratch;
+    ASSERT_TRUE(scratch.valid()) << "could not make a scratch directory";
 
     // Reads the directory only, so it answers before any tier is up.
     EXPECT_FALSE(dbengine_dir_has_datafiles(scratch.c_str()));
