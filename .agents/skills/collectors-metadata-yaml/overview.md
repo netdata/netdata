@@ -19,9 +19,10 @@ field means.
 - One idea per paragraph, a few sentences. A paragraph that enumerates becomes a list. Three or more items that share
   attributes (modes, permissions per endpoint, services per area, prerequisites per mode) become a table.
 - Admonitions carry what the reader must not miss and nothing else: `:::caution` for cost, data loss, destructive or
-  irreversible behavior; `:::tip` for a recommended shortcut ("need X, do Y"); `:::note` for a non-obvious fact that is
-  not a warning. `:::info` is the fleet's catch-all and is discouraged. At most one admonition per field. Prefer an
-  admonition over a blockquote. An admonition never replaces the field's own first paragraph.
+  irreversible behavior; `:::info` (blue) or `:::tip` (green, "need X, do Y") for a fact the operator must notice, such
+  as persisted state and how to reset it. `:::note` renders white and blends into the page; use it only for an aside
+  that may blend in. At most one admonition per field. Prefer an admonition over a blockquote. An admonition never
+  replaces the field's own first paragraph.
 - Define unfamiliar operator terms inline on first use; omit irrelevant implementation mechanics (see the reading
   model in `SKILL.md`). A glossary table is allowed only when
   four or more terms recur across the page and the options table, and then it closes `method_description`, after the

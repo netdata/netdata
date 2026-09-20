@@ -58,6 +58,12 @@ same persistent state MUST load or revalidate it after acquiring active ownershi
 `src/go/plugin/agent/jobmgr/joboutput/candidate_stage.go` and cover a predecessor commit between candidate probe and
 activation. This applies to durable local state even without remote mutation.
 
+A `go.d.plugin` debug run from a terminal shares the Agent's varlib directory with the running job that owns a state
+file there. A collector that writes under varlib MUST detect that run with `pkg/terminal.IsTerminal()` (the same
+check `src/go/cmd/godplugin/main.go` and `src/go/plugin/agent/policy/runmode.go` use) and keep the file read-only:
+load, compare and apply transitions in memory, never write. Inject the check so tests are deterministic, and cover a
+terminal run with and without an existing file asserting the file is untouched (`smbios_memory` is the reference).
+
 ## 4. Cleanup Versus Measurement
 
 **When:** the collector must clean up what it created. **Do:** separate active probing from unfinished cleanup so

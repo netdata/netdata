@@ -310,3 +310,9 @@ Tests are evidence only when they have an independent oracle:
 - Final sweep: dead fields and helpers, duplicated defaults, unused persisted
   state, repeated finalization, interfaces or knobs whose motivating requirement
   disappeared, and tests that pin prose are removed before review.
+- Checklist pass: before declaring a new collector ready, you MUST check the complete diff against
+  `src/go/plugin/go.d/docs/how-to-write-a-collector.md` (File Layout, Registration And Lifecycle, Collect Flow, Tests),
+  `AGENTS.md#go-test-style`, `./chart-template.md#review-checklist` and the review questions of every
+  `collectors-metadata-yaml` family the collector's `metadata.yaml` fills. Record each deviation and its reason in the
+  SOW; a passing build and test run is not evidence that these were applied. When independent review is required,
+  put the same sections in the reviewer's brief; a parser-only or arithmetic-only review does not cover them.
