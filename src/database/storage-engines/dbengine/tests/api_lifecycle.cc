@@ -2,12 +2,6 @@
 
 #include "support.h"
 
-// Reached today through the public headers, named here because this suite's whole point is what those headers do
-// and do not have to drag in.
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <string>
 
 // The engine's lifecycle and configuration surface, as dbengine-api.h and dbengine-config.h state them: an engine
@@ -19,44 +13,6 @@ namespace {
 
 // Every test that brings a tier up needs a directory nobody else writes: two tiers on one directory corrupt it, and
 // nothing in the engine refuses the second one.
-class Scratch {
-public:
-    Scratch() {
-        char tmpl[] = "/tmp/dbengine-test-XXXXXX";
-        const char *made = mkdtemp(tmpl);
-        if (made)
-            path_ = made;
-    }
-
-    ~Scratch() {
-        if (path_.empty())
-            return;
-
-        // The engine leaves datafiles and journals behind; remove the directory's contents, then the directory.
-        DIR *dir = opendir(path_.c_str());
-        if (dir) {
-            const struct dirent *entry;
-            while ((entry = readdir(dir))) {
-                if (entry->d_name[0] == '.')
-                    continue;
-                unlink((path_ + "/" + entry->d_name).c_str());
-            }
-            closedir(dir);
-        }
-        rmdir(path_.c_str());
-    }
-
-    Scratch(const Scratch &) = delete;
-    Scratch &operator=(const Scratch &) = delete;
-
-    // A tier refuses an empty path by ending the process, so every case checks this before using the directory
-    // rather than letting a full disk take the whole binary down.
-    bool valid() const { return !path_.empty(); }
-    const char *c_str() const { return path_.c_str(); }
-
-private:
-    std::string path_;
-};
 
 struct dbengine_tier_config tier_config(const Scratch &scratch) {
     struct dbengine_tier_config tc = {};

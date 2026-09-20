@@ -9,6 +9,14 @@
 
 #include <gtest/gtest.h>
 
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <cstdlib>
+#include <string>
+
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 
 // The pool the engine's work is dispatched into is process-wide, sized once at its first use from
@@ -34,5 +42,81 @@ inline struct dbengine_config netdata_test_config() {
 
     return cfg;
 }
+
+// Remove a directory and everything below it. Reports whether it managed to, because a cleanup that fails silently
+// leaves litter nobody hears about - and every earlier version of this ignored what unlink() and rmdir() returned.
+//
+// It descends rather than assuming one flat level, and it skips only "." and "..", not every dotfile: a tier writes
+// two plain files today, but a cleanup that quietly cannot cope with anything else is a cleanup that will one day
+// quietly stop working.
+inline bool netdata_test_remove_tree(const std::string &path) {
+    DIR *dir = opendir(path.c_str());
+    if (!dir)
+        return rmdir(path.c_str()) == 0 || errno == ENOENT;
+
+    bool removed_everything = true;
+
+    while (const struct dirent *entry = readdir(dir)) {
+        const std::string name = entry->d_name;
+        if (name == "." || name == "..")
+            continue;
+
+        const std::string child = path + "/" + name;
+
+        struct stat st = {};
+        if (lstat(child.c_str(), &st) != 0) {
+            removed_everything = false;
+            continue;
+        }
+
+        if (S_ISDIR(st.st_mode))
+            removed_everything = netdata_test_remove_tree(child) && removed_everything;
+        else if (unlink(child.c_str()) != 0)
+            removed_everything = false;
+    }
+
+    closedir(dir);
+
+    if (rmdir(path.c_str()) != 0)
+        removed_everything = false;
+
+    return removed_everything;
+}
+
+// A directory of its own for a test that brings a tier up. Two tiers writing one directory corrupt it and nothing
+// in the engine refuses the second, so no two tests may share one.
+class Scratch {
+public:
+    Scratch() {
+        // TMPDIR when the environment names one: a runner or a sandbox that redirects it usually cannot write to
+        // /tmp at all, and a suite that ignores it fails there for a reason that looks like the engine's fault.
+        const char *root = getenv("TMPDIR");
+        if (!root || !*root)
+            root = "/tmp";
+
+        std::string tmpl = std::string(root) + "/dbengine-test-XXXXXX";
+        if (mkdtemp(tmpl.data()))
+            path_ = tmpl;
+    }
+
+    ~Scratch() {
+        if (path_.empty())
+            return;
+
+        if (!netdata_test_remove_tree(path_))
+            ADD_FAILURE() << "the scratch directory " << path_ << " could not be removed";
+    }
+
+    Scratch(const Scratch &) = delete;
+    Scratch &operator=(const Scratch &) = delete;
+
+    // A tier refuses an empty path by ending the process, so every case checks this before using the directory
+    // rather than letting a full or read-only temporary directory take the whole binary down.
+    bool valid() const { return !path_.empty(); }
+    const char *c_str() const { return path_.c_str(); }
+
+private:
+    std::string path_;
+};
 
 #endif // NETDATA_DBENGINE_TESTS_SUPPORT_H

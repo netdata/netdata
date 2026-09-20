@@ -2,12 +2,6 @@
 
 #include "support.h"
 
-// Reached today through the public headers, named here because this suite's whole point is what those headers do
-// and do not have to drag in.
-#include <dirent.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <string>
 #include <vector>
 
@@ -24,44 +18,6 @@
 //    doubles, which allows for the representation and still catches a wrong number.
 
 namespace {
-
-class Scratch {
-public:
-    Scratch() {
-        char tmpl[] = "/tmp/dbengine-test-XXXXXX";
-        const char *made = mkdtemp(tmpl);
-        if (made)
-            path_ = made;
-    }
-
-    ~Scratch() {
-        if (path_.empty())
-            return;
-
-        DIR *dir = opendir(path_.c_str());
-        if (dir) {
-            const struct dirent *entry;
-            while ((entry = readdir(dir))) {
-                if (entry->d_name[0] == '.')
-                    continue;
-                unlink((path_ + "/" + entry->d_name).c_str());
-            }
-            closedir(dir);
-        }
-        rmdir(path_.c_str());
-    }
-
-    Scratch(const Scratch &) = delete;
-    Scratch &operator=(const Scratch &) = delete;
-
-    // A tier refuses an empty path by ending the process, so a case must never reach one. Checked where the
-    // directory is made rather than hoped for here.
-    bool valid() const { return !path_.empty(); }
-    const char *c_str() const { return path_.c_str(); }
-
-private:
-    std::string path_;
-};
 
 // One engine with tier 0 up and ready, torn down in the order the contract requires. Every case in this file needs
 // the same thing, and needs it on a directory of its own.
