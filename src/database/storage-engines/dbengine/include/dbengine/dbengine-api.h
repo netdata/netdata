@@ -127,9 +127,10 @@ uint64_t dbengine_disk_space_max(STORAGE_INSTANCE *si);             // the tier'
 uint64_t dbengine_disk_space_used(STORAGE_INSTANCE *si);
 uint64_t dbengine_metrics(STORAGE_INSTANCE *si);
 uint64_t dbengine_samples(STORAGE_INSTANCE *si);
-// the oldest time the tier holds data for; 0 until dbengine_readiness_wait() returned for it (the load may not have
-// found the oldest datafile yet), and for a tier that came up empty the moment it became ready, so such a tier's
-// retention (what the embedder derives from this) counts from then
+// the oldest time the tier holds data for: 0 while no journal has given it one yet, the oldest found so far while
+// its registry loads (only final once dbengine_readiness_wait() returned for it), and for a tier that came up
+// empty the moment it became ready, so such a tier's retention (what the embedder derives from this) counts from
+// then
 time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si);
 uint64_t dbengine_get_used_disk_space(DBENGINE_TIER *tier);
 uint64_t dbengine_get_directory_free_bytes_space(DBENGINE_TIER *tier);

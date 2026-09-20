@@ -1116,7 +1116,8 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
 
     // a tier that came up with no data reports the moment it became ready as its first time, so the retention the
     // readers derive from dbengine_global_first_time_s() (rrd-retention.c, pulse-db-dbengine-retention.c) counts
-    // from then; the sentinel is what a tier holds until this call returns for it
+    // from then; the sentinel is what a tier holds while no journal has given it a first time (the loaders lower it
+    // as they go), and only a tier whose load found none still holds it here
     if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
 
@@ -1127,8 +1128,9 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     errno = saved_errno;
 }
 
-// a malformed configuration is a programming error, fatal; a path that does not fit the tier is refused, with
-// UV_ENAMETOOLONG (it was silently truncated before, after the file descriptors had been reserved)
+// a malformed configuration is a programming error, fatal; a path longer than DBENGINE_DBFILES_PATH_MAX is refused,
+// with UV_ENAMETOOLONG (a path that overflowed the tier was silently truncated before, after the file descriptors
+// had been reserved; one that fit but left no room for the file names truncated those)
 static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) {
     if(tc->tier >= RRD_STORAGE_TIERS)
         fatal("DBENGINE: tier %zu does not exist (the engine has %d tiers)", tc->tier, RRD_STORAGE_TIERS);
@@ -1157,8 +1159,8 @@ static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) 
 
 int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tier_config *tc)
 {
-    // the configuration first (a malformed one is a programming error, fatal whatever the engine's state; a path
-    // that does not fit is refused), then the engine and the tier, all before anything is written: a refused init
+    // the configuration first (a malformed one is a programming error, fatal whatever the engine's state; an
+    // over-long path is refused), then the engine and the tier, all before anything is written: a refused init
     // must leave the tier as it found it
     int rc = dbengine_tier_config_validate(tc);
     if(rc)

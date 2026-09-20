@@ -80,7 +80,9 @@ struct dbengine_config {
     // from the UV_THREADPOOL_SIZE environment variable (4 threads when unset); nothing resizes it afterwards. The
     // engine dispatches every piece of work it takes off its event loop into it: extent writes and reads, flushes,
     // the registry loads of a tier coming up, journal indexing, datafile rotation, query preparation (a query at
-    // the synchronous priorities runs on the caller's own thread and never touches the pool). The engine neither
+    // STORAGE_PRIORITY_SYNCHRONOUS runs its preparation and its reads on the caller's own thread and never touches
+    // the pool; one at STORAGE_PRIORITY_SYNCHRONOUS_FIRST prepares and reads its first extent there and queues the
+    // rest). The engine neither
     // sizes the pool nor can read its size: libuv_worker_threads is what the embedder tells it the size is, and it
     // must equal the real one, so the embedder sets UV_THREADPOOL_SIZE to the same number before the process first
     // touches the pool (the daemon does, from the variable it hands here: netdata-conf-global.c). The engine counts
@@ -166,9 +168,10 @@ struct dbengine_config {
 struct dbengine_config dbengine_config_defaults(void);
 
 // One tier's configuration, handed to dbengine_tier_init(); the engine copies what it needs.
-// the longest dbfiles_path a tier takes: the engine appends the names of its datafiles and journals (and the journal
-// writer's temporary directory) to it in FILENAME_MAX-sized buffers, so a path that leaves them no room is refused
-// by dbengine_tier_init() (UV_ENAMETOOLONG) rather than silently truncated
+// the longest dbfiles_path a tier takes: the engine appends the names of its datafiles and journals (at most 31
+// characters, "/journalfile-<tier>-<number>.njfv2") to it in buffers of FILENAME_MAX + 1, so a path that leaves
+// them no room is refused by dbengine_tier_init() (UV_ENAMETOOLONG) rather than silently truncated; 64 is the room
+// kept
 #define DBENGINE_DBFILES_PATH_MAX (FILENAME_MAX - 64)
 
 struct dbengine_tier_config {
