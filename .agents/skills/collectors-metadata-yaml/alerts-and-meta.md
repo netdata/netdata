@@ -74,6 +74,10 @@ an aspects table (name as `<Module>:<id>`, `require_cloud`, `performance`, `secu
 Prerequisites (one h5 per entry, or "No additional configuration is required."), h4 Parameters (table), h4 Returns
 (`returns.description` and a columns table). Empty renders nothing.
 
+- The Name row is a UI display name. `integrations/templates/functions.md` MUST retain `|capitalize` on the module
+  component to match the UI's display logic. Do not remove it to match the raw registered/API identifier. Keep
+  `meta.module_name` and Function `id` unchanged in metadata; API invocation examples MUST use the exact registered
+  identifier. Display formatting does not rename the callable Function.
 - Every Function the collector registers has an entry, and every entry has a Function in the code. `id`, the
   parameters (name, type, required, default, options), and the return columns (name, type, unit, visibility) mirror
   the implementation verbatim; they are drift checks, not prose.

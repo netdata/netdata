@@ -51,7 +51,8 @@ Behavior not visible in the schema:
   `metrics.profile_coverage` is a generated in-memory projection that must never be authored
   (`how-tos/prometheus-profile-metadata.md`).
 - `functions.list[].parameters[].default` is a string only. `returns.columns[].visibility` is rendered as a table cell
-  by `templates/functions.md`; the `hidden` value does not suppress the column.
+  by `templates/functions.md`; the `hidden` value does not suppress the column. Function display-name capitalization:
+  `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md#5-functions-live-data`.
 - `additionalProperties: false` is set only on `profile_coverage`, the two `metrics.dynamic_*` list entries, and (via
   `shared.json`) `instance.variables` and the troubleshooting `errors.list[]` entry, so unknown module keys pass through
   (`gotchas.md`, `alternative_monitored_instances`).
