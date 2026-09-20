@@ -9,8 +9,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
@@ -89,6 +91,21 @@ func TestCollector_Configuration(t *testing.T) {
 	// Verify defaults
 	assert.Equal(t, "sqlserver://localhost:1433", c.DSN)
 	assert.False(t, c.CollectDisabledJobs)
+}
+
+func TestConfig_FunctionTimeoutDefaultsAreIndependentOfCollectionTimeout(t *testing.T) {
+	c := Config{Timeout: confopt.Duration(5 * time.Second)}
+
+	assert.Equal(t, 30*time.Second, c.topQueriesTimeout())
+	assert.Equal(t, 30*time.Second, c.deadlockInfoTimeout())
+	assert.Equal(t, 30*time.Second, c.errorInfoTimeout())
+
+	c.Functions.TopQueries.Timeout = confopt.Duration(11 * time.Second)
+	c.Functions.DeadlockInfo.Timeout = confopt.Duration(12 * time.Second)
+	c.Functions.ErrorInfo.Timeout = confopt.Duration(13 * time.Second)
+	assert.Equal(t, 11*time.Second, c.topQueriesTimeout())
+	assert.Equal(t, 12*time.Second, c.deadlockInfoTimeout())
+	assert.Equal(t, 13*time.Second, c.errorInfoTimeout())
 }
 
 func TestCollector_Charts(t *testing.T) {

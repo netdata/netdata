@@ -7,14 +7,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func mssqlFunctionContextError(ctx context.Context, err error) *funcapi.FunctionResponse {
+func mssqlFunctionContextError(ctx context.Context, err error, timeout time.Duration, functionName string) *funcapi.FunctionResponse {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return funcapi.ErrorResponse(504, "query timed out")
+		return funcapi.ErrorResponse(504, "%s query timed out after %s; increase functions.%s.timeout if needed", functionName, timeout.Round(time.Millisecond), functionName)
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 		return funcapi.ErrorResponse(499, "query canceled")

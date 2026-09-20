@@ -283,7 +283,7 @@ modules:
               required: false
               group: Functions
             - name: functions.top_queries.timeout
-              description: Query timeout for top-queries function (seconds). Uses collector timeout if not set.
+              description: Query timeout for top-queries function (seconds). Set to 0 to use the Function default of 30 seconds.
               default_value: ""
               required: false
               group: Functions
@@ -307,7 +307,7 @@ modules:
               required: false
               group: Functions
             - name: functions.deadlock_info.timeout
-              description: Query timeout for deadlock-info function (seconds). Uses collector timeout if not set.
+              description: Query timeout for deadlock-info function (seconds). Set to 0 to use the Function default of 30 seconds.
               default_value: ""
               required: false
               group: Functions
@@ -323,7 +323,7 @@ modules:
               required: false
               group: Functions
             - name: functions.error_info.timeout
-              description: Query timeout for error-info function (seconds). Uses collector timeout if not set.
+              description: Query timeout for error-info function (seconds). Set to 0 to use the Function default of 30 seconds.
               default_value: ""
               required: false
               group: Functions

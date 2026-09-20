@@ -104,9 +104,11 @@ type ErrorInfoConfig struct {
 	UseRingBuffer bool             `yaml:"use_ring_buffer" json:"use_ring_buffer"`
 }
 
+const defaultMSSQLFunctionTimeout = 30 * time.Second
+
 func (c Config) topQueriesTimeout() time.Duration {
 	if c.Functions.TopQueries.Timeout == 0 {
-		return c.Timeout.Duration()
+		return defaultMSSQLFunctionTimeout
 	}
 	return c.Functions.TopQueries.Timeout.Duration()
 }
@@ -130,14 +132,14 @@ func (c Config) topQueriesTimeWindowDays() int {
 
 func (c Config) deadlockInfoTimeout() time.Duration {
 	if c.Functions.DeadlockInfo.Timeout == 0 {
-		return c.Timeout.Duration()
+		return defaultMSSQLFunctionTimeout
 	}
 	return c.Functions.DeadlockInfo.Timeout.Duration()
 }
 
 func (c Config) errorInfoTimeout() time.Duration {
 	if c.Functions.ErrorInfo.Timeout == 0 {
-		return c.Timeout.Duration()
+		return defaultMSSQLFunctionTimeout
 	}
 	return c.Functions.ErrorInfo.Timeout.Duration()
 }

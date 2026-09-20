@@ -213,12 +213,12 @@ func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 	mock.ExpectQuery("is_query_store_on").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.dm_exec_query_stats`).
 		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
-	mock.ExpectQuery(`CROSS APPLY sys\.dm_exec_sql_text`).
+	mock.ExpectQuery(`OUTER APPLY sys\.dm_exec_sql_text`).
 		WillReturnRows(sqlmock.NewRows([]string{"queryHash", "query", "database", "calls", "totalTime", "avgTime"}).
 			AddRow("0x1122334455667788", "SELECT 1", "appdb", 7, 42.0, 6.0))
 	mock.ExpectQuery("server_event_session_fields").WithArgs("netdata_errors").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("netdata_errors.xel"))
-	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", 500).
+	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", 500).
 		WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 
 	c := New()
@@ -341,15 +341,20 @@ func TestBuildPlanCacheSQL(t *testing.T) {
 		query := f.buildPlanCacheSQL(cols, "calls", 7, 500)
 
 		assert.Contains(t, query, "FROM sys.dm_exec_query_stats AS qs")
-		assert.Contains(t, query, "CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle)")
-		assert.Contains(t, query, "GROUP BY qs.query_hash")
+		assert.Contains(t, query, "OUTER APPLY (")
+		assert.Contains(t, query, "FROM sys.dm_exec_plan_attributes(qs.plan_handle)")
+		assert.Contains(t, query, "OUTER APPLY sys.dm_exec_sql_text(CONVERT(VARBINARY(64), a.sql_handle_hex, 1))")
+		assert.Contains(t, query, "SELECT TOP 500 *\n    FROM aggregated")
+		assert.Less(t, strings.Index(query, "SELECT TOP 500 *\n    FROM aggregated"), strings.Index(query, "OUTER APPLY sys.dm_exec_sql_text"))
+		assert.NotContains(t, query, "CROSS APPLY sys.dm_exec_sql_text")
+		assert.Contains(t, query, "GROUP BY rs.query_hash")
 		assert.Contains(t, query, "SELECT TOP 500")
 		assert.Contains(t, query, "ORDER BY [calls] DESC")
 		assert.Contains(t, query, "NOT IN ('master', 'tempdb', 'model', 'msdb')")
 		// Same hex rendering as Query Store, so error attribution still matches.
-		assert.Contains(t, query, "CONVERT(VARCHAR(64), qs.query_hash, 1) AS [queryHash]")
+		assert.Contains(t, query, "CONVERT(VARCHAR(64), rs.query_hash, 1) AS [queryHash]")
 		// Averages must not truncate: both operands are bigint.
-		assert.Contains(t, query, "SUM(qs.total_dop) * 1.0 / SUM(qs.execution_count)")
+		assert.Contains(t, query, "SUM(rs.total_dop) * 1.0 / SUM(rs.execution_count)")
 		assert.NotContains(t, query, "query_store")
 	})
 
@@ -398,6 +403,7 @@ func TestTopQueries_QueryStoreCapabilityTimeout(t *testing.T) {
 	response := handler.Handle(context.Background(), topQueriesMethodID, resolved)
 	assert.Equal(t, 504, response.Status)
 	assert.Contains(t, response.Message, "timed out")
+	assert.Contains(t, response.Message, "functions.top_queries.timeout")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -444,6 +450,7 @@ func TestTopQueries_QueryStoreColumnDiscoveryTimeout(t *testing.T) {
 	response := handler.collectData(context.Background(), "")
 	assert.Equal(t, 504, response.Status)
 	assert.Contains(t, response.Message, "timed out")
+	assert.Contains(t, response.Message, "functions.top_queries.timeout")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

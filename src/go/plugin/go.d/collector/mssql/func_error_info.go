@@ -189,7 +189,7 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
 	defer cancel()
 	if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
-		if response := mssqlFunctionContextError(queryCtx, err); response != nil {
+		if response := mssqlFunctionContextError(queryCtx, err, f.router.collector.errorInfoTimeout(), "error_info"); response != nil {
 			return response
 		}
 		return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
@@ -206,9 +206,11 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 
 	sessionName := f.router.collector.errorInfoSessionName()
 	limit := f.router.collector.topQueriesLimit()
+	started := time.Now()
 	status, source, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
+	f.router.collector.Debugf("error-info: source=%s status=%s rows=%d duration=%s", source, status, len(rows), time.Since(started).Round(time.Millisecond))
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.errorInfoTimeout(), "error_info"); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -618,7 +620,7 @@ func shouldFallbackErrorInfo(err error) bool {
 
 func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlErrorReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
 	query := queryMSSQLErrorInfoEventFile
-	args := []any{sql.Named("filePath", target.filePath), sql.Named("filePrefix", target.filePrefix), sql.Named("limit", limit)}
+	args := []any{sql.Named("filePath", target.filePath), sql.Named("limit", limit)}
 	if target.filePath == "" {
 		query = queryMSSQLErrorInfoRingBuffer
 		if c.isAzureSQLDatabase() {
@@ -676,8 +678,7 @@ func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target ms
 // mssqlErrorReadTarget says where error_reported events should be read from.
 type mssqlErrorReadTarget struct {
 	// filePath is the event_file read pattern. Empty when reading the ring buffer.
-	filePath   string
-	filePrefix string
+	filePath string
 }
 
 // resolveMSSQLErrorReadTarget locates the Extended Events target for a session, reporting
@@ -712,9 +713,9 @@ func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName
 	return mssqlErrorReadTarget{}, available, err
 }
 
-// eventFileReadTarget turns the configured event_file filename into the read path and
-// exact generated-file prefix. Local files use a wildcard; Azure Storage uses the
-// wildcard-free blob prefix required by sys.fn_xe_file_target_read_file.
+// eventFileReadTarget turns the configured event_file filename into the read path.
+// Local files use a wildcard; Azure Storage uses the wildcard-free blob prefix
+// required by sys.fn_xe_file_target_read_file.
 func eventFileReadTarget(configured string) mssqlErrorReadTarget {
 	path := strings.TrimSpace(configured)
 	if path == "" {
@@ -725,16 +726,11 @@ func eventFileReadTarget(configured string) mssqlErrorReadTarget {
 	}
 
 	prefix := path + "_0_"
-	base := strings.ReplaceAll(path, `\`, "/")
-	if idx := strings.LastIndex(base, "/"); idx >= 0 {
-		base = base[idx+1:]
-	}
-	filePrefix := base + "_0_"
 	lower := strings.ToLower(path)
 	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
-		return mssqlErrorReadTarget{filePath: prefix, filePrefix: filePrefix}
+		return mssqlErrorReadTarget{filePath: prefix}
 	}
-	return mssqlErrorReadTarget{filePath: prefix + "*.xel", filePrefix: filePrefix}
+	return mssqlErrorReadTarget{filePath: prefix + "*.xel"}
 }
 
 // mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events

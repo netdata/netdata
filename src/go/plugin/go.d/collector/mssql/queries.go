@@ -360,7 +360,7 @@ WHERE object_name LIKE '%SQL Errors%'
 const querySystemHealthLatestDeadlockEventFile = `
 WITH xevents AS (
   SELECT CAST(event_data AS XML) AS event_xml
-  FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
+  FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
   WHERE object_name = 'xml_deadlock_report'
 )
 SELECT TOP (1)
@@ -467,37 +467,13 @@ WHERE xs.name = @sessionName
 
 // queryMSSQLErrorInfoEventFile reads recent error_reported events from the event_file target.
 // @filePath is the resolved on-disk pattern, not the session name; see
-// queryMSSQLErrorSessionEventFilePath.
+// queryMSSQLErrorSessionEventFilePath. The path already selects the generated
+// rollover files, so no second filename-prefix filter is needed.
 //
 // query_hash is returned as the raw unsigned-64-bit decimal string that Extended Events
 // emits. It is not converted here because query_hash exceeds bigint range, so
 // CAST(... AS bigint) would overflow; mssqlQueryHashToHex does it in Go instead.
 const queryMSSQLErrorInfoEventFile = `
-WITH file_events AS (
-  SELECT
-    CAST(event_data AS XML) AS event_xml,
-    RIGHT(
-      file_name,
-      CHARINDEX('/', REVERSE('/' + REPLACE(file_name, '\', '/'))) - 1
-    ) AS file_basename
-  FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
-  WHERE object_name = 'error_reported'
-), xevents AS (
-  SELECT event_xml
-  FROM file_events
-  WHERE LEN(file_basename) > LEN(@filePrefix) + 4
-    AND LEFT(file_basename, LEN(@filePrefix)) = @filePrefix
-    AND RIGHT(file_basename, 4) = '.xel'
-    AND SUBSTRING(
-      file_basename,
-      LEN(@filePrefix) + 1,
-      CASE
-        WHEN LEN(file_basename) > LEN(@filePrefix) + 4
-        THEN LEN(file_basename) - LEN(@filePrefix) - 4
-        ELSE 0
-      END
-    ) NOT LIKE '%[^0123456789]%'
-)
 SELECT TOP (@limit)
   event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') AS event_time,
   event_xml.value('(/event/data[@name="error_number"]/value)[1]', 'int') AS error_number,
@@ -505,7 +481,11 @@ SELECT TOP (@limit)
   event_xml.value('(/event/data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
   event_xml.value('(/event/action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
   event_xml.value('(/event/action[@name="query_hash"]/value)[1]', 'nvarchar(32)') AS query_hash
-FROM xevents
+FROM (
+  SELECT CAST(event_data AS XML) AS event_xml
+  FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
+  WHERE object_name = 'error_reported'
+) AS events
 ORDER BY event_time DESC;
 `
 

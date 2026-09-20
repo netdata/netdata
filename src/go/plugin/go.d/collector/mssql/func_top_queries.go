@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlquery"
@@ -243,7 +244,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 		defer cancel()
 		if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
-			if response := mssqlFunctionContextError(queryCtx, err); response != nil {
+			if response := mssqlFunctionContextError(queryCtx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 				return response
 			}
 			return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
@@ -286,7 +287,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	}
 	source, availableCols, err := f.resolveTopQueriesSource(ctx)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -312,9 +313,11 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	limit := f.router.collector.topQueriesLimit()
 	query := f.buildTopQueriesSQL(source, cols, validatedSortColumn, timeWindowDays, limit)
 
+	started := time.Now()
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		f.router.collector.Debugf("top-queries: source=%s duration=%s query_error=%v", source, time.Since(started).Round(time.Millisecond), err)
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -333,11 +336,13 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	data, err := f.scanDynamicRows(rows, cols)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		f.router.collector.Debugf("top-queries: source=%s duration=%s scan_error=%v", source, time.Since(started).Round(time.Millisecond), err)
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 			return response
 		}
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
+	f.router.collector.Debugf("top-queries: source=%s rows=%d duration=%s", source, len(data), time.Since(started).Round(time.Millisecond))
 
 	errorStatus, errorDetails := f.router.collector.collectMSSQLErrorDetails(ctx)
 	// Plan attribution reads Query Store plan XML, so it has nothing to answer with when
@@ -347,7 +352,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	if source == topQueriesSourceQueryStore {
 		planOpsByDB = f.router.collector.collectMSSQLPlanOps(ctx, data, cols)
 	}
-	if response := mssqlFunctionContextError(ctx, ctx.Err()); response != nil {
+	if response := mssqlFunctionContextError(ctx, ctx.Err(), f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 		return response
 	}
 	extraCols := []topQueriesColumn{topQueriesSourceColumn(source)}
@@ -868,7 +873,7 @@ func (f *funcTopQueries) buildTopQueriesSQL(source topQueriesSource, cols []topQ
 	return f.buildQueryStoreSQL(cols, sortColumn, timeWindowDays, limit)
 }
 
-// buildPlanCacheSelectExpressions mirrors buildSelectExpressions for sys.dm_exec_query_stats.
+// buildPlanCacheSelectExpressions builds aggregate expressions for ranked plan-cache rows.
 // The two sources need separate aggregation: Query Store stores per-interval averages that
 // must be re-weighted by execution count, while the plan cache stores running totals that
 // only need dividing. Averages multiply by 1.0 first because both operands are bigint and
@@ -882,32 +887,31 @@ func (f *funcTopQueries) buildPlanCacheSelectExpressions(cols []topQueriesColumn
 		case col.IsIdentity:
 			switch col.Name {
 			case "queryHash":
-				// Same hex rendering as the Query Store path, so error attribution keeps matching.
-				expr = fmt.Sprintf("CONVERT(VARCHAR(64), qs.query_hash, 1) AS [%s]", col.Name)
-			case "query":
-				expr = fmt.Sprintf("MIN(qs.query_sql_text) AS [%s]", col.Name)
-			case "database":
-				expr = fmt.Sprintf("MIN(qs.database_name) AS [%s]", col.Name)
+				// queryHash is emitted by buildPlanCacheSQL because it is the grouping key.
+				continue
+			case "query", "database":
+				// Text extraction is deliberately deferred until after statistics are aggregated.
+				continue
 			}
 		case col.Name == "calls":
-			expr = fmt.Sprintf("SUM(qs.execution_count) AS [%s]", col.Name)
+			expr = fmt.Sprintf("SUM(rs.execution_count) AS [%s]", col.Name)
 		case col.Name == "totalTime":
-			expr = fmt.Sprintf("SUM(qs.total_elapsed_time) / 1000.0 AS [%s]", col.Name)
+			expr = fmt.Sprintf("SUM(rs.total_elapsed_time) / 1000.0 AS [%s]", col.Name)
 		case col.NeedsAvg && col.IsMicroseconds:
-			expr = fmt.Sprintf("CASE WHEN SUM(qs.execution_count) > 0 THEN SUM(qs.%s) * 1.0 / SUM(qs.execution_count) / 1000.0 ELSE 0 END AS [%s]", col.CacheColumn, col.Name)
+			expr = fmt.Sprintf("CASE WHEN SUM(rs.execution_count) > 0 THEN SUM(rs.%s) * 1.0 / SUM(rs.execution_count) / 1000.0 ELSE 0 END AS [%s]", col.CacheColumn, col.Name)
 		case col.NeedsAvg:
-			expr = fmt.Sprintf("CASE WHEN SUM(qs.execution_count) > 0 THEN SUM(qs.%s) * 1.0 / SUM(qs.execution_count) ELSE 0 END AS [%s]", col.CacheColumn, col.Name)
+			expr = fmt.Sprintf("CASE WHEN SUM(rs.execution_count) > 0 THEN SUM(rs.%s) * 1.0 / SUM(rs.execution_count) ELSE 0 END AS [%s]", col.CacheColumn, col.Name)
 		case strings.HasPrefix(col.CacheColumn, "last_"):
-			expr = topQueriesLastValueExpression(col, "qs", col.CacheColumn)
+			expr = topQueriesLastValueExpression(col, "rs", col.CacheColumn)
 		default:
 			aggFunc := "MAX"
 			if strings.HasPrefix(col.CacheColumn, "min_") {
 				aggFunc = "MIN"
 			}
 			if col.IsMicroseconds {
-				expr = fmt.Sprintf("%s(qs.%s) / 1000.0 AS [%s]", aggFunc, col.CacheColumn, col.Name)
+				expr = fmt.Sprintf("%s(rs.%s) / 1000.0 AS [%s]", aggFunc, col.CacheColumn, col.Name)
 			} else {
-				expr = fmt.Sprintf("%s(qs.%s) AS [%s]", aggFunc, col.CacheColumn, col.Name)
+				expr = fmt.Sprintf("%s(rs.%s) AS [%s]", aggFunc, col.CacheColumn, col.Name)
 			}
 		}
 		if expr != "" {
@@ -918,14 +922,30 @@ func (f *funcTopQueries) buildPlanCacheSelectExpressions(cols []topQueriesColumn
 }
 
 // buildPlanCacheSQL aggregates cached plans by query hash across the whole instance.
-//
-// The statement text lives in the plan cache rather than alongside the statistics, so the
-// text function has to be applied before grouping. The recency predicate is pushed into the
-// derived table so the optimizer can discard rows before that apply. Unlike Query Store,
-// the plan cache has no interval history, so the configured window filters by last
-// execution instead of aggregating a period.
+// Statistics are reduced before the text function is applied, because extracting statement
+// text for every cached plan is substantially more expensive than aggregating the DMV rows.
+// Unlike Query Store, the plan cache has no interval history, so the configured window
+// filters by last execution instead of aggregating a period.
 func (f *funcTopQueries) buildPlanCacheSQL(cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
 	selectExpr := strings.Join(f.buildPlanCacheSelectExpressions(cols), ",\n  ")
+	outerExpr := make([]string, 0, len(cols))
+	for _, col := range cols {
+		switch col.Name {
+		case "queryHash":
+			outerExpr = append(outerExpr, "a.[queryHash]")
+		case "query":
+			outerExpr = append(outerExpr, "SUBSTRING(qt.text, (a.statement_start_offset / 2) + 1, ((CASE a.statement_end_offset WHEN -1 THEN DATALENGTH(qt.text) ELSE a.statement_end_offset END - a.statement_start_offset) / 2) + 1) AS [query]")
+		case "database":
+			outerExpr = append(outerExpr, "DB_NAME(a.database_id) AS [database]")
+		default:
+			outerExpr = append(outerExpr, fmt.Sprintf("a.[%s]", col.Name))
+		}
+	}
+
+	groupExpr := ""
+	if selectExpr != "" {
+		groupExpr = ",\n  " + selectExpr
+	}
 
 	recencyFilter := ""
 	if timeWindowDays > 0 {
@@ -939,29 +959,42 @@ func (f *funcTopQueries) buildPlanCacheSQL(cols []topQueriesColumn, sortColumn s
 	}
 
 	return fmt.Sprintf(`
-SELECT TOP %d
-  %s
-FROM (
+WITH ranked_stats AS (
     SELECT qs.*,
+           pa.netdata_plan_database_id,
            ROW_NUMBER() OVER (
              PARTITION BY qs.query_hash
              ORDER BY qs.last_execution_time DESC, qs.plan_handle, qs.statement_start_offset
-           ) AS execution_rank,
-           DB_NAME(qt.dbid) AS database_name,
-           SUBSTRING(qt.text,
-                     (qs.statement_start_offset / 2) + 1,
-                     ((CASE qs.statement_end_offset
-                         WHEN -1 THEN DATALENGTH(qt.text)
-                         ELSE qs.statement_end_offset
-                       END - qs.statement_start_offset) / 2) + 1) AS query_sql_text
+           ) AS execution_rank
     FROM sys.dm_exec_query_stats AS qs
-    CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) AS qt
-    WHERE (DB_NAME(qt.dbid) IS NULL OR DB_NAME(qt.dbid) NOT IN ('master', 'tempdb', 'model', 'msdb'))
+    OUTER APPLY (
+        SELECT MAX(CONVERT(INT, value)) AS netdata_plan_database_id
+        FROM sys.dm_exec_plan_attributes(qs.plan_handle)
+        WHERE attribute = 'dbid'
+    ) AS pa
+    WHERE qs.query_hash IS NOT NULL
+      AND (DB_NAME(pa.netdata_plan_database_id) IS NULL OR DB_NAME(pa.netdata_plan_database_id) NOT IN ('master', 'tempdb', 'model', 'msdb'))
     %s
-) AS qs
-GROUP BY qs.query_hash
+), aggregated AS (
+    SELECT
+      CONVERT(VARCHAR(64), rs.query_hash, 1) AS [queryHash],
+      MAX(CONVERT(VARCHAR(130), CASE WHEN rs.execution_rank = 1 THEN rs.sql_handle END, 1)) AS sql_handle_hex,
+      MAX(CASE WHEN rs.execution_rank = 1 THEN rs.netdata_plan_database_id END) AS database_id,
+      MAX(CASE WHEN rs.execution_rank = 1 THEN rs.statement_start_offset END) AS statement_start_offset,
+      MAX(CASE WHEN rs.execution_rank = 1 THEN rs.statement_end_offset END) AS statement_end_offset%s
+    FROM ranked_stats AS rs
+    GROUP BY rs.query_hash
+), top_candidates AS (
+    SELECT TOP %d *
+    FROM aggregated
+    ORDER BY [%s] DESC
+)
+SELECT
+  %s
+FROM top_candidates AS a
+OUTER APPLY sys.dm_exec_sql_text(CONVERT(VARBINARY(64), a.sql_handle_hex, 1)) AS qt
 ORDER BY [%s] DESC;
-`, limit, selectExpr, recencyFilter, orderByExpr)
+`, recencyFilter, groupExpr, limit, orderByExpr, strings.Join(outerExpr, ",\n  "), orderByExpr)
 }
 
 func defaultTopQueriesOrderColumn(cols []topQueriesColumn) string {
