@@ -34,8 +34,8 @@ bool ram_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *fir
 bool ram_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 void ram_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 
-STORAGE_METRICS_GROUP *ram_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
-void ram_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
+STORAGE_METRICS_GROUP *ram_metrics_group_get(void);
+void ram_metrics_group_release(STORAGE_METRICS_GROUP *smg);
 
 STORAGE_COLLECT_HANDLE *ram_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
 void ram_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);

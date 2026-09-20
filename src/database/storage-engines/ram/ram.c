@@ -18,11 +18,11 @@ static void __attribute__((destructor)) destroy_lock(void) {
 // ----------------------------------------------------------------------------
 // metrics groups
 
-STORAGE_METRICS_GROUP *ram_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *ram_metrics_group_get(void) {
     return NULL;
 }
 
-void ram_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+void ram_metrics_group_release(STORAGE_METRICS_GROUP *smg __maybe_unused) {
     // if(!smg) return; // smg may be NULL
     ;
 }

@@ -112,7 +112,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
             if(!eng) continue;
 
-            st->smg[tier] = storage_engine_metrics_group_get(eng->seb, host->db[tier].si, &st->chart_uuid);
+            st->smg[tier] = storage_engine_metrics_group_get(eng->seb);
         }
     }
 

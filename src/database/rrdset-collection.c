@@ -82,7 +82,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         if(!eng) continue;
 
         if(st->smg[tier]) {
-            storage_engine_metrics_group_release(eng->seb, host->db[tier].si, st->smg[tier]);
+            storage_engine_metrics_group_release(eng->seb, st->smg[tier]);
             st->smg[tier] = NULL;
         }
     }

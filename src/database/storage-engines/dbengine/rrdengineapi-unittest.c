@@ -742,7 +742,7 @@ int dbengine_zero_page_cadence_unittest(DBENGINE_ENGINE *engine, STORAGE_INSTANC
     uuid_generate(uuid);
     UUIDMAP_ID id = uuidmap_create(uuid);
     STORAGE_METRIC_HANDLE *smh = dbengine_metric_get_or_create_by_id(si, id);
-    STORAGE_METRICS_GROUP *smg = dbengine_metrics_group_get(si, &uuid);
+    STORAGE_METRICS_GROUP *smg = dbengine_metrics_group_get();
     STORAGE_COLLECT_HANDLE *sch = smh ? dbengine_store_init(smh, 10, smg) : NULL;
     if(!smh || !sch) {
         fprintf(stderr, " >>> DBENGINE: zero-page-cadence metric initialization failed\n");
@@ -793,7 +793,7 @@ cleanup:
     if(sch)
         dbengine_store_finalize(sch); // flushes the page it holds
     if(smg)
-        dbengine_metrics_group_release(si, smg);
+        dbengine_metrics_group_release(smg);
     if(smh)
         dbengine_metric_release(smh);
     uuidmap_free(id);

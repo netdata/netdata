@@ -48,14 +48,14 @@ static inline bool dbengine_page_alignment_release(struct pg_alignment *pa) {
 }
 
 // charts call this
-STORAGE_METRICS_GROUP *dbengine_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *dbengine_metrics_group_get(void) {
     struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
     dbengine_page_alignment_acquire(pa);
     return (STORAGE_METRICS_GROUP *)pa;
 }
 
 // charts call this
-void dbengine_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_METRICS_GROUP *smg) {
+void dbengine_metrics_group_release(STORAGE_METRICS_GROUP *smg) {
     if(unlikely(!smg)) return;
 
     struct pg_alignment *pa = (struct pg_alignment *)smg;
@@ -1114,6 +1114,9 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     completion_wait_for(&ctx->loading.load_mrg);
     completion_destroy(&ctx->loading.load_mrg);
 
+    // a tier that came up with no data reports the moment it became ready as its first time: from here on the
+    // readers (dbengine_global_first_time_s() and the retention they derive from it) see a tier that is up, and
+    // the sentinel is only ever what a tier holds before its registry load completed
     if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
 

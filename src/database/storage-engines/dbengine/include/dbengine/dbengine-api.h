@@ -131,8 +131,12 @@ bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t
 bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
 void dbengine_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 
-extern STORAGE_METRICS_GROUP *dbengine_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
-extern void dbengine_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
+// a chart's metrics group: the page alignment its dimensions share (its address seeds the page size every metric
+// of the chart is given, so their pages cut at the same points in time). It is bound to no tier and holds nothing
+// of the chart; the caller hands it to dbengine_store_init() for each of the chart's metrics and releases it when
+// the chart goes
+STORAGE_METRICS_GROUP *dbengine_metrics_group_get(void);
+void dbengine_metrics_group_release(STORAGE_METRICS_GROUP *smg);
 
 // work the embedder wants run on the engine's worker pool, next to the engine's own jobs. The caller owns the
 // request and its completion (init before, destroy after); the engine runs fn(data) on a worker and marks the
