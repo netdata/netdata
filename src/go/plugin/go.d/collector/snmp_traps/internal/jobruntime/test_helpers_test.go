@@ -265,7 +265,7 @@ func newTestV3Job(t *testing.T, jobName string, writer output.Writer, users []re
 	t.Helper()
 	cfg := receiver.PolicyConfig{Versions: []string{"v3"}, USMUsers: users, EngineIDWhitelist: engineIDs}
 	j := newTestV2JobWithPolicy(jobName, writer, cfg)
-	if err := j.receiver.PrepareV3(t.TempDir(), jobName); err != nil {
+	if err := j.receiver.PrepareV3(t.TempDir(), jobName, false); err != nil {
 		t.Fatalf("prepare test v3 receiver: %v", err)
 	}
 	t.Cleanup(j.receiver.RollbackPreparedState)
