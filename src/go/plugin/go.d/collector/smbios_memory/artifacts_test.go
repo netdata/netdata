@@ -3,16 +3,12 @@
 package smbios_memory
 
 import (
-	"encoding/json"
 	"os"
 	"testing"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,38 +27,7 @@ func TestArtifacts(t *testing.T) {
 	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, chartTemplateYAML)
 	collecttest.AssertHealthAlertsMatchMetadata(t, health, metadata)
 	collecttest.AssertMetadataAlertsMatchHealthConfig(t, metadata, health)
-	// This one-option form intentionally has no tabs; the tabbed-form helper does not apply.
-	type option struct {
-		Description string
-		Default     int `json:"default" yaml:"default_value"`
-	}
-	var form struct {
-		JSONSchema struct {
-			Properties map[string]option
-		}
-	}
-	var doc struct {
-		Modules []struct {
-			Setup struct {
-				Configuration struct {
-					Options struct {
-						List []struct {
-							Name   string
-							option `yaml:",inline"`
-						}
-					}
-				}
-			}
-		}
-	}
-	require.NoError(t, json.Unmarshal([]byte(configSchema), &form))
-	require.NoError(t, yaml.Unmarshal(metadata, &doc))
-	require.NotEmpty(t, doc.Modules)
-	documented := make(map[string]option)
-	for _, item := range doc.Modules[0].Setup.Configuration.Options.List {
-		documented[item.Name] = item.option
-	}
-	assert.Equal(t, form.JSONSchema.Properties, documented)
+	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml", collecttest.ConfigSchemaCheck{Defaults: true})
 }
 
 // The Live Data section mirrors the Function: ids, parameters and returned columns.
