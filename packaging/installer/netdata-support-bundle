@@ -31,6 +31,8 @@
 #   --timeout SECONDS    per-command timeout (default: 10)
 #   --no-obfuscate       disable PII pseudonymization (secrets STILL redacted)
 #   --include-snmp-diagnostics  include original, UNSANITIZED SNMP evidence
+#   --include-plugin-debug      RUN systemd-journal.plugin in debug mode and capture
+#                               its output (the only option that executes a collector)
 #   --keep-staging       keep staging dir for inspection
 #   --selftest           run the sanitizer regression vectors and exit
 #   -v, --version        print version
@@ -59,6 +61,7 @@ init_defaults() {
   KEEP_STAGING=0
   SELFTEST=0
   INCLUDE_SNMP=0
+  INCLUDE_PLUGIN_DEBUG=0
   SNMP_FILES=0
   SNMP_STATUS=not_requested
   # Admission deadline checked before collectors; filesystem operations,
@@ -81,6 +84,7 @@ parse_options() {
       --timeout) need_val "$@"; CMD_TIMEOUT="$2"; shift 2 ;;
       --no-obfuscate) OBFUSCATE=0; shift ;;
       --include-snmp-diagnostics) INCLUDE_SNMP=1; shift ;;
+      --include-plugin-debug) INCLUDE_PLUGIN_DEBUG=1; shift ;;
       --keep-staging) KEEP_STAGING=1; shift ;;
       --selftest) SELFTEST=1; shift ;;
       -v|--version) echo "netdata-support-bundle $VERSION"; exit 0 ;;
@@ -1717,8 +1721,12 @@ collect_permissions() {
   # every netdata-owned path worth reporting permissions for; the cache dir stays
   # TOP-LEVEL only (recursing it would enumerate thousands of dbengine files)
   _PERM_PATHS=""
+  # the journal directories are NOT netdata's, but they decide whether
+  # systemd-journal.plugin can read anything: on a default host they are
+  # root:systemd-journal with an ACL, and an ACL is invisible to ls
   for _p in "$CONFDIR" "$CONFDIR/netdata.conf" "$CONFDIR/stream.conf" "$CONFDIR/ssl" \
             "$LOGDIR" "$LIBDIR" "$LIBDIR/cloud.d" "$LIBDIR/registry" "$CACHEDIR" \
+            /var/log/journal /run/log/journal \
             $PLUGINSD_DIRS "${NETDATA_BIN:-}"; do
     [ -n "$_p" ] || continue
     [ -e "$_p" ] || continue
@@ -1726,6 +1734,139 @@ collect_permissions() {
     _PERM_PATHS="$_PERM_PATHS $_p"
   done
   _PERM_PATHS="${_PERM_PATHS# }"
+
+  # Which user the agent runs as, and what groups it is in. Journal access is
+  # granted by a file capability, by journal-group membership, or by an ACL; the
+  # capability sweep above covers the first, this covers the second, and the
+  # journal directories in the path list cover the third. Without all three a
+  # host that relies on group membership looks identical to a broken one.
+  collect_cmd 09-permissions/netdata-user.txt "Which user the agent runs as and its group membership (journal and device access depend on it)" sh -c '
+    raw=""
+    [ -n "${1:-}" ] && raw=$(ps -o user= -p "$1" 2>/dev/null | tr -d " ")
+    echo "agent process user (as ps reports it): ${raw:-(unknown: no running netdata process)}"
+
+    # ps prints a NUMERIC uid when the name will not fit or the account does not
+    # exist here - which is exactly what a containerised agent looks like from
+    # the host. Resolve it rather than reporting a bare number.
+    resolved=""
+    case "$raw" in
+      "" ) : ;;
+      *[!0-9]* ) resolved="$raw" ;;
+      * ) if getent passwd "$raw" >/dev/null 2>&1; then
+            resolved=$(getent passwd "$raw" | cut -d: -f1)
+            echo "resolved uid $raw to account: $resolved"
+          else
+            echo "uid $raw has NO account on this host - the agent is probably containerised,"
+            echo "so its groups live in the container, not here. Collect a bundle inside the container."
+          fi ;;
+    esac
+
+    echo
+    if [ -n "$resolved" ]; then
+      echo "--- id $resolved ---"
+      id "$resolved" 2>/dev/null || echo "(id failed for $resolved)"
+    fi
+    if getent passwd netdata >/dev/null 2>&1; then
+      echo "--- id netdata (the local account, for comparison) ---"
+      id netdata 2>/dev/null || true
+    else
+      echo "(no local netdata account on this host)"
+    fi
+
+    echo
+    echo "--- groups that grant journal access ---"
+    for g in systemd-journal adm; do
+      if getent group "$g" >/dev/null 2>&1; then getent group "$g"; else echo "$g: (group does not exist on this host)"; fi
+    done
+    true' sh "${NETDATA_PID:-}"
+
+  # OPT-IN ONLY. Every other capture is read-only; this one executes a collector,
+  # so it runs solely when the operator asked for it. Bounded by the usual
+  # per-command timeout and cap, sanitized like any other capture. It answers the
+  # question the permission artifacts cannot: what the plugin itself reports when
+  # it tries to open the journal.
+  if [ "$INCLUDE_PLUGIN_DEBUG" = "1" ]; then
+    # Everything - identity lookup included - happens inside collect_cmd, so it
+    # is bounded by the per-command timeout. A getent out here would be
+    # unbounded, and a slow or wedged NSS would stall the whole bundle before
+    # the capped capture even started.
+    # shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
+    collect_cmd 09-permissions/plugin-debug-systemd-journal.txt \
+      "REQUESTED: systemd-journal.plugin debug STDERR (its stdout is journal content and is discarded); states directly why the journal could not be opened" \
+      sh -c '
+        pid="$1"; t="$2"; shift 2
+
+        # --- locate the plugin -------------------------------------------------
+        bin=""; seen=""
+        for d in "$@"; do
+          [ -n "$d" ] || continue
+          [ -f "$d/systemd-journal.plugin" ] || continue
+          seen="$d/systemd-journal.plugin"
+          if [ -x "$seen" ]; then bin="$seen"; break; fi
+        done
+        if [ -z "$bin" ] && [ -n "$seen" ]; then
+          echo "systemd-journal.plugin IS installed at: $seen"
+          echo "but it is not executable by the current user ($(id -un 2>/dev/null))."
+          ls -l "$seen" 2>/dev/null
+          echo "Re-run the bundle with sudo to capture the debug output."
+          exit 0
+        fi
+        if [ -z "$bin" ]; then
+          echo "systemd-journal.plugin is not installed in any discovered plugins.d directory."
+          exit 0
+        fi
+
+        # --- resolve the agent user to a local NAME ----------------------------
+        raw=""; u=""
+        [ -n "$pid" ] && raw=$(ps -o user= -p "$pid" 2>/dev/null | tr -d " ")
+        case "$raw" in
+          "") if getent passwd netdata >/dev/null 2>&1; then u=netdata
+                echo "# note: no running netdata process; using the local netdata account"
+              else
+                echo "# note: no running netdata process and no local netdata account"
+              fi ;;
+          *[!0-9]*) u="$raw" ;;
+          *) if getent passwd "$raw" >/dev/null 2>&1; then
+               u=$(getent passwd "$raw" | cut -d: -f1)
+             else
+               echo "# note: the agent runs as uid $raw, which has no local account (containerised)."
+               echo "# NOT substituting the host netdata account - that would test a different identity."
+             fi ;;
+        esac
+        [ -n "$u" ] || exit 0
+
+        # --- refuse a path we cannot pass safely -------------------------------
+        # runuser takes argv, so any path is safe there; the su fallback has to
+        # build a command string, and a path with shell metacharacters would be
+        # executed as code under the agent account.
+        case "$bin" in
+          *[!A-Za-z0-9/._-]*) bin_safe=0 ;;
+          *) bin_safe=1 ;;
+        esac
+
+        run() { if command -v timeout >/dev/null 2>&1; then timeout "$t" "$@"; else echo "# note: no timeout(1) here; only the bundle watchdog bounds this"; "$@"; fi; }
+
+        if [ "$(id -u)" = "0" ] && command -v runuser >/dev/null 2>&1; then
+          echo "# running as: $u (via runuser)"
+          run runuser -u "$u" -- "$bin" debug 2>&1 >/dev/null
+          echo "# exit: $?"
+        elif [ "$(id -u)" = "0" ] && command -v su >/dev/null 2>&1 && [ "$bin_safe" = "1" ]; then
+          echo "# running as: $u (via su)"
+          run su -s /bin/sh -c "$bin debug 2>&1 >/dev/null" "$u"
+          echo "# exit: $?"
+        elif [ "$(id -u)" = "0" ] && [ "$bin_safe" = "0" ]; then
+          echo "# NOT running the plugin: its path contains characters that cannot be passed"
+          echo "# safely to su, and runuser is unavailable. Path: $bin"
+        elif [ "$(id -un 2>/dev/null)" = "$u" ]; then
+          echo "# running as: $u (already this user)"
+          run "$bin" debug 2>&1 >/dev/null
+          echo "# exit: $?"
+        else
+          echo "# NOT running the plugin: cannot become $u (not root, or no runuser/su)."
+          echo "# An access error from any other user would not reflect the agent."
+        fi
+        true' sh "${NETDATA_PID:-}" "${CMD_TIMEOUT:-10}" $PLUGINSD_DIRS
+  fi
 
   # paths reach the child as positional ARGUMENTS - see the note above
   # shellcheck disable=SC2086  # deliberate word-split of the discovered path list
