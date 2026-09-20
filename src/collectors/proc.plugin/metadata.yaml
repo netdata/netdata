@@ -1618,10 +1618,6 @@ modules:
             - memory controllers that can identify the physical DIMMS and report errors directly for them,
             - memory controllers that report errors for memory address ranges that can be linked to dimms.
               In this case the DIMMS reported may be more than the physical DIMMS installed.
-
-          Correctable-error alerts detect a net counter increase over the last two minutes, so historical errors alone do not keep an alert active.
-          A counter reset can hide new errors until pre-reset samples leave that window; a decrease in one controller counter can also offset an increase in another.
-          Uncorrectable-error alerts continue to report a nonzero cumulative count.
         method_description: ""
       supported_platforms:
         include: []
@@ -1660,7 +1656,7 @@ modules:
     alerts:
       - name: ecc_memory_mc_correctable
         metric: mem.edac_mc_errors
-        info: Memory controller ${label:controller} ECC correctable error net increase over the last 2 minutes
+        info: Memory controller ${label:controller} ECC correctable errors
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_mc_uncorrectable
         metric: mem.edac_mc_errors
@@ -1668,7 +1664,7 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_dimm_correctable
         metric: mem.edac_mc_dimm_errors
-        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable error net increase over the last 2 minutes
+        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_dimm_uncorrectable
         metric: mem.edac_mc_dimm_errors
