@@ -22,6 +22,8 @@ import (
 const (
 	deadlockInfoHelp         = "Latest deadlock from the system_health Extended Events session. WARNING: query text may include unmasked sensitive literals; restrict dashboard access."
 	deadlockParseErrorStatus = 561
+	deadlockSourceEventFile  = "event_file"
+	deadlockSourceRingBuffer = "ring_buffer"
 )
 
 const deadlockInfoMethodID = "deadlock-info"
@@ -286,7 +288,7 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 		return funcapi.UnavailableResponse(deadlockInfoAzureSQLDatabaseUnavailable)
 	}
 
-	deadlockTime, deadlockXML, err := f.queryLatestDeadlock(ctx)
+	deadlockTime, deadlockXML, source, err := f.queryLatestDeadlock(ctx)
 	if err != nil {
 		if response := mssqlFunctionContextError(ctx, err); response != nil {
 			return f.buildResponse(response.Status, response.Message, nil)
@@ -299,7 +301,7 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 	}
 
 	if deadlockXML == "" {
-		return f.buildResponse(200, "no deadlock found in system_health Extended Events", nil)
+		return f.buildResponse(200, fmt.Sprintf("no deadlock found in system_health %s target; retained events may have aged out", source), nil)
 	}
 
 	dbNames, dbErr := f.queryDatabaseNames(ctx)
@@ -318,7 +320,7 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 	}
 
 	if !parseRes.found {
-		return f.buildResponse(200, "no deadlock found in system_health Extended Events", nil)
+		return f.buildResponse(200, fmt.Sprintf("no deadlock found in system_health %s target; retained events may have aged out", source), nil)
 	}
 
 	deadlockID := generateDeadlockID(parseRes.deadlockTime)
@@ -328,7 +330,7 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 		return f.buildResponse(200, "deadlock detected but no processes could be parsed", nil)
 	}
 
-	return f.buildResponse(200, "latest detected deadlock", rows)
+	return f.buildResponse(200, fmt.Sprintf("latest detected deadlock from system_health %s target", source), rows)
 }
 
 func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []deadlockRowData) *funcapi.FunctionResponse {
@@ -353,7 +355,7 @@ func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []
 	}
 }
 
-func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, string, error) {
+func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, string, string, error) {
 	c := f.router.collector
 	var deadlockTime sql.NullTime
 	var deadlockXML sql.NullString
@@ -369,30 +371,33 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 	}
 
 	var err error
+	source := deadlockSourceEventFile
 	if c.Functions.DeadlockInfo.UseRingBuffer {
+		source = deadlockSourceRingBuffer
 		err = readRingBuffer()
 	} else {
 		err = c.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockEventFile).Scan(&deadlockTime, &deadlockXML)
 		if err != nil && shouldFallbackDeadlockEventFile(err) {
 			// Retry only on a file read error, not on an available but empty file target.
+			source = deadlockSourceRingBuffer
 			err = readRingBuffer()
 		}
 	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return time.Time{}, "", nil
+			return time.Time{}, "", source, nil
 		}
-		return time.Time{}, "", err
+		return time.Time{}, "", source, err
 	}
 
 	if !deadlockXML.Valid || strings.TrimSpace(deadlockXML.String) == "" {
-		return time.Time{}, "", nil
+		return time.Time{}, "", source, nil
 	}
 
 	if deadlockTime.Valid {
-		return deadlockTime.Time, deadlockXML.String, nil
+		return deadlockTime.Time, deadlockXML.String, source, nil
 	}
-	return time.Now().UTC(), deadlockXML.String, nil
+	return time.Now().UTC(), deadlockXML.String, source, nil
 }
 
 func shouldFallbackDeadlockEventFile(err error) bool {
