@@ -71,25 +71,16 @@ TEST(NullEngine, OwnMemorySlotsAreUnset) {
     }
 
     EXPECT_EQ(sizes.wal, 0u);
-}
 
-TEST(NullEngine, TheDaemonCanReadEveryMemorySlotIncludingTheEmptyOnes) {
-    const struct dbengine_buffer_sizes sizes = dbengine_get_memory_sizes(nullptr);
-
-    // What this pins is the daemon's habit, not an engine behaviour: it runs every allocator statistics reader over
-    // every slot without first checking which are populated, and that must not crash. The readers themselves
-    // return zero for an empty slot by construction, so the zero comparisons below cannot fail - they document the
-    // expected answer rather than test it. The engine's side of this, that a NULL engine populates none of its own
-    // slots, is asserted in OwnMemorySlotsAreUnset above, which is the case that would catch garbage here.
+    // The daemon runs every allocator statistics reader over every slot without first checking which are populated,
+    // so doing it here must not crash. There is deliberately no assertion on what comes back: those readers return
+    // zero for an empty slot by construction, so comparing against zero would be a check that cannot fail - and a
+    // case that cannot fail is what the rest of this review removed. The engine's side of it is the loop above.
     for (size_t i = 0; i < DBENGINE_MEM_MAX; i++) {
-        if (sizes.as[i])
-            continue;
-
-        SCOPED_TRACE(i);
-        EXPECT_EQ(aral_structures_bytes_from_stats(sizes.as[i]), 0u);
-        EXPECT_EQ(aral_free_bytes_from_stats(sizes.as[i]), 0u);
-        EXPECT_EQ(aral_used_bytes_from_stats(sizes.as[i]), 0u);
-        EXPECT_EQ(aral_padding_bytes_from_stats(sizes.as[i]), 0u);
+        aral_structures_bytes_from_stats(sizes.as[i]);
+        aral_free_bytes_from_stats(sizes.as[i]);
+        aral_used_bytes_from_stats(sizes.as[i]);
+        aral_padding_bytes_from_stats(sizes.as[i]);
     }
 }
 

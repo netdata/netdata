@@ -128,11 +128,18 @@ TEST_F(PgdTest, MemoryFootprintGrowsWithTheDataHeld) {
     const uint32_t empty_footprint = pgd_memory_footprint(pg);
     EXPECT_GT(empty_footprint, 0u) << "a page occupies no memory at all";
 
-    for (uint32_t slot = 0; slot < 512; slot++)
-        append(pg, slot, slot % 7);
+    // Appended until the footprint moves rather than a fixed count, because for this page type it only moves when
+    // the encoder takes another buffer - so a fixed number would be a bet on how many encoded values fit in one,
+    // and would fail for that reason rather than for anything about the page. Bounded by the page's capacity.
+    uint32_t appended = 0;
+    while (appended < pgd_capacity(pg) && pgd_memory_footprint(pg) == empty_footprint) {
+        append(pg, appended, appended % 7);
+        appended++;
+    }
 
     EXPECT_GT(pgd_memory_footprint(pg), empty_footprint)
-        << "the footprint did not grow while 512 points were appended to the page";
+        << "the footprint never grew across " << appended << " appended points";
+    EXPECT_LT(appended, pgd_capacity(pg)) << "the page filled up before its footprint grew at all";
 
     pgd_free(pg);
 }

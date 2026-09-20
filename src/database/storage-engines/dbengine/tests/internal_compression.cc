@@ -165,7 +165,9 @@ TEST(Compression, ACompressiblePayloadGetsSmaller) {
 
         const size_t compressed_size = dbengine_compress(buffer.data(), original.size(), algorithm);
 
-        // Without this a codec that copied its input would pass the round-trip case above.
+        // 0 means the codec declined to compress, and 0 is less than the payload - so without this the case would
+        // report success for exactly the silently-broken codec it exists to catch.
+        ASSERT_GT(compressed_size, 0u) << "a highly repetitive payload was not compressed at all";
         EXPECT_LT(compressed_size, original.size())
             << "a highly repetitive payload did not compress";
     }

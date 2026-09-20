@@ -36,7 +36,7 @@ env:
   # A googletest binary whose filter matches nothing exits 0 while running no tests, so an exit code alone cannot
   # tell a passing suite from one that never ran. Every leg asserts the number of cases that actually reported a
   # result, and this is the floor it checks against. Raise it as the suite grows.
-  MIN_TEST_CASES: 82
+  MIN_TEST_CASES: 81
 
 jobs:
   unit-tests:
@@ -94,11 +94,19 @@ jobs:
               exit 1
             fi
             echo "--- running $t"
-            timeout 300 "$bin" | tee "/tmp/$t.log"
+            # The status is captured rather than allowed to end the step, because set -e would exit here and the
+            # count check below - the one that exists for a binary which ran nothing or stalled - would never print
+            # its diagnostic. Both are reported, then the run's own status decides the step.
+            status=0
+            timeout 300 "$bin" | tee "/tmp/$t.log" || status=$?
             cases="$(grep -cE '^\[       OK \]' "/tmp/$t.log" || true)"
             if [ "$cases" -lt "${MIN_TEST_CASES}" ]; then
               echo "::error::$t reported $cases passing cases, expected at least ${MIN_TEST_CASES}"
               exit 1
+            fi
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$t exited with status $status after reporting $cases passing cases"
+              exit "$status"
             fi
             echo "--- $t OK ($cases cases)"
           done
@@ -182,11 +190,16 @@ jobs:
               exit 1
             fi
             echo "--- running $t (ASAN)"
-            timeout 600 "$bin" | tee "/tmp/$t.log"
+            status=0
+            timeout 600 "$bin" | tee "/tmp/$t.log" || status=$?
             cases="$(grep -cE '^\[       OK \]' "/tmp/$t.log" || true)"
             if [ "$cases" -lt "${MIN_TEST_CASES}" ]; then
               echo "::error::$t reported $cases passing cases, expected at least ${MIN_TEST_CASES}"
               exit 1
+            fi
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$t exited with status $status after reporting $cases passing cases"
+              exit "$status"
             fi
             echo "--- $t OK ($cases cases)"
           done

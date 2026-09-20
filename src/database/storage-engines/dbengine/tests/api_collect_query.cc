@@ -258,13 +258,13 @@ TEST_F(CollectQueryTest, AQueryOutsideTheStoredRangeReturnsNothing) {
 
     const std::vector<STORAGE_POINT> got = query_all(smh, BASE_TIME + 1000, BASE_TIME + 2000);
 
-    // The claim in the name, asserted: a window past everything stored yields no points at all. Without this the
-    // case says nothing, because the loop below has nothing to iterate over.
+    // The claim in the name, and the whole of it: a window past everything stored yields no points at all.
+    //
+    // An earlier version also looped over the result asserting each point was a gap, described as tolerating a
+    // future engine that returned gaps instead of nothing. It could not do that: query_all() stops after 64 points
+    // and fails, so a gap-filling engine would fail here long before the loop expressed any tolerance. Promising
+    // something the code cannot deliver is worse than not promising it.
     EXPECT_TRUE(got.empty()) << "a query past the stored range returned " << got.size() << " points";
-
-    // And if that ever becomes "gaps rather than nothing", they must at least be gaps.
-    for (const STORAGE_POINT &sp : got)
-        EXPECT_TRUE(storage_point_is_gap(sp)) << "a query past the data returned a point that is not a gap";
 
     dbengine_store_finalize(sch);
     dbengine_metrics_group_release(smg);

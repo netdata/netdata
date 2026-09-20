@@ -46,7 +46,9 @@ protected:
 
     void TearDown() override {
         if (mrg_) {
-            mrg_destroy(mrg_);
+            // It reports the metrics still referenced and stays allocated when there are any, so a case that
+            // forgot a release would otherwise leak quietly and still pass.
+            EXPECT_EQ(mrg_destroy(mrg_), 0u) << "metrics were still referenced when the registry was destroyed";
             mrg_ = nullptr;
         }
 
