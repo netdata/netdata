@@ -3736,6 +3736,19 @@ if(ENABLE_DBENGINE)
     else()
         target_link_libraries(dbengine PUBLIC ${ZLIB_LDFLAGS})
     endif()
+
+    if(ENABLE_GTEST)
+        # The engine's googletest suite. EXCLUDE_FROM_ALL with no install rule: it is built by name, by a developer
+        # or by its own CI job, and never reaches a package. It takes the engine through the dbengine target rather
+        # than through its objects, so it inherits the usage requirements the target states - which is the same link
+        # an embedder outside this tree would make, and the reason this binary doubles as a check that the engine
+        # still links without the daemon.
+        add_executable(dbengine-test EXCLUDE_FROM_ALL
+                src/database/storage-engines/dbengine/tests/main.cc
+                src/database/storage-engines/dbengine/tests/support.h
+                src/database/storage-engines/dbengine/tests/api_null_engine.cc)
+        target_link_libraries(dbengine-test PRIVATE dbengine GTest::gtest)
+    endif()
 endif()
 
 add_executable(netdata
