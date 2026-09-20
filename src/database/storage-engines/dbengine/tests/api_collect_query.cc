@@ -357,14 +357,15 @@ TEST_F(CollectQueryTest, AMetricsGroupIsBoundToNoTier) {
     dbengine_metrics_group_release(second);
 }
 
-// Disabled because it does not fail, it ends the process. Deleting a metric's retention and then destroying the
-// engine reaches fatal() inside uuidmap_dup() with an id of 0, and fatal() takes the whole binary with it, so an
-// enabled case here would cost every result after it. It also shows a second thing on the way: the retention is
-// still reported after the delete.
+// Disabled because it does not fail, it ends the process. Deleting a metric's retention leaves its dirty page in
+// the cache holding the metric's address; the flush that the tier exit performs then reads that freed metric and
+// reaches fatal() inside uuidmap_dup(), and fatal() takes the whole binary with it, so an enabled case here would
+// cost every result after it.
 //
-// Both are recorded as a defect of the engine, not of this suite. Fixing them is not this change's work - this
-// change adds tests - so the case stays here, disabled, as the reproducer, and googletest reports it as disabled on
-// every run rather than letting it be forgotten. Enable it with the fix.
+// That is a defect of the engine, not of this suite, and the same fatal is reached in the field from the engine's
+// periodic flush. Fixing it is not this change's work - this change adds tests - so the case stays here, disabled,
+// as the reproducer, and googletest reports it as disabled on every run rather than letting it be forgotten.
+// Enable it with the fix; the retention assertions below already pass.
 TEST_F(CollectQueryTest, DISABLED_DeletingAMetricsRetentionLeavesItWithNone) {
     const UUIDMAP_ID id = make_metric_id();
 
