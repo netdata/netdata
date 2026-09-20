@@ -195,7 +195,6 @@ type planBuildContext struct {
 	materialized     *materializedState
 	materializedByID map[string]*materializedChartState
 	retired          map[string]*materializedChartState
-	original         map[string]*materializedChartState
 
 	planRouteStats
 }
@@ -436,7 +435,6 @@ func (e *Engine) preparePlanBuildContext(
 		chartOwners:       chartOwners,
 		dimCapHints:       dimCapHints,
 		materialized:      materialized,
-		original:          e.state.materialized.charts,
 		materializedByID:  materialized.charts,
 	}, nil
 }
@@ -683,9 +681,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		var entries map[string]*dimBuildEntry
 		matChart := ctx.materializedByID[route.ChartID]
 		matchingMaterializedChart := matChart != nil && matChart.templateID == route.ChartTemplateID
-		if matChart != nil && !matchingMaterializedChart {
-			ctx.rememberRetired(route.ChartID, ctx.original[route.ChartID])
-		}
+
 		if matchingMaterializedChart {
 			entries = matChart.checkoutScratchEntries(dimCap)
 		} else {
@@ -826,6 +822,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 	for _, chartID := range chartIDs {
 		cs := ctx.chartsByID[chartID]
 		if previous := ctx.materialized.charts[chartID]; previous != nil && previous.templateID != cs.templateID {
+			ctx.rememberRetired(chartID, previous)
 			delete(ctx.materialized.charts, chartID)
 		}
 		matChart, chartCreated := ctx.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)

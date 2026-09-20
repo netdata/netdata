@@ -297,3 +297,27 @@ func TestTemplateSetVirtualDocumentPrecedence(t *testing.T) {
 	assert.Equal(t, "profile10", chart.Meta.Title, "g10 precedes g9 lexically, as in the virtual document")
 	require.NoError(t, attempt.Commit())
 }
+
+func TestTemplateTransferDoesNotInheritOutgoingDimensionCapIncumbents(t *testing.T) {
+	e, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	store := metrix.NewCollectorStore()
+	policy := EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}
+	empty, err := NewTemplateSet(TemplateSetSpec{Policy: policy})
+	require.NoError(t, err)
+	attempt := templateAttempt(t, e, store, empty, map[string]float64{"requests": 1})
+	chart := findCreateChartAction(attempt.Plan())
+	require.NotNil(t, chart)
+	require.NoError(t, attempt.Commit())
+	entry := nativeEntry("profile", chart.ChartID, "requests")
+	entry.Groups[0].Charts[0].Dimensions = []charttpl.Dimension{{Selector: "requests", Name: "a"}, {Selector: "requests", Name: "requests"}}
+	entry.Groups[0].Charts[0].Lifecycle = &charttpl.Lifecycle{Dimensions: &charttpl.DimensionLifecycle{MaxDims: 1}}
+	next, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}, Policy: policy})
+	require.NoError(t, err)
+	attempt = templateAttempt(t, e, store, next, map[string]float64{"requests": 2})
+	update := findUpdateAction(attempt.Plan())
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 1)
+	assert.Equal(t, "a", update.Values[0].Name, "outgoing owner cannot affect the new owner's dimension cap")
+	require.NoError(t, attempt.Commit())
+}
