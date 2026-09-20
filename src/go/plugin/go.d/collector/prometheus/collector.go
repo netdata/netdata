@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
@@ -33,6 +34,14 @@ func init() {
 
 func New() *Collector {
 	return NewWithOptions()
+}
+
+// EnginePolicy applies the existing limits to each profile context after aggregation.
+func (c *Collector) EnginePolicy() chartengine.EnginePolicy {
+	if c.runtime == nil || len(c.runtime.profiles) == 0 {
+		return chartengine.EnginePolicy{}
+	}
+	return chartengine.EnginePolicy{MaxTimeSeries: c.MaxTS, MaxTimeSeriesPerMetric: c.MaxTSPerMetric}
 }
 
 // DefaultConfig returns an independent copy of the collector's runtime

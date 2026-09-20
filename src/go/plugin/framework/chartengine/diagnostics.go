@@ -41,6 +41,8 @@ const (
 	PlanRouteReasonAutogenBuildRejected     PlanRouteReason = "autogen_build_rejected"
 	PlanRouteReasonChartInstanceCap         PlanRouteReason = "chart_instance_cap"
 	PlanRouteReasonDimensionCap             PlanRouteReason = "dimension_cap"
+	PlanRouteReasonContextSeriesCap         PlanRouteReason = "context_series_cap"
+	PlanRouteReasonContextMetricSeriesCap   PlanRouteReason = "context_metric_series_cap"
 )
 
 // PlanLabelPromotionMode is the effective non-identity label policy for an
@@ -58,6 +60,8 @@ const (
 // value could be resolved. Slice fields are detached from engine state and are
 // owned by the callback.
 type PlanRouteDiagnostic struct {
+	SeriesCount             int
+	SeriesLimit             int
 	Decision                PlanRouteDecision
 	Reason                  PlanRouteReason
 	SeriesIdentity          metrix.SeriesIdentity

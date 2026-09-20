@@ -198,6 +198,7 @@ func TestDefaultCatalog_AllStockProfilesPreserveUnknownFutureFamilies(t *testing
 		"process_runtime": {"process_netdata_future_metric"},
 		"python_gc":       {"python_gc_netdata_future_metric"},
 		"vllm":            {"vllm:netdata_future_metric", "ray_vllm_netdata_future_metric"},
+		"sglang":          {"sglang:netdata_future_metric"},
 	}
 	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
@@ -320,6 +321,7 @@ func TestDefaultCatalog_StockProfilesHaveMetadataDisposition(t *testing.T) {
 			integrationID:      "collector-go.d.plugin-prometheus-litellm",
 			mustBeProofSupport: true,
 		},
+		"sglang": {metadataPath: "../metadata.yaml", integrationID: "collector-go.d.plugin-prometheus-sglang"},
 		"vllm": {
 			metadataPath:  "../metadata.yaml",
 			integrationID: "collector-go.d.plugin-prometheus-vllm",

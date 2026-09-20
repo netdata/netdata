@@ -5,6 +5,7 @@ package promsemantics
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -813,13 +814,20 @@ func categoryCoverageBranches(definition Normalization, source SourceLabel) []st
 		return sortedMapKeys(branches)
 	}
 	for value := range definition.Exact {
+		if source.Domain.Kind == "unsigned_integer" && !labelValueMayMatch(source, value) {
+			continue
+		}
 		branches["exact:"+value] = struct{}{}
 	}
 	for _, valueRange := range definition.Ranges {
 		branches[fmt.Sprintf("range:%d-%d", *valueRange.Min, *valueRange.Max)] = struct{}{}
 	}
-	branches["malformed"] = struct{}{}
-	branches["unknown"] = struct{}{}
+	if source.Domain.Kind != "unsigned_integer" {
+		branches["malformed"] = struct{}{}
+	}
+	if source.Domain.Kind != "unsigned_integer" || !categoryCoversUnsignedIntegers(definition) {
+		branches["unknown"] = struct{}{}
+	}
 	return sortedMapKeys(branches)
 }
 
@@ -853,13 +861,26 @@ func (c *semanticCompiler) validateFiniteAlias(node *compiledNormalization) erro
 
 func categoryOutputSchema(definition Normalization, source SourceLabel) SourceLabel {
 	values := make(map[string]struct{})
-	for _, value := range definition.Exact {
+	for key, value := range definition.Exact {
+		if source.Domain.Kind == "unsigned_integer" && !labelValueMayMatch(source, key) {
+			continue
+		}
 		values[value] = struct{}{}
 	}
 	for _, value := range definition.Ranges {
 		values[value.Value] = struct{}{}
 	}
-	for _, action := range []*CategoryAction{definition.Missing, definition.Malformed, definition.Unknown} {
+	actions := []*CategoryAction{definition.Missing, definition.Malformed, definition.Unknown}
+	if source.Domain.Kind == "unsigned_integer" {
+		actions = nil
+		if !categoryCoversUnsignedIntegers(definition) {
+			actions = append(actions, definition.Unknown)
+		}
+		if source.Presence.keyMayBeAbsent() {
+			actions = append(actions, definition.Missing)
+		}
+	}
+	for _, action := range actions {
 		if action.Set != nil {
 			values[*action.Set] = struct{}{}
 		}
@@ -875,8 +896,37 @@ func categoryOutputSchema(definition Normalization, source SourceLabel) SourceLa
 	}
 }
 
+// Validated ranges are sorted and disjoint. Only exact rules can fill their gaps.
+func categoryCoversUnsignedIntegers(definition Normalization) bool {
+	next := uint64(0)
+	for _, r := range definition.Ranges {
+		for next < *r.Min {
+			if _, ok := definition.Exact[strconv.FormatUint(next, 10)]; !ok {
+				return false
+			}
+			next++
+		}
+		if *r.Max == ^uint64(0) {
+			return true
+		}
+		next = *r.Max + 1
+	}
+	for {
+		if _, ok := definition.Exact[strconv.FormatUint(next, 10)]; !ok {
+			return false
+		}
+		if next == ^uint64(0) {
+			return true
+		}
+		next++
+	}
+}
+
 func categoryOutputPresence(definition Normalization, source SourceLabel) LabelPresence {
 	presentAlwaysSets := definition.Malformed.Set != nil && definition.Unknown.Set != nil
+	if source.Domain.Kind == "unsigned_integer" {
+		presentAlwaysSets = definition.Unknown.Set != nil || categoryCoversUnsignedIntegers(definition)
+	}
 	if source.Domain.Kind == "closed" {
 		presentAlwaysSets = true
 		for _, value := range source.Domain.Values {

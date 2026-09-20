@@ -301,14 +301,14 @@
       },
       "max_time_series": {
         "title": "Time series limit",
-        "description": "If the final output after job and profile relabeling contains more time series than this limit, the data is not processed. Set to 0 for no limit.",
+        "description": "With a selected profile, limits rendered time series independently in each context after aggregation; an over-limit context is skipped whole. Without a profile, limits total time series after relabeling at startup. Set to 0 for no limit.",
         "type": "integer",
         "minimum": 0,
         "default": 2000
       },
       "max_time_series_per_metric": {
         "title": "Time series per metric limit",
-        "description": "Final metric families with more time series than this limit are skipped. Set to 0 for no limit.",
+        "description": "With a selected profile, limits each metric family's rendered time series independently in each context; an over-limit context is skipped whole. Without a profile, skips final metric families exceeding this limit. Set to 0 for no limit.",
         "type": "integer",
         "minimum": 0,
         "default": 200

@@ -374,7 +374,10 @@ func (c *CompiledSemanticCase) validateProductionSourceLabels(
 		if forbidden && present {
 			return fmt.Errorf("conditionally absent label %q is present", name)
 		}
-		if present && schema.Domain.Kind == "closed" && !slices.Contains(schema.Domain.Values, value) {
+		if present && schema.Domain.Kind != "open" && !labelValueMayMatch(schema, value) {
+			if schema.Domain.Kind == "unsigned_integer" {
+				return fmt.Errorf("label %q value %q must be a canonical unsigned 64-bit integer (decimal, without signs or leading zeros)", name, value)
+			}
 			return fmt.Errorf("label %q value %q is outside closed domain %v", name, value, schema.Domain.Values)
 		}
 		delete(observed, name)
