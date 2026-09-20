@@ -26,7 +26,11 @@ modules:
 
           These are boot-time firmware tables: a recent read does not establish current usable memory, operating frequency, or hardware health. Only physical devices in system-memory arrays contribute to inventory totals.
 
-          The only file the collector writes is its private baseline, `smbios-memory.json` in the Agent's library directory (`/var/lib/netdata` by default). It never changes firmware, kernel settings, or device permissions.
+          :::info
+
+          The collector keeps a private baseline: `smbios-memory.json` in the Agent's library directory (`/var/lib/netdata` by default). The first complete inventory it saves becomes the configuration every later read is compared with, and a confirmed loss stays recorded there across restarts and reboots. To accept a smaller configuration as the new baseline, stop Netdata, move the file aside, and start Netdata again; Troubleshooting has the exact steps. This is the only file the collector writes; it never changes firmware, kernel settings, or device permissions.
+
+          :::
       supported_platforms:
         include: [Linux]
         exclude: []
