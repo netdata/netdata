@@ -779,6 +779,11 @@ and the rule for adding one; each skill's frontmatter description is the authori
     locally from a PR or docs branch; loads `docs-learn-site-structure` first
   - Also relevant: `integrations-lifecycle` (generated integration pages are published on Learn).
 - Triage.
+  - `triage-support-bundle`: offline investigation of a `netdata-support-bundle` archive - one host, one moment;
+    alerts, missing data and collector failures, crashes, resource use, retention, streaming, cloud claiming,
+    dashboard reachability, permissions, install and update, containers, Windows; the artifact map and what each
+    absence means, the evidence limits, and `scripts/bundle-summary.sh`. Not SNMP evidence, not fleet-wide crash
+    clustering, not live queries
   - `triage-snmp-diagnostics`: offline SNMP evidence investigations and diagnostics-tool/interpretation reviews
     with `src/go/tools/snmp-diagnostics`;
     topology devices/links, metrics, BGP, licensing, slow collection, discovery and lifecycle failures; `list`,
@@ -871,6 +876,7 @@ renames:
 | `triage-codeql` | `graphql/` | Code Scanning fetches and dismissals |
 | `triage-agent-events` | `query-agent-events/` | fetched event batches |
 | `triage-snmp-diagnostics` | `snmp-diagnostics/` | private bundle inspections, replay output, and incident reports |
+| `triage-support-bundle` | `support-bundle/` | per-case bundle inventories, extracted evidence, and incident reports |
 | `docs-learn-pr-preview` | `learn-pr-preview/` | private isolated source snapshots, manifests, Learn builds and server logs |
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
