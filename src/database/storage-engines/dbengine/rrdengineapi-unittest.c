@@ -314,6 +314,152 @@ static int engine_lifecycle_generation(const struct dbengine_config *cfg, const 
 
 static void engine_lifecycle_remove_dir(const char *dir);
 
+// The configuration surface an embedder that is not the daemon relies on: dbengine_config_defaults() is the
+// DBENGINE_CONFIG_DEFAULTS initialiser as a value; a zero max_reserved_file_descriptors resolves, at create, to a
+// quarter of the soft limit libnetdata read; a budget below one tier's reservation refuses the tier with UV_EMFILE,
+// nothing reserved and nothing written; a path that does not fit the tier is refused with UV_ENAMETOOLONG before
+// the budget is even looked at; a budget of exactly one tier's reservation brings the tier up
+static int engine_config_unittest(const struct dbengine_config *cfg, const char *dir, const char *what) {
+    int errors = 0;
+
+    struct dbengine_config from_macro = DBENGINE_CONFIG_DEFAULTS;
+    struct dbengine_config from_function = dbengine_config_defaults();
+#define CHECK_DEFAULT(field) do {                                                                               \
+        if(from_macro.field != from_function.field) {                                                           \
+            fprintf(stderr, " >>> DBENGINE: %s: dbengine_config_defaults() differs from the initialiser at "     \
+                            #field "\n", what);                                                                  \
+            errors++;                                                                                           \
+        }                                                                                                       \
+    } while(0)
+    CHECK_DEFAULT(page_cache_mb);
+    CHECK_DEFAULT(extent_cache_mb);
+    CHECK_DEFAULT(out_of_memory_protection_bytes);
+    CHECK_DEFAULT(use_all_ram_for_caches);
+    CHECK_DEFAULT(cache_statistics);
+    CHECK_DEFAULT(cpus);
+    CHECK_DEFAULT(allocator.partitions);
+    CHECK_DEFAULT(allocator.arals_for_large_pages);
+    CHECK_DEFAULT(allocator.compression_statistics);
+    CHECK_DEFAULT(direct_io);
+    CHECK_DEFAULT(pages_per_extent);
+    CHECK_DEFAULT(journal_integrity_check);
+    CHECK_DEFAULT(journal_v2_unmount_time_s);
+    CHECK_DEFAULT(max_reserved_file_descriptors);
+    CHECK_DEFAULT(default_update_every_s);
+    CHECK_DEFAULT(libuv_worker_threads);
+    CHECK_DEFAULT(reserved_libuv_worker_threads);
+    CHECK_DEFAULT(on_db_rotation);
+    CHECK_DEFAULT(preload_metrics);
+#undef CHECK_DEFAULT
+
+    if(mkdir(dir, 0700) != 0 && errno != EEXIST) {
+        fprintf(stderr, " >>> DBENGINE: %s: cannot create the scratch directory '%s'\n", what, dir);
+        return errors + 1;
+    }
+
+    // the zero budget resolves at create, to the quarter of the soft limit, and the engine keeps the resolved copy
+    struct dbengine_config zero_budget = *cfg;
+    zero_budget.max_reserved_file_descriptors = 0;
+    DBENGINE_ENGINE *engine = dbengine_create(&zero_budget);
+    if(!engine) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine with the zero budget did not come up\n", what);
+        return errors + 1;
+    }
+    if(engine->cfg.max_reserved_file_descriptors != (size_t)(rlimit_nofile.rlim_cur / 4)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the zero budget resolved to %zu, not a quarter of the soft limit %zu\n",
+                what, engine->cfg.max_reserved_file_descriptors, (size_t)rlimit_nofile.rlim_cur);
+        errors++;
+    }
+    dbengine_shutdown(engine);
+    if(dbengine_destroy(engine)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine with the zero budget kept referenced metrics\n", what);
+        errors++;
+    }
+
+    // a budget one short of a tier's reservation refuses the tier: nothing stays reserved, nothing is written
+    struct dbengine_config small = *cfg;
+    small.max_reserved_file_descriptors = DBENGINE_FD_BUDGET_PER_TIER - 1;
+    engine = dbengine_create(&small);
+    if(!engine) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine with the small budget did not come up\n", what);
+        return errors + 1;
+    }
+    struct dbengine_tier_config tc = {
+        .tier = 0,
+        .dbfiles_path = dir,
+        .disk_space_mb = 0,
+        .max_retention_s = 0,
+        .page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT,
+        .grouping = 1,
+    };
+    int rc = dbengine_tier_init(engine, &tc);
+    if(rc != UV_EMFILE) {
+        fprintf(stderr, " >>> DBENGINE: %s: a tier came up past the budget (returned %d)\n", what, rc);
+        errors++;
+    }
+    if(__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the refused tier left file descriptors reserved\n", what);
+        errors++;
+    }
+    if(dbengine_tier_is_active(dbengine_tier(engine, 0)) || dbengine_dir_has_datafiles(dir)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the refused tier is up or wrote datafiles\n", what);
+        errors++;
+    }
+
+    // a path longer than the tier's buffer is refused before the budget: the same engine, still nothing reserved
+    char long_path[FILENAME_MAX + 64];
+    memset(long_path, 'x', sizeof(long_path) - 1);
+    long_path[0] = '/';
+    long_path[sizeof(long_path) - 1] = '\0';
+    tc.dbfiles_path = long_path;
+    rc = dbengine_tier_init(engine, &tc);
+    if(rc != UV_ENAMETOOLONG) {
+        fprintf(stderr, " >>> DBENGINE: %s: an over-long path was not refused (returned %d)\n", what, rc);
+        errors++;
+    }
+    if(__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED) ||
+       dbengine_tier_is_active(dbengine_tier(engine, 0))) {
+        fprintf(stderr, " >>> DBENGINE: %s: the over-long path left file descriptors reserved or the tier up\n", what);
+        errors++;
+    }
+    dbengine_shutdown(engine);
+    if(dbengine_destroy(engine)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine with the small budget kept referenced metrics\n", what);
+        errors++;
+    }
+
+    // a budget of exactly one tier's reservation brings the tier up: the budget is the resolved value, not the limit
+    struct dbengine_config exact = *cfg;
+    exact.max_reserved_file_descriptors = DBENGINE_FD_BUDGET_PER_TIER;
+    engine = dbengine_create(&exact);
+    if(!engine) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine with the exact budget did not come up\n", what);
+        return errors + 1;
+    }
+    tc.dbfiles_path = dir;
+    rc = dbengine_tier_init(engine, &tc);
+    if(rc) {
+        fprintf(stderr, " >>> DBENGINE: %s: the tier did not come up on the exact budget: %s\n", what, uv_strerror(rc));
+        errors++;
+    }
+    else {
+        if(__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED) != DBENGINE_FD_BUDGET_PER_TIER) {
+            fprintf(stderr, " >>> DBENGINE: %s: the tier that came up did not reserve its file descriptors\n", what);
+            errors++;
+        }
+        DBENGINE_TIER *tier = dbengine_tier(engine, 0);
+        dbengine_readiness_wait(tier);
+        dbengine_tier_exit(tier);
+    }
+    dbengine_shutdown(engine);
+    if(dbengine_destroy(engine)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine with the exact budget kept referenced metrics\n", what);
+        errors++;
+    }
+
+    return errors;
+}
+
 // Two engines alive at once, each with its tier 0 on a scratch directory of its own: the tiers are distinct
 // objects, each engine collects and is queried on its own tier, a metric one engine created is unknown to the
 // other's registry, the tier refusals are per engine (a second init of one engine's tier while the other's comes
@@ -528,7 +674,7 @@ static void engine_lifecycle_remove_dir(const char *dir) {
 // settings, and logs that the new ones are ignored), runs a tier, and is destroyed the same way. The floors of the
 // caches and the NULL engine still hold between the two. Then two engines at once, each on a tier of its own,
 // destroyed in either order (engines_coexist()). Runs before the daemon's own engine, on four scratch directories
-// next to scratch_dir (its name with -a to -d), which it removes; the probe directories engines_coexist() makes
+// next to scratch_dir (its name with -a to -e), which it removes; the probe directories engines_coexist() makes
 // next to two of them are removed by it.
 int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const char *scratch_dir) {
     int errors = 0;
@@ -539,13 +685,16 @@ int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const 
     first.preload_metrics = NULL;
     first.on_db_rotation = NULL;
 
-    char dir_a[FILENAME_MAX + 1], dir_b[FILENAME_MAX + 1], dir_c[FILENAME_MAX + 1], dir_d[FILENAME_MAX + 1];
+    char dir_a[FILENAME_MAX + 1], dir_b[FILENAME_MAX + 1], dir_c[FILENAME_MAX + 1], dir_d[FILENAME_MAX + 1],
+         dir_e[FILENAME_MAX + 1];
     snprintfz(dir_a, sizeof(dir_a), "%s-a", scratch_dir);
     snprintfz(dir_b, sizeof(dir_b), "%s-b", scratch_dir);
     snprintfz(dir_c, sizeof(dir_c), "%s-c", scratch_dir);
     snprintfz(dir_d, sizeof(dir_d), "%s-d", scratch_dir);
+    snprintfz(dir_e, sizeof(dir_e), "%s-e", scratch_dir);
 
     errors += engine_lifecycle_generation(&first, dir_a, "the first engine");
+    errors += engine_config_unittest(&first, dir_e, "the configuration");
 
     uintptr_t layer = dbengine_allocator_layer_fingerprint();
 
@@ -576,6 +725,7 @@ int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const 
     engine_lifecycle_remove_dir(dir_b);
     engine_lifecycle_remove_dir(dir_c);
     engine_lifecycle_remove_dir(dir_d);
+    engine_lifecycle_remove_dir(dir_e);
 
     fprintf(stderr, "Two engines, one after the other and at once: %d ERROR(S)\n", errors);
     return errors;

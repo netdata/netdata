@@ -19,7 +19,8 @@
 // needs no engine (it checks that the engine's verbs and getters take NULL as an engine with nothing in it),
 // dbengine_engine_lifecycle_unittest() runs before the daemon's own engine comes up (it makes, runs, stops and
 // destroys engines of its own on scratch directories, one after the other and then two at once, and checks that
-// nothing of one is left for, or taken from, another),
+// nothing of one is left for, or taken from, another; it also pins the configuration surface: the defaults
+// function against the initialiser, the file descriptor budget and its refusal, the over-long path refusal),
 // dbengine_allocator_unittest() runs before the engine is up too (it brings the process-wide page allocators up
 // with the given configuration's allocator settings and checks that a second, different configuration leaves them
 // as built; the engine that comes up afterwards reuses them), and dbengine_zero_page_cadence_unittest() collects

@@ -75,6 +75,8 @@ time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle
 // dbengine_destroy() finalizes them). An invalid tc is fatal before any of those checks (a programming error,
 // whatever the state). The directory is the embedder's to keep exclusive: nothing refuses a second tier, of this
 // engine or of another, on a directory a tier already runs on, and two tiers writing one directory corrupt it.
+// A dbfiles_path longer than the tier's buffer holds is refused with UV_ENAMETOOLONG before any of those checks,
+// and a tier that would take the engine past its max_reserved_file_descriptors (dbengine-config.h) with UV_EMFILE.
 // Those refusals leave the tier untouched; an init that fails opening the datafiles returns
 // UV_EIO with the tier's configuration already written. Two inits of the same tier must not overlap, nothing
 // serialises them. A tier init and the shutdown must not overlap either: the check is made when the tier starts,

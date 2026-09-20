@@ -66,6 +66,12 @@ struct dbengine_config {
     unsigned pages_per_extent;                  // [db] dbengine pages per extent; 0 = default, > MAX_PAGES_PER_EXTENT is fatal
     bool journal_integrity_check;               // [db] dbengine enable journal integrity check
     time_t journal_v2_unmount_time_s;           // [db] dbengine journal v2 unmount time
+    size_t max_reserved_file_descriptors;       // the file descriptors this engine may reserve for its tiers, a
+                                                // fixed number per tier (dbengine_tier_init() returns UV_EMFILE when
+                                                // one more would exceed it); 0 = a quarter of the process's soft
+                                                // RLIMIT_NOFILE as libnetdata read it (rlimit_nofile), taken once when
+                                                // dbengine_create() resolves the configuration. Per engine: several
+                                                // engines each budget on their own against the one process table
 
     // runtime
     time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1, < 0 is fatal
@@ -126,7 +132,7 @@ struct dbengine_config {
 
 // The compiled defaults: the baseline a caller adjusts before dbengine_create(), which resolves the
 // 0-means-default fields (cpus, allocator.partitions, default_update_every_s, pages_per_extent,
-// libuv_worker_threads) to concrete values.
+// libuv_worker_threads, max_reserved_file_descriptors) to concrete values.
 #define DBENGINE_CONFIG_DEFAULTS {                              \
     .page_cache_mb = DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB,     \
     .extent_cache_mb = 0,                                       \
@@ -143,12 +149,17 @@ struct dbengine_config {
     .pages_per_extent = DBENGINE_DEFAULT_PAGES_PER_EXTENT,      \
     .journal_integrity_check = false,                           \
     .journal_v2_unmount_time_s = 120,                           \
+    .max_reserved_file_descriptors = 0,                         \
     .default_update_every_s = 1,                                \
     .libuv_worker_threads = 0,                                  \
     .reserved_libuv_worker_threads = 0,                         \
     .on_db_rotation = NULL,                                     \
     .preload_metrics = NULL,                                    \
 }
+
+// the same defaults as a value, for a caller that cannot use the initialiser (one that fills the struct at run
+// time, or from another language)
+struct dbengine_config dbengine_config_defaults(void);
 
 // One tier's configuration, handed to dbengine_tier_init(); the engine copies what it needs.
 struct dbengine_tier_config {
@@ -163,7 +174,7 @@ struct dbengine_tier_config {
 };
 
 // Bring an engine up: copy cfg into it, resolving the 0-means-default fields (cpus, default_update_every_s,
-// pages_per_extent, libuv_worker_threads), then create the event loop, the caches, the metrics registry (which
+// pages_per_extent, libuv_worker_threads, max_reserved_file_descriptors), then create the event loop, the caches, the metrics registry (which
 // preloads through cfg->preload_metrics, so the embedder's tier count must be final by now) and the engine's
 // thread, and start taking work. The only way up; tiers come after it. Fatal when the libuv pool is not larger
 // than the threads reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or

@@ -1124,10 +1124,9 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     errno = saved_errno;
 }
 
-/*
- * Returns 0 on success, negative on error
- */
-static void dbengine_tier_config_validate(const struct dbengine_tier_config *tc) {
+// a malformed configuration is a programming error, fatal; a path that does not fit the tier is refused, with
+// UV_ENAMETOOLONG (it was silently truncated before, after the file descriptors had been reserved)
+static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) {
     if(tc->tier >= RRD_STORAGE_TIERS)
         fatal("DBENGINE: tier %zu does not exist (the engine has %d tiers)", tc->tier, RRD_STORAGE_TIERS);
 
@@ -1143,15 +1142,24 @@ static void dbengine_tier_config_validate(const struct dbengine_tier_config *tc)
 
     if(!tc->grouping)
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
+
+    if(strlen(tc->dbfiles_path) > FILENAME_MAX) {
+        netdata_log_error("DBENGINE: tier %zu: the datafiles path is longer than %d characters, the tier cannot be initialized",
+                          tc->tier, FILENAME_MAX);
+        return UV_ENAMETOOLONG;
+    }
+
+    return 0;
 }
 
 int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tier_config *tc)
 {
-    uint32_t max_open_files;
-
-    // the configuration first (a bad one is a programming error, fatal whatever the engine's state), then the
-    // engine and the tier, all before anything is written: a refused init must leave the tier as it found it
-    dbengine_tier_config_validate(tc);
+    // the configuration first (a malformed one is a programming error, fatal whatever the engine's state; a path
+    // that does not fit is refused), then the engine and the tier, all before anything is written: a refused init
+    // must leave the tier as it found it
+    int rc = dbengine_tier_config_validate(tc);
+    if(rc)
+        return rc;
 
     if(!engine)
         fatal("DBENGINE: dbengine_tier_init() for tier %zu called without an engine", tc->tier);
@@ -1185,15 +1193,13 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
         return UV_EIO;
     }
 
-    max_open_files = rlimit_nofile.rlim_cur / 4;
-
-    /* reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier */
+    // reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier, out of the engine's resolved budget
     rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
-    if (engine->global_stats.dbengine_reserved_file_descriptors > max_open_files) {
+    if (engine->global_stats.dbengine_reserved_file_descriptors > engine->cfg.max_reserved_file_descriptors) {
         netdata_log_error(
             "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine tier.",
             (unsigned)engine->global_stats.dbengine_reserved_file_descriptors,
-            (unsigned)max_open_files);
+            (unsigned)engine->cfg.max_reserved_file_descriptors);
 
         rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
         rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);

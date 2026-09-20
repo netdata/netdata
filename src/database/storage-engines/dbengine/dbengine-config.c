@@ -9,6 +9,11 @@
 #define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (16)
 #endif
 
+struct dbengine_config dbengine_config_defaults(void) {
+    struct dbengine_config cfg = DBENGINE_CONFIG_DEFAULTS;
+    return cfg;
+}
+
 void dbengine_config_resolve(struct dbengine_config *cfg) {
     if(!cfg->cpus)
         cfg->cpus = os_get_system_cpus();
@@ -37,6 +42,11 @@ void dbengine_config_resolve(struct dbengine_config *cfg) {
 
     if(!cfg->libuv_worker_threads)
         cfg->libuv_worker_threads = DBENGINE_CONFIG_DEFAULT_WORKER_THREADS;
+
+    // the soft limit as libnetdata read it, taken here once: a tier init compares against the resolved value, so a
+    // limit raised after the engine came up is not seen (the daemon raises it before the engine)
+    if(!cfg->max_reserved_file_descriptors)
+        cfg->max_reserved_file_descriptors = rlimit_nofile.rlim_cur / 4;
 
     // the dispatcher keeps the reserved threads free for the embedder; a pool that small cannot host the engine
     if(cfg->reserved_libuv_worker_threads < 0 || cfg->libuv_worker_threads <= cfg->reserved_libuv_worker_threads)
