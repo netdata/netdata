@@ -222,6 +222,7 @@ TEST(TierInit, RefusesAPathWithNoRoomForTheFileNames) {
 TEST(TierInit, RefusesATierThatWouldExceedTheFileDescriptorBudget) {
     struct dbengine_config cfg = netdata_test_config();
     const Scratch scratch;
+    ASSERT_TRUE(scratch.valid()) << "could not make a scratch directory";
 
     // One descriptor is below any tier's reservation, so the first tier is already too many. The size of that
     // reservation is not on the public surface, so the case is written not to need it.

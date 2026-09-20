@@ -297,6 +297,13 @@ TEST_F(PgcTest, DirtyPagesAreSavedOnceThereAreEnoughOfThem) {
     EXPECT_GT(g_saved_dirty.load(), 0u) << "the cache did not save on its own once enough pages were dirty";
     EXPECT_GT(g_save_init_calls.load(), 0u) << "the saver was never told a flush was starting";
 
+    // And by which route. The cache flushes inline, on the thread releasing the page, once the dirty queue outgrows
+    // the high-water mark of the hot queue - which happens here from the second dirty page on, because pages are
+    // moved to dirty one at a time so the hot mark stays at one page. Asserting the count alone would not notice
+    // if that work moved to the evictor thread, where it would be a matter of timing rather than a rule.
+    EXPECT_GT(pgc_get_statistics(cache_).events_flush_critical, 0u)
+        << "pages were saved, but not by the inline flush the cache is supposed to do";
+
     // Only now, to drain whatever is left so the teardown has nothing to do.
     pgc_flush_pages(cache_);
 }

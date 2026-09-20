@@ -12,9 +12,17 @@
 # cannot parse.
 #
 # Permitted:
-#   #include <anything>                                              system, C++ standard library, googletest
+#   #include <anything>                                              system, C++ standard library, googletest -
+#                                                                    except anything that resolves inside this
+#                                                                    repository's src tree, see below
 #   #include "support.h"                                             this suite's own shared header
 #   #include "database/storage-engines/dbengine/include/dbengine/X"  the engine's public headers
+#
+# Angle brackets are not a safe-by-construction category here. libnetdata exports the whole src tree as a PUBLIC
+# include directory, which is how the quoted public-header include in support.h resolves at all - and the compiler
+# searches the same directories for <...>. So `#include <database/storage-engines/dbengine/rrdengine.h>` compiles
+# exactly as the quoted form would. An angle include whose first path component names a directory under src/ is
+# therefore treated as a repository include and refused; everything else is system.
 #
 # Files named internal_* are exempt: they test the engine's internals and say so in their name. They cannot be used
 # to smuggle a private header into an API test, because an API test including one would itself be rejected.
@@ -24,6 +32,13 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 
 readonly PUBLIC_PREFIX="database/storage-engines/dbengine/include/dbengine/"
+
+# tests -> dbengine -> storage-engines -> database -> src
+src_dir=$(cd "$here/../../../.." && pwd)
+if [ ! -d "$src_dir/libnetdata" ]; then
+    echo "check-public-includes: '$src_dir' does not look like the source tree; refusing to guess" >&2
+    exit 1
+fi
 
 status=0
 checked=0
@@ -39,8 +54,17 @@ while IFS= read -r file; do
     checked=$((checked + 1))
 
     while IFS= read -r line; do
-        # A system include is always fine and needs no further thought.
+        # An angle include is fine unless it names a directory of this repository's source tree, in which case it
+        # reaches exactly what the quoted forms are checked for.
         if printf '%s\n' "$line" | grep -qE '^[[:space:]]*#[[:space:]]*include[[:space:]]*<[^>]+>'; then
+            angled=$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*#[[:space:]]*include[[:space:]]*<([^>]+)>.*/\1/')
+            first=${angled%%/*}
+
+            if [ "$first" != "$angled" ] && [ -d "$src_dir/$first" ]; then
+                echo "$name: includes <$angled>, which resolves inside the source tree rather than the system" >&2
+                status=1
+            fi
+
             continue
         fi
 

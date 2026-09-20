@@ -641,8 +641,11 @@ if(ENABLE_SENTRY)
         include(NetdataSentry)
 endif()
 
-# Included only when enabled: the module refuses a C++ standard below 17 as soon as it is read.
-if(ENABLE_GTEST)
+# Included only when enabled, and only when something will actually use it. Every googletest target in this tree is
+# a dbengine one and none of them builds on Windows (the suite uses mkdtemp, dirent and a POSIX shell script), so
+# fetching googletest in those configurations would download and build a dependency for a target that is never
+# created. Widen this when a suite outside dbengine, or one that builds on Windows, appears.
+if(ENABLE_GTEST AND ENABLE_DBENGINE AND NOT OS_WINDOWS)
         include(NetdataGTest)
 endif()
 
@@ -653,7 +656,7 @@ endif()
 netdata_detect_jsonc()
 netdata_detect_libyaml()
 
-if(ENABLE_GTEST)
+if(ENABLE_GTEST AND ENABLE_DBENGINE AND NOT OS_WINDOWS)
         netdata_bundle_gtest()
 endif()
 
@@ -3737,7 +3740,10 @@ if(ENABLE_DBENGINE)
         target_link_libraries(dbengine PUBLIC ${ZLIB_LDFLAGS})
     endif()
 
-    if(ENABLE_GTEST)
+    # NOT OS_WINDOWS because the suite is POSIX: it makes its scratch directories with mkdtemp, walks them with
+    # dirent, and its include check is a shell script. Turning the option on for a native Windows build would fail
+    # before anything compiled.
+    if(ENABLE_GTEST AND NOT OS_WINDOWS)
         # The engine's googletest suite. ENABLE_GTEST is the opt-in and it is off by default, so an ordinary build
         # has no such target at all; when it is on, the suite builds with everything else rather than waiting to be
         # asked for by name, because a test that has to be remembered is a test that rots. It carries no install

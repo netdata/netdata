@@ -13,14 +13,14 @@ on:
       - '.github/workflows/dbengine-gtest.yml'
       - 'CMakeLists.txt'
       - 'packaging/cmake/Modules/**'
-      - 'src/database/storage-engines/dbengine/**'
+      - 'src/database/storage-engines/**'
       - 'src/libnetdata/**'
   pull_request:
     paths:
       - '.github/workflows/dbengine-gtest.yml'
       - 'CMakeLists.txt'
       - 'packaging/cmake/Modules/**'
-      - 'src/database/storage-engines/dbengine/**'
+      - 'src/database/storage-engines/**'
       - 'src/libnetdata/**'
 
 concurrency:
