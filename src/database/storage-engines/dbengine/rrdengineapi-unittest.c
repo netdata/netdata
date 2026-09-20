@@ -326,6 +326,13 @@ static void engine_lifecycle_remove_dir(const char *dir);
 // exactly one tier's reservation brings the tier up; and four tiers racing for a budget of two reservations end
 // with exactly two up and the budget fully used (engine_config_budget_race())
 
+// the tiers the budget race brings up at once and the reservations its budget holds: one constant sizes the
+// backing arrays and bounds the loops
+enum {
+    BUDGET_RACE_TIERS = 4,
+    BUDGET_RACE_FITS = 2,
+};
+
 struct budget_race_init {
     DBENGINE_ENGINE *engine;
     struct dbengine_tier_config tc;
@@ -344,7 +351,9 @@ static void engine_config_budget_race_init(void *ptr) {
 // while one of them fit. Each tier gets a scratch directory of its own next to dir
 static int engine_config_budget_race(const struct dbengine_config *cfg, const char *dir, const char *what) {
     int errors = 0;
-    const size_t tiers = 4, fits = 2;
+    const size_t tiers = BUDGET_RACE_TIERS, fits = BUDGET_RACE_FITS;
+    _Static_assert(BUDGET_RACE_TIERS <= RRD_STORAGE_TIERS, "the budget race needs a tier number each");
+    _Static_assert(BUDGET_RACE_FITS < BUDGET_RACE_TIERS, "the budget race needs tiers to refuse");
 
     struct dbengine_config two = *cfg;
     two.max_reserved_file_descriptors = fits * DBENGINE_FD_BUDGET_PER_TIER;
@@ -354,8 +363,8 @@ static int engine_config_budget_race(const struct dbengine_config *cfg, const ch
         return 1;
     }
 
-    char dirs[4][FILENAME_MAX + 1];
-    struct budget_race_init inits[4];
+    char dirs[BUDGET_RACE_TIERS][FILENAME_MAX + 1];
+    struct budget_race_init inits[BUDGET_RACE_TIERS];
     for(size_t i = 0; i < tiers; i++) {
         snprintfz(dirs[i], sizeof(dirs[i]), "%s-t%zu", dir, i);
         if(mkdir(dirs[i], 0700) != 0 && errno != EEXIST) {
