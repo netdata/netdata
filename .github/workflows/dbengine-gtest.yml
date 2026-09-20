@@ -137,9 +137,13 @@ jobs:
           # libnetdata's pooled allocators fall back to plain malloc/free. Setting the flags by hand instruments the
           # build but leaves the pools intact, so ASan cannot see a use-after-free inside ARAL, the dictionary
           # allocators, STRING or onewayalloc - it would report clean while checking very little.
+          # NETDATA_INTERNAL_CHECKS is what turns the engine's internal_fatal() checks on, and a developer's build
+          # has them on. Without it here the suite would be exercised in CI under weaker checks than the build it is
+          # written against, and a case that trips one of them would pass CI and fail on a desk.
           cmake -S . -B build -G Ninja \
             -DENABLE_GTEST=On \
             -DENABLE_ADDRESS_SANITIZER=On \
+            -DCMAKE_C_FLAGS="-DNETDATA_INTERNAL_CHECKS=1" \
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_PLUGIN_GO=OFF \
             -DENABLE_PLUGIN_XENSTAT=OFF \

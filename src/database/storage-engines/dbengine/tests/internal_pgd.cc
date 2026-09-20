@@ -63,7 +63,11 @@ TEST_F(PgdTest, AppendingPointsFillsSlots) {
 }
 
 TEST_F(PgdTest, CapacityIsAtLeastWhatWasAskedFor) {
-    for (uint32_t slots : {uint32_t(1), uint32_t(16), uint32_t(256), uint32_t(1024)}) {
+    // From two upwards: a page of a single slot is rejected as a programming error, for every page type, and the
+    // rejection is an internal_fatal - so it ends the process, and only in builds that have internal checks on.
+    // There is no case for it here because reaching it would take a death test, and this binary must not fork with
+    // a libuv pool alive.
+    for (uint32_t slots : {uint32_t(2), uint32_t(16), uint32_t(256), uint32_t(1024)}) {
         SCOPED_TRACE(slots);
 
         PGD *pg = pgd_create(TYPE, slots);
