@@ -6,31 +6,6 @@
 #include <math.h>
 #include "../libnetdata.h"
 
-#ifdef NETDATA_WITH_LONG_DOUBLE
-
-typedef long double NETDATA_DOUBLE;
-#define NETDATA_DOUBLE_FORMAT "%0.7Lf"
-#define NETDATA_DOUBLE_FORMAT_ZERO "%0.0Lf"
-#define NETDATA_DOUBLE_FORMAT_AUTO "%Lf"
-#define NETDATA_DOUBLE_MODIFIER "Lf"
-#define NETDATA_DOUBLE_FORMAT_G "%0.19Le"
-
-#define NETDATA_DOUBLE_MAX LDBL_MAX
-
-#define strtondd(s, endptr) strtold(s, endptr)
-#define powndd(x, y) powl(x, y)
-#define llrintndd(x) llrintl(x)
-#define roundndd(x) roundl(x)
-#define sqrtndd(x) sqrtl(x)
-#define copysignndd(x, y) copysignl(x, y)
-#define modfndd(x, y) modfl(x, y)
-#define fabsndd(x) fabsl(x)
-#define floorndd(x) floorl(x)
-#define ceilndd(x) ceill(x)
-#define log10ndd(x) log10l(x)
-
-#else // NETDATA_WITH_LONG_DOUBLE
-
 typedef double NETDATA_DOUBLE;
 #define NETDATA_DOUBLE_FORMAT "%0.7f"
 #define NETDATA_DOUBLE_FORMAT_ZERO "%0.0f"
@@ -51,8 +26,6 @@ typedef double NETDATA_DOUBLE;
 #define floorndd(x) floor(x)
 #define ceilndd(x) ceil(x)
 #define log10ndd(x) log10(x)
-
-#endif // NETDATA_WITH_LONG_DOUBLE
 
 typedef long long collected_number;
 #define COLLECTED_NUMBER_FORMAT "%lld"
