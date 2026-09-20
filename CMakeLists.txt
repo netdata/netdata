@@ -3738,12 +3738,15 @@ if(ENABLE_DBENGINE)
     endif()
 
     if(ENABLE_GTEST)
-        # The engine's googletest suite. EXCLUDE_FROM_ALL with no install rule: it is built by name, by a developer
-        # or by its own CI job, and never reaches a package. It takes the engine through the dbengine target rather
-        # than through its objects, so it inherits the usage requirements the target states - which is the same link
-        # an embedder outside this tree would make, and the reason this binary doubles as a check that the engine
-        # still links without the daemon.
-        add_executable(dbengine-test EXCLUDE_FROM_ALL
+        # The engine's googletest suite. ENABLE_GTEST is the opt-in and it is off by default, so an ordinary build
+        # has no such target at all; when it is on, the suite builds with everything else rather than waiting to be
+        # asked for by name, because a test that has to be remembered is a test that rots. It carries no install
+        # rule either way, so no package can contain it.
+        #
+        # It takes the engine through the dbengine target rather than through its objects, so it inherits the usage
+        # requirements the target states - which is the same link an embedder outside this tree would make, and the
+        # reason this binary doubles as a check that the engine still links without the daemon.
+        add_executable(dbengine-test
                 src/database/storage-engines/dbengine/tests/main.cc
                 src/database/storage-engines/dbengine/tests/support.h
                 src/database/storage-engines/dbengine/tests/api_null_engine.cc
@@ -3754,6 +3757,15 @@ if(ENABLE_DBENGINE)
                 src/database/storage-engines/dbengine/tests/internal_pgd.cc
                 src/database/storage-engines/dbengine/tests/internal_mrg.cc)
         target_link_libraries(dbengine-test PRIVATE dbengine GTest::gtest)
+
+        # Running the suite is a build target of its own rather than a test registration: this tree has no CTest
+        # anywhere, and adding enable_testing() here would imply a harness that does not exist. USES_TERMINAL so the
+        # cases report as they run instead of arriving in one block when it is over.
+        add_custom_target(dbengine-test-run
+                COMMAND dbengine-test
+                DEPENDS dbengine-test
+                COMMENT "Running the dbengine test suite"
+                USES_TERMINAL)
     endif()
 endif()
 
