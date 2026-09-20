@@ -3748,7 +3748,8 @@ if(ENABLE_DBENGINE)
                 src/database/storage-engines/dbengine/tests/support.h
                 src/database/storage-engines/dbengine/tests/api_null_engine.cc
                 src/database/storage-engines/dbengine/tests/api_lifecycle.cc
-                src/database/storage-engines/dbengine/tests/api_collect_query.cc)
+                src/database/storage-engines/dbengine/tests/api_collect_query.cc
+                src/database/storage-engines/dbengine/tests/internal_compression.cc)
         target_link_libraries(dbengine-test PRIVATE dbengine GTest::gtest)
     endif()
 endif()
