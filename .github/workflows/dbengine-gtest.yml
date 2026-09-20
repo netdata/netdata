@@ -63,10 +63,14 @@ jobs:
 
       - name: Configure
         run: |
+          # The scripts plugin is off because it makes a Go toolchain a hard requirement of configuring, and this
+          # job builds one C++ test binary that has nothing to do with Go. Leaving it on fails the configure on any
+          # runner whose Go is older than the tree asks for.
           cmake -S . -B build -G Ninja \
             -DENABLE_GTEST=On \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_SCRIPTS=Off \
             -DENABLE_PLUGIN_XENSTAT=OFF \
             -DENABLE_PLUGIN_FREEIPMI=Off \
             -DENABLE_PLUGIN_CUPS=Off \
@@ -147,6 +151,7 @@ jobs:
             -DCMAKE_C_FLAGS="-DNETDATA_INTERNAL_CHECKS=1" \
             -DCMAKE_BUILD_TYPE=Debug \
             -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_SCRIPTS=Off \
             -DENABLE_PLUGIN_XENSTAT=OFF \
             -DENABLE_PLUGIN_FREEIPMI=Off \
             -DENABLE_PLUGIN_CUPS=Off \
