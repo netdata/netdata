@@ -5,6 +5,28 @@ package inventory
 
 import "time"
 
+// Population is what firmware reports about a memory socket.
+const (
+	PopulationPopulated = "populated"
+	PopulationEmpty     = "empty"
+	PopulationUnknown   = "unknown"
+)
+
+// Inventory status: whether the current firmware table could be read.
+const (
+	InventoryAvailable   = "available"
+	InventoryUnavailable = "unavailable"
+)
+
+// Comparison status: whether the current table can be compared with the accepted baseline.
+const (
+	ComparisonComparable   = "comparable"
+	ComparisonUnavailable  = "unavailable"  // the firmware table could not be read
+	ComparisonUncomparable = "uncomparable" // the table lacks stable slot identities or known capacities
+	ComparisonUnbaselined  = "unbaselined"  // no baseline has been accepted and saved yet
+	ComparisonStateError   = "state_error"  // the baseline state could not be loaded or saved
+)
+
 type Device struct {
 	Handle          uint16  `json:"handle"`
 	Locator         string  `json:"locator"`
@@ -21,14 +43,16 @@ type Device struct {
 	ConfiguredSpeed *uint64 `json:"configured_speed_mts"`
 }
 
+// Table is one decoded firmware table: the physical system-memory devices and
+// whether their totals and identities are reliable enough to compare.
 type Table struct {
-	CountsKnown bool
 	Devices     []Device
-	Comparable  bool
-	Reason      string
-	Capacity    *uint64
+	Capacity    *uint64 // total known capacity; nil when any contribution is unknown
 	Populated   int
 	Empty       int
+	CountsKnown bool   // Populated and Empty cover every device
+	Comparable  bool   // every device has a unique locator and a known capacity
+	Reason      string // why the table is not comparable
 }
 
 type Row struct {

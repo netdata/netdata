@@ -14,12 +14,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/internal/inventory"
 )
 
+const stateVersion = 1
+
+// discrepancy is one accepted slot that is missing or smaller than accepted.
 type discrepancy struct {
 	Locator string `json:"locator"`
 	Missing bool   `json:"missing"`
 	Deficit uint64 `json:"deficit_bytes"`
 }
 
+// persistentState is the private envelope saved under the Agent's varlib directory:
+// the accepted populated slots and the loss last confirmed against them.
 type persistentState struct {
 	Version    int                `json:"version"`
 	Owner      string             `json:"owner"`
@@ -27,6 +32,104 @@ type persistentState struct {
 	Baseline   []inventory.Device `json:"baseline"`
 	Loss       []discrepancy      `json:"loss,omitempty"`
 	LossAt     time.Time          `json:"loss_at,omitempty"`
+}
+
+func (s *persistentState) validate(owner string) error {
+	if s.Version != stateVersion || owner == "" || s.Owner != owner || s.AcceptedAt.IsZero() || len(s.Baseline) == 0 {
+		return errors.New("memory baseline has unsupported version, owner or content")
+	}
+	accepted := make(map[string]uint64, len(s.Baseline))
+	for _, d := range s.Baseline {
+		if d.Locator == "" || accepted[d.Locator] != 0 || d.Capacity == nil || *d.Capacity == 0 ||
+			d.Population != inventory.PopulationPopulated {
+			return errors.New("memory baseline contains an invalid slot")
+		}
+		accepted[d.Locator] = *d.Capacity
+	}
+	lost := make(map[string]bool, len(s.Loss))
+	for _, l := range s.Loss {
+		capacity := accepted[l.Locator]
+		if capacity == 0 || lost[l.Locator] || l.Deficit == 0 || l.Deficit > capacity ||
+			(l.Missing && l.Deficit != capacity) || s.LossAt.IsZero() {
+			return errors.New("memory baseline contains invalid loss evidence")
+		}
+		lost[l.Locator] = true
+	}
+	return nil
+}
+
+// baselineStore owns the state file of the running canonical job.
+type baselineStore struct {
+	path  string
+	owner string
+
+	loaded  bool
+	current *persistentState // nil until a baseline has been accepted and saved
+	err     error            // load failure or missing Agent identity; persists until restart
+	dirty   bool             // observed loss that could not be saved yet
+}
+
+func (b *baselineStore) exists() bool {
+	_, err := os.Stat(b.path)
+	return !errors.Is(err, os.ErrNotExist)
+}
+
+// load reads the state file once, on the first active collection. Init and Check
+// also run for a replacement candidate while the previous job may still own the
+// file; the first active Collect runs after that owner has stopped.
+func (b *baselineStore) load() {
+	if b.loaded {
+		return
+	}
+	b.loaded = true
+	if b.owner == "" {
+		b.err = errors.New("Agent registry identity is unavailable; baseline persistence disabled")
+		return
+	}
+	b.current, b.err = readState(b.path, b.owner)
+	if errors.Is(b.err, os.ErrNotExist) {
+		b.err = nil
+	}
+}
+
+// reconcile compares a comparable table with the accepted baseline and saves
+// validated transitions. Unchanged observations do not rewrite the file.
+func (b *baselineStore) reconcile(table *inventory.Table, now time.Time) error {
+	if b.err != nil || (b.current == nil && table.Populated == 0) {
+		return nil
+	}
+	next := proposedState(b.current, table, b.owner, now)
+	if !b.dirty && reflect.DeepEqual(b.current, next) {
+		return nil
+	}
+	if err := saveState(b.path, next); err != nil {
+		b.retainLoss(next)
+		return err
+	}
+	b.current, b.dirty = next, false
+	return nil
+}
+
+// retainLoss remembers observed loss even if storage is temporarily unavailable.
+// Neither baseline increases nor restorations are accepted on failure.
+func (b *baselineStore) retainLoss(next *persistentState) {
+	if b.current == nil || len(next.Loss) == 0 {
+		return
+	}
+	b.current.Loss, b.current.LossAt = next.Loss, next.LossAt
+	b.dirty = true
+}
+
+// flush retries saving retained loss, including while the source stays unreadable.
+func (b *baselineStore) flush() error {
+	if !b.dirty {
+		return nil
+	}
+	if err := saveState(b.path, b.current); err != nil {
+		return err
+	}
+	b.dirty = false
+	return nil
 }
 
 func readState(path, owner string) (*persistentState, error) {
@@ -38,24 +141,8 @@ func readState(path, owner string) (*persistentState, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, fmt.Errorf("decode memory baseline: %w", err)
 	}
-	if s.Version != 1 || owner == "" || s.Owner != owner || s.AcceptedAt.IsZero() || len(s.Baseline) == 0 {
-		return nil, errors.New("memory baseline has unsupported version, owner or content")
-	}
-	seen := make(map[string]uint64)
-	for _, d := range s.Baseline {
-		if d.Locator == "" || seen[d.Locator] != 0 || d.Capacity == nil || *d.Capacity == 0 ||
-			d.Population != "populated" {
-			return nil, errors.New("memory baseline contains an invalid slot")
-		}
-		seen[d.Locator] = *d.Capacity
-	}
-	lost := make(map[string]bool)
-	for _, loss := range s.Loss {
-		if seen[loss.Locator] == 0 || lost[loss.Locator] || loss.Deficit == 0 || loss.Deficit > seen[loss.Locator] ||
-			(loss.Missing && loss.Deficit != seen[loss.Locator]) || s.LossAt.IsZero() {
-			return nil, errors.New("memory baseline contains invalid loss evidence")
-		}
-		lost[loss.Locator] = true
+	if err := s.validate(owner); err != nil {
+		return nil, err
 	}
 	return &s, nil
 }
@@ -94,72 +181,4 @@ func saveState(path string, state *persistentState) error {
 		return fmt.Errorf("sync baseline directory: %w", err)
 	}
 	return nil
-}
-
-func proposedState(current *persistentState, table *inventory.Table, owner string, now time.Time) *persistentState {
-	var loss []discrepancy
-	if current != nil {
-		devices := make(map[string]inventory.Device, len(table.Devices))
-		for _, d := range table.Devices {
-			devices[d.Locator] = d
-		}
-		for _, old := range current.Baseline {
-			d, exists := devices[old.Locator]
-			var capacity uint64
-			if exists {
-				capacity = *d.Capacity
-			}
-			if capacity < *old.Capacity {
-				loss = append(
-					loss,
-					discrepancy{
-						Locator: old.Locator,
-						Missing: !exists || d.Population == "empty",
-						Deficit: *old.Capacity - capacity,
-					},
-				)
-			}
-		}
-		if len(loss) > 0 {
-			next := *current
-			if !reflect.DeepEqual(loss, current.Loss) {
-				next.Loss = loss
-				next.LossAt = now
-			}
-			return &next
-		}
-	}
-	// Accept additions only after proving that no previously accepted slot shrank.
-	next := &persistentState{
-		Version:    1,
-		Owner:      owner,
-		AcceptedAt: now,
-	}
-	for _, d := range table.Devices {
-		if d.Population == "populated" {
-			next.Baseline = append(next.Baseline, d)
-		}
-	}
-	if current != nil && sameCapacities(current.Baseline, next.Baseline) {
-		// Descriptive metadata changes are not baseline changes or state writes.
-		next.Baseline = current.Baseline
-		next.AcceptedAt = current.AcceptedAt
-	}
-	return next
-}
-
-func sameCapacities(a, b []inventory.Device) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	bySlot := make(map[string]uint64, len(a))
-	for _, d := range a {
-		bySlot[d.Locator] = *d.Capacity
-	}
-	for _, d := range b {
-		if capacity, ok := bySlot[d.Locator]; !ok || capacity != *d.Capacity {
-			return false
-		}
-	}
-	return true
 }

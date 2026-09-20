@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package smbiosfunc serves the read-only Memory Inventory Function from the
+// collector's latest published snapshot.
 package smbiosfunc
 
 import (
@@ -11,27 +13,45 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/internal/inventory"
 )
 
-type Deps interface{ CurrentSnapshot() *inventory.Snapshot }
-type router struct{ deps Deps }
+const methodInventory = "inventory"
+
+// eccAssociation is reported for every row: no verified mapping from EDAC
+// ranks to physical devices is available.
+const eccAssociation = "unavailable"
+
+type Deps interface {
+	CurrentSnapshot() *inventory.Snapshot
+}
+
+type router struct {
+	deps Deps
+}
 
 func NewRouter(deps Deps) funcapi.MethodHandler {
-	return &router{
-		deps: deps,
-	}
+	return &router{deps: deps}
 }
+
 func Methods(updateEvery int) []funcapi.FunctionConfig {
-	return []funcapi.FunctionConfig{{ID: "inventory", Name: "Memory Inventory", UpdateEvery: updateEvery,
-		Help: "Boot-time SMBIOS physical system memory inventory and accepted baseline comparison", ResponseType: "table"}}
+	return []funcapi.FunctionConfig{{
+		ID:           methodInventory,
+		Name:         "Memory Inventory",
+		UpdateEvery:  updateEvery,
+		Help:         "Boot-time SMBIOS physical system memory inventory and accepted baseline comparison",
+		ResponseType: "table",
+	}}
 }
+
 func (*router) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if method != "inventory" {
+	if method != methodInventory {
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
 	return nil, nil
 }
+
 func (*router) Cleanup(context.Context) {}
+
 func (r *router) Handle(ctx context.Context, method string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if method != "inventory" {
+	if method != methodInventory {
 		return funcapi.NotFoundResponse(method)
 	}
 	if ctx.Err() != nil {
@@ -41,7 +61,24 @@ func (r *router) Handle(ctx context.Context, method string, _ funcapi.ResolvedPa
 	if s == nil {
 		return funcapi.UnavailableResponse("Waiting for the first memory inventory collection")
 	}
-	columns := []funcapi.ColumnMeta{
+
+	columns := inventoryColumns()
+	rows := make([][]any, 0, len(s.Rows))
+	for i, row := range s.Rows {
+		rows = append(rows, inventoryRow(i, row, s))
+	}
+	return &funcapi.FunctionResponse{
+		Status: 200,
+		Columns: funcapi.Columns(columns, func(c funcapi.ColumnMeta) funcapi.ColumnMeta { return c }).
+			BuildColumns(),
+		Data:              rows,
+		DefaultSortColumn: "Slot",
+		Help:              inventoryHelp(s),
+	}
+}
+
+func inventoryColumns() []funcapi.ColumnMeta {
+	return []funcapi.ColumnMeta{
 		{
 			Name:      "Key",
 			Tooltip:   "Identity within this table snapshot, not a persistent hardware identity",
@@ -64,52 +101,39 @@ func (r *router) Handle(ctx context.Context, method string, _ funcapi.ResolvedPa
 		numberColumn("Rated speed", "Maximum capable transfer rate reported by firmware", "MT/s", true),
 		numberColumn("Configured speed", "Transfer rate configured at boot; not a live frequency", "MT/s", true),
 		textColumn("ECC association", "No verified mapping from EDAC ranks to physical devices is available", false),
-	}
-	columns = append(
-		columns,
-		funcapi.ColumnMeta{
-			Name:      "Read attempt",
-			Tooltip:   "When Netdata last attempted to read the boot-time firmware table",
-			Type:      funcapi.FieldTypeTimestamp,
-			Sortable:  true,
-			Transform: funcapi.FieldTransformDatetime,
-		},
+		timestampColumn("Read attempt", "When Netdata last attempted to read the boot-time firmware table"),
 		textColumn("Inventory status", "Availability of the current firmware table", false),
-		funcapi.ColumnMeta{
-			Name:      "Loss recorded",
-			Tooltip:   "When the retained loss evidence last changed; blank if no retained loss",
-			Type:      funcapi.FieldTypeTimestamp,
-			Sortable:  true,
-			Transform: funcapi.FieldTransformDatetime,
-		},
-	)
-	rows := make([][]any, 0, len(s.Rows))
-	for i, row := range s.Rows {
-		d := row.Device
-		rows = append(
-			rows,
-			[]any{
-				fmt.Sprintf("%d:%04x", i, d.Handle),
-				nullable(d.Locator),
-				nullable(d.Bank),
-				d.Population,
-				number(d.Capacity),
-				number(row.BaselineCapacity),
-				row.Comparison,
-				row.Availability,
-				nullable(d.MemoryType),
-				nullable(d.FormFactor),
-				nullable(d.Manufacturer),
-				nullable(d.Part),
-				nullable(d.Serial),
-				number(d.Ranks),
-				number(d.RatedSpeed),
-				number(d.ConfiguredSpeed),
-				"unavailable",
-				s.ReadAt.UnixMilli(), s.InventoryStatus, timestamp(s.LossAt),
-			},
-		)
+		timestampColumn("Loss recorded", "When the retained loss evidence last changed; blank if no retained loss"),
 	}
+}
+
+func inventoryRow(i int, row inventory.Row, s *inventory.Snapshot) []any {
+	d := row.Device
+	return []any{
+		fmt.Sprintf("%d:%04x", i, d.Handle),
+		nullable(d.Locator),
+		nullable(d.Bank),
+		d.Population,
+		number(d.Capacity),
+		number(row.BaselineCapacity),
+		row.Comparison,
+		row.Availability,
+		nullable(d.MemoryType),
+		nullable(d.FormFactor),
+		nullable(d.Manufacturer),
+		nullable(d.Part),
+		nullable(d.Serial),
+		number(d.Ranks),
+		number(d.RatedSpeed),
+		number(d.ConfiguredSpeed),
+		eccAssociation,
+		s.ReadAt.UnixMilli(),
+		s.InventoryStatus,
+		timestamp(s.LossAt),
+	}
+}
+
+func inventoryHelp(s *inventory.Snapshot) string {
 	help := fmt.Sprintf(
 		"Boot-time firmware inventory, not live memory health. Last read attempt: %s. Inventory: %s. Comparison: %s.",
 		s.ReadAt.UTC().Format(time.RFC3339),
@@ -122,15 +146,9 @@ func (r *router) Handle(ctx context.Context, method string, _ funcapi.ResolvedPa
 	if s.Detail != "" {
 		help += " " + s.Detail
 	}
-	return &funcapi.FunctionResponse{
-		Status: 200,
-		Columns: funcapi.Columns(columns, func(c funcapi.ColumnMeta) funcapi.ColumnMeta { return c }).
-			BuildColumns(),
-		Data:              rows,
-		DefaultSortColumn: "Slot",
-		Help:              help,
-	}
+	return help
 }
+
 func textColumn(name, help string, visible bool) funcapi.ColumnMeta {
 	return funcapi.ColumnMeta{
 		Name:     name,
@@ -141,6 +159,7 @@ func textColumn(name, help string, visible bool) funcapi.ColumnMeta {
 		Filter:   funcapi.FieldFilterMultiselect,
 	}
 }
+
 func numberColumn(name, help, units string, visible bool) funcapi.ColumnMeta {
 	return funcapi.ColumnMeta{
 		Name:      name,
@@ -153,12 +172,24 @@ func numberColumn(name, help, units string, visible bool) funcapi.ColumnMeta {
 		Transform: funcapi.FieldTransformNumber,
 	}
 }
+
+func timestampColumn(name, help string) funcapi.ColumnMeta {
+	return funcapi.ColumnMeta{
+		Name:      name,
+		Tooltip:   help,
+		Type:      funcapi.FieldTypeTimestamp,
+		Sortable:  true,
+		Transform: funcapi.FieldTransformDatetime,
+	}
+}
+
 func nullable(s string) any {
 	if s == "" {
 		return nil
 	}
 	return s
 }
+
 func number(n *uint64) any {
 	if n == nil {
 		return nil

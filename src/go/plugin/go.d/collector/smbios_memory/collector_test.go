@@ -6,155 +6,19 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 	"sync"
 	"testing"
-	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
-
-var fixtureTime = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-
-type fixtureHost struct {
-	root, tables, statePath string
-	data                    []byte
-}
-
-func newFixtureHost(t *testing.T) *fixtureHost {
-	t.Helper()
-	_, data := fixture(t)
-	root := t.TempDir()
-	tables := filepath.Join(root, "sys/firmware/dmi/tables")
-	require.NoError(t, os.MkdirAll(tables, 0700))
-	stateDir := filepath.Join(root, "varlib")
-	require.NoError(t, os.Mkdir(stateDir, 0700))
-	h := &fixtureHost{
-		root:      root,
-		tables:    tables,
-		statePath: filepath.Join(stateDir, "smbios-memory.json"),
-		data:      data,
-	}
-	t.Setenv("NETDATA_HOST_PREFIX", root)
-	h.write(t, data)
-	return h
-}
-
-func (h *fixtureHost) write(t *testing.T, data []byte) {
-	t.Helper()
-	require.NoError(t, os.WriteFile(filepath.Join(h.tables, "smbios_entry_point"), entry3(data), 0600))
-	require.NoError(t, os.WriteFile(filepath.Join(h.tables, "DMI"), data, 0600))
-}
-
-func (h *fixtureHost) collector(t *testing.T) *Collector {
-	t.Helper()
-	c := New()
-	c.statePath = h.statePath
-	c.owner = "fixture-agent"
-	c.now = func() time.Time { return fixtureTime }
-	require.NoError(t, c.Init(t.Context()))
-	t.Cleanup(func() { c.Cleanup(context.Background()) })
-	return c
-}
-
-func cycle(t *testing.T, c *Collector) {
-	t.Helper()
-	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
-	require.True(t, ok)
-	cc := managed.CycleController()
-	cc.BeginCycle()
-	if err := c.Collect(t.Context()); err != nil {
-		cc.AbortCycle()
-		require.NoError(t, err)
-	}
-	require.NoError(t, cc.CommitCycleSuccess())
-}
-
-func diskState(t *testing.T, h *fixtureHost) []byte {
-	t.Helper()
-	data, err := os.ReadFile(h.statePath)
-	require.NoError(t, err)
-	return data
-}
-
-// Compare the complete measurement and slot-comparison result. Descriptive
-// inventory fields are checked through the Function's complete rows below.
-type collectionResult struct {
-	Inventory     string
-	Comparison    string
-	ConfirmedLoss string
-	Values        map[string]float64
-	Baseline      map[string]uint64
-	Loss          []discrepancy
-}
-
-func collectionOutput(t *testing.T, c *Collector) collectionResult {
-	t.Helper()
-	reader := c.store.Read()
-	activeStates := func(name string) string {
-		point, ok := reader.StateSet(name, nil)
-		require.True(t, ok, name)
-		var active []string
-		for state, enabled := range point.States {
-			if enabled {
-				active = append(active, state)
-			}
-		}
-		sort.Strings(active)
-		return strings.Join(active, ",")
-	}
-	got := collectionResult{
-		Inventory:     activeStates("inventory_status"),
-		Comparison:    activeStates("comparison_status"),
-		ConfirmedLoss: activeStates("confirmed_loss_status"),
-	}
-	reader.ForEachSeries(func(name string, labels metrix.LabelView, value metrix.SampleValue) {
-		require.Zero(t, labels.Len(), "host inventory metrics have no device labels")
-		if got.Values == nil {
-			got.Values = make(map[string]float64)
-		}
-		got.Values[name] = value
-	})
-	if c.state != nil {
-		got.Baseline = make(map[string]uint64)
-		for _, device := range c.state.Baseline {
-			got.Baseline[device.Locator] = *device.Capacity
-		}
-		got.Loss = c.state.Loss
-	}
-	return got
-}
-
-func expectedBaseline() map[string]uint64 {
-	baseline := make(map[string]uint64)
-	for i := range 16 {
-		baseline[fmt.Sprintf("DIMM_P%d_%c0", i/8, 'A'+i)] = 64 << 30
-	}
-	return baseline
-}
-
-func healthyCollection() collectionResult {
-	return collectionResult{
-		Inventory:     "available",
-		Comparison:    "comparable",
-		ConfirmedLoss: "absent",
-		Values: map[string]float64{
-			"installed_capacity_bytes": 1 << 40, "populated_slots": 16, "empty_slots": 0,
-			"missing_devices": 0, "capacity_deficit_bytes": 0,
-		},
-		Baseline: expectedBaseline(),
-	}
-}
 
 func TestCollector_Check(t *testing.T) {
 	for name, tc := range map[string]struct {
@@ -520,31 +384,6 @@ func TestCollectorInvalidSourceAndState(t *testing.T) {
 	}
 }
 
-// The row oracle comes from the synthetic fixture's documented device values,
-// not from the parser or published snapshot. A fixed clock makes timestamps exact.
-func expectedFunctionRows(baselineOnly bool) [][]any {
-	var rows [][]any
-	for i := range 16 {
-		row := []any{
-			fmt.Sprintf("%d:%04x", i, 0x110+i), fmt.Sprintf("DIMM_P%d_%c0", i/8, 'A'+i), "BANK 0",
-			"populated", uint64(64 << 30), uint64(64 << 30), "unchanged", "current firmware table",
-			"DDR4", "DIMM", "Example Memory", "EXAMPLE-64G", fmt.Sprintf("SYNTHETIC-%02d", i),
-			uint64(2), uint64(3200), uint64(3200), "unavailable", fixtureTime.UnixMilli(), "available", nil,
-		}
-		if baselineOnly {
-			row[3], row[4] = "unknown", nil
-			row[6], row[7] = "unavailable", "baseline only; current data unavailable"
-			row[13], row[14], row[15] = nil, nil, nil
-			row[18], row[19] = "unavailable", fixtureTime.UnixMilli()
-			if i == 0 {
-				row[6] = "retained loss; unavailable"
-			}
-		}
-		rows = append(rows, row)
-	}
-	return rows
-}
-
 func TestCollectorFunctionInventory(t *testing.T) {
 	for name, tc := range map[string]struct {
 		baselineOnly bool
@@ -570,7 +409,7 @@ func TestCollectorFunctionInventory(t *testing.T) {
 				assert.Equal(t, before, diskState(t, h))
 			}
 			before := diskState(t, h)
-			response := c.router.Handle(t.Context(), "inventory", funcapi.ResolvedParams{})
+			response := c.funcRouter.Handle(t.Context(), "inventory", funcapi.ResolvedParams{})
 			require.Equal(t, 200, response.Status)
 			assert.Equal(t, tc.want, response.Data)
 			assert.Len(t, response.Columns, len(tc.want[0]))
@@ -596,7 +435,7 @@ func TestCollectorFunctionErrors(t *testing.T) {
 			if tc.cancel {
 				cancel()
 			}
-			assert.Equal(t, tc.wantStatus, c.router.Handle(ctx, tc.method, funcapi.ResolvedParams{}).Status)
+			assert.Equal(t, tc.wantStatus, c.funcRouter.Handle(ctx, tc.method, funcapi.ResolvedParams{}).Status)
 		})
 	}
 }
@@ -612,7 +451,7 @@ func TestFunctionConcurrencyAndCancellation(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for range 100 {
-			response := c.router.Handle(t.Context(), "inventory", funcapi.ResolvedParams{})
+			response := c.funcRouter.Handle(t.Context(), "inventory", funcapi.ResolvedParams{})
 			assert.Equal(t, want, response.Data)
 			_, err := json.Marshal(response)
 			assert.NoError(t, err)
@@ -630,33 +469,10 @@ func TestFunctionConcurrencyAndCancellation(t *testing.T) {
 	managed.CycleController().BeginCycle()
 	assert.ErrorIs(t, c.Collect(ctx), context.Canceled)
 	managed.CycleController().AbortCycle()
-	assert.Equal(t, want, c.router.Handle(t.Context(), "inventory", funcapi.ResolvedParams{}).Data)
+	assert.Equal(t, want, c.funcRouter.Handle(t.Context(), "inventory", funcapi.ResolvedParams{}).Data)
 	assert.Equal(t, before, diskState(t, h))
 	c.Cleanup(t.Context())
 	c.Cleanup(t.Context())
-}
-
-func TestCollector_ConfigurationSerialize(t *testing.T) {
-	for name, tc := range map[string]struct {
-		marshal   func(any) ([]byte, error)
-		unmarshal func([]byte, any) error
-	}{
-		"JSON": {marshal: json.Marshal, unmarshal: json.Unmarshal},
-		"YAML": {marshal: yaml.Marshal, unmarshal: yaml.Unmarshal},
-	} {
-		t.Run(name, func(t *testing.T) {
-			want := Config{
-				UpdateEvery: 17,
-			}
-			c := New()
-			c.Config = want
-			data, err := tc.marshal(c.Configuration())
-			require.NoError(t, err)
-			var got Config
-			require.NoError(t, tc.unmarshal(data, &got))
-			assert.Equal(t, want, got)
-		})
-	}
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -732,7 +548,7 @@ func TestCandidateLoadsStateOnlyAfterActivation(t *testing.T) {
 	assert.Equal(
 		t,
 		expectedFunctionRows(true),
-		candidate.router.Handle(t.Context(), "inventory", funcapi.ResolvedParams{}).Data,
+		candidate.funcRouter.Handle(t.Context(), "inventory", funcapi.ResolvedParams{}).Data,
 	)
 }
 

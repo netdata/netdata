@@ -3,165 +3,80 @@
 package smbios_memory
 
 import (
+	"cmp"
 	"context"
-	"errors"
-	"fmt"
-	"os"
-	"reflect"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/internal/inventory"
 )
 
-func (c *Collector) Collect(ctx context.Context) error {
+// collect reads the firmware table, reconciles it with the accepted baseline,
+// publishes the Function snapshot and writes the host-level metrics.
+func (c *Collector) collect(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if !c.stateLoaded {
-		// Init/Check also run for candidates while an older job may still own the state.
-		// The first active Collect runs after that owner has stopped.
-		c.state, c.stateErr = readState(c.statePath, c.owner)
-		if errors.Is(c.stateErr, os.ErrNotExist) {
-			c.stateErr = nil
-		}
-		if c.owner == "" {
-			c.stateErr = errors.New("Agent registry identity is unavailable; baseline persistence disabled")
-		}
-		c.stateLoaded = true
-	}
+	c.baseline.load()
+
 	now := c.now()
-	table, readErr := c.read()
+	table, readErr := c.readTable()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	snapshot := &inventory.Snapshot{
-		ReadAt:           now,
-		InventoryStatus:  "unavailable",
-		ComparisonStatus: "unavailable",
-	}
+
+	snapshot := newSnapshot(now, table, readErr)
+
 	var writeErr error
-	if readErr != nil {
-		snapshot.Detail = readErr.Error()
-	} else {
-		snapshot.InventoryStatus = "available"
-		snapshot.ComparisonStatus = "uncomparable"
-		snapshot.Detail = table.Reason
-		if table.Comparable {
-			snapshot.ComparisonStatus = "unbaselined"
-			if c.stateErr == nil && (c.state != nil || table.Populated > 0) {
-				next := proposedState(c.state, table, c.owner, now)
-				if c.dirty || !reflect.DeepEqual(c.state, next) {
-					writeErr = saveState(c.statePath, next)
-					if writeErr == nil {
-						c.state = next
-						c.dirty = false
-					} else if c.state != nil && len(next.Loss) > 0 {
-						// Remember observed loss even if storage is temporarily unavailable.
-						// Neither baseline increases nor restorations are accepted on failure.
-						c.state.Loss = next.Loss
-						c.state.LossAt = next.LossAt
-						c.dirty = true
-					}
-				}
-				if c.state != nil && writeErr == nil {
-					snapshot.ComparisonStatus = "comparable"
-				}
-			}
+	if table != nil && table.Comparable {
+		writeErr = c.baseline.reconcile(table, now)
+		if c.baseline.current != nil && writeErr == nil {
+			snapshot.ComparisonStatus = inventory.ComparisonComparable
 		}
 	}
-	if c.dirty && writeErr == nil {
-		writeErr = saveState(c.statePath, c.state)
-		if writeErr == nil {
-			c.dirty = false
-		}
+	if writeErr == nil {
+		writeErr = c.baseline.flush()
 	}
-	if c.stateErr != nil || writeErr != nil {
-		snapshot.ComparisonStatus = "state_error"
-		err := c.stateErr
-		if err == nil {
-			err = writeErr
-		}
-		if snapshot.Detail != "" {
-			snapshot.Detail += "; "
-		}
-		snapshot.Detail += err.Error()
+	if err := cmp.Or(c.baseline.err, writeErr); err != nil {
+		snapshot.ComparisonStatus = inventory.ComparisonStateError
+		snapshot.Detail = joinDetail(snapshot.Detail, err.Error())
 	}
 	if snapshot.Detail != "" {
 		c.Limit("smbios_memory:collection", 1, time.Hour).Warningf("Memory inventory: %s", snapshot.Detail)
 	}
-	if c.state != nil {
-		snapshot.LossAt = c.state.LossAt
+
+	if state := c.baseline.current; state != nil {
+		snapshot.LossAt = state.LossAt
 	}
-	snapshot.Rows = inventoryRows(table, c.state, snapshot.ComparisonStatus)
+	snapshot.Rows = inventoryRows(table, c.baseline.current, snapshot.ComparisonStatus)
 	c.snapshot.Store(snapshot)
-	c.metrics.observe(table, snapshot, c.state)
+
+	c.writeMetrics(table, snapshot)
 	// Domain failures are observable states; returning an error would abort their metrics.
 	return nil
 }
 
-func inventoryRows(table *inventory.Table, state *persistentState, comparison string) []inventory.Row {
-	var rows []inventory.Row
-	baseline := make(map[string]inventory.Device)
-	loss := make(map[string]discrepancy)
-	if state != nil {
-		for _, d := range state.Baseline {
-			baseline[d.Locator] = d
-		}
-		for _, d := range state.Loss {
-			loss[d.Locator] = d
-		}
+// newSnapshot classifies the read result before any baseline comparison.
+func newSnapshot(now time.Time, table *inventory.Table, readErr error) *inventory.Snapshot {
+	s := &inventory.Snapshot{ReadAt: now}
+	switch {
+	case readErr != nil:
+		s.InventoryStatus = inventory.InventoryUnavailable
+		s.ComparisonStatus = inventory.ComparisonUnavailable
+		s.Detail = readErr.Error()
+	case !table.Comparable:
+		s.InventoryStatus = inventory.InventoryAvailable
+		s.ComparisonStatus = inventory.ComparisonUncomparable
+		s.Detail = table.Reason
+	default:
+		s.InventoryStatus = inventory.InventoryAvailable
+		s.ComparisonStatus = inventory.ComparisonUnbaselined
 	}
-	seen := make(map[string]bool)
-	if table != nil {
-		for _, d := range table.Devices {
-			seen[d.Locator] = true
-			row := inventory.Row{
-				Device:       d,
-				Availability: "current firmware table",
-				Comparison:   comparison,
-			}
-			if old, ok := baseline[d.Locator]; ok {
-				row.BaselineCapacity = old.Capacity
-				if comparison == "comparable" {
-					row.Comparison = "unchanged"
-					if d.Population == "empty" {
-						row.Comparison = "missing"
-					} else if *d.Capacity < *old.Capacity {
-						row.Comparison = "reduced capacity"
-					}
-				}
-			} else if comparison == "comparable" {
-				row.Comparison = "not in populated baseline"
-			}
-			rows = append(rows, row)
-		}
+	return s
+}
+
+func joinDetail(detail, more string) string {
+	if detail == "" {
+		return more
 	}
-	if state != nil {
-		for _, d := range state.Baseline {
-			if seen[d.Locator] {
-				continue
-			}
-			row := inventory.Row{
-				Device:           d,
-				Availability:     "baseline only; current data unavailable",
-				Comparison:       comparison,
-				BaselineCapacity: d.Capacity,
-			}
-			// The device metadata describes the accepted device; it is not a current measurement.
-			row.Device.Capacity = nil
-			row.Device.Population = "unknown"
-			row.Device.RatedSpeed = nil
-			row.Device.ConfiguredSpeed = nil
-			row.Device.Ranks = nil
-			if comparison == "comparable" {
-				row.Availability = "absent from current firmware table"
-				row.Comparison = "missing"
-			}
-			if _, ok := loss[d.Locator]; ok && comparison != "comparable" {
-				row.Comparison = fmt.Sprintf("retained loss; %s", comparison)
-			}
-			rows = append(rows, row)
-		}
-	}
-	return rows
+	return detail + "; " + more
 }

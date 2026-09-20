@@ -10,191 +10,239 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/internal/inventory"
 )
 
-func fixture(t *testing.T) ([]byte, []byte) {
-	t.Helper()
-	e, err := os.ReadFile("testdata/smbios3-entry.bin")
-	require.NoError(t, err)
-	d, err := os.ReadFile("testdata/system-memory.bin")
-	require.NoError(t, err)
-	return e, d
-}
-
-// This helper only frames the fixture's records; assertions come from the
-// supplied server's decoded shape and DSP0134, not from parser output.
-func fixtureRecords(t *testing.T, data []byte) [][]byte {
-	t.Helper()
-	var records [][]byte
-	for len(data) > 0 {
-		require.GreaterOrEqual(t, len(data), 4)
-		n := int(data[1])
-		require.LessOrEqual(t, n, len(data))
-		end := bytes.Index(data[n:], []byte{0, 0})
-		require.GreaterOrEqual(t, end, 0)
-		length := n + end + 2
-		records = append(records, bytes.Clone(data[:length]))
-		data = data[length:]
-	}
-	return records
-}
-func entry3(data []byte) []byte {
-	e := make([]byte, 24)
-	copy(e, "_SM3_")
-	e[6] = 24
-	e[7] = 3
-	e[8] = 3
-	e[10] = 1
-	binary.LittleEndian.PutUint32(e[12:16], uint32(len(data)+128))
-	checksum(e, 5)
-	return e
-}
-func checksum(data []byte, offset int) {
-	data[offset] = 0
-	var sum byte
-	for _, b := range data {
-		sum += b
-	}
-	data[offset] = 0 - sum
-}
-func joinRecords(records [][]byte) []byte { return bytes.Join(records, nil) }
-
-func TestParseSuppliedServerShape(t *testing.T) {
+func TestParseTable_SuppliedServerShape(t *testing.T) {
 	e, d := fixture(t)
+
 	table, err := parseTable(e, d)
+
 	require.NoError(t, err)
-	assert.True(t, table.Comparable)
-	assert.Equal(t, uint64(1<<40), *table.Capacity)
-	assert.Equal(t, 16, table.Populated)
-	assert.Zero(t, table.Empty)
-	require.Len(t, table.Devices, 16)
-	first := table.Devices[0]
-	assert.Equal(t, "DIMM_P0_A0", first.Locator)
-	assert.Equal(t, "BANK 0", first.Bank)
-	assert.Equal(t, "DDR4", first.MemoryType)
-	assert.Equal(t, "DIMM", first.FormFactor)
-	assert.Equal(t, uint64(64<<30), *first.Capacity)
-	assert.Equal(t, uint64(2), *first.Ranks)
-	assert.Equal(t, uint64(3200), *first.RatedSpeed)
-	assert.Equal(t, uint64(3200), *first.ConfiguredSpeed)
+	assert.Equal(t, &inventory.Table{
+		Devices:     fixtureDevices(),
+		Capacity:    uintPtr(1 << 40),
+		Populated:   16,
+		CountsKnown: true,
+		Comparable:  true,
+	}, table)
 }
 
-func TestDocumentedDeviceEncodings(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		size       uint16
-		extended   uint32
-		population string
-		capacity   *uint64
+// tableSummary is a decoded table without its device list.
+func tableSummary(table *inventory.Table) inventory.Table {
+	summary := *table
+	summary.Devices = nil
+	return summary
+}
+
+func TestParseTable_DocumentedSizeEncodings(t *testing.T) {
+	const fixtureTotal = 16 * (64 << 30)
+	withCapacity := func(capacity uint64, population string) inventory.Device {
+		d := fixtureDevice(0)
+		d.Capacity, d.Population = uintPtr(capacity), population
+		return d
+	}
+	known := func(capacity uint64, population string) inventory.Table {
+		empty := 0
+		if population == "empty" {
+			empty = 1
+		}
+		return inventory.Table{
+			Capacity:    uintPtr(fixtureTotal - 64<<30 + capacity),
+			Populated:   16 - empty,
+			Empty:       empty,
+			CountsKnown: true,
+			Comparable:  true,
+		}
+	}
+	unknownDevice := fixtureDevice(0)
+	unknownDevice.Capacity, unknownDevice.Population = nil, "unknown"
+	unknownTable := inventory.Table{Populated: 15, Reason: "Unknown device capacity"}
+
+	for name, tc := range map[string]struct {
+		size     uint16
+		extended uint32
+		device   inventory.Device
+		table    inventory.Table
 	}{
-		{"empty", 0, 0, "empty", uintPtr(0)}, {"megabytes", 8192, 0, "populated", uintPtr(8 << 30)},
-		{"kilobytes", 0x8001, 0, "populated", uintPtr(1024)}, {"unknown", 0xffff, 0, "unknown", nil},
-		{"extended", 0x7fff, 131072, "populated", uintPtr(128 << 30)}, {"unknown extended", 0x7fff, 0, "unknown", nil},
+		"empty socket": {
+			size:   0,
+			device: withCapacity(0, "empty"),
+			table:  known(0, "empty"),
+		},
+		"megabytes": {
+			size:   8192,
+			device: withCapacity(8<<30, "populated"),
+			table:  known(8<<30, "populated"),
+		},
+		"kilobytes": {
+			size:   0x8001,
+			device: withCapacity(1024, "populated"),
+			table:  known(1024, "populated"),
+		},
+		"extended size": {
+			size:     0x7fff,
+			extended: 131072,
+			device:   withCapacity(128<<30, "populated"),
+			table:    known(128<<30, "populated"),
+		},
+		"unknown size":          {size: 0xffff, device: unknownDevice, table: unknownTable},
+		"unknown extended size": {size: 0x7fff, extended: 0, device: unknownDevice, table: unknownTable},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			_, d := fixture(t)
 			records := fixtureRecords(t, d)
 			device := records[1]
 			binary.LittleEndian.PutUint16(device[12:14], tc.size)
 			binary.LittleEndian.PutUint32(device[28:32], tc.extended)
+			// Speeds use their extended fields the same way: 0xffff defers to the 32-bit value.
 			binary.LittleEndian.PutUint16(device[21:23], 0xffff)
 			binary.LittleEndian.PutUint32(device[84:88], 70000)
 			binary.LittleEndian.PutUint16(device[32:34], 4800)
 			d = joinRecords(records)
+			tc.device.RatedSpeed, tc.device.ConfiguredSpeed = uintPtr(70000), uintPtr(4800)
+
 			table, err := parseTable(entry3(d), d)
+
 			require.NoError(t, err)
-			got := table.Devices[0]
-			assert.Equal(t, tc.capacity, got.Capacity)
-			assert.Equal(t, tc.population, got.Population)
-			assert.Equal(t, uint64(70000), *got.RatedSpeed)
-			assert.Equal(t, uint64(4800), *got.ConfiguredSpeed)
-			if tc.capacity == nil {
-				assert.False(t, table.Comparable)
-				assert.Nil(t, table.Capacity)
-				assert.False(t, table.CountsKnown)
-			}
+			require.NotEmpty(t, table.Devices)
+			assert.Equal(t, tc.device, table.Devices[0])
+			assert.Equal(t, tc.table, tableSummary(table))
 		})
 	}
 }
 
-func TestParserClassificationAndIdentity(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		modify     func([][]byte)
-		err        string
-		devices    int
-		comparable bool
+func TestParseTable_Classification(t *testing.T) {
+	healthy := inventory.Table{Capacity: uintPtr(1 << 40), Populated: 16, CountsKnown: true, Comparable: true}
+	uncomparable := healthy
+	uncomparable.Comparable, uncomparable.Reason = false, "Slot locators are missing or duplicated"
+	unknownType := fixtureDevice(0)
+	unknownType.MemoryType = ""
+	unnamedSlot := fixtureDevice(0)
+	unnamedSlot.Locator = ""
+	minimal := fixtureDevice(0)
+	minimal.Capacity = uintPtr(8 << 30)
+	minimal.Manufacturer, minimal.Part, minimal.Serial = "", "", ""
+	minimal.Ranks, minimal.RatedSpeed, minimal.ConfiguredSpeed = nil, nil, nil
+
+	for name, tc := range map[string]struct {
+		modify  func([][]byte)
+		devices int
+		first   inventory.Device
+		table   inventory.Table
 	}{
-		{"unknown locator", func(r [][]byte) { r[1][16] = 0 }, "", 16, false},
-		{"duplicated locator", func(r [][]byte) { r[1][16] = 2; r[2][16] = 2 }, "", 16, false},
-		{"bank duplicates allowed", func(r [][]byte) {}, "", 16, true},
-		{"unknown technology still physical", func(r [][]byte) { r[1][18] = 2 }, "", 16, true},
-		{"logical memory excluded", func(r [][]byte) { r[1][18] = 0x1f; r[1][12] = 0xff; r[1][13] = 0xff }, "", 15, true},
-		{"not system memory", func(r [][]byte) { r[0][5] = 4 }, "no system memory", 0, false},
-		{"array count mismatch", func(r [][]byte) { r[0][13] = 17 }, "device count", 0, false},
-		{"array missing", func(r [][]byte) { r[1][4] = 0x99 }, "missing physical array", 0, false},
-		{"duplicate handle", func(r [][]byte) { copy(r[2][2:4], r[1][2:4]) }, "duplicate DMI handle", 0, false},
-		{"missing extended size", func(r [][]byte) { r[1] = append(bytes.Clone(r[1][:28]), r[1][92:]...); r[1][1] = 28 }, "extended memory size", 0, false},
-		{"optional fields omitted", func(r [][]byte) {
-			r[1][12] = 0
-			r[1][13] = 0x20
-			r[1] = append(bytes.Clone(r[1][:21]), r[1][92:]...)
-			r[1][1] = 21
-		}, "", 16, true},
+		"bank duplicates allowed": {
+			modify: func([][]byte) {}, devices: 16, first: fixtureDevice(0), table: healthy,
+		},
+		"unknown locator": {
+			modify: func(r [][]byte) { r[1][16] = 0 }, devices: 16, first: unnamedSlot, table: uncomparable,
+		},
+		"duplicated locator": {
+			modify: func(r [][]byte) { r[1][16], r[2][16] = 2, 2 }, devices: 16, table: uncomparable,
+			first: func() inventory.Device { d := fixtureDevice(0); d.Locator = "BANK 0"; return d }(),
+		},
+		"unknown technology still physical": {
+			modify: func(r [][]byte) { r[1][18] = 2 }, devices: 16, first: unknownType, table: healthy,
+		},
+		"logical memory excluded": {
+			modify: func(r [][]byte) {
+				r[1][18] = 0x1f
+				binary.LittleEndian.PutUint16(r[1][12:14], 0xffff)
+			},
+			devices: 15,
+			first:   fixtureDevice(1),
+			table:   inventory.Table{Capacity: uintPtr(15 * (64 << 30)), Populated: 15, CountsKnown: true, Comparable: true},
+		},
+		"optional fields omitted": {
+			modify: func(r [][]byte) {
+				binary.LittleEndian.PutUint16(r[1][12:14], 0x2000)
+				r[1] = append(bytes.Clone(r[1][:21]), r[1][92:]...)
+				r[1][1] = 21
+			},
+			devices: 16,
+			first:   minimal,
+			table:   inventory.Table{Capacity: uintPtr(15*(64<<30) + 8<<30), Populated: 16, CountsKnown: true, Comparable: true},
+		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			_, d := fixture(t)
 			r := fixtureRecords(t, d)
 			tc.modify(r)
 			d = joinRecords(r)
-			got, err := parseTable(entry3(d), d)
+
+			table, err := parseTable(entry3(d), d)
+
+			require.NoError(t, err)
+			assert.Len(t, table.Devices, tc.devices)
+			assert.Equal(t, tc.first, table.Devices[0])
+			assert.Equal(t, tc.table, tableSummary(table))
+		})
+	}
+}
+
+func TestParseTable_MalformedTables(t *testing.T) {
+	for name, tc := range map[string]struct {
+		modify func([][]byte)
+		err    string
+	}{
+		"not system memory":     {func(r [][]byte) { r[0][5] = 4 }, "no system memory"},
+		"array count mismatch":  {func(r [][]byte) { r[0][13] = 17 }, "device count"},
+		"array missing":         {func(r [][]byte) { r[1][4] = 0x99 }, "missing physical array"},
+		"duplicate handle":      {func(r [][]byte) { copy(r[2][2:4], r[1][2:4]) }, "duplicate DMI handle"},
+		"missing extended size": {func(r [][]byte) { r[1] = append(bytes.Clone(r[1][:28]), r[1][92:]...); r[1][1] = 28 }, "extended memory size"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, d := fixture(t)
+			r := fixtureRecords(t, d)
+			tc.modify(r)
+			d = joinRecords(r)
+
+			_, err := parseTable(entry3(d), d)
+
+			require.ErrorContains(t, err, tc.err)
+		})
+	}
+}
+
+func TestParseTable_EntryPoints(t *testing.T) {
+	for name, tc := range map[string]struct {
+		entry func(data []byte) []byte
+		err   string
+	}{
+		"smbios 3":                 {entry: entry3},
+		"smbios 2":                 {entry: func(d []byte) []byte { return entry2(d, 18) }},
+		"smbios 2 structure count": {entry: func(d []byte) []byte { return entry2(d, 19) }, err: "structure count"},
+		"corrupt checksum": {
+			entry: func(d []byte) []byte { e := entry3(d); e[5]++; return e },
+			err:   "entry point",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, d := fixture(t)
+
+			table, err := parseTable(tc.entry(d), d)
+
 			if tc.err != "" {
 				require.ErrorContains(t, err, tc.err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Len(t, got.Devices, tc.devices)
-			assert.Equal(t, tc.comparable, got.Comparable)
-			if tc.name == "optional fields omitted" {
-				assert.Nil(t, got.Devices[0].RatedSpeed)
-				assert.Nil(t, got.Devices[0].ConfiguredSpeed)
-				assert.Empty(t, got.Devices[0].Serial)
-			}
+			assert.Equal(t, 16, table.Populated)
 		})
 	}
 }
 
-func TestEntryPointsAndTruncation(t *testing.T) {
+func TestParseTable_Truncation(t *testing.T) {
 	e, d := fixture(t)
-	for i := 0; i < len(e); i++ {
+	for i := range len(e) {
 		_, err := parseTable(e[:i], d)
-		require.Error(t, err)
+		assert.Error(t, err, "entry point truncated to %d bytes", i)
 	}
 	for _, cut := range []int{0, 1, 3, 22, len(d) - 1, len(d) - 6} {
 		_, err := parseTable(e, d[:cut])
-		require.Error(t, err)
+		assert.Error(t, err, "table truncated to %d bytes", cut)
 	}
-	e[5]++
-	_, err := parseTable(e, d)
-	require.ErrorContains(t, err, "entry point")
-	e = make([]byte, 31)
-	copy(e, "_SM_")
-	e[5] = 31
-	e[6] = 2
-	e[7] = 8
-	copy(e[16:], "_DMI_")
-	binary.LittleEndian.PutUint16(e[22:24], uint16(len(d)))
-	binary.LittleEndian.PutUint16(e[28:30], 18)
-	checksum(e[16:31], 5)
-	checksum(e, 4)
-	got, err := parseTable(e, d)
-	require.NoError(t, err)
-	assert.Equal(t, 16, got.Populated)
-	e[28]++
-	checksum(e[16:31], 5)
-	checksum(e, 4)
-	_, err = parseTable(e, d)
-	require.ErrorContains(t, err, "structure count")
 }
 
 func FuzzParseTable(f *testing.F) {
