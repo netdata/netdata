@@ -381,6 +381,12 @@
 - Regenerate integrations docs ([#23935](https://github.com/netdata/netdata/issues/23935))
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.33.4 to 1.33.5 in /src/go ([#23953](https://github.com/netdata/netdata/issues/23953))
 - Build(deps): bump github.com/axiomhq/hyperloglog from 0.2.6 to 0.3.0 in /src/go ([#23951](https://github.com/netdata/netdata/issues/23951))
+- Refactor(go.d/redfish): rebuild the chart template and trim metric labels ([#23957](https://github.com/netdata/netdata/issues/23957))
+- Docs(skills): own chart template authoring in the V2 collector skill ([#23959](https://github.com/netdata/netdata/issues/23959))
+- Test(go.d): cross-check collector artifacts with collecttest instead of restating them ([#23960](https://github.com/netdata/netdata/issues/23960))
+- Docs(go.d/redfish): write the integration page for operators ([#23962](https://github.com/netdata/netdata/issues/23962))
+- Regenerate integrations docs ([#23958](https://github.com/netdata/netdata/issues/23958))
+- Build(deps): bump anyio from 4.13.0 to 4.14.2 in /packaging/tools/automation/mcp ([#23955](https://github.com/netdata/netdata/issues/23955))
 
 ## [2.11.0] - 2026-08-12
 
