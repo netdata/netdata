@@ -280,6 +280,7 @@ modules:
               - name: Data availability
                 type: string
                 unit: ''
+                visibility: hidden
                 description: Current firmware data or baseline-only evidence.
               - name: Memory type
                 type: string
@@ -293,12 +294,10 @@ modules:
               - name: Manufacturer
                 type: string
                 unit: ''
-                visibility: hidden
                 description: Current or baseline-only device manufacturer.
               - name: Part number
                 type: string
                 unit: ''
-                visibility: hidden
                 description: Current or baseline-only device part.
               - name: Serial number
                 type: string

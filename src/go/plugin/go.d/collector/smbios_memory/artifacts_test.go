@@ -9,7 +9,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -66,63 +65,16 @@ func TestArtifacts(t *testing.T) {
 	assert.Equal(t, form.JSONSchema.Properties, documented)
 }
 
-// The Live Data section mirrors the Function: ids, parameters and the returned columns.
-func TestMetadataDocumentsFunction(t *testing.T) {
-	type column struct {
-		Name       string
-		Type       string
-		Unit       string
-		Visibility string
-	}
-	type function struct {
-		ID         string
-		Parameters []any
-		Returns    struct {
-			Columns []column
-		}
-	}
-	var doc struct {
-		Modules []struct {
-			Functions struct {
-				List []function
-			}
-		}
-	}
+// The Live Data section mirrors the Function: ids, parameters and returned columns.
+func TestMetadataDocumentsFunctions(t *testing.T) {
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
-	require.NoError(t, yaml.Unmarshal(metadata, &doc))
-	require.Len(t, doc.Modules, 1)
-	documented := doc.Modules[0].Functions.List
-
-	var registered []function
-	for _, method := range smbiosMethods() {
-		params, err := New().funcRouter.MethodParams(t.Context(), method.ID)
-		require.NoError(t, err)
-		f := function{ID: method.ID, Parameters: make([]any, len(params))}
-		for i, p := range params {
-			f.Parameters[i] = p
-		}
-		registered = append(registered, f)
-	}
-	require.Len(t, documented, len(registered))
-
 	h := newFixtureHost(t)
 	c := h.collector(t)
 	cycle(t, c)
-	for i, f := range registered {
-		response := c.funcRouter.Handle(t.Context(), f.ID, funcapi.ResolvedParams{})
-		require.Equal(t, 200, response.Status, f.ID)
-		f.Returns.Columns = make([]column, len(response.Columns))
-		for name, meta := range response.Columns {
-			m := meta.(map[string]any)
-			col := column{Name: name, Type: m["type"].(string)}
-			col.Unit, _ = m["units"].(string)
-			if !m["visible"].(bool) {
-				col.Visibility = "hidden"
-			}
-			f.Returns.Columns[m["index"].(int)] = col
-		}
-		registered[i] = f
-	}
-	assert.Equal(t, registered, documented)
+	collecttest.AssertMetadataDocumentsFunctions(t, metadata, collecttest.MetadataFunctionsCheck{
+		Context: t.Context(),
+		Methods: smbiosMethods(),
+		Handler: c.funcRouter,
+	})
 }
