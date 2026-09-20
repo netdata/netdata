@@ -1200,14 +1200,14 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
 
     // reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier, out of the engine's resolved budget. The
     // check and the reservation are one atomic step: tiers coming up in parallel (the daemon brings them up on a
-    // thread each) can neither take the engine past its budget nor refuse one another while one of them fits
+    // thread each when it has the cpus for it) can neither take the engine past its budget nor refuse one another
+    // while one of them fits
     dbengine_stats_t reserved = __atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED);
     do {
         if (reserved + DBENGINE_FD_BUDGET_PER_TIER > engine->cfg.max_reserved_file_descriptors) {
             netdata_log_error(
-                "Exceeded the budget of available file descriptors (%zu/%zu), cannot create new dbengine tier.",
-                (size_t)(reserved + DBENGINE_FD_BUDGET_PER_TIER),
-                engine->cfg.max_reserved_file_descriptors);
+                "DBENGINE: tier %zu: the file descriptor budget has no room for the tier (%zu of %zu reserved, %d needed), the tier cannot be initialized",
+                tier, (size_t)reserved, engine->cfg.max_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
 
             rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
             return UV_EMFILE;

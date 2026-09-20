@@ -87,6 +87,10 @@ int dbengine_tier_init(DBENGINE_ENGINE *engine, const struct dbengine_tier_confi
 // wait until the tier's registry load is done: once, after a dbengine_tier_init() that returned 0; NULL returns at once
 void dbengine_readiness_wait(DBENGINE_TIER *tier);
 
+// take the tier down: once, after a dbengine_tier_init() that returned 0 and before dbengine_shutdown() (it needs
+// the live loop); the tier's file descriptor reservation is released here (its datafiles stay attached until
+// dbengine_destroy() finalizes them). Never on a tier that did not come up, and never twice: each call releases a
+// reservation, and one that was never made unbalances the engine's budget. NULL returns at once
 int dbengine_tier_exit(DBENGINE_TIER *tier);
 
 // a tier that came up and has not been shut down (dbengine_tier_exit() clears it first); the engine's

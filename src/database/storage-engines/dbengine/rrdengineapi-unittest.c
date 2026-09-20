@@ -323,7 +323,120 @@ static void engine_lifecycle_remove_dir(const char *dir);
 // quarter of the soft limit libnetdata read; a budget below one tier's reservation refuses the tier with UV_EMFILE,
 // nothing reserved and nothing written; a path longer than DBENGINE_DBFILES_PATH_MAX is refused with
 // UV_ENAMETOOLONG before the budget is even looked at, whether or not it would fit the tier's buffer; a budget of
-// exactly one tier's reservation brings the tier up
+// exactly one tier's reservation brings the tier up; and four tiers racing for a budget of two reservations end
+// with exactly two up and the budget fully used (engine_config_budget_race())
+
+struct budget_race_init {
+    DBENGINE_ENGINE *engine;
+    struct dbengine_tier_config tc;
+    ND_THREAD *thread;
+    int rc;
+};
+
+static void engine_config_budget_race_init(void *ptr) {
+    struct budget_race_init *bri = ptr;
+    bri->rc = dbengine_tier_init(bri->engine, &bri->tc);
+}
+
+// The reservation is one atomic step: four tiers brought up at once on an engine whose budget holds two
+// reservations end with exactly two of them up and the counter at two reservations, whatever the interleaving.
+// Before the check and the reservation were one step, two tiers could both see the combined total and both refuse
+// while one of them fit. Each tier gets a scratch directory of its own next to dir
+static int engine_config_budget_race(const struct dbengine_config *cfg, const char *dir, const char *what) {
+    int errors = 0;
+    const size_t tiers = 4, fits = 2;
+
+    struct dbengine_config two = *cfg;
+    two.max_reserved_file_descriptors = fits * DBENGINE_FD_BUDGET_PER_TIER;
+    DBENGINE_ENGINE *engine = dbengine_create(&two);
+    if(!engine) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine for the budget race did not come up\n", what);
+        return 1;
+    }
+
+    char dirs[4][FILENAME_MAX + 1];
+    struct budget_race_init inits[4];
+    for(size_t i = 0; i < tiers; i++) {
+        snprintfz(dirs[i], sizeof(dirs[i]), "%s-t%zu", dir, i);
+        if(mkdir(dirs[i], 0700) != 0 && errno != EEXIST) {
+            fprintf(stderr, " >>> DBENGINE: %s: cannot create the scratch directory '%s'\n", what, dirs[i]);
+            errors++;
+        }
+        inits[i].engine = engine;
+        inits[i].tc = (struct dbengine_tier_config) {
+            .tier = i,
+            .dbfiles_path = dirs[i],
+            .disk_space_mb = 0,
+            .max_retention_s = 0,
+            .page_type = i == 0 ? DBENGINE_PAGE_TYPE_GORILLA_32BIT : DBENGINE_PAGE_TYPE_ARRAY_TIER1,
+            .grouping = i == 0 ? 1 : 60,
+        };
+        inits[i].rc = -1;
+    }
+
+    for(size_t i = 0; i < tiers; i++) {
+        char tag[NETDATA_THREAD_TAG_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGRACE[%zu]", i);
+        inits[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, engine_config_budget_race_init, &inits[i]);
+        if(!inits[i].thread) {
+            fprintf(stderr, " >>> DBENGINE: %s: cannot start the init thread of tier %zu\n", what, i);
+            errors++;
+            engine_config_budget_race_init(&inits[i]);
+        }
+    }
+    for(size_t i = 0; i < tiers; i++)
+        if(inits[i].thread)
+            nd_thread_join(inits[i].thread);
+
+    size_t up = 0, refused = 0;
+    for(size_t i = 0; i < tiers; i++) {
+        if(inits[i].rc == 0)
+            up++;
+        else if(inits[i].rc == UV_EMFILE)
+            refused++;
+        else {
+            fprintf(stderr, " >>> DBENGINE: %s: tier %zu of the race returned %d\n", what, i, inits[i].rc);
+            errors++;
+        }
+    }
+    if(up != fits || refused != tiers - fits) {
+        fprintf(stderr, " >>> DBENGINE: %s: %zu tiers came up and %zu were refused on a budget of %zu\n",
+                what, up, refused, fits);
+        errors++;
+    }
+    if(__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED) != fits * DBENGINE_FD_BUDGET_PER_TIER) {
+        fprintf(stderr, " >>> DBENGINE: %s: the race left %zu file descriptors reserved, not %zu\n", what,
+                (size_t)__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED),
+                fits * DBENGINE_FD_BUDGET_PER_TIER);
+        errors++;
+    }
+
+    for(size_t i = 0; i < tiers; i++) {
+        DBENGINE_TIER *tier = dbengine_tier(engine, i);
+        if(inits[i].rc == 0) {
+            dbengine_readiness_wait(tier);
+            dbengine_tier_exit(tier);
+        }
+        else if(dbengine_tier_is_active(tier) || dbengine_dir_has_datafiles(dirs[i])) {
+            fprintf(stderr, " >>> DBENGINE: %s: refused tier %zu is up or wrote datafiles\n", what, i);
+            errors++;
+        }
+    }
+    if(__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED)) {
+        fprintf(stderr, " >>> DBENGINE: %s: file descriptors stayed reserved after the tiers exited\n", what);
+        errors++;
+    }
+    dbengine_shutdown(engine);
+    if(dbengine_destroy(engine)) {
+        fprintf(stderr, " >>> DBENGINE: %s: the engine of the budget race kept referenced metrics\n", what);
+        errors++;
+    }
+    for(size_t i = 0; i < tiers; i++)
+        engine_lifecycle_remove_dir(dirs[i]);
+
+    return errors;
+}
+
 static int engine_config_unittest(const struct dbengine_config *cfg, const char *dir, const char *what) {
     int errors = 0;
 
@@ -472,6 +585,8 @@ static int engine_config_unittest(const struct dbengine_config *cfg, const char 
         fprintf(stderr, " >>> DBENGINE: %s: the engine with the exact budget kept referenced metrics\n", what);
         errors++;
     }
+
+    errors += engine_config_budget_race(cfg, dir, what);
 
     return errors;
 }
