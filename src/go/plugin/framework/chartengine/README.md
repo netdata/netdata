@@ -74,6 +74,10 @@ The getter returns the same immutable pointer until desired content changes. An 
 `TemplateSet` are invalid. `Entries()` and `GlobalPolicy()` return detached data for tooling. Applicability and source
 preprocessing remain collector responsibilities; the framework combines the selected entries and shared fallback.
 
+The getter runs on the job goroutine, serialized with `Collect`. Keeping the stored snapshot pointer owned by that
+same goroutine needs no additional synchronization. If `Run` or another goroutine shares the pointer across
+replacements, synchronize pointer reads and writes.
+
 Entry IDs identify independently owned definitions within a job. A new snapshot may reuse an ID. Equal normalized
 content preserves chart/dimension state and expiry timestamps, regardless of entry-list order. Equality uses compiled
 metadata and defaults, local chart paths, group structure, declared metrics and entry restrictions; it does not infer
@@ -86,6 +90,10 @@ current active and quiet incumbents. Authored charts retain precedence over fall
 old public identities with final survivors; a surviving chart or dimension is never also marked obsolete, and dimension
 retirement headers use the surviving chart's metadata. Existing Agent redefinition, history, counter and context behavior
 applies; this API makes no stronger continuity guarantee for changed definitions.
+
+Dimension definitions explicitly emit `type=float` or `type=int`. Integer is the initial Agent default, but omitting
+this option during redefinition preserves the existing numeric mode. Explicit `type=int` clears a prior float mode,
+including when the Agent retains a dimension across a collector restart.
 
 Global selector/autogen policy and fallback namespace are fixed for a running job. `CollectorV2EnginePolicy` is captured
 once and overrides global fields. An explicit autogen override replaces the entire global autogen policy and its rules.
