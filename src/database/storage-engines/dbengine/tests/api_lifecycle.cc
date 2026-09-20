@@ -349,4 +349,23 @@ TEST(EngineDir, ReportsWhetherADirectoryHoldsDatafiles) {
     EXPECT_FALSE(dbengine_dir_has_datafiles(scratch.c_str()));
     EXPECT_FALSE(dbengine_dir_has_datafiles("/nonexistent-dbengine-test-directory"))
         << "a directory that cannot be opened was reported to hold datafiles";
+
+    // And the answer it exists to give: a directory a tier has used does hold datafiles. Without this the whole
+    // case would pass with the function stubbed to always say no.
+    const struct dbengine_config cfg = netdata_test_config();
+
+    Engine engine(cfg);
+    ASSERT_TRUE(engine);
+
+    const struct dbengine_tier_config tc = tier_config(scratch);
+    ASSERT_EQ(dbengine_tier_init(engine.get(), &tc), 0);
+    dbengine_readiness_wait(dbengine_tier(engine.get(), 0));
+
+    EXPECT_TRUE(dbengine_dir_has_datafiles(scratch.c_str()))
+        << "a directory a tier came up on was reported to hold no datafiles";
+
+    EXPECT_EQ(engine.reset(), 0u);
+
+    // Still true once the engine is gone: it reads the directory, not the engine.
+    EXPECT_TRUE(dbengine_dir_has_datafiles(scratch.c_str()));
 }

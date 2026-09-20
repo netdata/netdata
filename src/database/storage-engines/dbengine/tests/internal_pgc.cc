@@ -9,6 +9,7 @@ extern "C" {
 #include "database/storage-engines/dbengine/cache.h"
 }
 
+#include <utility>
 #include <vector>
 
 // The page cache, PGC. The existing test in cache.c carries a FIXME listing twelve behaviours nobody wrote cases
@@ -80,7 +81,9 @@ protected:
 
     void TearDown() override {
         if (cache_) {
-            pgc_destroy(cache_, true);
+            // false means pages were still referenced and the cache had to stay allocated. A case that forgets a
+            // release would otherwise leak quietly and still pass.
+            EXPECT_TRUE(pgc_destroy(cache_, true)) << "the cache could not be destroyed: pages are still referenced";
             cache_ = nullptr;
         }
     }
@@ -253,6 +256,7 @@ TEST_F(PgcTest, AHotPageWithNoOtherReferenceBecomesDirty) {
     PGC_PAGE *found = pgc_page_get_and_acquire(cache_, 1, 10, 100, PGC_SEARCH_EXACT);
     ASSERT_NE(found, nullptr) << "the page left the cache when the collector let it go";
     EXPECT_FALSE(pgc_is_page_hot(found)) << "the page is still hot after the collector let it go";
+    EXPECT_TRUE(pgc_is_page_dirty(found)) << "the page stopped being hot without becoming dirty";
     pgc_page_release(cache_, found);
 }
 
@@ -287,11 +291,14 @@ TEST_F(PgcTest, DirtyPagesAreSavedOnceThereAreEnoughOfThem) {
         pgc_page_hot_to_dirty_and_release(cache_, page, false);
     }
 
-    // Ask the cache to flush what it has, rather than waiting on its own evictor thread to decide.
-    pgc_flush_pages(cache_);
-
-    EXPECT_GT(g_saved_dirty.load(), 0u) << "no dirty page was handed to the saver";
+    // Asserted before asking the cache to flush, which is the whole point: the contract is that it saves once
+    // enough pages are dirty, and an assertion taken after an explicit flush would hold even if that never
+    // happened. Eight pages against a threshold of four is comfortably over the line.
+    EXPECT_GT(g_saved_dirty.load(), 0u) << "the cache did not save on its own once enough pages were dirty";
     EXPECT_GT(g_save_init_calls.load(), 0u) << "the saver was never told a flush was starting";
+
+    // Only now, to drain whatever is left so the teardown has nothing to do.
+    pgc_flush_pages(cache_);
 }
 
 // 8. find page exact
@@ -310,8 +317,12 @@ TEST_F(PgcTest, FindsAPageExactly) {
     EXPECT_EQ(pgc_page_start_time_s(found), 100);
     pgc_page_release(cache_, found);
 
-    // A time no page starts at is not an exact match.
-    EXPECT_EQ(pgc_page_get_and_acquire(cache_, 1, 10, 150, PGC_SEARCH_EXACT), nullptr);
+    // A time no page starts at is not an exact match. Released if it ever is, so that a failure here is one
+    // failure rather than a failure plus a cache that cannot be destroyed.
+    PGC_PAGE *unexpected = pgc_page_get_and_acquire(cache_, 1, 10, 150, PGC_SEARCH_EXACT);
+    EXPECT_EQ(unexpected, nullptr);
+    if (unexpected)
+        pgc_page_release(cache_, unexpected);
 }
 
 TEST_F(PgcTest, FindsTheLastPage) {
@@ -360,9 +371,14 @@ TEST_F(PgcTest, FindsNothingForAMetricItDoesNotHold) {
     ASSERT_NE(page, nullptr);
     pgc_page_release(cache_, page);
 
-    EXPECT_EQ(pgc_page_get_and_acquire(cache_, 1, 999, 100, PGC_SEARCH_EXACT), nullptr);
-    EXPECT_EQ(pgc_page_get_and_acquire(cache_, 999, 10, 100, PGC_SEARCH_EXACT), nullptr)
-        << "a page was found in a section it does not belong to";
+    for (const auto &lookup : {std::make_pair(Word_t(1), Word_t(999)), std::make_pair(Word_t(999), Word_t(10))}) {
+        SCOPED_TRACE(lookup.first);
+
+        PGC_PAGE *unexpected = pgc_page_get_and_acquire(cache_, lookup.first, lookup.second, 100, PGC_SEARCH_EXACT);
+        EXPECT_EQ(unexpected, nullptr) << "a page was found for a metric or section it does not belong to";
+        if (unexpected)
+            pgc_page_release(cache_, unexpected);
+    }
 }
 
 // 11. page cache full (should evict)

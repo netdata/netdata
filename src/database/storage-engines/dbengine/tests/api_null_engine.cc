@@ -73,11 +73,14 @@ TEST(NullEngine, OwnMemorySlotsAreUnset) {
     EXPECT_EQ(sizes.wal, 0u);
 }
 
-TEST(NullEngine, EmptyMemorySlotsReportNoBytes) {
+TEST(NullEngine, TheDaemonCanReadEveryMemorySlotIncludingTheEmptyOnes) {
     const struct dbengine_buffer_sizes sizes = dbengine_get_memory_sizes(nullptr);
 
-    // The daemon runs every allocator statistics reader over every slot, the empty ones included. An empty slot
-    // reads as zero bytes and crashes nothing.
+    // What this pins is the daemon's habit, not an engine behaviour: it runs every allocator statistics reader over
+    // every slot without first checking which are populated, and that must not crash. The readers themselves
+    // return zero for an empty slot by construction, so the zero comparisons below cannot fail - they document the
+    // expected answer rather than test it. The engine's side of this, that a NULL engine populates none of its own
+    // slots, is asserted in OwnMemorySlotsAreUnset above, which is the case that would catch garbage here.
     for (size_t i = 0; i < DBENGINE_MEM_MAX; i++) {
         if (sizes.as[i])
             continue;

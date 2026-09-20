@@ -335,7 +335,10 @@ TEST_F(CollectQueryTest, TheTierReportsWhatItHolds) {
     dbengine_store_flush(sch);
 
     EXPECT_EQ(dbengine_metrics(si_), metrics_before + 1) << "the tier did not count the metric it was given";
-    EXPECT_GT(dbengine_samples(si_), 0u) << "the tier reports no samples after two were stored";
+    // Exactly one, not merely more than none. Two points one second apart cover one second, and the tier counts
+    // the span its pages cover rather than the points in them - so a counter stuck at any positive number, which
+    // "greater than zero" would have accepted, fails here.
+    EXPECT_EQ(dbengine_samples(si_), 1u) << "the tier did not count the second the two points cover";
 
     dbengine_store_finalize(sch);
     dbengine_metrics_group_release(smg);

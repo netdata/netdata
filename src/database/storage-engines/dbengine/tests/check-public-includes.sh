@@ -28,9 +28,9 @@ readonly PUBLIC_PREFIX="database/storage-engines/dbengine/include/dbengine/"
 status=0
 checked=0
 
-for file in "$here"/*.cc "$here"/*.cpp "$here"/*.cxx "$here"/*.h "$here"/*.hh "$here"/*.hpp; do
-    [ -e "$file" ] || continue
-
+# Recursive on purpose: a glob of this directory alone would silently skip anything added in a subdirectory, and
+# a check that quietly covers less than it appears to is the failure this script exists to avoid.
+while IFS= read -r file; do
     name=$(basename "$file")
     case "$name" in
         internal_*) continue ;;
@@ -75,7 +75,8 @@ for file in "$here"/*.cc "$here"/*.cpp "$here"/*.cxx "$here"/*.h "$here"/*.hh "$
         echo "    and \"${PUBLIC_PREFIX}...\"" >&2
         status=1
     done < <(grep -E '^[[:space:]]*#[[:space:]]*include' "$file" || true)
-done
+done < <(find "$here" -type f \( -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \
+                                -o -name '*.h' -o -name '*.hh' -o -name '*.hpp' \) | sort)
 
 if [ "$checked" -eq 0 ]; then
     echo "check-public-includes: no files checked, which cannot be right" >&2
