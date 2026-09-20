@@ -84,6 +84,8 @@ Problem / root-cause model:
 Evidence reviewed:
 
 - <Specs, code, docs, tests, logs, traces, prior PRs/issues, external references.>
+- <Owner sections applied, not skill titles: `path.md#section` plus the artifact or operation it governs (a skill
+  listed as "reviewed" is not evidence that its rules were applied).>
 - <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste
   machine-specific absolute mirror paths (the mirror lives at `${NETDATA_REPOS_DIR}`).>
 
@@ -189,6 +191,8 @@ Clean-end-state evidence:
 - <Delivered state vs the recorded target: (i) removed/migrated, (ii) intentionally retained, (iii) deferred/excluded,
   and the recorded reference search where a path or contract was replaced; include required user approval for any
   non-clean state.>
+- <For each owner section named under Evidence reviewed: where it was checked in the final diff, the result, and any
+  justified exception; say which checks were automated and which were manual review.>
 
 Deferred clean-end-state remainder:
 
