@@ -50,12 +50,15 @@ type MetadataFunction struct {
 }
 
 // ImplementedFunction is the shape of one Function as the collector implements
-// it: its registered id, the parameters its handler declares and the columns of
-// a table response.
+// it: its registered id, its effective parameters (static FunctionConfig
+// parameters merged with the handler's dynamic ones, as the framework does)
+// and the columns of a table response. A RawRequest Function owns its own
+// response contract, so its columns are not compared.
 type ImplementedFunction struct {
 	ID         string
 	Parameters []funcapi.ParamConfig
 	Columns    []MetadataFunctionColumn
+	RawRequest bool
 }
 
 // FunctionJobParameter is the Instance selector the framework adds to every
@@ -68,7 +71,8 @@ func FunctionResponseColumns(response *funcapi.FunctionResponse) ([]MetadataFunc
 	if response == nil {
 		return nil, errors.New("no response")
 	}
-	if response.Status != 200 {
+	// The framework treats an unset status as 200.
+	if response.Status != 0 && response.Status != 200 {
 		return nil, fmt.Errorf("status %d: %s", response.Status, response.Message)
 	}
 	if response.RawResponse != nil {
@@ -182,6 +186,9 @@ func checkFunctionParameters(documented MetadataFunction, actual ImplementedFunc
 }
 
 func checkFunctionColumns(documented MetadataFunction, actual ImplementedFunction) []error {
+	if actual.RawRequest {
+		return nil
+	}
 	if len(documented.Columns) != len(actual.Columns) {
 		return []error{fmt.Errorf("%s: %d columns documented, %d returned", documented.ID, len(documented.Columns), len(actual.Columns))}
 	}
@@ -212,9 +219,9 @@ type MetadataFunctionsCheck struct {
 	JobSelectable bool
 }
 
-// CheckMetadataDocumentsFunctions decodes metadata.yaml, asks the handler for
-// every registered method's parameters and table, and runs
-// CheckMetadataFunctionsMatch.
+// CheckMetadataDocumentsFunctions decodes metadata.yaml, resolves every
+// registered method's effective parameters and table the way the framework
+// does, and runs CheckMetadataFunctionsMatch.
 func CheckMetadataDocumentsFunctions(metadataYAML []byte, check MetadataFunctionsCheck) error {
 	module, err := DecodeMetadataModule(metadataYAML, check.ModuleID)
 	if err != nil {
@@ -226,20 +233,41 @@ func CheckMetadataDocumentsFunctions(metadataYAML []byte, check MetadataFunction
 	}
 	implemented := make([]ImplementedFunction, 0, len(check.Methods))
 	for _, method := range check.Methods {
-		function := ImplementedFunction{ID: method.ID}
-		if function.Parameters, err = check.Handler.MethodParams(ctx, method.ID); err != nil {
-			return fmt.Errorf("%s: parameters: %w", method.ID, err)
-		}
-		var params funcapi.ResolvedParams
-		if check.Params != nil {
-			params = check.Params(method.ID)
-		}
-		if function.Columns, err = FunctionResponseColumns(check.Handler.Handle(ctx, method.ID, params)); err != nil {
-			return fmt.Errorf("%s: table: %w", method.ID, err)
+		function, err := implementedFunction(ctx, method, check)
+		if err != nil {
+			return err
 		}
 		implemented = append(implemented, function)
 	}
 	return CheckMetadataFunctionsMatch(module.Functions, implemented, check.JobSelectable)
+}
+
+// implementedFunction mirrors the framework's parameter resolution: static
+// FunctionConfig.RequiredParams, overridden by the handler's MethodParams and
+// then by the response's RequiredParams. Raw-request methods use only the
+// static parameters and are not asked for a table.
+func implementedFunction(ctx context.Context, method funcapi.FunctionConfig, check MetadataFunctionsCheck) (ImplementedFunction, error) {
+	function := ImplementedFunction{ID: method.ID, Parameters: method.RequiredParams, RawRequest: method.RawRequest}
+	if method.RawRequest {
+		return function, nil
+	}
+	dynamic, err := check.Handler.MethodParams(ctx, method.ID)
+	if err != nil {
+		return function, fmt.Errorf("%s: parameters: %w", method.ID, err)
+	}
+	function.Parameters = funcapi.MergeParamConfigs(function.Parameters, dynamic)
+	var params funcapi.ResolvedParams
+	if check.Params != nil {
+		params = check.Params(method.ID)
+	}
+	response := check.Handler.Handle(ctx, method.ID, params)
+	if function.Columns, err = FunctionResponseColumns(response); err != nil {
+		return function, fmt.Errorf("%s: table: %w", method.ID, err)
+	}
+	if len(response.RequiredParams) != 0 {
+		function.Parameters = funcapi.MergeParamConfigs(function.Parameters, response.RequiredParams)
+	}
+	return function, nil
 }
 
 // AssertMetadataDocumentsFunctions fails the test when

@@ -60,6 +60,7 @@ func TestFunctionResponseColumns(t *testing.T) {
 		wantErr  string
 	}{
 		"table":         {response: table(200), want: testFunctionColumns()},
+		"unset status":  {response: table(0), want: testFunctionColumns()},
 		"no response":   {wantErr: "no response"},
 		"error status":  {response: funcapi.UnavailableResponse("waiting"), wantErr: "status 503: waiting"},
 		"raw response":  {response: &funcapi.FunctionResponse{Status: 200, RawResponse: map[string]any{}}, wantErr: "raw responses"},
@@ -162,6 +163,14 @@ func TestCheckMetadataFunctionsMatch(t *testing.T) {
 			jobSelectable: true,
 			wantErr:       "inventory: parameter __job not documented, but the framework adds it",
 		},
+		"raw request skips columns": {
+			documented: documented(func(f *MetadataFunction) { f.Columns = nil }),
+			implemented: []ImplementedFunction{func() ImplementedFunction {
+				f := testImplementedFunction()
+				f.Columns, f.RawRequest = nil, true
+				return f
+			}()},
+		},
 		"job selector type drift": {
 			documented: documented(func(f *MetadataFunction) {
 				p := jobParam
@@ -246,7 +255,15 @@ modules:
 
 	require.NoError(t, CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: methods, Handler: handler}))
 
+	// Static FunctionConfig parameters count when the handler declares none, as in the framework.
+	static := []funcapi.FunctionConfig{{ID: "inventory", RequiredParams: testImplementedFunction().Parameters}}
+	noDynamic := handler
+	noDynamic.params = nil
+	require.NoError(t, CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: static, Handler: noDynamic}))
+	err := CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: methods, Handler: noDynamic})
+	require.ErrorContains(t, err, "inventory: parameter kind documented but not declared")
+
 	extra := append(methods, funcapi.FunctionConfig{ID: "logs"})
-	err := CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: extra, Handler: handler})
+	err = CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: extra, Handler: handler})
 	require.ErrorContains(t, err, "logs: implemented but not documented")
 }
