@@ -22,29 +22,36 @@ modules:
           Monitor physical memory inventory and detect missing or smaller memory devices relative to an accepted baseline.
           The Memory Inventory live table exposes slot locations, capacities, device identifiers, rank counts, and rated and configured speeds for local inspection or retrieval through the Functions API.
         method_description: |
-          Reads `/sys/firmware/dmi/tables/smbios_entry_point` and `/sys/firmware/dmi/tables/DMI` every 60 seconds by default, respecting `NETDATA_HOST_PREFIX`.
-          These are boot-time firmware tables: a recent read does not establish current usable memory, operating frequency, or hardware health.
-          Only physical devices in system-memory arrays contribute to inventory totals. No external command or EDAC support is required.
+          Reads `/sys/firmware/dmi/tables/smbios_entry_point` and `/sys/firmware/dmi/tables/DMI` every 60 seconds by default, respecting `NETDATA_HOST_PREFIX`. No external command or EDAC support is required.
+
+          These are boot-time firmware tables: a recent read does not establish current usable memory, operating frequency, or hardware health. Only physical devices in system-memory arrays contribute to inventory totals.
+
+          The only file the collector writes is its private baseline, `smbios-memory.json` in the Agent's library directory (`/var/lib/netdata` by default). It never changes firmware, kernel settings, or device permissions.
       supported_platforms:
         include: [Linux]
         exclude: []
       multi_instance: false
       additional_permissions:
         description: |
-          Linux normally restricts these raw firmware files to root. `go.d.plugin` needs read access, normally supplied by its existing `CAP_DAC_READ_SEARCH` installation capability.
-          The Agent's configured library directory must be writable for baseline persistence. The collector does not change firmware, kernel settings, or device permissions.
+          A standard installation needs nothing extra: the installer grants `go.d.plugin` the `CAP_DAC_READ_SEARCH` capability that reads the root-only firmware files, and the Agent's library directory is already writable.
+
+          | Access | Needed when |
+          |---|---|
+          | Read `/sys/firmware/dmi/tables/smbios_entry_point` and `/sys/firmware/dmi/tables/DMI` (root-only files, so `CAP_DAC_READ_SEARCH` or equivalent) | Always. Restore the plugin's file capabilities if a hardened install or a container drops them. |
+          | Write to the Agent's library directory (`/var/lib/netdata` by default) | To save the baseline and any confirmed loss. Without it the inventory is still read, but comparison reports `state_error`. |
       default_behavior:
         auto_detection:
           description: |
-            The stock configuration starts one canonical `smbios_memory` job when a supported table is readable.
-            A host with an existing state file continues monitoring when its firmware table becomes unavailable, so an unresolved loss remains visible.
-            The first complete inventory with unique nonempty slot locators and known capacities becomes the baseline after it is saved successfully. It is the first observed configuration, not an independently verified healthy one.
-            Capacity increases and added devices are accepted automatically only when every previously accepted populated slot still has at least its accepted capacity.
+            The stock configuration starts the single `smbios_memory` job when the host exposes a readable SMBIOS table with a system-memory array. A host that already has a saved baseline also starts when the table cannot be read, so an unresolved loss stays visible.
+
+            The baseline is learned automatically: the first complete inventory with unique slot locators and known capacities is saved as the accepted configuration. It is the first configuration observed, not an independently verified healthy one. Added devices and capacity increases are accepted automatically only while every previously accepted slot still has at least its accepted capacity; a missing or smaller slot is reported as loss until it is restored or the baseline is reset (see Troubleshooting).
         limits:
           description: |
-            Firmware may omit or misreport hardware. Blank or repeated slot locators, unknown capacities or array use, malformed records, and inconsistent array counts prevent reliable comparison.
-            Slot locators must remain stable across boots; firmware renaming is not matched automatically. Replacing a device with one of equal or larger capacity in the same slot does not count as memory loss.
-            Inventory does not assign EDAC errors to physical devices: the evidence needed to join platform-specific EDAC ranks and SMBIOS slots is not available.
+            Comparison depends on firmware quality. Blank or repeated slot locators, unknown device capacities or array use, malformed records, and inconsistent array counts leave the inventory readable but not comparable: the comparison status chart reports `uncomparable` and the `smbios_memory_comparison_unavailable` alert raises a warning.
+
+            Slot locators must stay stable across boots; a firmware update that renames slots is not matched automatically and shows every old slot as missing and every new slot as not in the baseline. Replacing a device with one of equal or larger capacity in the same slot is not loss.
+
+            Inventory does not attribute EDAC errors to physical devices: the evidence needed to join platform-specific EDAC ranks to SMBIOS slots is not available.
         performance_impact:
           description: |
             Reads two local firmware files per collection. Baseline and loss-state changes write one private state file; unchanged observations do not rewrite it.
@@ -52,24 +59,22 @@ modules:
       single_job: true
       prerequisites:
         list:
-          - title: Stop collection before manual debugging
+          - title: Expose the host firmware tables to a containerized Agent
             description: |
-              If running a separate debug process, first disable this collector through Dynamic Configuration and wait for it to stop, or stop the Netdata service.
-              The debug process can update the same baseline file, so only one process may own this inventory at a time. Re-enable the collector or restart Netdata after the debug process exits.
-          - title: Verify firmware and state access
-            description: |
-              Verify that the host exposes both raw DMI files and that the installed `go.d.plugin` has its standard read capability or equivalent access.
-              For containers, make the host's firmware tables visible beneath `NETDATA_HOST_PREFIX` and retain access to them. The Agent must also have its normal registry identity and writable library directory.
-              Confirm that Memory Inventory becomes available and the comparison status is `comparable`.
+              Applies only to Agents running in a container. The collector reads the host's firmware through `NETDATA_HOST_PREFIX`, so the host's `/sys` must be mounted there read-only. The documented `docker run` and Compose examples already include this mount:
+
+              ```text
+              -v /sys:/host/sys:ro
+              ```
+
+              Verify: the Memory Inventory Live Data table lists the host's memory slots and the comparison status chart reports `comparable` after the first collection.
       configuration:
         file:
           name: go.d/smbios_memory.conf
-          description: |
-            Keep the single job name `smbios_memory`. This collector has no remote target or virtual-node configuration.
+          description: ""
         options:
           description: |
-            The collection interval applies to the host's single memory inventory. Keep the canonical job name `smbios_memory`.
-            To edit a detected instance in the UI, open its existing entry under Collectors → Jobs; there is no add-job action.
+            Options apply to the host's single `smbios_memory` job. This collector has no remote target and cannot be attached to a virtual node.
           folding:
             title: Options
             enabled: false
@@ -84,19 +89,24 @@ modules:
             title: Config
             enabled: false
           list:
-            - name: Read inventory every two minutes
-              description: Reduce read frequency while retaining the same baseline.
+            - name: Basic
+              description: The stock configuration. The single job monitors the local host's memory inventory with the default interval.
               config: |
                 jobs:
                   - name: smbios_memory
-                    update_every: 120
+            - name: Read the firmware table less often
+              description: The table changes only at boot, so a longer interval loses nothing except how quickly a change after a reboot is reported.
+              config: |
+                jobs:
+                  - name: smbios_memory
+                    update_every: 300
     troubleshooting:
       errors:
         list:
           - error: Intentionally accepting a smaller memory configuration
-            cause: A planned removal or reduction remains a loss relative to the previously accepted baseline.
+            cause: A planned removal or downsizing is still a loss relative to the previously accepted baseline, and acknowledging or silencing the alert does not replace the baseline.
             fix: |
-              Stop the collector before resetting its state. For a systemd installation using the default library directory, stop Netdata, move the whole state file to a new backup name, then start Netdata:
+              Reset the baseline while the collector is stopped. Stop Netdata, move the state file aside as a backup, then start Netdata; the next valid, comparable inventory becomes the new baseline:
 
               ```bash
               sudo systemctl stop netdata
@@ -104,34 +114,55 @@ modules:
               sudo systemctl start netdata
               ```
 
-              Use the Agent's configured library directory instead of `/var/lib/netdata` if it differs. Static installations commonly use `/opt/netdata/var/lib/netdata`.
-              Alternatively, disable the canonical collector through Dynamic Configuration, wait for it to stop, move the file, then re-enable it. Do not run a separate manual collector against the same state directory while the Agent is running.
-              Verify a `comparable` status after the next valid inventory is saved. If reading or saving fails, no replacement baseline is accepted.
-              This reset intentionally discards both the old baseline and its retained loss state; alert acknowledgment or silencing does not do so. Keep the backup if the old evidence is needed.
-          - error: 'read SMBIOS entry point: permission denied'
-            cause: The collector cannot read the host's root-restricted firmware table.
-            fix: Restore the installed plugin's standard capabilities and verify any container mount and capability settings. A host without
-              SMBIOS tables cannot use this collector.
+              Use the Agent's configured library directory if it differs (static installations commonly use `/opt/netdata/var/lib/netdata`). Alternatively, disable the collector through Dynamic Configuration, wait for it to stop, move the file, then re-enable it.
+
+              :::caution
+
+              Only the running collector may own this file. Do not run a second collector process, including `go.d.plugin` in debug mode, against the same library directory while the Agent is running: both would update the same baseline.
+
+              :::
+
+              Verify that the comparison status returns to `comparable`. If reading or saving fails, no replacement baseline is accepted and the status stays `unbaselined` or `state_error`. Keep the backup if the old evidence is needed.
+          - error: 'read SMBIOS entry point: open `path`: permission denied'
+            cause: '`go.d.plugin` lost read access to the root-only firmware files, usually because its `CAP_DAC_READ_SEARCH` file capability was dropped by a hardened install or is not available inside the container.'
+            fix: Re-run the Netdata installer, which restores the plugin's file capabilities, or grant `CAP_DAC_READ_SEARCH` to the container. Existing charts and any saved baseline are kept while the source is unreadable.
+          - error: 'read SMBIOS entry point: open `path`: no such file or directory'
+            when: The host or container does not expose `/sys/firmware/dmi/tables`.
+            cause: The kernel exposes no SMBIOS tables on this platform, or the container was started without the host's `/sys` mounted under `NETDATA_HOST_PREFIX`.
+            fix: In a container, add the `-v /sys:/host/sys:ro` mount from the prerequisites. A host without SMBIOS tables cannot use this collector; disable it to silence the message.
+          - error: no system memory array
+            cause: The firmware table contains no physical memory array marked as system memory, which happens on some virtual machines and boards.
+            fix: Nothing to configure. This host cannot be inventoried through SMBIOS; disable the collector.
+          - error: Unknown device capacity
+            cause: Firmware reports at least one memory device with an unknown size, so totals and a per-slot baseline cannot be trusted.
+            fix: The inventory table remains available; comparison stays `uncomparable` until firmware reports every capacity. Check the vendor's firmware updates.
+          - error: Physical memory array use is unknown or unsupported
+            cause: Firmware does not state whether a memory array holds system memory, so the collector cannot tell which devices are host RAM.
+            fix: The inventory table remains available with totals withheld; comparison stays `uncomparable`. Check the vendor's firmware updates.
           - error: Slot locators are missing or duplicated
-            cause: Firmware does not provide unique slot locators, so devices cannot be compared reliably across observations.
-            fix: Inspect the inventory and the vendor's firmware information. Device details remain available, but this version cannot
-              establish a reliable per-slot baseline for that table.
-          - error: 'physical array device count disagrees with table'
-            cause: The firmware table is incomplete or inconsistent.
-            fix: Check the firmware table with the hardware vendor's tools and check for firmware corrections. A missing record in an
-              inconsistent table is not proof of a lost memory device.
+            cause: Firmware does not give every memory device a unique slot locator, so devices cannot be matched across observations.
+            fix: The inventory table remains available; comparison stays `uncomparable` for this firmware. Check the vendor's firmware updates.
+          - error: physical array device count disagrees with table
+            cause: The firmware table is inconsistent; it declares more or fewer memory devices than it lists.
+            fix: Check the table with the hardware vendor's tools and firmware updates. A missing record in an inconsistent table is not proof of a lost memory device, so nothing is reported as loss.
           - error: memory baseline has unsupported version, owner or content
             cause: The state file belongs to another Agent, is damaged, or uses an unsupported format.
-            fix: Restore the matching state file from backup. If deliberately starting a new baseline, follow the stopped-collector reset
-              procedure above; do not edit the state file in place. After restoring a file or repairing its read access, restart the collector; initial state-load errors remain until restart.
+            fix: Restore the matching state file from a backup, or start a new baseline with the stopped-collector reset above; do not edit the file in place. Restart the collector afterwards, because a failed state load is reported until restart.
+          - error: memory baseline contains an invalid slot
+            cause: The state file was edited or truncated and no longer describes valid accepted slots.
+            fix: Restore the state file from a backup, or start a new baseline with the stopped-collector reset above, then restart the collector.
+          - error: memory baseline contains invalid loss evidence
+            cause: The state file was edited or truncated and its recorded loss no longer matches its accepted slots.
+            fix: Restore the state file from a backup, or start a new baseline with the stopped-collector reset above, then restart the collector.
           - error: 'create baseline temporary file: `error`'
-            cause: The Agent library directory is unavailable or not writable, or its filesystem is full.
-            fix: Restore directory access and free space. Check the comparison status after collection retries. New loss observations cannot
-              survive a restart until they have been saved successfully.
+            cause: The Agent's library directory is missing, not writable, or on a full filesystem, so a new baseline or a newly observed loss cannot be saved.
+            fix: Restore the directory, its permissions and free space; saving is retried on every collection. A loss observed while saving fails is kept in memory but does not survive a restart until it has been saved.
+          - error: 'publish baseline: `error`'
+            cause: The temporary file was written but could not replace `smbios-memory.json`, usually because the directory permissions changed.
+            fix: Restore write permission on the Agent's library directory; saving is retried on every collection.
           - error: Agent registry identity is unavailable; baseline persistence disabled
-            cause: The collector cannot read the Agent's normal registry identity.
-            fix: Restore the Agent registry directory and its permissions, then restart the collector. Inventory is still readable, but no
-              baseline is accepted without an Agent identity.
+            cause: The collector cannot read the Agent's registry identity, which every saved baseline is bound to.
+            fix: Restore the Agent's registry directory and its permissions, then restart the collector. Inventory is still read, but no baseline is accepted without an Agent identity.
     alerts:
       - name: smbios_memory_confirmed_loss
         metric: smbios_memory.confirmed_loss_status
