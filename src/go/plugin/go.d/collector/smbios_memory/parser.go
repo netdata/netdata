@@ -263,7 +263,13 @@ func decodeSize(r record) (*uint64, string, error) {
 		if size&0x8000 != 0 {
 			unit = 1024
 		}
-		return uintPtr(uint64(size&0x7fff) * unit), inventory.PopulationPopulated, nil
+		capacity := uint64(size&0x7fff) * unit
+		if capacity == 0 {
+			// "0 KB" describes neither an empty socket (size 0) nor a device the
+			// baseline can accept; it is not comparable evidence.
+			return nil, inventory.PopulationUnknown, nil
+		}
+		return uintPtr(capacity), inventory.PopulationPopulated, nil
 	}
 }
 

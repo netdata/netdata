@@ -88,6 +88,7 @@ func TestParseTable_DocumentedSizeEncodings(t *testing.T) {
 			table:    known(128<<30, "populated"),
 		},
 		"unknown size":          {size: 0xffff, device: unknownDevice, table: unknownTable},
+		"zero kilobytes":        {size: 0x8000, device: unknownDevice, table: unknownTable},
 		"unknown extended size": {size: 0x7fff, extended: 0, device: unknownDevice, table: unknownTable},
 	} {
 		t.Run(name, func(t *testing.T) {

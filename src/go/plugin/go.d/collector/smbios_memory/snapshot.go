@@ -22,7 +22,8 @@ const (
 )
 
 // inventoryRows lists every device in the current table, then every accepted
-// slot the current table does not mention.
+// slot the current table does not mention. A nil table means the firmware
+// table could not be read this cycle.
 func inventoryRows(table *inventory.Table, state *persistentState, comparison string) []inventory.Row {
 	baseline := make(map[string]inventory.Device)
 	lost := make(map[string]bool)
@@ -47,7 +48,7 @@ func inventoryRows(table *inventory.Table, state *persistentState, comparison st
 	if state != nil {
 		for _, d := range state.Baseline {
 			if !seen[d.Locator] {
-				rows = append(rows, baselineOnlyRow(d, lost[d.Locator], comparison))
+				rows = append(rows, baselineOnlyRow(d, lost[d.Locator], comparison, table != nil))
 			}
 		}
 	}
@@ -79,11 +80,14 @@ func currentRow(d, old inventory.Device, accepted bool, comparison string) inven
 	return row
 }
 
-func baselineOnlyRow(d inventory.Device, lost bool, comparison string) inventory.Row {
+func baselineOnlyRow(d inventory.Device, lost bool, comparison string, tableRead bool) inventory.Row {
 	row := inventory.Row{
 		Availability:     availabilityBaselineOnly,
 		Comparison:       comparison,
 		BaselineCapacity: d.Capacity,
+	}
+	if tableRead {
+		row.Availability = availabilityAbsent
 	}
 	// The device metadata describes the accepted device; it is not a current measurement.
 	d.Capacity = nil
@@ -94,7 +98,6 @@ func baselineOnlyRow(d inventory.Device, lost bool, comparison string) inventory
 	row.Device = d
 	switch {
 	case comparison == inventory.ComparisonComparable:
-		row.Availability = availabilityAbsent
 		row.Comparison = comparisonMissing
 	case lost:
 		row.Comparison = fmt.Sprintf("retained loss; %s", comparison)
