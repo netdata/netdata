@@ -42,7 +42,7 @@ modules:
             Capacity increases and added devices are accepted automatically only when every previously accepted populated slot still has at least its accepted capacity.
         limits:
           description: |
-            Firmware may omit or misreport hardware. Blank or repeated slot locators, unknown capacities, malformed records, and inconsistent array counts prevent reliable comparison.
+            Firmware may omit or misreport hardware. Blank or repeated slot locators, unknown capacities or array use, malformed records, and inconsistent array counts prevent reliable comparison.
             Slot locators must remain stable across boots; firmware renaming is not matched automatically. Replacing a device with one of equal or larger capacity in the same slot does not count as memory loss.
             Inventory does not assign EDAC errors to physical devices: the evidence needed to join platform-specific EDAC ranks and SMBIOS slots is not available.
         performance_impact:
@@ -123,7 +123,7 @@ modules:
           - error: memory baseline has unsupported version, owner or content
             cause: The state file belongs to another Agent, is damaged, or uses an unsupported format.
             fix: Restore the matching state file from backup. If deliberately starting a new baseline, follow the stopped-collector reset
-              procedure above; do not edit the state file in place.
+              procedure above; do not edit the state file in place. After restoring a file or repairing its read access, restart the collector; initial state-load errors remain until restart.
           - error: 'create baseline temporary file: `error`'
             cause: The Agent library directory is unavailable or not writable, or its filesystem is full.
             fix: Restore directory access and free space. Check the comparison status after collection retries. New loss observations cannot

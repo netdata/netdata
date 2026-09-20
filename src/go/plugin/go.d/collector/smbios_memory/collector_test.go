@@ -360,3 +360,33 @@ func TestCandidateLoadsStateOnlyAfterActivation(t *testing.T) {
 	status(t, candidate, "confirmed_loss_status", "present")
 	assert.Contains(t, candidate.snapshot.Load().Rows[0].Comparison, "retained loss")
 }
+
+func TestUnknownArrayUseDoesNotConfirmLoss(t *testing.T) {
+	h := newFixtureHost(t)
+	r := fixtureRecords(t, h.data)
+	r[0][13] = 8
+	secondArray := append([]byte(nil), r[0]...)
+	binary.LittleEndian.PutUint16(secondArray[2:4], 0x200)
+	for _, d := range r[9:17] {
+		binary.LittleEndian.PutUint16(d[4:6], 0x200)
+	}
+	r = append([][]byte{r[0], secondArray}, r[1:]...)
+	h.write(t, joinRecords(r))
+	c := h.collector(t)
+	cycle(t, c)
+	before := diskState(t, h)
+	// DSP0134 Use=02h explicitly withholds array classification. Every device
+	// remains present; absence from the known-system subset is not a proven loss.
+	r[1][5] = 2
+	h.write(t, joinRecords(r))
+	cycle(t, c)
+	status(t, c, "inventory_status", "available")
+	status(t, c, "comparison_status", "uncomparable")
+	status(t, c, "confirmed_loss_status", "unknown")
+	assert.Equal(t, before, diskState(t, h))
+	for _, name := range []string{"installed_capacity_bytes", "populated_slots", "empty_slots", "missing_devices", "capacity_deficit_bytes"} {
+		_, ok := c.store.Read().Value(name, nil)
+		assert.False(t, ok, name)
+	}
+	assert.Contains(t, c.snapshot.Load().Detail, "array use")
+}

@@ -179,8 +179,18 @@ func parseTable(entry, data []byte) (*inventory.Table, error) {
 		if a.expected != a.seen {
 			return nil, fmt.Errorf("physical array device count disagrees with table")
 		}
-		if a.use == 3 {
+		switch a.use {
+		case 3:
 			systemArrays++
+		case 1, 4, 5, 6, 7:
+			// Explicitly other, video, flash, nonvolatile or cache memory.
+		default:
+			// DSP0134 Table 73: Unknown (02h), reserved or future values do not
+			// establish that this array is outside the host's system memory.
+			knownCapacity = false
+			out.CountsKnown = false
+			out.Comparable = false
+			out.Reason = "Physical memory array use is unknown or unsupported"
 		}
 	}
 	if systemArrays == 0 {

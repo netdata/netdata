@@ -128,6 +128,7 @@ func TestParserClassificationAndIdentity(t *testing.T) {
 		{"unknown locator", func(r [][]byte) { r[1][16] = 0 }, "", 16, false},
 		{"duplicated locator", func(r [][]byte) { r[1][16] = 2; r[2][16] = 2 }, "", 16, false},
 		{"bank duplicates allowed", func(r [][]byte) {}, "", 16, true},
+		{"unknown technology still physical", func(r [][]byte) { r[1][18] = 2 }, "", 16, true},
 		{"logical memory excluded", func(r [][]byte) { r[1][18] = 0x1f; r[1][12] = 0xff; r[1][13] = 0xff }, "", 15, true},
 		{"not system memory", func(r [][]byte) { r[0][5] = 4 }, "no system memory", 0, false},
 		{"array count mismatch", func(r [][]byte) { r[0][13] = 17 }, "device count", 0, false},
