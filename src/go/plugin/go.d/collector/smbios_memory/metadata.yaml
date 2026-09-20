@@ -118,7 +118,7 @@ modules:
 
               :::caution
 
-              Only the running collector may own this file. Do not run a second collector process, including `go.d.plugin` in debug mode, against the same library directory while the Agent is running: both would update the same baseline.
+              Only the running Agent's collector writes this file. A `go.d.plugin` debug run from a terminal reads and compares against it but never saves, so debugging is safe; do not run a second Agent against the same library directory.
 
               :::
 

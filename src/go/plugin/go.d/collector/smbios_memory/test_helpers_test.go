@@ -155,6 +155,7 @@ func (h *fixtureHost) collector(t *testing.T) *Collector {
 	c.baseline.path = h.statePath
 	c.baseline.owner = "fixture-agent"
 	c.now = func() time.Time { return fixtureTime }
+	c.isTerminal = func() bool { return false }
 	require.NoError(t, c.Init(t.Context()))
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	return c

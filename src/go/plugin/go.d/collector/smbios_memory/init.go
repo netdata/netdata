@@ -48,4 +48,8 @@ func (c *Collector) initBaselineStore() {
 	if c.baseline.owner == "" {
 		c.baseline.owner = pluginconfig.RegistryUniqueID()
 	}
+	if c.isTerminal() {
+		c.baseline.readOnly = true
+		c.Infof("running from a terminal: the memory baseline %s is read-only, changes are not saved", c.baseline.path)
+	}
 }

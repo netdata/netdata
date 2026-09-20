@@ -552,6 +552,48 @@ func TestCandidateLoadsStateOnlyAfterActivation(t *testing.T) {
 	)
 }
 
+// A debug run from a terminal compares like the Agent's job but never writes
+// the baseline file that job owns.
+func TestTerminalSessionKeepsStateReadOnly(t *testing.T) {
+	loss := healthyCollection()
+	loss.ConfirmedLoss = "present"
+	loss.Values = map[string]float64{
+		"installed_capacity_bytes": 15 * (64 << 30), "populated_slots": 15, "empty_slots": 1,
+		"missing_devices": 1, "capacity_deficit_bytes": 64 << 30,
+	}
+	loss.Loss = []discrepancy{{Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
+
+	for name, tc := range map[string]struct {
+		saved bool
+	}{
+		"without a saved baseline":        {},
+		"with the Agent's saved baseline": {saved: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newFixtureHost(t)
+			if tc.saved {
+				cycle(t, h.collector(t))
+			}
+			before, beforeErr := os.ReadFile(h.statePath)
+			c := h.collector(t)
+			c.isTerminal = func() bool { return true }
+			require.NoError(t, c.Init(t.Context()))
+
+			cycle(t, c)
+			assert.Equal(t, healthyCollection(), collectionOutput(t, c))
+			r := fixtureRecords(t, h.data)
+			binary.LittleEndian.PutUint16(r[1][12:14], 0)
+			h.write(t, joinRecords(r))
+			cycle(t, c)
+			assert.Equal(t, loss, collectionOutput(t, c))
+
+			after, afterErr := os.ReadFile(h.statePath)
+			assert.Equal(t, before, after)
+			assert.Equal(t, os.IsNotExist(beforeErr), os.IsNotExist(afterErr))
+		})
+	}
+}
+
 func TestUnknownArrayUseDoesNotConfirmLoss(t *testing.T) {
 	h := newFixtureHost(t)
 	r := fixtureRecords(t, h.data)

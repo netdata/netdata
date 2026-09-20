@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/internal/inventory"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/smbiosfunc"
@@ -42,9 +43,10 @@ func New() *Collector {
 		Config: Config{
 			UpdateEvery: defaultUpdateEvery,
 		},
-		store:   store,
-		metrics: newCollectorMetrics(store),
-		now:     time.Now,
+		store:      store,
+		metrics:    newCollectorMetrics(store),
+		now:        time.Now,
+		isTerminal: terminal.IsTerminal,
 	}
 	c.funcRouter = smbiosfunc.NewRouter(functionDeps{snapshot: &c.snapshot})
 	return c
@@ -63,6 +65,8 @@ type Collector struct {
 	// readTable decodes the host's firmware table; tests inject a reader.
 	readTable func() (*inventory.Table, error)
 	now       func() time.Time
+	// isTerminal reports a debug run from a terminal, which must not touch the Agent's baseline file.
+	isTerminal func() bool
 
 	baseline baselineStore
 }

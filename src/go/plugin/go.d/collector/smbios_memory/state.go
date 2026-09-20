@@ -58,10 +58,13 @@ func (s *persistentState) validate(owner string) error {
 	return nil
 }
 
-// baselineStore owns the state file of the running canonical job.
+// baselineStore owns the state file of the running canonical job. A read-only
+// store (a debug run from a terminal) still loads and compares, and applies
+// transitions in memory, but never writes the file the running Agent owns.
 type baselineStore struct {
-	path  string
-	owner string
+	path     string
+	owner    string
+	readOnly bool
 
 	loaded  bool
 	current *persistentState // nil until a baseline has been accepted and saved
@@ -100,6 +103,10 @@ func (b *baselineStore) reconcile(table *inventory.Table, now time.Time) error {
 	}
 	next := proposedState(b.current, table, b.owner, now)
 	if !b.dirty && reflect.DeepEqual(b.current, next) {
+		return nil
+	}
+	if b.readOnly {
+		b.current = next
 		return nil
 	}
 	if err := saveState(b.path, next); err != nil {
