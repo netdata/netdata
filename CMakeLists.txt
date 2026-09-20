@@ -270,6 +270,13 @@ option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
+# Testing
+#
+# Developer-only. Builds the googletest-based test executables, which are EXCLUDE_FROM_ALL and have no install rule,
+# and fetches googletest to do it. Off by default: a normal build must neither reach the network nor gain a target.
+option(ENABLE_GTEST "Build the googletest-based test executables (developer-only, fetches googletest)" False)
+mark_as_advanced(ENABLE_GTEST)
+
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
@@ -634,12 +641,21 @@ if(ENABLE_SENTRY)
         include(NetdataSentry)
 endif()
 
+# Included only when enabled: the module refuses a C++ standard below 17 as soon as it is read.
+if(ENABLE_GTEST)
+        include(NetdataGTest)
+endif()
+
 #
 # Checks from custom modules
 #
 
 netdata_detect_jsonc()
 netdata_detect_libyaml()
+
+if(ENABLE_GTEST)
+        netdata_bundle_gtest()
+endif()
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         netdata_fetch_legacy_ebpf_code()
