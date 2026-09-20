@@ -618,7 +618,7 @@ func shouldFallbackErrorInfo(err error) bool {
 
 func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlErrorReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
 	query := queryMSSQLErrorInfoEventFile
-	args := []any{sql.Named("filePath", target.filePath), sql.Named("limit", limit)}
+	args := []any{sql.Named("filePath", target.filePath), sql.Named("filePrefix", target.filePrefix), sql.Named("limit", limit)}
 	if target.filePath == "" {
 		query = queryMSSQLErrorInfoRingBuffer
 		if c.isAzureSQLDatabase() {
@@ -676,7 +676,8 @@ func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target ms
 // mssqlErrorReadTarget says where error_reported events should be read from.
 type mssqlErrorReadTarget struct {
 	// filePath is the event_file read pattern. Empty when reading the ring buffer.
-	filePath string
+	filePath   string
+	filePrefix string
 }
 
 // resolveMSSQLErrorReadTarget locates the Extended Events target for a session, reporting
@@ -724,11 +725,16 @@ func eventFileReadTarget(configured string) mssqlErrorReadTarget {
 	}
 
 	prefix := path + "_0_"
+	base := strings.ReplaceAll(path, `\`, "/")
+	if idx := strings.LastIndex(base, "/"); idx >= 0 {
+		base = base[idx+1:]
+	}
+	filePrefix := base + "_0_"
 	lower := strings.ToLower(path)
 	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
-		return mssqlErrorReadTarget{filePath: prefix}
+		return mssqlErrorReadTarget{filePath: prefix, filePrefix: filePrefix}
 	}
-	return mssqlErrorReadTarget{filePath: prefix + "*.xel"}
+	return mssqlErrorReadTarget{filePath: prefix + "*.xel", filePrefix: filePrefix}
 }
 
 // mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events

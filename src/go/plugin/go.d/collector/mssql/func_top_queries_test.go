@@ -218,7 +218,7 @@ func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 			AddRow("0x1122334455667788", "SELECT 1", "appdb", 7, 42.0, 6.0))
 	mock.ExpectQuery("server_event_session_fields").WithArgs("netdata_errors").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("netdata_errors.xel"))
-	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", 500).
+	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", 500).
 		WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 
 	c := New()
@@ -341,16 +341,15 @@ func TestBuildPlanCacheSQL(t *testing.T) {
 		query := f.buildPlanCacheSQL(cols, "calls", 7, 500)
 
 		assert.Contains(t, query, "FROM sys.dm_exec_query_stats AS qs")
-		assert.Contains(t, query, "CROSS APPLY sys.dm_exec_plan_attributes(qs.plan_handle)")
-		assert.Contains(t, query, "CROSS APPLY sys.dm_exec_sql_text(CONVERT(VARBINARY(64), a.sql_handle_hex, 1))")
-		assert.Contains(t, query, "GROUP BY rs.query_hash")
+		assert.Contains(t, query, "CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle)")
+		assert.Contains(t, query, "GROUP BY qs.query_hash")
 		assert.Contains(t, query, "SELECT TOP 500")
 		assert.Contains(t, query, "ORDER BY [calls] DESC")
 		assert.Contains(t, query, "NOT IN ('master', 'tempdb', 'model', 'msdb')")
 		// Same hex rendering as Query Store, so error attribution still matches.
-		assert.Contains(t, query, "CONVERT(VARCHAR(64), rs.query_hash, 1) AS [queryHash]")
+		assert.Contains(t, query, "CONVERT(VARCHAR(64), qs.query_hash, 1) AS [queryHash]")
 		// Averages must not truncate: both operands are bigint.
-		assert.Contains(t, query, "SUM(rs.total_dop) * 1.0 / SUM(rs.execution_count)")
+		assert.Contains(t, query, "SUM(qs.total_dop) * 1.0 / SUM(qs.execution_count)")
 		assert.NotContains(t, query, "query_store")
 	})
 
