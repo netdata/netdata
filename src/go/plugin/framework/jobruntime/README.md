@@ -20,6 +20,9 @@ A failed scope retains its previous state and may jump directly to a newer candi
 peer scopes are not rolled back. Empty output can commit state. There is no intermediate-version queue, cross-host
 transaction, replay, or Agent acknowledgment; short writes retain existing output-poison behavior.
 
+Cleanup inventories belong to the host that last accepted nonempty chart output. Failed or empty host switches
+retain that inventory; the next nonempty admission on a different host replaces it.
+
 Host changes stage materialized reset in the plan attempt. Rejected output preserves the old host's state, and old-host
 retirements are never sent to the new host. Function-only jobs do not require a chart provider.
 
@@ -39,8 +42,9 @@ plugin/module identity, configured job labels, `_collect_job`, and the job's col
 
 - V1 success means at least one collector chart was updated with a value, preserving its existing contract.
 - V2 success follows its existing overall cycle result. An empty cycle without errors is successful.
-  Collection, template-capture or metric-store commit errors fail the cycle. Scope emission retains partial-success semantics: one accepted scope can
-  keep the cycle successful when another scope fails; failure of every attempted scope fails the cycle.
+  Collection, template-capture or metric-store commit errors fail the cycle. Scope emission retains partial-success
+  semantics: one accepted scope can keep the cycle successful when another scope fails; failure of every attempted
+  scope fails the cycle.
 - Status reports complementary `success`/`failed` values on ordinary cycles. Duration is sampled only on success and
   measured before output I/O, so output backpressure is excluded. A panic does not publish self samples.
 - Autodetection and function-only jobs do not publish these charts.

@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -41,6 +42,7 @@ func runtimeTemplateSet(t *testing.T, id string) *chartengine.TemplateSet {
 
 func collectNativeFrame(t *testing.T, job *JobV2) jobV2PreparedEmission {
 	t.Helper()
+	job.refreshVnodeSnapshot()
 	prepared, ok := job.collectAndEmit(0)
 	require.True(t, ok)
 	return prepared
@@ -227,5 +229,127 @@ func TestJobV2RequiresProviderExceptFunctionOnly(t *testing.T) {
 		} else {
 			require.ErrorContains(t, err, "exactly one")
 		}
+	}
+}
+
+func TestJobV2NativeHostSwitchAndTemplateChange(t *testing.T) {
+	for name, tc := range map[string]struct {
+		empty     bool
+		retry     bool
+		supersede bool
+	}{
+		"rejected switch cleanup":             {},
+		"rejected switch retry":               {retry: true},
+		"rejected switch newer snapshot":      {retry: true, supersede: true},
+		"empty switch cleanup":                {empty: true},
+		"empty switch then nonempty snapshot": {empty: true, retry: true, supersede: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := metrix.NewCollectorStore()
+			emitValue := true
+			base := &mockModuleV2{
+				store: store,
+				collectFunc: func(context.Context) error {
+					if emitValue {
+						store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(7)
+					}
+					return nil
+				},
+			}
+			mod := &nativeModuleV2{
+				CollectorV2: base,
+				set:         runtimeTemplateSet(t, "initial"),
+			}
+			initial := vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "host-a",
+				GUID:     "guid-a",
+			}
+			next := vnodes.VirtualNode{
+				Name:     "db",
+				Hostname: "host-b",
+				GUID:     "guid-b",
+			}
+			out := &selectiveNativeOutput{}
+			publisher := hostoutput.New()
+			job := NewJobV2(JobV2Config{
+				PluginName:  pluginName,
+				Name:        jobName,
+				ModuleName:  modName,
+				FullName:    modName + "_" + jobName,
+				Module:      mod,
+				Out:         out,
+				UpdateEvery: 1,
+				Vnode:       initial,
+				Publication: publisher,
+			})
+			currentVnode := bindJobV2VnodeLookup(job, "db", VnodeSnapshot{
+				Vnode:            &initial,
+				Revision:         1,
+				MetadataRevision: 1,
+			})
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			require.NoError(t, job.finishPreparedEmission(collectNativeFrame(t, job)))
+			require.Contains(t, out.String(), "CHART 'module_job.initial'")
+			require.Equal(t, 1, publisher.OwnerCount(initial.GUID))
+			out.Reset()
+
+			mod.set = runtimeTemplateSet(t, "intermediate")
+			currentVnode.set(VnodeSnapshot{
+				Vnode:            &next,
+				Revision:         2,
+				MetadataRevision: 2,
+			})
+			emitValue = !tc.empty
+			out.reject = "HOST 'guid-b'"
+			prepared := collectNativeFrame(t, job)
+			require.Len(t, prepared.scopes, 1)
+			assert.True(t, prepared.scopes[0].decision.needEngineReload)
+			assert.NotContains(t, string(prepared.scopes[0].output), "module_job.initial")
+			if tc.empty {
+				assert.Empty(t, prepared.scopes[0].plan.Actions)
+				require.NoError(t, job.finishPreparedEmission(prepared))
+				assert.Equal(t, jobV2HostFromVnode(next), requireDefaultScopeState(t, job).host.engineHost)
+			} else {
+				require.ErrorContains(t, job.finishPreparedEmission(prepared), "scope output rejected")
+				assert.Equal(t, jobV2HostFromVnode(initial), requireDefaultScopeState(t, job).host.engineHost)
+			}
+			assert.Empty(t, out.String())
+			assert.Equal(t, jobV2HostFromVnode(initial), requireDefaultScopeState(t, job).host.cleanupOwner)
+			assert.Equal(t, 1, publisher.OwnerCount(initial.GUID))
+			assert.Zero(t, publisher.OwnerCount(next.GUID))
+
+			wantHost, wantChart := initial.GUID, "initial"
+			if tc.retry {
+				wantHost, wantChart = next.GUID, "intermediate"
+				if tc.supersede {
+					wantChart = "latest"
+					mod.set = runtimeTemplateSet(t, wantChart)
+				}
+				emitValue = true
+				out.reject = ""
+				prepared = collectNativeFrame(t, job)
+				require.Len(t, prepared.scopes, 1)
+				assert.Equal(t, !tc.empty, prepared.scopes[0].decision.needEngineReload)
+				require.NoError(t, job.finishPreparedEmission(prepared))
+				assert.Contains(t, out.String(), "HOST 'guid-b'")
+				assert.Contains(t, out.String(), "CHART 'module_job."+wantChart+"'")
+				assert.Contains(t, out.String(), "SET 'busy' = 7")
+				assert.NotContains(t, out.String(), "module_job.initial")
+				assert.NotContains(t, out.String(), "obsolete")
+				assert.Zero(t, publisher.OwnerCount(initial.GUID))
+				assert.Equal(t, 1, publisher.OwnerCount(next.GUID))
+			}
+			out.Reset()
+			out.reject = ""
+			job.Cleanup()
+			assert.Contains(t, out.String(), "HOST '"+wantHost+"'")
+			assert.Contains(t, out.String(), "CHART 'module_job."+wantChart+"'")
+			assert.Equal(t, 1, strings.Count(out.String(), "'obsolete'"), "cleanup only charts emitted on its host")
+			if tc.retry {
+				assert.NotContains(t, out.String(), "module_job.initial")
+			}
+			assert.Zero(t, publisher.Len())
+		})
 	}
 }
