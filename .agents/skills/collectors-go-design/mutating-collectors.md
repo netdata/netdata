@@ -17,8 +17,9 @@ Rules use When / Do / Don't / Evidence / Boundary.
 
 **When:** the collector creates, modifies, or deletes anything outside its process. **Do:** name every remote object
 the collector owns and the identity that owns it: the stable job identity (`pluginconfig.RegistryUniqueID()` plus the
-job name), never display labels, credentials, or endpoints. Decide which concurrent owners exist: the same job's old
-and new runtime (protect with a per-owner lock) versus different jobs (independent by default). State what a renamed
+job name), never display labels, credentials, or endpoints. Establish which writers can actually overlap from the
+runtime ownership contract before adding a per-owner lock; candidate probes can overlap even when active collection
+is serialized. Different jobs are independent by default. State what a renamed
 job inherits: nothing automatically; draining old work requires restoring the old identity and configuration.
 **Don't:** let mutable labels join the durable identity or safety fingerprint (correcting a display label must not
 strand owned state); scan other owners' state to decide whether this owner may run (Architecture Gate). **Evidence:**
@@ -50,6 +51,12 @@ telemetry truthful (early returns must not clear backlog or backpressure signals
 defect as data loss when remote mutations are already stopped. **Evidence:** tests for failed publication in the same
 call and the next call. **Boundary:** host or power-loss durability on a platform without the needed primitives is an
 accepted, documented limitation, not something to claim silently.
+
+A replacement candidate's `Init`/`Check` can run before the previous active job stops. A collector that reuses the
+same persistent state MUST load or revalidate it after acquiring active ownership, for example on its first active
+`Collect`; an Init-time snapshot can miss the predecessor's final commit. Verify the ordering in
+`src/go/plugin/agent/jobmgr/joboutput/candidate_stage.go` and cover a predecessor commit between candidate probe and
+activation. This applies to durable local state even without remote mutation.
 
 ## 4. Cleanup Versus Measurement
 

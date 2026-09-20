@@ -125,9 +125,10 @@ type MetadataMetric struct {
 
 // MetadataModule is the decoded part of one metadata.yaml module these checks use.
 type MetadataModule struct {
-	ID      string
-	Alerts  []MetadataAlert
-	Metrics []MetadataMetric
+	ID        string
+	Alerts    []MetadataAlert
+	Metrics   []MetadataMetric
+	Functions []MetadataFunction
 }
 
 type metadataDocument struct {
@@ -154,6 +155,30 @@ type metadataDocument struct {
 				} `yaml:"metrics"`
 			} `yaml:"scopes"`
 		} `yaml:"metrics"`
+		Functions struct {
+			List []struct {
+				ID           string `yaml:"id"`
+				FunctionName string `yaml:"function_name"`
+				Parameters   []struct {
+					ID      string `yaml:"id"`
+					Name    string `yaml:"name"`
+					Type    string `yaml:"type"`
+					Options []struct {
+						ID      string `yaml:"id"`
+						Name    string `yaml:"name"`
+						Default bool   `yaml:"default"`
+					} `yaml:"options"`
+				} `yaml:"parameters"`
+				Returns struct {
+					Columns []struct {
+						Name       string `yaml:"name"`
+						Type       string `yaml:"type"`
+						Unit       string `yaml:"unit"`
+						Visibility string `yaml:"visibility"`
+					} `yaml:"columns"`
+				} `yaml:"returns"`
+			} `yaml:"list"`
+		} `yaml:"functions"`
 	} `yaml:"modules"`
 }
 
@@ -203,6 +228,22 @@ func DecodeMetadataModule(metadataYAML []byte, moduleID string) (MetadataModule,
 			}
 			out.Metrics = append(out.Metrics, row)
 		}
+	}
+	for _, function := range raw.Functions.List {
+		row := MetadataFunction{ID: function.ID, FunctionName: function.FunctionName}
+		for _, parameter := range function.Parameters {
+			param := MetadataFunctionParameter{ID: parameter.ID, Name: parameter.Name, Type: parameter.Type}
+			for _, option := range parameter.Options {
+				param.Options = append(param.Options, MetadataFunctionOption{ID: option.ID, Name: option.Name, Default: option.Default})
+			}
+			row.Parameters = append(row.Parameters, param)
+		}
+		for _, column := range function.Returns.Columns {
+			row.Columns = append(row.Columns, MetadataFunctionColumn{
+				Name: column.Name, Type: column.Type, Unit: column.Unit, Visibility: column.Visibility,
+			})
+		}
+		out.Functions = append(out.Functions, row)
 	}
 	return out, nil
 }

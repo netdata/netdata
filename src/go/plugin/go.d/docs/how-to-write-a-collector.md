@@ -327,7 +327,8 @@ Recommended test coverage:
   `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`; never restate template contexts or dimensions;
 - state-set values for every known state and unknown fallback;
 - host-scope routing when scopes/vnodes are used;
-- Function handler tests with fake deps when Functions exist;
+- Function handler tests with fake deps when Functions exist, plus the Live Data drift check
+  `collecttest.AssertMetadataDocumentsFunctions` against `metadata.yaml`;
 - topology schema validation when topology exists;
 - fixture validity and attribution when fixtures come from public third-party projects.
 
