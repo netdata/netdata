@@ -41,7 +41,8 @@ references when their surfaces are affected, including the IBM.d exception.
 
 - New go.d collectors MUST implement `collectorapi.CollectorV2` from
   `src/go/plugin/framework/collectorapi/collector.go` and register via `CreateV2`: metrics through
-  `metrix.CollectorStore`, charts through `ChartTemplateYAML()`.
+  `metrix.CollectorStore`, charts through exactly one static YAML or native-set provider. See
+  `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`.
 - Guidance for new collectors MUST NOT teach or copy the V1 `Collect() map[string]int64` pattern.
 - Public config options SHOULD exist only for real operator decisions. Implementation tuning (page sizes, scan
   windows, retry limits, cadence) SHOULD be internal constants unless user control is clearly justified.

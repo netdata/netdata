@@ -134,12 +134,11 @@ type JobV2 struct {
 	store metrix.CollectorStore
 	cycle metrix.CycleController
 
-	scopeStates           map[string]*jobV2ScopeState
-	chartTemplateYAML     []byte
-	chartTemplateRevision uint64
-	engineOptions         []chartengine.Option
-	runtimeStore          metrix.RuntimeStore
-	runtimeAggregator     *chartengine.RuntimeAggregator
+	scopeStates       map[string]*jobV2ScopeState
+	chartTemplates    *collectorapi.ChartTemplateSource
+	engineOptions     []chartengine.Option
+	runtimeStore      metrix.RuntimeStore
+	runtimeAggregator *chartengine.RuntimeAggregator
 
 	prevRun     time.Time
 	retries     atomic.Int64
@@ -538,20 +537,18 @@ func (j *JobV2) postCheck() error {
 		chartengine.WithLogger(j.Logger.With(slog.String("component", "chartengine"))),
 		chartengine.WithEmitTypeIDBudgetPrefix(j.fullName),
 	}
-	if v, ok := j.module.(collectorapi.CollectorV2EnginePolicy); ok {
-		opts = append(opts, chartengine.WithEnginePolicy(v.EnginePolicy()))
+	templates, err := collectorapi.NewChartTemplateSource(j.module, opts...)
+	if err != nil {
+		return err
 	}
-
-	templateYAML := []byte(j.module.ChartTemplateYAML())
-	if err := validateJobV2ChartTemplate(templateYAML, opts); err != nil {
+	if _, err := templates.Capture(); err != nil {
 		return err
 	}
 
 	j.store = store
 	j.cycle = managed.CycleController()
 	j.scopeStates = make(map[string]*jobV2ScopeState)
-	j.chartTemplateYAML = templateYAML
-	j.chartTemplateRevision = 1
+	j.chartTemplates = templates
 	j.engineOptions = opts
 	j.runtimeStore = metrix.NewRuntimeStore()
 	j.runtimeAggregator = chartengine.NewRuntimeAggregator(j.runtimeStore)
@@ -559,16 +556,6 @@ func (j *JobV2) postCheck() error {
 		j.Warningf("runtime metrics registration failed: %v", err)
 	}
 	return nil
-}
-
-func validateJobV2ChartTemplate(templateYAML []byte, opts []chartengine.Option) error {
-	engineOpts := append([]chartengine.Option{}, opts...)
-	engineOpts = append(engineOpts, chartengine.WithRuntimeStore(nil))
-	engine, err := chartengine.New(engineOpts...)
-	if err != nil {
-		return err
-	}
-	return engine.LoadYAML(templateYAML, 1)
 }
 
 func (j *JobV2) runOnce() {
@@ -648,6 +635,13 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 		j.Warningf("collect failed: %v", err)
 		return jobV2PreparedEmission{}, false
 	}
+	candidate, err := j.chartTemplates.Capture()
+	if err != nil {
+		j.cycle.AbortCycle()
+		cycleOpen = false
+		j.Warningf("chart template capture failed: %v", sanitizeLifecycleError(j.lifecycleErrorSanitizer, err))
+		return jobV2PreparedEmission{}, false
+	}
 	if err := j.cycle.CommitCycleSuccess(); err != nil {
 		cycleOpen = false
 		j.Warningf("commit cycle failed: %v", err)
@@ -665,7 +659,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 				scope = state.scope
 			}
 		}
-		scopePrepared, scopeOK := j.prepareScopeEmission(scope, live, sinceLastRun)
+		scopePrepared, scopeOK := j.prepareScopeEmission(scope, live, sinceLastRun, candidate)
 		if !scopeOK {
 			prepared.scopeFailure = true
 			continue
@@ -722,6 +716,7 @@ func (j *JobV2) prepareScopeEmission(
 	scope metrix.HostScope,
 	live bool,
 	sinceLastRun int,
+	candidate *chartengine.TemplateSet,
 ) (prepared jobV2PreparedScopeEmission, ok bool) {
 	var attempt chartengine.PlanAttempt
 	var decision jobV2EmissionDecision
@@ -751,26 +746,21 @@ func (j *JobV2) prepareScopeEmission(
 	if state.scopeKey == defaultHostScopeKey {
 		vnode := j.currentVnode()
 		decision, err = state.host.prepareEmission(vnode)
-		if err == nil && decision.needEngineReload {
-			state.engine.ResetMaterialized()
-		}
 		if err != nil {
 			j.Warningf("prepare default host scope failed: %v", err)
 			return jobV2PreparedScopeEmission{}, false
 		}
 	} else {
 		decision, err = state.host.prepareScopedEmission(state.scope)
-		if err == nil && decision.needEngineReload {
-			state.engine.ResetMaterialized()
-		}
 		if err != nil {
 			j.Warningf("prepare host scope %q failed: %v", state.scopeKey, err)
 			return jobV2PreparedScopeEmission{}, false
 		}
 	}
 
-	attempt, err = state.engine.PreparePlan(
+	attempt, err = state.engine.PreparePlanWithOptions(
 		j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(state.scopeKey)),
+		chartengine.PlanOptions{TemplateSet: candidate, ResetMaterialized: decision.needEngineReload},
 	)
 	if err != nil {
 		j.Warningf("build plan for host scope %q failed: %v", state.scopeKey, err)

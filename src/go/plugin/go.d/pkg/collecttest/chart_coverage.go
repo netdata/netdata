@@ -13,6 +13,7 @@ import (
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
@@ -46,7 +47,6 @@ func AssertChartCoverage(
 	t *testing.T,
 	collector interface {
 		MetricStore() metrix.CollectorStore
-		ChartTemplateYAML() string
 	},
 	exp ChartCoverageExpectation,
 ) {
@@ -61,9 +61,17 @@ func AssertChartCoverage(
 		t.Fatalf("collecttest: nil metric store")
 		return
 	}
-	templateYAML := collector.ChartTemplateYAML()
-
-	coverages, err := buildChartCoveragesFromStore(templateYAML, 1, store, exp.ExcludeContextPatterns)
+	source, err := collectorapi.NewChartTemplateSource(collector)
+	if err != nil {
+		t.Fatalf("collecttest: chart provider: %v", err)
+		return
+	}
+	set, err := source.Capture()
+	if err != nil {
+		t.Fatalf("collecttest: chart template: %v", err)
+		return
+	}
+	coverages, err := buildChartCoveragesFromStore(set, store, exp.ExcludeContextPatterns)
 	if err != nil {
 		t.Fatalf("collecttest: build chart coverage: %v", err)
 		return
@@ -80,15 +88,14 @@ func AssertChartCoverage(
 }
 
 func buildChartCoveragesFromStore(
-	templateYAML string,
-	revision uint64,
+	set *chartengine.TemplateSet,
 	store metrix.CollectorStore,
 	excludeContextPatterns []string,
 ) ([]scopedChartCoverage, error) {
 	reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	scopes := reader.HostScopes()
 	if len(scopes) == 0 {
-		coverage, err := buildChartCoverage(templateYAML, revision, reader, excludeContextPatterns)
+		coverage, err := buildChartCoverage(set, reader, excludeContextPatterns)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +105,7 @@ func buildChartCoveragesFromStore(
 	out := make([]scopedChartCoverage, 0, len(scopes))
 	for _, scope := range scopes {
 		reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(scope.ScopeKey))
-		coverage, err := buildChartCoverage(templateYAML, revision, reader, excludeContextPatterns)
+		coverage, err := buildChartCoverage(set, reader, excludeContextPatterns)
 		if err != nil {
 			return nil, err
 		}
@@ -108,8 +115,7 @@ func buildChartCoveragesFromStore(
 }
 
 func buildChartCoverage(
-	templateYAML string,
-	revision uint64,
+	set *chartengine.TemplateSet,
 	reader metrix.Reader,
 	excludeContextPatterns []string,
 ) (chartCoverage, error) {
@@ -122,13 +128,19 @@ func buildChartCoverage(
 		return chartCoverage{}, err
 	}
 
-	plan, err := buildPlanFromTemplate(templateYAML, revision, reader)
+	engine, err := chartengine.New(chartengine.WithRuntimeStore(nil))
 	if err != nil {
 		return chartCoverage{}, err
 	}
+	attempt, err := engine.PreparePlanWithOptions(reader, chartengine.PlanOptions{TemplateSet: set})
+	if err != nil {
+		return chartCoverage{}, err
+	}
+	defer attempt.Abort()
+	plan := attempt.Plan()
 
 	actualByContext := materializedContextsByPattern(plan, contextMatchers)
-	expectedByContext, err := expectedTemplateCoverage(templateYAML, reader, contextMatchers)
+	expectedByContext, err := expectedTemplateCoverage(set, reader, contextMatchers)
 	if err != nil {
 		return chartCoverage{}, err
 	}
@@ -191,29 +203,26 @@ func materializedContextsByPattern(plan chartengine.Plan, contextMatchers []matc
 }
 
 func expectedTemplateCoverage(
-	templateYAML string,
+	set *chartengine.TemplateSet,
 	reader metrix.Reader,
 	contextMatchers []matcher.Matcher,
 ) (map[string][]string, error) {
-	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
-	if err != nil {
-		return nil, err
-	}
-
 	byContextSet := make(map[string]map[string]struct{})
 	selectorParseCache := make(map[string]metrixselector.Selector)
-	rootContext := normalizeOptionalContextPart(spec.ContextNamespace)
-
-	for i := range spec.Groups {
-		if err := collectTemplateContexts(
-			byContextSet,
-			spec.Groups[i],
-			rootContext,
-			reader,
-			contextMatchers,
-			selectorParseCache,
-		); err != nil {
+	var globalSelector metrixselector.Selector
+	if policy := set.GlobalPolicy(); policy.Selector != nil {
+		var err error
+		globalSelector, err = policy.Selector.Parse()
+		if err != nil {
 			return nil, err
+		}
+	}
+	for _, entry := range set.Entries() {
+		rootContext := normalizeOptionalContextPart(entry.ContextNamespace)
+		for _, group := range entry.Groups {
+			if err := collectTemplateContexts(byContextSet, group, rootContext, reader, contextMatchers, selectorParseCache, globalSelector); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -236,6 +245,7 @@ func collectTemplateContexts(
 	reader metrix.Reader,
 	contextMatchers []matcher.Matcher,
 	selectorParseCache map[string]metrixselector.Selector,
+	globalSelector metrixselector.Selector,
 ) error {
 	scopeContext := append([]string(nil), parentContextParts...)
 	scopeContext = append(scopeContext, normalizeOptionalContextPart(group.ContextNamespace)...)
@@ -251,7 +261,7 @@ func collectTemplateContexts(
 		matchedAnyDimension := false
 		dims := make(map[string]struct{})
 		for _, dim := range chart.Dimensions {
-			dimNames, matched, err := collectExpectedDimensionNames(reader, dim, selectorParseCache)
+			dimNames, matched, err := collectExpectedDimensionNames(reader, dim, selectorParseCache, globalSelector)
 			if err != nil {
 				return err
 			}
@@ -285,6 +295,7 @@ func collectTemplateContexts(
 			reader,
 			contextMatchers,
 			selectorParseCache,
+			globalSelector,
 		); err != nil {
 			return err
 		}
@@ -296,6 +307,7 @@ func collectExpectedDimensionNames(
 	reader metrix.Reader,
 	dim charttpl.Dimension,
 	parseCache map[string]metrixselector.Selector,
+	globalSelector metrixselector.Selector,
 ) ([]string, bool, error) {
 	selectorExpr := strings.TrimSpace(dim.Selector)
 	sel, err := parseSelectorCached(selectorExpr, parseCache)
@@ -315,6 +327,9 @@ func collectExpectedDimensionNames(
 		}
 		// Keep expected coverage aligned with chartengine's default series selection.
 		if meta.LastSeenSuccessSeq != lastSuccessSeq {
+			return
+		}
+		if globalSelector != nil && !globalSelector.Matches(metricName, labels) {
 			return
 		}
 		if !sel.Matches(metricName, labels) {

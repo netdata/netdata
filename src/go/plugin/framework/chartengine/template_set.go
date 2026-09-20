@@ -66,7 +66,11 @@ func NewTemplateSet(spec TemplateSetSpec) (*TemplateSet, error) {
 		selector:  normalizedSelectorExpr(spec.Policy.Selector),
 		namespace: strings.Join(normalizeOptional(spec.FallbackContextNamespace), "."),
 	}
-	policy := effectiveEnginePolicy{autogen: cfg.autogen, autogenRules: cfg.autogenRules, selector: cfg.selector}
+	policy := effectiveEnginePolicy{
+		autogen:      cfg.autogen,
+		autogenRules: cfg.autogenRules,
+		selector:     cfg.selector,
+	}
 	return compileTemplateSet(spec.Entries, global, policy, false, false)
 }
 
@@ -82,7 +86,10 @@ func NewTemplateSetYAML(data []byte) (*TemplateSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	global := templateGlobalPolicy{autogen: cloneAutogenPolicy(policy.autogen), namespace: spec.ContextNamespace}
+	global := templateGlobalPolicy{
+		autogen:   cloneAutogenPolicy(policy.autogen),
+		namespace: spec.ContextNamespace,
+	}
 	if spec.Engine != nil {
 		global.selector = normalizedSelectorExpr(spec.Engine.Selector)
 	}
@@ -96,7 +103,9 @@ func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, po
 		policy:    policy,
 		legacy:    legacy,
 	}
-	c := compiler{metricsSet: make(map[string]struct{})}
+	c := compiler{
+		metricsSet: make(map[string]struct{}),
+	}
 	rootOffset := 0
 	for _, input := range entries {
 		if strings.TrimSpace(input.ID) == "" {
@@ -125,7 +134,11 @@ func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, po
 		}
 		set.entryRules = append(set.entryRules, rules...)
 		start := len(c.charts)
-		if err := c.compileSpec(&charttpl.Spec{Version: charttpl.VersionV1, ContextNamespace: entry.ContextNamespace, Groups: entry.Groups}); err != nil {
+		if err := c.compileSpec(&charttpl.Spec{
+			Version:          charttpl.VersionV1,
+			ContextNamespace: entry.ContextNamespace,
+			Groups:           entry.Groups,
+		}); err != nil {
 			return nil, fmt.Errorf("chartengine: entry %q: %w", input.ID, err)
 		}
 		set.content = append(set.content, normalizedEntryContent(entry, c.charts[start:]))
@@ -177,7 +190,10 @@ func normalizedSelectorExpr(expr *metrixselector.Expr) *metrixselector.Expr {
 	if expr == nil || expr.Empty() {
 		return nil
 	}
-	out := &metrixselector.Expr{Allow: slices.Clone(expr.Allow), Deny: slices.Clone(expr.Deny)}
+	out := &metrixselector.Expr{
+		Allow: slices.Clone(expr.Allow),
+		Deny:  slices.Clone(expr.Deny),
+	}
 	for _, values := range [][]string{out.Allow, out.Deny} {
 		for i := range values {
 			values[i] = strings.TrimSpace(values[i])
@@ -192,8 +208,8 @@ func normalizedSelectorExpr(expr *metrixselector.Expr) *metrixselector.Expr {
 // PrepareTemplateSet binds fixed job options without recompiling the immutable
 // program or entry restrictions. Global overrides never replace entry restrictions.
 func PrepareTemplateSet(set *TemplateSet, opts ...Option) (*TemplateSet, error) {
-	if set == nil {
-		return nil, fmt.Errorf("chartengine: nil template set")
+	if set == nil || set.program == nil {
+		return nil, fmt.Errorf("chartengine: invalid template set; use NewTemplateSet or NewTemplateSetYAML")
 	}
 	cfg, err := applyOptions(opts...)
 	if err != nil {
@@ -262,13 +278,20 @@ type templateGroupShape struct {
 }
 
 func normalizedEntryContent(entry TemplateEntry, charts []program.Chart) templateEntryContent {
-	out := templateEntryContent{namespace: entry.ContextNamespace, rules: entry.AutogenRules}
+	out := templateEntryContent{
+		namespace: entry.ContextNamespace,
+		rules:     entry.AutogenRules,
+	}
 	var visit func([]charttpl.Group)
 	visit = func(groups []charttpl.Group) {
 		for _, group := range groups {
 			metrics := normalizeUnique(group.Metrics)
 			slices.Sort(metrics)
-			out.groups = append(out.groups, templateGroupShape{groups: len(group.Groups), charts: len(group.Charts), metrics: metrics})
+			out.groups = append(out.groups, templateGroupShape{
+				groups:  len(group.Groups),
+				charts:  len(group.Charts),
+				metrics: metrics,
+			})
 			visit(group.Groups)
 		}
 	}
@@ -304,4 +327,16 @@ func normalizedAutogenRules(rules []charttpl.EngineAutogenRule) []charttpl.Engin
 func normalizedGlobalPolicy(global templateGlobalPolicy) templateGlobalPolicy {
 	global.autogen.Rules = normalizedAutogenRules(global.autogen.Rules)
 	return global
+}
+
+// GlobalPolicy returns detached effective global policy for inspection. Entry
+// restrictions are available through Entries and are excluded from this policy.
+func (s *TemplateSet) GlobalPolicy() EnginePolicy {
+	if s == nil {
+		return EnginePolicy{}
+	}
+	return cloneEnginePolicy(EnginePolicy{
+		Autogen:  &s.global.autogen,
+		Selector: s.global.selector,
+	})
 }

@@ -12,14 +12,27 @@ import (
 )
 
 func nativeEntry(id, chartID, metric string) TemplateEntry {
-	return TemplateEntry{ID: id, ContextNamespace: "test", Groups: []charttpl.Group{{Family: "Test", Metrics: []string{metric}, Charts: []charttpl.Chart{{ID: chartID, Title: "Requests", Context: chartID, Units: "requests", Dimensions: []charttpl.Dimension{{Selector: metric, Name: "value"}}}}}}}
+	return TemplateEntry{
+		ID:               id,
+		ContextNamespace: "test",
+		Groups:           []charttpl.Group{{Family: "Test", Metrics: []string{metric}, Charts: []charttpl.Chart{{ID: chartID, Title: "Requests", Context: chartID, Units: "requests", Dimensions: []charttpl.Dimension{{Selector: metric, Name: "value"}}}}}},
+	}
 }
 
 func TestTemplateSetOwnsNormalizedInput(t *testing.T) {
 	entry := nativeEntry("profile", "requests", "requests")
-	entry.Groups[0].ChartDefaults = &charttpl.ChartDefaults{Priority: 42, Instances: &charttpl.Instances{ByLabels: []string{"node"}}}
-	entry.AutogenRules = []charttpl.EngineAutogenRule{{Scope: "private_*", Selector: metrixselector.Expr{Deny: []string{"*"}}}}
-	set, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}})
+	entry.Groups[0].ChartDefaults = &charttpl.ChartDefaults{
+		Priority: 42,
+		Instances: &charttpl.Instances{
+			ByLabels: []string{"node"},
+		},
+	}
+	entry.AutogenRules = []charttpl.EngineAutogenRule{{Scope: "private_*", Selector: metrixselector.Expr{
+		Deny: []string{"*"},
+	}}}
+	set, err := NewTemplateSet(TemplateSetSpec{
+		Entries: []TemplateEntry{entry},
+	})
 	require.NoError(t, err)
 	entries := set.Entries()
 	require.Equal(t, 42, entries[0].Groups[0].Charts[0].Priority)
@@ -37,7 +50,9 @@ func TestTemplateSetOwnsNormalizedInput(t *testing.T) {
 	assert.Equal(t, []string{"*"}, got.AutogenRules[0].Selector.Deny)
 	require.Len(t, set.policy.autogenRules, 1)
 	assert.False(t, set.policy.autogenRules[0].Selects("private_value", labelSliceView{}))
-	rebuilt, err := NewTemplateSet(TemplateSetSpec{Entries: set.Entries()})
+	rebuilt, err := NewTemplateSet(TemplateSetSpec{
+		Entries: set.Entries(),
+	})
 	require.NoError(t, err)
 	assert.True(t, rebuilt.preservesEntry(set, "profile"))
 }
@@ -52,7 +67,9 @@ func TestTemplateSetValidation(t *testing.T) {
 		"overlapping public ID": {valid, nativeEntry("two", "shared", "requests")},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := NewTemplateSet(TemplateSetSpec{Entries: entries})
+			_, err := NewTemplateSet(TemplateSetSpec{
+				Entries: entries,
+			})
 			if name == "empty" || name == "overlapping public ID" {
 				require.NoError(t, err)
 			} else {
@@ -80,9 +97,13 @@ func TestTemplateSetLegacyCompilerParity(t *testing.T) {
 
 func TestTemplateSetIdentityAndLayout(t *testing.T) {
 	a, b := nativeEntry("z", "shared", "requests"), nativeEntry("a", "shared", "requests")
-	first, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{a, b}})
+	first, err := NewTemplateSet(TemplateSetSpec{
+		Entries: []TemplateEntry{a, b},
+	})
 	require.NoError(t, err)
-	reordered, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{b, a}})
+	reordered, err := NewTemplateSet(TemplateSetSpec{
+		Entries: []TemplateEntry{b, a},
+	})
 	require.NoError(t, err)
 	assert.True(t, reordered.preservesEntry(first, "z"))
 	assert.True(t, reordered.preservesEntry(first, "a"))
@@ -96,11 +117,27 @@ func TestTemplateSetIdentityAndLayout(t *testing.T) {
 
 func TestTemplateSetPolicyBinding(t *testing.T) {
 	entry := nativeEntry("profile", "requests", "requests")
-	entry.AutogenRules = []charttpl.EngineAutogenRule{{Scope: "private_*", Selector: metrixselector.Expr{Deny: []string{"*"}}}}
-	globalRules := []AutogenRule{{Scope: "global_*", Selector: metrixselector.Expr{Deny: []string{"*"}}}}
-	set, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}, Policy: EnginePolicy{Autogen: &AutogenPolicy{Enabled: true, Rules: globalRules}}})
+	entry.AutogenRules = []charttpl.EngineAutogenRule{{Scope: "private_*", Selector: metrixselector.Expr{
+		Deny: []string{"*"},
+	}}}
+	globalRules := []AutogenRule{{Scope: "global_*", Selector: metrixselector.Expr{
+		Deny: []string{"*"},
+	}}}
+	set, err := NewTemplateSet(TemplateSetSpec{
+		Entries: []TemplateEntry{entry},
+		Policy: EnginePolicy{
+			Autogen: &AutogenPolicy{
+				Enabled: true,
+				Rules:   globalRules,
+			},
+		},
+	})
 	require.NoError(t, err)
-	override := WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}})
+	override := WithEnginePolicy(EnginePolicy{
+		Autogen: &AutogenPolicy{
+			Enabled: true,
+		},
+	})
 	bound, err := PrepareTemplateSet(set, override)
 	require.NoError(t, err)
 	require.Len(t, bound.policy.autogenRules, 1)
@@ -109,7 +146,14 @@ func TestTemplateSetPolicyBinding(t *testing.T) {
 	require.Len(t, set.policy.autogenRules, 2, "binding leaves the source immutable")
 	assert.Same(t, set.program, bound.program)
 	entry.AutogenRules = nil
-	changed, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}, Policy: EnginePolicy{Autogen: &AutogenPolicy{Enabled: false}}})
+	changed, err := NewTemplateSet(TemplateSetSpec{
+		Entries: []TemplateEntry{entry},
+		Policy: EnginePolicy{
+			Autogen: &AutogenPolicy{
+				Enabled: false,
+			},
+		},
+	})
 	require.NoError(t, err)
 	changed, err = PrepareTemplateSet(changed, override)
 	require.NoError(t, err)
@@ -126,32 +170,54 @@ func TestTemplateSetPolicyBinding(t *testing.T) {
 func TestTemplateSetGlobalNormalization(t *testing.T) {
 	a, err := NewTemplateSet(TemplateSetSpec{})
 	require.NoError(t, err)
-	b, err := NewTemplateSet(TemplateSetSpec{Policy: EnginePolicy{Autogen: &AutogenPolicy{}, Selector: &metrixselector.Expr{}}})
+	b, err := NewTemplateSet(TemplateSetSpec{
+		Policy: EnginePolicy{
+			Autogen:  &AutogenPolicy{},
+			Selector: &metrixselector.Expr{},
+		},
+	})
 	require.NoError(t, err)
 	assert.True(t, a.SameGlobalPolicy(b))
-	c, err := NewTemplateSet(TemplateSetSpec{FallbackContextNamespace: "different"})
+	c, err := NewTemplateSet(TemplateSetSpec{
+		FallbackContextNamespace: "different",
+	})
 	require.NoError(t, err)
 	assert.False(t, a.SameGlobalPolicy(c))
 }
 
 func TestTemplateSetCompilerNormalizedEquality(t *testing.T) {
 	entry := nativeEntry("profile", "requests", "requests")
-	original, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}})
+	original, err := NewTemplateSet(TemplateSetSpec{
+		Entries: []TemplateEntry{entry},
+	})
 	require.NoError(t, err)
 	entry.Groups[0].Charts[0].Priority = 70000
 	entry.Groups[0].Charts[0].Title = " Requests "
-	explicit, err := NewTemplateSet(TemplateSetSpec{Entries: []TemplateEntry{entry}})
+	explicit, err := NewTemplateSet(TemplateSetSpec{
+		Entries: []TemplateEntry{entry},
+	})
 	require.NoError(t, err)
 	assert.True(t, explicit.preservesEntry(original, "profile"))
 }
 
 func TestTemplateSetNormalizedGlobalRuleEquality(t *testing.T) {
-	policy := EnginePolicy{Autogen: &AutogenPolicy{Enabled: true, Rules: []AutogenRule{{Scope: "private_*", Selector: metrixselector.Expr{Deny: []string{"*"}}}}}}
-	original, err := NewTemplateSet(TemplateSetSpec{Policy: policy})
+	policy := EnginePolicy{
+		Autogen: &AutogenPolicy{
+			Enabled: true,
+			Rules: []AutogenRule{{Scope: "private_*", Selector: metrixselector.Expr{
+				Deny: []string{"*"},
+			}}},
+		},
+	}
+	original, err := NewTemplateSet(TemplateSetSpec{
+		Policy: policy,
+	})
 	require.NoError(t, err)
 	policy.Autogen.Rules[0].Scope = " private_* "
 	policy.Autogen.Rules[0].Selector.Deny[0] = " * "
-	explicit, err := NewTemplateSet(TemplateSetSpec{Policy: policy})
+	explicit, err := NewTemplateSet(TemplateSetSpec{
+		Policy: policy,
+	})
 	require.NoError(t, err)
 	assert.True(t, explicit.SameGlobalPolicy(original))
 }

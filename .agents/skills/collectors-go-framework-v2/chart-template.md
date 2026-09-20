@@ -145,7 +145,8 @@ a *leaf* is the innermost family that holds charts.
 ## Tests
 
 - **Validate.** `collecttest.AssertChartTemplateSchema` (`src/go/plugin/go.d/pkg/collecttest/chart_template_schema.go`),
-  then `charttpl.DecodeYAML` and `chartengine.Compile`.
+  then `charttpl.DecodeYAML` and `chartengine.Compile`. Native sets validate through `chartengine.NewTemplateSet`;
+  follow `src/go/plugin/framework/chartengine/README.md#named-active-template-sets` for runtime membership changes.
 - **Cross-check artifacts.** `collecttest.AssertMetadataDocumentsChartTemplate`,
   `collecttest.AssertHealthAlertsTargetChartTemplate`, `collecttest.AssertMetadataAlertsMatchHealthConfig` and
   `collecttest.AssertHealthAlertsMatchMetadata` (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare
@@ -158,7 +159,8 @@ a *leaf* is the innermost family that holds charts.
   MUST NOT exist; health.d owns alert policy. An independent oracle, such as a V1 parity manifest during a migration or
   upstream alert rules with a recorded mapping, is not a restatement.
 - **Coverage.** `collecttest.AssertChartCoverage` (`src/go/plugin/go.d/pkg/collecttest/chart_coverage.go`) derives the
-  expected charts and dimensions from the template; do not add `RequiredContexts` that repeat it.
+  expected charts and dimensions from the live static or native provider and store, per host scope; do not add
+  `RequiredContexts` that repeat it.
 - **Refactor proof.** To show a template change alters nothing, a throwaway local test writes every metric definition
   once into a store, builds the plan with `chartengine.New`, `Engine.LoadYAML` and `Engine.PreparePlan`, and diffs the
   plan actions before and after, normalizing only the field the change was meant to affect. No shipped helper does

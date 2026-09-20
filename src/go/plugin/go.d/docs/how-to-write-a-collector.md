@@ -43,7 +43,7 @@ Primary V2 reference:
 
 Read these files by responsibility:
 
-- `collector.go`: registration, defaults, public lifecycle methods, `MetricStore()`, `ChartTemplateYAML()`, and Function
+- `collector.go`: registration, defaults, public lifecycle methods, `MetricStore()`, the chart-provider getter, and Function
   wiring.
 - `config.go`: config defaults, normalization, validation, and intentionally small public config.
 - `collect.go`, `collect_metrics.go`, `collect_bgp.go`: collection orchestration and split domain operations.
@@ -117,7 +117,8 @@ New collectors MUST implement `collectorapi.CollectorV2` from `src/go/plugin/fra
 register via `CreateV2`. In practice, `collector.go` should:
 
 - embed `config_schema.json` for `JobConfigSchema`;
-- embed `charts.yaml` for `ChartTemplateYAML()`;
+- provide exactly one chart capability: embedded `charts.yaml` through `ChartTemplateYAML()` for static definitions,
+  or `ChartTemplateSet()` for changing native entries;
 - expose `Config: func() any { return &Config{} }`;
 - return a new collector from `CreateV2`;
 - add `Methods` and `MethodHandler` only when the collector has Functions.
@@ -138,7 +139,11 @@ Public lifecycle and framework-contract methods MUST stay in `collector.go`:
 - `Collect(context.Context) error`
 - `Cleanup(context.Context)`
 - `MetricStore() metrix.CollectorStore`
-- `ChartTemplateYAML() string`
+- `ChartTemplateYAML() string` or `ChartTemplateSet() *chartengine.TemplateSet`
+
+Native snapshot ownership, construction, replacement and fixed-policy rules are documented in
+[chartengine](/src/go/plugin/framework/chartengine/README.md#named-active-template-sets). Existing YAML collectors retain
+their getter; implementing both providers is a startup error. `collecttest.AssertChartCoverage` supports either provider.
 
 Collectors that need a long-running side-effect loop MAY additionally implement `collectorapi.CollectorV2Runner` with
 `Run(context.Context) error`. Use this only when work must start with the running job lifecycle but must not wait for

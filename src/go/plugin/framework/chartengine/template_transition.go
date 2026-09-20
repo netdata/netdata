@@ -34,15 +34,23 @@ func (e *Engine) prepareTemplateTransition(opts PlanOptions) (*Engine, *template
 	}
 	// Copy the state value, not the engine's mutex. Shared program data is immutable;
 	// materialized state is copied by buildPlan before any mutation.
-	view := &Engine{state: e.state}
+	view := &Engine{
+		state: e.state,
+	}
 	var transition *templateTransition
 	var retired map[string]*materializedChartState
 	if changed {
 		set := opts.TemplateSet
+		if set.program == nil {
+			return nil, nil, nil, fmt.Errorf("chartengine: unprepared template set")
+		}
 		if e.state.templateSet != nil && !set.SameGlobalPolicy(e.state.templateSet) {
 			return nil, nil, nil, fmt.Errorf("chartengine: template set changes fixed global policy or fallback namespace")
 		}
-		transition = &templateTransition{set: set, cache: newRouteCache()}
+		transition = &templateTransition{
+			set:   set,
+			cache: newRouteCache(),
+		}
 		transition.install(&view.state)
 		if !opts.ResetMaterialized {
 			retained := make(map[string]*materializedChartState, len(e.state.materialized.charts))
@@ -69,7 +77,9 @@ func (e *Engine) prepareTemplateTransition(opts PlanOptions) (*Engine, *template
 					retired[id] = chart
 				}
 			}
-			view.state.materialized = materializedState{charts: retained}
+			view.state.materialized = materializedState{
+				charts: retained,
+			}
 		}
 	}
 	if opts.ResetMaterialized {
@@ -118,7 +128,10 @@ func (ctx *planBuildContext) reconcileRetirements() {
 		old := ctx.retired[id]
 		final := ctx.materialized.charts[id]
 		if final == nil {
-			ctx.out.Actions = append(ctx.out.Actions, RemoveChartAction{ChartID: id, Meta: old.meta})
+			ctx.out.Actions = append(ctx.out.Actions, RemoveChartAction{
+				ChartID: id,
+				Meta:    old.meta,
+			})
 			continue
 		}
 		names := make([]string, 0)
@@ -136,5 +149,14 @@ func (ctx *planBuildContext) reconcileRetirements() {
 }
 
 func retiredDimension(id, name string, meta program.ChartMeta, dim *materializedDimensionState) RemoveDimensionAction {
-	return RemoveDimensionAction{ChartID: id, ChartMeta: meta, Name: name, Hidden: dim.hidden, Float: dim.float, Algorithm: dim.algorithm, Multiplier: dim.multiplier, Divisor: dim.divisor}
+	return RemoveDimensionAction{
+		ChartID:    id,
+		ChartMeta:  meta,
+		Name:       name,
+		Hidden:     dim.hidden,
+		Float:      dim.float,
+		Algorithm:  dim.algorithm,
+		Multiplier: dim.multiplier,
+		Divisor:    dim.divisor,
+	}
 }

@@ -41,7 +41,7 @@ type CollectorV1 interface {
 //
 // Collectors implementing this interface:
 //   - write metrics into CollectorStore during Collect(),
-//   - provide chart template YAML consumed by chartengine.
+//   - provide exactly one chart capability for metric jobs: static YAML or a native set.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error
@@ -53,7 +53,20 @@ type CollectorV2 interface {
 	VirtualNode() *vnodes.VirtualNode
 
 	MetricStore() metrix.CollectorStore
+}
+
+// StaticChartTemplateProvider supplies one document, captured once after Check.
+// Existing collectors may continue composing or embedding YAML through this API.
+type StaticChartTemplateProvider interface {
 	ChartTemplateYAML() string
+}
+
+// ChartTemplateSetProvider supplies the complete desired native set. The getter
+// is captured after Check and once after each successful Collect, before metric
+// commit. It must be cheap and return the same immutable pointer until content
+// changes. Nil is invalid; use an empty TemplateSet for no authored entries.
+type ChartTemplateSetProvider interface {
+	ChartTemplateSet() *chartengine.TemplateSet
 }
 
 // CollectorV2Runner is an optional long-running V2 collector hook.
@@ -86,7 +99,8 @@ type FunctionAvailability interface {
 }
 
 // CollectorV2EnginePolicy allows a V2 collector to provide chartengine policy
-// (series selector + autogen behavior).
+// (series selector + autogen behavior), captured once after Check. Overrides
+// apply to global policy; native entry restrictions remain in force.
 type CollectorV2EnginePolicy interface {
 	EnginePolicy() chartengine.EnginePolicy
 }
