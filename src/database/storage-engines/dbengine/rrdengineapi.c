@@ -1114,9 +1114,9 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     completion_wait_for(&ctx->loading.load_mrg);
     completion_destroy(&ctx->loading.load_mrg);
 
-    // a tier that came up with no data reports the moment it became ready as its first time: from here on the
-    // readers (dbengine_global_first_time_s() and the retention they derive from it) see a tier that is up, and
-    // the sentinel is only ever what a tier holds before its registry load completed
+    // a tier that came up with no data reports the moment it became ready as its first time, so the retention the
+    // readers derive from dbengine_global_first_time_s() (rrd-retention.c, pulse-db-dbengine-retention.c) counts
+    // from then; the sentinel is what a tier holds until this call returns for it
     if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
 
@@ -1146,9 +1146,9 @@ static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) 
     if(!tc->grouping)
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
 
-    if(strlen(tc->dbfiles_path) > FILENAME_MAX) {
+    if(strlen(tc->dbfiles_path) > DBENGINE_DBFILES_PATH_MAX) {
         netdata_log_error("DBENGINE: tier %zu: the datafiles path is longer than %d characters, the tier cannot be initialized",
-                          tc->tier, FILENAME_MAX);
+                          tc->tier, (int)DBENGINE_DBFILES_PATH_MAX);
         return UV_ENAMETOOLONG;
     }
 
@@ -1200,9 +1200,9 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
     if (engine->global_stats.dbengine_reserved_file_descriptors > engine->cfg.max_reserved_file_descriptors) {
         netdata_log_error(
-            "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine tier.",
-            (unsigned)engine->global_stats.dbengine_reserved_file_descriptors,
-            (unsigned)engine->cfg.max_reserved_file_descriptors);
+            "Exceeded the budget of available file descriptors (%zu/%zu), cannot create new dbengine tier.",
+            (size_t)engine->global_stats.dbengine_reserved_file_descriptors,
+            engine->cfg.max_reserved_file_descriptors);
 
         rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
         rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
@@ -1240,6 +1240,13 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
 
     rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
     return UV_EIO;
+}
+
+size_t dbengine_max_reserved_file_descriptors(struct dbengine_engine *engine) {
+    if(!engine)
+        return 0;
+
+    return engine->cfg.max_reserved_file_descriptors;
 }
 
 size_t dbengine_destroy(struct dbengine_engine *engine) {

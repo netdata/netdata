@@ -1722,8 +1722,7 @@ void pulse_dbengine_do(bool extended) {
                 priority++;
 
                 rrddim_set_by_pointer(st_fd, rd_fd_current, (collected_number)stats_array[32]);
-                /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
-                rrddim_set_by_pointer(st_fd, rd_fd_max, (collected_number)rlimit_nofile.rlim_cur / 4);
+                rrddim_set_by_pointer(st_fd, rd_fd_max, (collected_number)dbengine_max_reserved_file_descriptors(netdata_conf_dbengine_engine));
                 rrdset_done(st_fd);
             }
         }

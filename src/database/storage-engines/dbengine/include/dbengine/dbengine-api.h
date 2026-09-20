@@ -75,8 +75,8 @@ time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle
 // dbengine_destroy() finalizes them). An invalid tc is fatal before any of those checks (a programming error,
 // whatever the state). The directory is the embedder's to keep exclusive: nothing refuses a second tier, of this
 // engine or of another, on a directory a tier already runs on, and two tiers writing one directory corrupt it.
-// A dbfiles_path longer than the tier's buffer holds is refused with UV_ENAMETOOLONG before any of those checks,
-// and a tier that would take the engine past its max_reserved_file_descriptors (dbengine-config.h) with UV_EMFILE.
+// A dbfiles_path longer than DBENGINE_DBFILES_PATH_MAX (dbengine-config.h) is refused with UV_ENAMETOOLONG before
+// any of those checks, and a tier that would take the engine past its max_reserved_file_descriptors with UV_EMFILE.
 // Those refusals leave the tier untouched; an init that fails opening the datafiles returns
 // UV_EIO with the tier's configuration already written. Two inits of the same tier must not overlap, nothing
 // serialises them. A tier init and the shutdown must not overlap either: the check is made when the tier starts,
@@ -117,13 +117,20 @@ void dbengine_flush_all(DBENGINE_TIER *tier);
 // referenced, 0 when there were none; 0 for NULL.
 size_t dbengine_destroy(DBENGINE_ENGINE *engine);
 
+// the engine's resolved file descriptor budget (dbengine-config.h max_reserved_file_descriptors, with 0 resolved),
+// what each tier's reservation is checked against; 0 for NULL
+size_t dbengine_max_reserved_file_descriptors(DBENGINE_ENGINE *engine);
+
 // what the embedder reads about the tiers
 time_t dbengine_max_retention_s(DBENGINE_TIER *tier);   // the tier's configured time limit; 0 = none
 uint64_t dbengine_disk_space_max(STORAGE_INSTANCE *si);             // the tier's configured disk quota; 0 = none
 uint64_t dbengine_disk_space_used(STORAGE_INSTANCE *si);
 uint64_t dbengine_metrics(STORAGE_INSTANCE *si);
 uint64_t dbengine_samples(STORAGE_INSTANCE *si);
-time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si);          // 0 while the tier holds no data
+// the oldest time the tier holds data for; 0 until dbengine_readiness_wait() returned for it (the load may not have
+// found the oldest datafile yet), and for a tier that came up empty the moment it became ready, so such a tier's
+// retention (what the embedder derives from this) counts from then
+time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si);
 uint64_t dbengine_get_used_disk_space(DBENGINE_TIER *tier);
 uint64_t dbengine_get_directory_free_bytes_space(DBENGINE_TIER *tier);
 

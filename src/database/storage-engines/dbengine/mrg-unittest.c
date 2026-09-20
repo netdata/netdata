@@ -1555,10 +1555,8 @@ cleanup_early:
 // The mkdtemp() template appended to the temporary directory.
 #define JV2_TMPDIR_TEMPLATE "/netdata-jv2-writer-XXXXXX"
 
-// Longest name journalfile_v2_generate_path() appends to dbfiles_path:
-// "/" WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 is ~31 bytes.
-// Round up generously - being wrong here means a silently truncated journal path.
-#define JV2_JOURNAL_NAME_MAX 64
+// the room the engine keeps for the names it appends to a dbfiles_path (dbengine-config.h)
+#define JV2_JOURNAL_NAME_MAX (FILENAME_MAX - DBENGINE_DBFILES_PATH_MAX)
 
 // Is this directory safe to build the test's temporary tree in?
 //

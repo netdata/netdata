@@ -78,23 +78,27 @@ struct dbengine_config {
 
     // The libuv worker pool. There is one per process, and libuv sizes it once, at the process's first use of it,
     // from the UV_THREADPOOL_SIZE environment variable (4 threads when unset); nothing resizes it afterwards. The
-    // engine dispatches every piece of work it does off its event loop into it: extent writes and reads, flushes,
-    // the registry loads of a tier coming up, journal indexing, datafile rotation, query preparation. The engine
-    // neither sizes the pool nor can read its size: libuv_worker_threads is what the embedder tells it the size is,
-    // and it must equal the real one, so the embedder sets UV_THREADPOOL_SIZE to the same number before the process
-    // first touches the pool (the daemon does, from the variable it hands here: netdata-conf-global.c). The engine
-    // counts the work it has in flight against that figure: once fewer than reserved_libuv_worker_threads are left
-    // it dispatches only its own internal-priority work (queries and extent reads wait), so that the embedder's
-    // own uv_queue_work() calls find a thread. Its internal-priority work is never held back by the count.
+    // engine dispatches every piece of work it takes off its event loop into it: extent writes and reads, flushes,
+    // the registry loads of a tier coming up, journal indexing, datafile rotation, query preparation (a query at
+    // the synchronous priorities runs on the caller's own thread and never touches the pool). The engine neither
+    // sizes the pool nor can read its size: libuv_worker_threads is what the embedder tells it the size is, and it
+    // must equal the real one, so the embedder sets UV_THREADPOOL_SIZE to the same number before the process first
+    // touches the pool (the daemon does, from the variable it hands here: netdata-conf-global.c). The engine counts
+    // the work it has in flight against that figure: once no more than reserved_libuv_worker_threads are left it
+    // dispatches only its own internal-priority work (queries and extent reads wait), so that the embedder's own
+    // uv_queue_work() calls find a thread. Its internal-priority work is never held back by the count.
     //
     // Why the figure must be right: two of the engine's own work items wait, on the pool thread they hold, for a
     // work item they queued behind them (a flush waits for its extent write, pagecache.c; a tier's registry load
     // waits for the per-datafile loaders it queued, rrdengine.c), and both run at the internal priority the count
     // never holds back. On a pool smaller than libuv_worker_threads every thread can end up held by a waiting
     // parent whose child can never run, and the process hangs, silently and for good. With the two figures equal
-    // the daemon is safe by arithmetic (its pool is cpus x 6 threads, never fewer than 16, against roughly
-    // cpus + 2 x tiers such parents), not by a rule the engine enforces. The rule its work items should keep, and
-    // these two do not yet: no work item waits for another work item while it holds a pool thread.
+    // the daemon is safe by its usual numbers, not by a rule the engine enforces: it asks for a pool of cpus x 6
+    // threads against roughly cpus + 2 x tiers such parents, but a memory cap or the "libuv worker threads"
+    // setting (netdata-conf-global.c) can bring the pool down to its floor (16; 8 on a 32-bit build) while the
+    // flush parents it can have stay capped by cpus (pgc_max_flushers()), so a many-cpu host with a floor-sized
+    // pool is exposed as well. The rule the engine's work items should keep, and these two do not yet: no work
+    // item waits for another work item while it holds a pool thread.
     int libuv_worker_threads;                   // the pool's size, as the embedder set it; 0 = the engine's compiled
                                                 // default (16; 8 on a 32-bit build), which is then the number the
                                                 // embedder must have set UV_THREADPOOL_SIZE to
@@ -162,9 +166,15 @@ struct dbengine_config {
 struct dbengine_config dbengine_config_defaults(void);
 
 // One tier's configuration, handed to dbengine_tier_init(); the engine copies what it needs.
+// the longest dbfiles_path a tier takes: the engine appends the names of its datafiles and journals (and the journal
+// writer's temporary directory) to it in FILENAME_MAX-sized buffers, so a path that leaves them no room is refused
+// by dbengine_tier_init() (UV_ENAMETOOLONG) rather than silently truncated
+#define DBENGINE_DBFILES_PATH_MAX (FILENAME_MAX - 64)
+
 struct dbengine_tier_config {
     size_t tier;                                // 0 is the tier collectors write to; higher tiers aggregate the one below
-    const char *dbfiles_path;                   // directory of this tier's datafiles and journals
+    const char *dbfiles_path;                   // directory of this tier's datafiles and journals; at most
+                                                // DBENGINE_DBFILES_PATH_MAX characters
     unsigned disk_space_mb;                     // 0 = no disk quota
     time_t max_retention_s;                     // 0 = no time limit
     uint8_t page_type;                          // tier 0: DBENGINE_PAGE_TYPE_GORILLA_32BIT or

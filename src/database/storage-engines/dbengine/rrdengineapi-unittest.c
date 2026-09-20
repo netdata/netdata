@@ -174,6 +174,10 @@ int dbengine_null_engine_unittest(void) {
         fprintf(stderr, " >>> DBENGINE: no tier has a retention limit\n");
         errors++;
     }
+    if(dbengine_max_reserved_file_descriptors(NULL)) {
+        fprintf(stderr, " >>> DBENGINE: no engine has a file descriptor budget\n");
+        errors++;
+    }
     if(dbengine_collectors_running(NULL)) {
         fprintf(stderr, " >>> DBENGINE: no tier has collectors running\n");
         errors++;
@@ -317,8 +321,9 @@ static void engine_lifecycle_remove_dir(const char *dir);
 // The configuration surface an embedder that is not the daemon relies on: dbengine_config_defaults() is the
 // DBENGINE_CONFIG_DEFAULTS initialiser as a value; a zero max_reserved_file_descriptors resolves, at create, to a
 // quarter of the soft limit libnetdata read; a budget below one tier's reservation refuses the tier with UV_EMFILE,
-// nothing reserved and nothing written; a path that does not fit the tier is refused with UV_ENAMETOOLONG before
-// the budget is even looked at; a budget of exactly one tier's reservation brings the tier up
+// nothing reserved and nothing written; a path longer than DBENGINE_DBFILES_PATH_MAX is refused with
+// UV_ENAMETOOLONG before the budget is even looked at, whether or not it would fit the tier's buffer; a budget of
+// exactly one tier's reservation brings the tier up
 static int engine_config_unittest(const struct dbengine_config *cfg, const char *dir, const char *what) {
     int errors = 0;
 
@@ -365,9 +370,11 @@ static int engine_config_unittest(const struct dbengine_config *cfg, const char 
         fprintf(stderr, " >>> DBENGINE: %s: the engine with the zero budget did not come up\n", what);
         return errors + 1;
     }
-    if(engine->cfg.max_reserved_file_descriptors != (size_t)(rlimit_nofile.rlim_cur / 4)) {
-        fprintf(stderr, " >>> DBENGINE: %s: the zero budget resolved to %zu, not a quarter of the soft limit %zu\n",
-                what, engine->cfg.max_reserved_file_descriptors, (size_t)rlimit_nofile.rlim_cur);
+    if(engine->cfg.max_reserved_file_descriptors != (size_t)(rlimit_nofile.rlim_cur / 4) ||
+       dbengine_max_reserved_file_descriptors(engine) != engine->cfg.max_reserved_file_descriptors) {
+        fprintf(stderr, " >>> DBENGINE: %s: the zero budget resolved to %zu (reported %zu), not a quarter of the soft limit %zu\n",
+                what, engine->cfg.max_reserved_file_descriptors, dbengine_max_reserved_file_descriptors(engine),
+                (size_t)rlimit_nofile.rlim_cur);
         errors++;
     }
     dbengine_shutdown(engine);
@@ -406,21 +413,30 @@ static int engine_config_unittest(const struct dbengine_config *cfg, const char 
         errors++;
     }
 
-    // a path longer than the tier's buffer is refused before the budget: the same engine, still nothing reserved
+    // a path longer than DBENGINE_DBFILES_PATH_MAX is refused before the budget: the same engine, still nothing
+    // reserved; once with a path that overflows the tier's buffer, once with one that fits it but leaves no room
+    // for the names the engine appends
     char long_path[FILENAME_MAX + 64];
     memset(long_path, 'x', sizeof(long_path) - 1);
     long_path[0] = '/';
     long_path[sizeof(long_path) - 1] = '\0';
-    tc.dbfiles_path = long_path;
-    rc = dbengine_tier_init(engine, &tc);
-    if(rc != UV_ENAMETOOLONG) {
-        fprintf(stderr, " >>> DBENGINE: %s: an over-long path was not refused (returned %d)\n", what, rc);
-        errors++;
-    }
-    if(__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED) ||
-       dbengine_tier_is_active(dbengine_tier(engine, 0))) {
-        fprintf(stderr, " >>> DBENGINE: %s: the over-long path left file descriptors reserved or the tier up\n", what);
-        errors++;
+    const size_t long_lengths[] = { sizeof(long_path) - 1, DBENGINE_DBFILES_PATH_MAX + 1 };
+    for(size_t i = 0; i < _countof(long_lengths); i++) {
+        char saved = long_path[long_lengths[i]];
+        long_path[long_lengths[i]] = '\0';
+        tc.dbfiles_path = long_path;
+        rc = dbengine_tier_init(engine, &tc);
+        if(rc != UV_ENAMETOOLONG) {
+            fprintf(stderr, " >>> DBENGINE: %s: a path of %zu characters was not refused (returned %d)\n",
+                    what, long_lengths[i], rc);
+            errors++;
+        }
+        if(__atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED) ||
+           dbengine_tier_is_active(dbengine_tier(engine, 0))) {
+            fprintf(stderr, " >>> DBENGINE: %s: the over-long path left file descriptors reserved or the tier up\n", what);
+            errors++;
+        }
+        long_path[long_lengths[i]] = saved;
     }
     dbengine_shutdown(engine);
     if(dbengine_destroy(engine)) {
@@ -673,7 +689,7 @@ static void engine_lifecycle_remove_dir(const char *dir) {
 // differing configuration, comes up on the page allocators that already exist (the process-wide layer keeps its
 // settings, and logs that the new ones are ignored), runs a tier, and is destroyed the same way. The floors of the
 // caches and the NULL engine still hold between the two. Then two engines at once, each on a tier of its own,
-// destroyed in either order (engines_coexist()). Runs before the daemon's own engine, on four scratch directories
+// destroyed in either order (engines_coexist()). Runs before the daemon's own engine, on five scratch directories
 // next to scratch_dir (its name with -a to -e), which it removes; the probe directories engines_coexist() makes
 // next to two of them are removed by it.
 int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const char *scratch_dir) {

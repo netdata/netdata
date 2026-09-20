@@ -66,8 +66,6 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    RRDHOST *host = st->rrdhost;
-
     rrdset_flag_set(st, RRDSET_FLAG_COLLECTION_FINISHED);
 
     if(dimensions_too) {
