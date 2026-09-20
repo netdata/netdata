@@ -36,7 +36,7 @@ env:
   # A googletest binary whose filter matches nothing exits 0 while running no tests, so an exit code alone cannot
   # tell a passing suite from one that never ran. Every leg asserts the number of cases that actually reported a
   # result, and this is the floor it checks against. Raise it as the suite grows.
-  MIN_TEST_CASES: 18
+  MIN_TEST_CASES: 31
 
 jobs:
   unit-tests:
