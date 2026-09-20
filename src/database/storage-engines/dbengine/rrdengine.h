@@ -27,8 +27,6 @@
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
-#include <openssl/sha.h>
-#include <openssl/evp.h>
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
 
