@@ -103,12 +103,13 @@ jobs:
         run: |
           set -euo pipefail
           bin="$(find build -name dbengine-test -type f -executable | head -n 1)"
-          # The suite reaches the engine only through its public headers, so the engine's objects must resolve
-          # without anything from the daemon. A symbol from rrdhost, rrdset, pulse or the daemon's configuration
-          # here means the engine grew a dependency on its embedder.
-          if nm -u "$bin" | grep -qE '\b(rrdhost|rrdset|rrddim|pulse|netdata_conf|analytics)_[a-z_]+'; then
-            echo "::error::dbengine-test references daemon symbols"
-            nm -u "$bin" | grep -E '\b(rrdhost|rrdset|rrddim|pulse|netdata_conf|analytics)_[a-z_]+'
+          # Defined symbols, not undefined ones. An undefined daemon symbol cannot reach this step: it would have
+          # failed the link in the step above. Daemon code that did get linked in would be *defined* here, which is
+          # the case worth looking for - the engine having grown a dependency on its embedder, or daemon sources
+          # having been added to the target to make something compile.
+          if nm --defined-only "$bin" | grep -qE '\b(rrdhost|rrdset|rrddim|pulse|netdata_conf|analytics)_[a-z_]+'; then
+            echo "::error::dbengine-test contains daemon symbols"
+            nm --defined-only "$bin" | grep -E '\b(rrdhost|rrdset|rrddim|pulse|netdata_conf|analytics)_[a-z_]+'
             exit 1
           fi
 

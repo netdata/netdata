@@ -272,8 +272,8 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
 # Testing
 #
-# Developer-only. Builds the googletest-based test executables, which are EXCLUDE_FROM_ALL and have no install rule,
-# and fetches googletest to do it. Off by default: a normal build must neither reach the network nor gain a target.
+# Developer-only. Builds the googletest-based test executables, which have no install rule, and fetches googletest to
+# do it. Off by default: a normal build must neither reach the network nor gain a target.
 option(ENABLE_GTEST "Build the googletest-based test executables (developer-only, fetches googletest)" False)
 mark_as_advanced(ENABLE_GTEST)
 
@@ -3757,6 +3757,16 @@ if(ENABLE_DBENGINE)
                 src/database/storage-engines/dbengine/tests/internal_pgd.cc
                 src/database/storage-engines/dbengine/tests/internal_mrg.cc)
         target_link_libraries(dbengine-test PRIVATE dbengine GTest::gtest)
+
+        # The API tests are supposed to reach the engine only through its public headers, and nothing in the build
+        # can tell: libnetdata exports the whole src tree, so a private or daemon header compiles from there without
+        # complaint. The check runs as part of building the suite rather than only in CI, so that the developer who
+        # would add such an include is the one who hears about it.
+        add_custom_target(dbengine-test-includes
+                COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/database/storage-engines/dbengine/tests/check-public-includes.sh
+                COMMENT "Checking the dbengine API tests include only public headers"
+                VERBATIM)
+        add_dependencies(dbengine-test dbengine-test-includes)
 
         # Running the suite is a build target of its own rather than a test registration: this tree has no CTest
         # anywhere, and adding enable_testing() here would imply a harness that does not exist. USES_TERMINAL so the
