@@ -502,21 +502,22 @@ func TestCollectorRegistration(t *testing.T) {
 	creator := collectorapi.DefaultRegistry["smbios_memory"]
 	type registration struct {
 		Policy      collectorapi.InstancePolicy
-		Methods     []string
+		Methods     map[string]string // method id -> public Function name
 		UpdateEvery int
 	}
 	got := registration{
 		Policy:      creator.InstancePolicy,
+		Methods:     make(map[string]string),
 		UpdateEvery: New().UpdateEvery,
 	}
 	for _, method := range creator.SharedFunctions() {
-		got.Methods = append(got.Methods, method.ID)
+		got.Methods[method.ID] = funcapi.FunctionName("smbios_memory", method)
 	}
 	assert.Equal(
 		t,
 		registration{
 			Policy:      collectorapi.InstancePolicySingle,
-			Methods:     []string{"inventory"},
+			Methods:     map[string]string{"inventory": "smbios-memory-inventory"},
 			UpdateEvery: 60,
 		},
 		got,

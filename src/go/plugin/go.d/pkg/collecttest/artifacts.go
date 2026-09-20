@@ -157,8 +157,9 @@ type metadataDocument struct {
 		} `yaml:"metrics"`
 		Functions struct {
 			List []struct {
-				ID         string `yaml:"id"`
-				Parameters []struct {
+				ID           string `yaml:"id"`
+				FunctionName string `yaml:"function_name"`
+				Parameters   []struct {
 					ID      string `yaml:"id"`
 					Name    string `yaml:"name"`
 					Type    string `yaml:"type"`
@@ -229,7 +230,7 @@ func DecodeMetadataModule(metadataYAML []byte, moduleID string) (MetadataModule,
 		}
 	}
 	for _, function := range raw.Functions.List {
-		row := MetadataFunction{ID: function.ID}
+		row := MetadataFunction{ID: function.ID, FunctionName: function.FunctionName}
 		for _, parameter := range function.Parameters {
 			param := MetadataFunctionParameter{ID: parameter.ID, Name: parameter.Name, Type: parameter.Type}
 			for _, option := range parameter.Options {

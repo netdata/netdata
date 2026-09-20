@@ -163,6 +163,32 @@ func TestCheckMetadataFunctionsMatch(t *testing.T) {
 			jobSelectable: true,
 			wantErr:       "inventory: parameter __job not documented, but the framework adds it",
 		},
+		"default public name needs no function_name": {
+			documented: []MetadataFunction{testDocumentedFunction()},
+			implemented: []ImplementedFunction{func() ImplementedFunction {
+				f := testImplementedFunction()
+				f.PublicName = "app:inventory"
+				return f
+			}()},
+		},
+		"overridden public name must be documented": {
+			documented: []MetadataFunction{testDocumentedFunction()},
+			implemented: []ImplementedFunction{func() ImplementedFunction {
+				f := testImplementedFunction()
+				f.PublicName = "app-inventory"
+				return f
+			}()},
+			wantErr: `inventory: public name "app-inventory" is not the default, document it as function_name`,
+		},
+		"function_name drift": {
+			documented: documented(func(f *MetadataFunction) { f.FunctionName = "app-inv" }),
+			implemented: []ImplementedFunction{func() ImplementedFunction {
+				f := testImplementedFunction()
+				f.PublicName = "app-inventory"
+				return f
+			}()},
+			wantErr: `inventory: function_name "app-inv", public name "app-inventory"`,
+		},
 		"raw request skips columns": {
 			documented: documented(func(f *MetadataFunction) { f.Columns = nil }),
 			implemented: []ImplementedFunction{func() ImplementedFunction {
@@ -254,13 +280,17 @@ modules:
 	methods := []funcapi.FunctionConfig{{ID: "inventory"}}
 
 	require.NoError(t, CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: methods, Handler: handler}))
+	require.NoError(t, CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Module: "app", Methods: methods, Handler: handler}))
+	flat := []funcapi.FunctionConfig{{ID: "inventory", FunctionName: "app-inventory"}}
+	err := CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Module: "app", Methods: flat, Handler: handler})
+	require.ErrorContains(t, err, "document it as function_name")
 
 	// Static FunctionConfig parameters count when the handler declares none, as in the framework.
 	static := []funcapi.FunctionConfig{{ID: "inventory", RequiredParams: testImplementedFunction().Parameters}}
 	noDynamic := handler
 	noDynamic.params = nil
 	require.NoError(t, CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: static, Handler: noDynamic}))
-	err := CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: methods, Handler: noDynamic})
+	err = CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: methods, Handler: noDynamic})
 	require.ErrorContains(t, err, "inventory: parameter kind documented but not declared")
 
 	extra := append(methods, funcapi.FunctionConfig{ID: "logs"})

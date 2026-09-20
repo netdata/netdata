@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -42,11 +43,13 @@ type MetadataFunctionParameter struct {
 	Options []MetadataFunctionOption
 }
 
-// MetadataFunction is one documented Function.
+// MetadataFunction is one documented Function. FunctionName is the documented
+// public name; empty means the default "<module>:<id>".
 type MetadataFunction struct {
-	ID         string
-	Parameters []MetadataFunctionParameter
-	Columns    []MetadataFunctionColumn
+	ID           string
+	FunctionName string
+	Parameters   []MetadataFunctionParameter
+	Columns      []MetadataFunctionColumn
 }
 
 // ImplementedFunction is the shape of one Function as the collector implements
@@ -56,6 +59,7 @@ type MetadataFunction struct {
 // response contract, so its columns are not compared.
 type ImplementedFunction struct {
 	ID         string
+	PublicName string // as funcapi.FunctionName resolves it; empty skips the name comparison
 	Parameters []funcapi.ParamConfig
 	Columns    []MetadataFunctionColumn
 	RawRequest bool
@@ -126,6 +130,7 @@ func CheckMetadataFunctionsMatch(documented []MetadataFunction, implemented []Im
 			problems = append(problems, fmt.Errorf("%s: documented but not implemented", function.ID))
 			continue
 		}
+		problems = append(problems, checkFunctionName(function, actual)...)
 		problems = append(problems, checkFunctionParameters(function, actual, jobSelectable)...)
 		problems = append(problems, checkFunctionColumns(function, actual)...)
 	}
@@ -135,6 +140,25 @@ func CheckMetadataFunctionsMatch(documented []MetadataFunction, implemented []Im
 		}
 	}
 	return errors.Join(sortedErrors(problems)...)
+}
+
+// checkFunctionName compares the documented public name with the resolved one.
+// A documented name is required only when the collector overrides the default.
+func checkFunctionName(documented MetadataFunction, actual ImplementedFunction) []error {
+	if actual.PublicName == "" {
+		return nil
+	}
+	module, _, _ := strings.Cut(actual.PublicName, ":")
+	isDefault := actual.PublicName == module+":"+actual.ID
+	switch {
+	case documented.FunctionName == "" && isDefault:
+		return nil
+	case documented.FunctionName == "" && !isDefault:
+		return []error{fmt.Errorf("%s: public name %q is not the default, document it as function_name", documented.ID, actual.PublicName)}
+	case documented.FunctionName != actual.PublicName:
+		return []error{fmt.Errorf("%s: function_name %q, public name %q", documented.ID, documented.FunctionName, actual.PublicName)}
+	}
+	return nil
 }
 
 func checkFunctionParameters(documented MetadataFunction, actual ImplementedFunction, jobSelectable bool) []error {
@@ -209,6 +233,9 @@ type MetadataFunctionsCheck struct {
 	Context context.Context
 	// ModuleID selects the module by meta.id in a multi-module metadata.yaml.
 	ModuleID string
+	// Module is the collector's registered module name, used to resolve each
+	// method's public Function name; empty skips the name comparison.
+	Module string
 	// Methods are the Functions the collector registers (Creator.SharedFunctions or InstanceFunctions).
 	Methods []funcapi.FunctionConfig
 	// Handler declares the parameters and serves the table of every method.
@@ -248,6 +275,9 @@ func CheckMetadataDocumentsFunctions(metadataYAML []byte, check MetadataFunction
 // static parameters and are not asked for a table.
 func implementedFunction(ctx context.Context, method funcapi.FunctionConfig, check MetadataFunctionsCheck) (ImplementedFunction, error) {
 	function := ImplementedFunction{ID: method.ID, Parameters: method.RequiredParams, RawRequest: method.RawRequest}
+	if check.Module != "" {
+		function.PublicName = funcapi.FunctionName(check.Module, method)
+	}
 	if method.RawRequest {
 		return function, nil
 	}

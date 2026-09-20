@@ -240,6 +240,7 @@ modules:
         firmware read and does not change the baseline.
       list:
         - id: inventory
+          function_name: smbios-memory-inventory
           name: Memory Inventory
           description: Inspect populated and empty physical system-memory slots alongside their accepted capacities and comparison status.
           parameters: []

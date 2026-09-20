@@ -78,6 +78,10 @@ Prerequisites (one h5 per entry, or "No additional configuration is required."),
   component to match the UI's display logic. Do not remove it to match the raw registered/API identifier. Keep
   `meta.module_name` and Function `id` unchanged in metadata; API invocation examples MUST use the exact registered
   identifier. Display formatting does not rename the callable Function.
+- A collector that overrides the public name (`funcapi.FunctionConfig.FunctionName`, for example a flat
+  `smbios-memory-inventory` so the UI lists it with the host's system Functions) MUST document it as
+  `functions.list[].function_name`; the template then renders that name instead of `<module>:<id>`. The `id` stays the
+  method id. `collecttest.AssertMetadataDocumentsFunctions` with `Module` set enforces both.
 - Every Function the collector registers has an entry, and every entry has a Function in the code. `id`, the
   parameters (name, type, required, default, options), and the return columns (name, type, unit, visibility) mirror
   the implementation verbatim; they are drift checks, not prose. go.d collectors enforce this with

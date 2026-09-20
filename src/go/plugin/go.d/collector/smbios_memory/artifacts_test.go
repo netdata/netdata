@@ -74,6 +74,7 @@ func TestMetadataDocumentsFunctions(t *testing.T) {
 	cycle(t, c)
 	collecttest.AssertMetadataDocumentsFunctions(t, metadata, collecttest.MetadataFunctionsCheck{
 		Context: t.Context(),
+		Module:  "smbios_memory",
 		Methods: smbiosMethods(),
 		Handler: c.funcRouter,
 	})

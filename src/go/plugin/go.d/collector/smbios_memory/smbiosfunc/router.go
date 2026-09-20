@@ -15,6 +15,10 @@ import (
 
 const methodInventory = "inventory"
 
+// FunctionName is the public Function name. It is flat (no "<module>:" prefix)
+// so the UI lists it with the host's other system Functions.
+const FunctionName = "smbios-memory-inventory"
+
 // eccAssociation is reported for every row: no verified mapping from EDAC
 // ranks to physical devices is available.
 const eccAssociation = "unavailable"
@@ -34,6 +38,7 @@ func NewRouter(deps Deps) funcapi.MethodHandler {
 func Methods(updateEvery int) []funcapi.FunctionConfig {
 	return []funcapi.FunctionConfig{{
 		ID:           methodInventory,
+		FunctionName: FunctionName,
 		Name:         "Memory Inventory",
 		UpdateEvery:  updateEvery,
 		Help:         "Boot-time SMBIOS physical system memory inventory and accepted baseline comparison",
