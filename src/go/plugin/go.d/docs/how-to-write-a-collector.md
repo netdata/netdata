@@ -152,6 +152,12 @@ only after the job starts, never during autodetection or DynCfg `test`, cancels 
 `Cleanup()`. The implementation MUST return promptly after `ctx.Done()` and SHOULD make in-flight I/O cancellation-aware
 where the underlying library allows it.
 
+V2 collectors that need the Agent's existing first-sample storage behavior MAY set `StoreFirst: true` directly in
+their `collectorapi.Creator` registration. This fixed collector-wide setting applies to every collector chart,
+including automatic charts and later redefinitions. It defaults to false and does not change framework self-metrics
+or preserve counter baselines across restarts. See
+[first-sample storage](/src/go/plugin/framework/jobruntime/README.md#first-sample-storage).
+
 `Init()` validates config, prepares matchers/clients, and initializes persistent state. Explicit setup details SHOULD
 live in helper methods, preferably in `init.go`, so the public method reads as the lifecycle sequence. `Check()` MUST be
 a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run the real write path through `metrix`.

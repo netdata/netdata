@@ -26,6 +26,18 @@ retain that inventory; the next nonempty admission on a different host replaces 
 Host changes stage materialized reset in the plan attempt. Rejected output preserves the old host's state, and old-host
 retirements are never sent to the new host. Function-only jobs do not require a chart provider.
 
+## First-sample storage
+
+A V2 collector MAY set `StoreFirst: true` in its `collectorapi.Creator` registration to enable the Agent's existing
+`store_first` chart option. The factory copies this setting into `JobV2Config.StoreFirst` at construction, fixing it
+for the job lifetime. It defaults to `false`, preserving the Agent's default behavior. This is collector-wide
+registration metadata, not a job configuration, metric or chart-template option.
+
+The option applies to all collector-produced charts, authored or automatic, in every host scope. It accompanies every
+`CHART` definition, including later dimensions, label updates, obsoletion and cleanup: the Agent clears the option
+when a definition omits it. Framework collection-status/duration charts retain their own defaults. This option does
+not preserve counter baselines across a collector restart or supply custom first-interval timing.
+
 ## Per-job collection charts
 
 Both runtimes own two self-monitoring charts. They MUST emit them on the local Agent host (`HOST ''`), outside the
