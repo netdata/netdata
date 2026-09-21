@@ -179,18 +179,8 @@ func (f *funcErrorInfo) MethodParams(ctx context.Context, method string) ([]func
 }
 
 func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.functionDB == nil {
-		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-	}
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
-	defer cancel()
-	if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
-		if response := mssqlFunctionContextError(queryCtx, err, f.router.collector.errorInfoTimeout(), "error_info"); response != nil {
-			return response
-		}
-		return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
-	}
-	return f.collectData(queryCtx)
+	c := f.router.collector
+	return c.runFunction(ctx, c.errorInfoTimeout(), f.collectData)
 }
 
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
@@ -204,7 +194,7 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 	limit := f.router.collector.topQueriesLimit()
 	status, source, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err, f.router.collector.errorInfoTimeout(), "error_info"); response != nil {
+		if response := f.router.collector.errorInfoTimeout().contextError(ctx, err); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -613,9 +603,12 @@ func shouldFallbackErrorInfo(err error) bool {
 }
 
 func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlXEventReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
-	query := queryMSSQLErrorInfoEventFile
-	args := append(target.fileQueryArgs("error_reported"), sql.Named("limit", limit))
-	if target.filePath == "" {
+	var query string
+	var args []any
+	if target.filePath != "" {
+		query = queryMSSQLErrorInfoEventFile
+		args = append(target.fileQueryArgs("error_reported"), sql.Named("limit", limit))
+	} else {
 		query = queryMSSQLErrorInfoRingBuffer
 		if c.isAzureSQLDatabase() {
 			query = queryMSSQLErrorInfoDatabaseRingBuffer

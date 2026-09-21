@@ -221,7 +221,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	}
 	switch method {
 	case topQueriesMethodID:
-		paramsCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+		paramsCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout().value)
 		defer cancel()
 		if _, err := f.router.collector.ensureEngineEdition(paramsCtx); err != nil {
 			// Handle owns the final 499/500/504 response classification.
@@ -235,20 +235,12 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.functionDB == nil {
-		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-	}
 	switch method {
 	case topQueriesMethodID:
-		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
-		defer cancel()
-		if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
-			if response := mssqlFunctionContextError(queryCtx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
-				return response
-			}
-			return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
-		}
-		return f.collectData(queryCtx, params.Column(topQueriesParamSort))
+		c := f.router.collector
+		return c.runFunction(ctx, c.topQueriesTimeout(), func(queryCtx context.Context) *funcapi.FunctionResponse {
+			return f.collectData(queryCtx, params.Column(topQueriesParamSort))
+		})
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
@@ -284,9 +276,10 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	if f.router.collector.Functions.TopQueries.Disabled {
 		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
 	}
+	timeout := f.router.collector.topQueriesTimeout()
 	source, availableCols, err := f.resolveTopQueriesSource(ctx)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
+		if response := timeout.contextError(ctx, err); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -314,7 +307,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	rows, err := f.router.collector.functionDB.QueryContext(ctx, query)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
+		if response := timeout.contextError(ctx, err); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -333,7 +326,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	data, err := f.scanDynamicRows(rows, cols)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
+		if response := timeout.contextError(ctx, err); response != nil {
 			return response
 		}
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
@@ -347,7 +340,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	if source == topQueriesSourceQueryStore {
 		planOpsByDB = f.router.collector.collectMSSQLPlanOps(ctx, data, cols)
 	}
-	if response := mssqlFunctionContextError(ctx, ctx.Err(), f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
+	if response := timeout.contextError(ctx, ctx.Err()); response != nil {
 		return response
 	}
 	extraCols := []topQueriesColumn{topQueriesSourceColumn(source)}

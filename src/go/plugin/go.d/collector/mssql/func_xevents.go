@@ -12,8 +12,19 @@ import (
 // mssqlXEventReadTarget identifies an Extended Events session target.
 type mssqlXEventReadTarget struct {
 	// filePath is the event_file read pattern. Empty when reading the ring buffer.
-	filePath   string
+	filePath string
+	// filePrefix is the exact generated-file prefix that queryMSSQLXEventFileEvents uses to
+	// exclude other sessions whose configured filename shares this one's wildcard match.
 	filePrefix string
+}
+
+// fileQueryArgs binds the parameters of queryMSSQLXEventFileEvents for one event type.
+func (t mssqlXEventReadTarget) fileQueryArgs(eventName string) []any {
+	return []any{
+		sql.Named("filePath", t.filePath),
+		sql.Named("filePrefix", t.filePrefix),
+		sql.Named("eventName", eventName),
+	}
 }
 
 // resolveMSSQLXEventReadTarget locates the Extended Events target for a session, reporting
@@ -92,12 +103,4 @@ func (c *Collector) mssqlRingBufferAvailable(ctx context.Context, sessionName st
 	var count int
 	err := c.functionDB.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
 	return count > 0, err
-}
-
-func (t mssqlXEventReadTarget) fileQueryArgs(eventName string) []any {
-	return []any{
-		sql.Named("filePath", t.filePath),
-		sql.Named("filePrefix", t.filePrefix),
-		sql.Named("eventName", eventName),
-	}
 }

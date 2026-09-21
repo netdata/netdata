@@ -134,8 +134,8 @@ func (c *Collector) openConnection() (*sql.DB, error) {
 	return db, nil
 }
 
-// Construct the pool without dialing. Function requests establish connections under
-// their own contexts, independently of the metrics timeout and connection.
+// newConnectionPool configures a single-connection pool without dialing. Metrics ping it
+// under the metrics timeout; Functions connect lazily under their own request contexts.
 func (c *Collector) newConnectionPool() (*sql.DB, error) {
 	driverName, dsn, err := c.resolveConnectionParams()
 	if err != nil {

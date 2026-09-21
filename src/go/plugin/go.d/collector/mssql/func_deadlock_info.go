@@ -28,7 +28,10 @@ const (
 
 const deadlockInfoMethodID = "deadlock-info"
 
-var errDeadlockEventFileUnavailable = errors.New("system_health event_file target unavailable")
+var (
+	errDeadlockEventFileUnavailable  = errors.New("system_health event_file target unavailable")
+	errDeadlockRingBufferUnavailable = errors.New("system_health ring_buffer target unavailable")
+)
 
 const deadlockInfoAzureSQLDatabaseUnavailable = "deadlock-info is unavailable on Azure SQL Database because it has no built-in system_health Extended Events session"
 
@@ -262,18 +265,8 @@ func (f *funcDeadlockInfo) MethodParams(ctx context.Context, method string) ([]f
 }
 
 func (f *funcDeadlockInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.functionDB == nil {
-		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-	}
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.deadlockInfoTimeout())
-	defer cancel()
-	if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
-		if response := mssqlFunctionContextError(queryCtx, err, f.router.collector.deadlockInfoTimeout(), "deadlock_info"); response != nil {
-			return response
-		}
-		return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
-	}
-	return f.collectData(queryCtx)
+	c := f.router.collector
+	return c.runFunction(ctx, c.deadlockInfoTimeout(), f.collectData)
 }
 
 func (f *funcDeadlockInfo) Cleanup(ctx context.Context) {}
@@ -286,9 +279,10 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 		return funcapi.UnavailableResponse(deadlockInfoAzureSQLDatabaseUnavailable)
 	}
 
+	timeout := f.router.collector.deadlockInfoTimeout()
 	deadlockTime, deadlockXML, source, err := f.queryLatestDeadlock(ctx)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err, f.router.collector.deadlockInfoTimeout(), "deadlock_info"); response != nil {
+		if response := timeout.contextError(ctx, err); response != nil {
 			return f.buildResponse(response.Status, response.Message, nil)
 		}
 		if isDeadlockPermissionError(err) {
@@ -299,12 +293,12 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 	}
 
 	if deadlockXML == "" {
-		return f.buildResponse(200, fmt.Sprintf("no deadlock found in system_health %s target; retained events may have aged out", source), nil)
+		return f.buildResponse(200, noDeadlockFoundMessage(source), nil)
 	}
 
 	dbNames, dbErr := f.queryDatabaseNames(ctx)
 	if dbErr != nil {
-		if response := mssqlFunctionContextError(ctx, dbErr, f.router.collector.deadlockInfoTimeout(), "deadlock_info"); response != nil {
+		if response := timeout.contextError(ctx, dbErr); response != nil {
 			return f.buildResponse(response.Status, response.Message, nil)
 		}
 		f.router.collector.Debugf("deadlock-info: database name mapping failed: %v", dbErr)
@@ -318,7 +312,7 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 	}
 
 	if !parseRes.found {
-		return f.buildResponse(200, fmt.Sprintf("no deadlock found in system_health %s target; retained events may have aged out", source), nil)
+		return f.buildResponse(200, noDeadlockFoundMessage(source), nil)
 	}
 
 	deadlockID := generateDeadlockID(parseRes.deadlockTime)
@@ -353,52 +347,63 @@ func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []
 	}
 }
 
+func noDeadlockFoundMessage(source string) string {
+	return fmt.Sprintf("no deadlock found in system_health %s target; retained events may have aged out", source)
+}
+
+// queryLatestDeadlock returns the newest xml_deadlock_report and the system_health target
+// it was read from. An empty graph with a nil error means the target held no deadlock.
 func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, string, string, error) {
 	c := f.router.collector
 	var deadlockTime sql.NullTime
 	var deadlockXML sql.NullString
+
 	readRingBuffer := func() error {
 		available, err := c.mssqlRingBufferAvailable(ctx, "system_health")
 		if err != nil {
 			return err
 		}
 		if !available {
-			return errors.New("system_health ring_buffer target unavailable")
+			return errDeadlockRingBufferUnavailable
 		}
 		return c.functionDB.QueryRowContext(ctx, querySystemHealthLatestDeadlockRingBuffer).Scan(&deadlockTime, &deadlockXML)
 	}
+	readEventFile := func() error {
+		target, available, err := c.resolveMSSQLXEventReadTarget(ctx, "system_health", false)
+		if err != nil {
+			return err
+		}
+		if !available {
+			return errDeadlockEventFileUnavailable
+		}
+		args := target.fileQueryArgs("xml_deadlock_report")
+		row := c.functionDB.QueryRowContext(ctx, querySystemHealthLatestDeadlockEventFile, args...)
+		return row.Scan(&deadlockTime, &deadlockXML)
+	}
 
+	source := deadlockSourceRingBuffer
 	var err error
-	source := deadlockSourceEventFile
 	if c.Functions.DeadlockInfo.UseRingBuffer {
-		source = deadlockSourceRingBuffer
 		err = readRingBuffer()
 	} else {
-		target, available, targetErr := c.resolveMSSQLXEventReadTarget(ctx, "system_health", false)
-		if targetErr != nil {
-			err = targetErr
-		} else if !available {
-			err = errDeadlockEventFileUnavailable
-		} else {
-			err = c.functionDB.QueryRowContext(ctx, querySystemHealthLatestDeadlockEventFile, target.fileQueryArgs("xml_deadlock_report")...).Scan(&deadlockTime, &deadlockXML)
-		}
+		source = deadlockSourceEventFile
+		err = readEventFile()
 		if err != nil && shouldFallbackDeadlockEventFile(err) {
 			// Retry unavailable targets and file read errors, not an available but empty target.
 			source = deadlockSourceRingBuffer
 			err = readRingBuffer()
 		}
 	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, "", source, nil
+	}
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return time.Time{}, "", source, nil
-		}
 		return time.Time{}, "", source, err
 	}
 
 	if !deadlockXML.Valid || strings.TrimSpace(deadlockXML.String) == "" {
 		return time.Time{}, "", source, nil
 	}
-
 	if deadlockTime.Valid {
 		return deadlockTime.Time, deadlockXML.String, source, nil
 	}

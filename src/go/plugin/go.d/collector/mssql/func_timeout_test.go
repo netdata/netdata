@@ -21,18 +21,18 @@ func TestConfig_FunctionTimeouts(t *testing.T) {
 		c := Config{
 			Timeout: confopt.Duration(metricsTimeout),
 		}
-		assert.Equal(t, 30*time.Second, c.topQueriesTimeout())
-		assert.Equal(t, 30*time.Second, c.deadlockInfoTimeout())
-		assert.Equal(t, 30*time.Second, c.errorInfoTimeout())
+		assert.Equal(t, 30*time.Second, c.topQueriesTimeout().value)
+		assert.Equal(t, 30*time.Second, c.deadlockInfoTimeout().value)
+		assert.Equal(t, 30*time.Second, c.errorInfoTimeout().value)
 	}
 
 	c := New()
 	c.Functions.TopQueries.Timeout = confopt.Duration(11 * time.Second)
 	c.Functions.DeadlockInfo.Timeout = confopt.Duration(12 * time.Second)
 	c.Functions.ErrorInfo.Timeout = confopt.Duration(13 * time.Second)
-	assert.Equal(t, 11*time.Second, c.topQueriesTimeout())
-	assert.Equal(t, 12*time.Second, c.deadlockInfoTimeout())
-	assert.Equal(t, 13*time.Second, c.errorInfoTimeout())
+	assert.Equal(t, 11*time.Second, c.topQueriesTimeout().value)
+	assert.Equal(t, 12*time.Second, c.deadlockInfoTimeout().value)
+	assert.Equal(t, 13*time.Second, c.errorInfoTimeout().value)
 }
 
 func TestMSSQLFunctions_TimeoutAndCancellation(t *testing.T) {
