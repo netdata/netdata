@@ -243,7 +243,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 		defer cancel()
 		if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
-			if response := mssqlFunctionContextError(queryCtx, err); response != nil {
+			if response := mssqlFunctionContextError(queryCtx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 				return response
 			}
 			return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
@@ -286,7 +286,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	}
 	source, availableCols, err := f.resolveTopQueriesSource(ctx)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -314,7 +314,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	rows, err := f.router.collector.db.QueryContext(ctx, query)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -333,7 +333,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	data, err := f.scanDynamicRows(rows, cols)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 			return response
 		}
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
@@ -347,7 +347,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	if source == topQueriesSourceQueryStore {
 		planOpsByDB = f.router.collector.collectMSSQLPlanOps(ctx, data, cols)
 	}
-	if response := mssqlFunctionContextError(ctx, ctx.Err()); response != nil {
+	if response := mssqlFunctionContextError(ctx, ctx.Err(), f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 		return response
 	}
 	extraCols := []topQueriesColumn{topQueriesSourceColumn(source)}

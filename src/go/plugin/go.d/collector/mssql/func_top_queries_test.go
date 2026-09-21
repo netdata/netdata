@@ -218,7 +218,7 @@ func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 			AddRow("0x1122334455667788", "SELECT 1", "appdb", 7, 42.0, 6.0))
 	mock.ExpectQuery("server_event_session_fields").WithArgs("netdata_errors").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("netdata_errors.xel"))
-	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", 500).
+	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", "error_reported", 500).
 		WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 
 	c := New()

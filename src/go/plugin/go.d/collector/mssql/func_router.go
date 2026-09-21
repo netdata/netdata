@@ -4,17 +4,17 @@ package mssql
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func mssqlFunctionContextError(ctx context.Context, err error) *funcapi.FunctionResponse {
+func mssqlFunctionContextError(ctx context.Context, err error, timeout time.Duration, functionName string) *funcapi.FunctionResponse {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return funcapi.ErrorResponse(504, "query timed out")
+		return funcapi.ErrorResponse(504, "%s query timed out; Function timeout is %s (functions.%s.timeout), but the request deadline may be shorter", functionName, timeout, functionName)
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 		return funcapi.ErrorResponse(499, "query canceled")
@@ -87,15 +87,4 @@ func mssqlFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 		return nil
 	}
 	return c.funcRouter
-}
-
-// The target query joins live sessions, so it also excludes stopped sessions.
-func (c *Collector) mssqlRingBufferAvailable(ctx context.Context, sessionName string) (bool, error) {
-	query := queryMSSQLErrorSessionHasRingBuffer
-	if c.isAzureSQLDatabase() {
-		query = queryMSSQLErrorDatabaseSessionHasRingBuffer
-	}
-	var count int
-	err := c.db.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
-	return count > 0, err
 }

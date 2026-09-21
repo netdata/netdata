@@ -189,7 +189,7 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
 	defer cancel()
 	if _, err := f.router.collector.ensureEngineEdition(queryCtx); err != nil {
-		if response := mssqlFunctionContextError(queryCtx, err); response != nil {
+		if response := mssqlFunctionContextError(queryCtx, err, f.router.collector.errorInfoTimeout(), "error_info"); response != nil {
 			return response
 		}
 		return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
@@ -208,7 +208,7 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 	limit := f.router.collector.topQueriesLimit()
 	status, source, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
 	if err != nil {
-		if response := mssqlFunctionContextError(ctx, err); response != nil {
+		if response := mssqlFunctionContextError(ctx, err, f.router.collector.errorInfoTimeout(), "error_info"); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
@@ -569,7 +569,7 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 		limit = 500
 	}
 
-	target, available, err := c.resolveMSSQLErrorReadTarget(ctx, sessionName, c.Functions.ErrorInfo.UseRingBuffer)
+	target, available, err := c.resolveMSSQLXEventReadTarget(ctx, sessionName, c.Functions.ErrorInfo.UseRingBuffer)
 	if err != nil {
 		return mssqlErrorAttrNotEnabled, "", nil, err
 	}
@@ -588,7 +588,7 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 
 func (c *Collector) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, limit int) (string, string, []mssqlErrorRow, error) {
 	if !c.Functions.ErrorInfo.UseRingBuffer {
-		target, available, err := c.resolveMSSQLErrorReadTarget(ctx, "system_health", false)
+		target, available, err := c.resolveMSSQLXEventReadTarget(ctx, "system_health", false)
 		if err != nil && !shouldFallbackErrorInfo(err) {
 			return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
 		}
@@ -600,7 +600,7 @@ func (c *Collector) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, lim
 		}
 	}
 
-	target, available, err := c.resolveMSSQLErrorReadTarget(ctx, "system_health", true)
+	target, available, err := c.resolveMSSQLXEventReadTarget(ctx, "system_health", true)
 	if err != nil {
 		return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
 	}
@@ -616,9 +616,9 @@ func shouldFallbackErrorInfo(err error) bool {
 		!isDeadlockPermissionError(err)
 }
 
-func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlErrorReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
+func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlXEventReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
 	query := queryMSSQLErrorInfoEventFile
-	args := []any{sql.Named("filePath", target.filePath), sql.Named("filePrefix", target.filePrefix), sql.Named("limit", limit)}
+	args := append(target.fileQueryArgs("error_reported"), sql.Named("limit", limit))
 	if target.filePath == "" {
 		query = queryMSSQLErrorInfoRingBuffer
 		if c.isAzureSQLDatabase() {
@@ -671,70 +671,6 @@ func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target ms
 	}
 
 	return mssqlErrorAttrEnabled, source, results, nil
-}
-
-// mssqlErrorReadTarget says where error_reported events should be read from.
-type mssqlErrorReadTarget struct {
-	// filePath is the event_file read pattern. Empty when reading the ring buffer.
-	filePath   string
-	filePrefix string
-}
-
-// resolveMSSQLErrorReadTarget locates the Extended Events target for a session, reporting
-// false when the session or the requested target does not exist.
-//
-// For the event_file target the on-disk name is read from the catalog rather than derived
-// from the session name: the filename is operator-chosen and the two frequently differ.
-// The ring_buffer target only exists while the session is running, so that path still
-// goes through the runtime DMVs.
-func (c *Collector) resolveMSSQLErrorReadTarget(ctx context.Context, sessionName string, useRingBuffer bool) (mssqlErrorReadTarget, bool, error) {
-	if !useRingBuffer {
-		query := queryMSSQLErrorSessionEventFilePath
-		if c.isAzureSQLDatabase() {
-			query = queryMSSQLErrorDatabaseSessionEventFilePath
-		}
-		var configured sql.NullString
-		err := c.db.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&configured)
-		if errors.Is(err, sql.ErrNoRows) {
-			return mssqlErrorReadTarget{}, false, nil
-		}
-		if err != nil {
-			return mssqlErrorReadTarget{}, false, err
-		}
-		target := eventFileReadTarget(configured.String)
-		if target.filePath == "" {
-			return mssqlErrorReadTarget{}, false, nil
-		}
-		return target, true, nil
-	}
-
-	available, err := c.mssqlRingBufferAvailable(ctx, sessionName)
-	return mssqlErrorReadTarget{}, available, err
-}
-
-// eventFileReadTarget turns the configured event_file filename into the read path and
-// exact generated-file prefix. Local files use a wildcard; Azure Storage uses the
-// wildcard-free blob prefix required by sys.fn_xe_file_target_read_file.
-func eventFileReadTarget(configured string) mssqlErrorReadTarget {
-	path := strings.TrimSpace(configured)
-	if path == "" {
-		return mssqlErrorReadTarget{}
-	}
-	if strings.HasSuffix(strings.ToLower(path), ".xel") {
-		path = path[:len(path)-len(".xel")]
-	}
-
-	prefix := path + "_0_"
-	base := strings.ReplaceAll(path, `\`, "/")
-	if idx := strings.LastIndex(base, "/"); idx >= 0 {
-		base = base[idx+1:]
-	}
-	filePrefix := base + "_0_"
-	lower := strings.ToLower(path)
-	if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
-		return mssqlErrorReadTarget{filePath: prefix, filePrefix: filePrefix}
-	}
-	return mssqlErrorReadTarget{filePath: prefix + "*.xel", filePrefix: filePrefix}
 }
 
 // mssqlQueryHashToHex converts the unsigned-64-bit decimal rendering that Extended Events
