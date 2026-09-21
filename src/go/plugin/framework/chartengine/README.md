@@ -358,6 +358,9 @@ name.
     - a synthetic reserved field label (`measure_field=<field>`)
 - the synthetic `measure_field` label is the authoritative field-identity channel; the per-field metric-name suffix remains for `MetricMeta(name)` compatibility
 - gauge-like `MeasureSet` fields autogen with absolute algorithm behavior; counter-like `MeasureSet` fields autogen with incremental algorithm behavior
+- A snapshot gauge field carrying NaN is observed but unavailable: it keeps its dimension alive and emits a gap.
+  An all-NaN family still creates its chart and declared dimensions. Omitting the family follows normal lifecycle
+  expiry instead. The write/read contract is in [metrix field availability](../../../pkg/metrix/README.md#field-availability).
 
 ### Reserved Flattened Label Keys
 

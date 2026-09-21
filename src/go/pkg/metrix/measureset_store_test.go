@@ -469,6 +469,6 @@ func mustMeasureSet(t *testing.T, r Reader, name string, labels Labels, want []S
 	require.True(t, ok, "expected measureset for %s", name)
 	require.Len(t, got.Values, len(want), "unexpected measureset size for %s", name)
 	for i, w := range want {
-		require.Equal(t, w, got.Values[i], "unexpected measureset value %d for %s", i, name)
+		assertMeasureSetSample(t, w, got.Values[i])
 	}
 }
