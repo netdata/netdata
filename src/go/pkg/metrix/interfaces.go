@@ -56,6 +56,8 @@ type Reader interface {
 	Histogram(name string, labels Labels) (HistogramPoint, bool)
 	Summary(name string, labels Labels) (SummaryPoint, bool)
 	StateSet(name string, labels Labels) (StateSetPoint, bool)
+	// MeasureSet returns the full declared point. For snapshot gauges, NaN marks
+	// unavailable fields; the bool reports family presence, including all-NaN points.
 	MeasureSet(name string, labels Labels) (MeasureSetPoint, bool)
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
 	// MetricMeta resolves metadata by metric name in the active reader view and
@@ -275,7 +277,11 @@ type StateSetInstrument interface {
 }
 
 type SnapshotMeasureSetGauge interface {
+	// ObservePoint replaces the full snapshot in declared field order. NaN means
+	// unavailable; infinity and a mismatched field count panic.
 	ObservePoint(p MeasureSetPoint, labels ...LabelSet)
+	// ObserveFields requires exactly the declared keys, including unavailable
+	// fields with NaN values. Missing/unknown keys and infinity panic.
 	ObserveFields(fields map[string]SampleValue, labels ...LabelSet)
 }
 
