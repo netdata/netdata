@@ -116,7 +116,28 @@ TEST_F(ScaleRestartTest, WrittenDataSurvivesARestartAndIsReadFromDisk) {
         expect_every_point(metrics[m], m, base, priorities[m]);
     }
 
-    const struct dbengine_cache_efficiency_stats after_cold = efficiency();
+    // A query returns as soon as its pages are published; the loader counts them as loaded a moment later, on its
+    // own thread, so a sample taken the instant the last query returned can miss the last increment. Sampled once
+    // every page the planner scheduled for loading is accounted for, from disk, the extent cache or a cache hit
+    // while inserting, which is bounded by the loads themselves.
+    struct dbengine_cache_efficiency_stats after_cold = efficiency();
+    for (int i = 0; i < 1000; i++) {
+        const size_t planned = after_cold.pages_to_load_from_disk - after_load.pages_to_load_from_disk;
+        const size_t loaded = (after_cold.pages_data_source_disk - after_load.pages_data_source_disk) +
+                              (after_cold.pages_data_source_extent_cache - after_load.pages_data_source_extent_cache) +
+                              (after_cold.pages_load_ok_loaded_but_cache_hit_while_inserting -
+                               after_load.pages_load_ok_loaded_but_cache_hit_while_inserting);
+        if (loaded >= planned)
+            break;
+        sleep_usec(1000);
+        after_cold = efficiency();
+    }
+    EXPECT_GE((after_cold.pages_data_source_disk - after_load.pages_data_source_disk) +
+                  (after_cold.pages_data_source_extent_cache - after_load.pages_data_source_extent_cache) +
+                  (after_cold.pages_load_ok_loaded_but_cache_hit_while_inserting -
+                   after_load.pages_load_ok_loaded_but_cache_hit_while_inserting),
+              after_cold.pages_to_load_from_disk - after_load.pages_to_load_from_disk)
+        << "not every page the planner scheduled was loaded within a second";
 
     // Each route was taken exactly once: a route counter moves only for a query with pages to load from disk, and
     // each of the three queries was the first to touch its metric since the restart.

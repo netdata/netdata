@@ -33,11 +33,21 @@ protected:
         return tc;
     }
 
-    // Brings a higher tier up on the running engine and hands back its storage instance.
+    // Brings a higher tier up on the running engine and hands back its storage instance; nullptr when it did not
+    // come up. The readiness wait is only made on a tier whose init succeeded: on one that failed there is no load
+    // to wait for and the wait would never return, turning a failed case into a hung binary.
     STORAGE_INSTANCE *bring_up_tier(size_t tier) {
-        EXPECT_TRUE(tier == 1 ? scratch1_.valid() : scratch2_.valid()) << "could not make a scratch directory";
+        const Scratch &scratch = tier == 1 ? scratch1_ : scratch2_;
+        EXPECT_TRUE(scratch.valid()) << "could not make a scratch directory";
+        if (!scratch.valid())
+            return nullptr;
+
         const struct dbengine_tier_config tc = tier_config(tier);
-        EXPECT_EQ(dbengine_tier_init(engine_, &tc), 0) << "tier " << tier << " did not come up";
+        const int rc = dbengine_tier_init(engine_, &tc);
+        EXPECT_EQ(rc, 0) << "tier " << tier << " did not come up";
+        if (rc != 0)
+            return nullptr;
+
         DBENGINE_TIER *t = dbengine_tier(engine_, tier);
         dbengine_readiness_wait(t);
         return reinterpret_cast<STORAGE_INSTANCE *>(t);
@@ -113,8 +123,9 @@ const time_t TIER_BASE = 200001600;
 
 TEST_F(ScaleTiersTest, ThreeTiersHoldWhatEachIsGiven) {
     STORAGE_INSTANCE *tier1 = bring_up_tier(1);
+    ASSERT_NE(tier1, nullptr);
     STORAGE_INSTANCE *tier2 = bring_up_tier(2);
-    ASSERT_FALSE(HasFailure());
+    ASSERT_NE(tier2, nullptr);
 
     // Tier 0 as every other case uses it: samples, one per second, flags round-tripped.
     {

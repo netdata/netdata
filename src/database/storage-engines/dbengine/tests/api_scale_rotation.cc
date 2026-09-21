@@ -30,17 +30,17 @@
 namespace {
 
 // The completion the rotation callback marks. The engine holds the callback for as long as it lives, and the
-// callback takes no argument, so this is a static of the file: initialised once, never destroyed, and reset only
+// callback takes no argument, so this is a static of the file: initialised once (by the function-local static,
+// which the language makes thread-safe; the callback runs on an engine thread), never destroyed, and reset only
 // while no engine holds the callback (engine_config() runs before dbengine_create(), and after the previous
 // engine's destroy). gtest runs the cases of a binary one at a time, so one completion serves.
 struct completion &rotation_completion() {
-    static struct completion c;
-    static bool initialised = false;
-    if (!initialised) {
-        completion_init(&c);
-        initialised = true;
-    }
-    return c;
+    struct Holder {
+        struct completion c = {};
+        Holder() { completion_init(&c); }
+    };
+    static Holder holder;
+    return holder.c;
 }
 
 void on_db_rotation() {
@@ -189,6 +189,10 @@ TEST_F(ScaleRotationTest, TheOldestDatafileIsDeletedAndTheSurvivorsAreReadAfterA
     const struct dbengine_cache_efficiency_stats after_rotation = efficiency();
     EXPECT_GE(after_rotation.datafile_deletion_started, 1u);
     EXPECT_GE(after_rotation.journal_v2_indexing_started, 1u);
+    // How often the deletion found the file still in use and retried (a second per retry, thirty before it gives
+    // up): not asserted, since a reader can legitimately hold the file, but reported with the run so a slow
+    // rotation can be read off the result rather than guessed at.
+    RecordProperty("datafile_deletion_spin", static_cast<int>(after_rotation.datafile_deletion_spin));
 
     // Retention moved past the deleted file: the tier's oldest time is later than the first point stored, the
     // oldest window reads as nothing, and the newest still reads its points.
@@ -197,9 +201,14 @@ TEST_F(ScaleRotationTest, TheOldestDatafileIsDeletedAndTheSurvivorsAreReadAfterA
     STORAGE_METRIC_HANDLE *smh = dbengine_metric_get_by_id(si_, ids[0]);
     ASSERT_NE(smh, nullptr);
 
+    // Nothing, or gaps: the registry no longer has the window, so the query normally yields no point at all, and
+    // one that did reach the deleted file's pages could only yield gaps. Either is "nothing"; a value is not.
     const std::vector<STORAGE_POINT> oldest = query_all(smh, BASE_TIME + 1, BASE_TIME + POINTS_PER_ROUND);
+    size_t values_from_deleted_file = 0;
     for (const STORAGE_POINT &sp : oldest)
-        EXPECT_TRUE(storage_point_is_gap(sp)) << "a point of the deleted datafile came back at " << sp.end_time_s;
+        if (!storage_point_is_gap(sp))
+            values_from_deleted_file++;
+    EXPECT_EQ(values_from_deleted_file, 0u) << "points of the deleted datafile came back";
 
     const std::vector<STORAGE_POINT> newest = query_all(smh, last_time - (POINTS_PER_ROUND - 1), last_time);
     ASSERT_EQ(newest.size(), POINTS_PER_ROUND);

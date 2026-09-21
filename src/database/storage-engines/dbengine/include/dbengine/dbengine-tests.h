@@ -45,6 +45,10 @@ int dbengine_zero_page_cadence_unittest(DBENGINE_ENGINE *engine, STORAGE_INSTANC
 // record written), which is the guarantee dbengine_tier_exit() gives; false, having queued nothing, for a NULL
 // tier or an engine that is not serving (before dbengine_create() finished, or once dbengine_shutdown() started).
 //
+// Those are the only refusals: a tier that is exiting or has exited is not checked (the same holds for the
+// fire-and-forget verbs), so the caller keeps this to a tier that is up, as dbengine_tier_exit() does its own
+// flush and wait.
+//
 // The caller owns collector quiescence: dbengine_store_flush() or dbengine_store_finalize() on its handles first.
 // The engine does not check, a live collector's page races the flush, and on a tier still being collected into
 // the wait has no bound. Pages made hot after the call are not covered. On a tier that has not been quiesced the
