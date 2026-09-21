@@ -112,6 +112,11 @@ The default configuration for this integration does not impose any limits on dat
 
 The collector executes lightweight queries against system views.
 Most queries complete in milliseconds and have minimal impact on server performance.
+
+Each job uses up to two SQL connections: one for metric collection and one shared by the diagnostic
+Functions. Slow Functions do not occupy the metrics connection, but can still compete for SQL Server
+CPU, I/O and locks. The additional connection opens only when a Function is called.
+
 Enabling `collect_disabled_jobs` expands SQL Agent history/activity queries and adds four charts with eight
 dimensions for every disabled job. The administrative job-status chart is always collected.
 
@@ -258,14 +263,14 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Target** | timeout | Query timeout (seconds). | 5 | no |
 | **SQL Agent** | collect_disabled_jobs | Collect execution-result, execution-age, execution-duration, and current-runtime charts for disabled SQL Server Agent jobs. Their administrative enabled/disabled status is always collected. Enabling this option adds four charts and eight dimensions per disabled job. Stock last-execution alerts remain gated by the job's enabled state. | no | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
-|  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.timeout | Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default. | 30 | no |
 |  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
 |  | functions.top_queries.time_window_days | Number of days of query statistics to analyze. On the plan-cache fallback this filters by last execution time rather than aggregating a period. Set to 0 to use the default (7), or -1 to include all available data. Smaller positive values improve query performance but show less history. | 7 | no |
 |  | functions.deadlock_info.disabled | Disable the [deadlock-info](#deadlock-info) function. | no | no |
-|  | functions.deadlock_info.timeout | Query timeout for deadlock-info function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.deadlock_info.timeout | Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default. | 30 | no |
 |  | functions.deadlock_info.use_ring_buffer | Use the ring_buffer target instead of event_file for the built-in system_health session on SQL Server or Azure SQL Managed Instance.<br/><br/>WARNING:<br/>• Data is cleared on failover/restart<br/>• Capacity is limited<br/>• XML parsing can increase query CPU<br/><br/>Azure SQL Database is not supported by deadlock-info because it has no built-in system_health session. | no | no |
 |  | functions.error_info.disabled | Disable the [error-info](#error-info) function. | no | no |
-|  | functions.error_info.timeout | Query timeout for error-info function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.error_info.timeout | Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default. | 30 | no |
 |  | functions.error_info.session_name | Extended Events session name capturing error_reported events.<br/>Must be created by administrator with event_file (recommended) or ring_buffer target. | netdata_errors | no |
 |  | functions.error_info.use_ring_buffer | Use ring_buffer instead of event_file for error events.<br/><br/>WARNING:<br/>• The session must remain running<br/>• Data is cleared on failover/restart<br/>• Capacity is limited<br/>• XML parsing can increase query CPU<br/><br/>Useful when persistent event_file storage is unavailable, including Azure SQL Database without Blob Storage. | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
@@ -805,7 +810,7 @@ Query text is truncated at 4096 characters for display purposes. Columns are det
 |:-------|:------------|
 | Name | `Mssql:top-queries` |
 | Require Cloud | yes |
-| Performance | On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance. Azure SQL Database queries use the database selected in the DSN.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Function queries share the collector's database connection, so long scans can delay metric collection |
+| Performance | On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance. Azure SQL Database queries use the database selected in the DSN.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Function queries share the collector's database connection, so long scans can delay metric collection<br/>• Function timeouts are independent of the metrics timeout; an earlier request deadline still applies |
 | Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
 | Availability | Available when:<br/>• The collector has successfully connected<br/>• `functions.top_queries.disabled` is false<br/>• Query Store answers when the engine exposes it (SQL Server 2016 (13.x) and later, Azure SQL Managed Instance, or Azure SQL Database) and it is enabled on at least one user database; on Azure SQL Database, in the database selected in the DSN<br/>• Otherwise the plan cache (`sys.dm_exec_query_stats`) answers, which requires `query_hash`, available since SQL Server 2008<br/>• Returns HTTP 403 when required permissions are missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or neither Query Store nor the plan cache can answer<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
 
