@@ -104,11 +104,25 @@ type ErrorInfoConfig struct {
 	UseRingBuffer bool             `yaml:"use_ring_buffer" json:"use_ring_buffer"`
 }
 
-func (c Config) topQueriesTimeout() time.Duration {
-	if c.Functions.TopQueries.Timeout == 0 {
-		return c.Timeout.Duration()
+// Function timeouts default independently of the metrics timeout: a slow diagnostic query
+// must not inherit a budget tuned for lightweight metric collection.
+const defaultMSSQLFunctionTimeout = 30 * time.Second
+
+func newMSSQLFunctionTimeout(option string, configured confopt.Duration) mssqlFunctionTimeout {
+	if configured == 0 {
+		return mssqlFunctionTimeout{
+			option: option,
+			value:  defaultMSSQLFunctionTimeout,
+		}
 	}
-	return c.Functions.TopQueries.Timeout.Duration()
+	return mssqlFunctionTimeout{
+		option: option,
+		value:  configured.Duration(),
+	}
+}
+
+func (c Config) topQueriesTimeout() mssqlFunctionTimeout {
+	return newMSSQLFunctionTimeout("top_queries", c.Functions.TopQueries.Timeout)
 }
 
 func (c Config) topQueriesLimit() int {
@@ -128,18 +142,12 @@ func (c Config) topQueriesTimeWindowDays() int {
 	return c.Functions.TopQueries.TimeWindowDays
 }
 
-func (c Config) deadlockInfoTimeout() time.Duration {
-	if c.Functions.DeadlockInfo.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.DeadlockInfo.Timeout.Duration()
+func (c Config) deadlockInfoTimeout() mssqlFunctionTimeout {
+	return newMSSQLFunctionTimeout("deadlock_info", c.Functions.DeadlockInfo.Timeout)
 }
 
-func (c Config) errorInfoTimeout() time.Duration {
-	if c.Functions.ErrorInfo.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.ErrorInfo.Timeout.Duration()
+func (c Config) errorInfoTimeout() mssqlFunctionTimeout {
+	return newMSSQLFunctionTimeout("error_info", c.Functions.ErrorInfo.Timeout)
 }
 
 func (c Config) errorInfoSessionName() string {
@@ -155,7 +163,11 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	db *sql.DB
+	// Metrics and Functions use separate single-connection pools so a slow diagnostic
+	// query never delays metric collection. db is opened lazily by the first collect;
+	// functionDB is created in Init and never replaced by a request.
+	db         *sql.DB
+	functionDB *sql.DB
 
 	serverPropertiesMu     sync.RWMutex
 	serverPropertiesLoaded bool
@@ -237,7 +249,7 @@ func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
 		return edition, nil
 	}
 
-	version, edition, err := c.queryServerProperties(ctx)
+	version, edition, err := queryServerProperties(ctx, c.functionDB)
 	if err != nil {
 		return 0, err
 	}
@@ -254,10 +266,10 @@ func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
 	return edition, nil
 }
 
-func (c *Collector) queryServerProperties(ctx context.Context) (string, int, error) {
+func queryServerProperties(ctx context.Context, db *sql.DB) (string, int, error) {
 	var version string
 	var edition int
-	if err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
+	if err := db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
 		return "", 0, err
 	}
 	return version, edition, nil
@@ -278,7 +290,12 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.CloudAuth.Validate(); err != nil {
 		return err
 	}
-	c.Debugf("using DSN [%s]", c.DSN)
+
+	db, err := c.newConnectionPool()
+	if err != nil {
+		return err
+	}
+	c.functionDB = db
 
 	c.funcRouter = newFuncRouter(c)
 
@@ -312,6 +329,13 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
+	}
+	// functionDB stays set after Close so an in-flight request fails with a closed-database
+	// error instead of a nil dereference; sql.DB.Close tolerates a repeated Cleanup.
+	if c.functionDB != nil {
+		if err := c.functionDB.Close(); err != nil {
+			c.Errorf("cleanup: error closing Function database connection: %v", err)
+		}
 	}
 	if c.db == nil {
 		return

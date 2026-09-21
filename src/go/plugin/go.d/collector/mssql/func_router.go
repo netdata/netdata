@@ -4,22 +4,58 @@ package mssql
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func mssqlFunctionContextError(ctx context.Context, err error) *funcapi.FunctionResponse {
+// mssqlFunctionTimeout is one Function's query budget together with its `functions.<option>`
+// config key, so a timeout response can name the setting that controls it.
+type mssqlFunctionTimeout struct {
+	option string
+	value  time.Duration
+}
+
+// contextError maps a context failure to the Function response for it, or returns nil
+// when err is not a timeout or cancellation.
+func (t mssqlFunctionTimeout) contextError(ctx context.Context, err error) *funcapi.FunctionResponse {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return funcapi.ErrorResponse(504, "query timed out")
+		return funcapi.ErrorResponse(
+			504,
+			"%s query timed out; Function timeout is %s (functions.%s.timeout), but the request deadline may be shorter",
+			t.option,
+			t.value,
+			t.option,
+		)
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 		return funcapi.ErrorResponse(499, "query canceled")
 	}
 	return nil
+}
+
+// runFunction bounds a Function request by its own timeout and resolves the SQL engine
+// edition before collect runs edition-specific SQL.
+func (c *Collector) runFunction(
+	ctx context.Context,
+	timeout mssqlFunctionTimeout,
+	collect func(context.Context) *funcapi.FunctionResponse,
+) *funcapi.FunctionResponse {
+	if c.functionDB == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
+	}
+	queryCtx, cancel := context.WithTimeout(ctx, timeout.value)
+	defer cancel()
+	if _, err := c.ensureEngineEdition(queryCtx); err != nil {
+		if response := timeout.contextError(queryCtx, err); response != nil {
+			return response
+		}
+		return funcapi.ErrorResponse(500, "failed to detect SQL engine edition: %v", err)
+	}
+	return collect(queryCtx)
 }
 
 func (c *Collector) xeReadPermission() string {
@@ -87,15 +123,4 @@ func mssqlFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 		return nil
 	}
 	return c.funcRouter
-}
-
-// The target query joins live sessions, so it also excludes stopped sessions.
-func (c *Collector) mssqlRingBufferAvailable(ctx context.Context, sessionName string) (bool, error) {
-	query := queryMSSQLErrorSessionHasRingBuffer
-	if c.isAzureSQLDatabase() {
-		query = queryMSSQLErrorDatabaseSessionHasRingBuffer
-	}
-	var count int
-	err := c.db.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
-	return count > 0, err
 }

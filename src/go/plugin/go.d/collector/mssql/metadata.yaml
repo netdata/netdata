@@ -87,6 +87,11 @@ modules:
           description: |
             The collector executes lightweight queries against system views.
             Most queries complete in milliseconds and have minimal impact on server performance.
+
+            Each job uses up to two SQL connections: one for metric collection and one shared by the diagnostic
+            Functions. Slow Functions do not occupy the metrics connection, but can still compete for SQL Server
+            CPU, I/O and locks. The additional connection opens only when a Function is called.
+
             Enabling `collect_disabled_jobs` expands SQL Agent history/activity queries and adds four charts with eight
             dimensions for every disabled job. The administrative job-status chart is always collected.
       additional_permissions:
@@ -283,8 +288,8 @@ modules:
               required: false
               group: Functions
             - name: functions.top_queries.timeout
-              description: Query timeout for top-queries function (seconds). Uses collector timeout if not set.
-              default_value: ""
+              description: Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default.
+              default_value: 30
               required: false
               group: Functions
             - name: functions.top_queries.limit
@@ -307,8 +312,8 @@ modules:
               required: false
               group: Functions
             - name: functions.deadlock_info.timeout
-              description: Query timeout for deadlock-info function (seconds). Uses collector timeout if not set.
-              default_value: ""
+              description: Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default.
+              default_value: 30
               required: false
               group: Functions
             - name: functions.deadlock_info.use_ring_buffer
@@ -323,8 +328,8 @@ modules:
               required: false
               group: Functions
             - name: functions.error_info.timeout
-              description: Query timeout for error-info function (seconds). Uses collector timeout if not set.
-              default_value: ""
+              description: Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default.
+              default_value: 30
               required: false
               group: Functions
             - name: functions.error_info.session_name
@@ -825,7 +830,7 @@ modules:
                 visibility: hidden
                 description: Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation.
           performance: |
-            On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance. Azure SQL Database queries use the database selected in the DSN.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Function queries share the collector's database connection, so long scans can delay metric collection
+            On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance. Azure SQL Database queries use the database selected in the DSN.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Function queries share the collector's database connection, so long scans can delay metric collection<br/>• Function timeouts are independent of the metrics timeout; an earlier request deadline still applies
           security: |
             Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:

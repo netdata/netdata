@@ -89,7 +89,7 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreCatalogMissing(t *testing.
 		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.6024.0", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -114,7 +114,7 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreNotEnabledOnAnyDatabase(t 
 		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -136,7 +136,7 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreDetectionFails(t *testing.
 		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -169,7 +169,7 @@ func TestTopQueries_SourceFollowsQueryStoreEnablement(t *testing.T) {
 			mock.ExpectQuery(availabilityQuery).WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("appdb"))
 
 			c := New()
-			c.db = db
+			c.functionDB = db
 			c.setServerProperties("16.0.4265.3", edition)
 			handler := newFuncTopQueries(&funcRouter{collector: c})
 			for _, want := range []topQueriesSource{topQueriesSourceQueryStore, topQueriesSourcePlanCache, topQueriesSourceQueryStore} {
@@ -194,7 +194,7 @@ func TestTopQueries_UnavailableWhenNeitherSourceIsUsable(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"execution_count"}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("10.0.1600.22", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -218,11 +218,11 @@ func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 			AddRow("0x1122334455667788", "SELECT 1", "appdb", 7, 42.0, 6.0))
 	mock.ExpectQuery("server_event_session_fields").WithArgs("netdata_errors").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("netdata_errors.xel"))
-	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", 500).
+	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", "error_reported", 500).
 		WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.6024.0", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -261,7 +261,7 @@ func TestTopQueries_AvailableOnAzureSQLDatabaseReportingVersion12(t *testing.T) 
 	defer db.Close()
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -385,7 +385,7 @@ func TestTopQueries_QueryStoreCapabilityTimeout(t *testing.T) {
 	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -411,7 +411,7 @@ func TestTopQueries_QueryStoreCapabilityError(t *testing.T) {
 	mock.ExpectQuery("is_query_store_on").WillReturnError(probeErr)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -436,7 +436,7 @@ func TestTopQueries_QueryStoreColumnDiscoveryTimeout(t *testing.T) {
 
 	supported := true
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.queryStoreSupported = &supported
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
@@ -456,7 +456,7 @@ func TestTopQueries_QueryStoreColumnDiscoveryCancellation(t *testing.T) {
 
 	supported := true
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.queryStoreSupported = &supported
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -475,7 +475,7 @@ func TestTopQueries_QueryStorePermissionDenied(t *testing.T) {
 		WillReturnError(errors.New("VIEW SERVER PERFORMANCE STATE permission was denied"))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -495,7 +495,7 @@ func TestTopQueries_MethodParamsDefersTransientColumnDiscoveryErrorsToHandle(t *
 
 	supported := true
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.queryStoreSupported = &supported
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
@@ -521,7 +521,7 @@ func TestDetectQueryStoreColumns_RespectsContextWhileAnotherProbeRuns(t *testing
 		WillReturnError(sql.ErrNoRows)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	firstDone := make(chan error, 1)
@@ -553,7 +553,7 @@ func TestDetectQueryStoreColumns_EscapesDatabaseIdentifier(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count_executions", "avg_duration"}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	cols, err := handler.detectQueryStoreColumns(context.Background())
@@ -581,7 +581,7 @@ func TestDetectQueryStoreColumns_AzureSQLDatabaseUsesCurrentDatabase(t *testing.
 		WillReturnRows(sqlmock.NewRows([]string{"count_executions", "avg_duration"}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
@@ -613,7 +613,7 @@ func TestFetchMSSQLPlanOpsForDB_AzureSQLDatabaseUsesCurrentDatabase(t *testing.T
 		WillReturnRows(sqlmock.NewRows([]string{"query_hash", "query_plan"}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 
 	ops, err := c.fetchMSSQLPlanOpsForDB(context.Background(), "azure-db", []string{"0x01"})
@@ -634,7 +634,7 @@ func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t
 		WillReturnError(sql.ErrNoRows)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newFuncTopQueries(&funcRouter{collector: c})
 
 	discoveryDone := make(chan error, 1)

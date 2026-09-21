@@ -184,9 +184,10 @@
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "description": "Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default.",
                 "type": "number",
-                "minimum": 0
+                "minimum": 0,
+                "default": 30
               },
               "limit": {
                 "title": "Limit",
@@ -218,9 +219,10 @@
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "description": "Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default.",
                 "type": "number",
-                "minimum": 0
+                "minimum": 0,
+                "default": 30
               },
               "use_ring_buffer": {
                 "title": "Use Ring Buffer",
@@ -243,9 +245,10 @@
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "description": "Query timeout in seconds, independent of the metrics timeout. Set to 0 to use the Function default.",
                 "type": "number",
-                "minimum": 0
+                "minimum": 0,
+                "default": 30
               },
               "session_name": {
                 "title": "Session Name",

@@ -355,14 +355,39 @@ WHERE object_name LIKE '%SQL Errors%'
   AND counter_name = 'Errors/sec';
 `
 
+// A wildcard or Azure blob prefix also matches other targets whose configured names
+// share that prefix. Accept only this target's numeric rollover suffix to exclude those files.
+const queryMSSQLXEventFileEvents = `
+WITH file_events AS (
+  SELECT
+    CAST(event_data AS XML) AS event_xml,
+    RIGHT(
+      file_name,
+      CHARINDEX('/', REVERSE('/' + REPLACE(file_name, '\', '/'))) - 1
+    ) AS file_basename
+  FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
+  WHERE object_name = @eventName
+), xevents AS (
+  SELECT event_xml
+  FROM file_events
+  WHERE LEN(file_basename) > LEN(@filePrefix) + 4
+    AND LEFT(file_basename, LEN(@filePrefix)) = @filePrefix
+    AND RIGHT(file_basename, 4) = '.xel'
+    AND SUBSTRING(
+      file_basename,
+      LEN(@filePrefix) + 1,
+      CASE
+        WHEN LEN(file_basename) > LEN(@filePrefix) + 4
+        THEN LEN(file_basename) - LEN(@filePrefix) - 4
+        ELSE 0
+      END
+    ) NOT LIKE '%[^0123456789]%'
+)
+`
+
 // querySystemHealthLatestDeadlockEventFile retrieves the latest xml_deadlock_report event
 // from the system_health Extended Events file target.
-const querySystemHealthLatestDeadlockEventFile = `
-WITH xevents AS (
-  SELECT CAST(event_data AS XML) AS event_xml
-  FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
-  WHERE object_name = 'xml_deadlock_report'
-)
+const querySystemHealthLatestDeadlockEventFile = queryMSSQLXEventFileEvents + `
 SELECT TOP (1)
   event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') AS deadlock_time,
   CONVERT(nvarchar(max), event_xml.query('(/event/data[@name="xml_report"]/value/deadlock)[1]')) AS deadlock_xml
@@ -419,10 +444,10 @@ WHERE o.name = 'databases'
 // it instead of gating on a version number.
 const queryPlanCacheColumns = `SELECT TOP 0 * FROM sys.dm_exec_query_stats`
 
-// queryMSSQLErrorSessionEventFilePath returns the filename configured on the session's
+// queryMSSQLXEventSessionEventFilePath returns the filename configured on the session's
 // event_file target. The on-disk name is operator-chosen and need not match the session
 // name, so it has to be read from the catalog rather than guessed.
-const queryMSSQLErrorSessionEventFilePath = `
+const queryMSSQLXEventSessionEventFilePath = `
 SELECT CONVERT(nvarchar(260), fld.value) AS file_path
 FROM sys.server_event_sessions AS ses
 INNER JOIN sys.server_event_session_targets AS tgt
@@ -435,7 +460,7 @@ WHERE ses.name = @sessionName
   AND fld.name = 'filename';
 `
 
-const queryMSSQLErrorDatabaseSessionEventFilePath = `
+const queryMSSQLXEventDatabaseSessionEventFilePath = `
 SELECT CONVERT(nvarchar(2048), fld.value) AS file_path
 FROM sys.database_event_sessions AS ses
 INNER JOIN sys.database_event_session_targets AS tgt
@@ -448,8 +473,8 @@ WHERE ses.name = @sessionName
   AND fld.name = 'filename';
 `
 
-// queryMSSQLErrorSessionHasRingBuffer verifies that the session has a ring_buffer target.
-const queryMSSQLErrorSessionHasRingBuffer = `
+// queryMSSQLXEventSessionHasRingBuffer verifies that the session has a ring_buffer target.
+const queryMSSQLXEventSessionHasRingBuffer = `
 SELECT COUNT(*)
 FROM sys.dm_xe_session_targets AS xet
 JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
@@ -457,7 +482,7 @@ WHERE xs.name = @sessionName
   AND xet.target_name = 'ring_buffer';
 `
 
-const queryMSSQLErrorDatabaseSessionHasRingBuffer = `
+const queryMSSQLXEventDatabaseSessionHasRingBuffer = `
 SELECT COUNT(*)
 FROM sys.dm_xe_database_session_targets AS xet
 JOIN sys.dm_xe_database_sessions AS xs ON xs.address = xet.event_session_address
@@ -467,37 +492,12 @@ WHERE xs.name = @sessionName
 
 // queryMSSQLErrorInfoEventFile reads recent error_reported events from the event_file target.
 // @filePath is the resolved on-disk pattern, not the session name; see
-// queryMSSQLErrorSessionEventFilePath.
+// queryMSSQLXEventSessionEventFilePath.
 //
 // query_hash is returned as the raw unsigned-64-bit decimal string that Extended Events
 // emits. It is not converted here because query_hash exceeds bigint range, so
 // CAST(... AS bigint) would overflow; mssqlQueryHashToHex does it in Go instead.
-const queryMSSQLErrorInfoEventFile = `
-WITH file_events AS (
-  SELECT
-    CAST(event_data AS XML) AS event_xml,
-    RIGHT(
-      file_name,
-      CHARINDEX('/', REVERSE('/' + REPLACE(file_name, '\', '/'))) - 1
-    ) AS file_basename
-  FROM sys.fn_xe_file_target_read_file(@filePath, NULL, NULL, NULL)
-  WHERE object_name = 'error_reported'
-), xevents AS (
-  SELECT event_xml
-  FROM file_events
-  WHERE LEN(file_basename) > LEN(@filePrefix) + 4
-    AND LEFT(file_basename, LEN(@filePrefix)) = @filePrefix
-    AND RIGHT(file_basename, 4) = '.xel'
-    AND SUBSTRING(
-      file_basename,
-      LEN(@filePrefix) + 1,
-      CASE
-        WHEN LEN(file_basename) > LEN(@filePrefix) + 4
-        THEN LEN(file_basename) - LEN(@filePrefix) - 4
-        ELSE 0
-      END
-    ) NOT LIKE '%[^0123456789]%'
-)
+const queryMSSQLErrorInfoEventFile = queryMSSQLXEventFileEvents + `
 SELECT TOP (@limit)
   event_xml.value('(/event/@timestamp)[1]', 'datetime2(7)') AS event_time,
   event_xml.value('(/event/data[@name="error_number"]/value)[1]', 'int') AS error_number,

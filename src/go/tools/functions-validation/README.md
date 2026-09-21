@@ -78,6 +78,28 @@ Save the JSON body of a successful data response as `/tmp/pg.json`, then run fro
 (cd src/go && go run ./tools/functions-validation/validate --input /tmp/pg.json --min-rows 1)
 ```
 
+## MSSQL SQL and timeout checks
+
+Set `MSSQL_DSN` for a test SQL Server with metric collection and Function read permissions, then run from
+`src/go/`:
+
+```bash
+go test -tags=integration -race -count=1 -v \
+  -run 'TestIntegration_(TopQueriesSQL|XEventFileIsolation|FunctionTimeout|FunctionsDoNotWait|MetricsDoNotWait|FunctionPool)' \
+  ./plugin/go.d/collector/mssql/
+```
+
+The SQL tests execute the production aggregation and event-file queries with controlled input rows. The event-file
+cases cover Windows, Linux and Azure-style paths and overlapping filename prefixes; wildcard matching alone does not
+isolate a session's rollover files. These cases validate SQL behavior, not live Azure Storage access.
+
+The timeout test briefly occupies the Function pool with `WAITFOR`, then calls each Function with a shorter metrics
+timeout. It verifies that waiting for another Function uses the Function budget. Isolation tests hold one pool's
+connection while exercising the other: all three handlers must succeed with metrics busy, and full metric collection
+must succeed while a real handler queues on the busy Function pool. Additional cases cover concurrent first use and
+cancellation while waiting. These tests use normal collector initialization and create no persistent server objects.
+A passing controlled-delay test establishes this timeout mode, not the cause of an unrelated production 504.
+
 ## E2E runner (legacy)
 
 These commands document the existing container scripts. They currently invoke removed CLI flags and do not
