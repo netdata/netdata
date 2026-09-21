@@ -16,7 +16,7 @@ import (
 )
 
 func TestIntegration_FunctionsDoNotWaitForMetrics(t *testing.T) {
-	for _, method := range []string{topQueriesMethodID, deadlockInfoMethodID, errorInfoMethodID} {
+	for _, method := range []string{"top-queries", "deadlock-info", "error-info"} {
 		t.Run(method, func(t *testing.T) {
 			c := New()
 			c.DSN = getDSN(t)
@@ -55,7 +55,7 @@ func TestIntegration_MetricsDoNotWaitForFunctions(t *testing.T) {
 	functionWaits := c.functionDB.Stats().WaitCount
 	metricWaits := c.db.Stats().WaitCount
 	done := make(chan *funcapi.FunctionResponse, 1)
-	go func() { done <- c.funcRouter.Handle(ctx, errorInfoMethodID, funcapi.ResolvedParams{}) }()
+	go func() { done <- c.funcRouter.Handle(ctx, "error-info", funcapi.ResolvedParams{}) }()
 	require.Eventually(
 		t,
 		func() bool { return c.functionDB.Stats().WaitCount > functionWaits },
@@ -82,7 +82,7 @@ func TestIntegration_FunctionPoolConcurrentFirstUse(t *testing.T) {
 	defer cancel()
 	start := make(chan struct{})
 	done := make(chan *funcapi.FunctionResponse, 3)
-	for _, method := range []string{topQueriesMethodID, deadlockInfoMethodID, errorInfoMethodID} {
+	for _, method := range []string{"top-queries", "deadlock-info", "error-info"} {
 		go func() {
 			<-start
 			done <- c.funcRouter.Handle(ctx, method, funcapi.ResolvedParams{})
@@ -99,7 +99,7 @@ func TestIntegration_FunctionPoolConcurrentFirstUse(t *testing.T) {
 }
 
 func TestIntegration_FunctionPoolWaitCancellation(t *testing.T) {
-	for _, method := range []string{topQueriesMethodID, deadlockInfoMethodID, errorInfoMethodID} {
+	for _, method := range []string{"top-queries", "deadlock-info", "error-info"} {
 		t.Run(method, func(t *testing.T) {
 			c := New()
 			c.DSN = getDSN(t)
@@ -130,7 +130,7 @@ func TestIntegration_FunctionPoolWaitCancellation(t *testing.T) {
 // A request can wait for another Function longer than the metrics timeout,
 // without exhausting its own budget or borrowing the metrics connection.
 func TestIntegration_FunctionTimeoutIndependentOfMetrics(t *testing.T) {
-	for _, method := range []string{topQueriesMethodID, deadlockInfoMethodID, errorInfoMethodID} {
+	for _, method := range []string{"top-queries", "deadlock-info", "error-info"} {
 		t.Run(method, func(t *testing.T) {
 			c := New()
 			c.DSN = getDSN(t)

@@ -2,7 +2,7 @@
 
 //go:build integration
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
@@ -31,10 +31,13 @@ func TestIntegration_TopQueriesSQL(t *testing.T) {
 		"query store": topQueriesSourceQueryStore,
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := New()
+			router := newTestRouter(nil)
 			// This selects the database-local Query Store SQL without changing its aggregation.
-			c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-			h := newFuncTopQueries(&funcRouter{collector: c})
+			router.deps.(*testDeps).info = ServerInfo{
+				MajorVersion:     12,
+				AzureSQLDatabase: true,
+			}
+			h := newFuncTopQueries(router)
 			wanted := map[string]float64{
 				"calls": 4, "totalTime": 930, "avgTime": 232.5,
 				"lastTime": 10, "minTime": 5, "maxTime": 900,

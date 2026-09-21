@@ -9,12 +9,13 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mssql/mssqlfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMSSQLFunctions_CanceledBeforeFirstConnection(t *testing.T) {
-	for _, method := range []string{topQueriesMethodID, deadlockInfoMethodID, errorInfoMethodID} {
+	for _, method := range []string{"top-queries", "deadlock-info", "error-info"} {
 		t.Run(method, func(t *testing.T) {
 			c := New()
 			c.DSN = "sqlserver://127.0.0.1:0"
@@ -55,7 +56,7 @@ func TestCollector_FunctionPoolLifecycle(t *testing.T) {
 	c.Cleanup(context.Background())
 	assert.Same(t, db, c.functionDB)
 	assert.ErrorContains(t, db.PingContext(context.Background()), "database is closed")
-	for _, method := range []string{topQueriesMethodID, deadlockInfoMethodID, errorInfoMethodID} {
+	for _, method := range []string{"top-queries", "deadlock-info", "error-info"} {
 		response := c.funcRouter.Handle(context.Background(), method, funcapi.ResolvedParams{})
 		assert.Equal(t, 500, response.Status, response.Message)
 		assert.Contains(t, response.Message, "database is closed")
@@ -84,8 +85,8 @@ func TestCollector_CleanupClosesBothPools(t *testing.T) {
 
 func TestMSSQLFunctions_BeforeInit(t *testing.T) {
 	c := New()
-	r := newFuncRouter(c)
-	for _, method := range []string{topQueriesMethodID, deadlockInfoMethodID, errorInfoMethodID} {
+	r := mssqlfunc.NewRouter(functionDeps{collector: c}, c.Logger, c.Functions)
+	for _, method := range []string{"top-queries", "deadlock-info", "error-info"} {
 		response := r.Handle(context.Background(), method, funcapi.ResolvedParams{})
 		assert.Equal(t, 503, response.Status)
 	}

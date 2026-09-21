@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
@@ -12,54 +12,10 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	mssqlDriver "github.com/microsoft/go-mssqldb"
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func newTestDeadlockHandler(c *Collector) *funcDeadlockInfo {
-	r := &funcRouter{collector: c}
-	return &funcDeadlockInfo{router: r}
-}
-
-func TestConfig_FunctionsDisabledDefaults(t *testing.T) {
-	cfg := Config{}
-	assert.False(t, cfg.Functions.DeadlockInfo.Disabled, "deadlock_info should be enabled by default")
-	assert.False(t, cfg.Functions.ErrorInfo.Disabled, "error_info should be enabled by default")
-	assert.False(t, cfg.Functions.TopQueries.Disabled, "top_queries should be enabled by default")
-}
-
-func TestConfig_ErrorInfoSessionName(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  Config
-		want string
-	}{
-		{
-			name: "default session name",
-			cfg:  Config{},
-			want: "netdata_errors",
-		},
-		{
-			name: "explicit session name",
-			cfg: Config{
-				Functions: FunctionsConfig{
-					ErrorInfo: ErrorInfoConfig{
-						SessionName: "custom_errors",
-					},
-				},
-			},
-			want: "custom_errors",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.cfg.errorInfoSessionName())
-		})
-	}
-}
 
 func TestParseDeadlockGraph_WithDeadlock(t *testing.T) {
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 123456000, time.UTC)
@@ -157,16 +113,18 @@ func TestQueryLatestDeadlock_FallsBackToRingBufferOnFileError(t *testing.T) {
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
 	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("system_health.xel"))
-	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").WillReturnError(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"})
+	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").WillReturnError(mssqlDriver.Error{
+		Number:  25718,
+		Message: "event file is unavailable",
+	})
 	mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(
 		sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).AddRow(now, sampleDeadlockGraph),
 	)
 
-	c := New()
-	c.functionDB = db
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(db)
+	handler := newFuncDeadlockInfo(router)
 	deadlockTime, deadlockXML, source, err := handler.queryLatestDeadlock(context.Background())
 
 	require.NoError(t, err)
@@ -184,10 +142,12 @@ func TestDeadlockInfo_ConfiguredEventFile(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Custom\health.xel`))
 	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs(`C:\Custom\health_0_*.xel`, "health_0_", "xml_deadlock_report").
 		WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0", 3)
-	response := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	response := router.Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
 	assert.Equal(t, 200, response.Status, response.Message)
 	assert.Contains(t, response.Message, "no deadlock found")
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -202,9 +162,12 @@ func TestDeadlockInfo_TargetResolution(t *testing.T) {
 	}{
 		"missing file target falls back":       {missing: true, wantStatus: 200, wantSource: deadlockSourceRingBuffer},
 		"empty file target does not fall back": {wantStatus: 200, wantSource: deadlockSourceEventFile},
-		"lookup permission denied":             {lookupErr: mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"}, wantStatus: 403},
-		"lookup timed out":                     {lookupErr: context.DeadlineExceeded, wantStatus: 504},
-		"lookup canceled":                      {lookupErr: context.Canceled, wantStatus: 499},
+		"lookup permission denied": {lookupErr: mssqlDriver.Error{
+			Number:  297,
+			Message: "VIEW SERVER STATE permission was denied",
+		}, wantStatus: 403},
+		"lookup timed out": {lookupErr: context.DeadlineExceeded, wantStatus: 504},
+		"lookup canceled":  {lookupErr: context.Canceled, wantStatus: 499},
 	} {
 		t.Run(name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
@@ -224,10 +187,12 @@ func TestDeadlockInfo_TargetResolution(t *testing.T) {
 					WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").
 					WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
 			}
-			c := New()
-			c.functionDB = db
-			c.setServerProperties("16.0", 3)
-			response := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
+			router := newTestRouter(db)
+			router.deps.(*testDeps).info = ServerInfo{
+				MajorVersion:     16,
+				AzureSQLDatabase: false,
+			}
+			response := router.Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
 			assert.Equal(t, tc.wantStatus, response.Status, response.Message)
 			if tc.wantSource != "" {
 				assert.Contains(t, response.Message, tc.wantSource)
@@ -242,7 +207,10 @@ func TestQueryLatestDeadlock_DoesNotFallbackOnContextOrPermissionError(t *testin
 	assert.False(t, shouldFallbackDeadlockEventFile(context.Canceled))
 	assert.False(t, shouldFallbackDeadlockEventFile(context.DeadlineExceeded))
 	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("VIEW SERVER STATE permission was denied")))
-	assert.True(t, shouldFallbackDeadlockEventFile(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"}))
+	assert.True(t, shouldFallbackDeadlockEventFile(mssqlDriver.Error{
+		Number:  25718,
+		Message: "event file is unavailable",
+	}))
 	assert.False(t, shouldFallbackDeadlockEventFile(errors.New("event file scan failed")))
 }
 
@@ -264,7 +232,10 @@ func TestDeadlockInfo_RingBufferAvailability(t *testing.T) {
 				mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
 					WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("system_health.xel"))
 				mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").
-					WillReturnError(mssqlDriver.Error{Number: 25718, Message: "event file is unavailable"})
+					WillReturnError(mssqlDriver.Error{
+						Number:  25718,
+						Message: "event file is unavailable",
+					})
 			}
 			mock.ExpectQuery("FROM sys.dm_xe_session_targets").WithArgs("system_health").
 				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.target))
@@ -272,11 +243,13 @@ func TestDeadlockInfo_RingBufferAvailability(t *testing.T) {
 				mock.ExpectQuery("WITH xevents").
 					WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
 			}
-			c := New()
-			c.functionDB = db
-			c.setServerProperties("16.0.4265.3", 3)
-			c.Functions.DeadlockInfo.UseRingBuffer = tc.useRingBuffer
-			r := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
+			router := newTestRouter(db)
+			router.deps.(*testDeps).info = ServerInfo{
+				MajorVersion:     16,
+				AzureSQLDatabase: false,
+			}
+			router.cfg.DeadlockInfo.UseRingBuffer = tc.useRingBuffer
+			r := router.Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
 			assert.Equal(t, tc.wantStatus, r.Status, r.Message)
 			if tc.wantStatus == 500 {
 				assert.Contains(t, r.Message, "ring_buffer target unavailable")
@@ -297,12 +270,14 @@ func TestFetchMSSQLErrorRows_AzureSQLDatabaseUsesDatabaseRingBufferQuery(t *test
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
 		}))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-	c.Functions.ErrorInfo.UseRingBuffer = true
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
+	router.cfg.ErrorInfo.UseRingBuffer = true
 
-	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := router.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	assert.Empty(t, rows)
@@ -386,10 +361,9 @@ func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
 		}))
 
-	c := New()
-	c.functionDB = db
+	router := newTestRouter(db)
 
-	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := router.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	assert.Empty(t, rows)
@@ -409,10 +383,9 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthEventFile(t *testing.T) {
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
-	c := New()
-	c.functionDB = db
+	router := newTestRouter(db)
 
-	status, source, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, source, rows, err := router.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	assert.Equal(t, mssqlErrorSourceSystemHealth, source)
@@ -437,10 +410,9 @@ func TestFetchMSSQLErrorRows_RetriesSystemHealthRingBufferAfterEventFileError(t 
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
-	c := New()
-	c.functionDB = db
+	router := newTestRouter(db)
 
-	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := router.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	require.Len(t, rows, 1)
@@ -463,10 +435,9 @@ func TestFetchMSSQLErrorRows_UsesSystemHealthRingBufferWhenFileLookupFails(t *te
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
-	c := New()
-	c.functionDB = db
+	router := newTestRouter(db)
 
-	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := router.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	require.Len(t, rows, 1)
@@ -488,7 +459,10 @@ func TestFetchMSSQLErrorRows_PreservesSystemHealthResolverErrors(t *testing.T) {
 			check: func(t *testing.T, err error) { assert.ErrorIs(t, err, context.DeadlineExceeded) },
 		},
 		"permission": {
-			err:   mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"},
+			err: mssqlDriver.Error{
+				Number:  297,
+				Message: "VIEW SERVER STATE permission was denied",
+			},
 			check: func(t *testing.T, err error) { assert.True(t, isDeadlockPermissionError(err)) },
 		},
 	}
@@ -502,10 +476,9 @@ func TestFetchMSSQLErrorRows_PreservesSystemHealthResolverErrors(t *testing.T) {
 			mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
 			mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").WillReturnError(tc.err)
 
-			c := New()
-			c.functionDB = db
+			router := newTestRouter(db)
 
-			status, source, rows, gotErr := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+			status, source, rows, gotErr := router.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 			assert.Equal(t, mssqlErrorAttrNotSupported, status)
 			assert.Equal(t, mssqlErrorSourceSystemHealth, source)
 			assert.Nil(t, rows)
@@ -528,11 +501,10 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {
 			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
-	c := New()
-	c.functionDB = db
-	c.Functions.ErrorInfo.UseRingBuffer = true
+	router := newTestRouter(db)
+	router.cfg.ErrorInfo.UseRingBuffer = true
 
-	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
+	status, _, rows, err := router.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
 	assert.Equal(t, mssqlErrorAttrEnabled, status)
 	require.Len(t, rows, 1)
@@ -560,11 +532,13 @@ func TestCollectErrorInfo_SystemHealthRingBufferAvailability(t *testing.T) {
 				mock.ExpectQuery("WITH xevents").WithArgs("system_health", 500).
 					WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 			}
-			c := New()
-			c.functionDB = db
-			c.setServerProperties("16.0.4265.3", 3)
-			c.Functions.ErrorInfo.UseRingBuffer = true
-			r := newFuncRouter(c).Handle(context.Background(), errorInfoMethodID, funcapi.ResolvedParams{})
+			router := newTestRouter(db)
+			router.deps.(*testDeps).info = ServerInfo{
+				MajorVersion:     16,
+				AzureSQLDatabase: false,
+			}
+			router.cfg.ErrorInfo.UseRingBuffer = true
+			r := router.Handle(context.Background(), errorInfoMethodID, funcapi.ResolvedParams{})
 			assert.Equal(t, tc.wantStatus, r.Status, r.Message)
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -590,9 +564,8 @@ func TestCollectErrorInfo_ResolverTimeout(t *testing.T) {
 
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.DeadlineExceeded)
 
-	c := New()
-	c.functionDB = db
-	handler := newFuncErrorInfo(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	handler := newFuncErrorInfo(router)
 
 	response := handler.collectData(context.Background())
 	assert.Equal(t, 504, response.Status)
@@ -607,39 +580,12 @@ func TestCollectErrorInfo_ResolverCancellation(t *testing.T) {
 
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.Canceled)
 
-	c := New()
-	c.functionDB = db
-	handler := newFuncErrorInfo(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	handler := newFuncErrorInfo(router)
 
 	response := handler.collectData(context.Background())
 	assert.Equal(t, 499, response.Status)
 	assert.Contains(t, response.Message, "canceled")
-	require.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestErrorInfoFunctionTimeoutOverridesCollectorTimeout(t *testing.T) {
-	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
-	require.NoError(t, err)
-	defer db.Close()
-
-	mock.ExpectQuery("server_event_session_fields").
-		WillDelayFor(20 * time.Millisecond).
-		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
-	mock.ExpectQuery("fn_xe_file_target_read_file").
-		WillDelayFor(20 * time.Millisecond).
-		WillReturnRows(sqlmock.NewRows([]string{
-			"event_time", "error_number", "error_state", "message", "sql_text", "query_hash",
-		}))
-
-	c := New()
-	c.functionDB = db
-	c.Timeout = confopt.Duration(5 * time.Millisecond)
-	c.Functions.ErrorInfo.Timeout = confopt.Duration(200 * time.Millisecond)
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncErrorInfo(&funcRouter{collector: c})
-
-	response := handler.Handle(context.Background(), errorInfoMethodID, nil)
-	assert.Equal(t, 200, response.Status)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -658,9 +604,8 @@ func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 	dbNameRows := sqlmock.NewRows([]string{"database_id", "name"})
 	mock.ExpectQuery("SELECT\\s+database_id").WillReturnRows(dbNameRows)
 
-	c := New()
-	c.functionDB = db
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(db)
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, deadlockParseErrorStatus, resp.Status)
@@ -678,9 +623,8 @@ func TestCollectDeadlockInfo_QueryError(t *testing.T) {
 	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").
 		WillReturnError(errors.New("boom"))
 
-	c := New()
-	c.functionDB = db
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(db)
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 500, resp.Status)
@@ -706,7 +650,10 @@ func TestBuildDeadlockRows(t *testing.T) {
 }
 
 func TestDeadlockPermissionErrorDetection(t *testing.T) {
-	err := mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"}
+	err := mssqlDriver.Error{
+		Number:  297,
+		Message: "VIEW SERVER STATE permission was denied",
+	}
 	assert.True(t, isDeadlockPermissionError(err))
 }
 
@@ -718,12 +665,17 @@ func TestCollectDeadlockInfo_PermissionDenied(t *testing.T) {
 	mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("system_health.xel"))
 	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").
-		WillReturnError(mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"})
+		WillReturnError(mssqlDriver.Error{
+			Number:  297,
+			Message: "VIEW SERVER STATE permission was denied",
+		})
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 403, resp.Status)
@@ -737,12 +689,17 @@ func TestCollectErrorInfo_PermissionDenied(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery("server_event_session_fields").
-		WillReturnError(mssqlDriver.Error{Number: 297, Message: "VIEW SERVER PERFORMANCE STATE permission was denied"})
+		WillReturnError(mssqlDriver.Error{
+			Number:  297,
+			Message: "VIEW SERVER PERFORMANCE STATE permission was denied",
+		})
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncErrorInfo(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncErrorInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 403, resp.Status)
@@ -752,22 +709,22 @@ func TestCollectErrorInfo_PermissionDenied(t *testing.T) {
 
 func TestFunctionPermissionMessagesMatchEngineAndVersion(t *testing.T) {
 	tests := map[string]struct {
-		version       string
+		majorVersion  int
 		engineEdition int
 		want          string
 	}{
 		"SQL Server 2022": {
-			version:       "16.0.4265.3",
+			majorVersion:  16,
 			engineEdition: 3,
 			want:          "VIEW SERVER PERFORMANCE STATE",
 		},
 		"SQL Server 2019": {
-			version:       "15.0.4420.2",
+			majorVersion:  15,
 			engineEdition: 3,
 			want:          "VIEW SERVER STATE",
 		},
 		"Azure SQL Database": {
-			version:       "12.0.2000.8",
+			majorVersion:  12,
 			engineEdition: engineEditionAzureSQLDatabase,
 			want:          "VIEW DATABASE PERFORMANCE STATE",
 		},
@@ -775,27 +732,36 @@ func TestFunctionPermissionMessagesMatchEngineAndVersion(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.setServerProperties(tc.version, tc.engineEdition)
-			assert.Contains(t, c.errorInfoPermissionMessage(), tc.want)
-			assert.Contains(t, c.deadlockPermissionMessage(), tc.want)
-			assert.Contains(t, c.topQueriesPermissionMessage(), tc.want)
+			router := newTestRouter(nil)
+			router.deps.(*testDeps).info = ServerInfo{
+				MajorVersion:     tc.majorVersion,
+				AzureSQLDatabase: tc.engineEdition == engineEditionAzureSQLDatabase,
+			}
+			assert.Contains(t, router.errorInfoPermissionMessage(), tc.want)
+			assert.Contains(t, router.deadlockPermissionMessage(), tc.want)
+			assert.Contains(t, router.topQueriesPermissionMessage(), tc.want)
 		})
 	}
 }
 
 func TestErrorInfoPermissionMessage_AzureSQLDatabaseRingBuffer(t *testing.T) {
-	c := New()
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-	c.Functions.ErrorInfo.UseRingBuffer = true
+	router := newTestRouter(nil)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
+	router.cfg.ErrorInfo.UseRingBuffer = true
 
-	assert.Contains(t, c.errorInfoPermissionMessage(), "VIEW DATABASE STATE")
+	assert.Contains(t, router.errorInfoPermissionMessage(), "VIEW DATABASE STATE")
 }
 
 func TestCollectDeadlockInfo_UnavailableOnAzureSQLDatabase(t *testing.T) {
-	c := New()
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(nil)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 503, resp.Status)
@@ -803,9 +769,9 @@ func TestCollectDeadlockInfo_UnavailableOnAzureSQLDatabase(t *testing.T) {
 }
 
 func TestCollectDeadlockInfo_Disabled(t *testing.T) {
-	c := New()
-	c.Config.Functions.DeadlockInfo.Disabled = true
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(nil)
+	router.cfg.DeadlockInfo.Disabled = true
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 503, resp.Status)
@@ -822,9 +788,8 @@ func TestCollectDeadlockInfo_Timeout(t *testing.T) {
 	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").
 		WillReturnError(context.DeadlineExceeded)
 
-	c := New()
-	c.functionDB = db
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(db)
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 504, resp.Status)
@@ -842,9 +807,8 @@ func TestCollectDeadlockInfo_Cancellation(t *testing.T) {
 	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("system_health_0_*.xel", "system_health_0_", "xml_deadlock_report").
 		WillReturnError(context.Canceled)
 
-	c := New()
-	c.functionDB = db
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(db)
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 499, resp.Status)
@@ -873,9 +837,8 @@ func TestCollectDeadlockInfo_Success(t *testing.T) {
 				AddRow(5, "netdata"),
 		)
 
-	c := New()
-	c.functionDB = db
-	handler := newTestDeadlockHandler(c)
+	router := newTestRouter(db)
+	handler := newFuncDeadlockInfo(router)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 200, resp.Status)

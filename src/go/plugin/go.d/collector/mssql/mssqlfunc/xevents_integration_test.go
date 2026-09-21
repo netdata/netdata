@@ -2,7 +2,7 @@
 
 //go:build integration
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"

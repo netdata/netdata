@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
@@ -21,13 +21,12 @@ func TestResolveMSSQLXEventReadTarget_EventFileUsesConfiguredFilename(t *testing
 	mock.ExpectQuery("server_event_session_fields").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
 
-	c := New()
-	c.functionDB = db
+	router := newTestRouter(db)
 
-	target, available, err := c.resolveMSSQLXEventReadTarget(
+	target, available, err := router.resolveMSSQLXEventReadTarget(
 		context.Background(),
 		"netdata_errors",
-		c.Functions.ErrorInfo.UseRingBuffer,
+		router.cfg.ErrorInfo.UseRingBuffer,
 	)
 	require.NoError(t, err)
 	assert.True(t, available)
@@ -43,13 +42,12 @@ func TestResolveMSSQLXEventReadTarget_EventFileMissingSession(t *testing.T) {
 
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
 
-	c := New()
-	c.functionDB = db
+	router := newTestRouter(db)
 
-	target, available, err := c.resolveMSSQLXEventReadTarget(
+	target, available, err := router.resolveMSSQLXEventReadTarget(
 		context.Background(),
 		"netdata_errors",
-		c.Functions.ErrorInfo.UseRingBuffer,
+		router.cfg.ErrorInfo.UseRingBuffer,
 	)
 	require.NoError(t, err)
 	assert.False(t, available)
@@ -64,14 +62,13 @@ func TestResolveMSSQLXEventReadTarget_RingBufferRequiresRunningSession(t *testin
 
 	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	c := New()
-	c.functionDB = db
-	c.Config.Functions.ErrorInfo.UseRingBuffer = true
+	router := newTestRouter(db)
+	router.cfg.ErrorInfo.UseRingBuffer = true
 
-	target, available, err := c.resolveMSSQLXEventReadTarget(
+	target, available, err := router.resolveMSSQLXEventReadTarget(
 		context.Background(),
 		"netdata_errors",
-		c.Functions.ErrorInfo.UseRingBuffer,
+		router.cfg.ErrorInfo.UseRingBuffer,
 	)
 	require.NoError(t, err)
 	assert.True(t, available)
@@ -87,14 +84,16 @@ func TestResolveMSSQLXEventReadTarget_AzureSQLDatabaseUsesDatabaseCatalog(t *tes
 	mock.ExpectQuery("database_event_session_fields").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("https://storage.example/events/netdata_errors.xel"))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
 
-	target, available, err := c.resolveMSSQLXEventReadTarget(
+	target, available, err := router.resolveMSSQLXEventReadTarget(
 		context.Background(),
 		"netdata_errors",
-		c.Functions.ErrorInfo.UseRingBuffer,
+		router.cfg.ErrorInfo.UseRingBuffer,
 	)
 	require.NoError(t, err)
 	assert.True(t, available)
@@ -109,15 +108,17 @@ func TestResolveMSSQLXEventReadTarget_AzureSQLDatabaseUsesDatabaseRingBufferDMVs
 
 	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-	c.Functions.ErrorInfo.UseRingBuffer = true
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
+	router.cfg.ErrorInfo.UseRingBuffer = true
 
-	_, available, err := c.resolveMSSQLXEventReadTarget(
+	_, available, err := router.resolveMSSQLXEventReadTarget(
 		context.Background(),
 		"netdata_errors",
-		c.Functions.ErrorInfo.UseRingBuffer,
+		router.cfg.ErrorInfo.UseRingBuffer,
 	)
 	require.NoError(t, err)
 	assert.True(t, available)
@@ -132,14 +133,16 @@ func TestResolveMSSQLXEventReadTarget_AzureSQLManagedInstanceUsesServerCatalog(t
 	mock.ExpectQuery("server_event_session_fields").
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", engineEditionAzureSQLMI)
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
 
-	target, available, err := c.resolveMSSQLXEventReadTarget(
+	target, available, err := router.resolveMSSQLXEventReadTarget(
 		context.Background(),
 		"netdata_errors",
-		c.Functions.ErrorInfo.UseRingBuffer,
+		router.cfg.ErrorInfo.UseRingBuffer,
 	)
 	require.NoError(t, err)
 	assert.True(t, available)
