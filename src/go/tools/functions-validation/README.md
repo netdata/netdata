@@ -86,7 +86,7 @@ Set `MSSQL_DSN` for a test SQL Server with metric collection and Function read p
 ```bash
 go test -tags=integration -race -count=1 -v \
   -run 'TestIntegration_(TopQueriesSQL|XEventFileIsolation|FunctionTimeout|FunctionsDoNotWait|MetricsDoNotWait|FunctionPool)' \
-  ./plugin/go.d/collector/mssql/
+  ./plugin/go.d/collector/mssql/...
 ```
 
 The SQL tests execute the production aggregation and event-file queries with controlled input rows. The event-file

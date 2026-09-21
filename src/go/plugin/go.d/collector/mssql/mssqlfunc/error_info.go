@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
@@ -161,53 +161,64 @@ func errorInfoFunctionConfig() funcapi.FunctionConfig {
 
 // funcErrorInfo handles the error-info function.
 type funcErrorInfo struct {
-	router *funcRouter
+	router *router
 }
 
-func newFuncErrorInfo(r *funcRouter) *funcErrorInfo {
-	return &funcErrorInfo{router: r}
+func newFuncErrorInfo(r *router) *funcErrorInfo {
+	return &funcErrorInfo{
+		router: r,
+	}
 }
 
 // Compile-time interface check.
 var _ funcapi.MethodHandler = (*funcErrorInfo)(nil)
 
 func (f *funcErrorInfo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.router.collector.Functions.ErrorInfo.Disabled {
+	if f.router.cfg.ErrorInfo.Disabled {
 		return nil, fmt.Errorf("error-info function disabled in configuration")
 	}
 	return []funcapi.ParamConfig{}, nil
 }
 
 func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	c := f.router.collector
-	return c.runFunction(ctx, c.errorInfoTimeout(), f.collectData)
+	r := f.router
+	return r.runFunction(ctx, r.cfg.errorInfoTimeout(), f.collectData)
 }
 
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
 
 func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
-	if f.router.collector.Functions.ErrorInfo.Disabled {
+	if f.router.cfg.ErrorInfo.Disabled {
 		return funcapi.UnavailableResponse("error-info function has been disabled in configuration")
 	}
 
-	sessionName := f.router.collector.errorInfoSessionName()
-	limit := f.router.collector.topQueriesLimit()
-	status, source, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
+	sessionName := f.router.cfg.errorInfoSessionName()
+	limit := f.router.cfg.topQueriesLimit()
+	status, source, rows, err := f.router.fetchMSSQLErrorRows(ctx, sessionName, limit)
 	if err != nil {
-		if response := f.router.collector.errorInfoTimeout().contextError(ctx, err); response != nil {
+		if response := f.router.cfg.errorInfoTimeout().contextError(ctx, err); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
-			return &funcapi.FunctionResponse{Status: 403, Message: f.router.collector.errorInfoPermissionMessage()}
+			return &funcapi.FunctionResponse{
+				Status:  403,
+				Message: f.router.errorInfoPermissionMessage(),
+			}
 		}
 		if status == mssqlErrorAttrNotEnabled {
 			targetName := "event_file"
-			if f.router.collector.Functions.ErrorInfo.UseRingBuffer {
+			if f.router.cfg.ErrorInfo.UseRingBuffer {
 				targetName = "ring_buffer"
 			}
-			return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: Extended Events session not found or %s target missing", targetName)}
+			return &funcapi.FunctionResponse{
+				Status:  503,
+				Message: fmt.Sprintf("error-info not enabled: Extended Events session not found or %s target missing", targetName),
+			}
 		}
-		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("error-info query failed: %v", err)}
+		return &funcapi.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("error-info query failed: %v", err),
+		}
 	}
 
 	data := make([][]any, 0, len(rows))
@@ -237,9 +248,9 @@ func errorInfoHelp(source string) string {
 	return errorInfoHelpConfigured
 }
 
-func (c *Collector) errorInfoPermissionMessage() string {
-	permission := c.xeReadPermission()
-	if c.isAzureSQLDatabase() && c.Functions.ErrorInfo.UseRingBuffer {
+func (r *router) errorInfoPermissionMessage() string {
+	permission := r.xeReadPermission()
+	if r.deps.ServerInfo().AzureSQLDatabase && r.cfg.ErrorInfo.UseRingBuffer {
 		permission = "VIEW DATABASE STATE"
 	}
 	return fmt.Sprintf("error-info requires %s permission. Grant with: GRANT %s TO [netdata_user];", permission, permission)
@@ -383,20 +394,15 @@ func nullableString(value string) any {
 	return value
 }
 
-// TODO: Refactor error data access into a shared mssqlErrorData type.
-// Currently these methods live on Collector because they're used by both:
-// - funcErrorInfo (for error-info function)
-// - funcTopQueries (for error attribution columns)
-// A cleaner design would be a mssqlErrorData type on funcRouter that both handlers use.
-
-func (c *Collector) collectMSSQLErrorDetails(ctx context.Context) (string, map[string]mssqlErrorRow) {
-	status, _, rows, err := c.fetchMSSQLErrorRows(ctx, c.errorInfoSessionName(), c.topQueriesLimit())
+// The router shares error data access between error-info and top-query attribution.
+func (r *router) collectMSSQLErrorDetails(ctx context.Context) (string, map[string]mssqlErrorRow) {
+	status, _, rows, err := r.fetchMSSQLErrorRows(ctx, r.cfg.errorInfoSessionName(), r.cfg.topQueriesLimit())
 	if err != nil {
 		if status == mssqlErrorAttrNotEnabled {
 			return mssqlErrorAttrNotEnabled, nil
 		}
 		mapped := classifyMSSQLErrorAttrError(err)
-		c.Debugf("error attribution query failed: %v (status=%s)", err, mapped)
+		r.log.Debugf("error attribution query failed: %v (status=%s)", err, mapped)
 		return mapped, nil
 	}
 
@@ -440,7 +446,7 @@ func classifyMSSQLErrorAttrError(err error) string {
 	return mssqlErrorAttrNotEnabled
 }
 
-func (c *Collector) collectMSSQLPlanOps(ctx context.Context, data [][]any, cols []topQueriesColumn) map[string]map[string]mssqlPlanOps {
+func (r *router) collectMSSQLPlanOps(ctx context.Context, data [][]any, cols []topQueriesColumn) map[string]map[string]mssqlPlanOps {
 	dbIdx := -1
 	hashIdx := -1
 	for i, col := range cols {
@@ -478,9 +484,9 @@ func (c *Collector) collectMSSQLPlanOps(ctx context.Context, data [][]any, cols 
 
 	out := make(map[string]map[string]mssqlPlanOps)
 	for dbName, hashes := range hashesByDB {
-		ops, err := c.fetchMSSQLPlanOpsForDB(ctx, dbName, hashes)
+		ops, err := r.fetchMSSQLPlanOpsForDB(ctx, dbName, hashes)
 		if err != nil {
-			c.Debugf("plan attribution query failed for %s: %v", dbName, err)
+			r.log.Debugf("plan attribution query failed for %s: %v", dbName, err)
 			continue
 		}
 		out[dbName] = ops
@@ -488,7 +494,7 @@ func (c *Collector) collectMSSQLPlanOps(ctx context.Context, data [][]any, cols 
 	return out
 }
 
-func (c *Collector) fetchMSSQLPlanOpsForDB(ctx context.Context, dbName string, hashes []string) (map[string]mssqlPlanOps, error) {
+func (r *router) fetchMSSQLPlanOpsForDB(ctx context.Context, dbName string, hashes []string) (map[string]mssqlPlanOps, error) {
 	if len(hashes) == 0 {
 		return map[string]mssqlPlanOps{}, nil
 	}
@@ -505,7 +511,7 @@ func (c *Collector) fetchMSSQLPlanOpsForDB(ctx context.Context, dbName string, h
 
 	queryView := "sys.query_store_query"
 	planView := "sys.query_store_plan"
-	if !c.isAzureSQLDatabase() {
+	if !r.deps.ServerInfo().AzureSQLDatabase {
 		escapedDB := strings.ReplaceAll(dbName, "]", "]]")
 		queryView = fmt.Sprintf("[%s].sys.query_store_query", escapedDB)
 		planView = fmt.Sprintf("[%s].sys.query_store_plan", escapedDB)
@@ -519,7 +525,7 @@ INNER JOIN %s p ON q.query_id = p.query_id
 WHERE q.query_hash IN (%s);
 `, queryView, planView, strings.Join(validHashes, ","))
 
-	rows, err := c.functionDB.QueryContext(ctx, query)
+	rows, err := r.deps.DB().QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -550,50 +556,50 @@ WHERE q.query_hash IN (%s);
 	return out, nil
 }
 
-func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string, limit int) (string, string, []mssqlErrorRow, error) {
+func (r *router) fetchMSSQLErrorRows(ctx context.Context, sessionName string, limit int) (string, string, []mssqlErrorRow, error) {
 	if limit <= 0 {
 		limit = 500
 	}
 
-	target, available, err := c.resolveMSSQLXEventReadTarget(ctx, sessionName, c.Functions.ErrorInfo.UseRingBuffer)
+	target, available, err := r.resolveMSSQLXEventReadTarget(ctx, sessionName, r.cfg.ErrorInfo.UseRingBuffer)
 	if err != nil {
 		return mssqlErrorAttrNotEnabled, "", nil, err
 	}
 	if !available {
-		if c.isAzureSQLDatabase() {
+		if r.deps.ServerInfo().AzureSQLDatabase {
 			return mssqlErrorAttrNotEnabled, "", nil, errors.New("session not found")
 		}
-		return c.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
+		return r.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
 	}
-	status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, target, sessionName, limit, mssqlErrorSourceConfigured)
-	if err == nil || c.isAzureSQLDatabase() || !shouldFallbackErrorInfo(err) {
+	status, source, rows, err := r.fetchMSSQLErrorRowsFromTarget(ctx, target, sessionName, limit, mssqlErrorSourceConfigured)
+	if err == nil || r.deps.ServerInfo().AzureSQLDatabase || !shouldFallbackErrorInfo(err) {
 		return status, source, rows, err
 	}
-	return c.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
+	return r.fetchMSSQLErrorRowsFromSystemHealth(ctx, limit)
 }
 
-func (c *Collector) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, limit int) (string, string, []mssqlErrorRow, error) {
-	if !c.Functions.ErrorInfo.UseRingBuffer {
-		target, available, err := c.resolveMSSQLXEventReadTarget(ctx, "system_health", false)
+func (r *router) fetchMSSQLErrorRowsFromSystemHealth(ctx context.Context, limit int) (string, string, []mssqlErrorRow, error) {
+	if !r.cfg.ErrorInfo.UseRingBuffer {
+		target, available, err := r.resolveMSSQLXEventReadTarget(ctx, "system_health", false)
 		if err != nil && !shouldFallbackErrorInfo(err) {
 			return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
 		}
 		if err == nil && available {
-			status, source, rows, err := c.fetchMSSQLErrorRowsFromTarget(ctx, target, "system_health", limit, mssqlErrorSourceSystemHealth)
+			status, source, rows, err := r.fetchMSSQLErrorRowsFromTarget(ctx, target, "system_health", limit, mssqlErrorSourceSystemHealth)
 			if err == nil || !shouldFallbackErrorInfo(err) {
 				return status, source, rows, err
 			}
 		}
 	}
 
-	target, available, err := c.resolveMSSQLXEventReadTarget(ctx, "system_health", true)
+	target, available, err := r.resolveMSSQLXEventReadTarget(ctx, "system_health", true)
 	if err != nil {
 		return mssqlErrorAttrNotSupported, mssqlErrorSourceSystemHealth, nil, err
 	}
 	if !available {
 		return mssqlErrorAttrNotEnabled, mssqlErrorSourceSystemHealth, nil, errors.New("system_health ring_buffer target unavailable")
 	}
-	return c.fetchMSSQLErrorRowsFromTarget(ctx, target, "system_health", limit, mssqlErrorSourceSystemHealth)
+	return r.fetchMSSQLErrorRowsFromTarget(ctx, target, "system_health", limit, mssqlErrorSourceSystemHealth)
 }
 
 func shouldFallbackErrorInfo(err error) bool {
@@ -602,7 +608,7 @@ func shouldFallbackErrorInfo(err error) bool {
 		!isDeadlockPermissionError(err)
 }
 
-func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlXEventReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
+func (r *router) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target mssqlXEventReadTarget, sessionName string, limit int, source string) (string, string, []mssqlErrorRow, error) {
 	var query string
 	var args []any
 	if target.filePath != "" {
@@ -610,13 +616,13 @@ func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target ms
 		args = append(target.fileQueryArgs("error_reported"), sql.Named("limit", limit))
 	} else {
 		query = queryMSSQLErrorInfoRingBuffer
-		if c.isAzureSQLDatabase() {
+		if r.deps.ServerInfo().AzureSQLDatabase {
 			query = queryMSSQLErrorInfoDatabaseRingBuffer
 		}
 		args = []any{sql.Named("sessionName", sessionName), sql.Named("limit", limit)}
 	}
 
-	rows, err := c.functionDB.QueryContext(ctx, query, args...)
+	rows, err := r.deps.DB().QueryContext(ctx, query, args...)
 	if err != nil {
 		return mssqlErrorAttrNotSupported, source, nil, err
 	}

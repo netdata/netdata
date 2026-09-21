@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
@@ -74,90 +74,673 @@ type topQueriesColumn struct {
 // measure a different quantity in different units than Query Store reports.
 var topQueriesColumns = []topQueriesColumn{
 	// Identity columns - always available
-	{ColumnMeta: funcapi.ColumnMeta{Name: "queryHash", Tooltip: "Query Hash", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, UniqueKey: true}, DBColumn: "query_hash", IsIdentity: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, FullWidth: true}, DBColumn: "query_sql_text", IsIdentity: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "database", Tooltip: "Database", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect}, DBColumn: "database_name", IsIdentity: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "queryHash",
+		Tooltip:   "Query Hash",
+		Type:      funcapi.FieldTypeString,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNone,
+		Sort:      funcapi.FieldSortAscending,
+		Summary:   funcapi.FieldSummaryCount,
+		Filter:    funcapi.FieldFilterMultiselect,
+		UniqueKey: true,
+	}, DBColumn: "query_hash", IsIdentity: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "query",
+		Tooltip:   "Query",
+		Type:      funcapi.FieldTypeString,
+		Visible:   true,
+		Transform: funcapi.FieldTransformNone,
+		Sort:      funcapi.FieldSortAscending,
+		Summary:   funcapi.FieldSummaryCount,
+		Filter:    funcapi.FieldFilterMultiselect,
+		Sticky:    true,
+		FullWidth: true,
+	}, DBColumn: "query_sql_text", IsIdentity: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "database",
+		Tooltip:   "Database",
+		Type:      funcapi.FieldTypeString,
+		Visible:   true,
+		Transform: funcapi.FieldTransformNone,
+		Sort:      funcapi.FieldSortAscending,
+		Summary:   funcapi.FieldSummaryCount,
+		Filter:    funcapi.FieldFilterMultiselect,
+	}, DBColumn: "database_name", IsIdentity: true},
 
 	// Execution count - always available
-	{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Tooltip: "Calls", Type: funcapi.FieldTypeInteger, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange}, DBColumn: "count_executions", CacheColumn: "execution_count", sortOpt: true, sortLbl: "Top queries by Number of Calls"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "calls",
+		Tooltip:   "Calls",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   true,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummarySum,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "count_executions", CacheColumn: "execution_count", sortOpt: true, sortLbl: "Top queries by Number of Calls"},
 
 	// Duration metrics (microseconds -> milliseconds) - SQL 2016+
-	{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_duration", CacheColumn: "total_elapsed_time", IsMicroseconds: true, sortOpt: true, sortLbl: "Top queries by Total Execution Time", defaultSort: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTime", Tooltip: "Avg Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_duration", CacheColumn: "total_elapsed_time", IsMicroseconds: true, NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Execution Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastTime", Tooltip: "Last Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_duration", CacheColumn: "last_elapsed_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minTime", Tooltip: "Min Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_duration", CacheColumn: "min_elapsed_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTime", Tooltip: "Max Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_duration", CacheColumn: "max_elapsed_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevTime", Tooltip: "StdDev Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_duration", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "totalTime",
+		Tooltip:       "Total Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummarySum,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_duration", CacheColumn: "total_elapsed_time", IsMicroseconds: true, sortOpt: true, sortLbl: "Top queries by Total Execution Time", defaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgTime",
+		Tooltip:       "Avg Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_duration", CacheColumn: "total_elapsed_time", IsMicroseconds: true, NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Execution Time"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "lastTime",
+		Tooltip:       "Last Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "last_duration", CacheColumn: "last_elapsed_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "minTime",
+		Tooltip:       "Min Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMin,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "min_duration", CacheColumn: "min_elapsed_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "maxTime",
+		Tooltip:       "Max Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "max_duration", CacheColumn: "max_elapsed_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "stdevTime",
+		Tooltip:       "StdDev Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_duration", IsMicroseconds: true},
 
 	// CPU time metrics (microseconds -> milliseconds)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgCpu", Tooltip: "Avg CPU", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: true, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_cpu_time", CacheColumn: "total_worker_time", IsMicroseconds: true, NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average CPU Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastCpu", Tooltip: "Last CPU", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_cpu_time", CacheColumn: "last_worker_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minCpu", Tooltip: "Min CPU", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_cpu_time", CacheColumn: "min_worker_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxCpu", Tooltip: "Max CPU", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_cpu_time", CacheColumn: "max_worker_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevCpu", Tooltip: "StdDev CPU", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_cpu_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgCpu",
+		Tooltip:       "Avg CPU",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_cpu_time", CacheColumn: "total_worker_time", IsMicroseconds: true, NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average CPU Time"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "lastCpu",
+		Tooltip:       "Last CPU",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "last_cpu_time", CacheColumn: "last_worker_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "minCpu",
+		Tooltip:       "Min CPU",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMin,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "min_cpu_time", CacheColumn: "min_worker_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "maxCpu",
+		Tooltip:       "Max CPU",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "max_cpu_time", CacheColumn: "max_worker_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "stdevCpu",
+		Tooltip:       "StdDev CPU",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_cpu_time", IsMicroseconds: true},
 
 	// Logical I/O reads
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgReads", Tooltip: "Avg Logical Reads", Type: funcapi.FieldTypeFloat, DecimalPoints: 0, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_logical_io_reads", CacheColumn: "total_logical_reads", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Logical Reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastReads", Tooltip: "Last Logical Reads", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_logical_io_reads", CacheColumn: "last_logical_reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minReads", Tooltip: "Min Logical Reads", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_logical_io_reads", CacheColumn: "min_logical_reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxReads", Tooltip: "Max Logical Reads", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_logical_io_reads", CacheColumn: "max_logical_reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevReads", Tooltip: "StdDev Logical Reads", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_logical_io_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgReads",
+		Tooltip:       "Avg Logical Reads",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 0,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_logical_io_reads", CacheColumn: "total_logical_reads", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Logical Reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastReads",
+		Tooltip:   "Last Logical Reads",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_logical_io_reads", CacheColumn: "last_logical_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minReads",
+		Tooltip:   "Min Logical Reads",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_logical_io_reads", CacheColumn: "min_logical_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxReads",
+		Tooltip:   "Max Logical Reads",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_logical_io_reads", CacheColumn: "max_logical_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevReads",
+		Tooltip:   "StdDev Logical Reads",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_logical_io_reads"},
 
 	// Logical I/O writes
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgWrites", Tooltip: "Avg Logical Writes", Type: funcapi.FieldTypeFloat, DecimalPoints: 0, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_logical_io_writes", CacheColumn: "total_logical_writes", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Logical Writes"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastWrites", Tooltip: "Last Logical Writes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_logical_io_writes", CacheColumn: "last_logical_writes"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minWrites", Tooltip: "Min Logical Writes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_logical_io_writes", CacheColumn: "min_logical_writes"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxWrites", Tooltip: "Max Logical Writes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_logical_io_writes", CacheColumn: "max_logical_writes"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevWrites", Tooltip: "StdDev Logical Writes", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_logical_io_writes"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgWrites",
+		Tooltip:       "Avg Logical Writes",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 0,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_logical_io_writes", CacheColumn: "total_logical_writes", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Logical Writes"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastWrites",
+		Tooltip:   "Last Logical Writes",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_logical_io_writes", CacheColumn: "last_logical_writes"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minWrites",
+		Tooltip:   "Min Logical Writes",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_logical_io_writes", CacheColumn: "min_logical_writes"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxWrites",
+		Tooltip:   "Max Logical Writes",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_logical_io_writes", CacheColumn: "max_logical_writes"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevWrites",
+		Tooltip:   "StdDev Logical Writes",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_logical_io_writes"},
 
 	// Physical I/O reads
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgPhysReads", Tooltip: "Avg Physical Reads", Type: funcapi.FieldTypeFloat, DecimalPoints: 0, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_physical_io_reads", CacheColumn: "total_physical_reads", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Physical Reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastPhysReads", Tooltip: "Last Physical Reads", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_physical_io_reads", CacheColumn: "last_physical_reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minPhysReads", Tooltip: "Min Physical Reads", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_physical_io_reads", CacheColumn: "min_physical_reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxPhysReads", Tooltip: "Max Physical Reads", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_physical_io_reads", CacheColumn: "max_physical_reads"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevPhysReads", Tooltip: "StdDev Physical Reads", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_physical_io_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgPhysReads",
+		Tooltip:       "Avg Physical Reads",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 0,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_physical_io_reads", CacheColumn: "total_physical_reads", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Physical Reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastPhysReads",
+		Tooltip:   "Last Physical Reads",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_physical_io_reads", CacheColumn: "last_physical_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minPhysReads",
+		Tooltip:   "Min Physical Reads",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_physical_io_reads", CacheColumn: "min_physical_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxPhysReads",
+		Tooltip:   "Max Physical Reads",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_physical_io_reads", CacheColumn: "max_physical_reads"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevPhysReads",
+		Tooltip:   "StdDev Physical Reads",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_physical_io_reads"},
 
 	// CLR time (microseconds -> milliseconds)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgClr", Tooltip: "Avg CLR Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_clr_time", CacheColumn: "total_clr_time", IsMicroseconds: true, NeedsAvg: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastClr", Tooltip: "Last CLR Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_clr_time", CacheColumn: "last_clr_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minClr", Tooltip: "Min CLR Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_clr_time", CacheColumn: "min_clr_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxClr", Tooltip: "Max CLR Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_clr_time", CacheColumn: "max_clr_time", IsMicroseconds: true},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevClr", Tooltip: "StdDev CLR Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", DecimalPoints: 2, Visible: false, Transform: funcapi.FieldTransformDuration, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_clr_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgClr",
+		Tooltip:       "Avg CLR Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_clr_time", CacheColumn: "total_clr_time", IsMicroseconds: true, NeedsAvg: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "lastClr",
+		Tooltip:       "Last CLR Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "last_clr_time", CacheColumn: "last_clr_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "minClr",
+		Tooltip:       "Min CLR Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMin,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "min_clr_time", CacheColumn: "min_clr_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "maxClr",
+		Tooltip:       "Max CLR Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "max_clr_time", CacheColumn: "max_clr_time", IsMicroseconds: true},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "stdevClr",
+		Tooltip:       "StdDev CLR Time",
+		Type:          funcapi.FieldTypeDuration,
+		Units:         "milliseconds",
+		DecimalPoints: 2,
+		Visible:       false,
+		Transform:     funcapi.FieldTransformDuration,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMax,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_clr_time", IsMicroseconds: true},
 
 	// DOP (degree of parallelism)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgDop", Tooltip: "Avg DOP", Type: funcapi.FieldTypeFloat, DecimalPoints: 1, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_dop", CacheColumn: "total_dop", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Parallelism"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastDop", Tooltip: "Last DOP", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_dop", CacheColumn: "last_dop"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minDop", Tooltip: "Min DOP", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_dop", CacheColumn: "min_dop"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxDop", Tooltip: "Max DOP", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_dop", CacheColumn: "max_dop"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevDop", Tooltip: "StdDev DOP", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_dop"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgDop",
+		Tooltip:       "Avg DOP",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 1,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_dop", CacheColumn: "total_dop", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Parallelism"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastDop",
+		Tooltip:   "Last DOP",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_dop", CacheColumn: "last_dop"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minDop",
+		Tooltip:   "Min DOP",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_dop", CacheColumn: "min_dop"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxDop",
+		Tooltip:   "Max DOP",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_dop", CacheColumn: "max_dop"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevDop",
+		Tooltip:   "StdDev DOP",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_dop"},
 
 	// Memory grant (8KB pages)
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgMemory", Tooltip: "Avg Memory (8KB pages)", Type: funcapi.FieldTypeFloat, DecimalPoints: 0, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_query_max_used_memory", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Memory Grant"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastMemory", Tooltip: "Last Memory (8KB pages)", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_query_max_used_memory"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minMemory", Tooltip: "Min Memory (8KB pages)", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_query_max_used_memory"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxMemory", Tooltip: "Max Memory (8KB pages)", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_query_max_used_memory"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevMemory", Tooltip: "StdDev Memory", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_query_max_used_memory"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgMemory",
+		Tooltip:       "Avg Memory (8KB pages)",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 0,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_query_max_used_memory", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Memory Grant"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastMemory",
+		Tooltip:   "Last Memory (8KB pages)",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_query_max_used_memory"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minMemory",
+		Tooltip:   "Min Memory (8KB pages)",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_query_max_used_memory"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxMemory",
+		Tooltip:   "Max Memory (8KB pages)",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_query_max_used_memory"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevMemory",
+		Tooltip:   "StdDev Memory",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_query_max_used_memory"},
 
 	// Row count
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgRows", Tooltip: "Avg Rows", Type: funcapi.FieldTypeFloat, DecimalPoints: 0, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_rowcount", CacheColumn: "total_rows", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Row Count"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastRows", Tooltip: "Last Rows", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_rowcount", CacheColumn: "last_rows"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minRows", Tooltip: "Min Rows", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_rowcount", CacheColumn: "min_rows"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxRows", Tooltip: "Max Rows", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_rowcount", CacheColumn: "max_rows"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevRows", Tooltip: "StdDev Rows", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_rowcount"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgRows",
+		Tooltip:       "Avg Rows",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 0,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_rowcount", CacheColumn: "total_rows", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Row Count"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastRows",
+		Tooltip:   "Last Rows",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_rowcount", CacheColumn: "last_rows"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minRows",
+		Tooltip:   "Min Rows",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_rowcount", CacheColumn: "min_rows"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxRows",
+		Tooltip:   "Max Rows",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_rowcount", CacheColumn: "max_rows"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevRows",
+		Tooltip:   "StdDev Rows",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_rowcount"},
 
 	// SQL Server 2017+ log bytes
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgLogBytes", Tooltip: "Avg Log Bytes", Type: funcapi.FieldTypeFloat, DecimalPoints: 0, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_log_bytes_used", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Log Bytes"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastLogBytes", Tooltip: "Last Log Bytes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_log_bytes_used"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minLogBytes", Tooltip: "Min Log Bytes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_log_bytes_used"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxLogBytes", Tooltip: "Max Log Bytes", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_log_bytes_used"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevLogBytes", Tooltip: "StdDev Log Bytes", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_log_bytes_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgLogBytes",
+		Tooltip:       "Avg Log Bytes",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 0,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_log_bytes_used", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average Log Bytes"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastLogBytes",
+		Tooltip:   "Last Log Bytes",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_log_bytes_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minLogBytes",
+		Tooltip:   "Min Log Bytes",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_log_bytes_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxLogBytes",
+		Tooltip:   "Max Log Bytes",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_log_bytes_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevLogBytes",
+		Tooltip:   "StdDev Log Bytes",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_log_bytes_used"},
 
 	// SQL Server 2017+ tempdb space
-	{ColumnMeta: funcapi.ColumnMeta{Name: "avgTempdb", Tooltip: "Avg TempDB (8KB pages)", Type: funcapi.FieldTypeFloat, DecimalPoints: 0, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMean, Filter: funcapi.FieldFilterRange}, DBColumn: "avg_tempdb_space_used", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average TempDB Usage"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "lastTempdb", Tooltip: "Last TempDB (8KB pages)", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "last_tempdb_space_used"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "minTempdb", Tooltip: "Min TempDB (8KB pages)", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMin, Filter: funcapi.FieldFilterRange}, DBColumn: "min_tempdb_space_used"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "maxTempdb", Tooltip: "Max TempDB (8KB pages)", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "max_tempdb_space_used"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stdevTempdb", Tooltip: "StdDev TempDB", Type: funcapi.FieldTypeFloat, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange}, DBColumn: "stdev_tempdb_space_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:          "avgTempdb",
+		Tooltip:       "Avg TempDB (8KB pages)",
+		Type:          funcapi.FieldTypeFloat,
+		DecimalPoints: 0,
+		Visible:       true,
+		Transform:     funcapi.FieldTransformNumber,
+		Sort:          funcapi.FieldSortDescending,
+		Summary:       funcapi.FieldSummaryMean,
+		Filter:        funcapi.FieldFilterRange,
+	}, DBColumn: "avg_tempdb_space_used", NeedsAvg: true, sortOpt: true, sortLbl: "Top queries by Average TempDB Usage"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "lastTempdb",
+		Tooltip:   "Last TempDB (8KB pages)",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "last_tempdb_space_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "minTempdb",
+		Tooltip:   "Min TempDB (8KB pages)",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMin,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "min_tempdb_space_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "maxTempdb",
+		Tooltip:   "Max TempDB (8KB pages)",
+		Type:      funcapi.FieldTypeInteger,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "max_tempdb_space_used"},
+	{ColumnMeta: funcapi.ColumnMeta{
+		Name:      "stdevTempdb",
+		Tooltip:   "StdDev TempDB",
+		Type:      funcapi.FieldTypeFloat,
+		Visible:   false,
+		Transform: funcapi.FieldTransformNumber,
+		Sort:      funcapi.FieldSortDescending,
+		Summary:   funcapi.FieldSummaryMax,
+		Filter:    funcapi.FieldFilterRange,
+	}, DBColumn: "stdev_tempdb_space_used"},
 }
 
 // funcapi.SortableColumn interface implementation for topQueriesColumn.
@@ -204,11 +787,13 @@ type topQueriesRowScanner interface {
 // funcTopQueries implements funcapi.MethodHandler for MSSQL top-queries.
 // All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
 type funcTopQueries struct {
-	router *funcRouter
+	router *router
 }
 
-func newFuncTopQueries(r *funcRouter) *funcTopQueries {
-	return &funcTopQueries{router: r}
+func newFuncTopQueries(r *router) *funcTopQueries {
+	return &funcTopQueries{
+		router: r,
+	}
 }
 
 // Compile-time interface check.
@@ -216,14 +801,14 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.router.collector.functionDB == nil {
+	if f.router.deps.DB() == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
 	case topQueriesMethodID:
-		paramsCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout().value)
+		paramsCtx, cancel := context.WithTimeout(ctx, f.router.cfg.topQueriesTimeout().value)
 		defer cancel()
-		if _, err := f.router.collector.ensureEngineEdition(paramsCtx); err != nil {
+		if err := f.router.deps.EnsureServerInfo(paramsCtx); err != nil {
 			// Handle owns the final 499/500/504 response classification.
 			return nil, nil
 		}
@@ -237,8 +822,8 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	switch method {
 	case topQueriesMethodID:
-		c := f.router.collector
-		return c.runFunction(ctx, c.topQueriesTimeout(), func(queryCtx context.Context) *funcapi.FunctionResponse {
+		r := f.router
+		return r.runFunction(ctx, r.cfg.topQueriesTimeout(), func(queryCtx context.Context) *funcapi.FunctionResponse {
 			return f.collectData(queryCtx, params.Column(topQueriesParamSort))
 		})
 	default:
@@ -250,7 +835,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	if f.router.collector.Functions.TopQueries.Disabled {
+	if f.router.cfg.TopQueries.Disabled {
 		return nil, fmt.Errorf("top-queries function disabled in configuration")
 	}
 	source, availableCols, err := f.resolveTopQueriesSource(ctx)
@@ -273,17 +858,17 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
-	if f.router.collector.Functions.TopQueries.Disabled {
+	if f.router.cfg.TopQueries.Disabled {
 		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
 	}
-	timeout := f.router.collector.topQueriesTimeout()
+	timeout := f.router.cfg.topQueriesTimeout()
 	source, availableCols, err := f.resolveTopQueriesSource(ctx)
 	if err != nil {
 		if response := timeout.contextError(ctx, err); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
-			return funcapi.ErrorResponse(403, "%s", f.router.collector.topQueriesPermissionMessage())
+			return funcapi.ErrorResponse(403, "%s", f.router.topQueriesPermissionMessage())
 		}
 		if errors.Is(err, errTopQueriesNoSource) {
 			return funcapi.UnavailableResponse(topQueriesNoSource)
@@ -301,17 +886,17 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	validatedSortColumn := f.mapAndValidateSortColumn(sortColumn, cols)
 
-	timeWindowDays := f.router.collector.topQueriesTimeWindowDays()
-	limit := f.router.collector.topQueriesLimit()
+	timeWindowDays := f.router.cfg.topQueriesTimeWindowDays()
+	limit := f.router.cfg.topQueriesLimit()
 	query := f.buildTopQueriesSQL(source, cols, validatedSortColumn, timeWindowDays, limit)
 
-	rows, err := f.router.collector.functionDB.QueryContext(ctx, query)
+	rows, err := f.router.deps.DB().QueryContext(ctx, query)
 	if err != nil {
 		if response := timeout.contextError(ctx, err); response != nil {
 			return response
 		}
 		if isDeadlockPermissionError(err) {
-			return funcapi.ErrorResponse(403, "%s", f.router.collector.topQueriesPermissionMessage())
+			return funcapi.ErrorResponse(403, "%s", f.router.topQueriesPermissionMessage())
 		}
 		colIDs := make([]string, len(cols))
 		for i, col := range cols {
@@ -329,16 +914,19 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 		if response := timeout.contextError(ctx, err); response != nil {
 			return response
 		}
-		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
+		return &funcapi.FunctionResponse{
+			Status:  500,
+			Message: err.Error(),
+		}
 	}
 
-	errorStatus, errorDetails := f.router.collector.collectMSSQLErrorDetails(ctx)
+	errorStatus, errorDetails := f.router.collectMSSQLErrorDetails(ctx)
 	// Plan attribution reads Query Store plan XML, so it has nothing to answer with when
 	// the plan cache is the source. Its columns stay empty, as they already do whenever
 	// the attribution query fails.
 	var planOpsByDB map[string]map[string]mssqlPlanOps
 	if source == topQueriesSourceQueryStore {
-		planOpsByDB = f.router.collector.collectMSSQLPlanOps(ctx, data, cols)
+		planOpsByDB = f.router.collectMSSQLPlanOps(ctx, data, cols)
 	}
 	if response := timeout.contextError(ctx, ctx.Err()); response != nil {
 		return response
@@ -463,38 +1051,38 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 // top-queries there. Probing the catalog is version-proof, and it also fails closed on
 // servers whose version string cannot be parsed.
 func (f *funcTopQueries) queryStoreSupported(ctx context.Context) (bool, error) {
-	c := f.router.collector
+	r := f.router
 
-	c.queryStoreSupportedMu.RLock()
-	if cached := c.queryStoreSupported; cached != nil {
-		c.queryStoreSupportedMu.RUnlock()
+	r.queryStoreSupportedMu.RLock()
+	if cached := r.queryStoreSupported; cached != nil {
+		r.queryStoreSupportedMu.RUnlock()
 		return *cached, nil
 	}
-	c.queryStoreSupportedMu.RUnlock()
+	r.queryStoreSupportedMu.RUnlock()
 
-	if c.isAzureSQLDatabase() {
+	if r.deps.ServerInfo().AzureSQLDatabase {
 		supported := true
-		c.queryStoreSupportedMu.Lock()
-		if c.queryStoreSupported == nil {
-			c.queryStoreSupported = &supported
+		r.queryStoreSupportedMu.Lock()
+		if r.queryStoreSupported == nil {
+			r.queryStoreSupported = &supported
 		}
-		supported = *c.queryStoreSupported
-		c.queryStoreSupportedMu.Unlock()
+		supported = *r.queryStoreSupported
+		r.queryStoreSupportedMu.Unlock()
 		return supported, nil
 	}
 
 	var count int
-	if err := c.functionDB.QueryRowContext(ctx, queryQueryStoreSupported).Scan(&count); err != nil {
+	if err := r.deps.DB().QueryRowContext(ctx, queryQueryStoreSupported).Scan(&count); err != nil {
 		return false, err
 	}
 
 	supported := count > 0
-	c.queryStoreSupportedMu.Lock()
-	if c.queryStoreSupported == nil {
-		c.queryStoreSupported = &supported
+	r.queryStoreSupportedMu.Lock()
+	if r.queryStoreSupported == nil {
+		r.queryStoreSupported = &supported
 	}
-	supported = *c.queryStoreSupported
-	c.queryStoreSupportedMu.Unlock()
+	supported = *r.queryStoreSupported
+	r.queryStoreSupportedMu.Unlock()
 
 	return supported, nil
 }
@@ -530,16 +1118,16 @@ func (f *funcTopQueries) resolveTopQueriesSource(ctx context.Context) (topQuerie
 // The DMV grew columns over time (rows in 2008 R2 SP1, DOP and memory grants in 2016), and
 // probing keeps the query free of version arithmetic.
 func (f *funcTopQueries) detectPlanCacheColumns(ctx context.Context) (map[string]bool, error) {
-	c := f.router.collector
+	r := f.router
 
-	c.planCacheColsMu.RLock()
-	if cached := c.planCacheCols; cached != nil {
-		c.planCacheColsMu.RUnlock()
+	r.planCacheColsMu.RLock()
+	if cached := r.planCacheCols; cached != nil {
+		r.planCacheColsMu.RUnlock()
 		return cached, nil
 	}
-	c.planCacheColsMu.RUnlock()
+	r.planCacheColsMu.RUnlock()
 
-	rows, err := c.functionDB.QueryContext(ctx, queryPlanCacheColumns)
+	rows, err := r.deps.DB().QueryContext(ctx, queryPlanCacheColumns)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -564,12 +1152,12 @@ func (f *funcTopQueries) detectPlanCacheColumns(ctx context.Context) (map[string
 		return nil, errTopQueriesNoSource
 	}
 
-	c.planCacheColsMu.Lock()
-	if c.planCacheCols == nil {
-		c.planCacheCols = cols
+	r.planCacheColsMu.Lock()
+	if r.planCacheCols == nil {
+		r.planCacheCols = cols
 	}
-	cols = c.planCacheCols
-	c.planCacheColsMu.Unlock()
+	cols = r.planCacheCols
+	r.planCacheColsMu.Unlock()
 
 	return cols, nil
 }
@@ -612,14 +1200,14 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 		WHERE is_query_store_on = 1
 		  AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
 	`
-	if f.router.collector.isAzureSQLDatabase() {
+	if f.router.deps.ServerInfo().AzureSQLDatabase {
 		sampleQuery = `
 			SELECT DB_NAME()
 			FROM sys.database_query_store_options
 			WHERE actual_state IN (1, 2, 4)
 		`
 	}
-	err := f.router.collector.functionDB.QueryRowContext(ctx, sampleQuery).Scan(&sampleDB)
+	err := f.router.deps.DB().QueryRowContext(ctx, sampleQuery).Scan(&sampleDB)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -630,19 +1218,19 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 		return nil, fmt.Errorf("failed to find database with Query Store: %w", err)
 	}
 
-	f.router.collector.queryStoreColsMu.RLock()
-	if cols := f.router.collector.queryStoreCols; cols != nil {
-		f.router.collector.queryStoreColsMu.RUnlock()
+	f.router.queryStoreColsMu.RLock()
+	if cols := f.router.queryStoreCols; cols != nil {
+		f.router.queryStoreColsMu.RUnlock()
 		return cols, nil
 	}
-	f.router.collector.queryStoreColsMu.RUnlock()
+	f.router.queryStoreColsMu.RUnlock()
 
 	query := `SELECT TOP 0 * FROM sys.query_store_runtime_stats`
-	if !f.router.collector.isAzureSQLDatabase() {
+	if !f.router.deps.ServerInfo().AzureSQLDatabase {
 		escapedDB := strings.ReplaceAll(sampleDB, "]", "]]")
 		query = fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, escapedDB)
 	}
-	rows, err := f.router.collector.functionDB.QueryContext(ctx, query)
+	rows, err := f.router.deps.DB().QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -670,12 +1258,12 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 	cols["query_sql_text"] = true
 	cols["database_name"] = true
 
-	f.router.collector.queryStoreColsMu.Lock()
-	if f.router.collector.queryStoreCols == nil {
-		f.router.collector.queryStoreCols = cols
+	f.router.queryStoreColsMu.Lock()
+	if f.router.queryStoreCols == nil {
+		f.router.queryStoreCols = cols
 	}
-	cols = f.router.collector.queryStoreCols
-	f.router.collector.queryStoreColsMu.Unlock()
+	cols = f.router.queryStoreCols
+	f.router.queryStoreColsMu.Unlock()
 
 	return cols, nil
 }
@@ -970,7 +1558,7 @@ func defaultTopQueriesOrderColumn(cols []topQueriesColumn) string {
 }
 
 func (f *funcTopQueries) buildQueryStoreSQL(cols []topQueriesColumn, sortColumn string, timeWindowDays int, limit int) string {
-	if !f.router.collector.isAzureSQLDatabase() {
+	if !f.router.deps.ServerInfo().AzureSQLDatabase {
 		return f.buildDynamicSQL(cols, sortColumn, timeWindowDays, limit)
 	}
 
@@ -994,11 +1582,11 @@ func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQu
 	return data, nil
 }
 
-func (c *Collector) topQueriesPermissionMessage() string {
-	if c.isAzureSQLDatabase() {
+func (r *router) topQueriesPermissionMessage() string {
+	if r.deps.ServerInfo().AzureSQLDatabase {
 		return "top-queries requires VIEW DATABASE PERFORMANCE STATE for Query Store; plan-cache access requires VIEW DATABASE STATE or administrator/##MS_ServerStateReader## access, depending on the Azure SQL Database service tier"
 	}
-	if c.currentMajorVersion() >= 16 {
+	if r.deps.ServerInfo().MajorVersion >= 16 {
 		return "top-queries requires VIEW SERVER PERFORMANCE STATE for the plan cache, or VIEW DATABASE PERFORMANCE STATE in every queried user database for Query Store"
 	}
 	return "top-queries requires VIEW SERVER STATE for the plan cache, or VIEW DATABASE STATE in every queried user database for Query Store"

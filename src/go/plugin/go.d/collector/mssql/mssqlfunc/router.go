@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // mssqlFunctionTimeout is one Function's query budget together with its `functions.<option>`
@@ -39,17 +40,17 @@ func (t mssqlFunctionTimeout) contextError(ctx context.Context, err error) *func
 
 // runFunction bounds a Function request by its own timeout and resolves the SQL engine
 // edition before collect runs edition-specific SQL.
-func (c *Collector) runFunction(
+func (r *router) runFunction(
 	ctx context.Context,
 	timeout mssqlFunctionTimeout,
 	collect func(context.Context) *funcapi.FunctionResponse,
 ) *funcapi.FunctionResponse {
-	if c.functionDB == nil {
+	if r.deps.DB() == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 	queryCtx, cancel := context.WithTimeout(ctx, timeout.value)
 	defer cancel()
-	if _, err := c.ensureEngineEdition(queryCtx); err != nil {
+	if err := r.deps.EnsureServerInfo(queryCtx); err != nil {
 		if response := timeout.contextError(queryCtx, err); response != nil {
 			return response
 		}
@@ -58,27 +59,44 @@ func (c *Collector) runFunction(
 	return collect(queryCtx)
 }
 
-func (c *Collector) xeReadPermission() string {
-	if c.isAzureSQLDatabase() {
+func (r *router) xeReadPermission() string {
+	if r.deps.ServerInfo().AzureSQLDatabase {
 		return "VIEW DATABASE PERFORMANCE STATE"
 	}
-	if c.currentMajorVersion() >= 16 {
+	if r.deps.ServerInfo().MajorVersion >= 16 {
 		return "VIEW SERVER PERFORMANCE STATE"
 	}
 	return "VIEW SERVER STATE"
 }
 
-// funcRouter routes method calls to appropriate function handlers.
-type funcRouter struct {
-	collector *Collector
+// router routes method calls to appropriate function handlers.
+type router struct {
+	deps Deps
+	cfg  FunctionsConfig
+	log  *logger.Logger
+
+	// top-queries source discovery caches (per-instance to handle different SQL Server versions).
+	// Each probe has its own lock so they cannot block each other on the database round trip.
+	queryStoreColsMu      sync.RWMutex
+	queryStoreCols        map[string]bool
+	queryStoreSupportedMu sync.RWMutex
+	queryStoreSupported   *bool // nil until the capability probe has run
+	planCacheColsMu       sync.RWMutex
+	planCacheCols         map[string]bool
 
 	handlers map[string]funcapi.MethodHandler
 }
 
-func newFuncRouter(c *Collector) *funcRouter {
-	r := &funcRouter{
-		collector: c,
-		handlers:  make(map[string]funcapi.MethodHandler),
+func NewRouter(deps Deps, log *logger.Logger, cfg FunctionsConfig) funcapi.MethodHandler {
+	return newRouter(deps, log, cfg)
+}
+
+func newRouter(deps Deps, log *logger.Logger, cfg FunctionsConfig) *router {
+	r := &router{
+		deps:     deps,
+		log:      log,
+		cfg:      cfg,
+		handlers: make(map[string]funcapi.MethodHandler),
 	}
 	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
 	r.handlers[deadlockInfoMethodID] = newFuncDeadlockInfo(r)
@@ -87,40 +105,32 @@ func newFuncRouter(c *Collector) *funcRouter {
 }
 
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcRouter)(nil)
+var _ funcapi.MethodHandler = (*router)(nil)
 
-func (r *funcRouter) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (r *router) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
 	if h, ok := r.handlers[method]; ok {
 		return h.MethodParams(ctx, method)
 	}
 	return nil, fmt.Errorf("unknown method: %s", method)
 }
 
-func (r *funcRouter) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (r *router) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if h, ok := r.handlers[method]; ok {
 		return h.Handle(ctx, method, params)
 	}
 	return funcapi.NotFoundResponse(method)
 }
 
-func (r *funcRouter) Cleanup(ctx context.Context) {
+func (r *router) Cleanup(ctx context.Context) {
 	for _, h := range r.handlers {
 		h.Cleanup(ctx)
 	}
 }
 
-func mssqlMethods() []funcapi.FunctionConfig {
+func Methods() []funcapi.FunctionConfig {
 	return []funcapi.FunctionConfig{
 		topQueriesFunctionConfig(),
 		deadlockInfoFunctionConfig(),
 		errorInfoFunctionConfig(),
 	}
-}
-
-func mssqlFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-	c, ok := job.Collector().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcRouter
 }

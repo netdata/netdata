@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
@@ -34,18 +34,18 @@ func (t mssqlXEventReadTarget) fileQueryArgs(eventName string) []any {
 // from the session name: the filename is operator-chosen and the two frequently differ.
 // The ring_buffer target only exists while the session is running, so that path still
 // goes through the runtime DMVs.
-func (c *Collector) resolveMSSQLXEventReadTarget(
+func (r *router) resolveMSSQLXEventReadTarget(
 	ctx context.Context,
 	sessionName string,
 	useRingBuffer bool,
 ) (mssqlXEventReadTarget, bool, error) {
 	if !useRingBuffer {
 		query := queryMSSQLXEventSessionEventFilePath
-		if c.isAzureSQLDatabase() {
+		if r.deps.ServerInfo().AzureSQLDatabase {
 			query = queryMSSQLXEventDatabaseSessionEventFilePath
 		}
 		var configured sql.NullString
-		err := c.functionDB.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&configured)
+		err := r.deps.DB().QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&configured)
 		if errors.Is(err, sql.ErrNoRows) {
 			return mssqlXEventReadTarget{}, false, nil
 		}
@@ -59,7 +59,7 @@ func (c *Collector) resolveMSSQLXEventReadTarget(
 		return target, true, nil
 	}
 
-	available, err := c.mssqlRingBufferAvailable(ctx, sessionName)
+	available, err := r.mssqlRingBufferAvailable(ctx, sessionName)
 	return mssqlXEventReadTarget{}, available, err
 }
 
@@ -95,12 +95,12 @@ func eventFileReadTarget(configured string) mssqlXEventReadTarget {
 }
 
 // The target query joins live sessions, so it also excludes stopped sessions.
-func (c *Collector) mssqlRingBufferAvailable(ctx context.Context, sessionName string) (bool, error) {
+func (r *router) mssqlRingBufferAvailable(ctx context.Context, sessionName string) (bool, error) {
 	query := queryMSSQLXEventSessionHasRingBuffer
-	if c.isAzureSQLDatabase() {
+	if r.deps.ServerInfo().AzureSQLDatabase {
 		query = queryMSSQLXEventDatabaseSessionHasRingBuffer
 	}
 	var count int
-	err := c.functionDB.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
+	err := r.deps.DB().QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
 	return count > 0, err
 }

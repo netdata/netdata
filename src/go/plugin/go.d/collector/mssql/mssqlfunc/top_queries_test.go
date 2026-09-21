@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mssql
+package mssqlfunc
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 )
 
 func TestMSSQLMethods(t *testing.T) {
-	methods := mssqlMethods()
+	methods := Methods()
 
 	req := require.New(t)
 	req.Len(methods, 3)
@@ -88,10 +88,12 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreCatalogMissing(t *testing.
 	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.dm_exec_query_stats`).
 		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.6024.0", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
 	require.NoError(t, err)
@@ -113,10 +115,12 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreNotEnabledOnAnyDatabase(t 
 	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.dm_exec_query_stats`).
 		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	source, cols, err := handler.resolveTopQueriesSource(context.Background())
 	require.NoError(t, err)
@@ -135,10 +139,12 @@ func TestTopQueries_FallsBackToPlanCacheWhenQueryStoreDetectionFails(t *testing.
 	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.dm_exec_query_stats`).
 		WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	source, cols, err := handler.resolveTopQueriesSource(context.Background())
 	require.NoError(t, err)
@@ -168,10 +174,12 @@ func TestTopQueries_SourceFollowsQueryStoreEnablement(t *testing.T) {
 				WillReturnRows(sqlmock.NewRows(planCacheProbeColumns))
 			mock.ExpectQuery(availabilityQuery).WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("appdb"))
 
-			c := New()
-			c.functionDB = db
-			c.setServerProperties("16.0.4265.3", edition)
-			handler := newFuncTopQueries(&funcRouter{collector: c})
+			router := newTestRouter(db)
+			router.deps.(*testDeps).info = ServerInfo{
+				MajorVersion:     16,
+				AzureSQLDatabase: edition == engineEditionAzureSQLDatabase,
+			}
+			handler := newFuncTopQueries(router)
 			for _, want := range []topQueriesSource{topQueriesSourceQueryStore, topQueriesSourcePlanCache, topQueriesSourceQueryStore} {
 				source, _, err := handler.resolveTopQueriesSource(context.Background())
 				require.NoError(t, err)
@@ -193,10 +201,12 @@ func TestTopQueries_UnavailableWhenNeitherSourceIsUsable(t *testing.T) {
 	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.dm_exec_query_stats`).
 		WillReturnRows(sqlmock.NewRows([]string{"execution_count"}))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("10.0.1600.22", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     10,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	response := handler.collectData(context.Background(), "")
 	assert.Equal(t, 503, response.Status)
@@ -221,10 +231,12 @@ func TestTopQueries_PlanCacheResponseReportsItsSource(t *testing.T) {
 	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs("netdata_errors_0_*.xel", "netdata_errors_0_", "error_reported", 500).
 		WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.6024.0", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	response := handler.collectData(context.Background(), "")
 	require.Equal(t, 200, response.Status)
@@ -260,10 +272,12 @@ func TestTopQueries_AvailableOnAzureSQLDatabaseReportingVersion12(t *testing.T) 
 	require.NoError(t, err)
 	defer db.Close()
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
+	handler := newFuncTopQueries(router)
 
 	supported, err := handler.queryStoreSupported(context.Background())
 	require.NoError(t, err)
@@ -384,10 +398,12 @@ func TestTopQueries_QueryStoreCapabilityTimeout(t *testing.T) {
 	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
 	mock.ExpectQuery("is_query_store_on").WillReturnError(context.DeadlineExceeded)
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	method := topQueriesFunctionConfig()
 	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
@@ -410,10 +426,12 @@ func TestTopQueries_QueryStoreCapabilityError(t *testing.T) {
 	mock.ExpectQuery("is_query_store_on").WillReturnError(probeErr)
 	mock.ExpectQuery("is_query_store_on").WillReturnError(probeErr)
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	method := topQueriesFunctionConfig()
 	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
@@ -435,11 +453,13 @@ func TestTopQueries_QueryStoreColumnDiscoveryTimeout(t *testing.T) {
 	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(context.DeadlineExceeded)
 
 	supported := true
-	c := New()
-	c.functionDB = db
-	c.queryStoreSupported = &supported
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.queryStoreSupported = &supported
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	response := handler.collectData(context.Background(), "")
 	assert.Equal(t, 504, response.Status)
@@ -455,10 +475,9 @@ func TestTopQueries_QueryStoreColumnDiscoveryCancellation(t *testing.T) {
 	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(context.Canceled)
 
 	supported := true
-	c := New()
-	c.functionDB = db
-	c.queryStoreSupported = &supported
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.queryStoreSupported = &supported
+	handler := newFuncTopQueries(router)
 
 	response := handler.collectData(context.Background(), "")
 	assert.Equal(t, 499, response.Status)
@@ -474,10 +493,12 @@ func TestTopQueries_QueryStorePermissionDenied(t *testing.T) {
 	mock.ExpectQuery("is_query_store_on").
 		WillReturnError(errors.New("VIEW SERVER PERFORMANCE STATE permission was denied"))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	response := handler.collectData(context.Background(), "")
 	assert.Equal(t, 403, response.Status)
@@ -494,11 +515,13 @@ func TestTopQueries_MethodParamsDefersTransientColumnDiscoveryErrorsToHandle(t *
 	mock.ExpectQuery("SELECT TOP 1 name").WillReturnError(context.DeadlineExceeded)
 
 	supported := true
-	c := New()
-	c.functionDB = db
-	c.queryStoreSupported = &supported
-	c.setServerProperties("16.0.4265.3", 3)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.queryStoreSupported = &supported
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     16,
+		AzureSQLDatabase: false,
+	}
+	handler := newFuncTopQueries(router)
 
 	params, err := handler.MethodParams(context.Background(), topQueriesMethodID)
 	require.NoError(t, err)
@@ -520,9 +543,8 @@ func TestDetectQueryStoreColumns_RespectsContextWhileAnotherProbeRuns(t *testing
 		WillDelayFor(300 * time.Millisecond).
 		WillReturnError(sql.ErrNoRows)
 
-	c := New()
-	c.functionDB = db
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	handler := newFuncTopQueries(router)
 
 	firstDone := make(chan error, 1)
 	go func() {
@@ -552,9 +574,8 @@ func TestDetectQueryStoreColumns_EscapesDatabaseIdentifier(t *testing.T) {
 	mock.ExpectQuery(`SELECT TOP 0 \* FROM \[db\]\]name\]\.sys\.query_store_runtime_stats`).
 		WillReturnRows(sqlmock.NewRows([]string{"count_executions", "avg_duration"}))
 
-	c := New()
-	c.functionDB = db
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	handler := newFuncTopQueries(router)
 
 	cols, err := handler.detectQueryStoreColumns(context.Background())
 	require.NoError(t, err)
@@ -580,10 +601,12 @@ func TestDetectQueryStoreColumns_AzureSQLDatabaseUsesCurrentDatabase(t *testing.
 	mock.ExpectQuery(`SELECT TOP 0 \* FROM sys\.query_store_runtime_stats`).
 		WillReturnRows(sqlmock.NewRows([]string{"count_executions", "avg_duration"}))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
+	handler := newFuncTopQueries(router)
 
 	cols, err := handler.detectQueryStoreColumns(context.Background())
 	require.NoError(t, err)
@@ -592,9 +615,12 @@ func TestDetectQueryStoreColumns_AzureSQLDatabaseUsesCurrentDatabase(t *testing.
 }
 
 func TestBuildQueryStoreSQL_AzureSQLDatabaseUsesCurrentDatabase(t *testing.T) {
-	c := New()
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(nil)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
+	handler := newFuncTopQueries(router)
 
 	query := handler.buildQueryStoreSQL([]topQueriesColumn{topQueriesColumns[2], topQueriesColumns[3]}, "calls", 7, 10)
 
@@ -612,11 +638,13 @@ func TestFetchMSSQLPlanOpsForDB_AzureSQLDatabaseUsesCurrentDatabase(t *testing.T
 	mock.ExpectQuery(`FROM sys\.query_store_query q`).
 		WillReturnRows(sqlmock.NewRows([]string{"query_hash", "query_plan"}))
 
-	c := New()
-	c.functionDB = db
-	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
+	router := newTestRouter(db)
+	router.deps.(*testDeps).info = ServerInfo{
+		MajorVersion:     12,
+		AzureSQLDatabase: true,
+	}
 
-	ops, err := c.fetchMSSQLPlanOpsForDB(context.Background(), "azure-db", []string{"0x01"})
+	ops, err := router.fetchMSSQLPlanOpsForDB(context.Background(), "azure-db", []string{"0x01"})
 	require.NoError(t, err)
 	assert.Empty(t, ops)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -633,9 +661,8 @@ func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t
 		WillDelayFor(300 * time.Millisecond).
 		WillReturnError(sql.ErrNoRows)
 
-	c := New()
-	c.functionDB = db
-	handler := newFuncTopQueries(&funcRouter{collector: c})
+	router := newTestRouter(db)
+	handler := newFuncTopQueries(router)
 
 	discoveryDone := make(chan error, 1)
 	go func() {
@@ -660,10 +687,22 @@ func TestQueryStoreSupported_RespectsContextWhileColumnDiscoveryUsesConnection(t
 func TestTopQueriesScanDynamicRows(t *testing.T) {
 	makeCols := func() []topQueriesColumn {
 		return []topQueriesColumn{
-			{ColumnMeta: funcapi.ColumnMeta{Name: "query", Type: funcapi.FieldTypeString}},
-			{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Type: funcapi.FieldTypeInteger}},
-			{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Type: funcapi.FieldTypeDuration}},
-			{ColumnMeta: funcapi.ColumnMeta{Name: "ignored", Type: funcapi.FieldTypeBoolean}},
+			{ColumnMeta: funcapi.ColumnMeta{
+				Name: "query",
+				Type: funcapi.FieldTypeString,
+			}},
+			{ColumnMeta: funcapi.ColumnMeta{
+				Name: "calls",
+				Type: funcapi.FieldTypeInteger,
+			}},
+			{ColumnMeta: funcapi.ColumnMeta{
+				Name: "totalTime",
+				Type: funcapi.FieldTypeDuration,
+			}},
+			{ColumnMeta: funcapi.ColumnMeta{
+				Name: "ignored",
+				Type: funcapi.FieldTypeBoolean,
+			}},
 		}
 	}
 
