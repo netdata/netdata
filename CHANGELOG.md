@@ -387,6 +387,14 @@
 - Docs(go.d/redfish): write the integration page for operators ([#23962](https://github.com/netdata/netdata/issues/23962))
 - Regenerate integrations docs ([#23958](https://github.com/netdata/netdata/issues/23958))
 - Build(deps): bump anyio from 4.13.0 to 4.14.2 in /packaging/tools/automation/mcp ([#23955](https://github.com/netdata/netdata/issues/23955))
+- Fix the support bundle collecting a removed go.d state file ([#23894](https://github.com/netdata/netdata/issues/23894))
+- Capture what actually grants journal access, and add an opt-in plugin debug ([#23947](https://github.com/netdata/netdata/issues/23947))
+- Add a support-bundle triage skill ([#23895](https://github.com/netdata/netdata/issues/23895))
+- Feat(go.d): add SMBIOS memory inventory and persistent loss detection ([#23965](https://github.com/netdata/netdata/issues/23965))
+- Regenerate integrations docs ([#23966](https://github.com/netdata/netdata/issues/23966))
+- Docs(skills): apply the smbios_memory retrospective to the collector rules ([#23967](https://github.com/netdata/netdata/issues/23967))
+- Test(go.d/collecttest): check flat config forms and, on request, option defaults ([#23968](https://github.com/netdata/netdata/issues/23968))
+- Feat(go.d/chartengine): support named active chart template sets ([#23971](https://github.com/netdata/netdata/issues/23971))
 
 ## [2.11.0] - 2026-08-12
 
