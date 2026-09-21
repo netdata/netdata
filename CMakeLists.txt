@@ -3761,6 +3761,7 @@ if(ENABLE_DBENGINE)
                 src/database/storage-engines/dbengine/tests/api_scale_pages.cc
                 src/database/storage-engines/dbengine/tests/api_scale_extents.cc
                 src/database/storage-engines/dbengine/tests/api_scale_restart.cc
+                src/database/storage-engines/dbengine/tests/api_scale_rotation.cc
                 src/database/storage-engines/dbengine/tests/internal_compression.cc
                 src/database/storage-engines/dbengine/tests/internal_pgc.cc
                 src/database/storage-engines/dbengine/tests/internal_pgd.cc
