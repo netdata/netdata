@@ -443,13 +443,15 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 	)
 }
 
+// probeFailurePlan supplies failure handling for preparation and runtime startup.
+// Plain-stock removal applies only to preparation failures.
 type probeFailurePlan struct {
 	postimage        dyncfg.GraphConfig                                 // graph postimage to commit as StatusFailed
 	failedCleanup    lifecycle.TaskCleanup                              // protocol cleanup for the failed status
-	removedCleanup   lifecycle.TaskCleanup                              // protocol cleanup when a plain stock job is removed instead
+	removedCleanup   lifecycle.TaskCleanup                              // preparation only: cleanup when a plain stock job is removed
 	result           func(*autoDetectionFailure) lifecycle.SealedResult // builds the dyncfg response from the failure
 	afterApply       func(*autoDetectionFailure)                        // side effect (retry scheduling) after apply
-	removePlainStock bool                                               // remove instead of fail for a stock + non-coded failure
+	removePlainStock bool                                               // preparation only: remove a stock job on a non-coded failure
 }
 
 // autoDetectionFailureResultFunc builds a probeFailurePlan.result closure

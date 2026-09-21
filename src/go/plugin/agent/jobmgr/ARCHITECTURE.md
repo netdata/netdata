@@ -637,9 +637,9 @@ flowchart TD
 
 The optional V2 `Run(ctx, ready) error` hook acquires resources after runtime promotion, which requires predecessor
 physical release. `ManagedRun` serializes readiness, startup error, cancellation and timeout; only accepted readiness
-starts collection and running availability. Non-Runner V1/V2 jobs signal readiness directly. Job Manager gives startup
-the existing internal two-minute process-attempt budget without applying a deadline to the successful runtime
-lifetime.
+starts collection and running availability. Non-Runner V1/V2 jobs signal readiness directly. Job Manager starts a separate
+startup timer in the owner's `Start`, using `jobmgr.DefaultProcessAttemptFuse` for its two-minute duration. Runtime
+admission has already stopped the preparation fuse; neither timer limits the successfully started runtime lifetime.
 
 A typed `runtimeStartupFailure` carries the collector outcome through the existing source-specific activation
 fallback: discovery, DynCfg update/enable/restart, accepted activation and secret-dependent restart commit Failed,

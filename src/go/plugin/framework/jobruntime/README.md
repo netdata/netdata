@@ -12,10 +12,11 @@ hook MUST call `ready()` only after all fallible startup prerequisites succeed a
 depend on observation data.
 
 `ManagedRun` settles startup exactly once. Accepted readiness enables collection and running availability; duplicate
-or late callbacks cannot revive canceled or failed startup. Job Manager bounds logical startup waiting with its
-internal two-minute process-attempt budget. This timer applies only before readiness, not to the successful runtime
-lifetime. Timeout cancels the attempt but does not release physical ownership: `Run` must return before collector
-cleanup begins, and cleanup must finish before a same-job successor can acquire the runtime identity.
+or late callbacks cannot revive canceled or failed startup. Job Manager bounds logical startup waiting with a
+separate timer using the process-attempt fuse's default two-minute duration. This timer starts when runtime startup is
+requested and applies only before readiness, not to the successful runtime lifetime. Timeout cancels the attempt but
+does not release physical ownership: `Run` must return before collector cleanup begins, and cleanup must finish before
+a same-job successor can acquire the runtime identity.
 
 A normal startup error uses the existing configured autodetection retry cadence and tries. Runtime acquisition
 failures retain a Failed configuration, including stock jobs, and default to response code 503 when the collector
