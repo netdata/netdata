@@ -24,6 +24,10 @@ protected:
         STORAGE_METRIC_HANDLE *smh = nullptr;
         STORAGE_METRICS_GROUP *smg = nullptr;
         STORAGE_COLLECT_HANDLE *sch = nullptr;
+
+        // open() reports a handle it could not get, but cannot end the case itself: the case asserts this before
+        // storing into the handles, so a refused handle fails the case by name rather than by a crash.
+        bool opened() const { return smh && sch; }
     };
 
     Collector open(uint32_t update_every) {
@@ -60,6 +64,7 @@ const size_t POINTS_ACROSS_PAGES = 1100;
 
 TEST_F(ScalePagesTest, PointsAcrossAPageBoundaryAllComeBack) {
     Collector c = open(1);
+    ASSERT_TRUE(c.opened());
     const size_t pages_before = main_cache_pages_added();
 
     for (size_t i = 1; i <= POINTS_ACROSS_PAGES; i++)
@@ -91,6 +96,7 @@ TEST_F(ScalePagesTest, PointsAcrossAPageBoundaryAllComeBack) {
 
 TEST_F(ScalePagesTest, AShortGapIsFilledWithEmptySlotsOnTheSamePage) {
     Collector c = open(1);
+    ASSERT_TRUE(c.opened());
     const size_t pages_before = main_cache_pages_added();
 
     // Two missing seconds between two points: the store path fills them so the page stays one page.
@@ -116,6 +122,7 @@ TEST_F(ScalePagesTest, AShortGapIsFilledWithEmptySlotsOnTheSamePage) {
 
 TEST_F(ScalePagesTest, AGapLargerThanAPageStartsANewPage) {
     Collector c = open(1);
+    ASSERT_TRUE(c.opened());
     const size_t pages_before = main_cache_pages_added();
 
     // A gap no page could hold: rather than fill it, the store path ends the page and starts another at the
@@ -143,6 +150,7 @@ TEST_F(ScalePagesTest, AStepSmallerThanTheMetricsEndsThePage) {
     // A metric collected every two seconds, then a point one second after the last: the page cannot represent
     // it, so the store path ends the page and the point starts the next one.
     Collector c = open(2);
+    ASSERT_TRUE(c.opened());
     const size_t pages_before = main_cache_pages_added();
 
     store_point(c.sch, BASE_TIME + 2, 1);
@@ -172,6 +180,7 @@ TEST_F(ScalePagesTest, AStepThatIsNotAMultipleOfTheMetricsEndsThePage) {
     // Every two seconds, then a point three seconds after the last: not a gap the page can fill on its grid, so
     // the page ends and the point starts the next one.
     Collector c = open(2);
+    ASSERT_TRUE(c.opened());
     const size_t pages_before = main_cache_pages_added();
 
     store_point(c.sch, BASE_TIME + 2, 1);
