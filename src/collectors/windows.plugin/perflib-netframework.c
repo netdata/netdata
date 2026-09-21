@@ -1338,9 +1338,10 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                // Gen 0 heap size is the allocation budget, not current heap occupancy.
+                // Gen 0 heap size is the allocation budget, not current heap occupancy. The dimension id
+                // stays "gen0" so the series survives upgrades; only the displayed name carries the distinction.
                 p->rd_clrmemory_heap_gen0 =
-                    rrddim_add(p->st_clrmemory_heap_size, "gen0_budget", "gen0_budget", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(p->st_clrmemory_heap_size, "gen0", "gen0_budget", 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 p->rd_clrmemory_heap_gen1 =
                     rrddim_add(p->st_clrmemory_heap_size, "gen1", "gen1", 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 p->rd_clrmemory_heap_gen2 =
