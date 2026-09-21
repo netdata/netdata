@@ -595,6 +595,7 @@ func (f *Factory) buildV2(
 		AutoDetectEvery: config.AutoDetectionRetry(),
 		IsStock:         config.SourceType() == confgroup.TypeStock,
 		FunctionOnly:    functionOnly,
+		StoreFirst:      creator.StoreFirst,
 		RuntimeService:  runtimeStage,
 		Publication:     f.config.Publication,
 	}

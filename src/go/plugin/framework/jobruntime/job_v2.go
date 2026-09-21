@@ -47,6 +47,7 @@ type JobV2Config struct {
 	VnodeLookup             VnodeLookup
 	Publication             *hostoutput.Publisher
 	FunctionOnly            bool
+	StoreFirst              bool
 	RuntimeService          runtimecomp.Service
 	LifecycleErrorSanitizer func(error) error
 }
@@ -71,6 +72,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		autoDetectTries:         infTries,
 		isStock:                 cfg.IsStock,
 		functionOnly:            cfg.FunctionOnly,
+		storeFirst:              cfg.StoreFirst,
 		module:                  cfg.Module,
 		labels:                  cloneLabels(cfg.Labels),
 		out:                     cfg.Out,
@@ -119,6 +121,7 @@ type JobV2 struct {
 	autoDetectTries int
 	isStock         bool
 	functionOnly    bool
+	storeFirst      bool
 	labels          map[string]string
 
 	*logger.Logger
@@ -285,14 +288,7 @@ func (j *JobV2) cleanup(emit bool) {
 			continue
 		}
 
-		env := chartemit.EmitEnv{
-			TypeID:      j.fullName,
-			UpdateEvery: j.updateEvery,
-			Plugin:      j.pluginName,
-			Module:      j.moduleName,
-			JobName:     j.name,
-			JobLabels:   j.labels,
-		}
+		env := j.emitEnv(0, jobV2EmissionDecision{})
 		if snapshot.host.isVnode() {
 			env.HostScope = &chartemit.HostScope{
 				GUID: snapshot.host.guid,
@@ -821,6 +817,7 @@ func (j *JobV2) emitEnv(sinceLastRun int, decision jobV2EmissionDecision) charte
 		JobName:     j.name,
 		JobLabels:   j.labels,
 		MSSinceLast: sinceLastRun,
+		StoreFirst:  j.storeFirst,
 	}
 	env.HostScope = decision.hostScope
 	return env
