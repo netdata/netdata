@@ -890,6 +890,7 @@ func (pjc *preparedJobCandidate) run(
 	if factory == nil || config == nil {
 		return context.Canceled
 	}
+	startupTimeout := factory.startupTimeout
 	cloned, err := config.Clone()
 	if err != nil {
 		workerResult <- stagedJobResult{err: err}
@@ -955,7 +956,7 @@ func (pjc *preparedJobCandidate) run(
 			candidate.candidateJob.FullName(),
 		),
 	)
-	owner.startupTimeout = pjc.factory.startupTimeout
+	owner.startupTimeout = startupTimeout
 	pjc.publish(stagedJobResult{
 		candidate:     candidate,
 		owner:         owner,

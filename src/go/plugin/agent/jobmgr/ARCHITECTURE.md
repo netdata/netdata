@@ -638,23 +638,26 @@ flowchart TD
 The optional V2 `Run(ctx, ready) error` hook acquires resources after runtime promotion, which requires predecessor
 physical release. `ManagedRun` serializes readiness, startup error, cancellation and timeout; only accepted readiness
 starts collection and running availability. Non-Runner V1/V2 jobs signal readiness directly. Job Manager gives startup
-the existing internal two-minute process-attempt budget without applying a deadline to the successful runtime lifetime.
+the existing internal two-minute process-attempt budget without applying a deadline to the successful runtime
+lifetime.
 
-A typed `runtimeStartupFailure` carries the collector outcome through the existing source-specific activation fallback:
-discovery, DynCfg update/enable/restart, accepted activation and secret-dependent restart commit Failed, return their
-operational response and use the existing configured retry policy. A recovered collector `Run` panic or unexpected nil
-return is non-retryable. Positive classification must survive secret redaction without absorbing a joined structural or
-cleanup error. Operational outcomes do not become errors from the process-owned worker; physical cleanup still does.
+A typed `runtimeStartupFailure` carries the collector outcome through the existing source-specific activation
+fallback: discovery, DynCfg update/enable/restart, accepted activation and secret-dependent restart commit Failed,
+return their operational response and use the existing configured retry policy. Uncoded startup errors use response
+code 503; stock configurations remain visible as Failed after successful detection followed by runtime acquisition
+failure. Existing plain-stock removal for unsuccessful Init/Check detection is unchanged. A recovered collector `Run`
+panic or unexpected nil return is non-retryable. Positive classification must survive secret redaction without
+absorbing a joined structural or cleanup error. Operational outcomes do not become errors from the process-owned
+worker; physical cleanup still does.
 
 After accepted readiness, unexpected return atomically revokes new output admission before logging or joining the
-managed
-loop. The owner submits a response-free command on the job's existing lane with its exact resource generation. The
-command commits Failed and detaches that generation, without scheduling a retry; a stale command is a no-op. Submission
-does not wait for reconciliation, because finalization itself waits for detachment. Successful pending installation
-stays
-valid when terminal failure arrives before acknowledgement. Existing admitted writes drain normally, and no collector
-cleanup runs until both Run and Collect have physically exited. A recovered collector panic is restartable after clean
-release; independent ownership, lifecycle or cleanup failure still quarantines the process identity.
+managed loop. The owner submits a response-free command on the job's existing lane with its exact resource generation.
+The command commits Failed and detaches that generation, without scheduling a retry; a stale command is a no-op.
+Submission does not wait for reconciliation, because finalization itself waits for detachment. Successful pending
+installation stays valid when terminal failure arrives before acknowledgement. Existing admitted writes drain
+normally, and no collector cleanup runs until both Run and Collect have physically exited. A recovered collector panic
+is restartable after clean release; independent ownership, lifecycle or cleanup failure still quarantines the process
+identity.
 
 ### Activation failure classification
 

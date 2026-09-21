@@ -310,9 +310,6 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 			failure := typed.failure
 			postimage := &startup.postimage
 			cleanup := startup.failedCleanup
-			if startup.removePlainStock && !failure.coded {
-				postimage, cleanup = nil, startup.removedCleanup
-			}
 			result := lifecycle.SealedResult{}
 			if startup.result != nil {
 				result = startup.result(failure)

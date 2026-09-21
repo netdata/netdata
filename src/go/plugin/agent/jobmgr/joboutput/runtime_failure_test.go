@@ -530,3 +530,71 @@ func TestRuntimeStartupFailureDoesNotHideCleanupPanic(t *testing.T) {
 	// No output/generation resource remains, but the process identity stays quarantined.
 	require.Zero(t, attempts.Census().Active)
 }
+
+// Pause after the real admission commits, before the candidate worker can use it.
+type runtimeCandidateAdmissionBarrier struct {
+	jobmgr.ProcessAttemptAuthority
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (a runtimeCandidateAdmissionBarrier) StartProcessAttempt(ctx context.Context, plan jobmgr.ProcessAttemptPlan) (jobmgr.ProcessAttempt, error) {
+	original := plan.Work
+	plan.Work = func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+		return original(ctx, runtimeAdmissionFunc(func() error {
+			if err := admission.Admit(); err != nil {
+				return err
+			}
+			close(a.entered)
+			<-a.release
+			return nil
+		}))
+	}
+	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+}
+
+type runtimeAdmissionFunc func() error
+
+func (f runtimeAdmissionFunc) Admit() error { return f() }
+
+func TestRuntimeCandidateReleaseDuringAdmissionCleansWithoutQuarantine(t *testing.T) {
+	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
+	var cleaned atomic.Int32
+	configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
+		return &runtimeTestCollector{
+			run:     func(context.Context, func()) error { panic("released candidate must never Run") },
+			cleanup: func() { cleaned.Add(1) },
+		}
+	})
+	authority := controller.factory.config.Attempts.(*containment.Authority)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	defer releaseOnce.Do(func() { close(release) })
+	controller.factory.config.Attempts = runtimeCandidateAdmissionBarrier{ProcessAttemptAuthority: authority, entered: entered, release: release}
+	candidate, err := controller.factory.newCandidate(factoryTestConfig(false))
+	require.NoError(t, err)
+	candidate.Start()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("candidate was not admitted")
+	}
+	candidate.Release()
+	releaseOnce.Do(func() { close(release) })
+	require.Eventually(t, func() bool { return authority.Census().Active == 0 }, time.Second, time.Millisecond)
+	require.Equal(t, containment.Census{}, authority.Census(), "canceled candidate must clean up, not panic or quarantine")
+	require.EqualValues(t, 1, cleaned.Load())
+}
+
+func TestRuntimeStartupFailureRetainsStockConfig(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
+		return &runtimeTestCollector{run: func(context.Context, func()) error { return errors.New("listen 127.0.0.1:8125: bind failed") }}
+	})
+	cfg := factoryTestConfig(false).SetSourceType(confgroup.TypeStock)
+	require.Nil(t, runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, nil, 1)))
+	record, exists := graph.Lookup(cfg.FullName())
+	require.True(t, exists, "runtime acquisition failure must remain visible after successful detection")
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	requireFactoryAttemptsIdle(t, controller.factory)
+}
