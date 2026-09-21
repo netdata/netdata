@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -80,16 +81,19 @@ type FactoryConfig struct {
 // own current-job indexing or lifecycle state.
 type Factory struct {
 	config           FactoryConfig
+	startupTimeout   time.Duration
+	notifyRunFailure func(lifecycle.ResourceIdentity, *jobruntime.RunFailure)
 	runtimeStaging   bool
 	runWithoutClaims func(context.Context, func(context.Context) error) (error, error)
 }
 
 type factoryAttachment struct {
-	runtime         runtimecomp.Service
-	vnode           func(string) (jobruntime.VnodeSnapshot, bool)
-	handlerAttacher JobHandlerAttacher
-	scheduler       *Scheduler
-	observer        lifecycle.RuntimeObserver
+	runtime          runtimecomp.Service
+	vnode            func(string) (jobruntime.VnodeSnapshot, bool)
+	handlerAttacher  JobHandlerAttacher
+	scheduler        *Scheduler
+	observer         lifecycle.RuntimeObserver
+	notifyRunFailure func(lifecycle.ResourceIdentity, *jobruntime.RunFailure)
 }
 
 func (f *Factory) attachment() factoryAttachment {
@@ -97,11 +101,12 @@ func (f *Factory) attachment() factoryAttachment {
 		return factoryAttachment{}
 	}
 	return factoryAttachment{
-		runtime:         f.config.Runtime,
-		vnode:           f.config.Vnode,
-		handlerAttacher: f.config.HandlerAttacher,
-		scheduler:       f.config.Scheduler,
-		observer:        f.config.Observer,
+		runtime:          f.config.Runtime,
+		vnode:            f.config.Vnode,
+		handlerAttacher:  f.config.HandlerAttacher,
+		scheduler:        f.config.Scheduler,
+		observer:         f.config.Observer,
+		notifyRunFailure: f.notifyRunFailure,
 	}
 }
 
@@ -127,9 +132,16 @@ func (fa factoryAttachment) attach(
 	if err != nil {
 		return constructedJobAttachment{}, err
 	}
+	owner.notifyTerminal = func(failure *jobruntime.RunFailure) {
+		if fa.notifyRunFailure != nil {
+			fa.notifyRunFailure(identity, failure)
+		}
+	}
 	attached.Observer = fa.observer
 	attached.resolvedReferences = candidate.resolvedReferences
 	attached.finalCleanup = candidate.finalCleanup
+	attached.autoDetectionEvery = candidate.autoDetectionEvery
+	attached.retryAutoDetection = candidate.retryAutoDetection
 	attached.runtimeStage = candidate.runtimeStage
 	attached.vnodeStage = candidate.vnodeStage
 	attached.outputGate = candidate.outputGate
@@ -196,6 +208,7 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 	}
 	return &Factory{
 		config:           config,
+		startupTimeout:   jobmgr.DefaultProcessAttemptFuse,
 		runWithoutClaims: jobmgr.RunWithoutClaims,
 	}, nil
 }

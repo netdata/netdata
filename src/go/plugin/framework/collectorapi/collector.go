@@ -72,15 +72,15 @@ type ChartTemplateSetProvider interface {
 	ChartTemplateSet() *chartengine.TemplateSet
 }
 
-// CollectorV2Runner is an optional long-running V2 collector hook.
-//
-// Run is called only after the runtime job starts. It is not called during
-// config validation or autodetection. Implementations should block until ctx is
-// canceled, and must return promptly after ctx.Done(). Returning before
-// cancellation is treated as an unexpected runner stop and is logged by the job
-// runtime.
+// CollectorV2Runner optionally owns operational acquisition and serving.
+// Init/Check prepare configuration without acquiring exclusive runtime resources.
+// Run starts after predecessor release. Call ready after all fallible startup
+// prerequisites succeed and Collect can safely run; no packet or poll is required.
+// Duplicate/late ready calls are ignored. Run must return promptly on cancellation.
+// Unexpected return (including nil) fails the job. Before readiness, ordinary
+// failures use configured startup retries; after readiness recovery needs restart.
 type CollectorV2Runner interface {
-	Run(context.Context) error
+	Run(ctx context.Context, ready func()) error
 }
 
 // ConfiguredVnodeConsumer is an optional CollectorV1 or CollectorV2 capability. It receives an

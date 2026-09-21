@@ -112,5 +112,10 @@ func redactResolvedLifecycleError(err error) error {
 	if errors.As(err, &preparation) {
 		safe = &jobConfigPreparationError{cause: safe, failure: preparation.failure}
 	}
+	if startup, ok := onlyRuntimeStartupFailure(err); ok {
+		copy := *startup.failure
+		copy.cause = safe
+		safe = &runtimeStartupFailure{failure: &copy}
+	}
 	return safe
 }

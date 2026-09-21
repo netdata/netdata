@@ -2,6 +2,38 @@
 
 `Job` and `JobV2` manage collector lifecycle and protocol publication for V1 and V2 collectors.
 
+## Runtime Readiness And Termination
+
+A V2 collector with a long-lived receiver or background loop MAY implement `CollectorV2Runner.Run(ctx context.Context,
+ready func()) error`. `Init` and `Check` prepare and validate the candidate; DynCfg `test` never calls `Run`.
+Exclusive runtime resources belong in `Run`, after the predecessor has physically finished its loop and cleanup. The
+hook MUST call `ready()` only after all fallible startup prerequisites succeed and its state is safe for concurrent
+`Collect`. Readiness does not require a first packet or successful remote observation. Function availability may still
+depend on observation data.
+
+`ManagedRun` settles startup exactly once. Accepted readiness enables collection and running availability; duplicate
+or late callbacks cannot revive canceled or failed startup. Job Manager bounds logical startup waiting with a
+separate timer using the process-attempt fuse's default two-minute duration. This timer starts when runtime startup is
+requested and applies only before readiness, not to the successful runtime lifetime. Timeout cancels the attempt but
+does not release physical ownership: `Run` must return before collector cleanup begins, and cleanup must finish before
+a same-job successor can acquire the runtime identity.
+
+A normal startup error uses the existing configured autodetection retry cadence and tries. Runtime acquisition
+failures retain a Failed configuration, including stock jobs, and default to response code 503 when the collector
+supplies no code. Unexpected early nil return and recovered `Run` panic are non-retrying failures. Unexpected return
+after readiness, including nil, immediately cuts new ordinary output and running availability, then reconciles the
+exact generation to Failed without automatic retry. If the failure races with installation, successful startup still
+installs and its terminal event removes that generation. Stale events cannot remove its successor. Already-admitted
+output may finish; terminal observation does not wait for a blocked `Collect` or write lease before revoking future
+admission.
+
+On requested stop, nil and cancellation-only returns are normal. Mixed or unrelated errors, recovered panics and
+already settled failures remain failures. Collector error text is sanitized separately from its phase, code and retry
+eligibility. Jobs with resolved secret references retain blanket lifecycle-error redaction, including endpoint
+details. A recovered collector `Run` panic permits explicit restart after successful cleanup; independent lifecycle,
+owner or cleanup failures retain the existing containment/quarantine behavior. V1 collectors and V2 collectors without
+`Run` keep their existing collection lifecycle.
+
 ## V2 Template Capture And Publication
 
 Metric jobs implement exactly one of `collectorapi.StaticChartTemplateProvider` or

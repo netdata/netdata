@@ -132,7 +132,7 @@ func TestSNMPTopologyFunctionAvailabilityResetsWhenCollectorRuns(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- coll.Run(ctx)
+		errCh <- coll.Run(ctx, func() {})
 	}()
 
 	require.Eventually(t, func() bool {

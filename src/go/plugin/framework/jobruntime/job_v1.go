@@ -338,22 +338,17 @@ func (j *Job) Collector() any {
 // StartManaged starts the collector loop while leaving Cleanup ownership with
 // the caller. It acknowledges readiness only after the loop has published its
 // running state.
-func (j *Job) StartManaged(ready chan<- struct{}) {
-	j.run(ready)
-}
-
-func (j *Job) run(ready chan<- struct{}) {
+func (j *Job) StartManaged(run *ManagedRun) {
 	j.stopCtrl.markStarted()
 	j.running.Store(true)
-	if ready != nil {
-		close(ready)
-	}
+	run.Ready()
 	if j.functionOnly {
 		j.Info("started in function-only mode")
 	} else {
 		j.Infof("started, data collection interval %ds", j.updateEvery)
 	}
 	defer func() {
+		run.Stop(nil)
 		j.running.Store(false)
 		j.stopCtrl.markStopped()
 		j.Info("stopped")
@@ -363,6 +358,8 @@ LOOP:
 	for {
 		select {
 		case <-j.stopCtrl.stopCh:
+			break LOOP
+		case <-run.Context().Done():
 			break LOOP
 		case t := <-j.tick:
 			if !j.functionOnly && j.shouldCollect(t) {

@@ -466,6 +466,17 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		return dcjc.prepareAcceptedActivationError(attempt, current, scope, permit, classifyActivationError(err))
 	}
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
+	failurePlan := probeFailurePlan{
+		postimage:      failedPostimage,
+		failedCleanup:  dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
+		removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(scope.ID)),
+		result:         func(*autoDetectionFailure) lifecycle.SealedResult { return result },
+		afterApply: composeProbeFailureAfterApply(
+			dcjc.scheduleRetryAfterApply(config),
+			attempt.markApplied(),
+		),
+		removePlainStock: config.SourceType() == confgroup.TypeStock,
+	}
 	if probeFailure != nil {
 		return dcjc.prepareProbeFailure(
 			scope,
@@ -473,17 +484,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 			permit,
 			autoDetectionRetryToken{},
 			probeFailure,
-			probeFailurePlan{
-				postimage:      failedPostimage,
-				failedCleanup:  dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
-				removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(scope.ID)),
-				result:         func(*autoDetectionFailure) lifecycle.SealedResult { return result },
-				afterApply: composeProbeFailureAfterApply(
-					dcjc.scheduleRetryAfterApply(config),
-					attempt.markApplied(),
-				),
-				removePlainStock: config.SourceType() == confgroup.TypeStock,
-			},
+			failurePlan,
 		)
 	}
 	runningPostimage := graphConfig(record, dyncfg.StatusRunning)
@@ -513,6 +514,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 			cleanup:    dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			afterApply: attempt.markApplied(),
 		},
+		failurePlan,
 	)
 }
 

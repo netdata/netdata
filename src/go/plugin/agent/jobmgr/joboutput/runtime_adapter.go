@@ -14,7 +14,7 @@ import (
 // ManagedJob is the V1/V2 collector-loop boundary consumed by Job Manager.
 // Collector-specific chart, cycle, and runner state remains private.
 type ManagedJob interface {
-	StartManaged(chan<- struct{})
+	StartManaged(*jobruntime.ManagedRun)
 	Stop()
 	Cleanup()
 }

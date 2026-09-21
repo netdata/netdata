@@ -129,7 +129,7 @@ type JobV2 struct {
 	module                  collectorapi.CollectorV2
 	lifecycleErrorSanitizer func(error) error
 
-	running atomic.Bool
+	managed atomic.Pointer[ManagedRun]
 
 	initialized bool
 	panicked    atomic.Bool
@@ -211,8 +211,11 @@ type jobV2ScopeState struct {
 func (j *JobV2) FullName() string   { return j.fullName }
 func (j *JobV2) ModuleName() string { return j.moduleName }
 func (j *JobV2) Name() string       { return j.name }
-func (j *JobV2) IsRunning() bool    { return j.running.Load() }
-func (j *JobV2) Collector() any     { return j.module }
+func (j *JobV2) IsRunning() bool {
+	run := j.managed.Load()
+	return run != nil && run.Running()
+}
+func (j *JobV2) Collector() any { return j.module }
 func (j *JobV2) AutoDetectionEvery() int {
 	return j.autoDetectEvery
 }
@@ -369,106 +372,92 @@ func (j *JobV2) autoDetection(ctx context.Context) (err error) {
 	return nil
 }
 
-// StartManaged starts the collector loop while leaving Cleanup ownership with
-// the caller. It acknowledges readiness only after the loop and optional
-// runner have published their active state.
-func (j *JobV2) StartManaged(ready chan<- struct{}) {
-	j.run(ready)
-}
-
-func (j *JobV2) run(ready chan<- struct{}) {
+// StartManaged owns the loop and joins Run before returning. Cleanup remains
+// with the process owner. Run failures settle independently of a blocked Collect.
+func (j *JobV2) StartManaged(run *ManagedRun) {
 	j.stopCtrl.markStarted()
-	j.running.Store(true)
-	runCtx, cancel := context.WithCancel(context.Background())
-	j.setRunContext(runCtx, cancel)
-	var runnerDone <-chan error
-	if !j.stopCtrl.stopRequested() {
-		runnerDone = j.startCollectorRunner(runCtx)
+	j.managed.Store(run)
+	runCtx := run.Context()
+	j.setRunContext(runCtx, func() { run.Stop(nil) })
+	defer func() {
+		run.Stop(nil)
+		j.setRunContext(nil, nil)
+		j.stopCtrl.markStopped()
+		j.Info("stopped")
+	}()
+	if j.stopCtrl.stopRequested() {
+		run.Stop(nil)
+		return
 	}
-	if ready != nil {
-		close(ready)
+	var runnerDone chan struct{}
+	if runner, ok := j.module.(collectorapi.CollectorV2Runner); ok {
+		runnerDone = make(chan struct{})
+		go func() {
+			defer close(runnerDone)
+			j.runCollectorRunner(j.moduleContextFrom(runCtx), runner, run)
+		}()
+		defer func() { run.Stop(nil); <-runnerDone }()
+	} else {
+		run.Ready()
+	}
+	select {
+	case <-run.StartupDone():
+	case <-runCtx.Done():
+		run.Stop(context.Cause(runCtx))
+	case <-j.stopCtrl.stopCh:
+		run.Stop(nil)
+	}
+	if !run.Running() {
+		return
 	}
 	if j.functionOnly {
 		j.Info("started in function-only mode")
 	} else {
 		j.Infof("started (v2), data collection interval %ds", j.updateEvery)
 	}
-	defer func() {
-		cancel()
-		j.setRunContext(nil, nil)
-		j.stopCtrl.markStopped()
-		j.Info("stopped")
-	}()
-
-LOOP:
 	for {
 		select {
 		case <-j.stopCtrl.stopCh:
-			break LOOP
-		case err := <-runnerDone:
-			runnerDone = nil
-			j.handleCollectorRunnerExit(runCtx, err)
+			run.Stop(nil)
+			return
+		case <-runCtx.Done():
+			return
 		case t := <-j.tick:
-			if !j.functionOnly && j.shouldCollect(t) {
+			if run.Running() && !j.functionOnly && j.shouldCollect(t) {
 				markRunStartWithResumeLog(&j.skipTracker, j.Logger)
 				j.runOnce()
 				j.skipTracker.MarkRunStop(time.Now())
 			}
 		}
 	}
-	cancel()
-	j.waitCollectorRunner(runCtx, runnerDone)
-	// Mark not-running before returning so external function dispatch rejects
-	// requests before the lifecycle owner tears module resources down.
-	j.running.Store(false)
 }
 
-func (j *JobV2) startCollectorRunner(ctx context.Context) <-chan error {
-	runner, ok := j.module.(collectorapi.CollectorV2Runner)
-	if !ok {
-		return nil
-	}
-	done := make(chan error, 1)
-	go func() {
-		done <- j.runCollectorRunner(ctx, runner)
-	}()
-	return done
-}
-
-func (j *JobV2) runCollectorRunner(ctx context.Context, runner collectorapi.CollectorV2Runner) (err error) {
+func (j *JobV2) runCollectorRunner(ctx context.Context, runner collectorapi.CollectorV2Runner, run *ManagedRun) (err error) {
 	defer func() {
-		if r := recover(); r != nil {
-			j.panicked.Store(true)
-			err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, fmt.Errorf("panic %v", r))
-			j.Errorf("PANIC: %v", err)
+		var stack []byte
+		if recovered := recover(); recovered != nil {
+			err = newRunFailure(fmt.Errorf("panic %v", recovered), "panic", j.lifecycleErrorSanitizer)
 			if logger.Level.Enabled(slog.LevelDebug) {
-				j.Errorf("STACK: %s", debug.Stack())
+				stack = debug.Stack()
 			}
 		}
+		// Revoke output before logging, which can itself block on I/O.
+		run.Complete(err)
+		if failure := run.Failure(); err == nil && failure != nil {
+			err = failure
+		}
+		if err != nil {
+			j.Errorf("collector runner failed: %v", err)
+		}
+		if len(stack) != 0 {
+			j.Errorf("STACK: %s", stack)
+		}
 	}()
-
-	err = runner.Run(ctx)
-	if err != nil && ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+	err = runner.Run(ctx, run.Ready)
+	if err == nil || (ctx.Err() != nil && cancellationOnly(err, ctx.Err(), context.Cause(ctx))) {
 		return nil
 	}
-	return sanitizeLifecycleError(j.lifecycleErrorSanitizer, err)
-}
-
-func (j *JobV2) waitCollectorRunner(ctx context.Context, done <-chan error) {
-	if done == nil {
-		return
-	}
-	j.handleCollectorRunnerExit(ctx, <-done)
-}
-
-func (j *JobV2) handleCollectorRunnerExit(ctx context.Context, err error) {
-	if err != nil {
-		j.Errorf("collector runner failed: %v", err)
-		return
-	}
-	if ctx.Err() == nil {
-		j.Warningf("collector runner stopped before job stop")
-	}
+	return newRunFailure(err, "error", j.lifecycleErrorSanitizer)
 }
 
 func (j *JobV2) Stop() {

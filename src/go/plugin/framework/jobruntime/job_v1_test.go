@@ -317,7 +317,7 @@ func TestJob_Start(t *testing.T) {
 		job.Stop()
 	}()
 
-	job.StartManaged(make(chan struct{}))
+	job.StartManaged(NewManagedRun(context.Background(), nil))
 
 	assert.False(t, m.CleanupDone)
 	job.Cleanup()
@@ -407,7 +407,7 @@ func TestJob_MainLoop_Panic(t *testing.T) {
 		job.Stop()
 	}()
 
-	job.StartManaged(make(chan struct{}))
+	job.StartManaged(NewManagedRun(context.Background(), nil))
 
 	assert.True(t, job.panicked.Load())
 	assert.False(t, m.CleanupDone)
@@ -829,7 +829,7 @@ func TestJob_Start_FunctionOnly(t *testing.T) {
 		job.Stop()
 	}()
 
-	job.StartManaged(make(chan struct{}))
+	job.StartManaged(NewManagedRun(context.Background(), nil))
 
 	assert.False(t, collectCalled, "Collect should not be called for function-only jobs")
 	assert.False(t, m.CleanupDone)

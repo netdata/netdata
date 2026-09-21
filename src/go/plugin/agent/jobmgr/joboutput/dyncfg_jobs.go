@@ -120,6 +120,7 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 		dcjc.scheduler.accepted.stopWorker()
 		return err
 	}
+	dcjc.bindRuntimeFailures(commands, run, failure)
 	return nil
 }
 
