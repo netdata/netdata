@@ -16,6 +16,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 
@@ -118,5 +119,137 @@ public:
 private:
     std::string path_;
 };
+
+// One engine with tier 0 up and ready on a scratch directory of its own, torn down in the order the contract
+// requires. A case that needs a differently configured engine or tier overrides engine_config() or tier_config();
+// one that has to bring the engine down and up again in its body (a restart on the same directory) calls
+// take_down() and bring_up() itself, and TearDown() then finds nothing left to do or a fresh engine to take down.
+//
+// The teardown does not quiesce: the daemon does that before its shutdown, but nothing the engine promises depends
+// on it, and a case that wants the quiesced shape performs it in its body where the order is visible.
+class EngineFixture : public ::testing::Test {
+protected:
+    void SetUp() override {
+        ASSERT_TRUE(scratch_.valid()) << "could not make a scratch directory";
+        bring_up();
+    }
+
+    void TearDown() override { take_down(); }
+
+    virtual struct dbengine_config engine_config() { return netdata_test_config(); }
+
+    virtual struct dbengine_tier_config tier_config(size_t tier) {
+        struct dbengine_tier_config tc = {};
+        tc.tier = tier;
+        tc.dbfiles_path = scratch_.c_str();
+        tc.disk_space_mb = 0;
+        tc.max_retention_s = 0;
+        tc.page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT;
+        tc.grouping = 1;
+        return tc;
+    }
+
+    // Creates the engine and brings tier 0 up on it; the assertions end the calling case when it does not come up.
+    void bring_up() {
+        ASSERT_EQ(engine_, nullptr) << "bring_up() on a fixture that already holds an engine";
+
+        const struct dbengine_config cfg = engine_config();
+
+        engine_ = dbengine_create(&cfg);
+        ASSERT_NE(engine_, nullptr) << "the engine did not come up";
+
+        const struct dbengine_tier_config tc = tier_config(0);
+        ASSERT_EQ(dbengine_tier_init(engine_, &tc), 0) << "the tier did not come up";
+
+        tier_ = dbengine_tier(engine_, 0);
+        ASSERT_NE(tier_, nullptr);
+
+        // Nothing may be collected or queried until the tier's registry load is done.
+        dbengine_readiness_wait(tier_);
+
+        si_ = reinterpret_cast<STORAGE_INSTANCE *>(tier_);
+    }
+
+    // Every tier that is still up is exited, then the engine is stopped and destroyed. The destroy must find
+    // nothing referenced: a case that leaks a metric or a page handle fails here, in its own name.
+    void take_down() {
+        if (!engine_)
+            return;
+
+        for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+            DBENGINE_TIER *t = dbengine_tier(engine_, tier);
+            if (dbengine_tier_is_active(t))
+                dbengine_tier_exit(t);
+        }
+
+        dbengine_shutdown(engine_);
+        EXPECT_EQ(dbengine_destroy(engine_), 0u) << "metrics stayed referenced across the destroy";
+
+        engine_ = nullptr;
+        tier_ = nullptr;
+        si_ = nullptr;
+    }
+
+    DBENGINE_ENGINE *engine_ = nullptr;
+    DBENGINE_TIER *tier_ = nullptr;
+    STORAGE_INSTANCE *si_ = nullptr;
+    Scratch scratch_;
+};
+
+// A metric nobody else in the process shares: uuid map ids are unique for the map's lifetime and it is never
+// reset, so a fresh uuid per case keeps the cases independent of each other.
+inline UUIDMAP_ID make_metric_id() {
+    nd_uuid_t uuid;
+    uuid_generate(uuid);
+    return uuidmap_create(uuid);
+}
+
+struct Point {
+    time_t start_time_s;
+    time_t end_time_s;
+    NETDATA_DOUBLE value;
+};
+
+inline void store_point(STORAGE_COLLECT_HANDLE *sch, time_t end_time_s, NETDATA_DOUBLE value) {
+    dbengine_store_next(sch, static_cast<usec_t>(end_time_s) * USEC_PER_SEC, value, value, value, 1, 0,
+                        SN_DEFAULT_FLAGS);
+}
+
+// Reads the whole query and returns what it gave, rather than asserting inside the loop: a case that expected three
+// points and got two should say so once, with both lists in hand.
+//
+// Bounded by max_points: a query that never reports itself finished is a failure, not a reason to spin. The default
+// suits the cases that store a handful of points; a case that stores pages of them passes a cap above what it
+// expects back, because a cap below it fails the case rather than truncating the answer.
+inline std::vector<STORAGE_POINT> query_all(STORAGE_METRIC_HANDLE *smh, time_t start_time_s, time_t end_time_s,
+                                            STORAGE_PRIORITY priority = STORAGE_PRIORITY_SYNCHRONOUS,
+                                            size_t max_points = 64) {
+    std::vector<STORAGE_POINT> points;
+
+    struct storage_engine_query_handle seqh = {};
+    dbengine_query_init(smh, &seqh, start_time_s, end_time_s, priority);
+
+    while (points.size() < max_points && !dbengine_query_is_finished(&seqh))
+        points.push_back(dbengine_query_next(&seqh));
+
+    EXPECT_TRUE(dbengine_query_is_finished(&seqh)) << "the query did not finish within " << max_points << " points";
+
+    dbengine_query_finalize(&seqh);
+    return points;
+}
+
+inline void expect_point(const STORAGE_POINT &sp, const Point &expected) {
+    SCOPED_TRACE(static_cast<long long>(expected.end_time_s));
+
+    EXPECT_EQ(sp.start_time_s, expected.start_time_s);
+    EXPECT_EQ(sp.end_time_s, expected.end_time_s);
+    EXPECT_DOUBLE_EQ(sp.min, expected.value);
+    EXPECT_DOUBLE_EQ(sp.max, expected.value);
+    EXPECT_DOUBLE_EQ(sp.sum, expected.value);
+    EXPECT_EQ(sp.count, 1u);
+    EXPECT_EQ(sp.anomaly_count, 0u);
+    EXPECT_EQ(sp.flags, SN_DEFAULT_FLAGS);
+    EXPECT_FALSE(storage_point_is_gap(sp));
+}
 
 #endif // NETDATA_DBENGINE_TESTS_SUPPORT_H
