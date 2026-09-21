@@ -395,6 +395,11 @@
 - Docs(skills): apply the smbios_memory retrospective to the collector rules ([#23967](https://github.com/netdata/netdata/issues/23967))
 - Test(go.d/collecttest): check flat config forms and, on request, option defaults ([#23968](https://github.com/netdata/netdata/issues/23968))
 - Feat(go.d/chartengine): support named active chart template sets ([#23971](https://github.com/netdata/netdata/issues/23971))
+- Build(deps): bump google.golang.org/grpc from 1.83.2 to 1.84.0 in /src/go ([#23974](https://github.com/netdata/netdata/issues/23974))
+- Feat(go.d): support collector-wide store_first for V2 charts ([#23975](https://github.com/netdata/netdata/issues/23975))
+- Fix(go.d/mssql): separate Function timeouts and resolve deadlock targets ([#23976](https://github.com/netdata/netdata/issues/23976))
+- Regenerate integrations docs ([#23977](https://github.com/netdata/netdata/issues/23977))
+- Publish nightly build artifacts to a Cloudflare R2 bucket. ([#23712](https://github.com/netdata/netdata/issues/23712))
 
 ## [2.11.0] - 2026-08-12
 
