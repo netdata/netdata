@@ -237,8 +237,9 @@ _sb_load_llm_env() {
     local root env
     root="$(sb_repo_root)"
     env="${root}/.env"
-    [ -f "$env" ] && [ -r "$env" ] \
-        || sb_die "missing ${env}. See <repo>/.agents/ENV.md for the setup guide."
+    if [ ! -f "$env" ] || [ ! -r "$env" ]; then
+        sb_die "missing ${env}. See <repo>/.agents/ENV.md for the setup guide."
+    fi
     set -a
     # shellcheck disable=SC1090
     . "$env"
@@ -262,13 +263,17 @@ _sb_load_llm_env() {
 #        SB_LLM_ENDPOINT/_MODEL/_KEY may be preset to override .env (self-test).
 sb_llm_chat() {
     local body="$1"
-    local ep model key hdr rc out
+    local ep key hdr rc out
     [ -f "$body" ] || sb_die "no such request body: ${body}"
 
     if [ -n "${SB_LLM_ENDPOINT:-}" ] && [ -n "${SB_LLM_KEY:-}" ]; then
-        ep="${SB_LLM_ENDPOINT%/}"; model="${SB_LLM_MODEL:-unset}"; key="${SB_LLM_KEY}"
+        ep="${SB_LLM_ENDPOINT%/}"; key="${SB_LLM_KEY}"
     else
+        local model
         _sb_load_llm_env ep model key
+        # the model name is patched into the request body by the caller; this
+        # wrapper only needs the endpoint and the credential
+        : "${model:-}"
     fi
 
     hdr="$(mktemp "${TMPDIR:-/tmp}/sb-hdr.XXXXXX")"
