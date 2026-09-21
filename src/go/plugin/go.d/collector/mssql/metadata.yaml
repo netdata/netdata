@@ -621,9 +621,9 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
     functions:
       description: |
-        Three Functions run diagnostic queries on demand from the dashboard's Live tab. They use their own
-        connection, so they never delay metric collection, and they return raw query text, so restrict access to
-        people who may see it.
+        Three Functions run diagnostic queries on demand from the dashboard's Live tab. They keep the metrics
+        connection available, but share SQL Server CPU, I/O and locks. They return raw query text, so restrict
+        access to people who may see it.
       list:
         - id: top-queries
           name: Top Queries
