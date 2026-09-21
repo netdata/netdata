@@ -394,12 +394,7 @@ func nullableString(value string) any {
 	return value
 }
 
-// TODO: Refactor error data access into a shared mssqlErrorData type.
-// Currently these methods live on Collector because they're used by both:
-// - funcErrorInfo (for error-info function)
-// - funcTopQueries (for error attribution columns)
-// A cleaner design would be a mssqlErrorData type on funcRouter that both handlers use.
-
+// The router shares error data access between error-info and top-query attribution.
 func (r *router) collectMSSQLErrorDetails(ctx context.Context) (string, map[string]mssqlErrorRow) {
 	status, _, rows, err := r.fetchMSSQLErrorRows(ctx, r.cfg.errorInfoSessionName(), r.cfg.topQueriesLimit())
 	if err != nil {
