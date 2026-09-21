@@ -40,8 +40,9 @@ modules:
           per-database transactions and transaction logs, and the health of every job, publication, and availability
           group.
 
-          All SQL Server editions (Express, Web, Standard, Enterprise, Developer) and Azure SQL are supported. Charts
-          appear only for what the instance actually has and the monitoring login can read:
+          All SQL Server editions (Express, Web, Standard, Enterprise, Developer) and Azure SQL Managed Instance are
+          supported. Azure SQL Database is not supported: required instance-level memory and file views are unavailable,
+          so the job cannot start. Charts appear only for what the instance actually has and the monitoring login can read:
 
           | Area | Charts appear |
           |:-----|:--------------|
@@ -59,7 +60,7 @@ modules:
           The collector connects to the instance over TCP with the Tabular Data Stream (TDS) protocol, using the `dsn`
           connection string. It authenticates with a SQL Server login, with Windows integrated authentication when the
           DSN carries no credentials (Windows only), or with a Microsoft Entra ID token when `cloud_auth` is configured
-          for Azure SQL.
+          for Azure SQL Managed Instance.
 
           Every `update_every` seconds it runs read-only queries against system views on one connection, each bounded
           by `timeout`:
@@ -72,8 +73,8 @@ modules:
           | Replication | `distribution.dbo.MSreplication_monitordata`, `distribution.dbo.MSpublications`, `distribution.dbo.MSsubscriptions` |
           | Always On | `sys.availability_groups`, `sys.availability_replicas`, and the `sys.dm_hadr_*` views for group, replica, database, cluster, failover readiness, page repair and thread state |
 
-          Functions open a second connection the first time one is used and run their queries on it, so a slow
-          diagnostic query never delays metric collection. The collector never writes to the server: it creates no
+          Functions open a second connection the first time one is used, keeping the metrics connection available.
+          Both workloads still share SQL Server CPU, I/O and locks. The collector never writes to the server: it creates no
           objects, changes no settings, and leaves the Extended Events sessions it reads untouched.
       default_behavior:
         auto_detection:
@@ -192,18 +193,15 @@ modules:
               `Local System` cannot authenticate to a remote instance from a workgroup machine. Run the Netdata service
               as a domain account instead, or use a SQL login. To see which account SQL Server receives, connect with
               Windows Authentication and run `SELECT SYSTEM_USER`.
-          - title: Grant a Microsoft Entra identity access to Azure SQL
+          - title: Grant a Microsoft Entra identity access to Azure SQL Managed Instance
             description: |
               Only when `cloud_auth.provider` is `azure_ad`. The service principal or managed identity that Netdata
-              signs in with needs a user created from the external provider, named after the app registration or the
-              managed identity. See Microsoft's guide to
+              signs in with needs a login created from the external provider, named after the app registration or the
+              managed identity. Create database users and grant the optional database permissions listed above for
+              SQL Server Agent jobs and replication. See Microsoft's guide to
               [Microsoft Entra authentication for Azure SQL](https://learn.microsoft.com/en-us/azure/azure-sql/database/authentication-aad-configure).
 
               ```sql
-              -- Azure SQL Database: run in the database selected in the DSN
-              CREATE USER [netdata-monitoring] FROM EXTERNAL PROVIDER;
-              GRANT VIEW DATABASE STATE TO [netdata-monitoring];
-
               -- Azure SQL Managed Instance
               CREATE LOGIN [netdata-monitoring] FROM EXTERNAL PROVIDER;
               GRANT VIEW SERVER STATE TO [netdata-monitoring];
@@ -242,7 +240,7 @@ modules:
                 | SQL login | `sqlserver://netdata_user:password@host:1433` |
                 | Windows Authentication (Windows only) | `sqlserver://host:1433`, with no username and password |
                 | Named instance | `sqlserver://netdata_user:password@host/INSTANCENAME`; the SQL Server Browser service must be reachable |
-                | One database on Azure SQL Database | `sqlserver://myserver.database.windows.net:1433?database=mydb` |
+                | Azure SQL Managed Instance (private endpoint) | `sqlserver://my-instance.dns-zone.database.windows.net:1433?database=master` |
                 | Encrypted connection to a trusted certificate | append `?encrypt=true` |
 
                 The password may come from a secret store instead of the file, for example `${env:MSSQL_PASSWORD}`.
@@ -268,7 +266,7 @@ modules:
                 duration, age, and current run time. The stock last-execution alerts still fire only for enabled jobs.
 
             - name: cloud_auth.provider
-              description: Authentication provider for Azure SQL. `none` uses the credentials in `dsn`; `azure_ad` signs in with a Microsoft Entra ID token.
+              description: Authentication provider for Azure SQL Managed Instance. `none` uses the credentials in `dsn`; `azure_ad` signs in with a Microsoft Entra ID token.
               default_value: none
               required: false
               group: Cloud Auth
@@ -359,21 +357,21 @@ modules:
               required: false
               group: Functions
             - name: functions.error_info.session_name
-              description: Name of the Extended Events session that captures `error_reported` events, server-scoped on SQL Server and Managed Instance or database-scoped on Azure SQL Database.
+              description: Name of the server-scoped Extended Events session that captures `error_reported` events.
               default_value: netdata_errors
               required: false
               group: Functions
               detailed_description: |
                 Create the session as described under Live Data. When it is missing or its target is unavailable, SQL
                 Server and Managed Instance fall back to the built-in `system_health` session, which records only
-                selected errors; Azure SQL Database has no fallback.
+                selected errors.
             - name: functions.error_info.use_ring_buffer
               description: Read error events from the session's ring_buffer target instead of its event_file target.
               default_value: false
               required: false
               group: Functions
               detailed_description: |
-                Use it where event files cannot be stored, such as Azure SQL Database without Blob Storage. The session
+                Use it where event files cannot be stored, such as Managed Instance without configured Blob Storage. The session
                 must be running; events are lost on restart or failover, capacity is limited, and XML parsing costs more
                 CPU than reading event files.
         examples:
@@ -408,14 +406,14 @@ modules:
                 jobs:
                   - name: remote
                     dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
-            - name: Azure SQL Database with a service principal
+            - name: Azure SQL Managed Instance with a service principal
               description: |
-                One Azure SQL Database, authenticated with a Microsoft Entra app registration. The `database` parameter
-                selects the database the job monitors.
+                A managed instance, authenticated with a Microsoft Entra app registration through its private endpoint.
+                Replace the hostname with the managed instance's fully qualified domain name.
               config: |
                 jobs:
                   - name: azure_sql_sp
-                    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+                    dsn: "sqlserver://my-instance.dns-zone.database.windows.net:1433?database=master"
                     cloud_auth:
                       provider: azure_ad
                       azure_ad:
@@ -424,14 +422,14 @@ modules:
                           tenant_id: "00000000-0000-0000-0000-000000000000"
                           client_id: "11111111-1111-1111-1111-111111111111"
                           client_secret: "${env:AZURE_CLIENT_SECRET}"
-            - name: Azure SQL with a managed identity
+            - name: Azure SQL Managed Instance with a managed identity
               description: |
                 Netdata runs on an Azure resource and signs in with its system-assigned managed identity. Set
                 `mode_managed_identity.client_id` to use a user-assigned identity instead.
               config: |
                 jobs:
                   - name: azure_sql_mi
-                    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+                    dsn: "sqlserver://my-instance.dns-zone.database.windows.net:1433?database=master"
                     cloud_auth:
                       provider: azure_ad
                       azure_ad:
@@ -562,8 +560,7 @@ modules:
           - error: "`top-queries requires VIEW SERVER STATE for the plan cache, or VIEW DATABASE STATE in every queried user database for Query Store`"
             when: |
               Opening `top-queries` in the dashboard; the response is HTTP 403. On SQL Server 2022 and later the message
-              names `VIEW SERVER PERFORMANCE STATE` and `VIEW DATABASE PERFORMANCE STATE`; on Azure SQL Database it names
-              the database-level permissions.
+              names `VIEW SERVER PERFORMANCE STATE` and `VIEW DATABASE PERFORMANCE STATE`.
             cause: |
               The login can collect metrics but lacks the permission the query statistics source needs: Query Store is
               read per database, the plan cache at server level.
@@ -582,8 +579,7 @@ modules:
           - error: "`error-info requires VIEW SERVER STATE permission. Grant with: GRANT VIEW SERVER STATE TO [netdata_user];`"
             when: |
               Opening `error-info` in the dashboard; the response is HTTP 403. The message names `VIEW SERVER PERFORMANCE
-              STATE` on SQL Server 2022 and later, and `VIEW DATABASE PERFORMANCE STATE` or `VIEW DATABASE STATE` on
-              Azure SQL Database.
+              STATE` on SQL Server 2022 and later.
             cause: |
               Reading the Extended Events session target needs the state permission the message names, at the scope of
               the session.
@@ -595,19 +591,11 @@ modules:
               set, the message ends in `ring_buffer target missing`.
             cause: |
               No Extended Events session named by `functions.error_info.session_name` exists with the expected target,
-              and no `system_health` fallback is available (Azure SQL Database has none).
+              and no `system_health` fallback is available.
             fix: |
               Create the session as described in the `error-info` prerequisites under Live Data, or set
               `functions.error_info.session_name` to the name of an existing session and
               `functions.error_info.use_ring_buffer` to match its target.
-          - error: "`deadlock-info is unavailable on Azure SQL Database because it has no built-in system_health Extended Events session`"
-            when: |
-              Opening `deadlock-info` against an Azure SQL Database; the response is HTTP 503.
-            cause: |
-              Azure SQL Database does not expose the server-level `system_health` session the Function reads.
-            fix: |
-              There is no configuration that enables it. Inspect deadlocks through Azure SQL Database's own tooling
-              (Intelligent Insights or a database-scoped Extended Events session).
           - error: "`top_queries query timed out; Function timeout is 30s (functions.top_queries.timeout), but the request deadline may be shorter`"
             when: |
               Any Function; the response is HTTP 504 and the message names the Function and its timeout option.
@@ -992,7 +980,7 @@ modules:
                 visibility: hidden
                 description: Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation.
           performance: |
-            On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance. Azure SQL Database queries use the database selected in the DSN.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Functions run on their own connection, so long scans do not delay metric collection but still consume SQL Server CPU and I/O<br/>• Bounded by `functions.top_queries.timeout`, independent of the metrics timeout
+            On SQL Server and Azure SQL Managed Instance, Query Store queries span enabled user databases; the plan-cache fallback reads cached statements across the instance.<br/>• Execution time depends on retained Query Store history or qualifying cached statements and their text<br/>• Aggregation and latest-execution selection process the matching input before the default 500-row result limit<br/>• Error attribution also reads the configured Extended Events target or the system_health fallback. On Standard/Enterprise editions, system_health can retain about 1 GB of event files, which are scanned before selecting recent errors<br/>• Functions keep the metrics connection available, but compete for SQL Server CPU, I/O and locks<br/>• Bounded by `functions.top_queries.timeout`, independent of the metrics timeout
           security: |
             Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
@@ -1010,15 +998,11 @@ modules:
                   GRANT VIEW SERVER PERFORMANCE STATE TO [netdata_user];
                   ```
 
-                  Azure SQL Database plan-cache permissions depend on the service tier. See the
-                  [Microsoft DMV permissions reference](https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-exec-query-stats-transact-sql#permissions).
-
               - title: Enable Query Store for persistent history
                 description: |
                   On SQL Server 2016 and later, enable Query Store on the databases whose persistent query history
                   you want to inspect. SQL Server and Azure SQL Managed Instance query all enabled user databases.
-                  Azure SQL Database queries only the database selected in the collector DSN. These steps are not
-                  required for the plan-cache fallback.
+                  These steps are not required for the plan-cache fallback.
 
                   1. Verify Query Store state:
 
@@ -1028,9 +1012,6 @@ modules:
                      FROM sys.databases
                      WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
 
-                     -- Azure SQL Database (run in the database selected in the DSN)
-                     SELECT actual_state_desc
-                     FROM sys.database_query_store_options;
                      ```
 
                   2. Enable Query Store where it is disabled:
@@ -1041,9 +1022,8 @@ modules:
 
                   3. Grant the monitoring account the permissions required by your engine:
 
-                     On SQL Server/Managed Instance, map the login to a database user in every queried user database
-                     before granting the database permission. On Azure SQL Database, grant the permission to the
-                     database principal used by the collector connection.
+                     Map the login to a database user in every queried user database before granting the database
+                     permission.
 
                      ```sql
                      -- SQL Server 2022+ and Azure SQL Managed Instance 2022+
@@ -1058,20 +1038,18 @@ modules:
                      CREATE USER [netdata_user] FOR LOGIN [netdata_user]; -- once per database
                      GRANT VIEW DATABASE STATE TO [netdata_user];
 
-                     -- Azure SQL Database (run in the database selected in the DSN)
-                     GRANT VIEW DATABASE PERFORMANCE STATE TO [netdata_user];
                      ```
 
                   :::info
 
-                  - Query Store is available in SQL Server 2016+ and Azure SQL Database
+                  - Query Store is available in SQL Server 2016+ and Azure SQL Managed Instance
                   - Requires ALTER DATABASE permission to enable Query Store
                   - Query Store queries exclude system databases (master, tempdb, model, msdb). The plan cache excludes
                     statements identified as belonging to those databases, but can include statements with unknown database context
 
                   :::
           availability: |
-            Available when:<br/>• The collector has successfully connected<br/>• `functions.top_queries.disabled` is false<br/>• Query Store answers when the engine exposes it (SQL Server 2016 (13.x) and later, Azure SQL Managed Instance, or Azure SQL Database) and it is enabled on at least one user database; on Azure SQL Database, in the database selected in the DSN<br/>• Otherwise the plan cache (`sys.dm_exec_query_stats`) answers, which requires `query_hash`, available since SQL Server 2008<br/>• Returns HTTP 403 when required permissions are missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or neither Query Store nor the plan cache can answer<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected<br/>• `functions.top_queries.disabled` is false<br/>• Query Store answers when the engine exposes it (SQL Server 2016 (13.x) and later, or Azure SQL Managed Instance) and it is enabled on at least one user database<br/>• Otherwise the plan cache (`sys.dm_exec_query_stats`) answers, which requires `query_hash`, available since SQL Server 2008<br/>• Returns HTTP 403 when required permissions are missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or neither Query Store nor the plan cache can answer<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
         - id: deadlock-info
           name: Deadlock Info
@@ -1144,7 +1122,7 @@ modules:
           security: |
             Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only
           availability: |
-            Available on SQL Server and Azure SQL Managed Instance when:<br/>• The collector has successfully connected<br/>• `functions.deadlock_info.disabled` is false<br/>• SQL Server 2022+ has `VIEW SERVER PERFORMANCE STATE`; older versions have `VIEW SERVER STATE`<br/>• Azure SQL Database returns HTTP 503 because it has no built-in `system_health` session<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails or the required ring-buffer target is unavailable<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing, the function is disabled, or the engine is Azure SQL Database<br/>• Returns HTTP 504 if the query times out
+            Available on SQL Server and Azure SQL Managed Instance when:<br/>• The collector has successfully connected<br/>• `functions.deadlock_info.disabled` is false<br/>• SQL Server 2022+ has `VIEW SERVER PERFORMANCE STATE`; older versions have `VIEW SERVER STATE`<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails or the required ring-buffer target is unavailable<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
         - id: error-info
           name: Error Info
@@ -1200,7 +1178,7 @@ modules:
                 visibility: hidden
                 description: "Query hash captured with the error event (used for mapping into top-queries)."
           performance: |
-            Executes on-demand queries against the configured Extended Events target, falling back to `system_health` when unavailable:<br/>• Also used for error attribution by top-queries, but not by regular metric collection<br/>• event_file reads scan retained files and parse matching errors before returning the newest rows<br/>• The recommended dedicated-session settings of 6 MB per file and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• The system_health fallback has separate retention settings: Standard/Enterprise editions can retain about 1 GB. A small response limit does not bound the files scanned<br/>• Existing sessions keep their own retention settings; the collector does not alter them<br/>• Runs on its own connection and does not delay metric queries
+            Executes on-demand queries against the configured Extended Events target, falling back to `system_health` when unavailable:<br/>• Also used for error attribution by top-queries, but not by regular metric collection<br/>• event_file reads scan retained files and parse matching errors before returning the newest rows<br/>• On SQL Server, the dedicated-session settings of 6 MB per file and three rollover files keep the conservative filesystem scan envelope near 24 MB (current file plus rollovers)<br/>• The system_health fallback has separate retention settings: Standard/Enterprise editions can retain about 1 GB. A small response limit does not bound the files scanned<br/>• Existing sessions keep their own retention settings; the collector does not alter them<br/>• Keeps the metrics connection available, but shares SQL Server CPU, I/O and locks
           security: |
             Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only
           prerequisites:
@@ -1211,7 +1189,7 @@ modules:
                   `query_hash` actions. Choose the engine scope and target that match your deployment and
                   `functions.error_info.use_ring_buffer` setting.
 
-                  **SQL Server and Azure SQL Managed Instance — event_file (default):**
+                  **SQL Server — event_file (default):**
 
                   ```sql
                   CREATE EVENT SESSION [netdata_errors] ON SERVER
@@ -1252,49 +1230,29 @@ modules:
                   Set `functions.error_info.use_ring_buffer: true`. The session starts automatically after restart or
                   failover, but events previously held in memory are lost.
 
-                  **Azure SQL Database — event_file (default):**
+                  **Azure SQL Managed Instance — event_file (default):**
 
-                  Create the required database-scoped credential and grant the Database Engine access to an Azure
-                  Storage container first. See Microsoft's [event_file setup guide](https://learn.microsoft.com/en-us/azure/azure-sql/database/xevent-code-event-file).
+                  Managed Instance requires Azure Blob Storage for event files. Create a server-scoped credential in
+                  `master` and grant the Database Engine access to the storage container first. See Microsoft's [event_file setup guide](https://learn.microsoft.com/en-us/azure/azure-sql/database/xevent-code-event-file).
 
                   ```sql
-                  -- Run in the database selected in the collector DSN.
-                  CREATE EVENT SESSION [netdata_errors] ON DATABASE
+                  CREATE EVENT SESSION [netdata_errors] ON SERVER
                   ADD EVENT sqlserver.error_reported(
                     ACTION(sqlserver.sql_text, sqlserver.query_hash)
                   )
                   ADD TARGET package0.event_file(
                     SET filename=N'https://<storage-account>.blob.core.windows.net/<container>/netdata_errors.xel',
-                        max_file_size=6,
-                        max_rollover_files=3
+                        max_file_size=6
                   );
                   GO
 
-                  ALTER EVENT SESSION [netdata_errors] ON DATABASE STATE = START;
+                  ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
                   GO
                   ```
 
-                  Azure Storage rollover retention is currently a preview feature and requires creating a new event
-                  session with `max_rollover_files`. Existing sessions are not migrated automatically.
-
-                  **Azure SQL Database — ring_buffer:**
-
-                  ```sql
-                  -- Run in the database selected in the collector DSN.
-                  CREATE EVENT SESSION [netdata_errors] ON DATABASE
-                  ADD EVENT sqlserver.error_reported(
-                    ACTION(sqlserver.sql_text, sqlserver.query_hash)
-                  )
-                  ADD TARGET package0.ring_buffer
-                  WITH (STARTUP_STATE = ON);
-                  GO
-
-                  ALTER EVENT SESSION [netdata_errors] ON DATABASE STATE = START;
-                  GO
-                  ```
-
-                  Set `functions.error_info.use_ring_buffer: true`. The database-scoped session starts automatically
-                  after restart, failover, or maintenance, but events previously held in memory are lost.
+                  On Managed Instance, `max_rollover_files` does not currently limit retained blobs. Configure an Azure
+                  Storage lifecycle policy to bound retention; `max_file_size` alone does not bound the total data scanned.
+                  Alternatively, use the server-scoped ring buffer example above.
 
                   ```sql
                   -- SQL Server 2022+ and Azure SQL Managed Instance 2022+
@@ -1303,12 +1261,6 @@ modules:
                   -- SQL Server 2019 and earlier
                   GRANT VIEW SERVER STATE TO [netdata_user];
 
-                  -- Azure SQL Database (run in the database selected in the DSN)
-                  -- event_file target
-                  GRANT VIEW DATABASE PERFORMANCE STATE TO [netdata_user];
-
-                  -- ring_buffer target (also satisfies the catalog permission)
-                  GRANT VIEW DATABASE STATE TO [netdata_user];
                   ```
 
                   If you use a different session name, set it in the collector config:
@@ -1322,7 +1274,7 @@ modules:
                           session_name: your_session_name
                   ```
           availability: |
-            Available on SQL Server 2012+, Azure SQL Managed Instance, and Azure SQL Database when:<br/>• The collector has successfully connected<br/>• `functions.error_info.disabled` is false<br/>• The configured session is used when its selected target is available; otherwise SQL Server/Managed Instance falls back to the built-in `system_health` target, while Azure SQL Database returns HTTP 503 because it has no built-in `system_health` session<br/>• When `functions.error_info.use_ring_buffer` is false, the configured session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the configured session is running and has a ring_buffer target<br/>• SQL Server 2022+/Managed Instance 2022+ has `VIEW SERVER PERFORMANCE STATE`; older SQL Server has `VIEW SERVER STATE`; Azure SQL Database event_file has `VIEW DATABASE PERFORMANCE STATE`, while ring_buffer has `VIEW DATABASE STATE`<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if neither the selected target nor the applicable `system_health` fallback is available, or the function is disabled<br/>• Returns HTTP 504 if the query times out
+            Available on SQL Server 2012+ and Azure SQL Managed Instance when:<br/>• The collector has successfully connected<br/>• `functions.error_info.disabled` is false<br/>• The configured session is used when its selected target is available; otherwise SQL Server/Managed Instance falls back to the built-in `system_health` target<br/>• When `functions.error_info.use_ring_buffer` is false, the configured session has an event_file target. Its configured `filename` is resolved from catalog metadata, so it need not match the session name or be running<br/>• When `functions.error_info.use_ring_buffer` is true, the configured session is running and has a ring_buffer target<br/>• SQL Server 2022+/Managed Instance 2022+ has `VIEW SERVER PERFORMANCE STATE`; older SQL Server has `VIEW SERVER STATE`<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 499 when the caller cancels the request<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if neither the selected target nor the applicable `system_health` fallback is available, or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
     metrics:
       folding:
@@ -1333,7 +1285,7 @@ modules:
         monitoring login can read it; the Overview lists the grant each one needs.
       availability:
         - SQL Server
-        - Azure SQL Database
+        - Azure SQL Managed Instance
       scopes:
         - name: global
           description: The whole SQL Server instance.
@@ -1841,7 +1793,7 @@ modules:
                 - name: partially_healthy
                 - name: healthy
         - name: availability group database replica
-          description: One database within an availability group replica. The secondary lag chart requires SQL Server 2016 or later.
+          description: One database within an availability group replica; secondary lag requires SQL Server 2016+, and redo rate averages bytes redone over active redo time since SQL Server startup.
           labels:
             - name: ag_name
               description: Availability group name

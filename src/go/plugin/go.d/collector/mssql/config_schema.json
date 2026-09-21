@@ -26,12 +26,12 @@
       },
       "cloud_auth": {
         "title": "Cloud auth",
-        "description": "Optional cloud authentication settings for Azure SQL.",
+        "description": "Optional cloud authentication settings for Azure SQL Managed Instance.",
         "type": "object",
         "properties": {
           "provider": {
             "title": "Provider",
-            "description": "Authentication provider for Azure SQL. `none` uses the credentials in `dsn`; `azure_ad` signs in with a Microsoft Entra ID token.",
+            "description": "Authentication provider for Azure SQL Managed Instance. `none` uses the credentials in `dsn`; `azure_ad` signs in with a Microsoft Entra ID token.",
             "type": "string",
             "enum": [
               "none",
@@ -180,7 +180,7 @@
         "properties": {
           "top_queries": {
             "title": "Top Queries",
-            "description": "Configuration for top-queries. Uses Query Store across enabled user databases on SQL Server/Managed Instance, or the connected database on Azure SQL Database, and falls back to the plan cache (sys.dm_exec_query_stats) when Query Store is unavailable or disabled.",
+            "description": "Configuration for top-queries. Uses Query Store across enabled user databases and falls back to the plan cache (sys.dm_exec_query_stats) when Query Store is unavailable or disabled.",
             "type": "object",
             "properties": {
               "disabled": {
@@ -259,7 +259,7 @@
               },
               "session_name": {
                 "title": "Session Name",
-                "description": "Name of the Extended Events session that captures `error_reported` events, server-scoped on SQL Server and Managed Instance or database-scoped on Azure SQL Database.",
+                "description": "Name of the server-scoped Extended Events session that captures `error_reported` events.",
                 "type": "string",
                 "default": "netdata_errors"
               },
@@ -286,7 +286,7 @@
     "dsn": {
       "ui:placeholder": "sqlserver://user:password@localhost:1433",
       "ui:widget": "password",
-      "ui:help": "URL form: `sqlserver://user:password@host:1433`; `sqlserver://host:1433` for Windows Authentication (Windows only); `sqlserver://user:password@host/INSTANCENAME` for a named instance (needs the SQL Server Browser service); `sqlserver://server.database.windows.net:1433?database=mydb` for one Azure SQL Database. Append `?encrypt=true` for an encrypted connection to a trusted certificate. Percent-encode reserved characters in the password (`@` as `%40`)."
+      "ui:help": "URL form: `sqlserver://user:password@host:1433`; `sqlserver://host:1433` for Windows Authentication (Windows only); `sqlserver://user:password@host/INSTANCENAME` for a named instance (needs the SQL Server Browser service); `sqlserver://my-instance.dns-zone.database.windows.net:1433?database=master` for an Azure SQL Managed Instance private endpoint. Append `?encrypt=true` for an encrypted connection to a trusted certificate. Percent-encode reserved characters in the password (`@` as `%40`). Azure SQL Database is not supported by this collector."
     },
     "vnode": {
       "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
@@ -300,7 +300,7 @@
         "ui:options": {
           "inline": true
         },
-        "ui:help": "`azure_ad` needs a user created `FROM EXTERNAL PROVIDER` for the service principal or managed identity in Azure SQL; the DSN then carries no username and password."
+        "ui:help": "`azure_ad` needs a login created `FROM EXTERNAL PROVIDER` for the service principal or managed identity on Azure SQL Managed Instance; the DSN then carries no username and password."
       },
       "azure_ad": {
         "mode": {
@@ -339,13 +339,13 @@
       },
       "error_info": {
         "disabled": {
-          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, VIEW SERVER STATE on older versions, or on Azure SQL Database VIEW DATABASE PERFORMANCE STATE for event_file and VIEW DATABASE STATE for ring_buffer."
+          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, VIEW SERVER STATE on older versions."
         },
         "session_name": {
-          "ui:help": "Create the session as an administrator, capturing sqlserver.error_reported with the sql_text and query_hash actions, with an event_file target (default) or a ring_buffer target. When it is missing, SQL Server and Managed Instance fall back to system_health with reduced coverage; Azure SQL Database needs an ON DATABASE session and has no fallback."
+          "ui:help": "Create the session as an administrator, capturing sqlserver.error_reported with the sql_text and query_hash actions, with an event_file target (default) or a ring_buffer target. When it is missing, SQL Server and Managed Instance fall back to system_health with reduced coverage. On Managed Instance, event_file requires an Azure Blob Storage URL and storage access configured for the Database Engine."
         },
         "use_ring_buffer": {
-          "ui:help": "Use it where event files cannot be stored, such as Azure SQL Database without Blob Storage. The session must be running; events are lost on restart or failover, capacity is limited, and XML parsing costs more CPU than reading event files."
+          "ui:help": "Use it where event files cannot be stored, such as Managed Instance without configured Blob Storage. The session must be running; events are lost on restart or failover, capacity is limited, and XML parsing costs more CPU than reading event files."
         }
       }
     },
