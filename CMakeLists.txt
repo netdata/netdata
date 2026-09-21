@@ -3759,6 +3759,7 @@ if(ENABLE_DBENGINE)
                 src/database/storage-engines/dbengine/tests/api_lifecycle.cc
                 src/database/storage-engines/dbengine/tests/api_collect_query.cc
                 src/database/storage-engines/dbengine/tests/api_scale_pages.cc
+                src/database/storage-engines/dbengine/tests/api_scale_extents.cc
                 src/database/storage-engines/dbengine/tests/internal_compression.cc
                 src/database/storage-engines/dbengine/tests/internal_pgc.cc
                 src/database/storage-engines/dbengine/tests/internal_pgd.cc
