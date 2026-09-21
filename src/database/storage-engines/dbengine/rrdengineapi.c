@@ -1456,6 +1456,24 @@ void dbengine_flush_all(struct dbengine_tier *ctx)
     dbengine_enq_cmd(ctx->engine, ctx, DBENGINE_OPCODE_CTX_FLUSH_HOT_DIRTY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
+bool dbengine_flush_all_wait(struct dbengine_tier *ctx)
+{
+    if (NULL == ctx)
+        return false;
+
+    struct completion completion = {};
+    completion_init(&completion);
+
+    // Refused, not queued, when the engine is not serving: a command the loop will never run would leave the
+    // caller waiting on it forever.
+    bool queued = dbengine_enq_cmd_if_accepting(ctx->engine, ctx, DBENGINE_OPCODE_CTX_FLUSH_HOT_DIRTY, NULL, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE);
+    if (queued)
+        completion_wait_for(&completion);
+
+    completion_destroy(&completion);
+    return queued;
+}
+
 void dbengine_quiesce(struct dbengine_tier *ctx)
 {
     if (NULL == ctx)

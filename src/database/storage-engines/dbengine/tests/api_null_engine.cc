@@ -131,6 +131,14 @@ TEST(NullTier, SizeStatsAreZeroed) {
     EXPECT_TRUE(zeroed(dbengine_get_size_stats(nullptr)));
 }
 
+TEST(NullTier, FlushVerbsReturn) {
+    // The two fire-and-forget verbs have nothing to observe but their return; the waiting one reports that it
+    // queued nothing.
+    dbengine_flush_dirty(nullptr);
+    dbengine_flush_all(nullptr);
+    EXPECT_FALSE(dbengine_flush_all_wait(nullptr));
+}
+
 TEST(NullTier, ReadinessWaitReturns) {
     dbengine_readiness_wait(nullptr);
 }

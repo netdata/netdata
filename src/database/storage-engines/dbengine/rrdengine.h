@@ -784,6 +784,8 @@ void dbengine_req_cmd(struct dbengine_engine *engine, requeue_callback_t get_cmd
 void dbengine_enq_cmd(struct dbengine_engine *engine, struct dbengine_tier *ctx, enum dbengine_opcode opcode, void *data,
                 struct completion *completion, enum storage_priority priority,
                 enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb);
+bool dbengine_enq_cmd_if_accepting(struct dbengine_engine *engine, struct dbengine_tier *ctx, enum dbengine_opcode opcode, void *data,
+                                   struct completion *completion, enum storage_priority priority);
 
 void pdc_route_asynchronously(struct dbengine_tier *ctx, struct page_details_control *pdc);
 void pdc_route_synchronously(struct dbengine_tier *ctx, struct page_details_control *pdc);

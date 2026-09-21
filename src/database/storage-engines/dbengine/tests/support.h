@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
 // The pool the engine's work is dispatched into is process-wide, sized once at its first use from
 // UV_THREADPOOL_SIZE, and never resized. The engine does not size it and cannot read its size: it throttles itself

@@ -1072,16 +1072,24 @@ static void *external_work_worker(
     return NULL;
 }
 
-bool dbengine_enq_work(struct dbengine_engine *engine, struct dbengine_work_request *req) {
+// Enqueues only while the engine is serving (dbengine_create() done, dbengine_shutdown() not started); false, having
+// touched nothing the caller can observe, otherwise. The refusal is final: dbengine_cmd_append() checks and appends
+// under one lock, so a command accepted here is always run.
+bool dbengine_enq_cmd_if_accepting(struct dbengine_engine *engine, struct dbengine_tier *ctx, enum dbengine_opcode opcode, void *data,
+                                   struct completion *completion, enum storage_priority priority) {
     if(!dbengine_work_available(engine))
         return false;   // no engine, never spawned, or already shut down: the queue's allocator may not even exist
 
-    struct dbengine_cmd *cmd = dbengine_cmd_alloc(engine, NULL, DBENGINE_OPCODE_EXTERNAL_WORK, req, &req->completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL);
+    struct dbengine_cmd *cmd = dbengine_cmd_alloc(engine, ctx, opcode, data, completion, priority, NULL);
     if(!dbengine_cmd_append(engine, cmd, NULL, true)) {
         aral_freez(engine->cmd_queue.ar, cmd);
         return false;
     }
     return true;
+}
+
+bool dbengine_enq_work(struct dbengine_engine *engine, struct dbengine_work_request *req) {
+    return dbengine_enq_cmd_if_accepting(engine, NULL, DBENGINE_OPCODE_EXTERNAL_WORK, req, &req->completion, STORAGE_PRIORITY_INTERNAL_DBENGINE);
 }
 
 static void after_extent_write(struct dbengine_engine *engine __maybe_unused, struct dbengine_tier *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
@@ -1885,12 +1893,25 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct dbengine_engin
     ;
 }
 
-static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct dbengine_engine *engine, struct dbengine_tier *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct dbengine_engine *engine, struct dbengine_tier *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(DBENGINE_WORKER_JOB_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(engine->main_cache, (Word_t)ctx);
 
     for(size_t i = 0; i < pgc_max_flushers(engine->main_cache) ; i++)
         dbengine_enq_cmd(engine, NULL, DBENGINE_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    // Only a caller that waits (dbengine_flush_all_wait()) hands a completion in; the fire-and-forget verb does
+    // not, and for it nothing below runs. The flush above wrote the pages it found dirty, but a competing flusher
+    // may have taken a batch of this tier's pages before it looked: that batch counts itself in
+    // extents_currently_being_flushed under the dirty lock before the pages leave the queue, and is counted out
+    // only once its extent and journal record are on disk. Waiting for zero here is what makes "on disk" true for
+    // every page that was hot or dirty when the caller asked, the same wait ctx_shutdown_tp_worker() makes.
+    if(completion) {
+        while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED))
+            sleep_usec(1 * USEC_PER_MS);
+
+        completion_mark_complete(completion);
+    }
 
     return data;
 }
@@ -2910,7 +2931,8 @@ void dbengine_event_loop(void* arg) {
 
                 case DBENGINE_OPCODE_CTX_FLUSH_HOT_DIRTY: {
                     struct dbengine_tier *ctx = cmd.ctx;
-                    work_dispatch(engine, ctx, NULL, NULL, opcode,
+                    struct completion *completion = cmd.completion;
+                    work_dispatch(engine, ctx, NULL, completion, opcode,
                                   flush_all_hot_and_dirty_pages_of_section_tp_worker,
                                   after_flush_all_hot_and_dirty_pages_of_section);
                     break;

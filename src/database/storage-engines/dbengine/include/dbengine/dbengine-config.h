@@ -94,14 +94,16 @@ struct dbengine_config {
     //
     // Why the figure must be right: two of the engine's own work items wait, on the pool thread they hold, for a
     // work item they queued behind them (a flush waits for its extent write, pagecache.c; a tier's registry load
-    // waits for the per-datafile loaders it queued, rrdengine.c), and both run at the internal priority the count
+    // waits for the per-datafile loaders it queued, rrdengine.c), two more wait there for extent writes already in
+    // flight (a tier's shutdown, and a flush the caller waits on through dbengine_flush_all_wait(),
+    // dbengine-tests.h; both in rrdengine.c), and all of them run at the internal priority the count
     // never holds back. On a pool smaller than libuv_worker_threads every thread can end up held by a waiting
     // parent whose child can never run, and the process hangs, silently and for good. With the two figures equal
     // the daemon is safe by its usual numbers, not by a rule the engine enforces: it asks for a pool of cpus x 6
     // threads against roughly cpus + 2 x tiers such parents, but a memory cap or the "libuv worker threads"
     // setting (netdata-conf-global.c) can bring the pool down to its floor (16; 8 on a 32-bit build) while the
     // flush parents it can have stay capped by cpus (pgc_max_flushers()), so a many-cpu host with a floor-sized
-    // pool is exposed as well. The rule the engine's work items should keep, and these two do not yet: no work
+    // pool is exposed as well. The rule the engine's work items should keep, and these four do not yet: no work
     // item waits for another work item while it holds a pool thread.
     int libuv_worker_threads;                   // the pool's size, as the embedder set it; 0 = the engine's compiled
                                                 // default (16; 8 on a 32-bit build), which is then the number the
