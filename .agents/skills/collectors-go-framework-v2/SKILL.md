@@ -187,8 +187,9 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
     A `Group` you decoded yourself per job is already owned and needs no clone.
 - For native snapshots, handle `NewTemplateSet` errors where content is selected and retain the resulting pointer.
   Use the live provider and store with `collecttest.AssertChartCoverage`; do not reconstruct a second test-only set.
-- Skip empty distributions -- e.g. a summary whose every quantile is NaN -- so a
-  chart waits for real data, matching how scalar NaN values are already skipped.
+- Collectors MUST choose whether an empty observation window omits the family or publishes unavailable fields.
+  Snapshot MeasureSet gauge availability and its effect on chart lifetime are owned by
+  `src/go/pkg/metrix/README.md#field-availability`; do not universally skip all-NaN families.
 - For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is
   unbounded; cache per-series instruments yourself and evict handles unseen for N
   cycles to stay bounded. Prefer a framework fix if the need is general
