@@ -110,7 +110,7 @@ modules:
           | Grant | Needed for |
           |:------|:-----------|
           | `VIEW SERVER STATE` | All metrics (dynamic management views and performance counters). On SQL Server 2022 and later the narrower `VIEW SERVER PERFORMANCE STATE` can be granted instead. |
-          | `VIEW ANY DEFINITION` | Database file size charts (`sys.master_files`) and Always On Availability Group charts (availability group catalog views) |
+          | `VIEW ANY DEFINITION` | Data file size and I/O stall values (read through `sys.master_files`; without it those charts exist but stay empty) and Always On Availability Group charts (availability group catalog views) |
           | `SELECT` on `msdb.dbo.sysjobs` | SQL Server Agent job status chart |
           | `SELECT` on `msdb.dbo.sysjobhistory` and `msdb.dbo.sysjobactivity` | SQL Server Agent job execution charts |
           | `SELECT` on `distribution.dbo.MSreplication_monitordata`, `MSpublications` and `MSsubscriptions` | Replication charts (distributor instances only) |
@@ -132,7 +132,7 @@ modules:
               ```sql
               CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
               GRANT VIEW SERVER STATE TO netdata_user;
-              -- Database file sizes and Always On Availability Groups
+              -- Data file sizes, I/O stall, and Always On Availability Groups
               GRANT VIEW ANY DEFINITION TO netdata_user;
 
               -- SQL Server Agent jobs (skip on Express, which has no Agent)
@@ -478,9 +478,9 @@ modules:
     troubleshooting:
       errors:
         list:
-          - error: "`error pinging database: unable to open tcp connection with host 'localhost:1433': dial tcp 127.0.0.1:1433: connect: connection refused`"
+          - error: "`check failed: error pinging database: unable to open tcp connection with host 'localhost:1433': dial tcp [::1]:1433: connect: connection refused`"
             when: |
-              At job start, before any metric is collected.
+              At job start, before any metric is collected. The message ends with the address the driver dialed.
             cause: |
               Nothing accepts TCP connections at the address and port in `dsn`. SQL Server may have the TCP/IP protocol
               disabled, listen on another port, or sit behind a firewall that blocks port 1433.
@@ -491,15 +491,16 @@ modules:
               ```sql
               SELECT local_tcp_port FROM sys.dm_exec_connections WHERE session_id = @@SPID;
               ```
-          - error: "`error pinging database: unable to get instances from Sql Server Browser on host localhost: ...`"
+          - error: "`check failed: error pinging database: no instance matching 'INSTANCENAME' returned from host 'localhost'`"
             when: |
               The DSN names an instance (`host/INSTANCENAME`) instead of a port.
             cause: |
-              Named instances are resolved through the SQL Server Browser service on UDP port 1434, and the service is
-              stopped or the port is blocked.
+              Named instances are resolved through the SQL Server Browser service on UDP port 1434. The service is
+              stopped, the port is blocked, or no instance of that name exists on the host.
             fix: |
-              Start the SQL Server Browser service, or give the instance a static TCP port and use `host:port` in `dsn`.
-          - error: "`error pinging database: mssql: login error: Login failed for user 'netdata_user'.`"
+              Check the instance name, start the SQL Server Browser service, or give the instance a static TCP port and
+              use `host:port` in `dsn`.
+          - error: "`check failed: error pinging database: mssql: Login failed for user 'netdata_user'. (18456)`"
             cause: |
               The login or password in `dsn` is wrong, the login does not exist on this instance, or the instance
               accepts Windows Authentication only and rejects every SQL login.
@@ -507,7 +508,7 @@ modules:
               Check the credentials and that the login exists. For SQL logins, switch the instance to "SQL Server and
               Windows Authentication mode" (Server Properties, Security) and restart it. The SQL Server error log
               records the reason for every failed login.
-          - error: "`error pinging database: mssql: login error: Login failed for user 'NT AUTHORITY\\ANONYMOUS LOGON'.`"
+          - error: "`check failed: error pinging database: mssql: Login failed for user 'NT AUTHORITY\\ANONYMOUS LOGON'. (18456)`"
             when: |
               Windows Authentication (no credentials in `dsn`) against an instance on another machine.
             cause: |
@@ -516,19 +517,21 @@ modules:
             fix: |
               Join the Netdata host to the domain and grant its computer account as described under Prerequisites, run
               the Netdata service as a domain account with a SQL Server login, or use a SQL login in `dsn`.
-          - error: "`user connections query failed: mssql: The user does not have permission to perform this action.`"
+          - error: "`check failed: batch requests query failed: mssql: VIEW SERVER PERFORMANCE STATE permission was denied on object 'server', database 'master'. (300)`"
             when: |
-              At job start, right after the connection succeeded.
+              At job start, right after the connection succeeded. A second line, `mssql: The user does not have
+              permission to perform this action. (297)`, follows. SQL Server 2019 and earlier name `VIEW SERVER STATE`
+              instead.
             cause: |
-              The login lacks `VIEW SERVER STATE`, so the very first dynamic management view query is rejected and the
-              job does not start.
+              The login lacks `VIEW SERVER STATE`, so the first performance counter query is rejected and the job does
+              not start.
             fix: |
               ```sql
               GRANT VIEW SERVER STATE TO netdata_user;
               ```
 
               On SQL Server 2022 and later, `GRANT VIEW SERVER PERFORMANCE STATE` is enough for the metrics.
-          - error: "`SQL Server Agent jobs query failed; job metrics will be unavailable: mssql: The SELECT permission was denied on the object 'sysjobs', database 'msdb', schema 'dbo'.`"
+          - error: "`SQL Server Agent jobs query failed; job metrics will be unavailable: mssql: The SELECT permission was denied on the object 'sysjobs', database 'msdb', schema 'dbo'. (229)`"
             cause: |
               The login has no access to the SQL Server Agent tables in `msdb`. Every other metric keeps being collected;
               the message is logged once.
@@ -550,8 +553,8 @@ modules:
           - error: "No Always On Availability Group charts appear although Always On is enabled"
             cause: |
               The availability group catalog views return rows only to logins with `VIEW ANY DEFINITION`; without it the
-              queries succeed with no rows and nothing is logged. The same grant gates the data file size charts read
-              from `sys.master_files`.
+              queries succeed with no rows and nothing is logged. The same grant feeds the data file size and I/O stall
+              charts through `sys.master_files`, so those exist but stay empty.
             fix: |
               ```sql
               GRANT VIEW ANY DEFINITION TO netdata_user;
