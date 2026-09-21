@@ -22,7 +22,7 @@ func TestResolveMSSQLXEventReadTarget_EventFileUsesConfiguredFilename(t *testing
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	target, available, err := c.resolveMSSQLXEventReadTarget(
 		context.Background(),
@@ -44,7 +44,7 @@ func TestResolveMSSQLXEventReadTarget_EventFileMissingSession(t *testing.T) {
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(sql.ErrNoRows)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	target, available, err := c.resolveMSSQLXEventReadTarget(
 		context.Background(),
@@ -65,7 +65,7 @@ func TestResolveMSSQLXEventReadTarget_RingBufferRequiresRunningSession(t *testin
 	mock.ExpectQuery("dm_xe_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.Config.Functions.ErrorInfo.UseRingBuffer = true
 
 	target, available, err := c.resolveMSSQLXEventReadTarget(
@@ -88,7 +88,7 @@ func TestResolveMSSQLXEventReadTarget_AzureSQLDatabaseUsesDatabaseCatalog(t *tes
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow("https://storage.example/events/netdata_errors.xel"))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 
 	target, available, err := c.resolveMSSQLXEventReadTarget(
@@ -110,7 +110,7 @@ func TestResolveMSSQLXEventReadTarget_AzureSQLDatabaseUsesDatabaseRingBufferDMVs
 	mock.ExpectQuery("dm_xe_database_session_targets").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	c.Functions.ErrorInfo.UseRingBuffer = true
 
@@ -133,7 +133,7 @@ func TestResolveMSSQLXEventReadTarget_AzureSQLManagedInstanceUsesServerCatalog(t
 		WillReturnRows(sqlmock.NewRows([]string{"file_path"}).AddRow(`C:\Logs\nd_err.xel`))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", engineEditionAzureSQLMI)
 
 	target, available, err := c.resolveMSSQLXEventReadTarget(

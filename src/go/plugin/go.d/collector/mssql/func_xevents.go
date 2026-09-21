@@ -34,7 +34,7 @@ func (c *Collector) resolveMSSQLXEventReadTarget(
 			query = queryMSSQLXEventDatabaseSessionEventFilePath
 		}
 		var configured sql.NullString
-		err := c.db.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&configured)
+		err := c.functionDB.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&configured)
 		if errors.Is(err, sql.ErrNoRows) {
 			return mssqlXEventReadTarget{}, false, nil
 		}
@@ -90,7 +90,7 @@ func (c *Collector) mssqlRingBufferAvailable(ctx context.Context, sessionName st
 		query = queryMSSQLXEventDatabaseSessionHasRingBuffer
 	}
 	var count int
-	err := c.db.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
+	err := c.functionDB.QueryRowContext(ctx, query, sql.Named("sessionName", sessionName)).Scan(&count)
 	return count > 0, err
 }
 

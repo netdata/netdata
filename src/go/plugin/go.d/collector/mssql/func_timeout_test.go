@@ -55,7 +55,7 @@ func TestMSSQLFunctions_TimeoutAndCancellation(t *testing.T) {
 					require.NoError(t, err)
 					defer db.Close()
 					c := New()
-					c.db = db
+					c.functionDB = db
 					c.Timeout = confopt.Duration(time.Millisecond)
 					c.Functions.TopQueries.Timeout = confopt.Duration(tc.functionTimeout)
 					c.Functions.DeadlockInfo.Timeout = confopt.Duration(tc.functionTimeout)

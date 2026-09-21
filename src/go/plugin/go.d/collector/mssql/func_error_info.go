@@ -179,12 +179,8 @@ func (f *funcErrorInfo) MethodParams(ctx context.Context, method string) ([]func
 }
 
 func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.db == nil {
-		db, err := f.router.collector.openConnection()
-		if err != nil {
-			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-		}
-		f.router.collector.db = db
+	if f.router.collector.functionDB == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
 	defer cancel()
@@ -533,7 +529,7 @@ INNER JOIN %s p ON q.query_id = p.query_id
 WHERE q.query_hash IN (%s);
 `, queryView, planView, strings.Join(validHashes, ","))
 
-	rows, err := c.db.QueryContext(ctx, query)
+	rows, err := c.functionDB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -627,7 +623,7 @@ func (c *Collector) fetchMSSQLErrorRowsFromTarget(ctx context.Context, target ms
 		args = []any{sql.Named("sessionName", sessionName), sql.Named("limit", limit)}
 	}
 
-	rows, err := c.db.QueryContext(ctx, query, args...)
+	rows, err := c.functionDB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return mssqlErrorAttrNotSupported, source, nil, err
 	}

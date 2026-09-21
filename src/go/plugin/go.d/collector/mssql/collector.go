@@ -157,7 +157,10 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	db *sql.DB
+	db *sql.DB // Metrics only.
+
+	// Initialized before Functions are published; never replaced by a request.
+	functionDB *sql.DB
 
 	serverPropertiesMu     sync.RWMutex
 	serverPropertiesLoaded bool
@@ -239,7 +242,7 @@ func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
 		return edition, nil
 	}
 
-	version, edition, err := c.queryServerProperties(ctx)
+	version, edition, err := queryServerProperties(ctx, c.functionDB)
 	if err != nil {
 		return 0, err
 	}
@@ -256,10 +259,10 @@ func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
 	return edition, nil
 }
 
-func (c *Collector) queryServerProperties(ctx context.Context) (string, int, error) {
+func queryServerProperties(ctx context.Context, db *sql.DB) (string, int, error) {
 	var version string
 	var edition int
-	if err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
+	if err := db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
 		return "", 0, err
 	}
 	return version, edition, nil
@@ -280,7 +283,12 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.CloudAuth.Validate(); err != nil {
 		return err
 	}
-	c.Debugf("using DSN [%s]", c.DSN)
+
+	db, err := c.newConnectionPool()
+	if err != nil {
+		return err
+	}
+	c.functionDB = db
 
 	c.funcRouter = newFuncRouter(c)
 
@@ -314,6 +322,12 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
+	}
+	if c.functionDB != nil {
+		if err := c.functionDB.Close(); err != nil {
+			c.Errorf("cleanup: error closing Function database connection: %v", err)
+		}
+		// Keep the closed handle stable for in-flight readers. sql.DB.Close is idempotent.
 	}
 	if c.db == nil {
 		return

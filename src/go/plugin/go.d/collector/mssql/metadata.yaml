@@ -87,6 +87,11 @@ modules:
           description: |
             The collector executes lightweight queries against system views.
             Most queries complete in milliseconds and have minimal impact on server performance.
+
+            Each job uses up to two SQL connections: one for metric collection and one shared by the diagnostic
+            Functions. Slow Functions do not occupy the metrics connection, but can still compete for SQL Server
+            CPU, I/O and locks. The additional connection opens only when a Function is called.
+
             Enabling `collect_disabled_jobs` expands SQL Agent history/activity queries and adds four charts with eight
             dimensions for every disabled job. The administrative job-status chart is always collected.
       additional_permissions:

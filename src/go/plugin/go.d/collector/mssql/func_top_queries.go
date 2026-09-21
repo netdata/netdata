@@ -216,7 +216,7 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.router.collector.db == nil {
+	if f.router.collector.functionDB == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
@@ -235,7 +235,7 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.db == nil {
+	if f.router.collector.functionDB == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 	switch method {
@@ -312,7 +312,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	limit := f.router.collector.topQueriesLimit()
 	query := f.buildTopQueriesSQL(source, cols, validatedSortColumn, timeWindowDays, limit)
 
-	rows, err := f.router.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.functionDB.QueryContext(ctx, query)
 	if err != nil {
 		if response := mssqlFunctionContextError(ctx, err, f.router.collector.topQueriesTimeout(), "top_queries"); response != nil {
 			return response
@@ -491,7 +491,7 @@ func (f *funcTopQueries) queryStoreSupported(ctx context.Context) (bool, error) 
 	}
 
 	var count int
-	if err := c.db.QueryRowContext(ctx, queryQueryStoreSupported).Scan(&count); err != nil {
+	if err := c.functionDB.QueryRowContext(ctx, queryQueryStoreSupported).Scan(&count); err != nil {
 		return false, err
 	}
 
@@ -546,7 +546,7 @@ func (f *funcTopQueries) detectPlanCacheColumns(ctx context.Context) (map[string
 	}
 	c.planCacheColsMu.RUnlock()
 
-	rows, err := c.db.QueryContext(ctx, queryPlanCacheColumns)
+	rows, err := c.functionDB.QueryContext(ctx, queryPlanCacheColumns)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -626,7 +626,7 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 			WHERE actual_state IN (1, 2, 4)
 		`
 	}
-	err := f.router.collector.db.QueryRowContext(ctx, sampleQuery).Scan(&sampleDB)
+	err := f.router.collector.functionDB.QueryRowContext(ctx, sampleQuery).Scan(&sampleDB)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -649,7 +649,7 @@ func (f *funcTopQueries) detectQueryStoreColumns(ctx context.Context) (map[strin
 		escapedDB := strings.ReplaceAll(sampleDB, "]", "]]")
 		query = fmt.Sprintf(`SELECT TOP 0 * FROM [%s].sys.query_store_runtime_stats`, escapedDB)
 	}
-	rows, err := f.router.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.functionDB.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()

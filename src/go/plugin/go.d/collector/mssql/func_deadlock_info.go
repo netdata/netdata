@@ -262,12 +262,8 @@ func (f *funcDeadlockInfo) MethodParams(ctx context.Context, method string) ([]f
 }
 
 func (f *funcDeadlockInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.db == nil {
-		db, err := f.router.collector.openConnection()
-		if err != nil {
-			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-		}
-		f.router.collector.db = db
+	if f.router.collector.functionDB == nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.deadlockInfoTimeout())
 	defer cancel()
@@ -369,7 +365,7 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 		if !available {
 			return errors.New("system_health ring_buffer target unavailable")
 		}
-		return c.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockRingBuffer).Scan(&deadlockTime, &deadlockXML)
+		return c.functionDB.QueryRowContext(ctx, querySystemHealthLatestDeadlockRingBuffer).Scan(&deadlockTime, &deadlockXML)
 	}
 
 	var err error
@@ -384,7 +380,7 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 		} else if !available {
 			err = errDeadlockEventFileUnavailable
 		} else {
-			err = c.db.QueryRowContext(ctx, querySystemHealthLatestDeadlockEventFile, target.fileQueryArgs("xml_deadlock_report")...).Scan(&deadlockTime, &deadlockXML)
+			err = c.functionDB.QueryRowContext(ctx, querySystemHealthLatestDeadlockEventFile, target.fileQueryArgs("xml_deadlock_report")...).Scan(&deadlockTime, &deadlockXML)
 		}
 		if err != nil && shouldFallbackDeadlockEventFile(err) {
 			// Retry unavailable targets and file read errors, not an available but empty target.
@@ -425,7 +421,7 @@ func shouldFallbackDeadlockEventFile(err error) bool {
 }
 
 func (f *funcDeadlockInfo) queryDatabaseNames(ctx context.Context) (map[int]string, error) {
-	rows, err := f.router.collector.db.QueryContext(ctx, queryDatabaseNamesByID)
+	rows, err := f.router.collector.functionDB.QueryContext(ctx, queryDatabaseNamesByID)
 	if err != nil {
 		return nil, err
 	}

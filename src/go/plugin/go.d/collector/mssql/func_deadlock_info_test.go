@@ -165,7 +165,7 @@ func TestQueryLatestDeadlock_FallsBackToRingBufferOnFileError(t *testing.T) {
 	)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newTestDeadlockHandler(c)
 	deadlockTime, deadlockXML, source, err := handler.queryLatestDeadlock(context.Background())
 
@@ -185,7 +185,7 @@ func TestDeadlockInfo_ConfiguredEventFile(t *testing.T) {
 	mock.ExpectQuery("fn_xe_file_target_read_file").WithArgs(`C:\Custom\health_0_*.xel`, "health_0_", "xml_deadlock_report").
 		WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0", 3)
 	response := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
 	assert.Equal(t, 200, response.Status, response.Message)
@@ -225,7 +225,7 @@ func TestDeadlockInfo_TargetResolution(t *testing.T) {
 					WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
 			}
 			c := New()
-			c.db = db
+			c.functionDB = db
 			c.setServerProperties("16.0", 3)
 			response := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
 			assert.Equal(t, tc.wantStatus, response.Status, response.Message)
@@ -273,7 +273,7 @@ func TestDeadlockInfo_RingBufferAvailability(t *testing.T) {
 					WillReturnRows(sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}))
 			}
 			c := New()
-			c.db = db
+			c.functionDB = db
 			c.setServerProperties("16.0.4265.3", 3)
 			c.Functions.DeadlockInfo.UseRingBuffer = tc.useRingBuffer
 			r := newFuncRouter(c).Handle(context.Background(), deadlockInfoMethodID, funcapi.ResolvedParams{})
@@ -298,7 +298,7 @@ func TestFetchMSSQLErrorRows_AzureSQLDatabaseUsesDatabaseRingBufferQuery(t *test
 		}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("12.0.2000.8", engineEditionAzureSQLDatabase)
 	c.Functions.ErrorInfo.UseRingBuffer = true
 
@@ -387,7 +387,7 @@ func TestFetchMSSQLErrorRows_BindsExactGeneratedFilePrefix(t *testing.T) {
 		}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
@@ -410,7 +410,7 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthEventFile(t *testing.T) {
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	status, source, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
@@ -438,7 +438,7 @@ func TestFetchMSSQLErrorRows_RetriesSystemHealthRingBufferAfterEventFileError(t 
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
@@ -464,7 +464,7 @@ func TestFetchMSSQLErrorRows_UsesSystemHealthRingBufferWhenFileLookupFails(t *te
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 	require.NoError(t, err)
@@ -503,7 +503,7 @@ func TestFetchMSSQLErrorRows_PreservesSystemHealthResolverErrors(t *testing.T) {
 			mock.ExpectQuery("server_event_session_fields").WithArgs("system_health").WillReturnError(tc.err)
 
 			c := New()
-			c.db = db
+			c.functionDB = db
 
 			status, source, rows, gotErr := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
 			assert.Equal(t, mssqlErrorAttrNotSupported, status)
@@ -529,7 +529,7 @@ func TestFetchMSSQLErrorRows_FallsBackToSystemHealthRingBuffer(t *testing.T) {
 		}).AddRow(time.Now(), 208, 1, "system health error", "SELECT 1", nil))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.Functions.ErrorInfo.UseRingBuffer = true
 
 	status, _, rows, err := c.fetchMSSQLErrorRows(context.Background(), "netdata_errors", 500)
@@ -561,7 +561,7 @@ func TestCollectErrorInfo_SystemHealthRingBufferAvailability(t *testing.T) {
 					WillReturnRows(sqlmock.NewRows([]string{"event_time", "error_number", "error_state", "message", "sql_text", "query_hash"}))
 			}
 			c := New()
-			c.db = db
+			c.functionDB = db
 			c.setServerProperties("16.0.4265.3", 3)
 			c.Functions.ErrorInfo.UseRingBuffer = true
 			r := newFuncRouter(c).Handle(context.Background(), errorInfoMethodID, funcapi.ResolvedParams{})
@@ -591,7 +591,7 @@ func TestCollectErrorInfo_ResolverTimeout(t *testing.T) {
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.DeadlineExceeded)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newFuncErrorInfo(&funcRouter{collector: c})
 
 	response := handler.collectData(context.Background())
@@ -608,7 +608,7 @@ func TestCollectErrorInfo_ResolverCancellation(t *testing.T) {
 	mock.ExpectQuery("server_event_session_fields").WillReturnError(context.Canceled)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newFuncErrorInfo(&funcRouter{collector: c})
 
 	response := handler.collectData(context.Background())
@@ -632,7 +632,7 @@ func TestErrorInfoFunctionTimeoutOverridesCollectorTimeout(t *testing.T) {
 		}))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.Timeout = confopt.Duration(5 * time.Millisecond)
 	c.Functions.ErrorInfo.Timeout = confopt.Duration(200 * time.Millisecond)
 	c.setServerProperties("16.0.4265.3", 3)
@@ -659,7 +659,7 @@ func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 	mock.ExpectQuery("SELECT\\s+database_id").WillReturnRows(dbNameRows)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
@@ -679,7 +679,7 @@ func TestCollectDeadlockInfo_QueryError(t *testing.T) {
 		WillReturnError(errors.New("boom"))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
@@ -721,7 +721,7 @@ func TestCollectDeadlockInfo_PermissionDenied(t *testing.T) {
 		WillReturnError(mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"})
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newTestDeadlockHandler(c)
 
@@ -740,7 +740,7 @@ func TestCollectErrorInfo_PermissionDenied(t *testing.T) {
 		WillReturnError(mssqlDriver.Error{Number: 297, Message: "VIEW SERVER PERFORMANCE STATE permission was denied"})
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	c.setServerProperties("16.0.4265.3", 3)
 	handler := newFuncErrorInfo(&funcRouter{collector: c})
 
@@ -823,7 +823,7 @@ func TestCollectDeadlockInfo_Timeout(t *testing.T) {
 		WillReturnError(context.DeadlineExceeded)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
@@ -843,7 +843,7 @@ func TestCollectDeadlockInfo_Cancellation(t *testing.T) {
 		WillReturnError(context.Canceled)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
@@ -874,7 +874,7 @@ func TestCollectDeadlockInfo_Success(t *testing.T) {
 		)
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
