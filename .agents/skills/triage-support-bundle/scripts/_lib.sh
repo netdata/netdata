@@ -300,8 +300,30 @@ sb_llm_chat() {
         rm -f "$out"
         sb_die "model endpoint returned an error: ${msg}"
     fi
-    jq -r '.choices[0].message.content // empty' "$out"
+    # A reasoning model occasionally returns an empty content with
+    # finish_reason "stop" - it spent the turn reasoning and emitted nothing.
+    # That is transient, so report it distinctly instead of letting the caller
+    # call it malformed JSON.
+    local content
+    content="$(jq -r '.choices[0].message.content // empty' "$out")"
+    if [ -z "$content" ]; then
+        local fr; fr="$(jq -r '.choices[0].finish_reason // "unknown"' "$out")"
+        rm -f "$out"
+        sb_die "model returned an empty response (finish_reason=${fr}); this is usually transient - retry."
+    fi
+    printf '%s' "$content"
     rm -f "$out"
+}
+
+# sb_llm_chat, retried once on an empty response. Unattended callers should use
+# this: a transient empty turn should not cost a ticket its only triage attempt.
+sb_llm_chat_retry() {
+    local body="$1" out
+    if out="$(sb_llm_chat "$body" 2>/dev/null)" && [ -n "$out" ]; then
+        printf '%s' "$out"; return 0
+    fi
+    sb_warn "empty model response; retrying once"
+    sb_llm_chat "$body"
 }
 
 # Drive the public wrapper with a sentinel credential and assert the sentinel

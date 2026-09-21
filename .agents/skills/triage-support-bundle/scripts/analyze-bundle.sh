@@ -222,7 +222,7 @@ if [ -z "${NETDATA_LLM_MODEL:-}" ]; then
 fi
 
 echo -e "${SB_GRAY}querying the model...${SB_NC}" >&2
-RAW="$(sb_llm_chat "$REQ")" || { rm -f "$REQ"; exit 1; }
+RAW="$(sb_llm_chat_retry "$REQ")" || { rm -f "$REQ"; exit 1; }
 rm -f "$REQ"
 
 # Models sometimes fence JSON despite being asked not to.
