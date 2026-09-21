@@ -2,7 +2,6 @@
 
 #include "windows_plugin.h"
 #include "windows-internals.h"
-#include "perflib-rrd.h"
 
 enum netdata_netframework_metrics {
     NETDATA_NETFRAMEWORK_EXCEPTIONS,
@@ -412,6 +411,21 @@ static void netframework_update_memory_process_id_labels(struct net_framework_in
     p->process_id_label_initialized = true;
 
 #undef UPDATE_PROCESS_ID_LABEL
+}
+
+static void netframework_add_memory_labels(
+    RRDSET *st,
+    const char *process,
+    bool has_process_id,
+    ULONGLONG process_id)
+{
+    rrdlabels_add(st->rrdlabels, "process", process, RRDLABEL_SRC_AUTO);
+
+    if (has_process_id) {
+        char process_id_label[UINT64_MAX_LENGTH];
+        snprintfz(process_id_label, sizeof(process_id_label), "%llu", (unsigned long long)process_id);
+        rrdlabels_add(st->rrdlabels, "process_id", process_id_label, RRDLABEL_SRC_AUTO);
+    }
 }
 
 static void dict_net_framework_processes_delete_cb(
@@ -1198,6 +1212,9 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryAllocatedBytesPerSec);
         bool has_process_id =
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryProcessId);
+        // Perflib may park this counter temporarily; force one relabel pass when it returns.
+        if (!has_process_id)
+            p->process_id_label_initialized = false;
         bool has_finalization_survivors =
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryFinalizationSurvivors);
         bool has_gen0_heap =
@@ -1254,8 +1271,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_allocated_bytes =
                     rrddim_add(p->st_clrmemory_allocated_bytes, "allocated", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(
-                    p->st_clrmemory_allocated_bytes->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_allocated_bytes,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1286,11 +1306,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_finalization_survivors = rrddim_add(
                     p->st_clrmemory_finalization_survivors, "survivors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(
-                    p->st_clrmemory_finalization_survivors->rrdlabels,
-                    "process",
+                netframework_add_memory_labels(
+                    p->st_clrmemory_finalization_survivors,
                     windows_shared_buffer,
-                    RRDLABEL_SRC_AUTO);
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1310,7 +1330,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                     NULL,
                     "memory",
                     "netframework.clrmemory_heap_size",
-                    "Heap size by generation",
+                    "Heap sizes by generation and Gen 0 allocation budget",
                     "bytes",
                     PLUGIN_WINDOWS_NAME,
                     "PerflibNetFramework",
@@ -1318,8 +1338,9 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                     update_every,
                     RRDSET_TYPE_LINE);
 
+                // Gen 0 heap size is the allocation budget, not current heap occupancy.
                 p->rd_clrmemory_heap_gen0 =
-                    rrddim_add(p->st_clrmemory_heap_size, "gen0", "gen0", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(p->st_clrmemory_heap_size, "gen0_budget", "gen0_budget", 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 p->rd_clrmemory_heap_gen1 =
                     rrddim_add(p->st_clrmemory_heap_size, "gen1", "gen1", 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 p->rd_clrmemory_heap_gen2 =
@@ -1327,7 +1348,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_heap_loh =
                     rrddim_add(p->st_clrmemory_heap_size, "loh", "loh", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(p->st_clrmemory_heap_size->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_heap_size,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             if (has_gen0_heap)
@@ -1376,8 +1401,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_promoted_gen1 =
                     rrddim_add(p->st_clrmemory_promoted_bytes, "gen1", "gen1", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(
-                    p->st_clrmemory_promoted_bytes->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_promoted_bytes,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             if (has_gen0_promoted)
@@ -1414,7 +1442,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_gc_handles =
                     rrddim_add(p->st_clrmemory_gc_handles, "handles", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(p->st_clrmemory_gc_handles->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_gc_handles,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1449,7 +1481,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_collections_gen2 =
                     rrddim_add(p->st_clrmemory_collections, "gen2", "gen2", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(p->st_clrmemory_collections->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_collections,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             if (has_gen0_collections)
@@ -1491,7 +1527,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_induced_gc =
                     rrddim_add(p->st_clrmemory_induced_gc, "induced", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
-                rrdlabels_add(p->st_clrmemory_induced_gc->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_induced_gc,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1522,8 +1562,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_pinned_objects =
                     rrddim_add(p->st_clrmemory_pinned_objects, "pinned", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(
-                    p->st_clrmemory_pinned_objects->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_pinned_objects,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1554,11 +1597,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_sink_blocks_in_use =
                     rrddim_add(p->st_clrmemory_sink_blocks_in_use, "in_use", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(
-                    p->st_clrmemory_sink_blocks_in_use->rrdlabels,
-                    "process",
+                netframework_add_memory_labels(
+                    p->st_clrmemory_sink_blocks_in_use,
                     windows_shared_buffer,
-                    RRDLABEL_SRC_AUTO);
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1589,8 +1632,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_committed_bytes =
                     rrddim_add(p->st_clrmemory_committed_bytes, "committed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(
-                    p->st_clrmemory_committed_bytes->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_committed_bytes,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1621,8 +1667,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_reserved_bytes =
                     rrddim_add(p->st_clrmemory_reserved_bytes, "reserved", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-                rrdlabels_add(
-                    p->st_clrmemory_reserved_bytes->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_reserved_bytes,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             rrddim_set_by_pointer(
@@ -1653,7 +1702,11 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->rd_clrmemory_gc_time = perflib_rrddim_add(
                     p->st_clrmemory_gc_time, "time", NULL, 1, 1, &p->NETFrameworkCLRMemoryTimeInGC);
 
-                rrdlabels_add(p->st_clrmemory_gc_time->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                netframework_add_memory_labels(
+                    p->st_clrmemory_gc_time,
+                    windows_shared_buffer,
+                    has_process_id,
+                    p->NETFrameworkCLRMemoryProcessId.current.Data);
             }
 
             perflib_rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time,

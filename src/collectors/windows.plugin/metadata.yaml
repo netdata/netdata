@@ -2804,11 +2804,11 @@ modules:
               dimensions:
                 - name: survivors
             - name: netframework.clrmemory_heap_size
-              description: Heap size by generation
+              description: Heap sizes by generation and Gen 0 allocation budget
               unit: bytes
               chart_type: line
               dimensions:
-                - name: gen0
+                - name: gen0_budget
                 - name: gen1
                 - name: gen2
                 - name: loh
@@ -2826,7 +2826,7 @@ modules:
               dimensions:
                 - name: handles
             - name: netframework.clrmemory_collections
-              description: Garbage collections by generation rate
+              description: Garbage collections by generation
               unit: collections/s
               chart_type: line
               dimensions:
@@ -2834,7 +2834,7 @@ modules:
                 - name: gen1
                 - name: gen2
             - name: netframework.clrmemory_induced_gc
-              description: Induced garbage collections rate
+              description: Induced garbage collections
               unit: collections/s
               chart_type: line
               dimensions:
