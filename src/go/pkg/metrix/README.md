@@ -483,7 +483,7 @@ For a complete collector integration pattern (cycle management, error handling),
 - **Snapshot freshness** — snapshot-mode instruments cannot use `FreshnessCommitted`.
 - **Runtime writes** — `RuntimeStore` rejects snapshot-mode registration with an error; calling snapshot record methods
   (`ObserveTotal`, `ObservePoint`) panics. MeasureSet families work only through `StatefulMeter(...)`.
-- **MeasureSet writes** require the full declared shape. Only snapshot gauge fields may use NaN for unavailability;
+- **MeasureSet full-family writes** require the full declared shape. Only snapshot gauge fields may use NaN for unavailability;
   it does not mean an omitted field or an absent family. See [field availability](#field-availability).
 - **MeasureSet counter semantics** — stateful counter-like families reject negative `AddPoint(...)` deltas, like scalar
   counters.
