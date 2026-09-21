@@ -169,7 +169,8 @@ func (m *mockModuleV2) ChartTemplateYAML() string {
 	return m.template
 }
 
-func (m *mockRunnerModuleV2) Run(ctx context.Context) error {
+func (m *mockRunnerModuleV2) Run(ctx context.Context, ready func()) error {
+	ready()
 	if m.runFunc == nil {
 		return nil
 	}
@@ -360,7 +361,7 @@ func TestJobV2RunnerDoesNotStartAfterPreStartStop(t *testing.T) {
 
 	job.Stop()
 	go func() {
-		job.StartManaged(make(chan struct{}))
+		job.StartManaged(NewManagedRun(context.Background(), nil))
 		close(stopped)
 	}()
 
@@ -402,7 +403,7 @@ func TestJobV2RunnerStopJoinsBeforeCleanup(t *testing.T) {
 	job := newTestJobV2(mod, &bytes.Buffer{})
 	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
-	go job.StartManaged(make(chan struct{}))
+	go job.StartManaged(NewManagedRun(context.Background(), nil))
 	select {
 	case <-started:
 	case <-time.After(time.Second):
@@ -471,7 +472,7 @@ func TestJobV2RunnerPanicRecovered(t *testing.T) {
 	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	go func() {
-		job.StartManaged(make(chan struct{}))
+		job.StartManaged(NewManagedRun(context.Background(), nil))
 		close(stopped)
 	}()
 	select {
@@ -479,7 +480,10 @@ func TestJobV2RunnerPanicRecovered(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("runner did not start")
 	}
-	require.Eventually(t, job.panicked.Load, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool {
+		run := job.managed.Load()
+		return run != nil && run.Failure() != nil && run.Failure().Reason() == "panic"
+	}, time.Second, 10*time.Millisecond)
 
 	job.Stop()
 	select {
@@ -578,8 +582,8 @@ func TestJobV2RunnerFailuresAreSanitizedBeforeLogging(t *testing.T) {
 			job.Logger = captured
 			mod.GetBase().Logger = captured
 
-			err := job.runCollectorRunner(context.Background(), mod)
-			job.handleCollectorRunnerExit(context.Background(), err)
+			err := job.runCollectorRunner(context.Background(), mod, NewManagedRun(context.Background(), nil))
+			require.Error(t, err)
 
 			require.NotContains(t, logs.String(), "resolved-v2-runner-error-marker")
 			require.NotContains(t, logs.String(), "resolved-v2-runner-panic-marker")
@@ -1067,7 +1071,7 @@ END`,
 
 				startDone := make(chan struct{})
 				go func() {
-					job.StartManaged(make(chan struct{}))
+					job.StartManaged(NewManagedRun(context.Background(), nil))
 					close(startDone)
 				}()
 
@@ -1205,7 +1209,7 @@ END`,
 
 				done := make(chan struct{})
 				go func() {
-					job.StartManaged(make(chan struct{}))
+					job.StartManaged(NewManagedRun(context.Background(), nil))
 					close(done)
 				}()
 
@@ -1342,7 +1346,7 @@ func TestJobV2_CleanupObservesStoppedRuntime(t *testing.T) {
 
 	startDone := make(chan struct{})
 	go func() {
-		job.StartManaged(make(chan struct{}))
+		job.StartManaged(NewManagedRun(context.Background(), nil))
 		close(startDone)
 	}()
 

@@ -145,12 +145,19 @@ Native snapshot ownership, construction, replacement and fixed-policy rules are 
 [chartengine](/src/go/plugin/framework/chartengine/README.md#named-active-template-sets). Existing YAML collectors retain
 their getter; implementing both providers is a startup error. `collecttest.AssertChartCoverage` supports either provider.
 
-Collectors that need a long-running side-effect loop MAY additionally implement `collectorapi.CollectorV2Runner` with
-`Run(context.Context) error`. Use this only when work must start with the running job lifecycle but must not wait for
-the next globally aligned `Collect()` tick, such as an agent-wide Function state refresh. The runtime starts `Run()`
-only after the job starts, never during autodetection or DynCfg `test`, cancels it on stop, and waits for it before
-`Cleanup()`. The implementation MUST return promptly after `ctx.Done()` and SHOULD make in-flight I/O cancellation-aware
-where the underlying library allows it.
+Collectors that need a receiver or long-running background loop MAY implement `collectorapi.CollectorV2Runner` with
+`Run(ctx context.Context, ready func()) error`. Acquire exclusive runtime resources there, after predecessor cleanup,
+then call `ready()` once all fallible startup prerequisites succeed and state is safe for concurrent `Collect()`.
+Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `Check()` still run during configuration
+validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
+
+The framework waits for readiness before collecting. Startup errors follow the existing configured autodetection retry
+policy; unexpected nil return and recovered panic do not retry. Unexpected return after readiness makes the job Failed
+and requires an explicit restart. The implementation MUST return promptly after `ctx.Done()` and SHOULD make in-flight
+I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to return. See the
+[runtime readiness contract](/src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination) for
+startup
+timeout, cancellation, output fencing and physical ownership semantics.
 
 V2 collectors that need the Agent's existing first-sample storage behavior MAY set `StoreFirst: true` directly in
 their `collectorapi.Creator` registration. This fixed collector-wide setting applies to every collector chart,

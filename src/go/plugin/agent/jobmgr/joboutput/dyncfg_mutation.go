@@ -94,6 +94,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		jobConfig,
 		nil,
 		nil,
+		nil,
 	)
 }
 
@@ -111,6 +112,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	jobConfig preparedJobConfigLifecycle,
 	busyFallback *ResourceActivationFallback,
 	quarantinedFallback *ResourceActivationFallback,
+	startupFallback func(error) (*ResourceActivationFallback, error),
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfigReconcile := dcjc.prepareJobConfigLifecycleReconcile(scope.ID, postimage, jobConfig)
 	afterApply = composeAfterApply(dcjc.retrySettlement(scope.ID, retry), afterApply)
@@ -147,6 +149,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 					Graph:                         dcjc.graph,
 					AfterGraphCommit:              dependencyCommit,
 					AfterApply:                    afterApply,
+					ActivationStartupFallback:     startupFallback,
 					ActivationBusyFallback:        busyFallback,
 					ActivationQuarantinedFallback: quarantinedFallback,
 					Result:                        result,
@@ -181,6 +184,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 			MutationPrepared:              true,
 			AfterGraphCommit:              dependencyCommit,
 			AfterApply:                    afterApply,
+			ActivationStartupFallback:     startupFallback,
 			ActivationBusyFallback:        busyFallback,
 			ActivationQuarantinedFallback: quarantinedFallback,
 			Result:                        result,
@@ -257,6 +261,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 	afterApply func(),
 	busy activationFallbackPlan,
 	quarantined activationFallbackPlan,
+	startup probeFailurePlan,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfig := preparedJobConfigLifecycleState(successor)
 	busyFallback, err := dcjc.newActivationFallback(
@@ -297,6 +302,28 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		jobConfig,
 		busyFallback,
 		quarantinedFallback,
+		func(err error) (*ResourceActivationFallback, error) {
+			typed, ok := onlyRuntimeStartupFailure(err)
+			if !ok {
+				return nil, errors.New("job output: invalid startup failure classification")
+			}
+			failure := typed.failure
+			postimage := &startup.postimage
+			cleanup := startup.failedCleanup
+			if startup.removePlainStock && !failure.coded {
+				postimage, cleanup = nil, startup.removedCleanup
+			}
+			result := lifecycle.SealedResult{}
+			if startup.result != nil {
+				result = startup.result(failure)
+			}
+			afterApply := dcjc.retrySettlement(scope.ID, retry)
+			if startup.afterApply != nil {
+				afterApply = composeAfterApply(afterApply, func() { startup.afterApply(failure) })
+			}
+			return dcjc.newActivationFallback(scope.ID, postimage, result, cleanup, afterApply,
+				failure.jobConfigLifecycle, failure.diagnosticFailure)
+		},
 	)
 }
 
@@ -413,6 +440,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 			snapshot: failure.jobConfigLifecycle,
 			failure:  failure.diagnosticFailure,
 		},
+		nil,
 		nil,
 		nil,
 	)
