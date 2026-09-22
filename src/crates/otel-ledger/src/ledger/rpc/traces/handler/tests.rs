@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 fn make_handler_over(registries: Arc<RwLock<TenantRegistries>>) -> OtelTracesHandler {
     // Small min_entries so the WAL fixtures split into chunks + tail —
     // the end-to-end tests then cross the chunk-build path for real.
-    OtelTracesHandler::new(registries, Arc::new(ChunkCache::new(64 * 1024 * 1024)), 4)
+    OtelTracesHandler::new(registries, Arc::new(ChunkCache::new(64 * 1024 * 1024)), 4, None)
 }
 
 fn make_handler() -> OtelTracesHandler {

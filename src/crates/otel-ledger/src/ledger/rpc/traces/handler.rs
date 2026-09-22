@@ -46,7 +46,8 @@ use super::adapter::{
     to_attributes_result, to_overview_result, to_overview_section, to_search_result,
     to_slowest_result, to_trace_result, validate_trace_bounds,
 };
-use super::sources::{Capture, TracesSourceSupplier};
+use super::sources::{Capture, CaptureError, TracesSourceSupplier};
+use file_lifecycle::remote_read::RemoteRead;
 use super::wire::{
     AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
     FunctionsTracesResponse, InfoResponse, OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW,
@@ -57,6 +58,28 @@ use super::wire::{
 /// Shorthand for the handler-level error every failure path maps to.
 fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
     netdata_plugin_error::NetdataPluginError::FunctionHandler { message }
+}
+
+/// A capture that failed as a whole: a hard error the caller can act on.
+fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
+    let size = |bytes: u64| bytesize::ByteSize::b(bytes).display().si().to_string();
+    match e {
+        CaptureError::TooLarge { at_least, capacity } => handler_err(format!(
+            "this query needs more than {} of remote trace data (at least {}), more than the \
+             download cache holds; narrow the time range or raise \
+             `remote_storage.read_cache_max_size`",
+            size(capacity),
+            size(at_least)
+        )),
+        CaptureError::EvictionFailed => handler_err(
+            "the remote-read download cache directory is unwritable (eviction failed); check \
+             its permissions and free space"
+                .to_string(),
+        ),
+        CaptureError::Planning(e) => {
+            handler_err(format!("otel-traces remote planning task failed: {e}"))
+        }
+    }
 }
 
 /// The Functions view's aggregate half: what the second engine pass
@@ -85,13 +108,16 @@ pub(crate) struct OtelTracesHandler {
 }
 
 impl OtelTracesHandler {
+    /// `remote` reads files that local retention evicted back from remote
+    /// storage; `None` when remote storage is disabled.
     pub(crate) fn new(
         registries: Arc<RwLock<TenantRegistries>>,
         chunk_cache: Arc<ChunkCache>,
         min_entries: u64,
+        remote: Option<RemoteRead>,
     ) -> Self {
         Self {
-            supplier: TracesSourceSupplier::new(registries, chunk_cache, min_entries),
+            supplier: TracesSourceSupplier::new(registries, chunk_cache, min_entries, remote),
         }
     }
 
@@ -99,10 +125,11 @@ impl OtelTracesHandler {
     /// cross-source `trace_by_id`.
     ///
     /// Ignores the ENVELOPE window; assembly bounds live in the `trace`
-    /// sub-object. Absent bounds capture the FULL range — a trace is an
-    /// exact object whose spans straddle files (WAL rotation is
-    /// content-agnostic), and only the caller knows how much slack its
-    /// anchor deserves. Present bounds prune the capture file-granularly
+    /// sub-object. Absent bounds capture the FULL range, remote history
+    /// included (so the lookup fails as too large once that history
+    /// exceeds the download cache) — a trace is an exact object whose spans
+    /// straddle files (WAL rotation is content-agnostic), and only the
+    /// caller knows how much slack its anchor deserves. Present bounds prune the capture file-granularly
     /// (a file overlapping the bounds is probed whole). Either way the
     /// response DECLARES the range used (`coverage`) — spans beyond it
     /// are unknown, never silently dropped: the declaration is the
@@ -162,7 +189,8 @@ impl OtelTracesHandler {
         let Capture { mut sets, pins } = self
             .supplier
             .capture(&tenant, capture_range, 1, &ctx.cancellation, &ctx.progress)
-            .await;
+            .await
+            .map_err(capture_error)?;
         let sources = sets.pop().unwrap_or_default();
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
@@ -315,7 +343,8 @@ impl OtelTracesHandler {
         let Capture { mut sets, pins } = self
             .supplier
             .capture_ranges(&tenant, &ranges, &ctx.cancellation, &ctx.progress)
-            .await;
+            .await
+            .map_err(capture_error)?;
         let aggregate_sources = match aggregate_grid {
             Some(_) => sets.pop().unwrap_or_default(),
             None => Vec::new(),
@@ -506,7 +535,8 @@ impl OtelTracesHandler {
         let Capture { mut sets, pins } = self
             .supplier
             .capture(&tenant, window.capture, 1, &ctx.cancellation, &ctx.progress)
-            .await;
+            .await
+            .map_err(capture_error)?;
         Ok((sets.pop().unwrap_or_default(), pins, engine_window))
     }
 
@@ -663,7 +693,8 @@ impl OtelTracesHandler {
                 &ctx.cancellation,
                 &ctx.progress,
             )
-            .await;
+            .await
+            .map_err(capture_error)?;
         let sources = sets.pop().unwrap_or_default();
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
@@ -784,3 +815,6 @@ impl FunctionHandler for OtelTracesHandler {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod remote_tests;

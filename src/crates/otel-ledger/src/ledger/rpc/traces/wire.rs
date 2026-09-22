@@ -562,8 +562,8 @@ pub struct TraceParams {
     /// summary range overlaps `[after, before)` are probed for the
     /// trace's spans. Both-or-neither; `after < before` — violations
     /// are client errors. Any width is accepted. Absent = full
-    /// retention. The response's `coverage` declares the range actually
-    /// used either way.
+    /// retention, local and remote. The response's `coverage` declares
+    /// the range actually used either way.
     #[serde(default)]
     pub after: Option<u32>,
     #[serde(default)]

@@ -305,7 +305,7 @@ where
     let registries = Arc::new(RwLock::new(registries));
 
     // The caller's closure builds the signal's handler (capturing whatever it
-    // needs — e.g. the logs chunk/remote-read caches) and supplies the
+    // needs — e.g. the chunk cache and the download cache) and supplies the
     // args→payload shim; the declaration is read back off the boxed handler.
     let (handler, arg_shim) = make_handler(registries.clone());
     let declaration = handler.declaration();

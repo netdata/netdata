@@ -294,11 +294,12 @@ impl Ledger {
         )
         .await?;
 
-        // The traces pipeline: shares the same cleaner/uploader/storage (and
-        // the chunk cache — seqs are process-global, so cache keys never
-        // collide across signals) but has its own `{base}/traces/...` dirs,
-        // the traces seal (`ng_index::build_sfst_traces_file`), and the
-        // `otel-traces` Function handler.
+        // The traces pipeline: shares the same cleaner/uploader/storage, the
+        // download cache and the chunk cache (seqs are process-global, so
+        // cache keys never collide across signals) but has its own
+        // `{base}/traces/...` dirs, the traces seal
+        // (`ng_index::build_sfst_traces_file`), and the `otel-traces`
+        // Function handler.
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,
             traces_lifecycle,
@@ -309,6 +310,7 @@ impl Ledger {
             &mut cleaner,
             uploader.as_mut(),
             storage.as_ref(),
+            read_cache.as_ref(),
             chunk_cache.clone(),
             &pipeline_tx,
         )

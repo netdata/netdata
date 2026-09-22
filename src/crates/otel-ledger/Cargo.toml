@@ -16,6 +16,7 @@ otel-logs-identity = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bridge = { workspace = true }
+bytesize = { workspace = true }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
 file-cache = { workspace = true }
@@ -41,7 +42,6 @@ wal = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-bytesize = { workspace = true }
 # `mkfifo` for the test that proves the logs query reads catalogs off the
 # registry lock (a FIFO catalog blocks its reader until the test writes it).
 libc = { workspace = true }

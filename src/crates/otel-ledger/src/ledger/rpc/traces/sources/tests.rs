@@ -1,7 +1,7 @@
 use super::*;
 use bridge::function::ProgressState;
 use crate::ledger::rpc::traces::fixtures::{
-    install_sfst, install_wal, make_registries, otlp_req, test_file_id,
+    TestRemote, install_sfst, install_wal, make_registries, otlp_req, test_file_id,
 };
 
 // These tests cover `capture` end to end at the registry boundary —
@@ -22,6 +22,7 @@ fn make_supplier_with_min_entries(min_entries: u64) -> TracesSourceSupplier {
         make_registries(),
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
         min_entries,
+        None,
     )
 }
 
@@ -50,6 +51,7 @@ async fn empty_registries_yield_empty_copies() {
     let sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     assert_eq!(sets.len(), 2);
     assert!(sets.iter().all(|s| s.is_empty()));
@@ -63,6 +65,7 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
     let mut sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1);
@@ -94,6 +97,7 @@ async fn copies_are_structurally_identical() {
     let sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     let ids: Vec<Vec<String>> = sets.iter().map(|s| source_ids(s)).collect();
     assert_eq!(ids[0].len(), 2);
@@ -109,6 +113,7 @@ async fn window_pruning_is_file_granular() {
     let mut sets = supplier
         .capture(&TenantId::from("default"), 900..2000, 1, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     let sources = sets.pop().unwrap();
     // Pin WHICH file survives, not just the count — an inverted pruning
@@ -140,6 +145,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     let mut sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     let sources = sets.pop().unwrap();
     let ids = source_ids(&sources);
@@ -182,6 +188,7 @@ async fn wal_below_min_entries_is_all_tail() {
     let mut sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1);
@@ -220,6 +227,7 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
     let mut sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1, "only the sealed file survives");
@@ -243,6 +251,7 @@ async fn cancelled_capture_with_a_wal_returns_empty_and_caches_nothing() {
     let sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 1, &cancel, &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     assert!(sets.is_empty());
 }
@@ -258,6 +267,7 @@ async fn cancelled_capture_returns_empty() {
     let sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 2, &cancel, &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     assert!(sets.is_empty());
 }
@@ -270,6 +280,7 @@ async fn capture_is_tenant_scoped() {
     let mut sets = supplier
         .capture(&TenantId::from("tenant-b"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     assert!(
         sets.pop().unwrap().is_empty(),
@@ -302,6 +313,7 @@ async fn source_ids_do_not_depend_on_the_directory() {
         let mut sets = supplier
             .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
             .await
+            .unwrap()
             .sets;
         captured.push(sets.pop().unwrap());
     }
@@ -339,6 +351,7 @@ async fn chunk_ids_order_numerically() {
     let mut sets = supplier
         .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
         .await
+        .unwrap()
         .sets;
     let ids = source_ids(&sets.pop().unwrap());
     let chunk_ids: Vec<&String> = ids.iter().filter(|id| id.contains("#chunk")).collect();
@@ -365,10 +378,127 @@ async fn capture_sets_the_progress_total_to_the_distinct_ranges_sources() {
             &CancellationToken::new(),
             &progress,
         )
-        .await;
+        .await
+        .unwrap();
 
     let lens: Vec<usize> = capture.sets.iter().map(Vec::len).collect();
     assert_eq!(lens, [2, 2, 1]);
     assert!(capture.pins.is_empty(), "nothing remote was captured");
     assert_eq!(progress.load(), (0, 3));
+}
+
+/// A supplier reading back through `remote`, over `registries`.
+fn remote_supplier(
+    registries: Arc<RwLock<TenantRegistries>>,
+    remote: &TestRemote,
+) -> TracesSourceSupplier {
+    TracesSourceSupplier::new(
+        registries,
+        Arc::new(ChunkCache::new(64 * 1024 * 1024)),
+        4,
+        Some(remote.read()),
+    )
+}
+
+#[tokio::test]
+async fn too_large_fails_before_any_download_or_chunk_build() {
+    let registries = make_registries();
+    let remote = TestRemote::new(100);
+    for seq in 1..=2 {
+        remote
+            .evicted(
+                &registries,
+                "default",
+                file_registry::test_identity(),
+                seq,
+                vec![otlp_req(0x10 + seq as u8, 3, seq * 1_000_000_000)],
+            )
+            .await;
+    }
+    // A local WAL whose chunks a capture would build.
+    install_wal(
+        &registries,
+        "default",
+        9,
+        vec![otlp_req(0x11, 3, 1_000_000_000), otlp_req(0x22, 3, 2_000_000_000)],
+    )
+    .await;
+    let supplier = remote_supplier(registries, &remote);
+    let progress = ProgressState::new();
+
+    let err = supplier
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &progress)
+        .await
+        .err()
+        .expect("too large");
+
+    assert!(matches!(err, CaptureError::TooLarge { capacity: 100, .. }), "{err:?}");
+    assert_eq!(remote.cache.file_count(), 0, "nothing downloaded");
+    assert_eq!(progress.load(), (0, 0), "no total set: the capture stopped at planning");
+    let probe = supplier
+        .chunk_cache
+        .get_or_build(test_file_id(9).seq, 0, async {
+            Err::<Arc<Vec<u8>>, &str>("not built")
+        })
+        .await;
+    assert!(probe.is_err(), "no chunk was built");
+}
+
+#[tokio::test]
+async fn a_cancelled_capture_downloads_nothing() {
+    let registries = make_registries();
+    let remote = TestRemote::new(64 * 1024 * 1024);
+    remote
+        .evicted(
+            &registries,
+            "default",
+            file_registry::test_identity(),
+            1,
+            vec![otlp_req(0x11, 3, 1_000_000_000)],
+        )
+        .await;
+    let supplier = remote_supplier(registries, &remote);
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+
+    let capture = supplier
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &cancel, &ProgressState::new())
+        .await
+        .unwrap();
+
+    assert!(capture.sets.is_empty() && capture.pins.is_empty());
+    assert_eq!(remote.cache.file_count(), 0);
+}
+
+#[tokio::test]
+async fn remote_sources_are_named_like_local_sealed_files() {
+    // One name wherever a file's bytes come from: a downloaded file and a
+    // failed one both carry `<stem>.sfst`, so the engine's duplicate check
+    // and id order treat them as the local file would be.
+    let registries = make_registries();
+    let remote = TestRemote::new(64 * 1024 * 1024);
+    for seq in 1..=2 {
+        remote
+            .evicted(
+                &registries,
+                "default",
+                file_registry::test_identity(),
+                seq,
+                vec![otlp_req(0x10 + seq as u8, 3, seq * 1_000_000_000)],
+            )
+            .await;
+    }
+    std::fs::remove_file(remote.objects.join(format!("traces/{}", sfst_id(2)))).unwrap();
+    let supplier = remote_supplier(registries, &remote);
+
+    let mut capture = supplier
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .unwrap();
+    let sources = capture.sets.pop().unwrap();
+
+    assert_eq!(source_ids(&sources), [sfst_id(1), sfst_id(2)]);
+    assert!(matches!(&sources[0], TraceSource::Sfst(c) if matches!(&c.source, sfsq::Source::File(p) if p.starts_with(&remote.cache_dir))));
+    assert!(matches!(&sources[1], TraceSource::Unavailable(_)));
+    assert_eq!(capture.pins.len(), 1);
 }

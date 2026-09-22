@@ -282,3 +282,80 @@ pub(crate) async fn install_wal(
         .unwrap();
     path
 }
+
+/// A remote for read-back tests: an `fs://` object store and a download
+/// cache, each in a throwaway directory.
+pub(crate) struct TestRemote {
+    /// The object store's root: an object's key is its path below it.
+    pub(crate) objects: std::path::PathBuf,
+    pub(crate) cache_dir: std::path::PathBuf,
+    pub(crate) cache: file_cache::FileCache,
+}
+
+impl TestRemote {
+    pub(crate) fn new(cache_capacity: u64) -> Self {
+        let objects = tempfile::tempdir().unwrap().keep();
+        let cache_dir = tempfile::tempdir().unwrap().keep();
+        let cache = file_cache::FileCache::open(&cache_dir, cache_capacity).unwrap();
+        Self {
+            objects,
+            cache_dir,
+            cache,
+        }
+    }
+
+    /// The read-back handle a supplier or handler takes.
+    pub(crate) fn read(&self) -> file_lifecycle::remote_read::RemoteRead {
+        let storage = file_lifecycle::storage::OpendalStorage::new(&format!(
+            "fs://{}",
+            self.objects.display()
+        ))
+        .unwrap();
+        file_lifecycle::remote_read::RemoteRead::new(storage, self.cache.clone())
+    }
+
+    /// Seal `reqs` as `identity`'s file of sequence `seq`, store the bytes as
+    /// an object and catalog it for `tenant` — a file local retention has
+    /// evicted.
+    pub(crate) async fn evicted(
+        &self,
+        registries: &Arc<RwLock<TenantRegistries>>,
+        tenant: &str,
+        identity: file_registry::Identity,
+        seq: u64,
+        reqs: Vec<ExportTraceServiceRequest>,
+    ) -> Evicted {
+        let (summary, bytes) = sealed_traces(reqs);
+        let id = FileId::new(identity, 1, seq, 7);
+        let remote_key = format!("traces/{}", id.to_filename("sfst"));
+        let object = self.objects.join(&remote_key);
+        std::fs::create_dir_all(object.parent().unwrap()).unwrap();
+        std::fs::write(&object, &bytes).unwrap();
+        let entry = otel_catalog::CatalogEntry {
+            id,
+            remote_key,
+            min_timestamp_s: summary.min_timestamp_s,
+            max_timestamp_s: summary.max_timestamp_s,
+            record_count: summary.record_count,
+            content_meta: summary.content_meta,
+            size: ByteSize(bytes.len() as u64),
+            uploaded_at_ns: TimestampNs(0),
+            remote_etag: None,
+        };
+        let mut guard = registries.write().await;
+        let catalog = crate::test_helpers::track_catalog_entry(&mut guard, tenant, entry.clone());
+        Evicted { entry, catalog }
+    }
+
+    /// Remove an evicted file's object, so downloading it fails.
+    pub(crate) fn lose(&self, evicted: &Evicted) {
+        std::fs::remove_file(self.objects.join(&evicted.entry.remote_key)).unwrap();
+    }
+}
+
+/// A file [`TestRemote::evicted`] stored remotely: its catalog entry and the
+/// local catalog file that lists it.
+pub(crate) struct Evicted {
+    pub(crate) entry: otel_catalog::CatalogEntry,
+    pub(crate) catalog: std::path::PathBuf,
+}

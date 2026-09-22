@@ -154,12 +154,7 @@ impl<S: Storage> RemoteRead<S> {
             match cached.get(filename.as_str()) {
                 Some(pin) => files.push(SelectedFile {
                     id: entry.id,
-                    summary: sfst::Summary {
-                        min_timestamp_s: entry.min_timestamp_s,
-                        max_timestamp_s: entry.max_timestamp_s,
-                        record_count: entry.record_count,
-                        content_meta: entry.content_meta.clone(),
-                    },
+                    summary: entry.summary(),
                     path: pin.path().to_path_buf(),
                 }),
                 None => failed.push(entry.clone()),
