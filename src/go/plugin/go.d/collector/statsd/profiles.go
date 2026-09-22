@@ -217,10 +217,10 @@ func (p *profile) owns(name string) bool {
 // outside the relabel record, invisible to rules, and is restored unchanged.
 // Replaced labels are appended to labels[:0], so they may share the caller's storage.
 //
-// Label strings are substrings of the received datagram or TCP record. The reused
-// input buffer is cleared once the output is read, so the pipeline's processors
-// keep only their results for the most recent input per block, a bound fixed by
-// configuration and the record bound.
+// Label strings are substrings of the received datagram or buffered TCP records.
+// The reused input buffer is cleared once the output is read, so the pipeline's
+// processors keep only their results for the most recent input per block, a bound
+// fixed by configuration and the record bound.
 func (p *profile) replace(r record, labelsBuf []metrix.Label) (record, error) {
 	var held *metrix.Label
 	for i, l := range r.labels {

@@ -139,9 +139,11 @@ func parseNumber(text string) (float64, error) {
 
 // parseTags appends the tags, sorted by key, to labels. Identical repeats
 // collapse. A conflicting repeat rejects as labels, and takes precedence over a
-// later malformed tag, which the record never reaches.
+// later malformed tag, which the record never reaches. The storage behind labels
+// keeps no string beyond the result, so a caller clearing the result's length
+// retains nothing.
 func parseTags(text string, labels []metrix.Label) ([]metrix.Label, error) {
-	start := len(labels)
+	start, storage := len(labels), labels[len(labels):cap(labels)]
 	var err error
 	for tag := range strings.SplitSeq(text, ",") {
 		key, value, ok := strings.Cut(tag, ":")
@@ -160,21 +162,24 @@ func parseTags(text string, labels []metrix.Label) ([]metrix.Label, error) {
 	}
 	tags := labels[start:]
 	slices.SortFunc(tags, func(a, b metrix.Label) int { return strings.Compare(a.Key, b.Key) })
-	n := 0
+	n, conflict := 0, false
 	for _, l := range tags {
 		if n > 0 && tags[n-1].Key == l.Key {
-			if tags[n-1].Value != l.Value {
-				return labels, rejectLabels
-			}
+			conflict = conflict || tags[n-1].Value != l.Value
 			continue
 		}
 		tags[n] = l
 		n++
 	}
-	if err != nil {
-		return labels, err
+	clear(tags[n:])
+	if cap(labels) > start+len(storage) {
+		clear(storage) // Outgrown: the tags now live in a new array.
 	}
-	return labels[:start+n], nil
+	labels = labels[:start+n]
+	if conflict {
+		return labels, rejectLabels
+	}
+	return labels, err
 }
 
 // validText reports valid UTF-8 without control characters. ASCII is checked

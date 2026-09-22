@@ -222,12 +222,14 @@ func TestIdleCapacityAndTypeTransitions(t *testing.T) {
 	})
 	t.Run("expired binding frees name for another type", func(t *testing.T) {
 		f := newCoreFixture(t, 2, 10*time.Second)
-		f.ingest(t, "x:5|c")
+		f.ingest(t, "x:5|c|#a:one")
 		f.collect(t, false, false)
-		f.time = f.time.Add(10 * time.Second)
-		f.ingest(t, "x:1|g")
+		f.time = f.time.Add(9 * time.Second)
+		require.ErrorIs(t, f.c.receiver.ingest("x:1|g|#a:two", f.time), rejectType)
+		f.time = f.time.Add(time.Second)
+		f.ingest(t, "x:1|g|#a:two") // A new identity; its name's binding retires.
 		f.collect(t, false, false)
-		value(t, f.c, "g.value.x", 1, nil)
+		value(t, f.c, "g.value.x", 1, metrix.Labels{"a": "two"})
 	})
 	t.Run("disabled idle retains slot", func(t *testing.T) {
 		f := newCoreFixture(t, 1, 0)
@@ -427,30 +429,42 @@ func TestRetainedStringsOwnStorage(t *testing.T) {
 
 // TestIngestStorageRetainsNoRecord: the receiver's reusable record storage must
 // not keep an earlier record, or the datagram it was cut from, alive once a
-// smaller record follows, whether that record was admitted or rejected.
+// smaller record follows, whether that record was admitted or rejected and
+// whether its repeated tags collapsed.
 func TestIngestStorageRetainsNoRecord(t *testing.T) {
+	value := strings.Repeat("v", 700)
+	tags := func(keys ...string) string {
+		parts := make([]string, len(keys))
+		for i, key := range keys {
+			parts[i] = key + ":" + value
+		}
+		return strings.Join(parts, ",")
+	}
+	var distinct, identical []string
+	for i := range 12 {
+		distinct = append(distinct, fmt.Sprintf("k%d", i))
+	}
+	for range 17 {
+		identical = append(identical, "k")
+	}
 	for name, tc := range map[string]struct {
-		tags, suffix string
-		want         error
+		tags string
+		want error
 	}{
-		"admitted":         {want: nil},
-		"parse rejected":   {suffix: "|@2", want: rejectRate},
-		"prepare rejected": {tags: ",z:a  b", want: rejectLabels},
+		"admitted":           {tags: tags(distinct...)},
+		"parse rejected":     {tags: tags(distinct...) + "|@2", want: rejectRate},
+		"prepare rejected":   {tags: tags(distinct...) + ",z:a  b", want: rejectLabels},
+		"repeats collapse":   {tags: tags("a", "a", "b", "b", "c", "c")},
+		"many repeats":       {tags: tags(identical...)},
+		"repeats rejected":   {tags: tags("a", "a", "b", "b") + ",z:a  b", want: rejectLabels},
+		"repeats then field": {tags: tags("a", "a", "b", "b") + "|@2", want: rejectRate},
+		"repeat conflict":    {tags: tags("a", "a", "b", "b") + ",a:w", want: rejectLabels},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newCoreFixture(t, 4, time.Minute)
 			large := func() weak.Pointer[byte] {
-				var b strings.Builder
-				b.WriteString("large:1|c|#")
-				for i := range 12 {
-					if i > 0 {
-						b.WriteByte(',')
-					}
-					fmt.Fprintf(&b, "k%d:%s", i, strings.Repeat("v", 700))
-				}
-				b.WriteString(tc.tags + tc.suffix)
 				// The record is a substring of a larger datagram-like text.
-				datagram := b.String() + "\nsmall:1|c"
+				datagram := "large:1|c|#" + tc.tags + "\nsmall:1|c"
 				line, _, _ := strings.Cut(datagram, "\n")
 				assert.Equal(t, tc.want, f.c.receiver.ingest(line, f.time))
 				return weak.Make(unsafe.StringData(datagram))
