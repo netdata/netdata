@@ -333,8 +333,17 @@ void nd_thread_join_threads()
     do {
         spinlock_lock(&threads_globals.exited.spinlock);
         nti = threads_globals.exited.list;
-        while(nti && !nd_thread_try_claim_join(nti))
+        while(nti) {
+            // Manual-join wrappers are owned by their creator. Do not claim JOINED before
+            // checking this flag: a direct owner join would otherwise see a false success.
+            if (nd_thread_status_check(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN)) {
+                nti = nti->next;
+                continue;
+            }
+            if (nd_thread_try_claim_join(nti))
+                break;
             nti = nti->next;
+        }
         if(nti) {
             // Claim the wrapper before unlinking it. A direct owner may have the same pointer
             // and can free it immediately after winning the JOINED CAS.

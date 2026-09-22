@@ -201,7 +201,10 @@ static DICTIONARY *uncertainMountPoints = NULL;
 static DICTIONARY *excludedDeviceNames = NULL;
 static usec_t mountPointsRefreshedUT = 0;
 static bool mountPointsEvictionSafe = false;
+static bool mountPointsPrimed = false;
+static bool deviceMappingIncomplete = false;
 static bool mountPointsDiscoveryWarningActive = false;
+static usec_t volume_space_last_cancel_log_ut = 0;
 static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
 
 struct volume_space_result {
@@ -335,6 +338,9 @@ static void initialize(void)
     excludedDeviceNames = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     mountPointsRefreshedUT = 0;
     mountPointsEvictionSafe = false;
+    mountPointsPrimed = false;
+    deviceMappingIncomplete = false;
+    volume_space_last_cancel_log_ut = 0;
     mountPointsDiscoveryWarningActive = false;
 
     netdata_mutex_init(&volume_space_mutex);
@@ -608,9 +614,11 @@ static void volume_space_worker(void *ptr __maybe_unused)
         value.success = volume_space(name, &value.total_bytes, &value.free_bytes);
 
         netdata_mutex_lock(&volume_space_mutex);
-        bool space_cancelled = volume_space_worker_cancel_requested[worker_id] || volume_space_worker_stop;
+        bool space_query_cancelled = volume_space_worker_cancel_requested[worker_id];
+        // re-read: the stop flag captured before the query may have changed while it ran
+        stopping = volume_space_worker_stop;
         netdata_mutex_unlock(&volume_space_mutex);
-        if (!space_cancelled && metadata) {
+        if (!space_query_cancelled && !stopping && metadata) {
             value.metadata_attempted = true;
             struct logical_disk metadata_disk = {0};
             STRING *filesystem = getFileSystemType(&metadata_disk, name);
@@ -629,7 +637,22 @@ static void volume_space_worker(void *ptr __maybe_unused)
         dictionary_del(volume_space_inflight, name);
         volume_space_worker_busy[worker_id] = false;
         volume_space_worker_started_ut[worker_id] = 0;
-        if (space_cancelled) {
+        if (space_query_cancelled && !stopping) {
+            // volume_space() already reports failure for an aborted query, so the sample is left as
+            // it came back: zeroing it here would discard a query that completed just before the
+            // cancel flag was raised.
+            usec_t now_ut = now_monotonic_usec();
+            if (!volume_space_last_cancel_log_ut ||
+                now_ut - volume_space_last_cancel_log_ut >= 60 * USEC_PER_SEC) {
+                volume_space_last_cancel_log_ut = now_ut;
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_WARNING,
+                    "PerflibStorage space query cancelled for '%s'",
+                    name);
+            }
+        }
+        else if (stopping) {
             netdata_mutex_unlock(&volume_space_mutex);
             continue;
         }
@@ -866,7 +889,7 @@ static bool mount_points_record_volume_id(DICTIONARY *volume_ids, const wchar_t 
 
 // Map the volume's NT device name (\Device\HarddiskVolumeN) to a mount path, so a perflib instance
 // named after the device can be published under a name operators recognize.
-static void mount_points_map_device(
+static bool mount_points_map_device(
     DICTIONARY *devices, DICTIONARY *excluded_devices, const wchar_t *volumeGUID, const char *mount_path)
 {
     // "\\?\Volume{guid}\" -> "Volume{guid}"
@@ -874,12 +897,12 @@ static void mount_points_map_device(
     // future change that passes a different size cannot walk past the end of the array.
     size_t len = wcsnlen(volumeGUID, MAX_PATH + 1);
     if (len < 5 || wcsncmp(volumeGUID, L"\\\\?\\", 4) != 0)
-        return;
+        return false;
 
     wchar_t name[MAX_PATH + 1];
     size_t name_len = len - 4;
     if (name_len >= _countof(name))
-        return;
+        return false;
 
     memcpy(name, volumeGUID + 4, name_len * sizeof(wchar_t));
     name[name_len] = L'\0';
@@ -888,7 +911,7 @@ static void mount_points_map_device(
 
     wchar_t target[MAX_PATH + 1];
     if (!QueryDosDeviceW(name, target, _countof(target)))
-        return;
+        return false;
 
     // perflib publishes the leaf of the device name, e.g. "HarddiskVolume7"
     const wchar_t *leaf = wcsrchr(target, L'\\');
@@ -897,17 +920,19 @@ static void mount_points_map_device(
     char device[128];
     bool truncated = false;
     if (!utf16_to_utf8(device, sizeof(device), leaf, -1, &truncated) || truncated || !*device)
-        return;
+        return false;
 
     if (mount_path && *mount_path)
         dictionary_set(devices, device, (void *)mount_path, strlen(mount_path) + 1);
     else if (excluded_devices)
         dictionary_set(excluded_devices, device, device, strlen(device) + 1);
+
+    return true;
 }
 
-static void mount_points_mark_device_excluded(DICTIONARY *excluded_devices, const wchar_t *volumeGUID)
+static bool mount_points_mark_device_excluded(DICTIONARY *excluded_devices, const wchar_t *volumeGUID)
 {
-    mount_points_map_device(NULL, excluded_devices, volumeGUID, NULL);
+    return mount_points_map_device(NULL, excluded_devices, volumeGUID, NULL);
 }
 
 // A failed volume is retained by identity, while an enumeration failure with no reliable end boundary
@@ -917,7 +942,9 @@ static struct mount_points_scan_status mount_points_scan_volumes(
     DICTIONARY *devices,
     DICTIONARY *excluded_devices,
     DICTIONARY *failed_volume_ids,
-    DICTIONARY *volume_ids)
+    DICTIONARY *volume_ids,
+    DICTIONARY *uncertain_paths __maybe_unused,
+    bool *device_mapping_complete)
 {
     wchar_t volumeGUID[MAX_PATH + 1];
     bool complete = true;
@@ -945,10 +972,18 @@ static struct mount_points_scan_status mount_points_scan_volumes(
         }
 
         // a volume with no mount path is not reachable, so there is nothing to name it after
-        if (*first_path)
-            mount_points_map_device(devices, excluded_devices, volumeGUID, first_path);
-        else if (had_path)
-            mount_points_mark_device_excluded(excluded_devices, volumeGUID);
+        if (*first_path) {
+            if (!mount_points_map_device(devices, excluded_devices, volumeGUID, first_path)) {
+                // The device alias is unknown, so the perflib instance cannot be recognised as this
+                // same volume. Keep charting the mount path and suppress the unresolved bare device
+                // instead: dropping the path here leaves a first-time volume with no chart at all.
+                if (device_mapping_complete)
+                    *device_mapping_complete = false;
+            }
+        }
+        else if (had_path && !mount_points_mark_device_excluded(excluded_devices, volumeGUID) &&
+                 device_mapping_complete)
+            *device_mapping_complete = false;
 
     } while (FindNextVolumeW(h, volumeGUID, _countof(volumeGUID)));
 
@@ -976,7 +1011,11 @@ static struct mount_points_scan_status mount_points_scan_volumes(
 // normal non-cluster case and counts as a successful scan that found no CSVs - treating it as a
 // failure would freeze the registry permanently on every non-cluster Windows host.
 static struct mount_points_scan_status mount_points_scan_cluster_storage(
-    DICTIONARY *paths, DICTIONARY *excluded_devices, DICTIONARY *volume_ids)
+    DICTIONARY *paths,
+    DICTIONARY *excluded_devices,
+    DICTIONARY *volume_ids,
+    DICTIONARY *uncertain_paths,
+    bool *device_mapping_complete __maybe_unused)
 {
     wchar_t windir[MAX_PATH + 1];
     UINT len = GetSystemWindowsDirectoryW(windir, _countof(windir));
@@ -1036,11 +1075,10 @@ static struct mount_points_scan_status mount_points_scan_cluster_storage(
         bool volume_id_found = mount_path_len >= 0 && (size_t)mount_path_len < _countof(mount_path) &&
                                volume_id_for_mount_path(mount_path, volume_id, sizeof(volume_id));
         if (fd.dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT && !volume_id_found) {
-            // Without the volume identity this path cannot be deduplicated safely. Retain the
-            // previous snapshot and suppress eviction for this refresh instead of publishing a
-            // partial ClusterStorage result as complete.
+            // Without the volume identity this path cannot be deduplicated safely. Keep it
+            // uncertain for this refresh, but do not freeze eviction for unrelated volumes.
             complete = false;
-            eviction_safe = false;
+            dictionary_set(uncertain_paths, path, NULL, 0);
             continue;
         }
 
@@ -1077,9 +1115,15 @@ struct mount_points_scan_ops {
         DICTIONARY *devices,
         DICTIONARY *excluded_devices,
         DICTIONARY *failed_volume_ids,
-        DICTIONARY *volume_ids);
+        DICTIONARY *volume_ids,
+        DICTIONARY *uncertain_paths,
+        bool *device_mapping_complete);
     struct mount_points_scan_status (*scan_cluster_storage)(
-        DICTIONARY *paths, DICTIONARY *excluded_devices, DICTIONARY *volume_ids);
+        DICTIONARY *paths,
+        DICTIONARY *excluded_devices,
+        DICTIONARY *volume_ids,
+        DICTIONARY *uncertain_paths,
+        bool *device_mapping_complete);
 };
 
 static const struct mount_points_scan_ops mount_points_production_scan_ops = {
@@ -1093,6 +1137,8 @@ struct mount_points_snapshot {
     DICTIONARY *excluded_devices;
     DICTIONARY *volume_ids;
     DICTIONARY *failed_volume_ids;
+    DICTIONARY *uncertain_paths;
+    bool device_mapping_complete;
     struct mount_points_scan_status volumes;
     struct mount_points_scan_status cluster;
 };
@@ -1107,6 +1153,7 @@ static void mount_points_snapshot_destroy(struct mount_points_snapshot *snapshot
     dictionary_destroy(snapshot->excluded_devices);
     dictionary_destroy(snapshot->volume_ids);
     dictionary_destroy(snapshot->failed_volume_ids);
+    dictionary_destroy(snapshot->uncertain_paths);
     freez(snapshot);
 }
 
@@ -1118,14 +1165,22 @@ static struct mount_points_snapshot *mount_points_scan_with_ops(const struct mou
     snapshot->excluded_devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     snapshot->volume_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     snapshot->failed_volume_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->uncertain_paths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->device_mapping_complete = true;
     snapshot->volumes = ops->scan_volumes(
         snapshot->paths,
         snapshot->devices,
         snapshot->excluded_devices,
         snapshot->failed_volume_ids,
-        snapshot->volume_ids);
+        snapshot->volume_ids,
+        snapshot->uncertain_paths,
+        &snapshot->device_mapping_complete);
     snapshot->cluster = ops->scan_cluster_storage(
-        snapshot->paths, snapshot->excluded_devices, snapshot->volume_ids);
+        snapshot->paths,
+        snapshot->excluded_devices,
+        snapshot->volume_ids,
+        snapshot->uncertain_paths,
+        &snapshot->device_mapping_complete);
     return snapshot;
 }
 
@@ -1220,13 +1275,15 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
     DICTIONARY *excluded_devices = snapshot->excluded_devices;
     DICTIONARY *volume_ids = snapshot->volume_ids;
     DICTIONARY *failed_volume_ids = snapshot->failed_volume_ids;
+    DICTIONARY *scan_uncertain_paths = snapshot->uncertain_paths;
     struct mount_points_scan_status volumes = snapshot->volumes;
     struct mount_points_scan_status cluster = snapshot->cluster;
     bool discovery_ok = volumes.eviction_safe && cluster.eviction_safe;
+    deviceMappingIncomplete = !snapshot->device_mapping_complete;
     DICTIONARY *previous_volume_ids = mountPointVolumeIds;
     DICTIONARY *uncertain_paths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
 
-    if (!discovery_ok || dictionary_entries(failed_volume_ids)) {
+    if (!discovery_ok || dictionary_entries(failed_volume_ids) || dictionary_entries(scan_uncertain_paths)) {
         if (!mountPointsDiscoveryWarningActive) {
             nd_log(
                 NDLS_COLLECTORS,
@@ -1261,13 +1318,33 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             dfe_done(value);
         }
 
-        // Keep old entries alongside discoveries made before a failure. Only entries belonging to a
-        // volume that failed individually are uncertain; an unknown enumeration boundary disables
-        // eviction globally for this refresh.
+        if (scan_uncertain_paths) {
+            dfe_start_read(scan_uncertain_paths, value)
+            {
+                if (!mount_points_contains(discovered_paths, value_dfe.name))
+                    dictionary_set(uncertain_paths, value_dfe.name, NULL, 0);
+            }
+            dfe_done(value);
+        }
+
+        // Keep old entries only when the scan cannot establish an enumeration boundary, or when the
+        // individual path/volume is known to be uncertain. Fresh scans must otherwise be allowed to
+        // age out entries that are no longer present.
         if (mountPoints) {
             dfe_start_read(mountPoints, value)
             {
-                dictionary_set(paths, value_dfe.name, NULL, 0);
+                bool retain = !discovery_ok;
+                const char *old_volume_id = previous_volume_ids
+                                                ? dictionary_get(previous_volume_ids, value_dfe.name)
+                                                : NULL;
+                if (!retain && old_volume_id && dictionary_get(failed_volume_ids, old_volume_id))
+                    retain = true;
+                if (!retain && scan_uncertain_paths && dictionary_get(scan_uncertain_paths, value_dfe.name))
+                    retain = true;
+                if (!retain && uncertainMountPoints && dictionary_get(uncertainMountPoints, value_dfe.name))
+                    retain = true;
+                if (retain)
+                    dictionary_set(paths, value_dfe.name, NULL, 0);
             }
             dfe_done(value);
         }
@@ -1288,11 +1365,13 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             dfe_done(value);
         }
 
+        // Carry a previous identity forward only for a path that survived into this registry,
+        // otherwise every path ever seen keeps a row for as long as the scans stay incomplete.
         void *volume_id;
         if (previous_volume_ids) {
             dfe_start_read(previous_volume_ids, volume_id)
             {
-                if (volume_id)
+                if (volume_id && mount_points_contains(paths, volume_id_dfe.name))
                     if (!dictionary_get(volume_ids, volume_id_dfe.name))
                         dictionary_set(volume_ids, volume_id_dfe.name, volume_id, strlen(volume_id) + 1);
             }
@@ -1305,17 +1384,20 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
         dictionary_destroy(previous_volume_ids);
         dictionary_destroy(uncertainMountPoints);
         dictionary_destroy(failed_volume_ids);
+        dictionary_destroy(scan_uncertain_paths);
         mountPoints = paths;
         deviceMountPaths = devices;
         excludedDeviceNames = excluded_devices;
         mountPointVolumeIds = volume_ids;
         uncertainMountPoints = uncertain_paths;
         mountPointsEvictionSafe = discovery_ok;
+        mountPointsPrimed = true;
         snapshot->paths = NULL;
         snapshot->devices = NULL;
         snapshot->excluded_devices = NULL;
         snapshot->volume_ids = NULL;
         snapshot->failed_volume_ids = NULL;
+        snapshot->uncertain_paths = NULL;
         mount_points_snapshot_destroy(snapshot);
         return;
     }
@@ -1331,17 +1413,20 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
     dictionary_destroy(previous_volume_ids);
     dictionary_destroy(uncertainMountPoints);
     dictionary_destroy(failed_volume_ids);
+    dictionary_destroy(scan_uncertain_paths);
     mountPoints = paths;
     deviceMountPaths = devices;
     excludedDeviceNames = excluded_devices;
     mountPointVolumeIds = volume_ids;
     uncertainMountPoints = uncertain_paths;
     mountPointsEvictionSafe = true;
+    mountPointsPrimed = true;
     snapshot->paths = NULL;
     snapshot->devices = NULL;
     snapshot->excluded_devices = NULL;
     snapshot->volume_ids = NULL;
     snapshot->failed_volume_ids = NULL;
+    snapshot->uncertain_paths = NULL;
     mount_points_snapshot_destroy(snapshot);
 }
 
@@ -1695,6 +1780,13 @@ static void logical_disk_collect_instance(
 {
     DICTIONARY *dict = logicalDisks;
 
+    // A bare device name duplicates the volume's own mount-path chart whenever the alias is known,
+    // and cannot be attributed at all before the registry is first published. Suppress it only while
+    // unprimed, or when this specific device is one the scan could not map.
+    if (!strpbrk(name, ":\\") &&
+        (!mountPointsPrimed || (deviceMappingIncomplete && !dictionary_get(deviceMountPaths, name))))
+        return;
+
     char resolved_name[ND_MOUNT_PATH_MAX];
     logical_disk_resolve_name(name, resolved_name, sizeof(resolved_name));
     if (logical_disk_is_excluded(resolved_name))
@@ -1997,7 +2089,9 @@ static struct mount_points_scan_status mount_points_unittest_scan_volumes_ok(
     DICTIONARY *devices,
     DICTIONARY *excluded_devices __maybe_unused,
     DICTIONARY *failed_volume_ids __maybe_unused,
-    DICTIONARY *volume_ids)
+    DICTIONARY *volume_ids,
+    DICTIONARY *uncertain_paths __maybe_unused,
+    bool *device_mapping_complete __maybe_unused)
 {
     mount_points_unittest_volume_scans++;
     dictionary_set(paths, "C:", NULL, 0);
@@ -2013,7 +2107,9 @@ static struct mount_points_scan_status mount_points_unittest_scan_volumes_fail(
     DICTIONARY *devices,
     DICTIONARY *excluded_devices __maybe_unused,
     DICTIONARY *failed_volume_ids,
-    DICTIONARY *volume_ids __maybe_unused)
+    DICTIONARY *volume_ids __maybe_unused,
+    DICTIONARY *uncertain_paths __maybe_unused,
+    bool *device_mapping_complete __maybe_unused)
 {
     mount_points_unittest_volume_scans++;
     // two paths, so a leaked partial snapshot also differs from the retained one by entry count
@@ -2029,7 +2125,9 @@ static struct mount_points_scan_status mount_points_unittest_scan_volumes_partia
     DICTIONARY *devices,
     DICTIONARY *excluded_devices __maybe_unused,
     DICTIONARY *failed_volume_ids,
-    DICTIONARY *volume_ids)
+    DICTIONARY *volume_ids,
+    DICTIONARY *uncertain_paths __maybe_unused,
+    bool *device_mapping_complete __maybe_unused)
 {
     mount_points_unittest_volume_scans++;
     dictionary_set(paths, "C:", NULL, 0);
@@ -2041,7 +2139,11 @@ static struct mount_points_scan_status mount_points_unittest_scan_volumes_partia
 }
 
 static struct mount_points_scan_status mount_points_unittest_scan_csv_ok(
-    DICTIONARY *paths, DICTIONARY *excluded_devices __maybe_unused, DICTIONARY *volume_ids __maybe_unused)
+    DICTIONARY *paths,
+    DICTIONARY *excluded_devices __maybe_unused,
+    DICTIONARY *volume_ids __maybe_unused,
+    DICTIONARY *uncertain_paths __maybe_unused,
+    bool *device_mapping_complete __maybe_unused)
 {
     mount_points_unittest_csv_scans++;
     dictionary_set(paths, "C:\\ClusterStorage\\Volume1", NULL, 0);
@@ -2049,7 +2151,11 @@ static struct mount_points_scan_status mount_points_unittest_scan_csv_ok(
 }
 
 static struct mount_points_scan_status mount_points_unittest_scan_csv_fail(
-    DICTIONARY *paths, DICTIONARY *excluded_devices __maybe_unused, DICTIONARY *volume_ids __maybe_unused)
+    DICTIONARY *paths,
+    DICTIONARY *excluded_devices __maybe_unused,
+    DICTIONARY *volume_ids __maybe_unused,
+    DICTIONARY *uncertain_paths __maybe_unused,
+    bool *device_mapping_complete __maybe_unused)
 {
     mount_points_unittest_csv_scans++;
     dictionary_set(paths, "C:\\ClusterStorage\\Volume2", NULL, 0);
@@ -2069,6 +2175,26 @@ static const struct mount_points_scan_ops mount_points_unittest_ops_volumes_fail
 static const struct mount_points_scan_ops mount_points_unittest_ops_volumes_partial_resolved = {
     .scan_volumes = mount_points_unittest_scan_volumes_partial_resolved,
     .scan_cluster_storage = mount_points_unittest_scan_csv_ok,
+};
+
+// An unresolvable ClusterStorage junction: the entry cannot be identified, but the enumeration
+// completed, so absence elsewhere is still provable and eviction must stay enabled.
+static struct mount_points_scan_status mount_points_unittest_scan_csv_junction(
+    DICTIONARY *paths,
+    DICTIONARY *excluded_devices __maybe_unused,
+    DICTIONARY *volume_ids __maybe_unused,
+    DICTIONARY *uncertain_paths,
+    bool *device_mapping_complete __maybe_unused)
+{
+    mount_points_unittest_csv_scans++;
+    dictionary_set(paths, "C:\\ClusterStorage\\Volume2", NULL, 0);
+    dictionary_set(uncertain_paths, "C:\\ClusterStorage\\Volume1", NULL, 0);
+    return (struct mount_points_scan_status){ .started = true, .complete = false, .eviction_safe = true };
+}
+
+static const struct mount_points_scan_ops mount_points_unittest_ops_csv_junction = {
+    .scan_volumes = mount_points_unittest_scan_volumes_ok,
+    .scan_cluster_storage = mount_points_unittest_scan_csv_junction,
 };
 
 static const struct mount_points_scan_ops mount_points_unittest_ops_csv_fail = {
@@ -2167,6 +2293,9 @@ static int mount_points_unittest_run(void)
     DICTIONARY *previous_excluded_devices = excludedDeviceNames;
     usec_t previous_refresh_ut = mountPointsRefreshedUT;
     bool previous_refresh_success = mountPointsEvictionSafe;
+    bool previous_primed = mountPointsPrimed;
+    bool previous_device_mapping_incomplete = deviceMappingIncomplete;
+    usec_t previous_cancel_log_ut = volume_space_last_cancel_log_ut;
     bool previous_warning_active = mountPointsDiscoveryWarningActive;
     usec_t now_ut = MOUNT_POINTS_REFRESH_EVERY_UT;
     int errors = 0;
@@ -2177,6 +2306,9 @@ static int mount_points_unittest_run(void)
     uncertainMountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     excludedDeviceNames = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     mountPointsRefreshedUT = 0;
+    mountPointsPrimed = false;
+    deviceMappingIncomplete = false;
+    volume_space_last_cancel_log_ut = 0;
     mount_points_unittest_volume_scans = 0;
     mount_points_unittest_csv_scans = 0;
 
@@ -2189,7 +2321,7 @@ static int mount_points_unittest_run(void)
     now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
     mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_volumes_fail);
     errors += mount_points_unittest_expect(
-        "a failed volume scan must retain the previous registry", dictionary_entries(mountPoints) == 4);
+        "a failed volume scan must retain the uncertain previous entry", dictionary_entries(mountPoints) == 3);
     errors += mount_points_unittest_expect(
         "a failed volume scan must retain partial discoveries", mount_points_unittest_has(mountPoints, "E:"));
     errors += mount_points_unittest_expect(
@@ -2209,11 +2341,14 @@ static int mount_points_unittest_run(void)
     errors += mount_points_unittest_expect(
         "a path resolved during a partial refresh must clear its uncertainty",
         !mount_points_unittest_has(uncertainMountPoints, "C:"));
+    errors += mount_points_unittest_expect(
+        "a certain path absent from a later scan must age out",
+        !mount_points_unittest_has(mountPoints, "E:") && !mount_points_unittest_has(mountPoints, "F:"));
 
     now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
     mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_csv_fail);
     errors += mount_points_unittest_expect(
-        "a failed ClusterStorage scan must retain the previous and partial registry",
+        "a ClusterStorage scan with no enumeration boundary must retain the previous registry",
         mount_points_unittest_has(mountPoints, "C:\\ClusterStorage\\Volume1"));
     errors += mount_points_unittest_expect(
         "a failed ClusterStorage scan must retain partial discoveries",
@@ -2241,6 +2376,17 @@ static int mount_points_unittest_run(void)
             mount_points_unittest_volume_scans == volume_scans_before_recovery + 1 &&
             mount_points_unittest_csv_scans == csv_scans_before_recovery + 1);
 
+    now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
+    mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_csv_junction);
+    errors += mount_points_unittest_expect(
+        "an unresolvable junction must not freeze eviction for other volumes", mountPointsEvictionSafe);
+    errors += mount_points_unittest_expect(
+        "an unresolvable junction must keep its own path uncertain",
+        mount_points_unittest_has(uncertainMountPoints, "C:\\ClusterStorage\\Volume1"));
+    errors += mount_points_unittest_expect(
+        "an unresolvable junction must still publish what the scan did discover",
+        mount_points_unittest_has(mountPoints, "C:\\ClusterStorage\\Volume2"));
+
     dictionary_destroy(mountPoints);
     dictionary_destroy(deviceMountPaths);
     dictionary_destroy(mountPointVolumeIds);
@@ -2253,6 +2399,9 @@ static int mount_points_unittest_run(void)
     excludedDeviceNames = previous_excluded_devices;
     mountPointsRefreshedUT = previous_refresh_ut;
     mountPointsEvictionSafe = previous_refresh_success;
+    mountPointsPrimed = previous_primed;
+    deviceMappingIncomplete = previous_device_mapping_incomplete;
+    volume_space_last_cancel_log_ut = previous_cancel_log_ut;
     mountPointsDiscoveryWarningActive = previous_warning_active;
     return errors;
 }
@@ -2844,5 +2993,8 @@ void do_PerflibStorage_cleanup(void)
     excluded_logical_disk_paths = NULL;
     storage_initialized = false;
     mountPointsEvictionSafe = false;
+    mountPointsPrimed = false;
+    deviceMappingIncomplete = false;
+    volume_space_last_cancel_log_ut = 0;
     mountPointsDiscoveryWarningActive = false;
 }

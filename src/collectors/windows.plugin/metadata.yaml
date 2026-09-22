@@ -401,7 +401,8 @@ modules:
         metrics_description: |
           Detailed statistics for all disk devices and volumes.
         method_description: |
-          It queries 'LogicalDisk' and 'PhysicalDisk' objects from Perflib in order to gather the metrics.
+          It uses Windows volume-space APIs for disk-space metrics, including folder-mounted and Cluster Shared
+          Volumes, and queries the 'LogicalDisk' and 'PhysicalDisk' objects from Perflib for the remaining metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
