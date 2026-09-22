@@ -1078,6 +1078,46 @@ async fn overview_invalid_selectors_are_clean_client_errors() {
 
 // ── The Functions view's window aggregate ────────────────────────────
 
+/// Run `body` with a progress state the test keeps; returns `(done, total)`.
+async fn progress_of(h: &OtelTracesHandler, body: serde_json::Value) -> (usize, usize) {
+    let progress = ProgressState::new();
+    let ctx = FunctionCallContext::new(
+        "tx-test".to_string(),
+        progress.clone(),
+        CancellationToken::new(),
+    );
+    let req: OtelTracesRequest = serde_json::from_value(body.clone()).unwrap();
+    h.on_call(ctx, req)
+        .await
+        .unwrap_or_else(|e| panic!("{body}: {e}"));
+    progress.load()
+}
+
+#[tokio::test]
+async fn every_mode_sets_its_progress_total_and_completes_it() {
+    // The corpus WAL resolves to two chunks at min_entries 4; every pass
+    // ticks once per source it walks. The Functions view walks the
+    // completion range for its page AND the grid's window for its
+    // aggregate.
+    let h = handler_with_search_corpus().await;
+    let windowed = |mode: &str, extra: serde_json::Value| {
+        let mut body = window_body();
+        merge(&mut body, extra);
+        as_mode(mode, body)
+    };
+    for (body, expected) in [
+        (json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}), (2, 2)),
+        (windowed("search", json!({})), (2, 2)),
+        (functions_body(2), (4, 4)),
+        (windowed("overview", json!({})), (2, 2)),
+        (windowed("slowest", json!({})), (2, 2)),
+        (windowed("attributes", json!({})), (2, 2)),
+        (windowed("attribute_values", json!({"key": "name"})), (2, 2)),
+    ] {
+        assert_eq!(progress_of(&h, body.clone()).await, expected, "{body}");
+    }
+}
+
 /// The Functions request for the corpus window: the protocol's own
 /// top-level fields, no mode selector.
 fn functions_body(last: usize) -> serde_json::Value {

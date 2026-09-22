@@ -1,4 +1,5 @@
 use super::*;
+use bridge::function::ProgressState;
 use crate::ledger::rpc::traces::fixtures::{
     install_sfst, install_wal, make_registries, otlp_req, test_file_id,
 };
@@ -47,8 +48,9 @@ fn source_ids(sources: &[TraceSource]) -> Vec<String> {
 async fn empty_registries_yield_empty_copies() {
     let supplier = make_supplier();
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     assert_eq!(sets.len(), 2);
     assert!(sets.iter().all(|s| s.is_empty()));
 }
@@ -59,8 +61,9 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
     let path = install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1);
     let TraceSource::Sfst(c) = &sources[0] else {
@@ -89,8 +92,9 @@ async fn copies_are_structurally_identical() {
     install_sfst(&supplier.registries, "default", 2, 2000, 2005).await;
 
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     let ids: Vec<Vec<String>> = sets.iter().map(|s| source_ids(s)).collect();
     assert_eq!(ids[0].len(), 2);
     assert_eq!(ids[0], ids[1]);
@@ -103,8 +107,9 @@ async fn window_pruning_is_file_granular() {
     install_sfst(&supplier.registries, "default", 2, 5000, 5005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 900..2000, 1, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 900..2000, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     let sources = sets.pop().unwrap();
     // Pin WHICH file survives, not just the count — an inverted pruning
     // predicate keeping the wrong file must fail here.
@@ -133,8 +138,9 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     .await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     let sources = sets.pop().unwrap();
     let ids = source_ids(&sources);
     assert_eq!(ids.len(), 2, "one chunk + one tail: {ids:?}");
@@ -174,8 +180,9 @@ async fn wal_below_min_entries_is_all_tail() {
     .await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1);
     let TraceSource::Tail(tail) = &sources[0] else {
@@ -211,8 +218,9 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
     }
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1, "only the sealed file survives");
     assert!(matches!(&sources[0], TraceSource::Sfst(c) if c.coverage.is_none()));
@@ -233,8 +241,9 @@ async fn cancelled_capture_with_a_wal_returns_empty_and_caches_nothing() {
     let cancel = CancellationToken::new();
     cancel.cancel();
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &cancel)
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &cancel, &ProgressState::new())
+        .await
+        .sets;
     assert!(sets.is_empty());
 }
 
@@ -247,8 +256,9 @@ async fn cancelled_capture_returns_empty() {
     let cancel = CancellationToken::new();
     cancel.cancel();
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &cancel)
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &cancel, &ProgressState::new())
+        .await
+        .sets;
     assert!(sets.is_empty());
 }
 
@@ -258,8 +268,9 @@ async fn capture_is_tenant_scoped() {
     install_sfst(&supplier.registries, "tenant-a", 1, 1000, 1005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("tenant-b"), 0..u32::MAX, 1, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("tenant-b"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     assert!(
         sets.pop().unwrap().is_empty(),
         "another tenant's files are invisible"
@@ -289,8 +300,9 @@ async fn source_ids_do_not_depend_on_the_directory() {
         )
         .await;
         let mut sets = supplier
-            .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
-            .await;
+            .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+            .await
+            .sets;
         captured.push(sets.pop().unwrap());
     }
     assert_ne!(sealed_paths[0], sealed_paths[1], "two distinct directories");
@@ -325,8 +337,9 @@ async fn chunk_ids_order_numerically() {
     install_wal(&supplier.registries, "default", 1, reqs).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
-        .await;
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .await
+        .sets;
     let ids = source_ids(&sets.pop().unwrap());
     let chunk_ids: Vec<&String> = ids.iter().filter(|id| id.contains("#chunk")).collect();
     assert!(chunk_ids.len() > 10, "more than ten chunks: {ids:?}");
@@ -334,4 +347,28 @@ async fn chunk_ids_order_numerically() {
     let mut sorted = ids.clone();
     sorted.sort();
     assert_eq!(sorted, ids, "id order is capture (chunk index) order");
+}
+
+#[tokio::test]
+async fn capture_sets_the_progress_total_to_the_distinct_ranges_sources() {
+    // Search's two roles share one range and only one of them ticks, so a
+    // range captured twice counts once; a distinct range counts on its own.
+    let supplier = make_supplier();
+    install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
+    install_sfst(&supplier.registries, "default", 2, 5000, 5005).await;
+    let progress = ProgressState::new();
+
+    let capture = supplier
+        .capture_ranges(
+            &TenantId::from("default"),
+            &[0..u32::MAX, 0..u32::MAX, 900..2000],
+            &CancellationToken::new(),
+            &progress,
+        )
+        .await;
+
+    let lens: Vec<usize> = capture.sets.iter().map(Vec::len).collect();
+    assert_eq!(lens, [2, 2, 1]);
+    assert!(capture.pins.is_empty(), "nothing remote was captured");
+    assert_eq!(progress.load(), (0, 3));
 }

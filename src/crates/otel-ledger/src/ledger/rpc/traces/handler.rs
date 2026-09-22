@@ -46,7 +46,7 @@ use super::adapter::{
     to_attributes_result, to_overview_result, to_overview_section, to_search_result,
     to_slowest_result, to_trace_result, validate_trace_bounds,
 };
-use super::sources::TracesSourceSupplier;
+use super::sources::{Capture, TracesSourceSupplier};
 use super::wire::{
     AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
     FunctionsTracesResponse, InfoResponse, OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW,
@@ -157,16 +157,13 @@ impl OtelTracesHandler {
         // A cancelled capture returns NO copies; the empty default flows
         // into the engine, which polls the same token up front and
         // reports the Cancelled partial — one consistent cancel path.
-        let sources = self
+        // The capture sets the progress total; the engine ticks the done
+        // counter once per source and the bridge's ticker renders it.
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, capture_range, 1, &ctx.cancellation)
-            .await
-            .pop()
-            .unwrap_or_default();
-
-        // The engine ticks its progress counter once per source; the
-        // bridge's ticker renders it. Set before handing the counter off.
-        ctx.progress.set_total(sources.len());
+            .capture(&tenant, capture_range, 1, &ctx.cancellation, &ctx.progress)
+            .await;
+        let sources = sets.pop().unwrap_or_default();
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
 
@@ -177,6 +174,7 @@ impl OtelTracesHandler {
         // the client's — framed as internal so a debugger looks at the
         // right side. A panicked task is a handler failure.
         let data = match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
             trace_by_id(sources, query, cancel, done)
         })
         .await
@@ -311,9 +309,12 @@ impl OtelTracesHandler {
         if let Some((_, aligned_after, aligned_before)) = aggregate_grid {
             ranges.push(aligned_after..aligned_before);
         }
-        let mut sets = self
+        // The capture sets the progress total: the completion range's
+        // sources plus the aggregate's (the window role shares the
+        // completion range and does not tick).
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture_ranges(&tenant, &ranges, &ctx.cancellation)
+            .capture_ranges(&tenant, &ranges, &ctx.cancellation, &ctx.progress)
             .await;
         let aggregate_sources = match aggregate_grid {
             Some(_) => sets.pop().unwrap_or_default(),
@@ -321,11 +322,6 @@ impl OtelTracesHandler {
         };
         let completion = sets.pop().unwrap_or_default();
         let window_sources = sets.pop().unwrap_or_default();
-
-        // Two passes, two source sets: the progress total is their sum
-        // (the logs handler's arithmetic for its own two passes).
-        ctx.progress
-            .set_total(completion.len() + aggregate_sources.len());
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
         let (aggregate_facets, aggregate_predicate) = aggregate
@@ -349,6 +345,7 @@ impl OtelTracesHandler {
         // runtime thread, so one blocking task covers the pair — and a
         // cancellation between them cannot pair mismatched snapshots.
         let joined = tokio::task::spawn_blocking(move || {
+            let _pins = pins;
             let page = search(
                 SearchSources {
                     window: window_sources,
@@ -484,8 +481,9 @@ impl OtelTracesHandler {
     }
 
     /// Common setup for the windowed fold modes (enumeration, slowest):
-    /// canonicalized window + one captured source set + the engine
-    /// window/progress plumbing. Callers pass their own params' window
+    /// canonicalized window + one captured source set (with its pins, for
+    /// the caller's blocking closure) + the engine window; the capture
+    /// sets the progress total. Callers pass their own params' window
     /// fields — every mode's window is self-contained on the wire.
     async fn enumeration_setup(
         &self,
@@ -493,7 +491,11 @@ impl OtelTracesHandler {
         after: u32,
         before: u32,
         tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<(Vec<sfsq::traces::TraceSource>, TimeWindow)> {
+    ) -> netdata_plugin_error::Result<(
+        Vec<sfsq::traces::TraceSource>,
+        Vec<file_cache::CachedFile>,
+        TimeWindow,
+    )> {
         let now_s = unix_now_s();
         let window: ResolvedWindow = resolve_window(after, before, now_s, None)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
@@ -501,14 +503,11 @@ impl OtelTracesHandler {
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
 
         let tenant = TenantId::resolve_query(tenant);
-        let sources = self
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, window.capture, 1, &ctx.cancellation)
-            .await
-            .pop()
-            .unwrap_or_default();
-        ctx.progress.set_total(sources.len());
-        Ok((sources, engine_window))
+            .capture(&tenant, window.capture, 1, &ctx.cancellation, &ctx.progress)
+            .await;
+        Ok((sets.pop().unwrap_or_default(), pins, engine_window))
     }
 
     /// The `attributes` mode: exact dictionary-backed key enumeration —
@@ -534,15 +533,18 @@ impl OtelTracesHandler {
             }
             query = query.max_keys(max);
         }
-        let (sources, window) = self
+        let (sources, pins, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
             .await?;
         query = query.window(window);
 
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
-        match tokio::task::spawn_blocking(move || attribute_names(sources, query, cancel, done))
-            .await
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            attribute_names(sources, query, cancel, done)
+        })
+        .await
         {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Attributes(to_attributes_result(data))),
             Ok(Err(e)) => Err(map_attribute_error(e)),
@@ -573,7 +575,7 @@ impl OtelTracesHandler {
             }
             query = query.max_values(max);
         }
-        let (sources, window) = self
+        let (sources, pins, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
             .await?;
         query = query.window(window);
@@ -581,8 +583,11 @@ impl OtelTracesHandler {
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
         let wire_key = params.key.clone();
-        match tokio::task::spawn_blocking(move || attribute_values(sources, query, cancel, done))
-            .await
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            attribute_values(sources, query, cancel, done)
+        })
+        .await
         {
             Ok(Ok(data)) => Ok(OtelTracesResponse::AttributeValues(
                 to_attribute_values_result(data, wire_key),
@@ -649,17 +654,26 @@ impl OtelTracesHandler {
 
         // Alignment can widen the window; prune files by the widened one.
         let tenant = TenantId::resolve_query(tenant);
-        let sources = self
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, aligned_after..aligned_before, 1, &ctx.cancellation)
-            .await
-            .pop()
-            .unwrap_or_default();
-        ctx.progress.set_total(sources.len());
+            .capture(
+                &tenant,
+                aligned_after..aligned_before,
+                1,
+                &ctx.cancellation,
+                &ctx.progress,
+            )
+            .await;
+        let sources = sets.pop().unwrap_or_default();
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
 
-        match tokio::task::spawn_blocking(move || overview(sources, query, cancel, done)).await {
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            overview(sources, query, cancel, done)
+        })
+        .await
+        {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Overview(Box::new(to_overview_result(
                 data, grid, scope,
             )))),
@@ -697,14 +711,19 @@ impl OtelTracesHandler {
             )));
         }
 
-        let (sources, window) = self
+        let (sources, pins, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
             .await?;
         let query = SlowestQuery::new(window).limit(limit);
 
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
-        match tokio::task::spawn_blocking(move || slowest(sources, query, cancel, done)).await {
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            slowest(sources, query, cancel, done)
+        })
+        .await
+        {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Slowest(Box::new(to_slowest_result(
                 data, limit,
             )))),

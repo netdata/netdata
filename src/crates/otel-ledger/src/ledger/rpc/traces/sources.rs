@@ -36,6 +36,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use bridge::function::ProgressState;
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use file_registry::{FileId, TenantId};
@@ -64,6 +65,15 @@ struct ResolvedChunk {
     range: wal::FrameRange,
     summary: sfst::Summary,
     bytes: Arc<Vec<u8>>,
+}
+
+/// One capture: a source vector per requested copy, and the download-cache
+/// pins that keep captured remote files in place. The pins MUST live until
+/// the engine has read the sources — move them into the blocking closure
+/// that runs it.
+pub(crate) struct Capture {
+    pub(crate) sets: Vec<Vec<TraceSource>>,
+    pub(crate) pins: Vec<file_cache::CachedFile>,
 }
 
 pub(crate) struct TracesSourceSupplier {
@@ -97,15 +107,19 @@ impl TracesSourceSupplier {
     ///
     /// The chunk-building phase can be the slow one, so it polls `cancel`
     /// between builds (the logs handler's discipline); a cancelled call
-    /// returns empty — the caller is about to discard the result anyway.
+    /// returns no copies — the caller is about to discard the result anyway.
+    ///
+    /// Sets the call's progress total (see
+    /// [`capture_ranges`](Self::capture_ranges)).
     pub(crate) async fn capture(
         &self,
         tenant: &TenantId,
         time_range: std::ops::Range<u32>,
         copies: usize,
         cancel: &CancellationToken,
-    ) -> Vec<Vec<TraceSource>> {
-        self.capture_ranges(tenant, &vec![time_range; copies], cancel)
+        progress: &ProgressState,
+    ) -> Capture {
+        self.capture_ranges(tenant, &vec![time_range; copies], cancel, progress)
             .await
     }
 
@@ -127,14 +141,25 @@ impl TracesSourceSupplier {
     /// observe one `valid_up_to` — the single-snapshot guarantee a
     /// second `capture` call would break — and each WAL resolves ONCE,
     /// its chunk bytes `Arc`-shared by every copy that selected it.
+    ///
+    /// Sets `progress`'s total to the sources of the DISTINCT ranges: every
+    /// mode walks each distinct range with exactly one engine pass that
+    /// ticks once per source (search's window role shares the completion
+    /// range and does not tick). Set after the WALs resolve, so the total
+    /// counts the chunks and tails the engine will see.
     pub(crate) async fn capture_ranges(
         &self,
         tenant: &TenantId,
         ranges: &[std::ops::Range<u32>],
         cancel: &CancellationToken,
-    ) -> Vec<Vec<TraceSource>> {
+        progress: &ProgressState,
+    ) -> Capture {
+        let cancelled = Capture {
+            sets: Vec::new(),
+            pins: Vec::new(),
+        };
         if ranges.is_empty() {
-            return Vec::new();
+            return cancelled;
         }
         // Distinct ranges only: copies over one range share its answer
         // (search's two roles always do), so the registry is scanned
@@ -183,10 +208,12 @@ impl TracesSourceSupplier {
         // the return blocks, so this is the last point cancellation can
         // save the copy-materialization work.
         if cancel.is_cancelled() {
-            return Vec::new();
+            return cancelled;
         }
 
-        per_copy
+        let mut total = 0;
+        let mut counted = vec![false; snapshots.len()];
+        let sets = per_copy
             .into_iter()
             .map(|at| {
                 let (sealed, wal_descs) = &snapshots[at];
@@ -223,9 +250,18 @@ impl TracesSourceSupplier {
                         }));
                     }
                 }
+                if !counted[at] {
+                    counted[at] = true;
+                    total += sources.len();
+                }
                 sources
             })
-            .collect()
+            .collect();
+        progress.set_total(total);
+        Capture {
+            sets,
+            pins: Vec::new(),
+        }
     }
 
     /// Resolve one active WAL into chunk images + the tail range, or
