@@ -1573,7 +1573,7 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
     // find_uuid_first_time() (which registers its own frame), and the final
     // cleanup -- masking unrelated faults that might land in the mmap range
     // and inflating nesting depth unnecessarily.
-    // reported after the frame below is gone rather than under it, for the reason the comment below already
+    // reported after the frame below is gone rather than under it, for the reason the comment above already
     // gives for scoping the frame tightly: an armed frame covers memory this code has stopped walking
     bool metric_list_overflows_file = false;
     size_t overflow_metric_offset = 0, overflow_list_size = 0, overflow_file_size = 0;

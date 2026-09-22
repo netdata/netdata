@@ -60,9 +60,12 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 // - May be called after dbengine_shutdown(), from inside dbengine_destroy(), and - when the engine was retained
 //   because something was still referenced - from whichever thread later releases the last of it. The sink and
 //   its data must stay callable until the embedder has released every handle it took from the engine (metric
-//   handles, collection and query handles, and anything holding a cache page) AND a dbengine_destroy() has run
-//   after that. The return value alone does not say when that is: it counts registry metrics only, so it can be
-//   0 while a cache the engine still points at holds referenced pages, and that cache can emit.
+//   handles, collection and query handles, anything holding a cache page, and the preload references
+//   dbengine_preload_release() drops) AND a dbengine_destroy() has run after that. The return value alone does
+//   not say when that is: it counts registry metrics only, so it can be 0 while a cache the engine still points
+//   at holds referenced pages, and that cache can emit. Simplest rule that is always right: an engine a
+//   dbengine_destroy() left retained can still call the sink, from a later verb on it or from a later destroy,
+//   so keep the sink alive until a destroy has left nothing retained.
 // - Never called after the engine is freed, and never for what the engine cannot survive: fatal() and
 //   internal_fatal() end the process through netdata's logger whatever this field holds.
 // - Does not receive every line the engine's work produces, for two separate reasons.
@@ -71,6 +74,12 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   the engine's file and decompression primitives, which sit below the level where an engine is in hand, the
 //   public verbs that reject a NULL storage instance - which is exactly when there is no engine to ask - and a
 //   failed protected read of a mapped journal, which libnetdata's own recovery reports.
+//
+//   A sink is never handed a pointer into memory the engine is reading under a fault guard, and no line it
+//   receives points into a mapped journal. That is what lets the engine emit while such a guard is armed: the
+//   guard recovers only a fault inside the mapping it registered, so a sink faulting on its own memory is not
+//   diverted into the engine's recovery path. A new emission site must keep it that way - format a value out of
+//   a mapping rather than passing a pointer into one.
 //
 //   And some lines are dropped before the sink is reached, by the gate the emitting site has always had: a rate
 //   limited site emits at most once per its own window, a debug site emits only when the matching debug flag is

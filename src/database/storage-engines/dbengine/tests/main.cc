@@ -63,8 +63,10 @@ int main(int argc, char **argv) {
     }
 
     // What still reaches netdata's logger rather than the suite's sink: the process-wide page-data layer, which has
-    // no engine to ask, and libnetdata's own recovery log for a failed protected read. The default limits drop
-    // repeated messages, which is right for a running agent and wrong for the few lines that get here.
+    // no engine to ask, and libnetdata's own recovery log for a failed protected read. This lifts the per-source
+    // flood limit those lines would otherwise hit, which is right for a running agent and wrong here. It does not
+    // lift the per-call-site limits: those live in each site's own ERROR_LIMIT and still drop repeats, on the
+    // sink's side of the layer as well as the logger's.
     nd_log_limits_unlimited();
 
     ::testing::InitGoogleTest(&argc, argv);

@@ -34,9 +34,11 @@ void dbengine_log_emit(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY pri
 // only on a line that is emitted move the window and reset the count. The ERROR_LIMIT is the site's own object -
 // the same one the no-sink arm hands to libnetdata - so a site that switches arms carries its state across.
 //
-// It differs from the original in the two ways it must (dbengine-log.h says why): no single-threaded-child lock
-// elision, and no priority pre-filter. The sleep is kept although every dbengine call site declares sleep_ut 0,
-// so a site that ever sets one behaves as it would have on the old path.
+// It differs from the original in three ways. Two are forced (dbengine-log.h says why): no single-threaded-child
+// lock elision, and no priority pre-filter. The third is deliberate: libnetdata captures errno only to annotate
+// the line and never writes it back, while this restores it on every path out, because the sink contract
+// promises a caller that its errno survives an engine verb. The sleep is kept although every dbengine call site
+// declares sleep_ut 0, so a site that ever sets one behaves as it would have on the old path.
 void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, ND_LOG_FIELD_PRIORITY priority,
                              const char *file, const char *function, unsigned long line,
                              const char *fmt, ...) {
