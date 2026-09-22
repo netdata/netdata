@@ -828,7 +828,9 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		}
 		if previous != nil &&
 			(previous.templateID != cs.templateID || needsChartRevival(previous, cs, ctx.collectMeta.LastSuccessSeq)) {
-			ctx.rememberRetired(chartID, previous)
+			// Caps may already have pruned staged dimensions and queued their removal.
+			// Reconciliation needs the complete committed definition to retain those removals.
+			ctx.rememberRetired(chartID, e.state.materialized.charts[chartID])
 			delete(ctx.materialized.charts, chartID)
 		}
 		matChart, chartCreated := ctx.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)

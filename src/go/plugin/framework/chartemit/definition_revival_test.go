@@ -230,9 +230,17 @@ groups:
 }
 
 func TestRevivedChartRetiresOnlyMissingDimensions(t *testing.T) {
-	for name, changedLabels := range map[string]bool{"same labels": false, "changed labels": true} {
+	for name, tc := range map[string]struct {
+		changedLabels bool
+		maxDims       int
+	}{
+		"same labels":               {},
+		"changed labels":            {changedLabels: true},
+		"cap removes old dimension": {maxDims: 2},
+		"cap and changed labels":    {maxDims: 2, changedLabels: true},
+	} {
 		t.Run(name, func(t *testing.T) {
-			template := `
+			template := fmt.Sprintf(`
 version: v1
 groups:
   - family: Latency
@@ -244,19 +252,27 @@ groups:
         units: seconds
         lifecycle:
           expire_after_cycles: 2
+          dimensions:
+            max_dims: %d
         dimensions:
           - selector: latency_*
             name_from_label: measure_field
-`
+`, tc.maxDims)
 			f := newRevivalFixture(t, template, 0)
 			observe := func(changed bool) func() {
 				return func() {
 					region := "east"
-					if changed && changedLabels {
+					if changed && tc.changedLabels {
 						region = "west"
 					}
 					fields := []metrix.MeasureFieldSpec{{Name: "min", Float: !changed}}
 					values := []metrix.SampleValue{10}
+					if changed && tc.maxDims > 0 {
+						fields = append(fields, metrix.MeasureFieldSpec{
+							Name: "mean",
+						})
+						values = append(values, 15)
+					}
 					if !changed {
 						fields = append(fields, metrix.MeasureFieldSpec{
 							Name: "max",
@@ -282,7 +298,11 @@ groups:
 			attempt := f.collect(t, observe(true))
 			charts, dims := revivalDefinitions(attempt.Plan())
 			require.Len(t, charts, 1)
-			require.Len(t, dims, 1)
+			wantDims := 1
+			if tc.maxDims > 0 {
+				wantDims = 2
+			}
+			require.Len(t, dims, wantDims)
 			assert.False(t, dims[0].Float, "recreation clears the previous float mode")
 			var removed []string
 			for _, action := range attempt.Plan().Actions {
@@ -297,7 +317,7 @@ groups:
 			attempt.Abort()
 			wire := f.publish(t, f.prepare(t))
 			region := "east"
-			if changedLabels {
+			if tc.changedLabels {
 				region = "west"
 			}
 			assert.Contains(t, wire, "CLABEL 'region' '"+region+"'")
