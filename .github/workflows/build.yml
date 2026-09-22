@@ -1076,7 +1076,7 @@ jobs:
       - artifact-verification-dist
       - artifact-verification-static
     steps:
-      - name: Install RClone
+      - name: Install Rclone
         id: install-rclone
         run: |
           sudo apt-get update || exit 1
@@ -1098,8 +1098,8 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          rclone copy --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/
-          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/
+          rclone copy --verbose --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/ || exit 1
+          rclone sync --verbose --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/ || exit 1
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
