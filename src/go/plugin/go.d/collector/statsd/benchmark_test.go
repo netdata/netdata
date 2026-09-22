@@ -202,6 +202,75 @@ func BenchmarkTCPReceive(b *testing.B) {
 	}
 }
 
+// datagrams packs records into LF-joined UDP payloads of perDatagram records each.
+func datagrams(lines []string, perDatagram int) [][]byte {
+	var out [][]byte
+	for len(lines) > 0 {
+		n := min(perDatagram, len(lines))
+		out = append(out, []byte(strings.Join(lines[:n], "\n")))
+		lines = lines[n:]
+	}
+	return out
+}
+
+// UDP framing and ingestion without the socket, for single-record and batched
+// datagrams of admitted identities. ns/op and allocations are per record.
+func BenchmarkDatagram(b *testing.B) {
+	for _, perDatagram := range []int{1, 16} {
+		b.Run(fmt.Sprint(perDatagram), func(b *testing.B) {
+			f := newCoreFixture(b, 1000, 5*time.Minute)
+			s := &server{
+				receiver: f.c.receiver,
+				stats:    f.c.diagnostics,
+				now:      f.c.now,
+			}
+			// 960 identities divide evenly into datagrams and the five-type mix.
+			payloads := datagrams(mixedRecords(960), perDatagram)
+			for _, p := range payloads {
+				s.datagram(p)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i += perDatagram {
+				s.datagram(payloads[(i/perDatagram)%len(payloads)])
+			}
+			b.StopTimer()
+			require.Empty(b, f.counts().rejected)
+		})
+	}
+}
+
+// Complete UDP path: socket read, datagram framing, parsing, admission and
+// aggregation, 16 records per datagram. Sends pause every window datagrams until
+// the receiver has admitted them, so loopback buffers never drop input.
+// Allocation counts include the server goroutines; ns/op is per record.
+func BenchmarkUDPReceive(b *testing.B) {
+	const perDatagram, window = 16, 128
+	f := startRuntime(b, func(c *Collector) { c.MetricIdleTimeout = 0 })
+	payloads := datagrams(mixedRecords(960), perDatagram)
+	conn, err := net.Dial(protocolUDP, f.addr)
+	require.NoError(b, err)
+	b.Cleanup(func() { _ = conn.Close() })
+	b.ReportAllocs()
+	b.ResetTimer()
+	sent := 0
+	deadline := time.Now().Add(time.Minute)
+	for d := 0; sent < b.N; d++ {
+		if _, err := conn.Write(payloads[d%len(payloads)]); err != nil {
+			b.Fatal(err)
+		}
+		sent += perDatagram
+		if d%window == window-1 || sent >= b.N {
+			for f.counts().accepted < uint64(sent) {
+				if time.Now().After(deadline) {
+					b.Fatalf("accepted %d of %d", f.counts().accepted, sent)
+				}
+				time.Sleep(50 * time.Microsecond)
+			}
+		}
+	}
+}
+
 // Normal mixed publication with profile entries active and one replace owner.
 func BenchmarkMixedPublicationProfiles(b *testing.B) {
 	f := newProfileFixture(b, testProfiles, "pools", "shadow", "app", "meta")
