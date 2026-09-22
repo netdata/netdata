@@ -86,10 +86,10 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   The engine does call the sink while such a guard is armed. The guard recovers a fault only at an address
 //   inside the range it registered, so two rules keep a sink out of that recovery, and a new emission site or a
 //   new guarded read must keep both: no line the sink receives points into a mapped journal - a site formats a
-//   value out of a mapping rather than passing a pointer into one - and no guard stays armed over a range the
-//   engine has released, because the release can unmap the journal and whatever later occupies that range could
-//   be the sink's own memory. With both held, a sink that faults on its own memory faults exactly as it would
-//   with no guard armed; it is never diverted into the engine's recovery path.
+//   value out of a mapping rather than passing a pointer into one - and the sink is never called while a guard is
+//   armed over a range the engine has released, because the release can unmap the journal and whatever later
+//   occupies that range could be the sink's own memory. With both held, a sink that faults on its own memory
+//   faults exactly as it would with no guard armed; it is never diverted into the engine's recovery path.
 //
 //   And some lines are dropped before the sink is reached, by the gate the emitting site has always had: a rate
 //   limited site emits at most once per its own window, a debug site emits only when the matching debug flag is
