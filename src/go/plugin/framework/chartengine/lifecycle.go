@@ -15,6 +15,7 @@ type materializedState struct {
 type materializedChartState struct {
 	templateID         string
 	meta               program.ChartMeta
+	emittedMeta        program.ChartMeta
 	lifecycle          program.LifecyclePolicy
 	lastSeenSuccessSeq uint64
 	dimensions         map[string]*materializedDimensionState
@@ -75,6 +76,7 @@ func (c *materializedChartState) clone() *materializedChartState {
 	out := &materializedChartState{
 		templateID:         c.templateID,
 		meta:               c.meta,
+		emittedMeta:        c.emittedMeta,
 		lifecycle:          c.lifecycle,
 		lastSeenSuccessSeq: c.lastSeenSuccessSeq,
 		presentation:       c.presentation,
@@ -127,21 +129,20 @@ func (s *materializedState) ensureChart(
 	return chart, true
 }
 
-func (c *materializedChartState) ensureDimension(name string, state dimensionState) (*materializedDimensionState, bool) {
+func (c *materializedChartState) ensureDimension(
+	name string,
+	state dimensionState,
+) (*materializedDimensionState, bool) {
 	algorithm := state.algorithm.programAlgorithm()
 	dim, ok := c.dimensions[name]
 	if ok {
 		if dim.static != state.static || dim.order != state.order || dim.sortKey != state.sortKey {
 			c.orderedDimsDirty = true
 		}
-		dim.hidden = state.hidden
-		dim.float = state.float
+		// Creation settings describe the published dimension until it is recreated.
 		dim.static = state.static
 		dim.order = state.order
 		dim.sortKey = state.sortKey
-		dim.algorithm = algorithm
-		dim.multiplier = state.multiplier
-		dim.divisor = state.divisor
 		return dim, false
 	}
 	dim = &materializedDimensionState{

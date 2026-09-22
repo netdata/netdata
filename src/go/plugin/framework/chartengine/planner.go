@@ -325,6 +325,7 @@ func (e *Engine) buildPlan(reader metrix.Reader, retired map[string]*materialize
 	}
 	phaseStartedAt = time.Now()
 	ctx.reconcileRetirements()
+	staged.recordEmittedChartDefinitions(out.Actions)
 	sortInferredDimensions(out.InferredDimensions)
 	sample.phaseSortSeconds = time.Since(phaseStartedAt).Seconds()
 
@@ -821,8 +822,16 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 
 	for _, chartID := range chartIDs {
 		cs := ctx.chartsByID[chartID]
-		if previous := ctx.materialized.charts[chartID]; previous != nil && previous.templateID != cs.templateID {
-			ctx.rememberRetired(chartID, previous)
+		previous := ctx.materialized.charts[chartID]
+		dimensionExpiry := cs.lifecycle.Dimensions.ExpireAfterCycles
+		if previous != nil {
+			dimensionExpiry = previous.lifecycle.Dimensions.ExpireAfterCycles
+		}
+		if previous != nil &&
+			(previous.templateID != cs.templateID || needsChartRevival(previous, cs, ctx.collectMeta.LastSuccessSeq)) {
+			// Caps may already have pruned staged dimensions and queued their removal.
+			// Reconciliation needs the complete committed definition to retain those removals.
+			ctx.rememberRetired(chartID, e.state.materialized.charts[chartID])
 			delete(ctx.materialized.charts, chartID)
 		}
 		matChart, chartCreated := ctx.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
@@ -854,7 +863,17 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				matChart.replaceLabelMembership(membership)
 			}
 		} else if chartCreated {
-			return fmt.Errorf("chartengine: new chart %q unexpectedly matched prior label membership", cs.chartID)
+			if previous == nil || previous.presentation == nil {
+				return fmt.Errorf("chartengine: new chart %q unexpectedly matched prior label membership", cs.chartID)
+			}
+			// Revival can recreate a definition without changing its exact series membership.
+			matChart.replaceLabels(previous.presentation.labelValues, previous.presentation.labelMembership)
+			ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
+				ChartTemplateID: cs.templateID,
+				ChartID:         cs.chartID,
+				Meta:            cs.meta,
+				Labels:          maps.Clone(previous.presentation.labelValues),
+			})
 		}
 		matChart.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
 
@@ -863,6 +882,11 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			entry := cs.entries[name]
 			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
 				continue
+			}
+			if dim := matChart.dimensions[name]; dim != nil &&
+				expiredBeforeCycle(dim.lastSeenSuccessSeq, ctx.collectMeta.LastSuccessSeq, dimensionExpiry) &&
+				dimensionDefinitionChanged(dim, entry.dimensionState) {
+				matChart.removeDimension(name)
 			}
 			matDim, dimCreated := matChart.ensureDimension(name, entry.dimensionState)
 			if dimCreated {
